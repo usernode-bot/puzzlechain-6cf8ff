@@ -1,3 +1,7 @@
 {
-  "secrets": []
+  "name": "PuzzleChain",
+  "secrets": [],
+  "tests": [
+    { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" }
+  ]
 }

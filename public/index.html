@@ -71,10 +71,41 @@
 </head>
 <body>
   <div id="root"></div>
-  <!-- Compile app.jsx as plain classic-script JSX. data-presets="react"
-       applies the JSX transform; data-type="script" forces classic-script
-       mode so Babel Standalone doesn't treat the external src file as an ES
-       module (which throws "Cannot use import statement outside a module"). -->
-  <script type="text/babel" data-type="script" data-presets="react" src="/app.jsx"></script>
+  <!-- Deterministic JSX bootstrap. Babel Standalone's automatic
+       text/babel script-tag scanner is unreliable for external `src`
+       files (it silently skipped app.jsx in staging — React never
+       mounted). Instead we fetch the source, compile it with the React
+       preset in classic-script mode (React.createElement runtime, no ES
+       module imports), and inject the compiled code as a plain script so
+       it runs in global scope with React/ReactDOM available as globals.
+       Any failure surfaces loudly in the console. -->
+  <script>
+    (function () {
+      function fail(stage, err) {
+        console.error('[PuzzleChain] failed to ' + stage + ':', err && (err.stack || err.message || err));
+        var root = document.getElementById('root');
+        if (root && !root.firstChild) {
+          root.textContent = 'Failed to load PuzzleChain. See console for details.';
+        }
+      }
+      if (typeof Babel === 'undefined') { fail('load Babel (CDN blocked?)', new Error('Babel undefined')); return; }
+      if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') { fail('load React (CDN blocked?)', new Error('React/ReactDOM undefined')); return; }
+      fetch('/app.jsx')
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status + ' fetching /app.jsx');
+          return r.text();
+        })
+        .then(function (src) {
+          var compiled;
+          try {
+            compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script' }).code;
+          } catch (e) { fail('compile app.jsx', e); return; }
+          var s = document.createElement('script');
+          s.textContent = compiled + '\n//# sourceURL=app.compiled.js';
+          document.body.appendChild(s);
+        })
+        .catch(function (e) { fail('fetch app.jsx', e); });
+    })();
+  </script>
 </body>
 </html>

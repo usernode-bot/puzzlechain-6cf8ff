@@ -1,18 +1,64 @@
 const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
+const IS_STAGING = process.env.USERNODE_ENV === 'staging';
 
-// Paths that stay open without authentication. Add a path here (and add it
-// with `app.get`/`app.post` below) if you deliberately want it public.
-// Everything else requires a valid platform-issued JWT.
-const PUBLIC_API_PATHS = new Set(['/health']);
-// Public path prefixes that bypass the JWT gate. `/explorer-api/*` is a
-// transparent proxy to the public block explorer.
-const PUBLIC_PREFIXES = ['/explorer-api/'];
+// Single shared connection pool to this app's Postgres DB.
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Known game ids — kept in sync with the GAMES registry in public/app.jsx.
+// Used to validate :gameId on the daily-attempt routes.
+const GAME_IDS = new Set(['sudoku', 'wordhunt']);
+
+// ---- Schema bootstrap (idempotent, runs on boot) -------------------------
+// daily_attempts is PUBLIC (the platform default): it holds gameplay
+// results, not sensitive personal data, and a future leaderboard would
+// want them visible. One row per (user, game, UTC day) — the UNIQUE
+// constraint is what enforces "exactly one attempt per day". The day
+// resets implicitly: a new UTC date yields a new attempt_date, so
+// yesterday's rows simply stop matching today's lookups.
+async function migrate() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_attempts (
+      id           SERIAL PRIMARY KEY,
+      user_id      TEXT NOT NULL,
+      username     TEXT,
+      game_id      TEXT NOT NULL,
+      attempt_date DATE NOT NULL,
+      score        INTEGER,
+      steps        INTEGER,
+      time_secs    INTEGER,
+      started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at  TIMESTAMPTZ,
+      UNIQUE (user_id, game_id, attempt_date)
+    )
+  `);
+}
+
+// Next 00:00:00 UTC after the given instant.
+function nextResetUtc(from = new Date()) {
+  const d = new Date(Date.UTC(
+    from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + 1, 0, 0, 0, 0
+  ));
+  return d.toISOString();
+}
+
+// Shape a DB row for the client.
+function shapeAttempt(row) {
+  return {
+    gameId: row.game_id,
+    score: row.score,
+    steps: row.steps,
+    timeSecs: row.time_secs,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+  };
+}
 
 app.use(express.json());
 
@@ -20,6 +66,9 @@ app.use(express.json());
 // anything not explicitly marked public. The iframe adds `?token=…`
 // on load; the frontend script forwards the token via `x-usernode-token`
 // on subsequent fetches.
+const PUBLIC_API_PATHS = new Set(['/health']);
+const PUBLIC_PREFIXES = ['/explorer-api/'];
+
 app.use((req, res, next) => {
   const token = req.query.token || req.headers['x-usernode-token'];
   if (token && JWT_SECRET) {
@@ -39,6 +88,118 @@ app.use((req, res, next) => {
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
+// ---- Daily attempts API --------------------------------------------------
+
+// Current UTC-day state for the signed-in user: which games are locked
+// today (with their results), plus server time + next reset so the client
+// can drive a clock-skew-proof countdown.
+app.get('/api/daily', async (req, res) => {
+  try {
+    // Staging-only demo seed: gives the current viewer a finished attempt
+    // for today so they immediately see the locked screen + countdown.
+    // Idempotent, obviously fake (round score), strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'locked') {
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+         VALUES ($1, $2, 'sudoku', (now() AT TIME ZONE 'utc')::date, 980, 17, 132, now())
+         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+    }
+
+    const { rows } = await pool.query(
+      `SELECT * FROM daily_attempts
+       WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
+      [req.user.id]
+    );
+    const attempts = {};
+    for (const row of rows) attempts[row.game_id] = shapeAttempt(row);
+
+    res.json({
+      // Surface the signed-in account so the UI can confirm login +
+      // that persistent data is active. Always present here (route is
+      // auth-gated), but the client still handles a null user gracefully.
+      user: {
+        username: req.user.username || null,
+        id: req.user.id,
+        usernodePubkey: req.user.usernode_pubkey || null,
+      },
+      serverNowUtc: new Date().toISOString(),
+      nextResetUtc: nextResetUtc(),
+      attempts,
+    });
+  } catch (err) {
+    console.error('[daily] GET failed:', err.message);
+    res.status(500).json({ error: 'Failed to load daily state' });
+  }
+});
+
+// Claim today's single attempt for a game. First call wins (creates the
+// row); any later call the same UTC day hits the unique constraint and is
+// rejected as locked.
+app.post('/api/daily/:gameId/start', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date)
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date)
+       ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
+       RETURNING *`,
+      [req.user.id, req.user.username || null, gameId]
+    );
+    if (rows.length === 0) {
+      // Already used today — return the existing attempt so the client can
+      // render the locked screen with its stored result.
+      const existing = await pool.query(
+        `SELECT * FROM daily_attempts
+         WHERE user_id = $1 AND game_id = $2
+           AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
+        [req.user.id, gameId]
+      );
+      return res.status(409).json({
+        error: 'Already played today',
+        locked: true,
+        nextResetUtc: nextResetUtc(),
+        attempt: existing.rows[0] ? shapeAttempt(existing.rows[0]) : null,
+      });
+    }
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc() });
+  } catch (err) {
+    console.error('[daily] start failed:', err.message);
+    res.status(500).json({ error: 'Failed to start attempt' });
+  }
+});
+
+// Record the result of today's attempt (score/steps/time). Only touches
+// today's already-claimed row.
+app.post('/api/daily/:gameId/finish', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const steps = Number.isFinite(req.body.steps) ? Math.round(req.body.steps) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE daily_attempts
+         SET score = $3, steps = $4, time_secs = $5, finished_at = now()
+       WHERE user_id = $1 AND game_id = $2
+         AND attempt_date = (now() AT TIME ZONE 'utc')::date
+       RETURNING *`,
+      [req.user.id, gameId, score, steps, timeSecs]
+    );
+    if (rows.length === 0) {
+      // No claimed attempt today (client out of sync) — surface so it resyncs.
+      return res.status(409).json({ error: 'No active attempt to finish' });
+    }
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc() });
+  } catch (err) {
+    console.error('[daily] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to record result' });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated, otherwise an "open in Usernode"
@@ -57,4 +218,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(port, () => console.log(`Listening on :${port}`));
+migrate()
+  .then(() => app.listen(port, () => console.log(`Listening on :${port}`)))
+  .catch((err) => {
+    console.error('Migration failed:', err);
+    process.exit(1);
+  });

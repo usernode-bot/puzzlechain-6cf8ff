@@ -75,14 +75,55 @@ purpose.
   - calls `onWin(score, steps, secs)` **exactly once** when solved;
   then add its CSS to `css` and append
   `{ id, name, icon, desc, tag, tagColor, component }` to the `GAMES`
-  array. The root `App` auto-wires the lobby card, the one-play lock,
-  the streak bonus (`floor(score * 0.1 * streak)`), and the win
+  array. The root `App` auto-wires the lobby card, the daily one-play
+  lock, the streak bonus (`floor(score * 0.1 * streak)`), and the win
   overlay — the game component never touches that machinery.
-- **No persistence / no database.** `server.js` is a thin Express
-  static server + JWT auth gate (`/health` and `/explorer-api/*` are
-  public); there is **no Postgres and no `/api/*` endpoints**. Score,
-  streak, and the `completed` (one-play) map are **in-memory React
-  state** and reset on reload — so "one play per day" is currently
-  per-session. Don't assume a DB exists; adding real persistence or a
-  leaderboard means introducing `pg` + a schema + (per platform
-  rules) staging seed data, and is deliberately out of scope today.
+  - **Also add the new `id` to `GAME_IDS` in `server.js`.** The daily
+    routes validate `:gameId` against that set and reject unknown ids
+    with `400`, so a game that's in `GAMES` but not in `GAME_IDS`
+    silently fails to start. Keep the two in sync.
+
+## Persistence — Postgres-backed daily attempts
+
+As of the daily-lock feature, this app **has a database**. Don't
+describe it as static-only.
+
+- **`server.js`** is still the Express + JWT auth gate, but now also
+  opens a single `pg.Pool` from `DATABASE_URL` and runs an idempotent
+  `CREATE TABLE IF NOT EXISTS` migration on boot before listening.
+- **Table `daily_attempts`** (PUBLIC — gameplay results, no sensitive
+  data) stores one row per `(user_id, game_id, attempt_date)` with a
+  `UNIQUE` constraint on that triple. `attempt_date` is the UTC day,
+  computed server-side as `(now() AT TIME ZONE 'utc')::date`. The day
+  **resets implicitly at midnight UTC**: a new date yields rows that no
+  longer match today's lookups — there is no cron/cleanup. `score`,
+  `steps`, `time_secs` are nullable (null between start and finish).
+- **Auth-gated API** (all under `/api/`, so the existing deny-by-default
+  middleware requires `req.user` — do **not** whitelist these):
+  - `GET /api/daily` — today's state for the signed-in user: `user`
+    (`{ username, id, usernodePubkey }`), `serverNowUtc`,
+    `nextResetUtc` (next 00:00 UTC), and `attempts` keyed by `game_id`.
+    A present key = that game is locked today.
+  - `POST /api/daily/:gameId/start` — **consume-on-start**: claims the
+    day's single attempt via `INSERT … ON CONFLICT DO NOTHING
+    RETURNING *`. Empty result ⇒ already used ⇒ `409` (locked) with the
+    existing row.
+  - `POST /api/daily/:gameId/finish` — records `score/steps/time_secs`
+    on today's already-claimed row.
+- **Identity comes from `req.user`** (the iframe JWT), never the client.
+  Progress is keyed to the Usernode account and persists across reloads
+  and devices. The nav's `AccountChip` reads `user` from `/api/daily`
+  to show the signed-in username + "Progress saved" (or a "Signed out"
+  state if the call 401s / the DB is unreachable).
+- **Frontend** hydrates this on mount (`loadDaily`), claims on launch,
+  persists on win, and renders a `LockedScreen` with an HH:MM:SS
+  countdown driven by a **server-time offset** (`serverNowUtc −
+  Date.now()`) so a wrong device clock can't unlock early.
+- **Staging seed:** `GET /api/daily?demo=locked` (gated on
+  `IS_STAGING`) upserts one finished `sudoku` attempt for the current
+  viewer so the locked screen is demonstrable on a fresh staging DB.
+  Strict no-op in production.
+- The nav **`Score`** is rehydrated from today's finished attempts.
+  Cross-day score history, a persistent multi-day streak, and a
+  leaderboard remain **out of scope** (the public table leaves room for
+  them); the displayed `streak` is still session-derived.

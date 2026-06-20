@@ -76,6 +76,50 @@ body {
 .nav-stat .value.score { color: ${C.gold}; }
 .nav-stat .value.streak { color: ${C.emerald}; }
 
+/* ---- Account indicator ---- */
+.nav-right { display: flex; align-items: center; gap: 1.25rem; }
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem 0.35rem 0.45rem;
+  cursor: default;
+}
+.account-chip .avatar {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: ${C.accent};
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.account-chip .who { display: flex; flex-direction: column; line-height: 1.1; }
+.account-chip .uname { font-size: 0.82rem; font-weight: 600; }
+.account-chip .status { font-size: 0.6rem; color: ${C.emerald}; letter-spacing: 0.02em; }
+.account-chip .dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%; flex: 0 0 auto;
+}
+.account-chip.loading .dot { background: ${C.muted}; }
+.account-chip.loading { color: ${C.muted}; }
+.account-chip.loading .who { font-size: 0.82rem; }
+.account-chip.off { border-color: ${C.rose}; }
+.account-chip.off .dot { background: ${C.rose}; }
+.account-chip.off .who { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; }
+
+@media (max-width: 560px) {
+  .account-chip .who { display: none; }
+  .account-chip { padding: 0.35rem; }
+  .nav-right { gap: 0.8rem; }
+}
+
 /* ---- Lobby ---- */
 .lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem 1.25rem; width: 100%; }
 .lobby-head { margin-bottom: 1.5rem; }
@@ -299,6 +343,66 @@ body {
 }
 .primary-btn:hover { background: #2f6fe0; }
 
+/* ---- Locked screen ---- */
+.locked-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 18px;
+  padding: 2rem 1.75rem;
+  text-align: center;
+  max-width: 420px;
+  margin: 1rem auto 0;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+}
+.locked-card .lock-icon { font-size: 2.6rem; }
+.locked-card h2 { font-size: 1.4rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
+.locked-card .sub { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1.25rem; }
+.countdown-block {
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 14px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+.countdown-block .clabel {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: ${C.muted};
+  margin-bottom: 0.35rem;
+}
+.countdown-block .ctime {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 2rem;
+  color: ${C.gold};
+  letter-spacing: 0.04em;
+}
+.locked-result {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  border-top: 1px solid ${C.border};
+  padding-top: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+.locked-result .score-row { display: flex; justify-content: space-between; padding: 0.18rem 0; }
+.locked-result .k { color: ${C.muted}; }
+.locked-result .v { color: ${C.gold}; }
+
+/* ---- Locked lobby card ---- */
+.card.locked { cursor: default; }
+.card.locked:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
+.card-lock {
+  margin-top: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: ${C.gold};
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 /* ---- Word Hunt ---- */
 .wordsearch {
   display: grid;
@@ -378,6 +482,58 @@ function useTimer(running) {
   }, [running]);
   const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return { secs, fmt: fmt(secs) };
+}
+
+/* ============================================================
+   Platform API helpers — forward the iframe JWT
+   ============================================================ */
+// The shell injects ?token=… on the initial iframe load; capture it once
+// and forward it on every API call via the x-usernode-token header.
+const USERNODE_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(USERNODE_TOKEN ? { 'x-usernode-token': USERNODE_TOKEN } : {}),
+      ...(opts.headers || {}),
+    },
+  });
+  let body = null;
+  try { body = await res.json(); } catch {}
+  return { ok: res.ok, status: res.status, body };
+}
+
+// HH:MM:SS for a millisecond remainder.
+function fmtCountdown(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = t % 60;
+  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+}
+
+// Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)
+// so a wrong device clock can't unlock early. Calls onExpire once at zero.
+function useCountdown(nextResetUtc, offset, onExpire) {
+  const [now, setNow] = useState(() => Date.now() + offset);
+  const fired = useRef(false);
+  useEffect(() => {
+    fired.current = false;
+    setNow(Date.now() + offset);
+    const id = setInterval(() => setNow(Date.now() + offset), 1000);
+    return () => clearInterval(id);
+  }, [nextResetUtc, offset]);
+  const target = nextResetUtc ? new Date(nextResetUtc).getTime() : 0;
+  const remaining = target - now;
+  useEffect(() => {
+    if (nextResetUtc && remaining <= 0 && !fired.current) {
+      fired.current = true;
+      onExpire && onExpire();
+    }
+  }, [remaining, nextResetUtc]);
+  return fmtCountdown(remaining);
 }
 
 /* ============================================================
@@ -530,6 +686,71 @@ function SudokuGame({ onWin, onStepChange }) {
       <div className="numpad" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
         <button className="numkey erase" onClick={() => place(0)}>Erase</button>
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Account indicator — confirms the signed-in Usernode account so the
+   player knows their progress is being saved (not just session state).
+   ============================================================ */
+function AccountChip({ loading, authOk, user }) {
+  if (loading) {
+    return (
+      <div className="account-chip loading" title="Checking your account…">
+        <span className="dot" /> <span className="who">Connecting…</span>
+      </div>
+    );
+  }
+  if (!authOk || !user) {
+    return (
+      <div className="account-chip off" title="Not signed in — progress won't be saved. Open this app inside Usernode.">
+        <span className="dot" /> <span className="who">Signed out</span>
+      </div>
+    );
+  }
+  const name = user.username || 'Linked account';
+  const initial = (user.username || '?').charAt(0).toUpperCase();
+  return (
+    <div className="account-chip on" title={`Signed in as ${name} — your daily progress is saved to your account.`}>
+      <span className="avatar mono">{initial}</span>
+      <span className="who">
+        <span className="uname">{name}</span>
+        <span className="status">● Progress saved</span>
+      </span>
+    </div>
+  );
+}
+
+/* ============================================================
+   Locked screen — shown when today's attempt is already used
+   ============================================================ */
+function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) {
+  const countdown = useCountdown(nextResetUtc, offset, onReset);
+  const hasResult = attempt && attempt.score != null;
+  const fmtTime = s =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  return (
+    <div className="locked-card">
+      <div className="lock-icon">🔒</div>
+      <h2>You've played today</h2>
+      <div className="sub">{game.name} — one attempt per day</div>
+      <div className="countdown-block">
+        <div className="clabel">Next puzzle in</div>
+        <div className="ctime mono">{countdown}</div>
+      </div>
+      {hasResult && (
+        <div className="locked-result">
+          <div className="score-row"><span className="k">Score</span><span className="v">+{attempt.score}</span></div>
+          {attempt.steps != null && (
+            <div className="score-row"><span className="k">Steps</span><span className="v">{attempt.steps}</span></div>
+          )}
+          {attempt.timeSecs != null && (
+            <div className="score-row"><span className="k">Time</span><span className="v">{fmtTime(attempt.timeSecs)}</span></div>
+          )}
+        </div>
+      )}
+      <button className="primary-btn" onClick={onBack}>Back to Lobby</button>
     </div>
   );
 }
@@ -761,32 +982,102 @@ const GAMES = [
    Root app
    ============================================================ */
 function App() {
-  const [screen, setScreen] = useState('lobby'); // 'lobby' | 'game'
+  const [screen, setScreen] = useState('lobby'); // 'lobby' | 'game' | 'locked'
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [winData, setWinData] = useState(null);
-  const [completed, setCompleted] = useState({}); // { [gameId]: {score, steps, timeSecs} }
+  // Server-backed per-day attempt state, keyed by game id.
+  // { [gameId]: { score, steps, timeSecs, startedAt, finishedAt } }
+  const [attempts, setAttempts] = useState({});
+  const [nextResetUtc, setNextResetUtc] = useState(null);
+  const [offset, setOffset] = useState(0); // serverNow - clientNow (ms)
+  const [loading, setLoading] = useState(true);
   const [stepCount, setStepCount] = useState(0);
+  const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
+  const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
+  const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
 
-  const launchGame = (game) => {
-    if (completed[game.id]) return; // one play per day
-    setCurrentGame(game);
-    setStepCount(0);
-    setWinData(null);
-    setScreen('game');
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Hydrate today's locked/result state from the server on mount, and
+  // recompute the score from finished attempts so it survives reloads.
+  const loadDaily = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo');
+    const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
+    const { ok, body } = await api(path);
+    if (ok && body) {
+      setAuthOk(true);
+      setUser(body.user || null);
+      setAttempts(body.attempts || {});
+      setNextResetUtc(body.nextResetUtc);
+      setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
+      const sum = Object.values(body.attempts || {})
+        .reduce((acc, a) => acc + (a.score || 0), 0);
+      setTotalScore(sum);
+    } else {
+      // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
+      // so persistence isn't guaranteed — reflect that in the nav.
+      setAuthOk(false);
+      setUser(null);
+    }
+    setLoading(false);
   };
 
-  const handleWin = (score, steps, timeSecs) => {
+  useEffect(() => { loadDaily(); }, []);
+
+  // Midnight UTC reached — reload state so everything unlocks.
+  const onReset = () => {
+    setScreen('lobby');
+    setCurrentGame(null);
+    setWinData(null);
+    loadDaily();
+  };
+
+  const launchGame = async (game) => {
+    if (attempts[game.id]) {
+      // Already used today — straight to the locked screen.
+      setCurrentGame(game);
+      setScreen('locked');
+      return;
+    }
+    const { ok, status, body } = await api(`/api/daily/${game.id}/start`, { method: 'POST' });
+    if (ok) {
+      if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
+      setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
+      setCurrentGame(game);
+      setStepCount(0);
+      setWinData(null);
+      setScreen('game');
+    } else if (status === 409) {
+      // Lost the race / already locked — show the locked screen.
+      if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
+      if (body && body.attempt) setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
+      setCurrentGame(game);
+      setScreen('locked');
+    }
+  };
+
+  const handleWin = async (score, steps, timeSecs) => {
     const bonus = streak > 0 ? Math.floor(score * 0.1 * streak) : 0;
     const finalScore = score + bonus;
-    setTotalScore(t => t + finalScore);
     setStreak(s => s + 1);
-    setCompleted(prev => ({
-      ...prev,
-      [currentGame.id]: { score: finalScore, steps, timeSecs },
-    }));
     setWinData({ score, bonus, finalScore, steps, timeSecs });
+
+    const gameId = currentGame.id;
+    const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify({ score: finalScore, steps, timeSecs }),
+    });
+    const stored = ok && body && body.attempt
+      ? body.attempt
+      : { score: finalScore, steps, timeSecs, finishedAt: new Date().toISOString() };
+    setAttempts(prev => ({ ...prev, [gameId]: stored }));
+    setTotalScore(t => t + finalScore);
   };
 
   const backToLobby = () => {
@@ -806,15 +1097,18 @@ function App() {
 
       <nav className="nav">
         <div className="nav-brand"><span className="logo">⬢</span> PuzzleChain</div>
-        <div className="nav-stats">
-          <div className="nav-stat">
-            <div className="label">Score</div>
-            <div className="value score mono">{totalScore}</div>
+        <div className="nav-right">
+          <div className="nav-stats">
+            <div className="nav-stat">
+              <div className="label">Score</div>
+              <div className="value score mono">{totalScore}</div>
+            </div>
+            <div className="nav-stat">
+              <div className="label">Streak</div>
+              <div className="value streak mono">{streak}</div>
+            </div>
           </div>
-          <div className="nav-stat">
-            <div className="label">Streak</div>
-            <div className="value streak mono">{streak}</div>
-          </div>
+          <AccountChip loading={loading} authOk={authOk} user={user} />
         </div>
       </nav>
 
@@ -822,24 +1116,28 @@ function App() {
         <div className="lobby">
           <div className="lobby-head">
             <h1>Daily Puzzles</h1>
-            <p>One play each, per day. Solve fast and keep your streak alive.</p>
+            <p>One attempt each, per day. Resets at midnight UTC.</p>
           </div>
           <div className="grid">
             {GAMES.map(g => {
-              const c = completed[g.id];
+              const a = attempts[g.id];
+              const locked = !!a;
               return (
                 <div
                   key={g.id}
-                  className={`card${c ? ' done' : ''}`}
+                  className={`card${locked ? ' done locked' : ''}`}
                   style={{ '--accent': g.tagColor }}
-                  onClick={() => launchGame(g)}
+                  onClick={() => !loading && launchGame(g)}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
                   <div className="card-desc">{g.desc}</div>
-                  {c ? (
-                    <div className="card-done-stats">
-                      ✓ +{c.score} pts · {c.steps} steps · {fmtTime(c.timeSecs)}
+                  {locked ? (
+                    <div className="card-lock">
+                      🔒 {a.score != null
+                        ? <span>+{a.score} pts · resets in {fmtCountdown(
+                            (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
+                        : <span>Played · locked until reset</span>}
                     </div>
                   ) : (
                     <span
@@ -853,6 +1151,25 @@ function App() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {screen === 'locked' && currentGame && (
+        <div className="game-wrap">
+          <div className="game-head">
+            <button className="back-btn" onClick={backToLobby}>← Back</button>
+            <div className="game-title">
+              <span>{currentGame.icon}</span> {currentGame.name}
+            </div>
+          </div>
+          <LockedScreen
+            game={currentGame}
+            attempt={attempts[currentGame.id]}
+            nextResetUtc={nextResetUtc}
+            offset={offset}
+            onReset={onReset}
+            onBack={backToLobby}
+          />
         </div>
       )}
 

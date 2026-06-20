@@ -78,6 +78,19 @@ purpose.
   array. The root `App` auto-wires the lobby card, the daily one-play
   lock, the streak bonus (`floor(score * 0.1 * streak)`), and the win
   overlay — the game component never touches that machinery.
+  - **Optional win/loss extras (backward-compatible).** `onWin` accepts
+    an optional 4th `meta` arg — `onWin(score, steps, secs, { share })` —
+    and `App` stashes `meta.share` so the win overlay can show a **Share**
+    button (copies the string to the clipboard). For games that can be
+    *lost* (e.g. Crypto Wordle), `App` also passes an optional
+    `onLose(steps, secs, { share, answer })` prop: call it **once** when
+    the round is lost. `handleLose` records a finished row with `score: 0`
+    (so the day still locks) **without** incrementing the streak, and
+    renders a loss overlay that reveals `answer` plus the same Share
+    button. Win-only games simply never call `onLose` and ignore the
+    extra props — no change needed. Games that need the server-anchored
+    UTC day (e.g. a deterministic daily word) also receive `offset`
+    (`serverNow − clientNow`, ms).
   - **Also add the new `id` to `GAME_IDS` in `server.js`.** The daily
     routes validate `:gameId` against that set and reject unknown ids
     with `400`, so a game that's in `GAMES` but not in `GAME_IDS`

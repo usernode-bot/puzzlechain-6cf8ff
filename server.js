@@ -13,7 +13,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -103,6 +103,15 @@ app.get('/api/daily', async (req, res) => {
         `INSERT INTO daily_attempts
            (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
          VALUES ($1, $2, 'sudoku', (now() AT TIME ZONE 'utc')::date, 980, 17, 132, now())
+         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+      // Crypto Wordle finished-attempt seed so its locked card/screen is
+      // demonstrable on a fresh staging DB. Obviously-fake round numbers.
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+         VALUES ($1, $2, 'cryptowordle', (now() AT TIME ZONE 'utc')::date, 820, 4, 95, now())
          ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
         [req.user.id, req.user.username || 'staging-demo-user']
       );

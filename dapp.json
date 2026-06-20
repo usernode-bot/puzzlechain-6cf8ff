@@ -3,6 +3,7 @@
   "secrets": [],
   "tests": [
     { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
-    { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" }
+    { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" },
+    { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" }
   ]
 }

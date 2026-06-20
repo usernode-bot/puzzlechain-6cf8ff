@@ -561,6 +561,227 @@ body {
 .cw-key.green  { background: ${C.emerald}; color: #fff; }
 .cw-key.yellow { background: ${C.gold};    color: #fff; }
 .cw-key.gray   { background: ${C.dim};     color: ${C.muted}; }
+
+/* ---- Lobby tab switcher ---- */
+.lobby-tabs { display: flex; gap: 0.35rem; margin-bottom: 1.1rem; }
+.lobby-tab {
+  padding: 0.45rem 1.1rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 999px;
+  font-size: 0.87rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  color: ${C.text};
+  transition: border-color 0.12s, background 0.12s;
+}
+.lobby-tab.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.lobby-tab:not(.active):hover { border-color: ${C.accent}; }
+
+/* ---- Minesweeper ---- */
+.ms-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  max-width: 360px;
+  margin: 0 auto;
+  background: ${C.border};
+  border: 2px solid ${C.border};
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 1/1;
+  touch-action: none;
+}
+.ms-cell {
+  font-family: 'JetBrains Mono', monospace;
+  aspect-ratio: 1/1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.08s ease;
+  border: none;
+  background: ${C.card};
+}
+.ms-cell.ms-hidden { background: ${C.card}; }
+.ms-cell.ms-hidden:hover { background: ${C.accent}26; }
+.ms-cell.ms-revealed { background: ${C.surface}; cursor: default; }
+.ms-cell.ms-flagged { background: ${C.card}; cursor: default; }
+.ms-cell.ms-mine-dead { background: ${C.rose}40; cursor: default; }
+.ms-cell.ms-exploded { background: ${C.rose}99; cursor: default; }
+.ms-n1 { color: ${C.accent}; }
+.ms-n2 { color: ${C.emerald}; }
+.ms-n3 { color: ${C.rose}; }
+.ms-n4 { color: ${C.violet}; }
+.ms-n5 { color: ${C.gold}; }
+.ms-n6 { color: #06b6d4; }
+.ms-n7 { color: #be123c; }
+.ms-n8 { color: ${C.muted}; }
+@keyframes ms-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 ${C.emerald}40; }
+  50% { box-shadow: 0 0 0 6px ${C.emerald}00; }
+}
+.ms-cashout-btn {
+  width: 100%;
+  background: ${C.emerald};
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.8rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  animation: ms-pulse 1.8s ease infinite;
+}
+.ms-cashout-btn:hover { background: #059669; }
+.ms-cashout-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  animation: none;
+  background: ${C.dim};
+}
+.ms-dev-badge {
+  font-size: 0.6rem;
+  color: ${C.muted};
+  margin-top: 0.2rem;
+  text-align: center;
+}
+.ms-usernode-banner {
+  display: inline-block;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid ${C.border};
+  font-size: 0.75rem;
+  color: ${C.muted};
+  margin-bottom: 0.75rem;
+}
+.ms-game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.ms-theme-btn {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.12s;
+}
+.ms-theme-btn:hover { border-color: ${C.accent}; }
+.ms-action-row {
+  display: flex;
+  gap: 0.6rem;
+  max-width: 360px;
+  margin: 0.9rem auto 0;
+}
+.ms-action-row .ms-cashout-wrap { flex: 2; }
+.ms-action-row .ms-newgame-btn {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 12px;
+  padding: 0.8rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.ms-action-row .ms-newgame-btn:hover { border-color: ${C.accent}; }
+.ms-bottom-nav {
+  display: flex;
+  border-top: 1px solid ${C.border};
+  background: ${C.surface};
+  position: sticky;
+  bottom: 0;
+  margin: 1rem -1.25rem -1.5rem;
+}
+.ms-tab {
+  flex: 1;
+  padding: 0.7rem;
+  font-size: 0.82rem;
+  border: none;
+  background: transparent;
+  color: ${C.muted};
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  border-top: 2px solid transparent;
+  transition: color 0.12s, border-color 0.12s;
+}
+.ms-tab.active { color: ${C.accent}; border-top-color: ${C.accent}; }
+.ms-history-list { overflow-y: auto; max-height: 60vh; padding: 0.5rem 0; }
+.ms-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid ${C.border};
+  padding: 0.55rem 0;
+  font-size: 0.82rem;
+}
+.ms-outcome-chip {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
+.ms-outcome-chip.win { background: ${C.emerald}22; color: ${C.emerald}; border: 1px solid ${C.emerald}44; }
+.ms-outcome-chip.loss { background: ${C.rose}22; color: ${C.rose}; border: 1px solid ${C.rose}44; }
+.ms-leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom: 1px solid ${C.border};
+  padding: 0.55rem 0;
+  font-size: 0.82rem;
+}
+.ms-leaderboard-row .ms-rank {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: ${C.muted};
+  width: 1.5rem;
+  text-align: center;
+}
+.ms-empty-state {
+  color: ${C.muted};
+  text-align: center;
+  padding: 2rem 0;
+  font-size: 0.9rem;
+}
+.ms-dev-label {
+  font-size: 0.72rem;
+  color: ${C.muted};
+  margin-bottom: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  background: ${C.card};
+  border-radius: 8px;
+  display: inline-block;
+}
+/* Light theme overrides for minesweeper board only */
+[data-ms-theme="light"] .ms-cell.ms-hidden { background: #e5e7eb; }
+[data-ms-theme="light"] .ms-cell.ms-hidden:hover { background: #d1d5db; }
+[data-ms-theme="light"] .ms-cell.ms-revealed { background: #f9fafb; color: #111827; }
+[data-ms-theme="light"] .ms-cell.ms-flagged { background: #e5e7eb; }
+[data-ms-theme="light"] .ms-grid { background: #9ca3af; border-color: #9ca3af; }
+[data-ms-theme="light"] .ms-cell.ms-mine-dead { background: #fca5a5; }
+[data-ms-theme="light"] .ms-cell.ms-exploded { background: #f87171; }
 `;
 
 /* ============================================================
@@ -1258,6 +1479,355 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset }) {
 }
 
 /* ============================================================
+   Game 4 — Minesweeper (8×8, 10 mines, classic game)
+   ============================================================ */
+const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10, MS_SAFE = MS_ROWS * MS_COLS - MS_MINES; // 54
+
+const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
+const MS_HISTORY_MAX = 50;
+
+function msLoadHistory() {
+  try { return JSON.parse(localStorage.getItem(MS_HISTORY_KEY) || '[]'); }
+  catch { return []; }
+}
+function msSaveEntry(entry) {
+  const h = msLoadHistory();
+  h.unshift(entry);
+  if (h.length > MS_HISTORY_MAX) h.length = MS_HISTORY_MAX;
+  try { localStorage.setItem(MS_HISTORY_KEY, JSON.stringify(h)); } catch {}
+}
+
+function generateMines(firstR, firstC) {
+  const protected_ = new Set();
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const r = firstR + dr, c = firstC + dc;
+      if (r >= 0 && r < MS_ROWS && c >= 0 && c < MS_COLS)
+        protected_.add(r * MS_COLS + c);
+    }
+  }
+  const indices = [];
+  for (let i = 0; i < MS_ROWS * MS_COLS; i++) if (!protected_.has(i)) indices.push(i);
+  // Fisher-Yates on eligible indices
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return new Set(indices.slice(0, MS_MINES));
+}
+
+function computeAdjacency(mineSet) {
+  const adj = new Int8Array(MS_ROWS * MS_COLS);
+  for (let r = 0; r < MS_ROWS; r++) {
+    for (let c = 0; c < MS_COLS; c++) {
+      const idx = r * MS_COLS + c;
+      if (mineSet.has(idx)) { adj[idx] = -1; continue; }
+      let count = 0;
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < MS_ROWS && nc >= 0 && nc < MS_COLS && mineSet.has(nr * MS_COLS + nc)) count++;
+      }
+      adj[idx] = count;
+    }
+  }
+  return adj;
+}
+
+function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
+  const next = new Set(prevRevealed);
+  const queue = [startIdx];
+  while (queue.length) {
+    const idx = queue.shift();
+    if (next.has(idx) || mineSet.has(idx) || flagged.has(idx)) continue;
+    next.add(idx);
+    if (adjacency[idx] === 0) {
+      const r = Math.floor(idx / MS_COLS), c = idx % MS_COLS;
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < MS_ROWS && nc >= 0 && nc < MS_COLS) queue.push(nr * MS_COLS + nc);
+      }
+    }
+  }
+  return next;
+}
+
+function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
+  const [theme, setTheme] = useState('dark');
+  const [activeTab, setActiveTab] = useState('game');
+  const [mineSet, setMineSet] = useState(null);
+  const [adjacency, setAdjacency] = useState(null);
+  const [revealed, setRevealed] = useState(() => new Set());
+  const [flagged, setFlagged] = useState(() => new Set());
+  const [done, setDone] = useState(false);
+  const [gameOverMine, setGameOverMine] = useState(null);
+  const [steps, setSteps] = useState(0);
+  const [isMock, setIsMock] = useState(false);
+  const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
+  const flagTimerRef = useRef(null);
+  const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
+
+  // Reset when parent increments resetKey
+  useEffect(() => {
+    setMineSet(null);
+    setAdjacency(null);
+    setRevealed(new Set());
+    setFlagged(new Set());
+    setDone(false);
+    setGameOverMine(null);
+    setSteps(0);
+    setActiveTab('game');
+  }, [resetKey]);
+
+  // Bridge: detect mock mode
+  useEffect(() => {
+    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
+      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
+    }
+  }, []);
+
+  const safeRevealed = mineSet
+    ? Array.from(revealed).filter(i => !mineSet.has(i)).length
+    : 0;
+  const cashOutActive = safeRevealed >= 10 && !done;
+  const cashoutMultiplier = parseFloat((1.0 + safeRevealed / MS_SAFE).toFixed(2));
+
+  const handleReveal = (idx) => {
+    if (done || revealed.has(idx) || flagged.has(idx)) return;
+    const r = Math.floor(idx / MS_COLS), c = idx % MS_COLS;
+
+    let mines = mineSet, adj = adjacency;
+    if (!mines) {
+      mines = generateMines(r, c);
+      adj = computeAdjacency(mines);
+      setMineSet(mines);
+      setAdjacency(adj);
+    }
+
+    const newSteps = steps + 1;
+    setSteps(newSteps);
+    onStepChange(newSteps);
+
+    if (mines.has(idx)) {
+      setGameOverMine(idx);
+      setDone(true);
+      const baseScore = 0;
+      const entry = {
+        id: String(Date.now()),
+        date: new Date().toISOString().slice(0, 10),
+        outcome: 'loss', score: 0, steps: newSteps, secs, safeRevealed, cashOut: false, cashoutMultiplier: null,
+      };
+      msSaveEntry(entry);
+      setGameHistory(msLoadHistory());
+      const shareText = `Minesweeper ${entry.date} — 💥 Game Over · ${safeRevealed}/54 safe · ${secs}s · +0 pts`;
+      onLose(newSteps, secs, { share: shareText });
+      return;
+    }
+
+    const newRevealed = floodReveal(idx, adj, mines, revealed, flagged);
+    setRevealed(newRevealed);
+
+    const newSafeRevealed = Array.from(newRevealed).filter(i => !mines.has(i)).length;
+    if (newSafeRevealed >= MS_SAFE) {
+      // Full board clear
+      setDone(true);
+      const baseScore = Math.max(newSafeRevealed * 30 - secs * 2, 100) + 200;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const entry = {
+        id: String(Date.now()),
+        date: dateStr,
+        outcome: 'win', score: baseScore, steps: newSteps, secs, safeRevealed: newSafeRevealed, cashOut: false, cashoutMultiplier: 1.0,
+      };
+      msSaveEntry(entry);
+      setGameHistory(msLoadHistory());
+      const shareText = `Minesweeper ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secs}s · +${baseScore} pts`;
+      onWin(baseScore, newSteps, secs, { share: shareText, cashOut: false });
+    }
+  };
+
+  const handleCashOut = () => {
+    if (!cashOutActive || !mineSet) return;
+    setDone(true);
+    const baseScore = Math.max(safeRevealed * 30 - secs * 2, 100);
+    const finalScore = Math.round(baseScore * cashoutMultiplier);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const entry = {
+      id: String(Date.now()),
+      date: dateStr,
+      outcome: 'win', score: finalScore, steps, secs, safeRevealed, cashOut: true, cashoutMultiplier,
+    };
+    msSaveEntry(entry);
+    setGameHistory(msLoadHistory());
+    const shareText = `Minesweeper ${dateStr} — 💰×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
+    onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
+  };
+
+  const handleFlag = (idx) => {
+    if (done || revealed.has(idx)) return;
+    setFlagged(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+
+  // Long-press flagging
+  const onPointerDown = (idx) => {
+    flagTimerRef.current = setTimeout(() => { handleFlag(idx); flagTimerRef.current = null; }, 500);
+  };
+  const onPointerUp = () => { if (flagTimerRef.current) { clearTimeout(flagTimerRef.current); flagTimerRef.current = null; } };
+
+  const minesLeft = MS_MINES - flagged.size;
+
+  const bannerText = isMock
+    ? '🔧 Developer Mode — mock wallet active'
+    : (window.usernode ? '🔗 Usernode connected' : null);
+
+  const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
+
+  return (
+    <div>
+      <div className="ms-game-header">
+        {bannerText && <span className="ms-usernode-banner">{bannerText}</span>}
+        <button className="ms-theme-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+          {theme === 'dark' ? '☀' : '🌙'}
+        </button>
+      </div>
+
+      {activeTab === 'game' && (
+        <div>
+          <div className="status-bar">
+            <div className="pill">
+              <div className="plabel">Time</div>
+              <div className="pvalue time">{timeFmt}</div>
+            </div>
+            <div className="pill">
+              <div className="plabel">Mines Left</div>
+              <div className="pvalue">{minesLeft}</div>
+            </div>
+            <div className="pill">
+              <div className="plabel">Safe Revealed</div>
+              <div className="pvalue">{safeRevealed}/{MS_SAFE}</div>
+            </div>
+          </div>
+
+          <div
+            className="ms-grid"
+            data-ms-theme={theme}
+            onContextMenu={e => e.preventDefault()}
+          >
+            {Array.from({ length: MS_ROWS * MS_COLS }, (_, idx) => {
+              const isRevealed = revealed.has(idx);
+              const isFlagged = flagged.has(idx);
+              const isMine = mineSet && mineSet.has(idx);
+              const isExploded = gameOverMine === idx;
+              const isMineVisible = done && mineSet && mineSet.has(idx) && !isRevealed;
+              const adjVal = adjacency && adjacency[idx];
+
+              let cls = 'ms-cell';
+              if (isExploded) cls += ' ms-exploded';
+              else if (isMineVisible) cls += ' ms-mine-dead';
+              else if (isRevealed) { cls += ' ms-revealed'; if (adjVal > 0) cls += ` ms-n${adjVal}`; }
+              else if (isFlagged) cls += ' ms-flagged';
+              else cls += ' ms-hidden';
+
+              let content = '';
+              if (isExploded) content = '💥';
+              else if (isMineVisible) content = '💣';
+              else if (isRevealed && adjVal > 0) content = adjVal;
+              else if (isRevealed && adjVal === 0) content = '';
+              else if (isFlagged) content = '🚩';
+
+              return (
+                <div
+                  key={idx}
+                  className={cls}
+                  onClick={() => !done && !isFlagged && handleReveal(idx)}
+                  onContextMenu={e => { e.preventDefault(); handleFlag(idx); }}
+                  onPointerDown={() => onPointerDown(idx)}
+                  onPointerUp={onPointerUp}
+                  onPointerLeave={onPointerUp}
+                >
+                  {content}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="ms-action-row">
+            <div className="ms-cashout-wrap">
+              <button
+                className={'ms-cashout-btn' + (cashOutActive ? '' : ' disabled')}
+                onClick={handleCashOut}
+                disabled={!cashOutActive}
+              >
+                Cash Out 💰 ×{cashoutMultiplier}
+              </button>
+              {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
+            </div>
+            <button className="ms-newgame-btn" onClick={() => {
+              setMineSet(null); setAdjacency(null); setRevealed(new Set());
+              setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+            }}>↺ New</button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div>
+          {isMock && <div className="ms-dev-label">Local storage — will sync to chain when live</div>}
+          <div className="ms-history-list">
+            {gameHistory.length === 0
+              ? <div className="ms-empty-state">No games recorded yet</div>
+              : gameHistory.map(h => (
+                <div key={h.id} className="ms-history-row">
+                  <span className={`ms-outcome-chip ${h.outcome}`}>{h.outcome === 'win' ? 'Win' : 'Loss'}</span>
+                  <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtDate(h.date)}</span>
+                  <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
+                  <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/54 · {h.secs}s</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'leaderboard' && (
+        <div>
+          {isMock && <div className="ms-dev-label">Local leaderboard — dev mode</div>}
+          {gameHistory.length === 0
+            ? <div className="ms-empty-state">No games recorded yet</div>
+            : gameHistory
+                .filter(h => h.outcome === 'win')
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10)
+                .map((h, i) => (
+                  <div key={h.id} className="ms-leaderboard-row">
+                    <span className="ms-rank">#{i + 1}</span>
+                    <span style={{ flex: 1, fontWeight: 600 }}>You</span>
+                    <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtDate(h.date)}</span>
+                  </div>
+                ))}
+        </div>
+      )}
+
+      <div className="ms-bottom-nav">
+        {['game', 'history', 'leaderboard'].map(tab => (
+          <button
+            key={tab}
+            className={'ms-tab' + (activeTab === tab ? ' active' : '')}
+            onClick={() => { setActiveTab(tab); if (tab !== 'game') setGameHistory(msLoadHistory()); }}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -1266,6 +1836,7 @@ const GAMES = [
     id: 'sudoku',
     name: 'Mini Sudoku',
     icon: '🔢',
+    category: 'daily',
     desc: 'Fill the 6×6 grid so every row, column, and box has 1–6.',
     tag: 'Logic',
     tagColor: C.accent,
@@ -1275,6 +1846,7 @@ const GAMES = [
     id: 'wordhunt',
     name: 'Word Hunt',
     icon: '🔤',
+    category: 'daily',
     desc: 'Find every hidden word in the letter grid.',
     tag: 'Word',
     tagColor: C.violet,
@@ -1284,10 +1856,21 @@ const GAMES = [
     id: 'cryptowordle',
     name: 'Crypto Wordle',
     icon: '🟩',
+    category: 'daily',
     desc: 'Guess the daily 5-letter Web3 term in 6 tries.',
     tag: 'Web3',
     tagColor: C.emerald,
     component: CryptoWordleGame,
+  },
+  {
+    id: 'minesweeper',
+    name: 'Minesweeper',
+    icon: '💣',
+    category: 'classic',
+    desc: 'Clear the 8×8 grid of mines. Cash Out early to lock in a risk multiplier.',
+    tag: 'Risk',
+    tagColor: C.rose,
+    component: MinesweeperGame,
   },
 ];
 
@@ -1311,6 +1894,13 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
+  // Lobby tab: 'daily' or 'classic', initialized from ?tab= URL param
+  const [lobbyTab, setLobbyTab] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return t === 'classic' ? 'classic' : 'daily';
+  });
+  // Incremented to trigger MinesweeperGame reset on Play Again
+  const [playAgainKey, setPlayAgainKey] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -1356,6 +1946,15 @@ function App() {
   };
 
   const launchGame = async (game) => {
+    // Classic games skip the server entirely
+    if (game.category === 'classic') {
+      setCurrentGame(game);
+      setStepCount(0);
+      setWinData(null);
+      setLoseData(null);
+      setScreen('game');
+      return;
+    }
     if (attempts[game.id]) {
       // Already used today — straight to the locked screen.
       setCurrentGame(game);
@@ -1380,6 +1979,23 @@ function App() {
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
+    // Classic games skip server, streak, and totalScore nav update
+    if (currentGame && currentGame.category === 'classic') {
+      const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
+      setWinData({
+        score,
+        bonus: 0,
+        finalScore: score,
+        steps,
+        timeSecs,
+        multiplier: cashoutMultiplier,
+        effectiveStreak: 0,
+        share: meta && meta.share,
+        cashOut: meta && meta.cashOut,
+        isClassic: true,
+      });
+      return;
+    }
     // The streak this win lands in: the first finished game of the day extends
     // the consecutive-day streak by 1; a second game the same day reuses the
     // same day count (the multiplier is per-day, not per-game).
@@ -1410,6 +2026,17 @@ function App() {
   // finished row with score 0 so the day stays locked, but does NOT touch the
   // streak. Existing win-only games never call this.
   const handleLose = async (steps, timeSecs, meta) => {
+    // Classic games skip server entirely
+    if (currentGame && currentGame.category === 'classic') {
+      setLoseData({
+        steps,
+        timeSecs,
+        share: meta && meta.share,
+        answer: meta && meta.answer,
+        isClassic: true,
+      });
+      return;
+    }
     setLoseData({
       steps,
       timeSecs,
@@ -1428,11 +2055,19 @@ function App() {
     setAttempts(prev => ({ ...prev, [gameId]: stored }));
   };
 
-  const backToLobby = () => {
+  const backToLobby = (tab) => {
     setScreen('lobby');
     setCurrentGame(null);
     setWinData(null);
     setLoseData(null);
+    if (tab) setLobbyTab(tab);
+  };
+
+  const playAgain = () => {
+    setWinData(null);
+    setLoseData(null);
+    setStepCount(0);
+    setPlayAgainKey(k => k + 1);
   };
 
   // Copy-to-clipboard Share button for the win/loss overlays. Flips its label
@@ -1495,26 +2130,40 @@ function App() {
       {screen === 'lobby' && (
         <div className="lobby">
           <div className="lobby-head">
-            <h1>Daily Puzzles</h1>
-            <p>One attempt each, per day. Resets at midnight UTC.</p>
-            {authOk && streak > 0 && (
+            <h1>{lobbyTab === 'daily' ? 'Daily Puzzles' : 'Classic Games'}</h1>
+            <p>{lobbyTab === 'daily'
+              ? 'One attempt each, per day. Resets at midnight UTC.'
+              : 'Play anytime — track your best scores.'}
+            </p>
+            {lobbyTab === 'daily' && authOk && streak > 0 && (
               <p className="lobby-hint">
                 🔥 {streak}-day streak · {tierAhead
                   ? `${tierAhead.daysAway} more daily win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
                   : `max ×${activeMult} multiplier active`}
               </p>
             )}
-            {nextResetUtc && (
+            {lobbyTab === 'daily' && nextResetUtc && (
               <p className="reset-countdown mono">
                 Next puzzle in {fmtHoursMins(
                   new Date(nextResetUtc).getTime() - (Date.now() + offset))}
               </p>
             )}
           </div>
+          <div className="lobby-tabs">
+            <button
+              className={'lobby-tab' + (lobbyTab === 'daily' ? ' active' : '')}
+              onClick={() => setLobbyTab('daily')}
+            >Daily Puzzle</button>
+            <button
+              className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
+              onClick={() => setLobbyTab('classic')}
+            >Classic Games</button>
+          </div>
           <div className="grid">
-            {GAMES.map(g => {
+            {GAMES.filter(g => g.category === lobbyTab).map(g => {
+              const isClassic = g.category === 'classic';
               const a = attempts[g.id];
-              const locked = !!a;
+              const locked = !isClassic && !!a;
               return (
                 <div
                   key={g.id}
@@ -1579,6 +2228,7 @@ function App() {
             onLose={handleLose}
             onStepChange={setStepCount}
             offset={offset}
+            resetKey={playAgainKey}
           />
         </div>
       )}
@@ -1586,15 +2236,21 @@ function App() {
       {screen === 'game' && winData && (
         <div className="win-overlay">
           <div className="win-card">
-            <div className="trophy">🏆</div>
-            <h2>Solved!</h2>
+            <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
+            <h2>{winData.cashOut ? 'Cashed Out! 💰' : 'Solved!'}</h2>
             <div className="sub">{currentGame && currentGame.name}</div>
             <div className="score-rows">
               <div className="score-row">
                 <span className="k">Base score</span>
                 <span className="v mono">{winData.score}</span>
               </div>
-              {winData.multiplier > 1 && (
+              {winData.isClassic && winData.multiplier > 1 && (
+                <div className="score-row bonus">
+                  <span className="k">Cash Out ×{winData.multiplier}</span>
+                  <span className="v mono">×{winData.multiplier}</span>
+                </div>
+              )}
+              {!winData.isClassic && winData.multiplier > 1 && (
                 <div className="score-row bonus">
                   <span className="k">Streak ×{winData.multiplier} · {winData.effectiveStreak}-day</span>
                   <span className="v mono">+{winData.bonus}</span>
@@ -1610,7 +2266,12 @@ function App() {
               </div>
             </div>
             <ShareButton text={winData.share} />
-            <button className="primary-btn" onClick={backToLobby}>Back to Lobby</button>
+            {winData.isClassic && (
+              <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
+                Play Again
+              </button>
+            )}
+            <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
       )}
@@ -1618,8 +2279,8 @@ function App() {
       {screen === 'game' && loseData && (
         <div className="win-overlay">
           <div className="win-card">
-            <div className="trophy">💀</div>
-            <h2>Out of guesses</h2>
+            <div className="trophy">{loseData.isClassic ? '💥' : '💀'}</div>
+            <h2>{loseData.isClassic ? 'Game Over' : 'Out of guesses'}</h2>
             <div className="sub">{currentGame && currentGame.name}</div>
             <div className="score-rows">
               {loseData.answer && (
@@ -1629,7 +2290,7 @@ function App() {
                 </div>
               )}
               <div className="score-row">
-                <span className="k">Guesses · Time</span>
+                <span className="k">{loseData.isClassic ? 'Steps' : 'Guesses'} · Time</span>
                 <span className="v mono">{loseData.steps} · {fmtTime(loseData.timeSecs)}</span>
               </div>
               <div className="score-row total">
@@ -1638,7 +2299,12 @@ function App() {
               </div>
             </div>
             <ShareButton text={loseData.share} />
-            <button className="primary-btn" onClick={backToLobby}>Back to Lobby</button>
+            {loseData.isClassic && (
+              <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
+                Play Again
+              </button>
+            )}
+            <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
       )}

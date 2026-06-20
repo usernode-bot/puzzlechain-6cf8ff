@@ -76,8 +76,8 @@ purpose.
   then add its CSS to `css` and append
   `{ id, name, icon, desc, tag, tagColor, component }` to the `GAMES`
   array. The root `App` auto-wires the lobby card, the daily one-play
-  lock, the streak bonus (`floor(score * 0.1 * streak)`), and the win
-  overlay — the game component never touches that machinery.
+  lock, the streak **multiplier** (see "Streak multiplier tiers" below),
+  and the win overlay — the game component never touches that machinery.
   - **Optional win/loss extras (backward-compatible).** `onWin` accepts
     an optional 4th `meta` arg — `onWin(score, steps, secs, { share })` —
     and `App` stashes `meta.share` so the win overlay can show a **Share**
@@ -115,14 +115,16 @@ describe it as static-only.
   middleware requires `req.user` — do **not** whitelist these):
   - `GET /api/daily` — today's state for the signed-in user: `user`
     (`{ username, id, usernodePubkey }`), `serverNowUtc`,
-    `nextResetUtc` (next 00:00 UTC), and `attempts` keyed by `game_id`.
-    A present key = that game is locked today.
+    `nextResetUtc` (next 00:00 UTC), `streak` (server-computed
+    consecutive-day count — see below), and `attempts` keyed by
+    `game_id`. A present key = that game is locked today.
   - `POST /api/daily/:gameId/start` — **consume-on-start**: claims the
     day's single attempt via `INSERT … ON CONFLICT DO NOTHING
     RETURNING *`. Empty result ⇒ already used ⇒ `409` (locked) with the
     existing row.
   - `POST /api/daily/:gameId/finish` — records `score/steps/time_secs`
-    on today's already-claimed row.
+    on today's already-claimed row, and returns the freshly recomputed
+    `streak` so the client reconciles its optimistic value.
 - **Identity comes from `req.user`** (the iframe JWT), never the client.
   Progress is keyed to the Usernode account and persists across reloads
   and devices. The nav's `AccountChip` reads `user` from `/api/daily`
@@ -135,8 +137,48 @@ describe it as static-only.
 - **Staging seed:** `GET /api/daily?demo=locked` (gated on
   `IS_STAGING`) upserts one finished `sudoku` attempt for the current
   viewer so the locked screen is demonstrable on a fresh staging DB.
-  Strict no-op in production.
+  `GET /api/daily?demo=streak` (also `IS_STAGING`-only, idempotent)
+  upserts finished `sudoku` attempts for the **10 UTC days before
+  today**, giving the viewer a 10-day streak so the multiplier UI is
+  demonstrable; today is left open so a tester can trigger a multiplied
+  win. Both are strict no-ops in production.
 - The nav **`Score`** is rehydrated from today's finished attempts.
-  Cross-day score history, a persistent multi-day streak, and a
-  leaderboard remain **out of scope** (the public table leaves room for
-  them); the displayed `streak` is still session-derived.
+  Cross-day score history and a leaderboard remain **out of scope** (the
+  public table leaves room for them).
+
+## Streak multiplier tiers
+
+The **streak is now a real consecutive-day count**, server-computed in
+`computeStreak(userId)` from the distinct `attempt_date`s that have a
+non-null `finished_at`: the unbroken run of UTC days ending today (or
+ending yesterday if today isn't played yet — a streak stays alive until
+a full day is missed). It persists across reloads/devices and is
+returned as `streak` from `/api/daily` (and refreshed by `finish`).
+
+The streak multiplies points via **tiers**, defined once in
+`STREAK_TIERS` (`public/app.jsx`) and applied client-side in
+`streakMultiplier(streak)`:
+
+| Streak (consecutive days) | Multiplier |
+|---|---|
+| 0–2 | 1.0× |
+| 3–4 | 1.1× |
+| 5–9 | 1.2× |
+| 10–19 | 1.5× |
+| 20+ | 2.0× |
+
+- **Where applied:** `handleWin` computes `effectiveStreak` (the day's
+  first win extends the streak by 1; a second game the same day reuses
+  the same day count — the multiplier is per-day, not per-game), then
+  `finalScore = round(base × streakMultiplier(effectiveStreak))`. The
+  client persists `finalScore` via `finish`; the server stores it as-is
+  (no server-side multiplier math today — see below).
+- **Surfaced in UI:** a `×N` `.mult-badge` next to the nav Streak, a
+  `.lobby-hint` nudging toward the next tier, and a multiplier row in
+  the win overlay (all hidden at 1.0× or when signed out).
+- **Tier table is the single balance knob** — editing `STREAK_TIERS`
+  changes breakpoints/multipliers everywhere.
+- **Deferred:** server-authoritative scoring (server applies the
+  multiplier in `finish` instead of trusting the client `finalScore`)
+  matters only if a leaderboard ships; the displayed multi-day streak
+  has **no** grace-day/freeze — a missed UTC day resets it to 0.

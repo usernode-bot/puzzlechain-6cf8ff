@@ -5,6 +5,7 @@
     { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" },
     { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" },
+    { "name": "Crypto Wordle card in lobby", "path": "/", "expectText": "Crypto Wordle" },
     { "name": "Lobby shows live reset countdown", "path": "/", "expectText": "Next puzzle in" },
     { "name": "Streak multiplier hint in lobby", "path": "/?demo=streak", "expectText": "day streak" }
   ]

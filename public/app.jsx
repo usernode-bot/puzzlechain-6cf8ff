@@ -492,6 +492,75 @@ body {
   margin: 0 auto 1rem;
 }
 .word-theme b { color: ${C.text}; }
+
+/* ---- Crypto Wordle ---- */
+.cw-board {
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  gap: 0.4rem;
+  max-width: 330px;
+  margin: 0 auto;
+}
+.cw-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+}
+.cw-row.shake { animation: cw-shake 0.4s ease; }
+@keyframes cw-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.cw-tile {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  border: 2px solid ${C.dim};
+  border-radius: 8px;
+  background: ${C.card};
+  color: ${C.text};
+  user-select: none;
+  transition: border-color 0.1s ease, background 0.1s ease;
+}
+.cw-tile.filled { border-color: ${C.muted}; }
+.cw-tile.green  { background: ${C.emerald}; border-color: ${C.emerald}; color: #fff; }
+.cw-tile.yellow { background: ${C.gold};    border-color: ${C.gold};    color: #fff; }
+.cw-tile.gray   { background: ${C.dim};     border-color: ${C.dim};     color: ${C.text}; }
+
+.cw-kbd {
+  max-width: 480px;
+  margin: 1.3rem auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cw-kbd-row { display: flex; gap: 0.35rem; justify-content: center; }
+.cw-key {
+  flex: 1 1 auto;
+  min-width: 1.5rem;
+  padding: 0.85rem 0.2rem;
+  background: ${C.border};
+  border: none;
+  border-radius: 6px;
+  color: ${C.text};
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.cw-key:hover { background: ${C.accent}; color: #fff; }
+.cw-key.wide { flex: 1.6 1 auto; font-size: 0.72rem; }
+.cw-key.green  { background: ${C.emerald}; color: #fff; }
+.cw-key.yellow { background: ${C.gold};    color: #fff; }
+.cw-key.gray   { background: ${C.dim};     color: ${C.muted}; }
 `;
 
 /* ============================================================
@@ -1017,6 +1086,178 @@ function WordHuntGame({ onWin, onStepChange }) {
 }
 
 /* ============================================================
+   Game 3 — Crypto Wordle (daily 5-letter Web3 term)
+   ============================================================ */
+const CW_LEN = 5;
+const CW_MAX = 6;
+
+// Curated, well-known 5-letter Web3 / crypto terms. The daily answer is
+// chosen deterministically from this list, so everyone gets the same word
+// on the same UTC day (shareable, comparable). No dictionary validates the
+// guesses — any 5 letters are accepted — but the answer is always from here.
+const CW_ANSWERS = [
+  'TOKEN', 'BLOCK', 'CHAIN', 'MINER', 'NONCE', 'STAKE', 'VAULT', 'TRADE',
+  'WHALE', 'PROOF', 'AUDIT', 'ETHER', 'YIELD', 'LAYER', 'NODES', 'MOONS',
+  'DEGEN', 'ALPHA', 'FLOOR', 'MINTS', 'ASSET', 'BYTES', 'PEERS', 'SHARD',
+  'BASED', 'VYPER', 'BLOBS', 'WAGMI', 'PUMPS', 'DUMPS',
+];
+
+const CW_EMOJI = { green: '🟩', yellow: '🟨', gray: '⬛' };
+const CW_KEYS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+
+// UTC day number, anchored to server time (offset = serverNow − clientNow),
+// so the daily word can't desync from the lock countdown on a skewed clock.
+function cwDayNum(offset) {
+  const d = new Date(Date.now() + (offset || 0));
+  return Math.floor(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000
+  );
+}
+
+// Standard two-pass Wordle coloring (handles duplicate letters): greens
+// first, consuming a tally of the answer's letters; then yellows only while
+// an unconsumed copy of the letter remains, else gray.
+function cwScoreGuess(guess, answer) {
+  const res = Array(CW_LEN).fill('gray');
+  const counts = {};
+  for (let i = 0; i < CW_LEN; i++) counts[answer[i]] = (counts[answer[i]] || 0) + 1;
+  for (let i = 0; i < CW_LEN; i++) {
+    if (guess[i] === answer[i]) { res[i] = 'green'; counts[guess[i]]--; }
+  }
+  for (let i = 0; i < CW_LEN; i++) {
+    if (res[i] === 'green') continue;
+    if (counts[guess[i]] > 0) { res[i] = 'yellow'; counts[guess[i]]--; }
+  }
+  return res;
+}
+
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset }) {
+  const dayNum = useRef(cwDayNum(offset)).current;
+  const answer = useRef(
+    CW_ANSWERS[((dayNum % CW_ANSWERS.length) + CW_ANSWERS.length) % CW_ANSWERS.length]
+  ).current;
+
+  const [guesses, setGuesses] = useState([]); // [{ word, result: ['green'|'yellow'|'gray', …] }]
+  const [cur, setCur] = useState('');          // in-progress letters for the active row
+  const [shake, setShake] = useState(false);
+  const [done, setDone] = useState(false);
+  const { secs, fmt } = useTimer(!done);
+
+  // Best color seen per letter, for the on-screen keyboard tinting.
+  const keyState = {};
+  const rank = { gray: 0, yellow: 1, green: 2 };
+  for (const g of guesses) {
+    for (let i = 0; i < CW_LEN; i++) {
+      const ch = g.word[i], c = g.result[i];
+      if (!(ch in keyState) || rank[c] > rank[keyState[ch]]) keyState[ch] = c;
+    }
+  }
+
+  const buildShare = (rows, solved) =>
+    `Crypto Wordle #${dayNum} ${solved ? rows.length : 'X'}/${CW_MAX}\n` +
+    rows.map(r => r.result.map(c => CW_EMOJI[c]).join('')).join('\n');
+
+  const submit = () => {
+    if (done) return;
+    if (cur.length !== CW_LEN) {
+      setShake(true);
+      setTimeout(() => setShake(false), 400);
+      return;
+    }
+    const result = cwScoreGuess(cur, answer);
+    const rows = [...guesses, { word: cur, result }];
+    setGuesses(rows);
+    setCur('');
+    onStepChange(rows.length);
+
+    if (cur === answer) {
+      setDone(true);
+      const score = Math.max((7 - rows.length) * 180 - secs * 2, 100);
+      onWin(score, rows.length, secs, { share: buildShare(rows, true) });
+    } else if (rows.length >= CW_MAX) {
+      setDone(true);
+      onLose(rows.length, secs, { share: buildShare(rows, false), answer });
+    }
+  };
+
+  const typeLetter = (ch) => { if (!done && cur.length < CW_LEN) setCur(cur + ch); };
+  const backspace = () => { if (!done) setCur(cur.slice(0, -1)); };
+
+  // Physical keyboard. The window listener is registered once; it dispatches
+  // through a ref so each keypress runs the latest closure (fresh cur/secs).
+  const apiRef = useRef({});
+  apiRef.current = { submit, typeLetter, backspace };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); return; }
+      if (e.key === 'Backspace') { apiRef.current.backspace(); return; }
+      const ch = (e.key || '').toUpperCase();
+      if (ch.length === 1 && ch >= 'A' && ch <= 'Z') apiRef.current.typeLetter(ch);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const rowsLeft = Math.max(CW_MAX - guesses.length, 0);
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Time</div>
+          <div className="pvalue time">{fmt}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Guesses</div>
+          <div className="pvalue">{Math.min(guesses.length, CW_MAX)}/{CW_MAX}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Left</div>
+          <div className="pvalue">{rowsLeft}</div>
+        </div>
+      </div>
+
+      <div className="cw-board">
+        {Array.from({ length: CW_MAX }).map((_, r) => {
+          const g = guesses[r];
+          const isCurrent = !g && r === guesses.length && !done;
+          const letters = g ? g.word : (isCurrent ? cur : '');
+          return (
+            <div key={r} className={`cw-row${isCurrent && shake ? ' shake' : ''}`}>
+              {Array.from({ length: CW_LEN }).map((__, c) => {
+                const ch = letters[c] || '';
+                const cls = ['cw-tile'];
+                if (g) cls.push(g.result[c]);
+                else if (ch) cls.push('filled');
+                return <div key={c} className={cls.join(' ')}>{ch}</div>;
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="cw-kbd">
+        {CW_KEYS.map((row, ri) => (
+          <div key={ri} className="cw-kbd-row">
+            {ri === 2 && <button className="cw-key wide" onClick={submit}>Enter</button>}
+            {row.split('').map(ch => (
+              <button
+                key={ch}
+                className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
+                onClick={() => typeLetter(ch)}
+              >
+                {ch}
+              </button>
+            ))}
+            {ri === 2 && <button className="cw-key wide" onClick={backspace}>⌫</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -1039,6 +1280,15 @@ const GAMES = [
     tagColor: C.violet,
     component: WordHuntGame,
   },
+  {
+    id: 'cryptowordle',
+    name: 'Crypto Wordle',
+    icon: '🟩',
+    desc: 'Guess the daily 5-letter Web3 term in 6 tries.',
+    tag: 'Web3',
+    tagColor: C.emerald,
+    component: CryptoWordleGame,
+  },
 ];
 
 /* ============================================================
@@ -1050,6 +1300,7 @@ function App() {
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [winData, setWinData] = useState(null);
+  const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
   // { [gameId]: { score, steps, timeSecs, startedAt, finishedAt } }
   const [attempts, setAttempts] = useState({});
@@ -1100,6 +1351,7 @@ function App() {
     setScreen('lobby');
     setCurrentGame(null);
     setWinData(null);
+    setLoseData(null);
     loadDaily();
   };
 
@@ -1127,7 +1379,7 @@ function App() {
     }
   };
 
-  const handleWin = async (score, steps, timeSecs) => {
+  const handleWin = async (score, steps, timeSecs, meta) => {
     // The streak this win lands in: the first finished game of the day extends
     // the consecutive-day streak by 1; a second game the same day reuses the
     // same day count (the multiplier is per-day, not per-game).
@@ -1137,7 +1389,7 @@ function App() {
     const finalScore = Math.round(score * multiplier);
     const bonus = finalScore - score;
     setStreak(effectiveStreak);
-    setWinData({ score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak });
+    setWinData({ score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak, share: meta && meta.share });
 
     const gameId = currentGame.id;
     const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
@@ -1154,11 +1406,57 @@ function App() {
     if (ok && body && typeof body.streak === 'number') setStreak(body.streak);
   };
 
+  // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
+  // finished row with score 0 so the day stays locked, but does NOT touch the
+  // streak. Existing win-only games never call this.
+  const handleLose = async (steps, timeSecs, meta) => {
+    setLoseData({
+      steps,
+      timeSecs,
+      share: meta && meta.share,
+      answer: meta && meta.answer,
+    });
+
+    const gameId = currentGame.id;
+    const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify({ score: 0, steps, timeSecs }),
+    });
+    const stored = ok && body && body.attempt
+      ? body.attempt
+      : { score: 0, steps, timeSecs, finishedAt: new Date().toISOString() };
+    setAttempts(prev => ({ ...prev, [gameId]: stored }));
+  };
+
   const backToLobby = () => {
     setScreen('lobby');
     setCurrentGame(null);
     setWinData(null);
+    setLoseData(null);
   };
+
+  // Copy-to-clipboard Share button for the win/loss overlays. Flips its label
+  // to "Copied!" briefly; degrades to a no-op where clipboard is unavailable.
+  function ShareButton({ text }) {
+    const [copied, setCopied] = useState(false);
+    if (!text) return null;
+    const copy = async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch {}
+    };
+    return (
+      <button
+        className="primary-btn"
+        style={{ background: C.violet, marginBottom: '0.6rem' }}
+        onClick={copy}
+      >
+        {copied ? 'Copied!' : 'Share result'}
+      </button>
+    );
+  }
 
   const fmtTime = s =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -1268,7 +1566,7 @@ function App() {
         </div>
       )}
 
-      {screen === 'game' && currentGame && !winData && (
+      {screen === 'game' && currentGame && !winData && !loseData && (
         <div className="game-wrap">
           <div className="game-head">
             <button className="back-btn" onClick={backToLobby}>← Back</button>
@@ -1276,7 +1574,12 @@ function App() {
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
           </div>
-          <GameComponent onWin={handleWin} onStepChange={setStepCount} />
+          <GameComponent
+            onWin={handleWin}
+            onLose={handleLose}
+            onStepChange={setStepCount}
+            offset={offset}
+          />
         </div>
       )}
 
@@ -1306,6 +1609,35 @@ function App() {
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
             </div>
+            <ShareButton text={winData.share} />
+            <button className="primary-btn" onClick={backToLobby}>Back to Lobby</button>
+          </div>
+        </div>
+      )}
+
+      {screen === 'game' && loseData && (
+        <div className="win-overlay">
+          <div className="win-card">
+            <div className="trophy">💀</div>
+            <h2>Out of guesses</h2>
+            <div className="sub">{currentGame && currentGame.name}</div>
+            <div className="score-rows">
+              {loseData.answer && (
+                <div className="score-row">
+                  <span className="k">Answer</span>
+                  <span className="v mono">{loseData.answer}</span>
+                </div>
+              )}
+              <div className="score-row">
+                <span className="k">Guesses · Time</span>
+                <span className="v mono">{loseData.steps} · {fmtTime(loseData.timeSecs)}</span>
+              </div>
+              <div className="score-row total">
+                <span className="k">Earned</span>
+                <span className="v mono">+0</span>
+              </div>
+            </div>
+            <ShareButton text={loseData.share} />
             <button className="primary-btn" onClick={backToLobby}>Back to Lobby</button>
           </div>
         </div>

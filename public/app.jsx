@@ -1008,6 +1008,177 @@ body {
   .mnc-store { min-height: 70px; }
 }
 
+/* ---- Mancala mode selection ---- */
+.mnc-mode-select {
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.mnc-mode-btn {
+  background: ${C.card};
+  border: 2px solid ${C.border};
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: ${C.text};
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+}
+.mnc-mode-btn:hover { border-color: ${C.gold}; background: ${C.gold}08; }
+.mnc-mode-btn.active { border-color: ${C.gold}; background: ${C.gold}14; }
+.mnc-mode-icon { font-size: 1.7rem; flex-shrink: 0; }
+.mnc-mode-text { display: flex; flex-direction: column; gap: 0.1rem; }
+.mnc-mode-name { font-weight: 600; font-size: 1rem; }
+.mnc-mode-desc { font-size: 0.78rem; color: ${C.muted}; }
+.mnc-mode-sub {
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+.mnc-difficulty-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.mnc-difficulty-pill {
+  flex: 1;
+  padding: 0.45rem 0.4rem;
+  background: ${C.card};
+  border: 1.5px solid ${C.border};
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: ${C.muted};
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  text-align: center;
+}
+.mnc-difficulty-pill:hover { border-color: ${C.gold}; color: ${C.text}; }
+.mnc-difficulty-pill.active { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}14; font-weight: 600; }
+.mnc-mode-start-btn {
+  width: 100%;
+  padding: 0.65rem;
+  background: ${C.gold};
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.mnc-mode-start-btn:hover { background: #d97706; }
+.mnc-online-actions { display: flex; gap: 0.5rem; }
+.mnc-online-actions button {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  background: ${C.card};
+  border: 1.5px solid ${C.border};
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: ${C.text};
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.mnc-online-actions button:hover { border-color: ${C.gold}; background: ${C.gold}0d; }
+
+/* ---- Mancala online waiting / join screen ---- */
+.mnc-room-waiting { max-width: 480px; margin: 0 auto; text-align: center; }
+.mnc-room-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: ${C.gold};
+  background: ${C.gold}14;
+  border: 2px solid ${C.gold}44;
+  border-radius: 14px;
+  padding: 0.75rem 1.25rem;
+  margin: 0.85rem 0;
+  display: inline-block;
+}
+.mnc-spinner {
+  display: inline-block;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 2.5px solid ${C.border};
+  border-top-color: ${C.gold};
+  border-radius: 50%;
+  animation: mnc-spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+@keyframes mnc-spin { to { transform: rotate(360deg); } }
+.mnc-join-form { max-width: 480px; margin: 0 auto; }
+.mnc-join-input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  background: ${C.card};
+  border: 1.5px solid ${C.border};
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: ${C.text};
+  text-transform: uppercase;
+  outline: none;
+  transition: border-color 0.12s;
+  margin-bottom: 0.6rem;
+  box-sizing: border-box;
+  text-align: center;
+}
+.mnc-join-input:focus { border-color: ${C.gold}; }
+.mnc-join-error { color: ${C.rose}; font-size: 0.82rem; margin-bottom: 0.6rem; text-align: center; }
+
+/* ---- Mancala online in-game UI ---- */
+.mnc-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: ${C.muted};
+  margin-bottom: 0.45rem;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.mnc-conn-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
+.mnc-conn-dot.green { background: ${C.emerald}; }
+.mnc-conn-dot.amber { background: ${C.gold}; }
+
+/* ---- Mancala AI thinking banner ---- */
+.mnc-ai-thinking {
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: ${C.muted};
+  padding: 0.35rem 0.6rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 8px;
+  margin: 0.5rem 0 0;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
 /* ---- 2048 ---- */
 .t2048-board-wrap {
   position: relative;
@@ -2423,9 +2594,176 @@ function mncDistribute(pits, pitIdx, player) {
 }
 
 /* ============================================================
+   Mancala — AI Engine (pure functions, no side effects)
+   ============================================================ */
+const MNC_AI_DIFF_KEY = 'puzzlechain_mancala_ai_difficulty';
+
+function mncGetValidMoves(pits, player) {
+  const min = player === 1 ? 0 : 7;
+  const max = player === 1 ? 5 : 12;
+  const moves = [];
+  for (let i = min; i <= max; i++) if (pits[i] > 0) moves.push(i);
+  return moves;
+}
+
+function mncEval(pits) { return pits[6] - pits[13]; }
+
+// Minimax with alpha-beta pruning. player = whose turn it currently is.
+function mncMinimax(pits, player, depth, alpha, beta) {
+  const p1Empty = pits.slice(0, 6).every(v => v === 0);
+  const p2Empty = pits.slice(7, 13).every(v => v === 0);
+  if (p1Empty || p2Empty) {
+    const p = pits.slice();
+    for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+    for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    return mncEval(p);
+  }
+  if (depth === 0) return mncEval(pits);
+  const moves = mncGetValidMoves(pits, player);
+  if (moves.length === 0) return mncEval(pits);
+  if (player === 1) {
+    let best = -Infinity;
+    for (const idx of moves) {
+      const { pits: np, extraTurn } = mncDistribute(pits, idx, 1);
+      const score = mncMinimax(np, extraTurn ? 1 : 2, depth - 1, alpha, beta);
+      if (score > best) best = score;
+      alpha = Math.max(alpha, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const idx of moves) {
+      const { pits: np, extraTurn } = mncDistribute(pits, idx, 2);
+      const score = mncMinimax(np, extraTurn ? 2 : 1, depth - 1, alpha, beta);
+      if (score < best) best = score;
+      beta = Math.min(beta, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+}
+
+// Return the best pit index for P2 at the given difficulty, or -1 if no moves.
+function mncAIMove(pits, difficulty) {
+  const moves = mncGetValidMoves(pits, 2);
+  if (moves.length === 0) return -1;
+  if (difficulty === 'easy') return shuffle(moves)[0];
+  // Medium: greedy single-ply
+  if (difficulty === 'medium') {
+    let bestIdx = moves[0], bestScore = Infinity;
+    for (const idx of moves) {
+      const { pits: np } = mncDistribute(pits, idx, 2);
+      const s = mncEval(np);
+      if (s < bestScore) { bestScore = s; bestIdx = idx; }
+    }
+    return bestIdx;
+  }
+  // Hard: minimax depth 7 (AI's own move is at depth 0; 6 additional plies)
+  let bestIdx = moves[0], bestScore = Infinity;
+  for (const idx of moves) {
+    const { pits: np, extraTurn } = mncDistribute(pits, idx, 2);
+    const s = mncMinimax(np, extraTurn ? 2 : 1, 6, -Infinity, Infinity);
+    if (s < bestScore) { bestScore = s; bestIdx = idx; }
+  }
+  return bestIdx;
+}
+
+/* ============================================================
+   Mancala — Networking (polling hook for online multiplayer)
+   ============================================================ */
+const MNC_ONLINE_SESSION_KEY = 'puzzlechain_mancala_online_session';
+
+function useMancalaRoom(roomId) {
+  const [room, setRoom]                         = useState(null);
+  const [pollingError, setPollingError]         = useState(null);
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const consecutiveErrors = useRef(0);
+  const intervalRef       = useRef(null);
+
+  const fetchRoom = async () => {
+    if (!roomId) return;
+    try {
+      const { ok, status, body } = await api('/api/mancala/rooms/' + roomId);
+      if (ok && body) {
+        setRoom(body);
+        setPollingError(null);
+        consecutiveErrors.current = 0;
+        setOpponentDisconnected(false);
+      } else if (status === 404) {
+        setPollingError('room_not_found');
+        consecutiveErrors.current++;
+      } else {
+        consecutiveErrors.current++;
+        if (consecutiveErrors.current >= 3) {
+          setOpponentDisconnected(true);
+          setPollingError('connection_error');
+        }
+      }
+    } catch {
+      consecutiveErrors.current++;
+      if (consecutiveErrors.current >= 3) {
+        setOpponentDisconnected(true);
+        setPollingError('connection_error');
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!roomId) { setRoom(null); setPollingError(null); return; }
+    consecutiveErrors.current = 0;
+    fetchRoom();
+    intervalRef.current = setInterval(() => {
+      setRoom(r => {
+        if (r && r.status === 'finished') {
+          clearInterval(intervalRef.current);
+          return r;
+        }
+        return r;
+      });
+      fetchRoom();
+    }, 1500);
+    return () => clearInterval(intervalRef.current);
+  }, [roomId]);
+
+  const submitMove = async (pitIdx) => {
+    if (!room || room.status !== 'active') return;
+    const player = pitIdx <= 5 ? 1 : 2;
+    const moveSeq = room.moveSeq + 1;
+    // Optimistic update
+    try {
+      const { pits: afterPits, extraTurn } = mncDistribute(room.pits, pitIdx, player);
+      const p1Empty = afterPits.slice(0, 6).every(v => v === 0);
+      const p2Empty = afterPits.slice(7, 13).every(v => v === 0);
+      let finalPits = afterPits.slice();
+      let gameOver = false, winner = null;
+      if (p1Empty || p2Empty) {
+        for (let i = 0; i < 6;  i++) { finalPits[6]  += finalPits[i]; finalPits[i] = 0; }
+        for (let i = 7; i < 13; i++) { finalPits[13] += finalPits[i]; finalPits[i] = 0; }
+        winner = finalPits[6] > finalPits[13] ? '1' : finalPits[13] > finalPits[6] ? '2' : 'draw';
+        gameOver = true;
+      }
+      const nextPlayer = gameOver ? null : (extraTurn ? player : (player === 1 ? 2 : 1));
+      setRoom(r => ({ ...r, pits: finalPits, currentPlayer: nextPlayer, status: gameOver ? 'finished' : 'active', winner, moveSeq }));
+    } catch {}
+    // Confirm with server
+    try {
+      const { ok, body } = await api('/api/mancala/rooms/' + roomId + '/move', {
+        method: 'POST',
+        body: JSON.stringify({ pitIdx, moveSeq }),
+      });
+      if (ok && body) { setRoom(body); }
+      else { fetchRoom(); }
+    } catch { fetchRoom(); }
+  };
+
+  return { room, pollingError, opponentDisconnected, submitMove };
+}
+
+/* ============================================================
    Game 5 — Mancala (Kalah variant, pass-and-play)
    ============================================================ */
-function MancalaGame({ onWin, onStepChange, resetKey }) {
+function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
   const [pits, setPits]           = useState(mncInitBoard);
   const [player, setPlayer]       = useState(1);
   const [done, setDone]           = useState(false);
@@ -2805,6 +3143,534 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
       </div>
     </div>
   );
+}
+
+/* ============================================================
+   Game 5b — Mancala AI variant (human P1 vs AI P2)
+   ============================================================ */
+function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
+  const [pits, setPits]                 = useState(mncInitBoard);
+  const [player, setPlayer]             = useState(1);
+  const [done, setDone]                 = useState(false);
+  const [winner, setWinner]             = useState(null);
+  const [moves, setMoves]               = useState(0);
+  const [flashPits, setFlashPits]       = useState(() => new Set());
+  const [captureFlash, setCaptureFlash] = useState(() => new Set());
+  const [bannerMsg, setBannerMsg]       = useState('');
+  const [aiThinking, setAiThinking]     = useState(false);
+  const [history, setHistory]           = useState(() => mncLoadHistory());
+  const [soundOn, setSoundOn]           = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
+
+  const animatingRef  = useRef(false);
+  const soundOnRef    = useRef(soundOn);
+  const winTimerRef   = useRef(null);
+  const applyMoveRef  = useRef(null);
+  const pitsRef       = useRef(pits);
+  const movesRef      = useRef(moves);
+  soundOnRef.current  = soundOn;
+  pitsRef.current     = pits;
+  movesRef.current    = moves;
+
+  const { secs, fmt } = useTimer(!done);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+
+  useEffect(() => { resetGame(); }, [resetKey]);
+
+  const resetGame = () => {
+    animatingRef.current = false;
+    if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
+    setPits(mncInitBoard());
+    setPlayer(1);
+    setDone(false);
+    setWinner(null);
+    setMoves(0);
+    setFlashPits(new Set());
+    setCaptureFlash(new Set());
+    setBannerMsg('');
+    setAiThinking(false);
+  };
+
+  const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
+    const p = newPits.slice();
+    const p1Empty = p.slice(0, 6).every(v => v === 0);
+    const p2Empty = p.slice(7, 13).every(v => v === 0);
+    const isGameOver = p1Empty || p2Empty;
+    if (isGameOver) {
+      for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i]  = 0; }
+      for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i]  = 0; }
+    }
+    setPits(p);
+    setMoves(newMoves);
+    onStepChange(newMoves);
+    if (isGameOver) {
+      const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
+      setWinner(w);
+      setDone(true);
+      setAiThinking(false);
+      const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
+      setBannerMsg(wLabel);
+      const entry = {
+        id: String(Date.now()),
+        date: new Date().toISOString().slice(0, 10),
+        winner: w,
+        p1Score: p[6],
+        p2Score: p[13],
+        moves: newMoves,
+        secs: secsRef.current,
+        mode: 'ai',
+        difficulty,
+      };
+      mncSaveEntry(entry);
+      setHistory(mncLoadHistory());
+      winTimerRef.current = setTimeout(() => {
+        winTimerRef.current = null;
+        setBannerMsg('');
+        const base = Math.max(Math.abs(p[6] - p[13]) * 15 - secsRef.current, 50);
+        const share = `Mancala vs AI (${difficulty}) — 🫘 You ${p[6]} · AI ${p[13]} · ${newMoves} moves · ${secsRef.current}s`;
+        onWin(w === 1 ? base : w === 'draw' ? 50 : 0, newMoves, secsRef.current, { winner: w, share });
+      }, 1500);
+    } else if (extraTurn) {
+      setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
+      setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
+    } else {
+      setPlayer(currentPlayer === 1 ? 2 : 1);
+      setBannerMsg('');
+    }
+  };
+
+  const applyMove = (idx, currentPlayer) => {
+    if (animatingRef.current) return;
+    const curPits = pitsRef.current;
+    if (curPits[idx] === 0) return;
+    const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(curPits, idx, currentPlayer);
+    const newMoves = movesRef.current + 1;
+    animatingRef.current = true;
+    const working = curPits.slice();
+    working[idx] = 0;
+    setPits(working.slice());
+    setFlashPits(new Set());
+    let step = 0;
+    const animate = () => {
+      if (!animatingRef.current) { setFlashPits(new Set()); return; }
+      if (step >= sequence.length) {
+        setFlashPits(new Set());
+        if (captureFrom >= 0) {
+          setCaptureFlash(new Set([captureFrom]));
+          setTimeout(() => {
+            if (!animatingRef.current) return;
+            setCaptureFlash(new Set());
+            animatingRef.current = false;
+            finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+          }, 350);
+        } else {
+          animatingRef.current = false;
+          finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+        }
+        return;
+      }
+      working[sequence[step]]++;
+      setPits(working.slice());
+      setFlashPits(new Set([sequence[step]]));
+      if (soundOnRef.current) mncPlayClick();
+      step++;
+      setTimeout(animate, 80);
+    };
+    setTimeout(animate, 0);
+  };
+  applyMoveRef.current = applyMove;
+
+  // Trigger AI when it's P2's turn
+  useEffect(() => {
+    if (player !== 2 || done) return;
+    setAiThinking(true);
+    const delay = difficulty === 'easy' ? 500 : difficulty === 'medium' ? 700 : 1100;
+    const t = setTimeout(() => {
+      setAiThinking(false);
+      const idx = mncAIMove(pitsRef.current, difficulty);
+      if (idx >= 0) applyMoveRef.current(idx, 2);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [player, done]);
+
+  const handlePitClick = (idx) => {
+    if (player !== 1 || done || animatingRef.current) return;
+    if (idx < 0 || idx > 5 || pits[idx] === 0) return;
+    applyMove(idx, 1);
+  };
+
+  const p2Display = [12, 11, 10, 9, 8, 7];
+  const p1Display = [0, 1, 2, 3, 4, 5];
+  const p1Color = C.accent;
+  const p2Color = C.rose;
+  const activeColor = player === 1 ? p1Color : p2Color;
+
+  const pitClass = (idx) => {
+    const isP1Pit = idx <= 5;
+    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
+    const cls = ['mnc-pit'];
+    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
+    if (flashPits.has(idx)) cls.push('mnc-flash');
+    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
+    return cls.join(' ');
+  };
+
+  const aiHistory = history.filter(h => h.mode === 'ai');
+  const stats = aiHistory.reduce(
+    (acc, h) => { acc.total++; if (h.winner === 1) acc.wins++; else if (h.winner === 2) acc.losses++; else acc.draws++; return acc; },
+    { total: 0, wins: 0, losses: 0, draws: 0 },
+  );
+  const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
+        <div className="pill">
+          <div className="plabel">Diff</div>
+          <div className="pvalue" style={{ fontSize: '0.8rem', textTransform: 'capitalize' }}>{difficulty}</div>
+        </div>
+      </div>
+
+      <div style={{
+        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
+        color: done ? C.muted : activeColor,
+        background: (done ? C.dim : activeColor) + '22',
+        border: `1px solid ${(done ? C.dim : activeColor)}44`,
+        borderRadius: '999px', padding: '0.32rem 0.8rem',
+        maxWidth: 480, margin: '0 auto 0.65rem',
+      }}>
+        {done
+          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn'}
+      </div>
+
+      <div className="mnc-board">
+        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
+          <div className="mnc-store-label">AI</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p2Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
+          <div className="mnc-store-label">You</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p1Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
+            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+      </div>
+
+      {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
+
+      <div className="mnc-controls">
+        <button onClick={resetGame}>↺ New Game</button>
+        <button onClick={() => { const next = !soundOn; setSoundOn(next); soundOnRef.current = next; try { localStorage.setItem(MNC_SOUND_KEY, next ? '1' : '0'); } catch {} }}>
+          {soundOn ? '🔊' : '🔇'}
+        </button>
+      </div>
+
+      {aiHistory.length > 0 && (
+        <div className="mnc-stats-grid" style={{ marginTop: '1rem' }}>
+          <div className="mnc-stat-card"><div className="mnc-stat-val">{stats.total}</div><div className="mnc-stat-lbl">Games</div></div>
+          <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: p1Color }}>{stats.wins}</div><div className="mnc-stat-lbl">Wins</div></div>
+          <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: p2Color }}>{stats.losses}</div><div className="mnc-stat-lbl">Losses</div></div>
+          <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: C.muted }}>{stats.draws}</div><div className="mnc-stat-lbl">Draws</div></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Game 5c — Mancala Online variant (polling multiplayer)
+   ============================================================ */
+function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
+  const { room, pollingError, opponentDisconnected, submitMove } = useMancalaRoom(roomId);
+  const [myMoves, setMyMoves] = useState(0);
+  const winCalledRef = useRef(false);
+  const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+
+  useEffect(() => {
+    if (!room || room.status !== 'finished' || winCalledRef.current) return;
+    winCalledRef.current = true;
+    const p = room.pits;
+    const w = room.winner;
+    const youWin = (w === String(myPlayerNum));
+    const isDraw  = (w === 'draw');
+    const base = Math.max(Math.abs(p[6] - p[13]) * 15 - secsRef.current, 50);
+    const date = new Date().toISOString().slice(0, 10);
+    const share = `Mancala Online ${date} — 🫘 P1 ${p[6]} · P2 ${p[13]} · ${secsRef.current}s`;
+    onWin(youWin ? base : isDraw ? 50 : 0, myMoves, secsRef.current, { winner: w, share });
+  }, [room && room.status]);
+
+  if (!room && !pollingError) {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} />
+        <div style={{ color: C.muted, fontSize: '0.85rem' }}>Connecting…</div>
+      </div>
+    );
+  }
+
+  if (pollingError === 'room_not_found') {
+    return <div style={{ textAlign: 'center', padding: '1.5rem', color: C.rose }}>Room not found.</div>;
+  }
+
+  const pits = room ? room.pits : Array(14).fill(0);
+  const status = room ? room.status : 'waiting';
+  const currentPlayer = room ? room.currentPlayer : null;
+  const isMyTurn = status === 'active' && currentPlayer === myPlayerNum;
+  const p1Color = C.accent;
+  const p2Color = C.rose;
+  const myColor = myPlayerNum === 1 ? p1Color : p2Color;
+
+  if (status === 'waiting') {
+    return (
+      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+        <div style={{ color: C.muted, marginBottom: '0.6rem', fontSize: '0.85rem' }}>Waiting for opponent to join…</div>
+        <div className="mnc-room-code">{roomId}</div>
+        <div style={{ color: C.muted, fontSize: '0.78rem', marginTop: '0.4rem' }}>Share this room code</div>
+        <div className="mnc-spinner" style={{ margin: '1rem auto 0' }} />
+      </div>
+    );
+  }
+
+  const handleClick = (idx) => {
+    if (!isMyTurn) return;
+    const ownMin = myPlayerNum === 1 ? 0 : 7;
+    const ownMax = myPlayerNum === 1 ? 5 : 12;
+    if (idx < ownMin || idx > ownMax || pits[idx] === 0) return;
+    const next = myMoves + 1;
+    setMyMoves(next);
+    onStepChange(next);
+    submitMove(idx);
+  };
+
+  const p2Display = [12, 11, 10, 9, 8, 7];
+  const p1Display = [0, 1, 2, 3, 4, 5];
+
+  const pitClass = (idx) => {
+    const isP1Pit = idx <= 5;
+    const isMyPit = myPlayerNum === 1 ? isP1Pit : !isP1Pit;
+    const canClick = isMyTurn && isMyPit && pits[idx] > 0;
+    const cls = ['mnc-pit'];
+    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
+    return cls.join(' ');
+  };
+
+  const p1Name = room && room.player1Name ? room.player1Name : 'P1';
+  const p2Name = room && room.player2Name ? room.player2Name : 'P2';
+  const myName  = myPlayerNum === 1 ? p1Name : p2Name;
+  const oppName = myPlayerNum === 1 ? p2Name : p1Name;
+
+  const turnLabel = status === 'finished'
+    ? (room.winner === String(myPlayerNum) ? 'You win! 🎉' : room.winner === 'draw' ? "Draw! 🤝" : `${oppName} wins!`)
+    : isMyTurn ? 'Your turn' : `${oppName}'s turn`;
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
+        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} />
+          <div className="plabel">Online</div>
+        </div>
+      </div>
+
+      {opponentDisconnected && (
+        <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+          Opponent connection lost — waiting for reconnect…
+        </div>
+      )}
+
+      <div className="mnc-board">
+        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: currentPlayer === 2 && status === 'active' ? p2Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={false} capturing={false} />
+          <div className="mnc-store-label">{myPlayerNum === 2 ? 'You' : oppName}</div>
+          <div className="mnc-store-score" style={{ color: currentPlayer === 2 && status === 'active' ? p2Color : '#C8A87A' }}>{pits[13]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p2Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }} onClick={() => handleClick(idx)}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={false} capturing={false} />
+          </div>
+        ))}
+        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: currentPlayer === 1 && status === 'active' ? p1Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={false} capturing={false} />
+          <div className="mnc-store-label">{myPlayerNum === 1 ? 'You' : oppName}</div>
+          <div className="mnc-store-score" style={{ color: currentPlayer === 1 && status === 'active' ? p1Color : '#C8A87A' }}>{pits[6]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p1Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handleClick(idx)}
+            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={false} capturing={false} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Game 5d — Mancala Mode Selector
+   ============================================================ */
+function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
+  const [mode, setMode]             = useState(null);
+  const [difficulty, setDifficulty] = useState(() => localStorage.getItem(MNC_AI_DIFF_KEY) || 'medium');
+  const [onlineAction, setOnlineAction] = useState(null);
+  const [joinCode, setJoinCode]     = useState('');
+  const [joinError, setJoinError]   = useState('');
+  const [busy, setBusy]             = useState(false);
+
+  const handleStart = async () => {
+    if (!mode) return;
+    if (mode === 'local') { onSelectLocal(); return; }
+    if (mode === 'ai') {
+      try { localStorage.setItem(MNC_AI_DIFF_KEY, difficulty); } catch {}
+      onSelectAI(difficulty);
+      return;
+    }
+    if (mode === 'online') {
+      if (onlineAction === 'create') {
+        setBusy(true);
+        const { ok, body } = await api('/api/mancala/rooms', { method: 'POST' });
+        setBusy(false);
+        if (ok && body) { onSelectOnline(1, body.roomId); }
+        else { setJoinError('Could not create room. Try again.'); }
+      } else if (onlineAction === 'join') {
+        const code = joinCode.trim().toUpperCase();
+        if (code.length < 4) { setJoinError('Enter a valid room code.'); return; }
+        setBusy(true);
+        const { ok, status, body } = await api('/api/mancala/rooms/' + code + '/join', { method: 'POST' });
+        setBusy(false);
+        if (ok && body)        { onSelectOnline(2, code); }
+        else if (status === 404) { setJoinError('Room not found. Check the code.'); }
+        else if (status === 409) { setJoinError('Room is full or you created it.'); }
+        else                     { setJoinError('Could not join. Try again.'); }
+      }
+    }
+  };
+
+  const modes = [
+    { id: 'local',  icon: '👥', name: 'Local 2-Player', desc: 'Pass and play on this device' },
+    { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer' },
+    { id: 'online', icon: '🌐', name: 'Online',          desc: 'Play with a friend via room code' },
+  ];
+
+  const canStart = mode && (
+    mode !== 'online' ||
+    (onlineAction === 'create') ||
+    (onlineAction === 'join' && joinCode.trim().length >= 4)
+  );
+
+  return (
+    <div className="mnc-mode-select">
+      {modes.map(m => (
+        <button key={m.id} className={'mnc-mode-btn' + (mode === m.id ? ' active' : '')} onClick={() => { setMode(m.id); setJoinError(''); }}>
+          <span className="mnc-mode-icon">{m.icon}</span>
+          <span className="mnc-mode-text">
+            <span className="mnc-mode-name">{m.name}</span>
+            <span className="mnc-mode-desc">{m.desc}</span>
+          </span>
+        </button>
+      ))}
+
+      {mode === 'ai' && (
+        <div className="mnc-difficulty-row">
+          {['easy', 'medium', 'hard'].map(d => (
+            <button key={d} className={'mnc-difficulty-pill' + (difficulty === d ? ' active' : '')} onClick={() => setDifficulty(d)}>
+              {d.charAt(0).toUpperCase() + d.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === 'online' && (
+        <div className="mnc-online-actions">
+          <div className="mnc-mode-sub">
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')}
+              onClick={() => { setOnlineAction('create'); setJoinError(''); }}>
+              Create Room
+            </button>
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')}
+              onClick={() => { setOnlineAction('join'); setJoinError(''); }}>
+              Join Room
+            </button>
+          </div>
+          {onlineAction === 'join' && (
+            <div className="mnc-join-form">
+              <input
+                className="mnc-join-input"
+                placeholder="Room code (e.g. AB3K7P)"
+                value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(''); }}
+                maxLength={8}
+              />
+            </div>
+          )}
+          {joinError && <div className="mnc-join-error">{joinError}</div>}
+        </div>
+      )}
+
+      {mode && (
+        <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>
+          {busy ? 'Please wait…' : 'Play'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Game 5 — Mancala wrapper (delegates to mode sub-components)
+   ============================================================ */
+function MancalaGame({ onWin, onStepChange, resetKey }) {
+  const [mode, setMode]               = useState(null);
+  const [difficulty, setDifficulty]   = useState(null);
+  const [roomId, setRoomId]           = useState(null);
+  const [myPlayerNum, setMyPlayerNum] = useState(null);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  // When "Play Again" fires, keep mode for local/ai but reset online (needs new room).
+  useEffect(() => {
+    if (modeRef.current === 'online') {
+      setMode(null);
+      setRoomId(null);
+      setMyPlayerNum(null);
+    }
+  }, [resetKey]);
+
+  if (!mode) {
+    return (
+      <MancalaModeSelect
+        onSelectLocal={() => setMode('local')}
+        onSelectAI={(diff) => { setDifficulty(diff); setMode('ai'); }}
+        onSelectOnline={(playerNum, rId) => { setMyPlayerNum(playerNum); setRoomId(rId); setMode('online'); }}
+      />
+    );
+  }
+
+  if (mode === 'local') return React.createElement(MancalaLocalGame, { onWin, onStepChange, resetKey });
+  if (mode === 'ai')    return React.createElement(MancalaAIGame,    { onWin, onStepChange, resetKey, difficulty });
+  if (mode === 'online') return React.createElement(MancalaOnlineGame, { onWin, onStepChange, roomId, myPlayerNum });
+  return null;
 }
 
 /* ============================================================

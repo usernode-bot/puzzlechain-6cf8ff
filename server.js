@@ -13,7 +13,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -38,6 +38,124 @@ async function migrate() {
       UNIQUE (user_id, game_id, attempt_date)
     )
   `);
+
+  // mancala_rooms is PUBLIC — game results contain no sensitive data.
+  // One row per multiplayer room; rooms persist until cleaned up.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mancala_rooms (
+      id             TEXT PRIMARY KEY,
+      player1_id     TEXT NOT NULL,
+      player2_id     TEXT,
+      player1_name   TEXT,
+      player2_name   TEXT,
+      pits           JSONB NOT NULL,
+      current_player INTEGER NOT NULL DEFAULT 1,
+      status         TEXT NOT NULL DEFAULT 'waiting',
+      winner         TEXT,
+      move_seq       INTEGER NOT NULL DEFAULT 0,
+      last_move_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Staging seeds for mancala_rooms so testers can exercise all states
+  // without needing a second device. Strictly a no-op in production.
+  if (IS_STAGING) {
+    const initPits = JSON.stringify([4,4,4,4,4,4,0,4,4,4,4,4,4,0]);
+    const finishedPits = JSON.stringify([0,0,0,0,0,0,32,0,0,0,0,0,0,16]);
+    const midPits = JSON.stringify([0,0,0,0,0,1,28,2,2,2,2,2,2,5]);
+
+    await pool.query(
+      `INSERT INTO mancala_rooms (id, player1_id, player1_name, pits, status)
+       VALUES ('STAGE1', 'staging-demo-user', 'staging-p1', $1, 'waiting')
+       ON CONFLICT (id) DO NOTHING`,
+      [initPits]
+    );
+    await pool.query(
+      `INSERT INTO mancala_rooms
+         (id, player1_id, player1_name, player2_id, player2_name, pits, status, winner, current_player)
+       VALUES ('STAGE2', 'staging-demo-user', 'staging-p1', 'staging-opponent', 'staging-p2',
+               $1, 'finished', '1', 1)
+       ON CONFLICT (id) DO NOTHING`,
+      [finishedPits]
+    );
+    await pool.query(
+      `INSERT INTO mancala_rooms
+         (id, player1_id, player1_name, player2_id, player2_name, pits, status, current_player)
+       VALUES ('STAGE3', 'staging-demo-user', 'staging-p1', 'staging-opponent', 'staging-p2',
+               $1, 'active', 1)
+       ON CONFLICT (id) DO NOTHING`,
+      [midPits]
+    );
+  }
+}
+
+// ---- Mancala room helpers ------------------------------------------------
+
+const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generateRoomId() {
+  let id = '';
+  for (let i = 0; i < 6; i++) id += ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)];
+  return id;
+}
+
+function srvMncOpposite(i) { return 12 - i; }
+
+// Server-side reimplementation of mncDistribute (mirrors client logic).
+function srvMncDistribute(pits, pitIdx, player) {
+  const p = pits.slice();
+  const stones = p[pitIdx];
+  p[pitIdx] = 0;
+  const skipStore = player === 1 ? 13 : 6;
+  const ownStore  = player === 1 ? 6  : 13;
+  const ownMin    = player === 1 ? 0  : 7;
+  const ownMax    = player === 1 ? 5  : 12;
+  let cur = pitIdx;
+  for (let i = 0; i < stones; i++) {
+    do { cur = (cur + 1) % 14; } while (cur === skipStore);
+    p[cur]++;
+  }
+  const lastIdx = cur;
+  const extraTurn = lastIdx === ownStore;
+  if (!extraTurn && lastIdx >= ownMin && lastIdx <= ownMax && p[lastIdx] === 1) {
+    const opp = srvMncOpposite(lastIdx);
+    if (p[opp] > 0) {
+      p[ownStore] += p[opp] + 1;
+      p[lastIdx]  = 0;
+      p[opp]      = 0;
+    }
+  }
+  return { pits: p, extraTurn };
+}
+
+// Apply distribute and sweep; returns final pits + game outcome.
+function srvMncApplyMove(pits, pitIdx, player) {
+  const { pits: p, extraTurn } = srvMncDistribute(pits, pitIdx, player);
+  const p1Empty = p.slice(0, 6).every(v => v === 0);
+  const p2Empty = p.slice(7, 13).every(v => v === 0);
+  if (p1Empty || p2Empty) {
+    for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+    for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    const winner = p[6] > p[13] ? '1' : p[13] > p[6] ? '2' : 'draw';
+    return { pits: p, extraTurn: false, gameOver: true, winner, nextPlayer: null };
+  }
+  return { pits: p, extraTurn, gameOver: false, winner: null, nextPlayer: extraTurn ? player : (player === 1 ? 2 : 1) };
+}
+
+function shapeRoom(r) {
+  return {
+    roomId:        r.id,
+    status:        r.status,
+    pits:          r.pits,
+    currentPlayer: r.current_player,
+    winner:        r.winner,
+    player1Id:     r.player1_id,
+    player2Id:     r.player2_id,
+    player1Name:   r.player1_name,
+    player2Name:   r.player2_name,
+    moveSeq:       r.move_seq,
+    lastMoveAt:    r.last_move_at,
+  };
 }
 
 // Next 00:00:00 UTC after the given instant.
@@ -268,6 +386,118 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
     res.status(500).json({ error: 'Failed to record result' });
   }
 });
+
+// ---- Mancala multiplayer API --------------------------------------------
+
+// Create a new room. Retries up to 3 times on ID collision.
+app.post('/api/mancala/rooms', async (req, res) => {
+  const initPits = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
+  let roomId = generateRoomId();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO mancala_rooms (id, player1_id, player1_name, pits)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [roomId, req.user.id, req.user.username || null, JSON.stringify(initPits)]
+      );
+      return res.json(shapeRoom(rows[0]));
+    } catch (err) {
+      if (err.code === '23505') { roomId = generateRoomId(); continue; }
+      console.error('[mancala] create room failed:', err.message);
+      return res.status(500).json({ error: 'Failed to create room' });
+    }
+  }
+  res.status(500).json({ error: 'Failed to generate unique room ID' });
+});
+
+// Join an existing waiting room as player 2.
+app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE mancala_rooms
+         SET player2_id = $1, player2_name = $2, status = 'active', last_move_at = now()
+       WHERE id = $3 AND status = 'waiting' AND player2_id IS NULL
+         AND player1_id != $1
+       RETURNING *`,
+      [req.user.id, req.user.username || null, roomId]
+    );
+    if (rows.length === 0) {
+      const existing = await pool.query('SELECT id, status, player2_id, player1_id FROM mancala_rooms WHERE id = $1', [roomId]);
+      if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+      const r = existing.rows[0];
+      if (r.player1_id === req.user.id) return res.status(409).json({ error: 'You created this room — share the code with a friend' });
+      return res.status(409).json({ error: 'Room is already full or finished' });
+    }
+    res.json(shapeRoom(rows[0]));
+  } catch (err) {
+    console.error('[mancala] join room failed:', err.message);
+    res.status(500).json({ error: 'Failed to join room' });
+  }
+});
+
+// Poll room state. Any authenticated user can poll (supports reconnect).
+app.get('/api/mancala/rooms/:roomId', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const { rows } = await pool.query('SELECT * FROM mancala_rooms WHERE id = $1', [roomId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    res.json(shapeRoom(rows[0]));
+  } catch (err) {
+    console.error('[mancala] get room failed:', err.message);
+    res.status(500).json({ error: 'Failed to get room' });
+  }
+});
+
+// Apply a move. Validates player identity, move_seq (anti-duplicate), and pit legality.
+app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
+  const { roomId } = req.params;
+  const { pitIdx, moveSeq } = req.body;
+  if (typeof pitIdx !== 'number' || typeof moveSeq !== 'number') {
+    return res.status(400).json({ error: 'pitIdx and moveSeq are required' });
+  }
+  try {
+    const { rows } = await pool.query('SELECT * FROM mancala_rooms WHERE id = $1', [roomId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    const r = rows[0];
+
+    if (r.status !== 'active') return res.status(409).json({ error: 'Game is not active' });
+    if (r.move_seq !== moveSeq - 1) {
+      return res.status(409).json({ error: 'Stale move_seq', serverMoveSeq: r.move_seq });
+    }
+
+    const player = r.current_player;
+    if (player === 1 && req.user.id !== r.player1_id) return res.status(403).json({ error: 'Not your turn' });
+    if (player === 2 && req.user.id !== r.player2_id) return res.status(403).json({ error: 'Not your turn' });
+
+    const ownMin = player === 1 ? 0 : 7;
+    const ownMax = player === 1 ? 5 : 12;
+    const pits = r.pits;
+    if (pitIdx < ownMin || pitIdx > ownMax || pits[pitIdx] === 0) {
+      return res.status(400).json({ error: 'Invalid pit selection' });
+    }
+
+    const { pits: finalPits, extraTurn, gameOver, winner, nextPlayer } = srvMncApplyMove(pits, pitIdx, player);
+    const newStatus = gameOver ? 'finished' : 'active';
+
+    // Atomic update — re-checks move_seq to prevent concurrent duplicate moves.
+    const { rows: updated } = await pool.query(
+      `UPDATE mancala_rooms
+         SET pits = $1, current_player = $2, status = $3, winner = $4,
+             move_seq = $5, last_move_at = now()
+       WHERE id = $6 AND move_seq = $7
+       RETURNING *`,
+      [JSON.stringify(finalPits), nextPlayer, newStatus, winner, moveSeq, roomId, moveSeq - 1]
+    );
+    if (updated.length === 0) return res.status(409).json({ error: 'Concurrent update conflict' });
+    res.json(shapeRoom(updated[0]));
+  } catch (err) {
+    console.error('[mancala] move failed:', err.message);
+    res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// ---- Static + HTML shell -------------------------------------------------
 
 app.use(express.static(path.join(__dirname, 'public')));
 

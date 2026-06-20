@@ -1513,6 +1513,470 @@ body {
   padding: 2rem 0;
   font-size: 0.9rem;
 }
+/* ---- Tile Match ---- */
+.tm-wrap { max-width: 400px; margin: 0 auto; }
+.tm-board-container {
+  position: relative;
+  margin: 0 auto;
+  overflow: visible;
+}
+.tm-tile {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.55rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.1s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+  border: 2px solid rgba(255,255,255,0.18);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+.tm-tile.available:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+.tm-tile.locked { opacity: 0.35; cursor: default; pointer-events: none; filter: brightness(0.7); }
+.tm-tile.flash {
+  animation: tm-match-flash 0.35s ease forwards;
+}
+@keyframes tm-match-flash {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1.25); opacity: 0.9; }
+  100% { transform: scale(0);   opacity: 0; }
+}
+.tm-bar {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  margin: 1rem auto 0;
+  max-width: 360px;
+  padding: 0.5rem;
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  transition: border-color 0.2s;
+}
+.tm-bar.bar-full { animation: tm-bar-flash 0.4s ease; border-color: ${C.rose}; }
+@keyframes tm-bar-flash {
+  0%, 100% { border-color: ${C.rose}; }
+  50%  { border-color: ${C.rose}; box-shadow: 0 0 12px ${C.rose}66; }
+}
+.tm-slot {
+  width: 44px;
+  height: 44px;
+  border: 2px dashed ${C.dim};
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.tm-slot.filled { border-style: solid; border-color: ${C.accent}33; background: ${C.card}; }
+.tm-slot.clear-target {
+  cursor: pointer;
+  border-color: ${C.rose};
+  background: ${C.rose}1a;
+  animation: tm-slot-pulse 0.7s ease infinite alternate;
+}
+.tm-slot.clear-target:hover { background: ${C.rose}33; }
+@keyframes tm-slot-pulse {
+  from { box-shadow: 0 0 0 0 ${C.rose}44; }
+  to   { box-shadow: 0 0 0 4px ${C.rose}00; }
+}
+.tm-bar-label {
+  text-align: center;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin-top: 0.3rem;
+}
+.tm-bar-label.full { color: ${C.rose}; font-weight: 600; }
+.tm-boosters {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 360px;
+  margin: 0.7rem auto 0;
+}
+.tm-booster-btn {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.45rem 0.3rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: border-color 0.12s, background 0.12s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+.tm-booster-btn:hover:not(:disabled) { border-color: ${C.accent}; background: ${C.accent}10; }
+.tm-booster-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.tm-booster-btn.active { border-color: ${C.rose}; background: ${C.rose}15; }
+.tm-booster-icon { font-size: 1rem; }
+.tm-booster-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: ${C.muted};
+}
+.tm-level-select { max-width: 400px; margin: 0 auto; }
+.tm-level-select h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.2rem; }
+.tm-level-select p { font-size: 0.85rem; color: ${C.muted}; margin-bottom: 1rem; }
+.tm-tier-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin: 0.75rem 0 0.35rem;
+  font-weight: 600;
+}
+.tm-level-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+.tm-level-btn {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.muted};
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0;
+}
+.tm-level-btn:hover { border-color: ${C.accent}; color: ${C.text}; }
+.tm-level-btn.selected { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
+.tm-level-btn.done { border-color: ${C.emerald}44; color: ${C.emerald}; }
+.tm-level-btn.done.selected { border-color: ${C.emerald}; background: ${C.emerald}22; }
+.tm-level-btn .tm-check {
+  position: absolute;
+  top: 1px; right: 2px;
+  font-size: 0.45rem;
+  color: ${C.emerald};
+}
+.tm-play-btn {
+  width: 100%;
+  margin-top: 1rem;
+  background: ${C.accent};
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.8rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.tm-play-btn:hover { background: #2f6fe0; }
+.tm-level-won {
+  background: ${C.card};
+  border: 1px solid ${C.emerald}55;
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  max-width: 360px;
+  margin: 0 auto;
+}
+.tm-level-won .trophy { font-size: 2.2rem; margin-bottom: 0.4rem; }
+.tm-level-won h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.15rem; }
+.tm-level-won .sub { color: ${C.muted}; font-size: 0.85rem; margin-bottom: 1rem; }
+.tm-level-stats {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  border-top: 1px solid ${C.border};
+  border-bottom: 1px solid ${C.border};
+  padding: 0.75rem 0;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+.tm-level-stat-row { display: flex; justify-content: space-between; padding: 0.15rem 0; }
+.tm-level-stat-row .k { color: ${C.muted}; }
+.tm-level-stat-row .v { color: ${C.gold}; font-weight: 600; }
+.tm-level-won-btns { display: flex; gap: 0.6rem; }
+.tm-next-btn {
+  flex: 2;
+  background: ${C.emerald};
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.tm-next-btn:hover { background: #059669; }
+.tm-end-btn {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.7rem;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.tm-end-btn:hover { border-color: ${C.accent}; }
+/* Timer pill */
+.tm-timer-pill {
+  transition: background 0.3s, color 0.3s;
+}
+.tm-timer-pill.warning {
+  background: ${C.rose}22 !important;
+  color: ${C.rose} !important;
+  animation: tm-timer-pulse 0.9s ease infinite alternate;
+}
+@keyframes tm-timer-pulse {
+  from { box-shadow: 0 0 0 0 ${C.rose}33; }
+  to   { box-shadow: 0 0 0 5px ${C.rose}00; }
+}
+/* Tier overview */
+.tm-tier-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.tm-tier-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  padding: 0.75rem 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+  text-align: left;
+}
+.tm-tier-card:hover { border-color: ${C.accent}; background: ${C.accent}0a; }
+.tm-tier-card-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: ${C.text};
+  margin-bottom: 0.15rem;
+}
+.tm-tier-card-range {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: ${C.muted};
+  margin-bottom: 0.2rem;
+}
+.tm-tier-card-progress {
+  font-size: 0.72rem;
+  color: ${C.emerald};
+  font-weight: 600;
+}
+/* Per-tier nav */
+.tm-tier-back-btn {
+  background: none;
+  border: none;
+  color: ${C.accent};
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 0 0.5rem;
+  display: inline-block;
+}
+.tm-tier-page-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+@media (max-width: 380px) {
+  .tm-level-grid { grid-template-columns: repeat(10, 1fr); gap: 0.25rem; }
+}
+
+/* ---- Idle Clicker ---- */
+.idle-container { display: flex; flex-direction: column; height: 100%; }
+.idle-main { flex: 1; padding: 1.5rem 1.25rem; max-width: 800px; margin: 0 auto; width: 100%; }
+.idle-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; }
+.idle-stat-box {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.8rem;
+  text-align: center;
+}
+.idle-stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.idle-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1.2rem; margin-top: 0.2rem; }
+.idle-stat-value.currency { color: ${C.gold}; }
+.idle-stat-value.prestige { color: ${C.accent}; }
+.idle-stat-value.income { color: ${C.emerald}; }
+
+.idle-tap-section { text-align: center; margin-bottom: 2rem; }
+.idle-tap-btn {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, ${C.gold}, ${C.accent});
+  border: 3px solid ${C.border};
+  color: white;
+  font-size: 2.5rem;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  font-weight: 700;
+}
+.idle-tap-btn:active { transform: scale(0.95); box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+.idle-tap-label { font-size: 0.85rem; color: ${C.muted}; margin-top: 0.5rem; }
+
+.idle-shop { margin-top: 1rem; }
+.idle-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid ${C.border};
+}
+.idle-tab {
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  color: ${C.muted};
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  position: relative;
+  transition: color 0.12s ease;
+}
+.idle-tab.active {
+  color: ${C.accent};
+  font-weight: 700;
+}
+.idle-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: ${C.accent};
+}
+
+.idle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.idle-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.idle-card:hover { border-color: ${C.accent}; transform: translateY(-2px); }
+.idle-card-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+.idle-card-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.3rem; }
+.idle-card-desc { font-size: 0.75rem; color: ${C.muted}; margin-bottom: 0.5rem; }
+.idle-card-stats { font-size: 0.7rem; color: ${C.muted}; margin-bottom: 0.5rem; }
+.idle-card-btn {
+  width: 100%;
+  padding: 0.5rem;
+  background: ${C.accent};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.idle-card-btn:hover { background: #2f6fe0; }
+.idle-card-btn:disabled { background: ${C.muted}; cursor: not-allowed; }
+
+.idle-coin-popup {
+  position: fixed;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: ${C.gold};
+  font-size: 1.2rem;
+  animation: float-up 1s ease-out forwards;
+}
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-40px); }
+}
+
+.prestige-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1.25rem;
+}
+.prestige-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 18px;
+  padding: 2rem;
+  text-align: center;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.prestige-card h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+.prestige-card .sub { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1.25rem; }
+.prestige-rows {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  border-top: 1px solid ${C.border};
+  border-bottom: 1px solid ${C.border};
+  padding: 1rem 0;
+  margin-bottom: 1.25rem;
+}
+.prestige-row { display: flex; justify-content: space-between; padding: 0.3rem 0; }
+.prestige-row .k { color: ${C.muted}; }
+.prestige-row .v { color: ${C.gold}; font-weight: 600; }
+.prestige-buttons { display: flex; gap: 0.8rem; }
+.prestige-confirm {
+  flex: 1;
+  padding: 0.8rem;
+  background: ${C.accent};
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.prestige-confirm:hover { background: #2f6fe0; }
+.prestige-cancel {
+  flex: 1;
+  padding: 0.8rem;
+  background: ${C.surface};
+  color: ${C.text};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.prestige-cancel:hover { border-color: ${C.accent}; }
 `;
 
 /* ============================================================
@@ -4732,6 +5196,1126 @@ function BlockBlastGame({ onWin, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   Game 7 — Tile Match (3-Tiles style)
+   ============================================================ */
+
+// Seeded PRNG (mulberry32) — deterministic layouts per level number.
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const TM_TILE_TYPES = [
+  { icon: '🌸', color: '#f43f5e' },
+  { icon: '🔥', color: '#f97316' },
+  { icon: '💎', color: '#3b82f6' },
+  { icon: '🌊', color: '#06b6d4' },
+  { icon: '⚡', color: '#f59e0b' },
+  { icon: '🌿', color: '#10b981' },
+  { icon: '🍄', color: '#e11d48' },
+  { icon: '🎵', color: '#8b5cf6' },
+  { icon: '🌙', color: '#7c3aed' },
+  { icon: '⭐', color: '#eab308' },
+  { icon: '🎮', color: '#0891b2' },
+  { icon: '🦋', color: '#c026d3' },
+];
+
+// 1000-level config computed from a smooth difficulty curve.
+function tmGetLevelConfig(level) {
+  const t = (level - 1) / 999;
+  const tileTypes   = Math.min(12, 3 + Math.floor(t * 9));
+  const setsPerType = 2 + Math.floor(t * 3);
+  const boardCols   = Math.min(10, 5 + Math.floor(t * 5));
+  const boardRows   = Math.min(8,  3 + Math.floor(t * 5));
+  const maxLayer    = Math.min(6,  2 + Math.floor(t * 4));
+  const undo        = t < 0.333 ? 3 : t < 0.667 ? 2 : 1;
+  const shuffle     = t < 0.667 ? 2 : 1;
+  return { tileTypes, setsPerType, boardCols, boardRows, maxLayer,
+           boosters: { undo, shuffle, clear: 1 } };
+}
+
+// Time limit scales with board size and difficulty.
+function tmLevelTimeLimit(level, cfg) {
+  const totalTiles  = cfg.tileTypes * cfg.setsPerType * 3;
+  const t           = (level - 1) / 999;
+  const secsPerTile = 3.5 - 2.0 * t;
+  return Math.round(totalTiles * secsPerTile);
+}
+
+// MM:SS formatter for tile countdown (named to avoid collision with fmtCountdown(ms) at lobby).
+function tmFmtSecs(secs) {
+  const s = Math.max(0, Math.floor(secs));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+const TM_TIER_LABELS = [
+  { label: 'Starter',  start: 0,   end: 99  },
+  { label: 'Beginner', start: 100, end: 199 },
+  { label: 'Easy',     start: 200, end: 299 },
+  { label: 'Normal',   start: 300, end: 399 },
+  { label: 'Medium',   start: 400, end: 499 },
+  { label: 'Hard',     start: 500, end: 599 },
+  { label: 'Harder',   start: 600, end: 699 },
+  { label: 'Expert',   start: 700, end: 799 },
+  { label: 'Master',   start: 800, end: 899 },
+  { label: 'Legend',   start: 900, end: 999 },
+];
+
+const TM_TILE_STEP = 50; // px per grid unit (48px tile + 2px gap)
+
+function tmGenerateLevel(cfg, seed) {
+  const rng = mulberry32(seed);
+  const { tileTypes, setsPerType, boardCols, boardRows, maxLayer } = cfg;
+  // Build tile list: tileTypes × setsPerType copies of each type (3 tiles per copy)
+  const typeList = [];
+  for (let t = 0; t < tileTypes; t++) {
+    for (let s = 0; s < setsPerType; s++) {
+      typeList.push(t, t, t);
+    }
+  }
+  // Fisher-Yates shuffle
+  for (let i = typeList.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [typeList[i], typeList[j]] = [typeList[j], typeList[i]];
+  }
+
+  const tiles = [];
+  let idx = 0;
+  let tileId = 0;
+
+  for (let layer = 0; layer <= maxLayer && idx < typeList.length; layer++) {
+    const offset = layer * 0.5;
+    const cols = boardCols - layer;
+    const rows = boardRows - layer;
+    if (cols <= 0 || rows <= 0) break;
+    for (let r = 0; r < rows && idx < typeList.length; r++) {
+      for (let c = 0; c < cols && idx < typeList.length; c++) {
+        tiles.push({
+          id: tileId++,
+          type: typeList[idx++],
+          col: c + offset,
+          row: r + offset,
+          layer,
+          removed: false,
+          inBar: false,
+        });
+      }
+    }
+  }
+  return tiles;
+}
+
+function tmIsLocked(tile, allTiles) {
+  for (let i = 0; i < allTiles.length; i++) {
+    const a = allTiles[i];
+    if (a.removed || a.inBar) continue;
+    if (a.layer <= tile.layer) continue;
+    if (Math.abs(a.col - tile.col) < 1.0 && Math.abs(a.row - tile.row) < 1.0) return true;
+  }
+  return false;
+}
+
+function tmSortBar(bar, tilesMap) {
+  return bar.slice().sort((a, b) => tilesMap[a].type - tilesMap[b].type);
+}
+
+function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
+  const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
+  const [selectedLevel, setSelectedLevel] = useState(1);
+  const [tierPage, setTierPage] = useState(null); // null = overview, 0-9 = tier index
+  const [tiles, setTiles] = useState([]);
+  const [bar, setBar] = useState([]);
+  const [moves, setMoves] = useState(0);
+  const [totalMoves, setTotalMoves] = useState(0);
+  const [sessionScore, setSessionScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const [boosters, setBoosters] = useState({ undo: 3, shuffle: 2, clear: 1 });
+  const [lastBarEntry, setLastBarEntry] = useState(null);
+  const [clearSlotMode, setClearSlotMode] = useState(false);
+  const [barFull, setBarFull] = useState(false);
+  const [completedLevels, setCompletedLevels] = useState(new Set());
+  const [flashIds, setFlashIds] = useState(new Set());
+  const [levelScore, setLevelScore] = useState(0);
+  const [timeLimit, setTimeLimit] = useState(0);
+  const { secs } = useTimer(!done && phase === 'playing');
+  const secsRef = useRef(0);
+  const totalSecsRef = useRef(0);
+  const levelStartSecsRef = useRef(0);
+
+  useEffect(() => { secsRef.current = secs; }, [secs]);
+
+  // Derived countdown values
+  const levelElapsed = secs - levelStartSecsRef.current;
+  const timeRemaining = timeLimit > 0 ? timeLimit - levelElapsed : Infinity;
+  const timeUp = phase === 'playing' && !done && timeLimit > 0 && timeRemaining <= 0;
+  const timeLow = phase === 'playing' && !done && timeLimit > 0 && timeRemaining > 0 && timeRemaining <= 30;
+
+  // Timeout triggers loss
+  useEffect(() => {
+    if (!timeUp) return;
+    setDone(true);
+    const totalS = totalSecsRef.current + secsRef.current;
+    const newTotalMoves = totalMoves + moves;
+    onLose(newTotalMoves, totalS, { share: `Tile Match ⏱ Level ${selectedLevel} | time's up` });
+  }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset everything when Play Again is triggered from App overlay
+  useEffect(() => {
+    setPhase('select');
+    setTierPage(null);
+    setTiles([]);
+    setBar([]);
+    setMoves(0);
+    setTotalMoves(0);
+    setSessionScore(0);
+    setDone(false);
+    setBoosters({ undo: 3, shuffle: 2, clear: 1 });
+    setLastBarEntry(null);
+    setClearSlotMode(false);
+    setBarFull(false);
+    setFlashIds(new Set());
+    setLevelScore(0);
+    setTimeLimit(0);
+    setCompletedLevels(new Set());
+    totalSecsRef.current = 0;
+    levelStartSecsRef.current = 0;
+  }, [resetKey]);
+
+  const startLevel = (lvl) => {
+    const cfg = tmGetLevelConfig(lvl);
+    const newTiles = tmGenerateLevel(cfg, lvl * 17 + 3);
+    const ls = Math.min(50 + Math.floor((lvl - 1) / 10) * 2, 200);
+    const limit = tmLevelTimeLimit(lvl, cfg);
+    setSelectedLevel(lvl);
+    setTiles(newTiles);
+    setBar([]);
+    setMoves(0);
+    setDone(false);
+    setBoosters({ ...cfg.boosters });
+    setLastBarEntry(null);
+    setClearSlotMode(false);
+    setBarFull(false);
+    setFlashIds(new Set());
+    setLevelScore(ls);
+    setTimeLimit(limit);
+    levelStartSecsRef.current = secsRef.current;
+    setPhase('playing');
+  };
+
+  const selectTile = (tileId) => {
+    if (clearSlotMode) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tilesMap = {};
+    tilesCopy.forEach(t => { tilesMap[t.id] = t; });
+    const tile = tilesMap[tileId];
+    if (!tile || tile.removed || tile.inBar) return;
+    if (tmIsLocked(tile, tilesCopy)) return;
+
+    // Game over: bar is already full with no match
+    if (bar.length >= 7) {
+      setDone(true);
+      setBarFull(true);
+      setTimeout(() => setBarFull(false), 600);
+      const totalS = totalSecsRef.current + secsRef.current;
+      const newTotal = totalMoves + moves + 1;
+      onLose(newTotal, totalS, { share: `Tile Match 💥 Level ${selectedLevel} | ${newTotal} moves` });
+      return;
+    }
+
+    tile.inBar = true;
+    const newBar = [...bar, tileId];
+    const newMoves = moves + 1;
+
+    // Sort bar
+    const sortedBar = tmSortBar(newBar, tilesMap);
+
+    // Check for match-3
+    let matchedIds = null;
+    for (let i = 0; i <= sortedBar.length - 3; i++) {
+      const a = tilesMap[sortedBar[i]];
+      const b = tilesMap[sortedBar[i + 1]];
+      const cc = tilesMap[sortedBar[i + 2]];
+      if (a && b && cc && a.type === b.type && b.type === cc.type) {
+        matchedIds = [sortedBar[i], sortedBar[i + 1], sortedBar[i + 2]];
+        break;
+      }
+    }
+
+    let finalBar = sortedBar;
+    if (matchedIds) {
+      // Flash animation then remove
+      const matchSet = new Set(matchedIds);
+      setFlashIds(matchSet);
+      matchedIds.forEach(id => {
+        tilesMap[id].removed = true;
+        tilesMap[id].inBar = false;
+      });
+      finalBar = sortedBar.filter(id => !matchSet.has(id));
+      setTimeout(() => setFlashIds(new Set()), 400);
+    }
+
+    const updatedTiles = tilesCopy;
+    const newTotalMoves = totalMoves + newMoves;
+
+    // Check game-over: bar full after placement, no match
+    if (!matchedIds && finalBar.length >= 7) {
+      setTiles(updatedTiles);
+      setBar(finalBar);
+      setMoves(newMoves);
+      setDone(true);
+      setBarFull(true);
+      setTimeout(() => setBarFull(false), 600);
+      const totalS = totalSecsRef.current + secsRef.current;
+      onLose(newTotalMoves, totalS, { share: `Tile Match 💥 Level ${selectedLevel} | ${newTotalMoves} moves` });
+      return;
+    }
+
+    setTiles(updatedTiles);
+    setBar(finalBar);
+    setMoves(newMoves);
+    setLastBarEntry(tileId);
+    onStepChange(newTotalMoves);
+
+    // Check win: no active board tiles
+    const remaining = updatedTiles.filter(t => !t.removed && !t.inBar);
+    const inBarNow = finalBar.length;
+    if (remaining.length === 0 && inBarNow === 0) {
+      setDone(true);
+      const s = secsRef.current;
+      setPhase('levelWon');
+      totalSecsRef.current += s;
+    }
+  };
+
+  const doUndo = () => {
+    if (boosters.undo <= 0 || !lastBarEntry) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tilesMap = {};
+    tilesCopy.forEach(t => { tilesMap[t.id] = t; });
+    const tile = tilesMap[lastBarEntry];
+    if (!tile || !tile.inBar) return;
+    tile.inBar = false;
+    const newBar = bar.filter(id => id !== lastBarEntry);
+    setTiles(tilesCopy);
+    setBar(newBar);
+    setLastBarEntry(null);
+    setBoosters(b => ({ ...b, undo: b.undo - 1 }));
+    setBarFull(false);
+  };
+
+  const doShuffle = () => {
+    if (boosters.shuffle <= 0) return;
+    const active = tiles.filter(t => !t.removed && !t.inBar);
+    if (active.length < 2) return;
+    const positions = active.map(t => ({ col: t.col, row: t.row, layer: t.layer }));
+    // Fisher-Yates with time-based seed (non-deterministic for shuffle)
+    const rng = mulberry32((Date.now() & 0xFFFF) + 1);
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    active.forEach((t, i) => {
+      const tc = tilesCopy.find(x => x.id === t.id);
+      if (tc) { tc.col = positions[i].col; tc.row = positions[i].row; tc.layer = positions[i].layer; }
+    });
+    setTiles(tilesCopy);
+    setBoosters(b => ({ ...b, shuffle: b.shuffle - 1 }));
+  };
+
+  const doClearMode = () => {
+    if (boosters.clear <= 0 || bar.length === 0) return;
+    setClearSlotMode(true);
+  };
+
+  const clearSlotTile = (tileId) => {
+    if (!clearSlotMode) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tilesMap = {};
+    tilesCopy.forEach(t => { tilesMap[t.id] = t; });
+    const tile = tilesMap[tileId];
+    if (!tile || !tile.inBar) return;
+    tile.removed = true;
+    tile.inBar = false;
+    const newBar = bar.filter(id => id !== tileId);
+    setTiles(tilesCopy);
+    setBar(newBar);
+    setBoosters(b => ({ ...b, clear: b.clear - 1 }));
+    setClearSlotMode(false);
+    setBarFull(false);
+  };
+
+  const handleNextLevel = () => {
+    const ns = sessionScore + levelScore;
+    setSessionScore(ns);
+    setCompletedLevels(prev => new Set([...prev, selectedLevel]));
+    const nextLvl = selectedLevel < 1000 ? selectedLevel + 1 : null;
+    if (nextLvl) {
+      startLevel(nextLvl);
+    }
+  };
+
+  const handleEndSession = () => {
+    const ns = sessionScore + levelScore;
+    setCompletedLevels(prev => new Set([...prev, selectedLevel]));
+    const totalS = totalSecsRef.current;
+    const newTotalMoves = totalMoves + moves;
+    const share = `Tile Match ⬢ L${completedLevels.size + 1} cleared | ${ns} pts 🀄✨`;
+    onWin(ns, newTotalMoves, totalS, { share });
+  };
+
+  // ---- Level selector screen ----
+  if (phase === 'select') {
+    // Tier overview
+    if (tierPage === null) {
+      return (
+        <div className="tm-level-select">
+          <h2>Tile Match Puzzle</h2>
+          <p>Click tiles off the layered board into your 7-slot bar — match three to clear them.</p>
+          <div className="tm-tier-overview">
+            {TM_TIER_LABELS.map((tier, idx) => {
+              const doneCount = Array.from(completedLevels).filter(l => l >= tier.start + 1 && l <= tier.end + 1).length;
+              return (
+                <div key={tier.label} className="tm-tier-card" onClick={() => { setTierPage(idx); setSelectedLevel(tier.start + 1); }}>
+                  <div className="tm-tier-card-name">{tier.label}</div>
+                  <div className="tm-tier-card-range">L{tier.start + 1}–{tier.end + 1}</div>
+                  {doneCount > 0 && <div className="tm-tier-card-progress">{doneCount}/100 cleared</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    // Per-tier grid
+    const tier = TM_TIER_LABELS[tierPage];
+    return (
+      <div className="tm-level-select">
+        <button className="tm-tier-back-btn" onClick={() => setTierPage(null)}>← Tiers</button>
+        <div className="tm-tier-page-title">{tier.label} <span style={{color:'var(--c-muted,#888)',fontWeight:400,fontSize:'0.85rem'}}>L{tier.start+1}–{tier.end+1}</span></div>
+        <div className="tm-level-grid">
+          {Array.from({ length: 100 }, (_, i) => {
+            const lvl = tier.start + i + 1;
+            const isDone = completedLevels.has(lvl);
+            const isSel = selectedLevel === lvl;
+            return (
+              <button
+                key={lvl}
+                className={`tm-level-btn${isSel ? ' selected' : ''}${isDone ? ' done' : ''}`}
+                onClick={() => setSelectedLevel(lvl)}
+              >
+                {lvl}
+                {isDone && <span className="tm-check">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+        <button className="tm-play-btn" onClick={() => startLevel(selectedLevel)}>
+          Play Level {selectedLevel}
+        </button>
+      </div>
+    );
+  }
+
+  // ---- Level won screen ----
+  if (phase === 'levelWon') {
+    const isLast = selectedLevel >= 1000;
+    return (
+      <div className="tm-level-won">
+        <div className="trophy">🏆</div>
+        <h3>Level {selectedLevel} Cleared!</h3>
+        <div className="sub">Board cleared — well played</div>
+        <div className="tm-level-stats">
+          <div className="tm-level-stat-row"><span className="k">Moves</span><span className="v">{moves}</span></div>
+          <div className="tm-level-stat-row"><span className="k">Level score</span><span className="v">+{levelScore}</span></div>
+          <div className="tm-level-stat-row"><span className="k">Session total</span><span className="v">{sessionScore + levelScore}</span></div>
+        </div>
+        <div className="tm-level-won-btns">
+          {!isLast && (
+            <button className="tm-next-btn" onClick={handleNextLevel}>Next Level →</button>
+          )}
+          <button className="tm-end-btn" onClick={handleEndSession}>End Session</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Playing screen ----
+  const cfg = tmGetLevelConfig(selectedLevel);
+  const tilesMap = {};
+  tiles.forEach(t => { tilesMap[t.id] = t; });
+
+  const boardW = (cfg.boardCols) * TM_TILE_STEP;
+  const boardH = (cfg.boardRows + cfg.maxLayer * 0.5) * TM_TILE_STEP + 48;
+
+  const activeTiles = tiles.filter(t => !t.removed);
+  const boardTiles = activeTiles.filter(t => !t.inBar);
+  const tilesLeft = boardTiles.length;
+
+  return (
+    <div className="tm-wrap">
+      <div className="status-bar">
+        <div className={`pill tm-timer-pill${timeLow ? ' warning' : ''}`}>
+          <div className="plabel">Time</div>
+          <div className="pvalue">{tmFmtSecs(timeRemaining === Infinity ? 0 : timeRemaining)}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Moves</div>
+          <div className="pvalue">{moves}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Tiles Left</div>
+          <div className="pvalue">{tilesLeft}</div>
+        </div>
+      </div>
+
+      <div
+        className="tm-board-container"
+        style={{ width: boardW, height: boardH, maxWidth: '100%' }}
+      >
+        {boardTiles.map(tile => {
+          const locked = tmIsLocked(tile, tiles);
+          const isFlash = flashIds.has(tile.id);
+          const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
+          return (
+            <div
+              key={tile.id}
+              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}`}
+              style={{
+                left: tile.col * TM_TILE_STEP,
+                top: tile.row * TM_TILE_STEP,
+                zIndex: tile.layer * 10 + 1,
+                background: tt.color,
+              }}
+              onClick={() => selectTile(tile.id)}
+            >
+              {tt.icon}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
+        {Array.from({ length: 7 }, (_, i) => {
+          const tid = bar[i];
+          const t = tid != null ? tilesMap[tid] : null;
+          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
+          const isClear = clearSlotMode && t != null;
+          return (
+            <div
+              key={i}
+              className={`tm-slot${t ? ' filled' : ''}${isClear ? ' clear-target' : ''}`}
+              onClick={isClear ? () => clearSlotTile(tid) : undefined}
+            >
+              {tt ? tt.icon : ''}
+            </div>
+          );
+        })}
+      </div>
+      <div className={`tm-bar-label${barFull ? ' full' : ''}`}>
+        {barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`}
+      </div>
+
+      <div className="tm-boosters">
+        <button
+          className="tm-booster-btn"
+          disabled={boosters.undo <= 0 || !lastBarEntry}
+          onClick={doUndo}
+          title="Return last tile to board"
+        >
+          <span className="tm-booster-icon">↩</span>
+          <span>Undo</span>
+          <span className="tm-booster-count">{boosters.undo} left</span>
+        </button>
+        <button
+          className="tm-booster-btn"
+          disabled={boosters.shuffle <= 0}
+          onClick={doShuffle}
+          title="Shuffle board tiles"
+        >
+          <span className="tm-booster-icon">🔀</span>
+          <span>Shuffle</span>
+          <span className="tm-booster-count">{boosters.shuffle} left</span>
+        </button>
+        <button
+          className={`tm-booster-btn${clearSlotMode ? ' active' : ''}`}
+          disabled={boosters.clear <= 0 || bar.length === 0}
+          onClick={clearSlotMode ? () => setClearSlotMode(false) : doClearMode}
+          title="Remove a tile from bar"
+        >
+          <span className="tm-booster-icon">✕</span>
+          <span>{clearSlotMode ? 'Cancel' : 'Clear'}</span>
+          <span className="tm-booster-count">{boosters.clear} left</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Daily Tile Match
+   ============================================================ */
+const TM_DAILY_CONFIG = {
+  tileTypes: 8, setsPerType: 3, boardCols: 8, boardRows: 5, maxLayer: 3,
+  boosters: { undo: 3, shuffle: 2, clear: 1 },
+};
+const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
+
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }) {
+  const [tiles, setTiles] = useState([]);
+  const [bar, setBar] = useState([]);
+  const [moves, setMoves] = useState(0);
+  const [done, setDone] = useState(false);
+  const [boosters, setBoosters] = useState({ ...TM_DAILY_CONFIG.boosters });
+  const [lastBarEntry, setLastBarEntry] = useState(null);
+  const [clearSlotMode, setClearSlotMode] = useState(false);
+  const [barFull, setBarFull] = useState(false);
+  const [flashIds, setFlashIds] = useState(new Set());
+  const [secs, setSecs] = useState(0);
+  const secsRef = useRef(0);
+  const movesRef = useRef(0);
+
+  useEffect(() => { secsRef.current = secs; }, [secs]);
+  useEffect(() => { movesRef.current = moves; }, [moves]);
+
+  // Self-managed timer so setSecs(0) on reset works correctly
+  useEffect(() => {
+    if (done) return;
+    const id = setInterval(() => setSecs(s => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [done]);
+
+  const remaining = TM_DAILY_TIME_LIMIT - secs;
+  const timeUp = !done && remaining <= 0;
+  const timeLow = !done && remaining > 0 && remaining <= 30;
+
+  useEffect(() => {
+    if (!timeUp) return;
+    setDone(true);
+    onLose(movesRef.current, secsRef.current, { share: 'Daily Tile Match ⏱ time\'s up' });
+  }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initialise board from day seed
+  useEffect(() => {
+    const dayNum = cwDayNum(offset || 0);
+    const seed = dayNum * 31 + 7;
+    setTiles(tmGenerateLevel(TM_DAILY_CONFIG, seed));
+    setBar([]);
+    setMoves(0);
+    setSecs(0);
+    setDone(false);
+    setBoosters({ ...TM_DAILY_CONFIG.boosters });
+    setLastBarEntry(null);
+    setClearSlotMode(false);
+    setBarFull(false);
+    setFlashIds(new Set());
+  }, [resetKey, offset]);
+
+  const tilesMap = {};
+  tiles.forEach(t => { tilesMap[t.id] = t; });
+
+  const selectTile = (tileId) => {
+    if (clearSlotMode || done) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tm = {};
+    tilesCopy.forEach(t => { tm[t.id] = t; });
+    const tile = tm[tileId];
+    if (!tile || tile.removed || tile.inBar) return;
+    if (tmIsLocked(tile, tilesCopy)) return;
+
+    if (bar.length >= 7) {
+      setBarFull(true);
+      setTimeout(() => setBarFull(false), 600);
+      setDone(true);
+      onLose(movesRef.current + 1, secsRef.current, { share: `Daily Tile Match 💥 ${movesRef.current + 1} moves` });
+      return;
+    }
+
+    tile.inBar = true;
+    const newBar = [...bar, tileId];
+    const newMoves = moves + 1;
+    const sortedBar = tmSortBar(newBar, tm);
+
+    let matchedIds = null;
+    for (let i = 0; i <= sortedBar.length - 3; i++) {
+      const a = tm[sortedBar[i]], b = tm[sortedBar[i+1]], c = tm[sortedBar[i+2]];
+      if (a && b && c && a.type === b.type && b.type === c.type) {
+        matchedIds = [sortedBar[i], sortedBar[i+1], sortedBar[i+2]];
+        break;
+      }
+    }
+
+    let finalBar = sortedBar;
+    if (matchedIds) {
+      const matchSet = new Set(matchedIds);
+      setFlashIds(matchSet);
+      matchedIds.forEach(id => { tm[id].removed = true; tm[id].inBar = false; });
+      finalBar = sortedBar.filter(id => !matchSet.has(id));
+      setTimeout(() => setFlashIds(new Set()), 400);
+    }
+
+    if (!matchedIds && finalBar.length >= 7) {
+      setTiles(tilesCopy);
+      setBar(finalBar);
+      setMoves(newMoves);
+      setBarFull(true);
+      setTimeout(() => setBarFull(false), 600);
+      setDone(true);
+      onLose(newMoves, secsRef.current, { share: `Daily Tile Match 💥 ${newMoves} moves` });
+      return;
+    }
+
+    setTiles(tilesCopy);
+    setBar(finalBar);
+    setMoves(newMoves);
+    setLastBarEntry(tileId);
+    onStepChange(newMoves);
+
+    const boardRemaining = tilesCopy.filter(t => !t.removed && !t.inBar);
+    if (boardRemaining.length === 0 && finalBar.length === 0) {
+      setDone(true);
+      onWin(150, newMoves, secsRef.current, { share: `Daily Tile Match ⬢ cleared in ${newMoves} moves! 🀄✨` });
+    }
+  };
+
+  const doUndo = () => {
+    if (boosters.undo <= 0 || !lastBarEntry) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tm = {};
+    tilesCopy.forEach(t => { tm[t.id] = t; });
+    const tile = tm[lastBarEntry];
+    if (!tile || !tile.inBar) return;
+    tile.inBar = false;
+    setTiles(tilesCopy);
+    setBar(bar.filter(id => id !== lastBarEntry));
+    setLastBarEntry(null);
+    setBoosters(b => ({ ...b, undo: b.undo - 1 }));
+    setBarFull(false);
+  };
+
+  const doShuffle = () => {
+    if (boosters.shuffle <= 0) return;
+    const active = tiles.filter(t => !t.removed && !t.inBar);
+    if (active.length < 2) return;
+    const positions = active.map(t => ({ col: t.col, row: t.row, layer: t.layer }));
+    const rng = mulberry32((secs * 1000 & 0xFFFF) + 1);
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    active.forEach((t, i) => {
+      const tc = tilesCopy.find(x => x.id === t.id);
+      if (tc) { tc.col = positions[i].col; tc.row = positions[i].row; tc.layer = positions[i].layer; }
+    });
+    setTiles(tilesCopy);
+    setBoosters(b => ({ ...b, shuffle: b.shuffle - 1 }));
+  };
+
+  const doClearMode = () => {
+    if (boosters.clear <= 0 || bar.length === 0) return;
+    setClearSlotMode(true);
+  };
+
+  const clearSlotTile = (tileId) => {
+    if (!clearSlotMode) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tm = {};
+    tilesCopy.forEach(t => { tm[t.id] = t; });
+    const tile = tm[tileId];
+    if (!tile || !tile.inBar) return;
+    tile.removed = true;
+    tile.inBar = false;
+    setTiles(tilesCopy);
+    setBar(bar.filter(id => id !== tileId));
+    setBoosters(b => ({ ...b, clear: b.clear - 1 }));
+    setClearSlotMode(false);
+    setBarFull(false);
+  };
+
+  const cfg = TM_DAILY_CONFIG;
+  const boardW = cfg.boardCols * TM_TILE_STEP;
+  const boardH = (cfg.boardRows + cfg.maxLayer * 0.5) * TM_TILE_STEP + 48;
+  const activeTiles = tiles.filter(t => !t.removed);
+  const boardTiles = activeTiles.filter(t => !t.inBar);
+
+  return (
+    <div className="tm-wrap">
+      <div className="status-bar">
+        <div className={`pill tm-timer-pill${timeLow ? ' warning' : ''}`}>
+          <div className="plabel">Time</div>
+          <div className="pvalue">{tmFmtSecs(remaining)}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Moves</div>
+          <div className="pvalue">{moves}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Tiles Left</div>
+          <div className="pvalue">{boardTiles.length}</div>
+        </div>
+      </div>
+
+      <div className="tm-board-container" style={{ width: boardW, height: boardH, maxWidth: '100%' }}>
+        {boardTiles.map(tile => {
+          const locked = tmIsLocked(tile, tiles);
+          const isFlash = flashIds.has(tile.id);
+          const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
+          return (
+            <div
+              key={tile.id}
+              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}`}
+              style={{ left: tile.col * TM_TILE_STEP, top: tile.row * TM_TILE_STEP, zIndex: tile.layer * 10 + 1, background: tt.color }}
+              onClick={() => selectTile(tile.id)}
+            >
+              {tt.icon}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
+        {Array.from({ length: 7 }, (_, i) => {
+          const tid = bar[i];
+          const t = tid != null ? tilesMap[tid] : null;
+          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
+          const isClear = clearSlotMode && t != null;
+          return (
+            <div
+              key={i}
+              className={`tm-slot${t ? ' filled' : ''}${isClear ? ' clear-target' : ''}`}
+              onClick={isClear ? () => clearSlotTile(tid) : undefined}
+            >
+              {tt ? tt.icon : ''}
+            </div>
+          );
+        })}
+      </div>
+      <div className={`tm-bar-label${barFull ? ' full' : ''}`}>
+        {barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`}
+      </div>
+
+      <div className="tm-boosters">
+        <button className="tm-booster-btn" disabled={boosters.undo <= 0 || !lastBarEntry} onClick={doUndo} title="Return last tile to board">
+          <span className="tm-booster-icon">↩</span>
+          <span>Undo</span>
+          <span className="tm-booster-count">{boosters.undo} left</span>
+        </button>
+        <button className="tm-booster-btn" disabled={boosters.shuffle <= 0} onClick={doShuffle} title="Shuffle board tiles">
+          <span className="tm-booster-icon">🔀</span>
+          <span>Shuffle</span>
+          <span className="tm-booster-count">{boosters.shuffle} left</span>
+        </button>
+        <button className={`tm-booster-btn${clearSlotMode ? ' active' : ''}`} disabled={boosters.clear <= 0 || bar.length === 0} onClick={clearSlotMode ? () => setClearSlotMode(false) : doClearMode} title="Remove a tile from bar">
+          <span className="tm-booster-icon">✕</span>
+          <span>{clearSlotMode ? 'Cancel' : 'Clear'}</span>
+          <span className="tm-booster-count">{boosters.clear} left</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+/* ============================================================
+   Idle clicker game constants & helpers
+   ============================================================ */
+const IDLE_UNITS = [
+  { id: 'worker', name: 'Worker Hamster', icon: '🐹', baseCost: 10, incomePerSec: 0.1 },
+  { id: 'coinpress', name: 'Coin Press', icon: '🏭', baseCost: 100, incomePerSec: 1 },
+  { id: 'goldenwheel', name: 'Golden Wheel', icon: '✨', baseCost: 1000, incomePerSec: 10 },
+  { id: 'vault', name: 'Treasure Vault', icon: '💰', baseCost: 10000, incomePerSec: 100 },
+];
+
+const IDLE_UPGRADES = [
+  { id: 'iron_paws', name: 'Iron Paws', baseCost: 50, maxLevel: 10, effect: 'tap', multiplier: 1.1, desc: 'Boost tap power' },
+  { id: 'worker_motivation', name: 'Worker Motivation', baseCost: 150, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'worker', desc: 'Worker +25%' },
+  { id: 'coinpress_boost', name: 'Press Power', baseCost: 500, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'coinpress', desc: 'Press +25%' },
+  { id: 'goldenwheel_boost', name: 'Wheel Speed', baseCost: 5000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'goldenwheel', desc: 'Wheel +25%' },
+  { id: 'vault_boost', name: 'Vault Depth', baseCost: 50000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'vault', desc: 'Vault +25%' },
+];
+
+function idleUnitCost(unit, count) {
+  return Math.ceil(unit.baseCost * Math.pow(1.15, count));
+}
+
+function idleUpgradeCost(upgrade, level) {
+  return Math.ceil(upgrade.baseCost * Math.pow(1.1, level));
+}
+
+function computePassiveIncome(unitsOwned, upgrades) {
+  let income = 0;
+  for (const unit of IDLE_UNITS) {
+    const count = unitsOwned[unit.id] || 0;
+    let unitIncome = unit.incomePerSec * count;
+    // Apply unit-specific upgrades (5 levels of 1.25x each = 3.05x at max)
+    for (const upgrade of IDLE_UPGRADES) {
+      if (upgrade.unitId === unit.id && upgrades[upgrade.id]) {
+        unitIncome *= Math.pow(upgrade.multiplier, upgrades[upgrade.id]);
+      }
+    }
+    income += unitIncome;
+  }
+  return income;
+}
+
+function computePrestigeMultiplier(prestigePoints) {
+  return 1 + 0.05 * prestigePoints;
+}
+
+function IdleGame() {
+  const [state, setState] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('units');
+  const [pendingPrestige, setPendingPrestige] = useState(null);
+  const [popups, setPopups] = useState([]);
+  const [offlineAccum, setOfflineAccum] = useState(0);
+  const tapPowerRef = useRef(1);
+
+  const loadState = async () => {
+    const { ok, body } = await api('/api/idle/state');
+    if (ok && body) {
+      setState(body);
+      tapPowerRef.current = parseFloat(body.tapPower) || 1;
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadState();
+  }, []);
+
+  // Passive income accumulation loop
+  useEffect(() => {
+    if (!state) return;
+    const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
+    const multiplier = computePrestigeMultiplier(state.prestigePoints);
+    const id = setInterval(() => {
+      setState(prev => {
+        const newCur = prev.currency + passiveIncome * multiplier;
+        const newPeak = Math.max(prev.peakCurrency, newCur);
+        return { ...prev, currency: newCur, peakCurrency: newPeak };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [state]);
+
+  // Sync offline accumulation periodically
+  useEffect(() => {
+    if (offlineAccum <= 0 || !state) return;
+    const timer = setTimeout(async () => {
+      const { ok } = await api('/api/idle/tap', { method: 'POST', body: JSON.stringify({ tapCount: offlineAccum }) });
+      if (ok) setOfflineAccum(0);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [offlineAccum, state]);
+
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+  if (!state) return <div style={{ padding: '2rem', textAlign: 'center' }}>Failed to load game</div>;
+
+  const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
+  const multiplier = computePrestigeMultiplier(state.prestigePoints);
+  const displayCurrency = Math.floor(state.currency);
+
+  const handleTap = async () => {
+    const tapPower = tapPowerRef.current;
+    const tapValue = tapPower * multiplier;
+    const newCur = state.currency + tapValue;
+    const newPeak = Math.max(state.peakCurrency, newCur);
+    setState(prev => ({ ...prev, currency: newCur, peakCurrency: newPeak }));
+    setOfflineAccum(offlineAccum + 1);
+
+    // Coin popup
+    const popupId = Math.random();
+    const x = Math.random() * 100 - 50;
+    const y = Math.random() * 50;
+    setPopups(prev => [...prev, { id: popupId, value: '+' + Math.ceil(tapValue), x, y }]);
+    setTimeout(() => setPopups(prev => prev.filter(p => p.id !== popupId)), 1000);
+  };
+
+  const handleBuyUnit = async (unit) => {
+    const count = state.unitsOwned[unit.id] || 0;
+    const cost = idleUnitCost(unit, count);
+    if (state.currency < cost) return alert('Insufficient currency');
+
+    const { ok, status } = await api('/api/idle/buy-unit', {
+      method: 'POST',
+      body: JSON.stringify({ unitId: unit.id })
+    });
+    if (ok) loadState();
+    else if (status === 409) alert('Insufficient currency');
+  };
+
+  const handleUpgrade = async (upgrade) => {
+    const level = state.upgrades[upgrade.id] || 0;
+    if (level >= upgrade.maxLevel) return alert('Already maxed');
+    const cost = idleUpgradeCost(upgrade, level);
+    if (state.currency < cost) return alert('Insufficient currency');
+
+    const { ok, status } = await api('/api/idle/upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ upgradeId: upgrade.id })
+    });
+    if (ok) loadState();
+    else if (status === 409) alert('Insufficient currency');
+  };
+
+  const handlePrestige = async () => {
+    const bonus = Math.floor(Math.sqrt(state.peakCurrency / 1000));
+    const newPrestigePoints = state.prestigePoints + bonus;
+    const multiplierGain = (0.05 * bonus).toFixed(1);
+    setPendingPrestige({ bonus, newPoints: newPrestigePoints, multiplierGain });
+  };
+
+  const confirmPrestige = async () => {
+    const { ok } = await api('/api/idle/prestige', { method: 'POST' });
+    if (ok) {
+      setPendingPrestige(null);
+      loadState();
+    }
+  };
+
+  return (
+    <div className="idle-container">
+      <div className="idle-main">
+        <div className="idle-stats">
+          <div className="idle-stat-box">
+            <div className="idle-stat-label">Coins</div>
+            <div className="idle-stat-value currency">{displayCurrency.toLocaleString()}</div>
+          </div>
+          <div className="idle-stat-box">
+            <div className="idle-stat-label">Per Second</div>
+            <div className="idle-stat-value income">{(passiveIncome * multiplier).toFixed(2)}</div>
+          </div>
+          <div className="idle-stat-box">
+            <div className="idle-stat-label">Prestige Bonus</div>
+            <div className="idle-stat-value prestige">+{Math.round(state.prestigePoints * 5)}%</div>
+          </div>
+        </div>
+
+        <div className="idle-tap-section">
+          <button className="idle-tap-btn" onClick={handleTap}>TAP</button>
+          <div className="idle-tap-label">Tap Power: {tapPowerRef.current.toFixed(2)}×</div>
+        </div>
+
+        <div className="idle-shop">
+          <div className="idle-tabs">
+            <button
+              className={`idle-tab ${activeTab === 'units' ? 'active' : ''}`}
+              onClick={() => setActiveTab('units')}
+            >
+              Units ({Object.values(state.unitsOwned).reduce((a, b) => a + b, 0)})
+            </button>
+            <button
+              className={`idle-tab ${activeTab === 'upgrades' ? 'active' : ''}`}
+              onClick={() => setActiveTab('upgrades')}
+            >
+              Upgrades
+            </button>
+          </div>
+
+          <div className="idle-grid">
+            {activeTab === 'units' && IDLE_UNITS.map(unit => {
+              const count = state.unitsOwned[unit.id] || 0;
+              const cost = idleUnitCost(unit, count);
+              const canAfford = state.currency >= cost;
+              return (
+                <div key={unit.id} className="idle-card">
+                  <div className="idle-card-icon">{unit.icon}</div>
+                  <div className="idle-card-name">{unit.name}</div>
+                  <div className="idle-card-stats">Income: {unit.incomePerSec.toFixed(2)}/s</div>
+                  <div className="idle-card-stats">Own: {count}</div>
+                  <button
+                    className="idle-card-btn"
+                    disabled={!canAfford}
+                    onClick={() => handleBuyUnit(unit)}
+                  >
+                    {cost.toLocaleString()}
+                  </button>
+                </div>
+              );
+            })}
+
+            {activeTab === 'upgrades' && IDLE_UPGRADES.map(upgrade => {
+              const level = state.upgrades[upgrade.id] || 0;
+              const cost = idleUpgradeCost(upgrade, level);
+              const canAfford = state.currency >= cost && level < upgrade.maxLevel;
+              return (
+                <div key={upgrade.id} className="idle-card">
+                  <div className="idle-card-icon">⚡</div>
+                  <div className="idle-card-name">{upgrade.name}</div>
+                  <div className="idle-card-desc">{upgrade.desc}</div>
+                  <div className="idle-card-stats">Level: {level}/{upgrade.maxLevel}</div>
+                  <button
+                    className="idle-card-btn"
+                    disabled={!canAfford}
+                    onClick={() => handleUpgrade(upgrade)}
+                  >
+                    {level >= upgrade.maxLevel ? 'MAXED' : cost.toLocaleString()}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {popups.map(p => (
+        <div
+          key={p.id}
+          className="idle-coin-popup"
+          style={{
+            left: 'calc(50% + ' + p.x + 'px)',
+            top: 'calc(50% + ' + p.y + 'px)',
+          }}
+        >
+          {p.value}
+        </div>
+      ))}
+
+      {pendingPrestige && (
+        <div className="prestige-modal">
+          <div className="prestige-card">
+            <h2>✨ Prestige</h2>
+            <div className="sub">Reset your progress and earn prestige points!</div>
+            <div className="prestige-rows">
+              <div className="prestige-row">
+                <span className="k">Peak Currency:</span>
+                <span className="v">{Math.floor(state.peakCurrency).toLocaleString()}</span>
+              </div>
+              <div className="prestige-row">
+                <span className="k">Bonus Points:</span>
+                <span className="v">+{pendingPrestige.bonus}</span>
+              </div>
+              <div className="prestige-row">
+                <span className="k">New Total:</span>
+                <span className="v">{pendingPrestige.newPoints}</span>
+              </div>
+              <div className="prestige-row">
+                <span className="k">Multiplier Gain:</span>
+                <span className="v">+{pendingPrestige.multiplierGain}%</span>
+              </div>
+            </div>
+            <div className="prestige-buttons">
+              <button className="prestige-confirm" onClick={confirmPrestige}>
+                Prestige
+              </button>
+              <button className="prestige-cancel" onClick={() => setPendingPrestige(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -4806,6 +6390,36 @@ const GAMES = [
     tagColor: C.violet,
     component: BlockBlastGame,
   },
+  {
+    id: 'tilematching',
+    name: 'Tile Match Puzzle',
+    icon: '🀄',
+    category: 'classic',
+    desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
+    tag: 'Puzzle',
+    tagColor: '#6366f1',
+    component: TileMatchingGame,
+  },
+  {
+    id: 'tilematchingdaily',
+    name: 'Daily Tile Match Puzzle',
+    icon: '🀄',
+    category: 'daily',
+    desc: 'Today\'s layered tile board — 3 minutes to clear it.',
+    tag: 'Puzzle',
+    tagColor: '#6366f1',
+    component: TileMatchingDailyGame,
+  },
+  {
+    id: 'idle',
+    name: 'Idle Empire',
+    icon: '🐹',
+    category: 'idle',
+    desc: 'Tap, upgrade, and build your hamster empire with prestige rewards.',
+    tag: 'Idle',
+    tagColor: C.gold,
+    component: IdleGame,
+  },
 ];
 
 /* ============================================================
@@ -4831,7 +6445,7 @@ function App() {
   // Lobby tab: 'daily' or 'classic', initialized from ?tab= URL param
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : 'daily';
+    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : 'daily';
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
@@ -4880,8 +6494,8 @@ function App() {
   };
 
   const launchGame = async (game) => {
-    // Classic games skip the server entirely
-    if (game.category === 'classic') {
+    // Classic games and idle games skip the daily system
+    if (game.category === 'classic' || game.category === 'idle') {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -5064,10 +6678,15 @@ function App() {
       {screen === 'lobby' && (
         <div className="lobby">
           <div className="lobby-head">
-            <h1>{lobbyTab === 'daily' ? 'Daily Puzzles' : 'Classic Games'}</h1>
-            <p>{lobbyTab === 'daily'
-              ? 'One attempt each, per day. Resets at midnight UTC.'
-              : 'Play anytime — track your best scores.'}
+            <h1>
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : 'Idle Empire'}
+            </h1>
+            <p>
+              {lobbyTab === 'daily'
+                ? 'One attempt each, per day. Resets at midnight UTC.'
+                : lobbyTab === 'classic'
+                ? 'Play anytime — track your best scores.'
+                : 'Tap, upgrade, and build your empire. Progress saved automatically.'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
               <p className="lobby-hint">
@@ -5092,12 +6711,16 @@ function App() {
               className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
               onClick={() => setLobbyTab('classic')}
             >Classic Games</button>
+            <button
+              className={'lobby-tab' + (lobbyTab === 'idle' ? ' active' : '')}
+              onClick={() => setLobbyTab('idle')}
+            >Idle Empire</button>
           </div>
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
-              const isClassic = g.category === 'classic';
+              const isClassicOrIdle = g.category === 'classic' || g.category === 'idle';
               const a = attempts[g.id];
-              const locked = !isClassic && !!a;
+              const locked = !isClassicOrIdle && !!a;
               return (
                 <div
                   key={g.id}

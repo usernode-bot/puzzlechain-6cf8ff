@@ -125,6 +125,13 @@ body {
 .lobby-head { margin-bottom: 1.5rem; }
 .lobby-head h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
 .lobby-head p { color: ${C.muted}; margin-top: 0.25rem; font-size: 0.92rem; }
+.lobby-head .reset-countdown {
+  margin-top: 0.5rem;
+  color: ${C.accent};
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 
 .grid {
   display: grid;
@@ -512,6 +519,14 @@ function fmtCountdown(ms) {
   const m = Math.floor((t % 3600) / 60);
   const s = t % 60;
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+}
+
+// "12h 45m" for a millisecond remainder — hours + minutes only.
+function fmtHoursMins(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  return `${h}h ${m}m`;
 }
 
 // Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)
@@ -1117,6 +1132,12 @@ function App() {
           <div className="lobby-head">
             <h1>Daily Puzzles</h1>
             <p>One attempt each, per day. Resets at midnight UTC.</p>
+            {nextResetUtc && (
+              <p className="reset-countdown mono">
+                Next puzzle in {fmtHoursMins(
+                  new Date(nextResetUtc).getTime() - (Date.now() + offset))}
+              </p>
+            )}
           </div>
           <div className="grid">
             {GAMES.map(g => {

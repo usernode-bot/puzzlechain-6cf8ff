@@ -1395,6 +1395,124 @@ body {
 .t2048-keep-btn:hover   { opacity: 0.88; }
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
+
+/* ---- Block Blast ---- */
+.bb-board-wrap {
+  position: relative;
+  max-width: 360px;
+  margin: 0 auto;
+}
+.bb-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  background: ${C.border};
+  border: 2px solid ${C.border};
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 1;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.bb-cell {
+  aspect-ratio: 1;
+  background: ${C.card};
+  transition: background 0.08s ease;
+}
+.bb-cell.occupied { background: var(--bb-color); }
+.bb-cell.ghost-valid { background: ${C.accent}66; }
+.bb-cell.ghost-invalid { background: ${C.rose}44; }
+.bb-score-delta {
+  position: absolute;
+  top: -1.4rem;
+  right: 0.1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: ${C.emerald};
+  pointer-events: none;
+  animation: bb-float-up 700ms ease-out forwards;
+  white-space: nowrap;
+}
+@keyframes bb-float-up {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-28px); }
+}
+.bb-tray {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  max-width: 360px;
+  margin: 0.9rem auto 0;
+  flex-wrap: wrap;
+}
+.bb-piece-btn {
+  cursor: pointer;
+  padding: 0.5rem;
+  border: 2px solid ${C.border};
+  border-radius: 10px;
+  background: ${C.card};
+  transition: border-color 0.12s, opacity 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 56px;
+}
+.bb-piece-btn:hover { border-color: ${C.accent}; }
+.bb-piece-btn.selected { border-color: ${C.accent}; background: ${C.accent}1a; }
+.bb-piece-btn.used { opacity: 0.2; pointer-events: none; }
+.bb-piece-grid {
+  display: grid;
+  gap: 2px;
+}
+.bb-piece-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--bb-color);
+}
+.bb-bottom-nav {
+  display: flex;
+  border-top: 1px solid ${C.border};
+  background: ${C.surface};
+  position: sticky;
+  bottom: 0;
+  margin: 1rem -1.25rem -1.5rem;
+}
+.bb-tab {
+  flex: 1;
+  padding: 0.7rem;
+  font-size: 0.82rem;
+  border: none;
+  background: transparent;
+  color: ${C.muted};
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  border-top: 2px solid transparent;
+  transition: color 0.12s, border-color 0.12s;
+}
+.bb-tab.active { color: ${C.accent}; border-top-color: ${C.accent}; }
+.bb-history-list { overflow-y: auto; max-height: 60vh; padding: 0.5rem 0; }
+.bb-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid ${C.border};
+  padding: 0.55rem 0;
+  font-size: 0.82rem;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.bb-best-row { color: ${C.gold}; font-weight: 600; }
+.bb-empty-state {
+  color: ${C.muted};
+  text-align: center;
+  padding: 2rem 0;
+  font-size: 0.9rem;
+}
 `;
 
 /* ============================================================
@@ -4224,6 +4342,396 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   Block Blast helpers + component
+   ============================================================ */
+
+const BB_COLORS = [
+  '#3b82f6', // accent blue
+  '#10b981', // emerald
+  '#8b5cf6', // violet
+  '#f43f5e', // rose
+  '#f59e0b', // gold
+  '#06b6d4', // cyan
+];
+
+// Each piece: array of [row, col] offsets from top-left anchor [0,0]
+const BB_PIECES = [
+  [[0,0]],                                          // 1×1
+  [[0,0],[0,1]],                                    // 1×2 h
+  [[0,0],[1,0]],                                    // 2×1 v
+  [[0,0],[0,1],[0,2]],                              // 1×3 h
+  [[0,0],[1,0],[2,0]],                              // 3×1 v
+  [[0,0],[0,1],[1,0],[1,1]],                        // 2×2 square
+  [[0,0],[1,0],[1,1]],                              // L bottom-right
+  [[0,0],[0,1],[1,0]],                              // L bottom-left (mirror)
+  [[0,1],[1,0],[1,1]],                              // L top-left
+  [[0,0],[0,1],[1,1]],                              // L top-right (mirror)
+  [[0,1],[1,0],[1,1],[1,2]],                        // T pointing up
+  [[0,0],[0,1],[1,1],[0,2]],                        // S-shape
+  [[0,1],[0,2],[1,0],[1,1]],                        // Z-shape
+  [[0,0],[0,1],[0,2],[0,3]],                        // 1×4 h
+  [[0,0],[1,0],[2,0],[3,0]],                        // 4×1 v
+];
+
+function bbNewTray() {
+  const tray = [];
+  while (tray.length < 3) {
+    const idx = Math.floor(Math.random() * BB_PIECES.length);
+    const colorIdx = Math.floor(Math.random() * BB_COLORS.length);
+    tray.push({ cells: BB_PIECES[idx], color: BB_COLORS[colorIdx] });
+  }
+  return tray;
+}
+
+function bbEmptyGrid() {
+  return Array.from({ length: 8 }, () => Array(8).fill(null));
+}
+
+function bbCanPlace(grid, cells, row, col) {
+  for (const [dr, dc] of cells) {
+    const r = row + dr, c = col + dc;
+    if (r < 0 || r >= 8 || c < 0 || c >= 8) return false;
+    if (grid[r][c] !== null) return false;
+  }
+  return true;
+}
+
+function bbHasAnyMove(grid, tray) {
+  for (const piece of tray) {
+    if (!piece) continue;
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        if (bbCanPlace(grid, piece.cells, r, c)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function bbPlace(grid, cells, row, col, color) {
+  const next = grid.map(r => r.slice());
+  for (const [dr, dc] of cells) next[row + dr][col + dc] = color;
+  return next;
+}
+
+function bbClearLines(grid) {
+  const fullRows = [];
+  const fullCols = [];
+  for (let r = 0; r < 8; r++) {
+    if (grid[r].every(c => c !== null)) fullRows.push(r);
+  }
+  for (let c = 0; c < 8; c++) {
+    if (grid.every(row => row[c] !== null)) fullCols.push(c);
+  }
+  const linesCleared = fullRows.length + fullCols.length;
+  if (linesCleared === 0) return { newGrid: grid, linesCleared: 0 };
+  const next = grid.map(r => r.slice());
+  for (const r of fullRows) for (let c = 0; c < 8; c++) next[r][c] = null;
+  for (const c of fullCols) for (let r = 0; r < 8; r++) next[r][c] = null;
+  return { newGrid: next, linesCleared };
+}
+
+function bbScorePlacement(cellCount, linesCleared) {
+  return cellCount + linesCleared * 80 + (linesCleared > 1 ? linesCleared * 10 : 0);
+}
+
+function bbShareText(score, pieces, secs) {
+  const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+  const ss = String(secs % 60).padStart(2, '0');
+  return `Block Blast 🧩\nScore: ${score.toLocaleString()} | Pieces: ${pieces} | Time: ${mm}:${ss}`;
+}
+
+// Bounding box dimensions for a piece (for rendering the mini-grid)
+function bbBounds(cells) {
+  let maxR = 0, maxC = 0;
+  for (const [r, c] of cells) { if (r > maxR) maxR = r; if (c > maxC) maxC = c; }
+  return { rows: maxR + 1, cols: maxC + 1 };
+}
+
+const BB_HISTORY_KEY = 'puzzlechain_blockblast_history';
+const BB_BEST_KEY    = 'puzzlechain_blockblast_best';
+
+function bbLoadHistory() {
+  try { return JSON.parse(localStorage.getItem(BB_HISTORY_KEY) || '[]'); } catch { return []; }
+}
+function bbSaveEntry(entry) {
+  try {
+    const h = bbLoadHistory();
+    h.unshift(entry);
+    localStorage.setItem(BB_HISTORY_KEY, JSON.stringify(h.slice(0, 20)));
+  } catch {}
+}
+function bbLoadBest() {
+  try { return parseInt(localStorage.getItem(BB_BEST_KEY) || '0', 10) || 0; } catch { return 0; }
+}
+function bbSaveBest(v) {
+  try { localStorage.setItem(BB_BEST_KEY, String(v)); } catch {}
+}
+
+function BlockBlastGame({ onWin, onStepChange, resetKey }) {
+  const [grid, setGrid]           = useState(() => bbEmptyGrid());
+  const [tray, setTray]           = useState(() => bbNewTray());
+  const [selected, setSelected]   = useState(null);
+  const [hoverCell, setHoverCell] = useState(null);
+  const [score, setScore]         = useState(0);
+  const [pieces, setPieces]       = useState(0);
+  const [elapsedSecs, setElapsedSecs] = useState(0);
+  const [done, setDone]           = useState(false);
+  const [scoreDelta, setScoreDelta] = useState(null);
+  const [activeTab, setActiveTab] = useState('game');
+  const [history, setHistory]     = useState(() => bbLoadHistory());
+  const [bestScore, setBestScore] = useState(() => bbLoadBest());
+  const deltaTimerRef = useRef(null);
+  const lastTouchCell = useRef(null);
+
+  const gameRunning = !done && activeTab === 'game';
+
+  useEffect(() => {
+    if (!gameRunning) return;
+    const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [gameRunning]);
+
+  useEffect(() => {
+    if (!resetKey) return;
+    handleNewGame();
+  }, [resetKey]);
+
+  const fmtSecs = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  const fmtDate = d => { if (!d) return ''; const [y, m, day] = d.split('-'); return m + '/' + day + '/' + y.slice(2); };
+
+  const handleNewGame = () => {
+    setGrid(bbEmptyGrid());
+    setTray(bbNewTray());
+    setSelected(null);
+    setHoverCell(null);
+    setScore(0);
+    setPieces(0);
+    setElapsedSecs(0);
+    setDone(false);
+    setScoreDelta(null);
+  };
+
+  const handlePlace = (row, col) => {
+    if (done || selected === null) return;
+    const piece = tray[selected];
+    if (!piece) return;
+    if (!bbCanPlace(grid, piece.cells, row, col)) return;
+
+    const placed = bbPlace(grid, piece.cells, row, col, piece.color);
+    const { newGrid, linesCleared } = bbClearLines(placed);
+    const delta = bbScorePlacement(piece.cells.length, linesCleared);
+    const newScore = score + delta;
+    const newPieces = pieces + 1;
+
+    const newTray = tray.slice();
+    newTray[selected] = null;
+    const allUsed = newTray.every(p => p === null);
+    const nextTray = allUsed ? bbNewTray() : newTray;
+
+    setGrid(newGrid);
+    setTray(nextTray);
+    setSelected(null);
+    setHoverCell(null);
+    setScore(newScore);
+    setPieces(newPieces);
+    onStepChange && onStepChange(newPieces);
+
+    if (delta > 0) {
+      if (deltaTimerRef.current) clearTimeout(deltaTimerRef.current);
+      setScoreDelta('+' + delta);
+      deltaTimerRef.current = setTimeout(() => setScoreDelta(null), 700);
+    }
+
+    if (newScore > bestScore) { setBestScore(newScore); bbSaveBest(newScore); }
+
+    if (!bbHasAnyMove(newGrid, nextTray)) {
+      setDone(true);
+      const entry = {
+        id: Date.now(),
+        date: new Date().toISOString().slice(0, 10),
+        score: newScore,
+        pieces: newPieces,
+        secs: elapsedSecs,
+      };
+      bbSaveEntry(entry);
+      setHistory(bbLoadHistory());
+      onWin && onWin(newScore, newPieces, elapsedSecs, { share: bbShareText(newScore, newPieces, elapsedSecs) });
+    }
+  };
+
+  // Compute ghost cells for the current hover position
+  const ghostCells = {};
+  if (selected !== null && hoverCell !== null && tray[selected]) {
+    const piece = tray[selected];
+    const [hr, hc] = hoverCell;
+    const valid = bbCanPlace(grid, piece.cells, hr, hc);
+    for (const [dr, dc] of piece.cells) {
+      const r = hr + dr, c = hc + dc;
+      if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+        ghostCells[r + ',' + c] = valid ? 'ghost-valid' : 'ghost-invalid';
+      }
+    }
+  }
+
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (el && el.dataset.row !== undefined) {
+      const r = parseInt(el.dataset.row, 10);
+      const c = parseInt(el.dataset.col, 10);
+      lastTouchCell.current = [r, c];
+      setHoverCell([r, c]);
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    e.preventDefault();
+    if (lastTouchCell.current) {
+      handlePlace(lastTouchCell.current[0], lastTouchCell.current[1]);
+      lastTouchCell.current = null;
+    }
+    setHoverCell(null);
+  };
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Score</div>
+          <div className="pvalue" style={{ color: C.gold }}>{score}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Pieces</div>
+          <div className="pvalue">{pieces}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Time</div>
+          <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
+        </div>
+      </div>
+
+      {activeTab === 'game' && (
+        <div>
+          <div className="bb-board-wrap">
+            {scoreDelta && <div className="bb-score-delta">{scoreDelta}</div>}
+            <div
+              className="bb-grid"
+              onMouseLeave={() => setHoverCell(null)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              {Array.from({ length: 8 }, (_, r) =>
+                Array.from({ length: 8 }, (_, c) => {
+                  const key = r + ',' + c;
+                  const ghost = ghostCells[key];
+                  const color = grid[r][c];
+                  let cls = 'bb-cell';
+                  if (ghost) cls += ' ' + ghost;
+                  else if (color) cls += ' occupied';
+                  return (
+                    <div
+                      key={key}
+                      className={cls}
+                      data-row={r}
+                      data-col={c}
+                      style={color && !ghost ? { '--bb-color': color } : undefined}
+                      onMouseEnter={() => setHoverCell([r, c])}
+                      onClick={() => handlePlace(r, c)}
+                    />
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="bb-tray">
+            {tray.map((piece, i) => {
+              if (!piece) {
+                return (
+                  <div key={i} className="bb-piece-btn used">
+                    <div style={{ width: 30, height: 30 }} />
+                  </div>
+                );
+              }
+              const { rows, cols } = bbBounds(piece.cells);
+              const cellSet = new Set(piece.cells.map(([r, c]) => r + ',' + c));
+              return (
+                <div
+                  key={i}
+                  className={'bb-piece-btn' + (selected === i ? ' selected' : '')}
+                  onClick={() => setSelected(selected === i ? null : i)}
+                >
+                  <div
+                    className="bb-piece-grid"
+                    style={{
+                      gridTemplateColumns: `repeat(${cols}, 10px)`,
+                      gridTemplateRows: `repeat(${rows}, 10px)`,
+                    }}
+                  >
+                    {Array.from({ length: rows }, (_, r) =>
+                      Array.from({ length: cols }, (_, c) => (
+                        <div
+                          key={r + ',' + c}
+                          className="bb-piece-cell"
+                          style={{
+                            '--bb-color': cellSet.has(r + ',' + c) ? piece.color : 'transparent',
+                            opacity: cellSet.has(r + ',' + c) ? 1 : 0,
+                          }}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {selected === null && !done && (
+            <p style={{ textAlign: 'center', color: C.muted, fontSize: '0.8rem', marginTop: '0.6rem' }}>
+              Tap a piece to select it, then tap the grid to place it
+            </p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className="bb-history-list">
+          {bestScore > 0 && (
+            <div className="bb-history-row bb-best-row">
+              <span>All-time best</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{bestScore.toLocaleString()} pts</span>
+            </div>
+          )}
+          {history.length === 0
+            ? <div className="bb-empty-state">No games yet — play your first round!</div>
+            : history.map(h => (
+              <div key={h.id} className="bb-history-row">
+                <span style={{ color: C.muted }}>{fmtDate(h.date)}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', color: C.gold }}>{h.score.toLocaleString()}</span>
+                <span style={{ color: C.muted }}>{h.pieces} pcs · {fmtSecs(h.secs)}</span>
+              </div>
+            ))
+          }
+        </div>
+      )}
+
+      <div className="bb-bottom-nav">
+        {['game', 'history'].map(tab => (
+          <button
+            key={tab}
+            className={'bb-tab' + (activeTab === tab ? ' active' : '')}
+            onClick={() => { setActiveTab(tab); if (tab === 'history') setHistory(bbLoadHistory()); }}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -4287,6 +4795,16 @@ const GAMES = [
     tag: 'Numbers',
     tagColor: C.emerald,
     component: T2048Game,
+  },
+  {
+    id: 'blockblast',
+    name: 'Block Blast',
+    icon: '🧩',
+    category: 'classic',
+    desc: 'Place blocks to fill rows and columns. Clear lines to score big.',
+    tag: 'Puzzle',
+    tagColor: C.violet,
+    component: BlockBlastGame,
   },
 ];
 

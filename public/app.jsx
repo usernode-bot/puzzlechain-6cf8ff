@@ -809,32 +809,33 @@ body {
   min-height: 88px;
   border: 2px solid #3A1206;
   transition: border-color 0.2s;
+  position: relative;
+  overflow: hidden;
 }
-.mnc-store-count {
+.mnc-store-score {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 600;
   color: #C8A87A;
   transition: color 0.2s;
+  position: relative;
+  z-index: 1;
 }
 .mnc-store-label {
   font-size: 0.48rem;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: #9E7A5A;
+  position: relative;
+  z-index: 1;
 }
 .mnc-pit {
   aspect-ratio: 1;
   border-radius: 50%;
   background: #4A1E09;
   border: 2px solid #3A1206;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #C8A87A;
+  position: relative;
+  overflow: hidden;
   user-select: none;
   cursor: default;
   transition: background 0.1s ease, transform 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
@@ -853,13 +854,37 @@ body {
 .mnc-pit.mnc-capture-flash { animation: mnc-capture-flash 0.32s ease forwards; }
 @keyframes mnc-pit-flash {
   0%   { background: #4A1E09; border-color: #3A1206; }
-  40%  { background: #C8A87A; border-color: #C8A87A; }
+  40%  { background: #5E2E12; border-color: #9E7A5A; }
   100% { background: #4A1E09; border-color: #3A1206; }
 }
 @keyframes mnc-capture-flash {
   0%   { background: #4A1E09; }
-  40%  { background: ${C.rose}; border-color: ${C.rose}; }
+  40%  { background: ${C.rose}22; border-color: ${C.rose}; }
   100% { background: #4A1E09; }
+}
+.mnc-pit-stones {
+  position: absolute;
+  inset: 0;
+}
+.mnc-stone {
+  position: absolute;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+@keyframes mnc-stone-enter {
+  from { transform: scale(0); opacity: 0.3; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.mnc-stone-entering {
+  animation: mnc-stone-enter 0.12s ease-out forwards;
+  transform-origin: center;
+}
+@keyframes mnc-stones-scatter {
+  0%   { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.mnc-stones-capturing {
+  animation: mnc-stones-scatter 0.22s ease-out forwards;
 }
 .mnc-banner {
   text-align: center;
@@ -980,8 +1005,6 @@ body {
 }
 @media (max-width: 380px) {
   .mnc-board { grid-template-columns: 2.5rem repeat(6, 1fr) 2.5rem; gap: 3px; padding: 5px; }
-  .mnc-pit { font-size: 0.78rem; }
-  .mnc-store-count { font-size: 0.95rem; }
   .mnc-store { min-height: 70px; }
 }
 `;
@@ -2033,6 +2056,74 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
    Mancala helpers
    ============================================================ */
 const MNC_HISTORY_KEY = 'puzzlechain_mancala_history';
+
+// Stone rendering helpers
+const MNC_STONE_COLORS = ['#C8A87A', '#A07845', '#D4B896', '#8B5E3C', '#BF9E5A'];
+
+// Deterministic float in [0,1) from two integer seeds — sin hash (stable, well-distributed).
+function mncRandVal(pitSeed, i) {
+  const x = Math.sin(pitSeed * 127.1 + i * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// Stone diameter as a fraction of the pit/store element's smaller dimension.
+function mncStoneSizeFactor(count, isStore) {
+  if (isStore) {
+    if (count <= 3)  return 0.20;
+    if (count <= 6)  return 0.17;
+    if (count <= 12) return 0.14;
+    if (count <= 18) return 0.11;
+    return 0.09;
+  }
+  if (count <= 4)  return 0.26;
+  if (count <= 8)  return 0.21;
+  if (count <= 16) return 0.17;
+  return 0.13;
+}
+
+// Renders count pebble divs absolutely-positioned inside the pit/store container.
+// pitSeed: pit array index (stable random layout per pit).
+// entering: true → newest stone (index count-1) plays pop-in animation.
+// capturing: true → whole stone layer plays scatter-out animation.
+// isStore: adjusts stone sizing for the taller pill-shaped store.
+function MncPitStones({ count, pitSeed, entering, capturing, isStore }) {
+  const stones = [];
+  const sf = mncStoneSizeFactor(count, isStore);
+  // Max center offset as fraction of element size; sqrt ensures uniform-disk distribution.
+  const maxR = (0.5 - sf / 2) * 0.82;
+
+  for (let i = 0; i < count; i++) {
+    const r     = Math.sqrt(mncRandVal(pitSeed, i * 3))        * maxR;
+    const theta = mncRandVal(pitSeed, i * 3 + 1) * 2 * Math.PI;
+    const sVar  = 0.85 + mncRandVal(pitSeed, i * 3 + 2) * 0.30; // ±15% size variance
+
+    const cx   = 0.5 + r * Math.cos(theta);
+    const cy   = 0.5 + r * Math.sin(theta);
+    const sz   = sf * sVar * 100;
+    const left = (cx - (sf * sVar) / 2) * 100;
+    const top  = (cy - (sf * sVar) / 2) * 100;
+
+    stones.push(
+      React.createElement('div', {
+        key: i,
+        className: 'mnc-stone' + (entering && i === count - 1 ? ' mnc-stone-entering' : ''),
+        style: {
+          left:       `${left}%`,
+          top:        `${top}%`,
+          width:      `${sz}%`,
+          height:     `${sz}%`,
+          background: MNC_STONE_COLORS[i % MNC_STONE_COLORS.length],
+        },
+      })
+    );
+  }
+
+  return React.createElement(
+    'div',
+    { className: 'mnc-pit-stones' + (capturing ? ' mnc-stones-capturing' : '') },
+    ...stones
+  );
+}
 const MNC_HISTORY_MAX = 50;
 const MNC_SOUND_KEY = 'puzzlechain_mancala_sound';
 
@@ -2369,8 +2460,9 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
               gridColumn: 1, gridRow: '1 / 3',
               borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206',
             }}>
+              <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
               <div className="mnc-store-label">P2</div>
-              <div className="mnc-store-count" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>
+              <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>
                 {pits[13]}
               </div>
               <div className="mnc-store-label">store</div>
@@ -2383,8 +2475,9 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
                 className={pitClass(idx)}
                 style={{ gridRow: 1, gridColumn: i + 2 }}
                 onClick={() => handlePitClick(idx)}
+                aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}
               >
-                {pits[idx]}
+                <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
               </div>
             ))}
 
@@ -2393,8 +2486,9 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
               gridColumn: 8, gridRow: '1 / 3',
               borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206',
             }}>
+              <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
               <div className="mnc-store-label">P1</div>
-              <div className="mnc-store-count" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>
+              <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>
                 {pits[6]}
               </div>
               <div className="mnc-store-label">store</div>
@@ -2407,8 +2501,9 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
                 className={pitClass(idx)}
                 style={{ gridRow: 2, gridColumn: i + 2 }}
                 onClick={() => handlePitClick(idx)}
+                aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}
               >
-                {pits[idx]}
+                <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
               </div>
             ))}
           </div>

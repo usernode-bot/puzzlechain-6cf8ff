@@ -782,6 +782,208 @@ body {
 [data-ms-theme="light"] .ms-grid { background: #9ca3af; border-color: #9ca3af; }
 [data-ms-theme="light"] .ms-cell.ms-mine-dead { background: #fca5a5; }
 [data-ms-theme="light"] .ms-cell.ms-exploded { background: #f87171; }
+
+/* ---- Mancala ---- */
+.mnc-board {
+  display: grid;
+  grid-template-columns: 3.2rem repeat(6, 1fr) 3.2rem;
+  grid-template-rows: 1fr 1fr;
+  gap: 5px;
+  background: #7B4F2E;
+  border: 2px solid #5A2F14;
+  border-radius: 16px;
+  padding: 8px;
+  max-width: 480px;
+  margin: 0 auto;
+  align-items: stretch;
+}
+.mnc-store {
+  border-radius: 999px;
+  background: #4A1E09;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0;
+  min-height: 88px;
+  border: 2px solid #3A1206;
+  transition: border-color 0.2s;
+}
+.mnc-store-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #C8A87A;
+  transition: color 0.2s;
+}
+.mnc-store-label {
+  font-size: 0.48rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #9E7A5A;
+}
+.mnc-pit {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #4A1E09;
+  border: 2px solid #3A1206;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #C8A87A;
+  user-select: none;
+  cursor: default;
+  transition: background 0.1s ease, transform 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.mnc-pit.mnc-clickable {
+  cursor: pointer;
+  border-color: #9E7A5A;
+}
+.mnc-pit.mnc-clickable:hover {
+  background: #6B3A24;
+  transform: scale(1.1);
+  border-color: #C8A87A;
+}
+.mnc-pit.mnc-dim { opacity: 0.4; }
+.mnc-pit.mnc-flash { animation: mnc-pit-flash 0.22s ease forwards; }
+.mnc-pit.mnc-capture-flash { animation: mnc-capture-flash 0.32s ease forwards; }
+@keyframes mnc-pit-flash {
+  0%   { background: #4A1E09; border-color: #3A1206; }
+  40%  { background: #C8A87A; border-color: #C8A87A; }
+  100% { background: #4A1E09; border-color: #3A1206; }
+}
+@keyframes mnc-capture-flash {
+  0%   { background: #4A1E09; }
+  40%  { background: ${C.rose}; border-color: ${C.rose}; }
+  100% { background: #4A1E09; }
+}
+.mnc-banner {
+  text-align: center;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: ${C.gold};
+  padding: 0.4rem 0.6rem;
+  background: ${C.gold}1a;
+  border: 1px solid ${C.gold}33;
+  border-radius: 8px;
+  margin: 0.6rem 0 0;
+  min-height: 2.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mnc-controls {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 480px;
+  margin: 0.8rem auto 0;
+}
+.mnc-controls button {
+  flex: 1;
+  min-width: 0;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.5rem 0.3rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: border-color 0.12s;
+  white-space: nowrap;
+}
+.mnc-controls button:hover { border-color: ${C.accent}; }
+.mnc-controls button:disabled { opacity: 0.38; cursor: not-allowed; }
+.mnc-controls button:disabled:hover { border-color: ${C.border}; }
+.mnc-bottom-nav {
+  display: flex;
+  border-top: 1px solid ${C.border};
+  background: ${C.surface};
+  position: sticky;
+  bottom: 0;
+  margin: 1rem -1.25rem -1.5rem;
+}
+.mnc-tab {
+  flex: 1;
+  padding: 0.7rem;
+  font-size: 0.82rem;
+  border: none;
+  background: transparent;
+  color: ${C.muted};
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  border-top: 2px solid transparent;
+  transition: color 0.12s, border-color 0.12s;
+}
+.mnc-tab.active { color: ${C.accent}; border-top-color: ${C.accent}; }
+.mnc-history-list { overflow-y: auto; max-height: 55vh; padding: 0.5rem 0; }
+.mnc-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid ${C.border};
+  padding: 0.55rem 0;
+  font-size: 0.82rem;
+  gap: 0.5rem;
+}
+.mnc-outcome-chip {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.mnc-outcome-chip.p1win { background: ${C.accent}22; color: ${C.accent}; border: 1px solid ${C.accent}44; }
+.mnc-outcome-chip.p2win { background: ${C.rose}22; color: ${C.rose}; border: 1px solid ${C.rose}44; }
+.mnc-outcome-chip.draw { background: ${C.muted}22; color: ${C.muted}; border: 1px solid ${C.muted}44; }
+.mnc-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+.mnc-stat-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.75rem;
+  text-align: center;
+}
+.mnc-stat-card .mnc-stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: ${C.gold};
+}
+.mnc-stat-card .mnc-stat-lbl {
+  font-size: 0.62rem;
+  color: ${C.muted};
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0.15rem;
+}
+.mnc-empty-state {
+  color: ${C.muted};
+  text-align: center;
+  padding: 2rem 0;
+  font-size: 0.9rem;
+}
+@media (max-width: 380px) {
+  .mnc-board { grid-template-columns: 2.5rem repeat(6, 1fr) 2.5rem; gap: 3px; padding: 5px; }
+  .mnc-pit { font-size: 0.78rem; }
+  .mnc-store-count { font-size: 0.95rem; }
+  .mnc-store { min-height: 70px; }
+}
 `;
 
 /* ============================================================
@@ -1828,6 +2030,472 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   Mancala helpers
+   ============================================================ */
+const MNC_HISTORY_KEY = 'puzzlechain_mancala_history';
+const MNC_HISTORY_MAX = 50;
+const MNC_SOUND_KEY = 'puzzlechain_mancala_sound';
+
+function mncLoadHistory() {
+  try { return JSON.parse(localStorage.getItem(MNC_HISTORY_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function mncSaveEntry(entry) {
+  const h = mncLoadHistory();
+  h.unshift(entry);
+  if (h.length > MNC_HISTORY_MAX) h.length = MNC_HISTORY_MAX;
+  try { localStorage.setItem(MNC_HISTORY_KEY, JSON.stringify(h)); } catch {}
+}
+
+function mncInitBoard() {
+  return [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
+}
+
+// Pit directly across the board from pit i. Formula: 12 - i works for both sides:
+// P1 pit 0 ↔ P2 pit 12, P1 pit 5 ↔ P2 pit 7, etc.
+function mncOpposite(i) { return 12 - i; }
+
+// Shared AudioContext for stone-click sounds (lazy, satisfies browser autoplay policy).
+let _mncAudioCtx = null;
+function mncPlayClick() {
+  try {
+    if (!_mncAudioCtx) _mncAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _mncAudioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = 360 + Math.floor(Math.random() * 120);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.08);
+  } catch {}
+}
+
+// Pure distribution function: picks up stones from pitIdx for player and sows them.
+// Returns { sequence, pits, lastIdx, extraTurn, captureFrom, captureAmount }.
+// sequence = ordered list of pit indices that received a stone (for animation).
+function mncDistribute(pits, pitIdx, player) {
+  const p = pits.slice();
+  const stones = p[pitIdx];
+  p[pitIdx] = 0;
+  const skipStore = player === 1 ? 13 : 6; // never place in opponent's store
+  const ownStore  = player === 1 ? 6  : 13;
+  const ownMin    = player === 1 ? 0  : 7;
+  const ownMax    = player === 1 ? 5  : 12;
+  const sequence  = [];
+  let cur = pitIdx;
+
+  for (let i = 0; i < stones; i++) {
+    do { cur = (cur + 1) % 14; } while (cur === skipStore);
+    p[cur]++;
+    sequence.push(cur);
+  }
+
+  const lastIdx  = sequence[sequence.length - 1];
+  const extraTurn = lastIdx === ownStore;
+
+  // Capture: last stone lands in player's own previously-empty pit and opposite has stones.
+  let captureFrom = -1, captureAmount = 0;
+  if (!extraTurn && lastIdx >= ownMin && lastIdx <= ownMax && p[lastIdx] === 1) {
+    const opp = mncOpposite(lastIdx);
+    if (p[opp] > 0) {
+      captureAmount = p[opp] + 1; // opposite stones + landing stone
+      captureFrom   = opp;
+      p[ownStore] += captureAmount;
+      p[lastIdx]   = 0;
+      p[opp]       = 0;
+    }
+  }
+
+  return { sequence, pits: p, lastIdx, extraTurn, captureFrom, captureAmount };
+}
+
+/* ============================================================
+   Game 5 — Mancala (Kalah variant, pass-and-play)
+   ============================================================ */
+function MancalaGame({ onWin, onStepChange, resetKey }) {
+  const [pits, setPits]           = useState(mncInitBoard);
+  const [player, setPlayer]       = useState(1);
+  const [done, setDone]           = useState(false);
+  const [winner, setWinner]       = useState(null);
+  const [moves, setMoves]         = useState(0);
+  const [flashPits, setFlashPits] = useState(() => new Set());
+  const [captureFlash, setCaptureFlash] = useState(() => new Set());
+  const [bannerMsg, setBannerMsg] = useState('');
+  const [moveStack, setMoveStack] = useState([]);
+  const [activeTab, setActiveTab] = useState('game');
+  const [history, setHistory]     = useState(() => mncLoadHistory());
+  const [isMock, setIsMock]       = useState(false);
+  const [soundOn, setSoundOn]     = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
+
+  const animatingRef  = useRef(false);
+  const soundOnRef    = useRef(soundOn);
+  const winTimerRef   = useRef(null);
+  soundOnRef.current  = soundOn;
+
+  const { secs, fmt } = useTimer(!done);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+
+  useEffect(() => {
+    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
+      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
+    }
+  }, []);
+
+  const resetGame = () => {
+    // Cancel any in-flight win callback and animation
+    animatingRef.current = false;
+    if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
+    setPits(mncInitBoard());
+    setPlayer(1);
+    setDone(false);
+    setWinner(null);
+    setMoves(0);
+    setFlashPits(new Set());
+    setCaptureFlash(new Set());
+    setBannerMsg('');
+    setMoveStack([]);
+  };
+
+  // Reset when parent increments resetKey (Play Again)
+  useEffect(() => { resetGame(); }, [resetKey]);
+
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    soundOnRef.current = next;
+    try { localStorage.setItem(MNC_SOUND_KEY, next ? '1' : '0'); } catch {}
+  };
+
+  const handleUndo = () => {
+    if (moveStack.length === 0 || done || animatingRef.current) return;
+    const prev = moveStack[moveStack.length - 1];
+    setMoveStack(ms => ms.slice(0, -1));
+    setPits(prev.pits.slice());
+    setPlayer(prev.player);
+    setMoves(prev.moves);
+    setFlashPits(new Set());
+    setCaptureFlash(new Set());
+    setBannerMsg('');
+  };
+
+  const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
+    const p = newPits.slice();
+
+    // Sweep any remaining stones when one side is emptied
+    const p1Empty = p.slice(0, 6).every(v => v === 0);
+    const p2Empty = p.slice(7, 13).every(v => v === 0);
+    const isGameOver = p1Empty || p2Empty;
+
+    if (isGameOver) {
+      for (let i = 0; i < 6; i++) { p[6] += p[i]; p[i] = 0; }
+      for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    }
+
+    setPits(p);
+    setMoves(newMoves);
+    onStepChange(newMoves);
+
+    if (isGameOver) {
+      const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
+      setWinner(w);
+      setDone(true);
+      const wLabel = w === 1 ? 'Player 1 wins! 🎉' : w === 2 ? 'Player 2 wins! 🎉' : "It's a draw! 🤝";
+      setBannerMsg(wLabel);
+
+      const entry = {
+        id: String(Date.now()),
+        date: new Date().toISOString().slice(0, 10),
+        winner: w,
+        p1Score: p[6],
+        p2Score: p[13],
+        moves: newMoves,
+        secs: secsRef.current,
+      };
+      mncSaveEntry(entry);
+      setHistory(mncLoadHistory());
+
+      winTimerRef.current = setTimeout(() => {
+        winTimerRef.current = null;
+        setBannerMsg('');
+        const score = Math.max(Math.abs(p[6] - p[13]) * 15 - secsRef.current, 50);
+        const share = `Mancala ${entry.date} — 🫘 P1 ${p[6]} · P2 ${p[13]} · ${newMoves} moves · ${secsRef.current}s`;
+        onWin(score, newMoves, secsRef.current, { winner: w, share, winnerLabel: wLabel });
+      }, 1500);
+
+    } else if (extraTurn) {
+      setBannerMsg('Extra turn! 🔄');
+      setTimeout(() => setBannerMsg(msg => msg === 'Extra turn! 🔄' ? '' : msg), 1200);
+    } else {
+      setPlayer(currentPlayer === 1 ? 2 : 1);
+      setBannerMsg('');
+    }
+  };
+
+  const handlePitClick = (idx) => {
+    if (animatingRef.current || done) return;
+    const ownMin = player === 1 ? 0 : 7;
+    const ownMax = player === 1 ? 5 : 12;
+    if (idx < ownMin || idx > ownMax || pits[idx] === 0) return;
+
+    // Snapshot for undo
+    setMoveStack(ms => [...ms, { pits: pits.slice(), player, moves }]);
+
+    const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(pits, idx, player);
+    const newMoves = moves + 1;
+
+    animatingRef.current = true;
+    const working = pits.slice();
+    working[idx] = 0;
+    setPits(working.slice());
+    setFlashPits(new Set());
+
+    let step = 0;
+    const animate = () => {
+      if (!animatingRef.current) { setFlashPits(new Set()); return; }
+      if (step >= sequence.length) {
+        // All stones placed — show capture flash if any, then finish
+        setFlashPits(new Set());
+        if (captureFrom >= 0) {
+          setCaptureFlash(new Set([captureFrom]));
+          setTimeout(() => {
+            if (!animatingRef.current) return;
+            setCaptureFlash(new Set());
+            animatingRef.current = false;
+            finishMove(newPits, player, extraTurn, captureFrom, newMoves);
+          }, 350);
+        } else {
+          animatingRef.current = false;
+          finishMove(newPits, player, extraTurn, captureFrom, newMoves);
+        }
+        return;
+      }
+      const pitIdx = sequence[step];
+      working[pitIdx]++;
+      setPits(working.slice());
+      setFlashPits(new Set([pitIdx]));
+      if (soundOnRef.current) mncPlayClick();
+      step++;
+      setTimeout(animate, 80);
+    };
+    setTimeout(animate, 0);
+  };
+
+  // Board display order: P2 pits shown right-to-left (pit 12 at left, pit 7 at right)
+  const p2Display = [12, 11, 10, 9, 8, 7];
+  const p1Display = [0, 1, 2, 3, 4, 5];
+
+  const pitClass = (idx) => {
+    const ownMin = player === 1 ? 0 : 7;
+    const ownMax = player === 1 ? 5 : 12;
+    const isOwn = idx >= ownMin && idx <= ownMax;
+    const canClick = !done && !animatingRef.current && isOwn && pits[idx] > 0;
+    const cls = ['mnc-pit'];
+    if (canClick) cls.push('mnc-clickable');
+    else cls.push('mnc-dim');
+    if (flashPits.has(idx)) cls.push('mnc-flash');
+    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
+    return cls.join(' ');
+  };
+
+  const p1Color = C.accent;
+  const p2Color = C.rose;
+  const activeColor = player === 1 ? p1Color : p2Color;
+
+  // Aggregate stats
+  const stats = history.reduce((acc, h) => {
+    acc.total++;
+    if (h.winner === 1) acc.p1++;
+    else if (h.winner === 2) acc.p2++;
+    else acc.draws++;
+    if (h.moves > acc.longest) acc.longest = h.moves;
+    return acc;
+  }, { total: 0, p1: 0, p2: 0, draws: 0, longest: 0 });
+
+  const fmtDate = (d) => {
+    const [y, m, day] = d.split('-');
+    return `${m}/${day}/${y.slice(2)}`;
+  };
+
+  return (
+    <div>
+      {activeTab === 'game' && (
+        <div>
+          <div className="status-bar">
+            <div className="pill">
+              <div className="plabel">Time</div>
+              <div className="pvalue time">{fmt}</div>
+            </div>
+            <div className="pill">
+              <div className="plabel">Moves</div>
+              <div className="pvalue">{moves}</div>
+            </div>
+            <div className="pill">
+              <div className="plabel">Turn</div>
+              <div className="pvalue" style={{ color: done ? C.muted : activeColor, fontSize: '0.9rem' }}>
+                {done ? (winner === 'draw' ? 'Draw' : `P${winner}`) : `P${player}`}
+              </div>
+            </div>
+          </div>
+
+          {/* Active-player indicator */}
+          <div style={{
+            textAlign: 'center',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            color: done ? C.muted : activeColor,
+            background: (done ? C.dim : activeColor) + '22',
+            border: `1px solid ${(done ? C.dim : activeColor)}44`,
+            borderRadius: '999px',
+            padding: '0.32rem 0.8rem',
+            maxWidth: 480,
+            margin: '0 auto 0.65rem',
+            display: 'block',
+          }}>
+            {done
+              ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : `Game over — Player ${winner} wins! 🎉`)
+              : `Player ${player}'s turn`}
+          </div>
+
+          {/* Board */}
+          <div className="mnc-board">
+            {/* P2 Store — col 1, spans both rows */}
+            <div className="mnc-store" style={{
+              gridColumn: 1, gridRow: '1 / 3',
+              borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206',
+            }}>
+              <div className="mnc-store-label">P2</div>
+              <div className="mnc-store-count" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>
+                {pits[13]}
+              </div>
+              <div className="mnc-store-label">store</div>
+            </div>
+
+            {/* P2 pits — row 1, cols 2–7 */}
+            {p2Display.map((idx, i) => (
+              <div
+                key={idx}
+                className={pitClass(idx)}
+                style={{ gridRow: 1, gridColumn: i + 2 }}
+                onClick={() => handlePitClick(idx)}
+              >
+                {pits[idx]}
+              </div>
+            ))}
+
+            {/* P1 Store — col 8, spans both rows */}
+            <div className="mnc-store" style={{
+              gridColumn: 8, gridRow: '1 / 3',
+              borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206',
+            }}>
+              <div className="mnc-store-label">P1</div>
+              <div className="mnc-store-count" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>
+                {pits[6]}
+              </div>
+              <div className="mnc-store-label">store</div>
+            </div>
+
+            {/* P1 pits — row 2, cols 2–7 */}
+            {p1Display.map((idx, i) => (
+              <div
+                key={idx}
+                className={pitClass(idx)}
+                style={{ gridRow: 2, gridColumn: i + 2 }}
+                onClick={() => handlePitClick(idx)}
+              >
+                {pits[idx]}
+              </div>
+            ))}
+          </div>
+
+          {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
+
+          <div className="mnc-controls">
+            <button onClick={resetGame}>↺ New Game</button>
+            <button onClick={resetGame}>⟳ Restart</button>
+            {isMock && (
+              <button onClick={handleUndo} disabled={moveStack.length === 0 || done}>
+                ↩ Undo
+              </button>
+            )}
+            <button onClick={toggleSound} title={soundOn ? 'Sound on' : 'Sound off'}>
+              {soundOn ? '🔊' : '🔇'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div>
+          <div className="mnc-history-list">
+            {history.length === 0
+              ? <div className="mnc-empty-state">No games recorded yet</div>
+              : history.map(h => (
+                <div key={h.id} className="mnc-history-row">
+                  <span className={`mnc-outcome-chip ${h.winner === 1 ? 'p1win' : h.winner === 2 ? 'p2win' : 'draw'}`}>
+                    {h.winner === 1 ? 'P1 Win' : h.winner === 2 ? 'P2 Win' : 'Draw'}
+                  </span>
+                  <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtDate(h.date)}</span>
+                  <span className="mono" style={{ color: C.gold }}>{h.p1Score}–{h.p2Score}</span>
+                  <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.moves} moves</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'stats' && (
+        <div>
+          {history.length === 0
+            ? <div className="mnc-empty-state">No games recorded yet</div>
+            : (
+              <div className="mnc-stats-grid">
+                <div className="mnc-stat-card">
+                  <div className="mnc-stat-val">{stats.total}</div>
+                  <div className="mnc-stat-lbl">Games Played</div>
+                </div>
+                <div className="mnc-stat-card">
+                  <div className="mnc-stat-val" style={{ color: p1Color }}>{stats.p1}</div>
+                  <div className="mnc-stat-lbl">P1 Wins</div>
+                </div>
+                <div className="mnc-stat-card">
+                  <div className="mnc-stat-val" style={{ color: p2Color }}>{stats.p2}</div>
+                  <div className="mnc-stat-lbl">P2 Wins</div>
+                </div>
+                <div className="mnc-stat-card">
+                  <div className="mnc-stat-val" style={{ color: C.muted }}>{stats.draws}</div>
+                  <div className="mnc-stat-lbl">Draws</div>
+                </div>
+                <div className="mnc-stat-card" style={{ gridColumn: '1 / 3' }}>
+                  <div className="mnc-stat-val">{stats.longest || '—'}</div>
+                  <div className="mnc-stat-lbl">Longest Game (moves)</div>
+                </div>
+              </div>
+            )}
+        </div>
+      )}
+
+      <div className="mnc-bottom-nav">
+        {['game', 'history', 'stats'].map(tab => (
+          <button
+            key={tab}
+            className={'mnc-tab' + (activeTab === tab ? ' active' : '')}
+            onClick={() => { setActiveTab(tab); if (tab !== 'game') setHistory(mncLoadHistory()); }}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -1871,6 +2539,16 @@ const GAMES = [
     tag: 'Risk',
     tagColor: C.rose,
     component: MinesweeperGame,
+  },
+  {
+    id: 'mancala',
+    name: 'Mancala',
+    icon: '🫘',
+    category: 'classic',
+    desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
+    tag: 'Strategy',
+    tagColor: C.gold,
+    component: MancalaGame,
   },
 ];
 
@@ -2237,7 +2915,7 @@ function App() {
         <div className="win-overlay">
           <div className="win-card">
             <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
-            <h2>{winData.cashOut ? 'Cashed Out! 💰' : 'Solved!'}</h2>
+            <h2>{winData.winnerLabel || (winData.cashOut ? 'Cashed Out! 💰' : 'Solved!')}</h2>
             <div className="sub">{currentGame && currentGame.name}</div>
             <div className="score-rows">
               <div className="score-row">

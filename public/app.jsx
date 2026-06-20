@@ -1977,6 +1977,93 @@ body {
   transition: border-color 0.12s ease;
 }
 .prestige-cancel:hover { border-color: ${C.accent}; }
+
+/* ---- Diamond Rush ---- */
+.dr-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.dr-select { width: 100%; max-width: 520px; text-align: center; }
+.dr-select h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.35rem; }
+.dr-select p { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1.2rem; }
+.dr-level-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 0.7rem; margin-bottom: 1.3rem;
+}
+.dr-level-btn {
+  position: relative; aspect-ratio: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0.15rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
+  color: ${C.text}; font-weight: 700; font-size: 1.1rem; cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.08s ease;
+}
+.dr-level-btn:not(.locked):hover { border-color: ${C.gold}; transform: translateY(-2px); }
+.dr-level-btn.selected { border-color: ${C.gold}; box-shadow: 0 0 0 2px ${C.gold}55; }
+.dr-level-btn.locked { opacity: 0.4; cursor: not-allowed; }
+.dr-level-btn.done { border-color: ${C.emerald}; }
+.dr-level-meta { font-size: 0.62rem; font-weight: 500; color: ${C.muted}; font-family: 'JetBrains Mono', monospace; }
+.dr-check { color: ${C.emerald}; font-size: 0.7rem; }
+.dr-lock-icon { font-size: 0.85rem; }
+.dr-play-btn {
+  width: 100%; padding: 0.85rem; background: ${C.gold}; color: #1a1206;
+  border: none; border-radius: 12px; font-weight: 700; font-size: 1rem;
+  cursor: pointer; transition: filter 0.12s ease;
+}
+.dr-play-btn:hover { filter: brightness(1.08); }
+.dr-play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.dr-toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.dr-tool-btn {
+  padding: 0.5rem 0.9rem; background: ${C.surface}; color: ${C.text};
+  border: 1px solid ${C.border}; border-radius: 10px; font-weight: 600;
+  font-size: 0.85rem; cursor: pointer; transition: border-color 0.12s ease;
+}
+.dr-tool-btn:hover { border-color: ${C.accent}; }
+.dr-board {
+  display: grid; gap: 2px; background: ${C.border}; padding: 4px;
+  border-radius: 12px; touch-action: none; user-select: none;
+  max-width: 92vw;
+}
+.dr-cell {
+  display: flex; align-items: center; justify-content: center;
+  background: ${C.surface}; border-radius: 4px; position: relative;
+  font-size: clamp(14px, 5vw, 26px); line-height: 1;
+}
+.dr-cell.wall { background: ${C.dim}; }
+.dr-cell.exit { background: ${C.accent}33; }
+.dr-cell.trap { background: ${C.rose}22; }
+.dr-cell.floor { background: ${C.surface}; }
+.dr-sprite { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.dr-hero { z-index: 3; }
+.dr-enemy { z-index: 2; }
+.dr-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 0.35rem; justify-content: center;
+}
+.dr-dbtn {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  color: ${C.text}; font-size: 1.3rem; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; touch-action: manipulation;
+}
+.dr-dbtn:active { background: ${C.accent}; }
+.dr-dpad .up { grid-column: 2; grid-row: 1; }
+.dr-dpad .left { grid-column: 1; grid-row: 2; }
+.dr-dpad .right { grid-column: 3; grid-row: 2; }
+.dr-dpad .down { grid-column: 2; grid-row: 3; }
+.dr-overlay-panel {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0.8rem;
+  background: ${C.bg}cc; border-radius: 12px; z-index: 5;
+}
+.dr-board-shell { position: relative; }
+.dr-paused-msg { font-weight: 700; font-size: 1.1rem; color: ${C.gold}; }
+.dr-end {
+  text-align: center; display: flex; flex-direction: column; align-items: center;
+  gap: 0.6rem; padding: 1.5rem 0; width: 100%; max-width: 420px;
+}
+.dr-end .dr-emoji { font-size: 3rem; }
+.dr-end h3 { font-size: 1.4rem; font-weight: 700; }
+.dr-end .dr-stats { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+.dr-end-btns { display: flex; flex-direction: column; gap: 0.55rem; width: 100%; margin-top: 0.5rem; }
+.dr-hint { color: ${C.muted}; font-size: 0.8rem; }
 `;
 
 /* ============================================================
@@ -6316,6 +6403,549 @@ function IdleGame() {
 }
 
 /* ============================================================
+   Diamond Rush — original tile maze adventure (Classic, server-saved)
+   ============================================================ */
+// Tile legend: # wall, . floor, G gem, K key, D door, T trap, X exit, S start.
+// Enemies are defined out-of-grid as a patrol path; they advance one step
+// per player move (turn-based, fully deterministic — no soft-locks).
+const DR_LEVELS = [
+  {
+    name: 'First Sparkle',
+    grid: [
+      '########',
+      '#S.....#',
+      '#.G.G..#',
+      '#......#',
+      '#..GG..#',
+      '#......#',
+      '#....GX#',
+      '########',
+    ],
+    enemyPath: null,
+  },
+  {
+    name: 'Mind the Spikes',
+    grid: [
+      '########',
+      '#S...G.#',
+      '#.TT##.#',
+      '#.G..T.#',
+      '#.##.#.#',
+      '#G...G.#',
+      '#.T#..X#',
+      '########',
+    ],
+    enemyPath: null,
+  },
+  {
+    name: 'Locked Vault',
+    grid: [
+      '########',
+      '#S..K..#',
+      '#.####.#',
+      '#G.G.#.#',
+      '#.##.#.#',
+      '#.#GD..#',
+      '#.#..#X#',
+      '########',
+    ],
+    // The gem at (5,3) sits in a pocket sealed by the door at (5,4): the only
+    // way to collect every gem (required to open the exit) is to grab the key.
+    enemyPath: null,
+  },
+  {
+    name: 'Patrol Run',
+    grid: [
+      '########',
+      '#S.G...#',
+      '#.####.#',
+      '#.G..G.#',
+      '#.####.#',
+      '#...G..#',
+      '#G....X#',
+      '########',
+    ],
+    enemyPath: [[3,1],[3,2],[3,3],[3,4],[3,5],[3,6],[3,5],[3,4],[3,3],[3,2]],
+  },
+  {
+    name: 'The Gauntlet',
+    grid: [
+      '########',
+      '#S.G.K.#',
+      '#.##.#.#',
+      '#.G#.#.#',
+      '#.#.#G.#',
+      '#.T.#.D#',
+      '#G..T#X#',
+      '########',
+    ],
+    enemyPath: [[1,6],[2,6],[3,6],[4,6],[3,6],[2,6]],
+  },
+];
+
+const DR_SOUND_KEY = 'puzzlechain_diamondrush_sound';
+const DR_LIVES = 3;
+
+function drKey(r, c) { return r + ',' + c; }
+function drCountGems(grid) {
+  let n = 0;
+  for (const row of grid) for (const ch of row) if (ch === 'G') n++;
+  return n;
+}
+function drFindStart(grid) {
+  for (let r = 0; r < grid.length; r++) {
+    const c = grid[r].indexOf('S');
+    if (c >= 0) return { r, c };
+  }
+  return { r: 1, c: 1 };
+}
+function drLevelScore(gems, timeSecs, lives) {
+  return Math.max(0, 200 + gems * 100 + Math.max(0, 300 - timeSecs * 3) + lives * 50);
+}
+
+function DiamondRushGame({ onStepChange, resetKey }) {
+  const { useState, useEffect, useRef } = React;
+  const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon' | 'levelFailed'
+  const [selectedLevel, setSelectedLevel] = useState(1);
+  const [progress, setProgress] = useState({ clearedLevels: [], bestResults: {}, totalGems: 0 });
+  const [paused, setPaused] = useState(false);
+  const [soundOn, setSoundOn] = useState(() => {
+    try { return localStorage.getItem(DR_SOUND_KEY) !== '0'; } catch { return true; }
+  });
+  const soundOnRef = useRef(soundOn);
+  useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
+
+  // Dynamic per-run state. Kept in a ref too so the keydown listener and the
+  // enemy stepper read fresh values without re-binding every render.
+  const [gs, setGs] = useState(null); // { heroR, heroC, collected:Set, hasKey, keyTaken, opened:Set, lives, enemyIdx, moves }
+  const gsRef = useRef(null);
+  useEffect(() => { gsRef.current = gs; }, [gs]);
+
+  const levelDef = DR_LEVELS[selectedLevel - 1];
+  const running = phase === 'playing' && !paused;
+  const { secs, fmt } = useTimer(running);
+  const secsRef = useRef(0);
+  const startSecsRef = useRef(0);
+  useEffect(() => { secsRef.current = secs; }, [secs]);
+
+  const [lastResult, setLastResult] = useState(null);
+
+  // ---- Audio (synthesized, lazy) ----
+  const audioRef = useRef(null);
+  const playSfx = (type) => {
+    if (!soundOnRef.current) return;
+    try {
+      if (!audioRef.current) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioRef.current = new Ctx();
+      }
+      const ctx = audioRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      const tones = {
+        gem:   [880, 0.08, 'triangle'],
+        key:   [660, 0.12, 'square'],
+        door:  [330, 0.16, 'sawtooth'],
+        hit:   [140, 0.22, 'sawtooth'],
+        clear: [990, 0.30, 'triangle'],
+        blocked: [200, 0.05, 'sine'],
+      };
+      const [freq, dur, wave] = tones[type] || tones.gem;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = wave;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + dur + 0.02);
+      if (type === 'clear') {
+        const osc2 = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(660, ctx.currentTime);
+        osc2.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.25);
+        g2.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g2.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + 0.02);
+        g2.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+        osc2.connect(g2).connect(ctx.destination);
+        osc2.start(); osc2.stop(ctx.currentTime + 0.32);
+      }
+    } catch {}
+  };
+
+  const toggleSound = () => {
+    setSoundOn(prev => {
+      const next = !prev;
+      try { localStorage.setItem(DR_SOUND_KEY, next ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
+
+  // ---- Load saved progress on mount (degrade gracefully on 401/error) ----
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api('/api/diamond/progress');
+      if (alive && ok && body) {
+        setProgress({
+          clearedLevels: Array.isArray(body.clearedLevels) ? body.clearedLevels : [],
+          bestResults: body.bestResults || {},
+          totalGems: body.totalGems || 0,
+        });
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Parent "Play Again" hook — return to level select.
+  useEffect(() => {
+    setPhase('select');
+    setPaused(false);
+    setGs(null);
+  }, [resetKey]);
+
+  const isUnlocked = (lvl) => lvl === 1 || progress.clearedLevels.includes(lvl - 1);
+
+  const startLevel = (lvl) => {
+    const def = DR_LEVELS[lvl - 1];
+    if (!def) return;
+    const start = drFindStart(def.grid);
+    setSelectedLevel(lvl);
+    setGs({
+      heroR: start.r, heroC: start.c,
+      collected: new Set(), hasKey: false, keyTaken: false,
+      opened: new Set(), lives: DR_LIVES, enemyIdx: 0, moves: 0,
+    });
+    setPaused(false);
+    setPhase('playing');
+    startSecsRef.current = secsRef.current;
+    onStepChange && onStepChange(0);
+  };
+
+  const restartLevel = () => startLevel(selectedLevel);
+
+  const finishWin = (state) => {
+    const def = DR_LEVELS[selectedLevel - 1];
+    const totalGems = drCountGems(def.grid);
+    const timeSecs = Math.max(0, secsRef.current - startSecsRef.current);
+    const gems = state.collected.size;
+    const score = drLevelScore(gems, timeSecs, state.lives);
+    playSfx('clear');
+    setLastResult({ level: selectedLevel, gems, totalGems, timeSecs, score, lives: state.lives });
+    setPhase('levelWon');
+
+    // Optimistic local update so Level Select reflects the clear even offline.
+    setProgress(prev => {
+      const cleared = prev.clearedLevels.includes(selectedLevel)
+        ? prev.clearedLevels
+        : [...prev.clearedLevels, selectedLevel].sort((a, b) => a - b);
+      const best = { ...prev.bestResults };
+      const prior = best[String(selectedLevel)];
+      if (!prior || score > prior.score) best[String(selectedLevel)] = { gems, timeSecs, score };
+      return { ...prev, clearedLevels: cleared, bestResults: best };
+    });
+
+    (async () => {
+      const { ok, body } = await api('/api/diamond/level-complete', {
+        method: 'POST',
+        body: JSON.stringify({ level: selectedLevel, gems, timeSecs, score }),
+      });
+      if (ok && body) {
+        setProgress({
+          clearedLevels: Array.isArray(body.clearedLevels) ? body.clearedLevels : [],
+          bestResults: body.bestResults || {},
+          totalGems: body.totalGems || 0,
+        });
+      }
+    })();
+  };
+
+  // ---- Core move logic ----
+  const move = (dr, dc) => {
+    const state = gsRef.current;
+    if (!state || phase !== 'playing' || paused) return;
+    const def = DR_LEVELS[selectedLevel - 1];
+    const grid = def.grid;
+    const tr = state.heroR + dr;
+    const tc = state.heroC + dc;
+    if (tr < 0 || tc < 0 || tr >= grid.length || tc >= grid[0].length) return;
+    let tile = grid[tr][tc];
+    const cellId = drKey(tr, tc);
+
+    if (tile === '#') { return; } // wall — no move
+    if (tile === 'D' && !state.opened.has(cellId)) {
+      if (!state.hasKey) { playSfx('blocked'); return; } // locked, no key
+    }
+
+    // Build the next state immutably.
+    const next = {
+      ...state,
+      collected: new Set(state.collected),
+      opened: new Set(state.opened),
+    };
+    next.heroR = tr;
+    next.heroC = tc;
+    next.moves = state.moves + 1;
+
+    if (tile === 'D' && !next.opened.has(cellId)) {
+      next.opened.add(cellId);
+      next.hasKey = false;
+      playSfx('door');
+    } else if (tile === 'G' && !next.collected.has(cellId)) {
+      next.collected.add(cellId);
+      playSfx('gem');
+    } else if (tile === 'K' && !next.keyTaken) {
+      next.hasKey = true;
+      next.keyTaken = true;
+      playSfx('key');
+    }
+
+    let lostLife = false;
+    if (tile === 'T') lostLife = true;
+
+    // Advance the enemy one step, then check collision with the hero.
+    let enemyPos = null;
+    if (def.enemyPath && def.enemyPath.length) {
+      next.enemyIdx = (state.enemyIdx + 1) % def.enemyPath.length;
+      enemyPos = def.enemyPath[next.enemyIdx];
+      if (enemyPos[0] === next.heroR && enemyPos[1] === next.heroC) lostLife = true;
+    }
+
+    if (lostLife) {
+      playSfx('hit');
+      next.lives = state.lives - 1;
+      if (next.lives <= 0) {
+        setGs(next);
+        gsRef.current = next;
+        setPhase('levelFailed');
+        return;
+      }
+      // Respawn at start; keep gems/key/doors collected so far.
+      const start = drFindStart(grid);
+      next.heroR = start.r;
+      next.heroC = start.c;
+      next.enemyIdx = 0;
+    }
+
+    setGs(next);
+    gsRef.current = next;
+    onStepChange && onStepChange(next.moves);
+
+    // Win check: standing on exit with every gem collected.
+    if (!lostLife && tile === 'X') {
+      const totalGems = drCountGems(grid);
+      if (next.collected.size >= totalGems) finishWin(next);
+    }
+  };
+
+  // Keep a stable ref to move() for the keyboard listener.
+  const moveRef = useRef(move);
+  moveRef.current = move;
+
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    const onKey = (e) => {
+      const k = e.key.toLowerCase();
+      let dir = null;
+      if (k === 'arrowup' || k === 'w') dir = [-1, 0];
+      else if (k === 'arrowdown' || k === 's') dir = [1, 0];
+      else if (k === 'arrowleft' || k === 'a') dir = [0, -1];
+      else if (k === 'arrowright' || k === 'd') dir = [0, 1];
+      if (dir) { e.preventDefault(); moveRef.current(dir[0], dir[1]); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase]);
+
+  // ---- Touch swipe ----
+  const touchRef = useRef(null);
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e) => {
+    if (!touchRef.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchRef.current.x;
+    const dy = t.clientY - touchRef.current.y;
+    touchRef.current = null;
+    if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(0, dx > 0 ? 1 : -1);
+    else move(dy > 0 ? 1 : -1, 0);
+  };
+
+  // ---- Level Select screen ----
+  if (phase === 'select') {
+    return (
+      <div className="dr-wrap">
+        <div className="dr-select">
+          <h2>💎 Diamond Rush</h2>
+          <p>Collect every gem, grab keys to open doors, dodge traps and the patrol — then reach the exit 🏁.</p>
+          <div className="dr-level-grid">
+            {DR_LEVELS.map((def, i) => {
+              const lvl = i + 1;
+              const unlocked = isUnlocked(lvl);
+              const done = progress.clearedLevels.includes(lvl);
+              const best = progress.bestResults[String(lvl)];
+              const sel = selectedLevel === lvl;
+              return (
+                <button
+                  key={lvl}
+                  className={`dr-level-btn${sel ? ' selected' : ''}${done ? ' done' : ''}${!unlocked ? ' locked' : ''}`}
+                  onClick={() => unlocked && setSelectedLevel(lvl)}
+                  disabled={!unlocked}
+                >
+                  {!unlocked ? <span className="dr-lock-icon">🔒</span> : <span>{lvl}</span>}
+                  {done && <span className="dr-check">✓</span>}
+                  {best && <span className="dr-level-meta">💎{best.gems} · {best.timeSecs}s</span>}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            className="dr-play-btn"
+            disabled={!isUnlocked(selectedLevel)}
+            onClick={() => startLevel(selectedLevel)}
+          >
+            Play Level {selectedLevel} · {levelDef ? levelDef.name : ''}
+          </button>
+          <p className="dr-hint" style={{ marginTop: '0.8rem' }}>
+            Arrow keys / WASD on desktop · swipe or D-pad on mobile.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Level Cleared screen ----
+  if (phase === 'levelWon' && lastResult) {
+    const isLast = lastResult.level >= DR_LEVELS.length;
+    return (
+      <div className="dr-end">
+        <div className="dr-emoji">🏆</div>
+        <h3>Level {lastResult.level} Cleared!</h3>
+        <div className="dr-stats">
+          💎 {lastResult.gems}/{lastResult.totalGems} · ⏱ {lastResult.timeSecs}s · ❤️ {lastResult.lives} left
+        </div>
+        <div className="dr-stats" style={{ color: C.gold }}>Score +{lastResult.score}</div>
+        <div className="dr-end-btns">
+          {!isLast && (
+            <button className="dr-play-btn" onClick={() => startLevel(lastResult.level + 1)}>
+              Next Level →
+            </button>
+          )}
+          {isLast && <div className="dr-hint">🎉 You cleared every Phase 1 level!</div>}
+          <button className="dr-tool-btn" onClick={() => startLevel(lastResult.level)}>Replay</button>
+          <button className="dr-tool-btn" onClick={() => setPhase('select')}>Level Select</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Level Failed screen ----
+  if (phase === 'levelFailed') {
+    return (
+      <div className="dr-end">
+        <div className="dr-emoji">💥</div>
+        <h3>Level Failed</h3>
+        <div className="dr-stats">Out of lives! Traps and the patrol got the better of you.</div>
+        <div className="dr-end-btns">
+          <button className="dr-play-btn" onClick={restartLevel}>Retry</button>
+          <button className="dr-tool-btn" onClick={() => setPhase('select')}>Level Select</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Playing screen ----
+  const grid = levelDef.grid;
+  const w = grid[0].length;
+  const totalGems = drCountGems(grid);
+  const enemyPos = (levelDef.enemyPath && gs) ? levelDef.enemyPath[gs.enemyIdx] : null;
+  const levelSecs = Math.max(0, secs - startSecsRef.current);
+  const levelFmt = `${String(Math.floor(levelSecs / 60)).padStart(2, '0')}:${String(levelSecs % 60).padStart(2, '0')}`;
+
+  return (
+    <div className="dr-wrap">
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Gems</div>
+          <div className="pvalue">{gs ? gs.collected.size : 0}/{totalGems}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Keys</div>
+          <div className="pvalue">{gs && gs.hasKey ? '🔑' : '—'}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Lives</div>
+          <div className="pvalue">{'❤️'.repeat(gs ? gs.lives : 0) || '—'}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Time</div>
+          <div className="pvalue time">{levelFmt}</div>
+        </div>
+      </div>
+
+      <div className="dr-board-shell">
+        <div
+          className="dr-board"
+          style={{ gridTemplateColumns: `repeat(${w}, clamp(30px, 11vw, 42px))`, gridAutoRows: 'clamp(30px, 11vw, 42px)' }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          {grid.map((row, r) => row.split('').map((ch, c) => {
+            const cellId = drKey(r, c);
+            const collected = gs && gs.collected.has(cellId);
+            const opened = gs && gs.opened.has(cellId);
+            const keyTaken = gs && gs.keyTaken;
+            let cls = 'dr-cell floor';
+            let glyph = '';
+            if (ch === '#') cls = 'dr-cell wall';
+            else if (ch === 'X') { cls = 'dr-cell exit'; glyph = '🏁'; }
+            else if (ch === 'T') { cls = 'dr-cell trap'; glyph = '⚠️'; }
+            else if (ch === 'G') { glyph = collected ? '' : '💎'; }
+            else if (ch === 'K') { glyph = keyTaken ? '' : '🔑'; }
+            else if (ch === 'D') { cls = 'dr-cell'; glyph = opened ? '' : '🚪'; }
+            const isHero = gs && gs.heroR === r && gs.heroC === c;
+            const isEnemy = enemyPos && enemyPos[0] === r && enemyPos[1] === c;
+            return (
+              <div key={cellId} className={cls}>
+                {glyph && <span className="dr-sprite">{glyph}</span>}
+                {isEnemy && <span className="dr-sprite dr-enemy">👾</span>}
+                {isHero && <span className="dr-sprite dr-hero">🦸</span>}
+              </div>
+            );
+          }))}
+        </div>
+        {paused && (
+          <div className="dr-overlay-panel">
+            <div className="dr-paused-msg">⏸ Paused</div>
+            <button className="dr-play-btn" style={{ width: 'auto', padding: '0.7rem 1.6rem' }} onClick={() => setPaused(false)}>Resume</button>
+          </div>
+        )}
+      </div>
+
+      <div className="dr-toolbar">
+        <button className="dr-tool-btn" onClick={() => setPaused(p => !p)}>{paused ? '▶ Resume' : '⏸ Pause'}</button>
+        <button className="dr-tool-btn" onClick={restartLevel}>↻ Restart</button>
+        <button className="dr-tool-btn" onClick={toggleSound}>{soundOn ? '🔊 Sound' : '🔇 Muted'}</button>
+        <button className="dr-tool-btn" onClick={() => setPhase('select')}>≡ Levels</button>
+      </div>
+
+      <div className="dr-dpad">
+        <button className="dr-dbtn up" onPointerDown={(e) => { e.preventDefault(); move(-1, 0); }}>▲</button>
+        <button className="dr-dbtn left" onPointerDown={(e) => { e.preventDefault(); move(0, -1); }}>◀</button>
+        <button className="dr-dbtn right" onPointerDown={(e) => { e.preventDefault(); move(0, 1); }}>▶</button>
+        <button className="dr-dbtn down" onPointerDown={(e) => { e.preventDefault(); move(1, 0); }}>▼</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -6399,6 +7029,16 @@ const GAMES = [
     tag: 'Puzzle',
     tagColor: '#6366f1',
     component: TileMatchingGame,
+  },
+  {
+    id: 'diamondrush',
+    name: 'Diamond Rush',
+    icon: '💎',
+    category: 'classic',
+    desc: 'Guide your hero through tile mazes — grab gems and keys, dodge traps and the patrol, reach the exit.',
+    tag: 'Adventure',
+    tagColor: C.gold,
+    component: DiamondRushGame,
   },
   {
     id: 'tilematchingdaily',

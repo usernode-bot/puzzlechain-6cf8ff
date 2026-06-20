@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <script>
   // usernode-dev-console@1
   (function () {
@@ -64,58 +64,52 @@
   })();
   </script>
   <title>PuzzleChain</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { darkMode: 'class' }</script>
+  <!-- Inline data-URI favicon so the browser never requests /favicon.ico,
+       which the JWT auth gate would 401 (and that 401 logs a console error
+       tripping the no-console-errors check). -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230A0E1A'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%233b82f6'%3E%E2%AC%A2%3C/text%3E%3C/svg%3E">
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-center gap-8 p-4">
-  <h1 class="text-2xl font-bold">PuzzleChain</h1>
-
-  <button id="press-btn" class="w-32 h-32 rounded-full bg-violet-600 hover:bg-violet-500 active:scale-95 transition-all text-white text-xl font-bold shadow-lg shadow-violet-600/30">
-    Press!
-  </button>
-
-  <div id="count" class="text-lg text-zinc-400">0 total presses</div>
-
-  <div class="w-full max-w-sm">
-    <h2 class="text-sm font-medium text-zinc-500 mb-2 text-center">Leaderboard</h2>
-    <div id="leaderboard" class="space-y-1"></div>
-  </div>
-
+<body>
+  <div id="root"></div>
+  <!-- Deterministic JSX bootstrap. Babel Standalone's automatic
+       text/babel script-tag scanner is unreliable for external `src`
+       files (it silently skipped app.jsx in staging — React never
+       mounted). Instead we fetch the source, compile it with the React
+       preset in classic-script mode (React.createElement runtime, no ES
+       module imports), and inject the compiled code as a plain script so
+       it runs in global scope with React/ReactDOM available as globals.
+       Any failure surfaces loudly in the console. -->
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token') || '';
-    const headers = token ? { 'x-usernode-token': token } : {};
-
-    async function loadLeaderboard() {
-      const res = await fetch('/api/leaderboard', { headers });
-      if (!res.ok) return;
-      const { leaderboard } = await res.json();
-      const el = document.getElementById('leaderboard');
-      if (!leaderboard.length) {
-        el.innerHTML = '<p class="text-center text-zinc-600 text-sm">No presses yet</p>';
-        return;
+    (function () {
+      function fail(stage, err) {
+        console.error('[PuzzleChain] failed to ' + stage + ':', err && (err.stack || err.message || err));
+        var root = document.getElementById('root');
+        if (root && !root.firstChild) {
+          root.textContent = 'Failed to load PuzzleChain. See console for details.';
+        }
       }
-      el.innerHTML = leaderboard.map((r, i) =>
-        '<div class="flex justify-between px-3 py-1 rounded ' + (i === 0 ? 'bg-violet-600/20 text-violet-300' : 'text-zinc-400') + '">' +
-        '<span>' + (i + 1) + '. ' + r.username + '</span>' +
-        '<span class="font-mono">' + r.presses + '</span></div>'
-      ).join('');
-      const total = leaderboard.reduce((s, r) => s + parseInt(r.presses), 0);
-      document.getElementById('count').textContent = total + ' total presses';
-    }
-
-    document.getElementById('press-btn').addEventListener('click', async () => {
-      try {
-        const res = await fetch('/api/press', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-        });
-        if (res.ok) loadLeaderboard();
-        else if (res.status === 401) document.getElementById('count').textContent = 'Sign in to press!';
-      } catch {}
-    });
-
-    loadLeaderboard();
+      if (typeof Babel === 'undefined') { fail('load Babel (CDN blocked?)', new Error('Babel undefined')); return; }
+      if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') { fail('load React (CDN blocked?)', new Error('React/ReactDOM undefined')); return; }
+      fetch('/app.jsx')
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status + ' fetching /app.jsx');
+          return r.text();
+        })
+        .then(function (src) {
+          var compiled;
+          try {
+            compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script' }).code;
+          } catch (e) { fail('compile app.jsx', e); return; }
+          var s = document.createElement('script');
+          s.textContent = compiled + '\n//# sourceURL=app.compiled.js';
+          document.body.appendChild(s);
+        })
+        .catch(function (e) { fail('fetch app.jsx', e); });
+    })();
   </script>
 </body>
 </html>

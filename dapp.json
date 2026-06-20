@@ -1,3 +1,8 @@
 {
-  "secrets": []
+  "name": "PuzzleChain",
+  "secrets": [],
+  "tests": [
+    { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
+    { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" }
+  ]
 }

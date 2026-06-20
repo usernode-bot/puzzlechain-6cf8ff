@@ -1395,6 +1395,238 @@ body {
 .t2048-keep-btn:hover   { opacity: 0.88; }
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
+
+/* ---- Tile Match ---- */
+.tm-wrap { max-width: 400px; margin: 0 auto; }
+.tm-board-container {
+  position: relative;
+  margin: 0 auto;
+  overflow: visible;
+}
+.tm-tile {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.55rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.1s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+  border: 2px solid rgba(255,255,255,0.18);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+.tm-tile.available:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+.tm-tile.locked { opacity: 0.35; cursor: default; pointer-events: none; filter: brightness(0.7); }
+.tm-tile.flash {
+  animation: tm-match-flash 0.35s ease forwards;
+}
+@keyframes tm-match-flash {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1.25); opacity: 0.9; }
+  100% { transform: scale(0);   opacity: 0; }
+}
+.tm-bar {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  margin: 1rem auto 0;
+  max-width: 360px;
+  padding: 0.5rem;
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  transition: border-color 0.2s;
+}
+.tm-bar.bar-full { animation: tm-bar-flash 0.4s ease; border-color: ${C.rose}; }
+@keyframes tm-bar-flash {
+  0%, 100% { border-color: ${C.rose}; }
+  50%  { border-color: ${C.rose}; box-shadow: 0 0 12px ${C.rose}66; }
+}
+.tm-slot {
+  width: 44px;
+  height: 44px;
+  border: 2px dashed ${C.dim};
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.tm-slot.filled { border-style: solid; border-color: ${C.accent}33; background: ${C.card}; }
+.tm-slot.clear-target {
+  cursor: pointer;
+  border-color: ${C.rose};
+  background: ${C.rose}1a;
+  animation: tm-slot-pulse 0.7s ease infinite alternate;
+}
+.tm-slot.clear-target:hover { background: ${C.rose}33; }
+@keyframes tm-slot-pulse {
+  from { box-shadow: 0 0 0 0 ${C.rose}44; }
+  to   { box-shadow: 0 0 0 4px ${C.rose}00; }
+}
+.tm-bar-label {
+  text-align: center;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin-top: 0.3rem;
+}
+.tm-bar-label.full { color: ${C.rose}; font-weight: 600; }
+.tm-boosters {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 360px;
+  margin: 0.7rem auto 0;
+}
+.tm-booster-btn {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.45rem 0.3rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: border-color 0.12s, background 0.12s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+.tm-booster-btn:hover:not(:disabled) { border-color: ${C.accent}; background: ${C.accent}10; }
+.tm-booster-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.tm-booster-btn.active { border-color: ${C.rose}; background: ${C.rose}15; }
+.tm-booster-icon { font-size: 1rem; }
+.tm-booster-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: ${C.muted};
+}
+.tm-level-select { max-width: 400px; margin: 0 auto; }
+.tm-level-select h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.2rem; }
+.tm-level-select p { font-size: 0.85rem; color: ${C.muted}; margin-bottom: 1rem; }
+.tm-tier-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin: 0.75rem 0 0.35rem;
+  font-weight: 600;
+}
+.tm-level-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+.tm-level-btn {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.muted};
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0;
+}
+.tm-level-btn:hover { border-color: ${C.accent}; color: ${C.text}; }
+.tm-level-btn.selected { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
+.tm-level-btn.done { border-color: ${C.emerald}44; color: ${C.emerald}; }
+.tm-level-btn.done.selected { border-color: ${C.emerald}; background: ${C.emerald}22; }
+.tm-level-btn .tm-check {
+  position: absolute;
+  top: 1px; right: 2px;
+  font-size: 0.45rem;
+  color: ${C.emerald};
+}
+.tm-play-btn {
+  width: 100%;
+  margin-top: 1rem;
+  background: ${C.accent};
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.8rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.tm-play-btn:hover { background: #2f6fe0; }
+.tm-level-won {
+  background: ${C.card};
+  border: 1px solid ${C.emerald}55;
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  max-width: 360px;
+  margin: 0 auto;
+}
+.tm-level-won .trophy { font-size: 2.2rem; margin-bottom: 0.4rem; }
+.tm-level-won h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.15rem; }
+.tm-level-won .sub { color: ${C.muted}; font-size: 0.85rem; margin-bottom: 1rem; }
+.tm-level-stats {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  border-top: 1px solid ${C.border};
+  border-bottom: 1px solid ${C.border};
+  padding: 0.75rem 0;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+.tm-level-stat-row { display: flex; justify-content: space-between; padding: 0.15rem 0; }
+.tm-level-stat-row .k { color: ${C.muted}; }
+.tm-level-stat-row .v { color: ${C.gold}; font-weight: 600; }
+.tm-level-won-btns { display: flex; gap: 0.6rem; }
+.tm-next-btn {
+  flex: 2;
+  background: ${C.emerald};
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.tm-next-btn:hover { background: #059669; }
+.tm-end-btn {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.7rem;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.tm-end-btn:hover { border-color: ${C.accent}; }
+@media (max-width: 380px) {
+  .tm-level-grid { grid-template-columns: repeat(10, 1fr); gap: 0.25rem; }
+}
 `;
 
 /* ============================================================
@@ -4224,6 +4456,558 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   Game 7 — Tile Match (3-Tiles style)
+   ============================================================ */
+
+// Seeded PRNG (mulberry32) — deterministic layouts per level number.
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const TM_TILE_TYPES = [
+  { icon: '🌸', color: '#f43f5e' },
+  { icon: '🔥', color: '#f97316' },
+  { icon: '💎', color: '#3b82f6' },
+  { icon: '🌊', color: '#06b6d4' },
+  { icon: '⚡', color: '#f59e0b' },
+  { icon: '🌿', color: '#10b981' },
+  { icon: '🍄', color: '#e11d48' },
+  { icon: '🎵', color: '#8b5cf6' },
+  { icon: '🌙', color: '#7c3aed' },
+  { icon: '⭐', color: '#eab308' },
+  { icon: '🎮', color: '#0891b2' },
+  { icon: '🦋', color: '#c026d3' },
+];
+
+// 50-level config table. totalTiles = tileTypes * setsPerType * 3 (always div by 3).
+const TM_LEVEL_CONFIGS = [
+  // Starter 1-10
+  { tileTypes:3,  setsPerType:2, boardCols:5, boardRows:3, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L1  18
+  { tileTypes:3,  setsPerType:2, boardCols:5, boardRows:3, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L2  18
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:3, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L3  24
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:3, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L4  24
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:4, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L5  24
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:4, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L6  24
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:4, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L7  24
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:4, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L8  24
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:4, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L9  24
+  { tileTypes:4,  setsPerType:2, boardCols:6, boardRows:4, maxLayer:2, boosters:{undo:3,shuffle:2,clear:1} }, // L10 24
+  // Easy 11-20
+  { tileTypes:5,  setsPerType:3, boardCols:6, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L11 45
+  { tileTypes:5,  setsPerType:3, boardCols:6, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L12 45
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L13 54
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L14 54
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L15 54
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L16 54
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L17 54
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L18 54
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L19 54
+  { tileTypes:6,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:3,shuffle:2,clear:1} }, // L20 54
+  // Medium 21-30
+  { tileTypes:7,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L21 63
+  { tileTypes:7,  setsPerType:3, boardCols:7, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L22 63
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L23 72
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L24 72
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L25 72
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L26 72
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L27 72
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L28 72
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L29 72
+  { tileTypes:8,  setsPerType:3, boardCols:8, boardRows:5, maxLayer:3, boosters:{undo:2,shuffle:2,clear:1} }, // L30 72
+  // Hard 31-40
+  { tileTypes:9,  setsPerType:3, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L31 81
+  { tileTypes:9,  setsPerType:3, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L32 81
+  { tileTypes:10, setsPerType:3, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L33 90
+  { tileTypes:10, setsPerType:3, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L34 90
+  { tileTypes:10, setsPerType:3, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L35 90
+  { tileTypes:10, setsPerType:3, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L36 90
+  { tileTypes:10, setsPerType:4, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L37 120
+  { tileTypes:10, setsPerType:4, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L38 120
+  { tileTypes:10, setsPerType:4, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L39 120
+  { tileTypes:10, setsPerType:4, boardCols:8, boardRows:6, maxLayer:4, boosters:{undo:2,shuffle:1,clear:1} }, // L40 120
+  // Expert 41-50
+  { tileTypes:10, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L41 120
+  { tileTypes:11, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L42 132
+  { tileTypes:11, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L43 132
+  { tileTypes:12, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L44 144
+  { tileTypes:12, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L45 144
+  { tileTypes:12, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L46 144
+  { tileTypes:12, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L47 144
+  { tileTypes:12, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L48 144
+  { tileTypes:12, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L49 144
+  { tileTypes:12, setsPerType:4, boardCols:9, boardRows:7, maxLayer:5, boosters:{undo:1,shuffle:1,clear:1} }, // L50 144
+];
+
+const TM_TIER_LABELS = [
+  { label: 'Starter', start: 0, end: 9 },
+  { label: 'Easy',    start: 10, end: 19 },
+  { label: 'Medium',  start: 20, end: 29 },
+  { label: 'Hard',    start: 30, end: 39 },
+  { label: 'Expert',  start: 40, end: 49 },
+];
+
+const TM_TILE_STEP = 50; // px per grid unit (48px tile + 2px gap)
+
+function tmGenerateLevel(cfg, seed) {
+  const rng = mulberry32(seed);
+  const { tileTypes, setsPerType, boardCols, boardRows, maxLayer } = cfg;
+  // Build tile list: tileTypes × setsPerType copies of each type (3 tiles per copy)
+  const typeList = [];
+  for (let t = 0; t < tileTypes; t++) {
+    for (let s = 0; s < setsPerType; s++) {
+      typeList.push(t, t, t);
+    }
+  }
+  // Fisher-Yates shuffle
+  for (let i = typeList.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [typeList[i], typeList[j]] = [typeList[j], typeList[i]];
+  }
+
+  const tiles = [];
+  let idx = 0;
+  let tileId = 0;
+
+  for (let layer = 0; layer <= maxLayer && idx < typeList.length; layer++) {
+    const offset = layer * 0.5;
+    const cols = boardCols - layer;
+    const rows = boardRows - layer;
+    if (cols <= 0 || rows <= 0) break;
+    for (let r = 0; r < rows && idx < typeList.length; r++) {
+      for (let c = 0; c < cols && idx < typeList.length; c++) {
+        tiles.push({
+          id: tileId++,
+          type: typeList[idx++],
+          col: c + offset,
+          row: r + offset,
+          layer,
+          removed: false,
+          inBar: false,
+        });
+      }
+    }
+  }
+  return tiles;
+}
+
+function tmIsLocked(tile, allTiles) {
+  for (let i = 0; i < allTiles.length; i++) {
+    const a = allTiles[i];
+    if (a.removed || a.inBar) continue;
+    if (a.layer <= tile.layer) continue;
+    if (Math.abs(a.col - tile.col) < 1.0 && Math.abs(a.row - tile.row) < 1.0) return true;
+  }
+  return false;
+}
+
+function tmSortBar(bar, tilesMap) {
+  return bar.slice().sort((a, b) => tilesMap[a].type - tilesMap[b].type);
+}
+
+function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
+  const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
+  const [selectedLevel, setSelectedLevel] = useState(1);
+  const [tiles, setTiles] = useState([]);
+  const [bar, setBar] = useState([]);
+  const [moves, setMoves] = useState(0);
+  const [totalMoves, setTotalMoves] = useState(0);
+  const [sessionScore, setSessionScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const [boosters, setBoosters] = useState({ undo: 3, shuffle: 2, clear: 1 });
+  const [lastBarEntry, setLastBarEntry] = useState(null);
+  const [clearSlotMode, setClearSlotMode] = useState(false);
+  const [barFull, setBarFull] = useState(false);
+  const [completedLevels, setCompletedLevels] = useState(new Set());
+  const [flashIds, setFlashIds] = useState(new Set());
+  const [levelScore, setLevelScore] = useState(0);
+  const { secs, fmt } = useTimer(!done && phase === 'playing');
+  const secsRef = useRef(0);
+  const totalSecsRef = useRef(0);
+  const timerBase = useRef(0);
+
+  useEffect(() => { secsRef.current = secs; }, [secs]);
+
+  // Reset everything when Play Again is triggered from App overlay
+  useEffect(() => {
+    setPhase('select');
+    setTiles([]);
+    setBar([]);
+    setMoves(0);
+    setTotalMoves(0);
+    setSessionScore(0);
+    setDone(false);
+    setBoosters({ undo: 3, shuffle: 2, clear: 1 });
+    setLastBarEntry(null);
+    setClearSlotMode(false);
+    setBarFull(false);
+    setFlashIds(new Set());
+    setLevelScore(0);
+    setCompletedLevels(new Set());
+    totalSecsRef.current = 0;
+    timerBase.current = 0;
+  }, [resetKey]);
+
+  const startLevel = (lvl) => {
+    const cfg = TM_LEVEL_CONFIGS[lvl - 1];
+    const newTiles = tmGenerateLevel(cfg, lvl * 17 + 3); // seed varies per level
+    setSelectedLevel(lvl);
+    setTiles(newTiles);
+    setBar([]);
+    setMoves(0);
+    setDone(false);
+    setBoosters({ ...cfg.boosters });
+    setLastBarEntry(null);
+    setClearSlotMode(false);
+    setBarFull(false);
+    setFlashIds(new Set());
+    setLevelScore(0);
+    setPhase('playing');
+  };
+
+  const selectTile = (tileId) => {
+    if (clearSlotMode) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tilesMap = {};
+    tilesCopy.forEach(t => { tilesMap[t.id] = t; });
+    const tile = tilesMap[tileId];
+    if (!tile || tile.removed || tile.inBar) return;
+    if (tmIsLocked(tile, tilesCopy)) return;
+
+    // Game over: bar is already full with no match
+    if (bar.length >= 7) {
+      setBarFull(true);
+      setTimeout(() => setBarFull(false), 600);
+      // call onLose immediately when full bar is re-clicked
+      const totalS = totalSecsRef.current + secsRef.current;
+      const newTotal = totalMoves + moves + 1;
+      onLose(newTotal, totalS, { share: `Tile Match 💥 Level ${selectedLevel} | ${newTotal} moves` });
+      return;
+    }
+
+    tile.inBar = true;
+    const newBar = [...bar, tileId];
+    const newMoves = moves + 1;
+
+    // Sort bar
+    const sortedBar = tmSortBar(newBar, tilesMap);
+
+    // Check for match-3
+    let matchedIds = null;
+    for (let i = 0; i <= sortedBar.length - 3; i++) {
+      const a = tilesMap[sortedBar[i]];
+      const b = tilesMap[sortedBar[i + 1]];
+      const cc = tilesMap[sortedBar[i + 2]];
+      if (a && b && cc && a.type === b.type && b.type === cc.type) {
+        matchedIds = [sortedBar[i], sortedBar[i + 1], sortedBar[i + 2]];
+        break;
+      }
+    }
+
+    let finalBar = sortedBar;
+    if (matchedIds) {
+      // Flash animation then remove
+      const matchSet = new Set(matchedIds);
+      setFlashIds(matchSet);
+      matchedIds.forEach(id => {
+        tilesMap[id].removed = true;
+        tilesMap[id].inBar = false;
+      });
+      finalBar = sortedBar.filter(id => !matchSet.has(id));
+      setTimeout(() => setFlashIds(new Set()), 400);
+    }
+
+    const updatedTiles = tilesCopy;
+    const newTotalMoves = totalMoves + newMoves;
+
+    // Check game-over: bar full after placement, no match
+    if (!matchedIds && finalBar.length >= 7) {
+      // Update state first, then trigger lose
+      setTiles(updatedTiles);
+      setBar(finalBar);
+      setMoves(newMoves);
+      setBarFull(true);
+      setTimeout(() => setBarFull(false), 600);
+      const totalS = totalSecsRef.current + secsRef.current;
+      onLose(newTotalMoves, totalS, { share: `Tile Match 💥 Level ${selectedLevel} | ${newTotalMoves} moves` });
+      return;
+    }
+
+    setTiles(updatedTiles);
+    setBar(finalBar);
+    setMoves(newMoves);
+    setLastBarEntry(tileId);
+    onStepChange(newTotalMoves);
+
+    // Check win: no active board tiles
+    const remaining = updatedTiles.filter(t => !t.removed && !t.inBar);
+    const inBarNow = finalBar.length;
+    if (remaining.length === 0 && inBarNow === 0) {
+      setDone(true);
+      const s = secsRef.current;
+      const ls = Math.max(1000 - newMoves * 4 - s, 100);
+      setLevelScore(ls);
+      setPhase('levelWon');
+      totalSecsRef.current += s;
+    }
+  };
+
+  const doUndo = () => {
+    if (boosters.undo <= 0 || !lastBarEntry) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tilesMap = {};
+    tilesCopy.forEach(t => { tilesMap[t.id] = t; });
+    const tile = tilesMap[lastBarEntry];
+    if (!tile || !tile.inBar) return;
+    tile.inBar = false;
+    const newBar = bar.filter(id => id !== lastBarEntry);
+    setTiles(tilesCopy);
+    setBar(newBar);
+    setLastBarEntry(null);
+    setBoosters(b => ({ ...b, undo: b.undo - 1 }));
+    setBarFull(false);
+  };
+
+  const doShuffle = () => {
+    if (boosters.shuffle <= 0) return;
+    const active = tiles.filter(t => !t.removed && !t.inBar);
+    if (active.length < 2) return;
+    const positions = active.map(t => ({ col: t.col, row: t.row, layer: t.layer }));
+    // Fisher-Yates with time-based seed (non-deterministic for shuffle)
+    const rng = mulberry32((Date.now() & 0xFFFF) + 1);
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    active.forEach((t, i) => {
+      const tc = tilesCopy.find(x => x.id === t.id);
+      if (tc) { tc.col = positions[i].col; tc.row = positions[i].row; tc.layer = positions[i].layer; }
+    });
+    setTiles(tilesCopy);
+    setBoosters(b => ({ ...b, shuffle: b.shuffle - 1 }));
+  };
+
+  const doClearMode = () => {
+    if (boosters.clear <= 0 || bar.length === 0) return;
+    setClearSlotMode(true);
+  };
+
+  const clearSlotTile = (tileId) => {
+    if (!clearSlotMode) return;
+    const tilesCopy = tiles.map(t => ({ ...t }));
+    const tilesMap = {};
+    tilesCopy.forEach(t => { tilesMap[t.id] = t; });
+    const tile = tilesMap[tileId];
+    if (!tile || !tile.inBar) return;
+    tile.removed = true;
+    tile.inBar = false;
+    const newBar = bar.filter(id => id !== tileId);
+    setTiles(tilesCopy);
+    setBar(newBar);
+    setBoosters(b => ({ ...b, clear: b.clear - 1 }));
+    setClearSlotMode(false);
+    setBarFull(false);
+  };
+
+  const handleNextLevel = () => {
+    const ns = sessionScore + levelScore;
+    setSessionScore(ns);
+    setCompletedLevels(prev => new Set([...prev, selectedLevel]));
+    totalSecsRef.current += 0; // already accumulated in selectTile win path
+    const nextLvl = selectedLevel < 50 ? selectedLevel + 1 : null;
+    if (nextLvl) {
+      startLevel(nextLvl);
+    }
+  };
+
+  const handleEndSession = () => {
+    const ns = sessionScore + levelScore;
+    setCompletedLevels(prev => new Set([...prev, selectedLevel]));
+    const totalS = totalSecsRef.current;
+    const newTotalMoves = totalMoves + moves;
+    const share = `Tile Match ⬢ L${completedLevels.size + 1} cleared | ${ns} pts 🀄✨`;
+    onWin(ns, newTotalMoves, totalS, { share });
+  };
+
+  const fmtTime = s => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+
+  // ---- Level selector screen ----
+  if (phase === 'select') {
+    return (
+      <div className="tm-level-select">
+        <h2>Tile Match</h2>
+        <p>Click tiles off the layered board into your 7-slot bar — match three to clear them.</p>
+        {TM_TIER_LABELS.map(tier => (
+          <div key={tier.label}>
+            <div className="tm-tier-label">{tier.label}</div>
+            <div className="tm-level-grid">
+              {Array.from({ length: tier.end - tier.start + 1 }, (_, i) => {
+                const lvl = tier.start + i + 1;
+                const isDone = completedLevels.has(lvl);
+                const isSel = selectedLevel === lvl;
+                return (
+                  <button
+                    key={lvl}
+                    className={`tm-level-btn${isSel ? ' selected' : ''}${isDone ? ' done' : ''}`}
+                    onClick={() => setSelectedLevel(lvl)}
+                  >
+                    {lvl}
+                    {isDone && <span className="tm-check">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <button className="tm-play-btn" onClick={() => startLevel(selectedLevel)}>
+          Play Level {selectedLevel}
+        </button>
+      </div>
+    );
+  }
+
+  // ---- Level won screen ----
+  if (phase === 'levelWon') {
+    const isLast = selectedLevel >= 50;
+    return (
+      <div className="tm-level-won">
+        <div className="trophy">🏆</div>
+        <h3>Level {selectedLevel} Cleared!</h3>
+        <div className="sub">Board cleared — well played</div>
+        <div className="tm-level-stats">
+          <div className="tm-level-stat-row"><span className="k">Time</span><span className="v">{fmtTime(secsRef.current)}</span></div>
+          <div className="tm-level-stat-row"><span className="k">Moves</span><span className="v">{moves}</span></div>
+          <div className="tm-level-stat-row"><span className="k">Level score</span><span className="v">+{levelScore}</span></div>
+          <div className="tm-level-stat-row"><span className="k">Session total</span><span className="v">{sessionScore + levelScore}</span></div>
+        </div>
+        <div className="tm-level-won-btns">
+          {!isLast && (
+            <button className="tm-next-btn" onClick={handleNextLevel}>Next Level →</button>
+          )}
+          <button className="tm-end-btn" onClick={handleEndSession}>End Session</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Playing screen ----
+  const cfg = TM_LEVEL_CONFIGS[selectedLevel - 1];
+  const tilesMap = {};
+  tiles.forEach(t => { tilesMap[t.id] = t; });
+
+  const boardW = (cfg.boardCols) * TM_TILE_STEP;
+  const boardH = (cfg.boardRows + cfg.maxLayer * 0.5) * TM_TILE_STEP + 48;
+
+  const activeTiles = tiles.filter(t => !t.removed);
+  const boardTiles = activeTiles.filter(t => !t.inBar);
+  const tilesLeft = boardTiles.length;
+
+  return (
+    <div className="tm-wrap">
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Time</div>
+          <div className="pvalue time">{fmt}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Moves</div>
+          <div className="pvalue">{moves}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Tiles Left</div>
+          <div className="pvalue">{tilesLeft}</div>
+        </div>
+      </div>
+
+      <div
+        className="tm-board-container"
+        style={{ width: boardW, height: boardH, maxWidth: '100%' }}
+      >
+        {boardTiles.map(tile => {
+          const locked = tmIsLocked(tile, tiles);
+          const isFlash = flashIds.has(tile.id);
+          const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
+          return (
+            <div
+              key={tile.id}
+              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}`}
+              style={{
+                left: tile.col * TM_TILE_STEP,
+                top: tile.row * TM_TILE_STEP,
+                zIndex: tile.layer * 10 + 1,
+                background: tt.color,
+              }}
+              onClick={() => selectTile(tile.id)}
+            >
+              {tt.icon}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
+        {Array.from({ length: 7 }, (_, i) => {
+          const tid = bar[i];
+          const t = tid != null ? tilesMap[tid] : null;
+          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
+          const isClear = clearSlotMode && t != null;
+          return (
+            <div
+              key={i}
+              className={`tm-slot${t ? ' filled' : ''}${isClear ? ' clear-target' : ''}`}
+              onClick={isClear ? () => clearSlotTile(tid) : undefined}
+            >
+              {tt ? tt.icon : ''}
+            </div>
+          );
+        })}
+      </div>
+      <div className={`tm-bar-label${barFull ? ' full' : ''}`}>
+        {barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`}
+      </div>
+
+      <div className="tm-boosters">
+        <button
+          className="tm-booster-btn"
+          disabled={boosters.undo <= 0 || !lastBarEntry}
+          onClick={doUndo}
+          title="Return last tile to board"
+        >
+          <span className="tm-booster-icon">↩</span>
+          <span>Undo</span>
+          <span className="tm-booster-count">{boosters.undo} left</span>
+        </button>
+        <button
+          className="tm-booster-btn"
+          disabled={boosters.shuffle <= 0}
+          onClick={doShuffle}
+          title="Shuffle board tiles"
+        >
+          <span className="tm-booster-icon">🔀</span>
+          <span>Shuffle</span>
+          <span className="tm-booster-count">{boosters.shuffle} left</span>
+        </button>
+        <button
+          className={`tm-booster-btn${clearSlotMode ? ' active' : ''}`}
+          disabled={boosters.clear <= 0 || bar.length === 0}
+          onClick={clearSlotMode ? () => setClearSlotMode(false) : doClearMode}
+          title="Remove a tile from bar"
+        >
+          <span className="tm-booster-icon">✕</span>
+          <span>{clearSlotMode ? 'Cancel' : 'Clear'}</span>
+          <span className="tm-booster-count">{boosters.clear} left</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -4287,6 +5071,16 @@ const GAMES = [
     tag: 'Numbers',
     tagColor: C.emerald,
     component: T2048Game,
+  },
+  {
+    id: 'tilematching',
+    name: 'Tile Match',
+    icon: '🀄',
+    category: 'classic',
+    desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
+    tag: 'Puzzle',
+    tagColor: '#6366f1',
+    component: TileMatchingGame,
   },
 ];
 

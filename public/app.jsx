@@ -1395,6 +1395,175 @@ body {
 .t2048-keep-btn:hover   { opacity: 0.88; }
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
+
+/* ---- Idle Clicker ---- */
+.idle-container { display: flex; flex-direction: column; height: 100%; }
+.idle-main { flex: 1; padding: 1.5rem 1.25rem; max-width: 800px; margin: 0 auto; width: 100%; }
+.idle-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; }
+.idle-stat-box {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.8rem;
+  text-align: center;
+}
+.idle-stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.idle-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1.2rem; margin-top: 0.2rem; }
+.idle-stat-value.currency { color: ${C.gold}; }
+.idle-stat-value.prestige { color: ${C.accent}; }
+.idle-stat-value.income { color: ${C.emerald}; }
+
+.idle-tap-section { text-align: center; margin-bottom: 2rem; }
+.idle-tap-btn {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, ${C.gold}, ${C.accent});
+  border: 3px solid ${C.border};
+  color: white;
+  font-size: 2.5rem;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  font-weight: 700;
+}
+.idle-tap-btn:active { transform: scale(0.95); box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+.idle-tap-label { font-size: 0.85rem; color: ${C.muted}; margin-top: 0.5rem; }
+
+.idle-shop { margin-top: 1rem; }
+.idle-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid ${C.border};
+}
+.idle-tab {
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  color: ${C.muted};
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  position: relative;
+  transition: color 0.12s ease;
+}
+.idle-tab.active {
+  color: ${C.accent};
+  font-weight: 700;
+}
+.idle-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: ${C.accent};
+}
+
+.idle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.idle-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.idle-card:hover { border-color: ${C.accent}; transform: translateY(-2px); }
+.idle-card-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+.idle-card-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.3rem; }
+.idle-card-desc { font-size: 0.75rem; color: ${C.muted}; margin-bottom: 0.5rem; }
+.idle-card-stats { font-size: 0.7rem; color: ${C.muted}; margin-bottom: 0.5rem; }
+.idle-card-btn {
+  width: 100%;
+  padding: 0.5rem;
+  background: ${C.accent};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.idle-card-btn:hover { background: #2f6fe0; }
+.idle-card-btn:disabled { background: ${C.muted}; cursor: not-allowed; }
+
+.idle-coin-popup {
+  position: fixed;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: ${C.gold};
+  font-size: 1.2rem;
+  animation: float-up 1s ease-out forwards;
+}
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-40px); }
+}
+
+.prestige-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1.25rem;
+}
+.prestige-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 18px;
+  padding: 2rem;
+  text-align: center;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.prestige-card h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+.prestige-card .sub { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1.25rem; }
+.prestige-rows {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  border-top: 1px solid ${C.border};
+  border-bottom: 1px solid ${C.border};
+  padding: 1rem 0;
+  margin-bottom: 1.25rem;
+}
+.prestige-row { display: flex; justify-content: space-between; padding: 0.3rem 0; }
+.prestige-row .k { color: ${C.muted}; }
+.prestige-row .v { color: ${C.gold}; font-weight: 600; }
+.prestige-buttons { display: flex; gap: 0.8rem; }
+.prestige-confirm {
+  flex: 1;
+  padding: 0.8rem;
+  background: ${C.accent};
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.prestige-confirm:hover { background: #2f6fe0; }
+.prestige-cancel {
+  flex: 1;
+  padding: 0.8rem;
+  background: ${C.surface};
+  color: ${C.text};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.prestige-cancel:hover { border-color: ${C.accent}; }
 `;
 
 /* ============================================================
@@ -4224,6 +4393,300 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   Idle clicker game constants & helpers
+   ============================================================ */
+const IDLE_UNITS = [
+  { id: 'worker', name: 'Worker Hamster', icon: '🐹', baseCost: 10, incomePerSec: 0.1 },
+  { id: 'coinpress', name: 'Coin Press', icon: '🏭', baseCost: 100, incomePerSec: 1 },
+  { id: 'goldenwheel', name: 'Golden Wheel', icon: '✨', baseCost: 1000, incomePerSec: 10 },
+  { id: 'vault', name: 'Treasure Vault', icon: '💰', baseCost: 10000, incomePerSec: 100 },
+];
+
+const IDLE_UPGRADES = [
+  { id: 'iron_paws', name: 'Iron Paws', baseCost: 50, maxLevel: 10, effect: 'tap', multiplier: 1.1, desc: 'Boost tap power' },
+  { id: 'worker_motivation', name: 'Worker Motivation', baseCost: 150, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'worker', desc: 'Worker +25%' },
+  { id: 'coinpress_boost', name: 'Press Power', baseCost: 500, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'coinpress', desc: 'Press +25%' },
+  { id: 'goldenwheel_boost', name: 'Wheel Speed', baseCost: 5000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'goldenwheel', desc: 'Wheel +25%' },
+  { id: 'vault_boost', name: 'Vault Depth', baseCost: 50000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'vault', desc: 'Vault +25%' },
+];
+
+function idleUnitCost(unit, count) {
+  return Math.ceil(unit.baseCost * Math.pow(1.15, count));
+}
+
+function idleUpgradeCost(upgrade, level) {
+  return Math.ceil(upgrade.baseCost * Math.pow(1.1, level));
+}
+
+function computePassiveIncome(unitsOwned, upgrades) {
+  let income = 0;
+  for (const unit of IDLE_UNITS) {
+    const count = unitsOwned[unit.id] || 0;
+    let unitIncome = unit.incomePerSec * count;
+    // Apply unit-specific upgrades (5 levels of 1.25x each = 3.05x at max)
+    for (const upgrade of IDLE_UPGRADES) {
+      if (upgrade.unitId === unit.id && upgrades[upgrade.id]) {
+        unitIncome *= Math.pow(upgrade.multiplier, upgrades[upgrade.id]);
+      }
+    }
+    income += unitIncome;
+  }
+  return income;
+}
+
+function computePrestigeMultiplier(prestigePoints) {
+  return 1 + 0.05 * prestigePoints;
+}
+
+function IdleGame() {
+  const [state, setState] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('units');
+  const [pendingPrestige, setPendingPrestige] = useState(null);
+  const [popups, setPopups] = useState([]);
+  const [offlineAccum, setOfflineAccum] = useState(0);
+  const tapPowerRef = useRef(1);
+
+  const loadState = async () => {
+    const { ok, body } = await api('/api/idle/state');
+    if (ok && body) {
+      setState(body);
+      tapPowerRef.current = parseFloat(body.tapPower) || 1;
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadState();
+  }, []);
+
+  // Passive income accumulation loop
+  useEffect(() => {
+    if (!state) return;
+    const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
+    const multiplier = computePrestigeMultiplier(state.prestigePoints);
+    const id = setInterval(() => {
+      setState(prev => {
+        const newCur = prev.currency + passiveIncome * multiplier;
+        const newPeak = Math.max(prev.peakCurrency, newCur);
+        return { ...prev, currency: newCur, peakCurrency: newPeak };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [state]);
+
+  // Sync offline accumulation periodically
+  useEffect(() => {
+    if (offlineAccum <= 0 || !state) return;
+    const timer = setTimeout(async () => {
+      const { ok } = await api('/api/idle/tap', { method: 'POST', body: JSON.stringify({ tapCount: offlineAccum }) });
+      if (ok) setOfflineAccum(0);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [offlineAccum, state]);
+
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+  if (!state) return <div style={{ padding: '2rem', textAlign: 'center' }}>Failed to load game</div>;
+
+  const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
+  const multiplier = computePrestigeMultiplier(state.prestigePoints);
+  const displayCurrency = Math.floor(state.currency);
+
+  const handleTap = async () => {
+    const tapPower = tapPowerRef.current;
+    const tapValue = tapPower * multiplier;
+    const newCur = state.currency + tapValue;
+    const newPeak = Math.max(state.peakCurrency, newCur);
+    setState(prev => ({ ...prev, currency: newCur, peakCurrency: newPeak }));
+    setOfflineAccum(offlineAccum + 1);
+
+    // Coin popup
+    const popupId = Math.random();
+    const x = Math.random() * 100 - 50;
+    const y = Math.random() * 50;
+    setPopups(prev => [...prev, { id: popupId, value: '+' + Math.ceil(tapValue), x, y }]);
+    setTimeout(() => setPopups(prev => prev.filter(p => p.id !== popupId)), 1000);
+  };
+
+  const handleBuyUnit = async (unit) => {
+    const count = state.unitsOwned[unit.id] || 0;
+    const cost = idleUnitCost(unit, count);
+    if (state.currency < cost) return alert('Insufficient currency');
+
+    const { ok, status } = await api('/api/idle/buy-unit', {
+      method: 'POST',
+      body: JSON.stringify({ unitId: unit.id })
+    });
+    if (ok) loadState();
+    else if (status === 409) alert('Insufficient currency');
+  };
+
+  const handleUpgrade = async (upgrade) => {
+    const level = state.upgrades[upgrade.id] || 0;
+    if (level >= upgrade.maxLevel) return alert('Already maxed');
+    const cost = idleUpgradeCost(upgrade, level);
+    if (state.currency < cost) return alert('Insufficient currency');
+
+    const { ok, status } = await api('/api/idle/upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ upgradeId: upgrade.id })
+    });
+    if (ok) loadState();
+    else if (status === 409) alert('Insufficient currency');
+  };
+
+  const handlePrestige = async () => {
+    const bonus = Math.floor(Math.sqrt(state.peakCurrency / 1000));
+    const newPrestigePoints = state.prestigePoints + bonus;
+    const multiplierGain = (0.05 * bonus).toFixed(1);
+    setPendingPrestige({ bonus, newPoints: newPrestigePoints, multiplierGain });
+  };
+
+  const confirmPrestige = async () => {
+    const { ok } = await api('/api/idle/prestige', { method: 'POST' });
+    if (ok) {
+      setPendingPrestige(null);
+      loadState();
+    }
+  };
+
+  return (
+    <div className="idle-container">
+      <div className="idle-main">
+        <div className="idle-stats">
+          <div className="idle-stat-box">
+            <div className="idle-stat-label">Coins</div>
+            <div className="idle-stat-value currency">{displayCurrency.toLocaleString()}</div>
+          </div>
+          <div className="idle-stat-box">
+            <div className="idle-stat-label">Per Second</div>
+            <div className="idle-stat-value income">{(passiveIncome * multiplier).toFixed(2)}</div>
+          </div>
+          <div className="idle-stat-box">
+            <div className="idle-stat-label">Prestige Bonus</div>
+            <div className="idle-stat-value prestige">+{Math.round(state.prestigePoints * 5)}%</div>
+          </div>
+        </div>
+
+        <div className="idle-tap-section">
+          <button className="idle-tap-btn" onClick={handleTap}>TAP</button>
+          <div className="idle-tap-label">Tap Power: {tapPowerRef.current.toFixed(2)}×</div>
+        </div>
+
+        <div className="idle-shop">
+          <div className="idle-tabs">
+            <button
+              className={`idle-tab ${activeTab === 'units' ? 'active' : ''}`}
+              onClick={() => setActiveTab('units')}
+            >
+              Units ({Object.values(state.unitsOwned).reduce((a, b) => a + b, 0)})
+            </button>
+            <button
+              className={`idle-tab ${activeTab === 'upgrades' ? 'active' : ''}`}
+              onClick={() => setActiveTab('upgrades')}
+            >
+              Upgrades
+            </button>
+          </div>
+
+          <div className="idle-grid">
+            {activeTab === 'units' && IDLE_UNITS.map(unit => {
+              const count = state.unitsOwned[unit.id] || 0;
+              const cost = idleUnitCost(unit, count);
+              const canAfford = state.currency >= cost;
+              return (
+                <div key={unit.id} className="idle-card">
+                  <div className="idle-card-icon">{unit.icon}</div>
+                  <div className="idle-card-name">{unit.name}</div>
+                  <div className="idle-card-stats">Income: {unit.incomePerSec.toFixed(2)}/s</div>
+                  <div className="idle-card-stats">Own: {count}</div>
+                  <button
+                    className="idle-card-btn"
+                    disabled={!canAfford}
+                    onClick={() => handleBuyUnit(unit)}
+                  >
+                    {cost.toLocaleString()}
+                  </button>
+                </div>
+              );
+            })}
+
+            {activeTab === 'upgrades' && IDLE_UPGRADES.map(upgrade => {
+              const level = state.upgrades[upgrade.id] || 0;
+              const cost = idleUpgradeCost(upgrade, level);
+              const canAfford = state.currency >= cost && level < upgrade.maxLevel;
+              return (
+                <div key={upgrade.id} className="idle-card">
+                  <div className="idle-card-icon">⚡</div>
+                  <div className="idle-card-name">{upgrade.name}</div>
+                  <div className="idle-card-desc">{upgrade.desc}</div>
+                  <div className="idle-card-stats">Level: {level}/{upgrade.maxLevel}</div>
+                  <button
+                    className="idle-card-btn"
+                    disabled={!canAfford}
+                    onClick={() => handleUpgrade(upgrade)}
+                  >
+                    {level >= upgrade.maxLevel ? 'MAXED' : cost.toLocaleString()}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {popups.map(p => (
+        <div
+          key={p.id}
+          className="idle-coin-popup"
+          style={{
+            left: 'calc(50% + ' + p.x + 'px)',
+            top: 'calc(50% + ' + p.y + 'px)',
+          }}
+        >
+          {p.value}
+        </div>
+      ))}
+
+      {pendingPrestige && (
+        <div className="prestige-modal">
+          <div className="prestige-card">
+            <h2>✨ Prestige</h2>
+            <div className="sub">Reset your progress and earn prestige points!</div>
+            <div className="prestige-rows">
+              <div className="prestige-row">
+                <span className="k">Peak Currency:</span>
+                <span className="v">{Math.floor(state.peakCurrency).toLocaleString()}</span>
+              </div>
+              <div className="prestige-row">
+                <span className="k">Bonus Points:</span>
+                <span className="v">+{pendingPrestige.bonus}</span>
+              </div>
+              <div className="prestige-row">
+                <span className="k">New Total:</span>
+                <span className="v">{pendingPrestige.newPoints}</span>
+              </div>
+              <div className="prestige-row">
+                <span className="k">Multiplier Gain:</span>
+                <span className="v">+{pendingPrestige.multiplierGain}%</span>
+              </div>
+            </div>
+            <div className="prestige-buttons">
+              <button className="prestige-confirm" onClick={confirmPrestige}>
+                Prestige
+              </button>
+              <button className="prestige-cancel" onClick={() => setPendingPrestige(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -4287,6 +4750,16 @@ const GAMES = [
     tag: 'Numbers',
     tagColor: C.emerald,
     component: T2048Game,
+  },
+  {
+    id: 'idle',
+    name: 'Idle Empire',
+    icon: '🐹',
+    category: 'idle',
+    desc: 'Tap, upgrade, and build your hamster empire with prestige rewards.',
+    tag: 'Idle',
+    tagColor: C.gold,
+    component: IdleGame,
   },
 ];
 
@@ -4362,8 +4835,8 @@ function App() {
   };
 
   const launchGame = async (game) => {
-    // Classic games skip the server entirely
-    if (game.category === 'classic') {
+    // Classic games and idle games skip the daily system
+    if (game.category === 'classic' || game.category === 'idle') {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -4546,10 +5019,15 @@ function App() {
       {screen === 'lobby' && (
         <div className="lobby">
           <div className="lobby-head">
-            <h1>{lobbyTab === 'daily' ? 'Daily Puzzles' : 'Classic Games'}</h1>
-            <p>{lobbyTab === 'daily'
-              ? 'One attempt each, per day. Resets at midnight UTC.'
-              : 'Play anytime — track your best scores.'}
+            <h1>
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : 'Idle Empire'}
+            </h1>
+            <p>
+              {lobbyTab === 'daily'
+                ? 'One attempt each, per day. Resets at midnight UTC.'
+                : lobbyTab === 'classic'
+                ? 'Play anytime — track your best scores.'
+                : 'Tap, upgrade, and build your empire. Progress saved automatically.'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
               <p className="lobby-hint">
@@ -4574,12 +5052,16 @@ function App() {
               className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
               onClick={() => setLobbyTab('classic')}
             >Classic Games</button>
+            <button
+              className={'lobby-tab' + (lobbyTab === 'idle' ? ' active' : '')}
+              onClick={() => setLobbyTab('idle')}
+            >Idle Empire</button>
           </div>
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
-              const isClassic = g.category === 'classic';
+              const isClassicOrIdle = g.category === 'classic' || g.category === 'idle';
               const a = attempts[g.id];
-              const locked = !isClassic && !!a;
+              const locked = !isClassicOrIdle && !!a;
               return (
                 <div
                   key={g.id}

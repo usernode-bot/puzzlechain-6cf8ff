@@ -75,6 +75,17 @@ body {
 }
 .nav-stat .value.score { color: ${C.gold}; }
 .nav-stat .value.streak { color: ${C.emerald}; }
+.mult-badge {
+  margin-left: 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: ${C.gold};
+  background: ${C.gold}1f;
+  border: 1px solid ${C.gold}40;
+  border-radius: 999px;
+  padding: 0.05rem 0.35rem;
+  vertical-align: middle;
+}
 
 /* ---- Account indicator ---- */
 .nav-right { display: flex; align-items: center; gap: 1.25rem; }
@@ -131,6 +142,12 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+.lobby-head .lobby-hint {
+  margin-top: 0.5rem;
+  color: ${C.emerald};
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .grid {
@@ -527,6 +544,37 @@ function fmtHoursMins(ms) {
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);
   return `${h}h ${m}m`;
+}
+
+/* ============================================================
+   Streak → score multiplier tiers
+   ============================================================ */
+// Loyal daily players earn more on every win. Tiers are listed high→low;
+// the first whose `min` the streak meets wins. Centralized here so the
+// breakpoints/multipliers are a one-line balance change. The 5-day→1.2x and
+// 10-day→1.5x breakpoints are the headline; 3-day and 20-day fill the ramp.
+const STREAK_TIERS = [
+  { min: 20, mult: 2.0 },
+  { min: 10, mult: 1.5 },
+  { min: 5,  mult: 1.2 },
+  { min: 3,  mult: 1.1 },
+  { min: 0,  mult: 1.0 },
+];
+
+// Multiplier for a streak length (consecutive days, including the current win).
+function streakMultiplier(streak) {
+  for (const t of STREAK_TIERS) if (streak >= t.min) return t.mult;
+  return 1.0;
+}
+
+// The next higher tier above the current streak: { daysAway, mult }, or null
+// when already at the top tier.
+function nextTierInfo(streak) {
+  const above = STREAK_TIERS
+    .filter(t => t.min > streak)
+    .sort((a, b) => a.min - b.min);
+  if (above.length === 0) return null;
+  return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
 
 // Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)
@@ -1030,6 +1078,7 @@ function App() {
       setUser(body.user || null);
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
+      setStreak(typeof body.streak === 'number' ? body.streak : 0);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -1039,6 +1088,7 @@ function App() {
       // so persistence isn't guaranteed — reflect that in the nav.
       setAuthOk(false);
       setUser(null);
+      setStreak(0);
     }
     setLoading(false);
   };
@@ -1078,10 +1128,16 @@ function App() {
   };
 
   const handleWin = async (score, steps, timeSecs) => {
-    const bonus = streak > 0 ? Math.floor(score * 0.1 * streak) : 0;
-    const finalScore = score + bonus;
-    setStreak(s => s + 1);
-    setWinData({ score, bonus, finalScore, steps, timeSecs });
+    // The streak this win lands in: the first finished game of the day extends
+    // the consecutive-day streak by 1; a second game the same day reuses the
+    // same day count (the multiplier is per-day, not per-game).
+    const playedToday = Object.values(attempts).some(a => a && a.score != null);
+    const effectiveStreak = playedToday ? streak : streak + 1;
+    const multiplier = streakMultiplier(effectiveStreak);
+    const finalScore = Math.round(score * multiplier);
+    const bonus = finalScore - score;
+    setStreak(effectiveStreak);
+    setWinData({ score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak });
 
     const gameId = currentGame.id;
     const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
@@ -1093,6 +1149,9 @@ function App() {
       : { score: finalScore, steps, timeSecs, finishedAt: new Date().toISOString() };
     setAttempts(prev => ({ ...prev, [gameId]: stored }));
     setTotalScore(t => t + finalScore);
+    // Reconcile against the server's authoritative streak (now that today is
+    // finished) so a reload and the live nav badge agree.
+    if (ok && body && typeof body.streak === 'number') setStreak(body.streak);
   };
 
   const backToLobby = () => {
@@ -1105,6 +1164,11 @@ function App() {
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const GameComponent = currentGame ? currentGame.component : null;
+
+  // Reward level surfaced in the nav + lobby. Suppressed when signed out so we
+  // never show a multiplier the server can't back.
+  const activeMult = authOk ? streakMultiplier(streak) : 1;
+  const tierAhead = authOk && streak > 0 ? nextTierInfo(streak) : null;
 
   return (
     <div className="app">
@@ -1120,7 +1184,10 @@ function App() {
             </div>
             <div className="nav-stat">
               <div className="label">Streak</div>
-              <div className="value streak mono">{streak}</div>
+              <div className="value streak mono">
+                {streak}
+                {activeMult > 1 && <span className="mult-badge">×{activeMult}</span>}
+              </div>
             </div>
           </div>
           <AccountChip loading={loading} authOk={authOk} user={user} />
@@ -1132,6 +1199,13 @@ function App() {
           <div className="lobby-head">
             <h1>Daily Puzzles</h1>
             <p>One attempt each, per day. Resets at midnight UTC.</p>
+            {authOk && streak > 0 && (
+              <p className="lobby-hint">
+                🔥 {streak}-day streak · {tierAhead
+                  ? `${tierAhead.daysAway} more daily win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
+                  : `max ×${activeMult} multiplier active`}
+              </p>
+            )}
             {nextResetUtc && (
               <p className="reset-countdown mono">
                 Next puzzle in {fmtHoursMins(
@@ -1217,9 +1291,9 @@ function App() {
                 <span className="k">Base score</span>
                 <span className="v mono">{winData.score}</span>
               </div>
-              {winData.bonus > 0 && (
+              {winData.multiplier > 1 && (
                 <div className="score-row bonus">
-                  <span className="k">Streak bonus</span>
+                  <span className="k">Streak ×{winData.multiplier} · {winData.effectiveStreak}-day</span>
                   <span className="v mono">+{winData.bonus}</span>
                 </div>
               )}

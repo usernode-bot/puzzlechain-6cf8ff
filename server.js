@@ -48,6 +48,42 @@ function nextResetUtc(from = new Date()) {
   return d.toISOString();
 }
 
+// The UTC day (YYYY-MM-DD) before a given ISO date string.
+function prevUtcDay(iso) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Consecutive-day streak for a user: the length of the unbroken run of UTC
+// days (each with >=1 finished attempt) ending today, or ending yesterday if
+// today hasn't been played yet (a streak stays alive until a full day is
+// missed). Computed from the existing daily_attempts rows — no extra schema.
+async function computeStreak(userId) {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT attempt_date::text AS d
+       FROM daily_attempts
+      WHERE user_id = $1 AND finished_at IS NOT NULL
+      ORDER BY d DESC
+      LIMIT 60`,
+    [userId]
+  );
+  if (rows.length === 0) return 0;
+  const days = new Set(rows.map(r => r.d));
+  const today = new Date().toISOString().slice(0, 10); // UTC, matches (now() AT TIME ZONE 'utc')::date
+  const yesterday = prevUtcDay(today);
+  let cursor;
+  if (days.has(today)) cursor = today;
+  else if (days.has(yesterday)) cursor = yesterday;
+  else return 0; // last finished day is older than yesterday → streak broken
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak++;
+    cursor = prevUtcDay(cursor);
+  }
+  return streak;
+}
+
 // Shape a DB row for the client.
 function shapeAttempt(row) {
   return {
@@ -108,6 +144,24 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: gives the current viewer a 10-day consecutive
+    // streak (finished sudoku attempts for the last 10 UTC days BEFORE today)
+    // so the multiplier tier UI is demonstrable — nav badge, lobby next-tier
+    // hint, and a 1.5x win card on today's still-unplayed games. Today is left
+    // open on purpose so a tester can trigger a multiplied win. Idempotent,
+    // obviously fake (round scores), strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'streak') {
+      for (let i = 1; i <= 10; i++) {
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+           VALUES ($1, $2, 'sudoku', ((now() AT TIME ZONE 'utc')::date - $3::int), 900, 20, 120, now())
+           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', i]
+        );
+      }
+    }
+
     const { rows } = await pool.query(
       `SELECT * FROM daily_attempts
        WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
@@ -115,6 +169,8 @@ app.get('/api/daily', async (req, res) => {
     );
     const attempts = {};
     for (const row of rows) attempts[row.game_id] = shapeAttempt(row);
+
+    const streak = await computeStreak(req.user.id);
 
     res.json({
       // Surface the signed-in account so the UI can confirm login +
@@ -127,6 +183,7 @@ app.get('/api/daily', async (req, res) => {
       },
       serverNowUtc: new Date().toISOString(),
       nextResetUtc: nextResetUtc(),
+      streak,
       attempts,
     });
   } catch (err) {
@@ -193,7 +250,10 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       // No claimed attempt today (client out of sync) — surface so it resyncs.
       return res.status(409).json({ error: 'No active attempt to finish' });
     }
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc() });
+    // Recompute the streak now that today is finished so the client can
+    // reconcile its optimistic value without a full reload.
+    const streak = await computeStreak(req.user.id);
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });

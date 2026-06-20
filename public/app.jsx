@@ -76,6 +76,50 @@ body {
 .nav-stat .value.score { color: ${C.gold}; }
 .nav-stat .value.streak { color: ${C.emerald}; }
 
+/* ---- Account indicator ---- */
+.nav-right { display: flex; align-items: center; gap: 1.25rem; }
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem 0.35rem 0.45rem;
+  cursor: default;
+}
+.account-chip .avatar {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: ${C.accent};
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.account-chip .who { display: flex; flex-direction: column; line-height: 1.1; }
+.account-chip .uname { font-size: 0.82rem; font-weight: 600; }
+.account-chip .status { font-size: 0.6rem; color: ${C.emerald}; letter-spacing: 0.02em; }
+.account-chip .dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%; flex: 0 0 auto;
+}
+.account-chip.loading .dot { background: ${C.muted}; }
+.account-chip.loading { color: ${C.muted}; }
+.account-chip.loading .who { font-size: 0.82rem; }
+.account-chip.off { border-color: ${C.rose}; }
+.account-chip.off .dot { background: ${C.rose}; }
+.account-chip.off .who { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; }
+
+@media (max-width: 560px) {
+  .account-chip .who { display: none; }
+  .account-chip { padding: 0.35rem; }
+  .nav-right { gap: 0.8rem; }
+}
+
 /* ---- Lobby ---- */
 .lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem 1.25rem; width: 100%; }
 .lobby-head { margin-bottom: 1.5rem; }
@@ -647,6 +691,38 @@ function SudokuGame({ onWin, onStepChange }) {
 }
 
 /* ============================================================
+   Account indicator — confirms the signed-in Usernode account so the
+   player knows their progress is being saved (not just session state).
+   ============================================================ */
+function AccountChip({ loading, authOk, user }) {
+  if (loading) {
+    return (
+      <div className="account-chip loading" title="Checking your account…">
+        <span className="dot" /> <span className="who">Connecting…</span>
+      </div>
+    );
+  }
+  if (!authOk || !user) {
+    return (
+      <div className="account-chip off" title="Not signed in — progress won't be saved. Open this app inside Usernode.">
+        <span className="dot" /> <span className="who">Signed out</span>
+      </div>
+    );
+  }
+  const name = user.username || 'Linked account';
+  const initial = (user.username || '?').charAt(0).toUpperCase();
+  return (
+    <div className="account-chip on" title={`Signed in as ${name} — your daily progress is saved to your account.`}>
+      <span className="avatar mono">{initial}</span>
+      <span className="who">
+        <span className="uname">{name}</span>
+        <span className="status">● Progress saved</span>
+      </span>
+    </div>
+  );
+}
+
+/* ============================================================
    Locked screen — shown when today's attempt is already used
    ============================================================ */
 function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) {
@@ -918,6 +994,8 @@ function App() {
   const [offset, setOffset] = useState(0); // serverNow - clientNow (ms)
   const [loading, setLoading] = useState(true);
   const [stepCount, setStepCount] = useState(0);
+  const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
+  const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
 
   useEffect(() => {
@@ -933,12 +1011,19 @@ function App() {
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
     const { ok, body } = await api(path);
     if (ok && body) {
+      setAuthOk(true);
+      setUser(body.user || null);
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
       setTotalScore(sum);
+    } else {
+      // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
+      // so persistence isn't guaranteed — reflect that in the nav.
+      setAuthOk(false);
+      setUser(null);
     }
     setLoading(false);
   };
@@ -1012,15 +1097,18 @@ function App() {
 
       <nav className="nav">
         <div className="nav-brand"><span className="logo">⬢</span> PuzzleChain</div>
-        <div className="nav-stats">
-          <div className="nav-stat">
-            <div className="label">Score</div>
-            <div className="value score mono">{totalScore}</div>
+        <div className="nav-right">
+          <div className="nav-stats">
+            <div className="nav-stat">
+              <div className="label">Score</div>
+              <div className="value score mono">{totalScore}</div>
+            </div>
+            <div className="nav-stat">
+              <div className="label">Streak</div>
+              <div className="value streak mono">{streak}</div>
+            </div>
           </div>
-          <div className="nav-stat">
-            <div className="label">Streak</div>
-            <div className="value streak mono">{streak}</div>
-          </div>
+          <AccountChip loading={loading} authOk={authOk} user={user} />
         </div>
       </nav>
 

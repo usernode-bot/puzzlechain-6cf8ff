@@ -13,7 +13,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -117,6 +117,14 @@ app.get('/api/daily', async (req, res) => {
     for (const row of rows) attempts[row.game_id] = shapeAttempt(row);
 
     res.json({
+      // Surface the signed-in account so the UI can confirm login +
+      // that persistent data is active. Always present here (route is
+      // auth-gated), but the client still handles a null user gracefully.
+      user: {
+        username: req.user.username || null,
+        id: req.user.id,
+        usernodePubkey: req.user.usernode_pubkey || null,
+      },
       serverNowUtc: new Date().toISOString(),
       nextResetUtc: nextResetUtc(),
       attempts,

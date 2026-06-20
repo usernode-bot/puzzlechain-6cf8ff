@@ -4898,7 +4898,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     if (tierPage === null) {
       return (
         <div className="tm-level-select">
-          <h2>Tile Match</h2>
+          <h2>Tile Match Puzzle</h2>
           <p>Click tiles off the layered board into your 7-slot bar — match three to clear them.</p>
           <div className="tm-tier-overview">
             {TM_TIER_LABELS.map((tier, idx) => {
@@ -5411,7 +5411,7 @@ const GAMES = [
   },
   {
     id: 'tilematching',
-    name: 'Tile Match',
+    name: 'Tile Match Puzzle',
     icon: '🀄',
     category: 'classic',
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
@@ -5421,7 +5421,7 @@ const GAMES = [
   },
   {
     id: 'tilematchingdaily',
-    name: 'Daily Tile Match',
+    name: 'Daily Tile Match Puzzle',
     icon: '🀄',
     category: 'daily',
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',

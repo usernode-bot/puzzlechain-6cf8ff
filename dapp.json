@@ -12,6 +12,6 @@
     { "name": "Mancala card in Classic Games tab", "path": "/?tab=classic", "expectText": "Mancala" },
     { "name": "2048 card in Classic Games tab", "path": "/?tab=classic", "expectText": "2048" },
     { "name": "Tile Match card in Classic Games tab", "path": "/?tab=classic", "expectText": "Tile Match" },
-    { "name": "Daily Tile Match card in lobby", "path": "/", "expectText": "Daily Tile Match" }
+    { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" }
   ]
 }

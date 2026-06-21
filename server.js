@@ -58,6 +58,26 @@ async function migrate() {
     )
   `);
 
+  // poker_chips is PUBLIC — chip counts contain no sensitive data.
+  // One row per user; upserted after every hand.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS poker_chips (
+      user_id    TEXT        PRIMARY KEY,
+      chips      INTEGER     NOT NULL DEFAULT 1000,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Staging seed: give staging-demo-user 2500 chips so testers see a
+  // non-default chip count in the lobby card. Idempotent, no-op in prod.
+  if (IS_STAGING) {
+    await pool.query(
+      `INSERT INTO poker_chips (user_id, chips)
+       VALUES ('staging-demo-user', 2500)
+       ON CONFLICT (user_id) DO NOTHING`
+    );
+  }
+
   // idle_game_state is PUBLIC: game state, no sensitive data.
   // One row per user; tracks currency, prestige, units owned, upgrades.
   await pool.query(`
@@ -550,6 +570,44 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
   } catch (err) {
     console.error('[mancala] move failed:', err.message);
     res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// ---- Poker chips API -----------------------------------------------------
+
+// GET /api/poker/chips — returns the player's persistent chip count.
+// Lazy init: no row yet → return the default 1000 without inserting.
+app.get('/api/poker/chips', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT chips FROM poker_chips WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json({ chips: rows.length > 0 ? rows[0].chips : 1000 });
+  } catch (err) {
+    console.error('[poker] GET chips failed:', err.message);
+    res.status(500).json({ error: 'Failed to load chips' });
+  }
+});
+
+// POST /api/poker/chips { chips: N } — upsert the player's chip count.
+app.post('/api/poker/chips', async (req, res) => {
+  const chips = Math.round(Number(req.body.chips));
+  if (!Number.isFinite(chips) || chips < 0) {
+    return res.status(400).json({ error: 'chips must be a non-negative integer' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO poker_chips (user_id, chips)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET chips = EXCLUDED.chips, updated_at = now()
+       RETURNING chips`,
+      [req.user.id, chips]
+    );
+    res.json({ chips: rows[0].chips });
+  } catch (err) {
+    console.error('[poker] POST chips failed:', err.message);
+    res.status(500).json({ error: 'Failed to save chips' });
   }
 });
 

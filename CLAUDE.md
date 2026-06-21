@@ -112,7 +112,10 @@ purpose.
     hook — `useAutosave(onSaveProgress, () => ({ progress, steps, secs }),
     !done)`. Per-game progress shapes today: sudoku `{ dayNum, grid }`,
     wordhunt `{ dayNum, found: [...words] }`, cryptowordle
-    `{ dayNum, words: [...guessStrings] }`. The lock is **finished-aware**:
+    `{ dayNum, words: [...guessStrings] }`, tilematchingdaily
+    `{ dayNum, tiles: [...], bar: [...ids], moves, boosters }` (the tile
+    snapshot is stored in full because the shuffle booster moves tiles).
+    The lock is **finished-aware**:
     a row with `finishedAt` set is locked; a claimed-but-unfinished row
     resumes into the game (lobby card shows "▶ In progress · resume").
   - **Daily leaderboard.** The win overlay and `LockedScreen` render a

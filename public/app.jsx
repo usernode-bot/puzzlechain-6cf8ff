@@ -7213,7 +7213,7 @@ const TM_DAILY_CONFIG = {
 };
 const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
 
-function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }) {
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress }) {
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -7226,6 +7226,12 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }
   const [secs, setSecs] = useState(0);
   const secsRef = useRef(0);
   const movesRef = useRef(0);
+
+  // Server-anchored UTC day; the board is re-derived deterministically from it,
+  // so persisted progress only carries the mutable player state.
+  const dayNum = cwDayNum(offset || 0);
+  // `hydrated` guards the autosave effects from firing before the board exists.
+  const hydratedRef = useRef(false);
 
   useEffect(() => { secsRef.current = secs; }, [secs]);
   useEffect(() => { movesRef.current = moves; }, [moves]);
@@ -7247,21 +7253,58 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }
     onLose(movesRef.current, secsRef.current, { share: 'Daily Tile Match ⏱ time\'s up' });
   }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialise board from day seed
+  // Initialise board from the day seed, hydrating today's saved progress when
+  // present so a resumed attempt restores the exact tiles/bar/moves/boosters
+  // and continues the timer from where it stopped.
   useEffect(() => {
-    const dayNum = cwDayNum(offset || 0);
     const seed = dayNum * 31 + 7;
-    setTiles(tmGenerateLevel(TM_DAILY_CONFIG, seed));
-    setBar([]);
-    setMoves(0);
-    setSecs(0);
+    const freshTiles = tmGenerateLevel(TM_DAILY_CONFIG, seed);
+    const resume = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.tiles)
+      ? savedProgress
+      : null;
+    if (resume) {
+      setTiles(resume.tiles.map(t => ({ ...t })));
+      setBar(Array.isArray(resume.bar) ? resume.bar.slice() : []);
+      setMoves(Number.isFinite(resume.moves) ? resume.moves : 0);
+      setSecs(Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0);
+      setBoosters(resume.boosters ? { ...resume.boosters } : { ...TM_DAILY_CONFIG.boosters });
+    } else {
+      setTiles(freshTiles);
+      setBar([]);
+      setMoves(0);
+      setSecs(0);
+      setBoosters({ ...TM_DAILY_CONFIG.boosters });
+    }
     setDone(false);
-    setBoosters({ ...TM_DAILY_CONFIG.boosters });
     setLastBarEntry(null);
     setClearSlotMode(false);
     setBarFull(false);
     setFlashIds(new Set());
+    hydratedRef.current = true;
   }, [resetKey, offset]);
+
+  // Autosave the mutable board state. The per-change effect captures every move
+  // (tile placed, undo, shuffle, clear); useAutosave covers idle timer advance
+  // and the tab-close case. Both are no-ops once finished.
+  const tmStateRef = useRef({});
+  tmStateRef.current = { tiles, bar, moves, boosters, secs };
+  const buildTmProgress = () => ({
+    progress: {
+      dayNum,
+      tiles: tmStateRef.current.tiles,
+      bar: tmStateRef.current.bar,
+      moves: tmStateRef.current.moves,
+      boosters: tmStateRef.current.boosters,
+    },
+    steps: tmStateRef.current.moves,
+    secs: tmStateRef.current.secs,
+  });
+  useAutosave(onSaveProgress, buildTmProgress, !done);
+  useEffect(() => {
+    if (done || !hydratedRef.current || tiles.length === 0 || !onSaveProgress) return;
+    const s = buildTmProgress();
+    onSaveProgress(s.progress, s.steps, s.secs);
+  }, [tiles, bar, moves, boosters, done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tilesMap = {};
   tiles.forEach(t => { tilesMap[t.id] = t; });

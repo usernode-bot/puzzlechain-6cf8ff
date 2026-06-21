@@ -13,7 +13,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -77,6 +77,24 @@ async function migrate() {
        ON CONFLICT (user_id) DO NOTHING`
     );
   }
+
+  // idle_game_state is PUBLIC: game state, no sensitive data.
+  // One row per user; tracks currency, prestige, units owned, upgrades.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS idle_game_state (
+      id              SERIAL PRIMARY KEY,
+      user_id         TEXT NOT NULL UNIQUE,
+      currency        BIGINT NOT NULL DEFAULT 0,
+      peak_currency   BIGINT NOT NULL DEFAULT 0,
+      prestige_points INTEGER NOT NULL DEFAULT 0,
+      tap_power       DECIMAL NOT NULL DEFAULT 1,
+      units_owned     JSONB NOT NULL DEFAULT '{}',
+      upgrades        JSONB NOT NULL DEFAULT '{}',
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
 
   // Staging seeds for mancala_rooms so testers can exercise all states
   // without needing a second device. Strictly a no-op in production.
@@ -552,6 +570,232 @@ app.post('/api/poker/chips', async (req, res) => {
   } catch (err) {
     console.error('[poker] POST chips failed:', err.message);
     res.status(500).json({ error: 'Failed to save chips' });
+  }
+});
+
+// ---- Idle clicker API -------------------------------------------------------
+
+app.get('/api/idle/state', async (req, res) => {
+  try {
+    const demo = req.query.demo;
+    if (IS_STAGING && demo === 'progress') {
+      await pool.query(
+        `INSERT INTO idle_game_state
+           (user_id, currency, peak_currency, prestige_points, units_owned, upgrades)
+         VALUES ($1, 50000, 100000, 5, $2, $3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [
+          req.user.id,
+          JSON.stringify({ worker: 10, coinpress: 5, goldenwheel: 2 }),
+          JSON.stringify({ iron_paws: 3, worker_motivation: 2 })
+        ]
+      );
+    }
+
+    let { rows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (rows.length === 0) {
+      await pool.query(
+        `INSERT INTO idle_game_state (user_id)
+         VALUES ($1)
+         ON CONFLICT (user_id) DO NOTHING
+         RETURNING *`,
+        [req.user.id]
+      );
+      rows = await pool.query(
+        'SELECT * FROM idle_game_state WHERE user_id = $1',
+        [req.user.id]
+      ).then(r => r.rows);
+    }
+
+    const row = rows[0];
+    res.json({
+      currency: row.currency,
+      peakCurrency: row.peak_currency,
+      prestigePoints: row.prestige_points,
+      tapPower: row.tap_power,
+      unitsOwned: row.units_owned || {},
+      upgrades: row.upgrades || {},
+    });
+  } catch (err) {
+    console.error('[idle] GET state failed:', err.message);
+    res.status(500).json({ error: 'Failed to load state' });
+  }
+});
+
+app.post('/api/idle/tap', async (req, res) => {
+  try {
+    const tapCount = Number.isFinite(req.body.tapCount) ? Math.max(1, Math.round(req.body.tapCount)) : 1;
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = currency + $2,
+             peak_currency = GREATEST(peak_currency, currency + $2),
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, tapCount]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+    const row = rows[0];
+    res.json({
+      currency: row.currency,
+      unitsOwned: row.units_owned || {},
+    });
+  } catch (err) {
+    console.error('[idle] tap failed:', err.message);
+    res.status(500).json({ error: 'Failed to record tap' });
+  }
+});
+
+app.post('/api/idle/buy-unit', async (req, res) => {
+  try {
+    const unitId = req.body.unitId;
+    if (!unitId || typeof unitId !== 'string') return res.status(400).json({ error: 'Invalid unitId' });
+
+    const IDLE_UNITS = {
+      worker: { baseCost: 10, incomePerSec: 0.1 },
+      coinpress: { baseCost: 100, incomePerSec: 1 },
+      goldenwheel: { baseCost: 1000, incomePerSec: 10 },
+      vault: { baseCost: 10000, incomePerSec: 100 },
+    };
+
+    if (!IDLE_UNITS[unitId]) return res.status(400).json({ error: 'Unknown unit' });
+
+    const { rows: stateRows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (stateRows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+
+    const row = stateRows[0];
+    const unitsOwned = row.units_owned || {};
+    const count = unitsOwned[unitId] || 0;
+    const cost = Math.ceil(IDLE_UNITS[unitId].baseCost * Math.pow(1.15, count));
+
+    if (row.currency < cost) return res.status(409).json({ error: 'Insufficient currency' });
+
+    unitsOwned[unitId] = count + 1;
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = currency - $2,
+             units_owned = $3,
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, cost, JSON.stringify(unitsOwned)]
+    );
+
+    const updated = rows[0];
+    res.json({
+      currency: updated.currency,
+      unitsOwned: updated.units_owned || {},
+    });
+  } catch (err) {
+    console.error('[idle] buy-unit failed:', err.message);
+    res.status(500).json({ error: 'Failed to purchase unit' });
+  }
+});
+
+app.post('/api/idle/upgrade', async (req, res) => {
+  try {
+    const upgradeId = req.body.upgradeId;
+    if (!upgradeId || typeof upgradeId !== 'string') return res.status(400).json({ error: 'Invalid upgradeId' });
+
+    const IDLE_UPGRADES = {
+      iron_paws: { baseCost: 50, maxLevel: 10, effect: 'tap', multiplier: 1.1 },
+      worker_motivation: { baseCost: 150, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+      coinpress_boost: { baseCost: 500, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+      goldenwheel_boost: { baseCost: 5000, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+      vault_boost: { baseCost: 50000, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+    };
+
+    if (!IDLE_UPGRADES[upgradeId]) return res.status(400).json({ error: 'Unknown upgrade' });
+
+    const { rows: stateRows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (stateRows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+
+    const row = stateRows[0];
+    const upgrades = row.upgrades || {};
+    const currentLevel = upgrades[upgradeId] || 0;
+    const upgrade = IDLE_UPGRADES[upgradeId];
+
+    if (currentLevel >= upgrade.maxLevel) return res.status(409).json({ error: 'Upgrade already maxed' });
+
+    const cost = Math.ceil(upgrade.baseCost * Math.pow(1.1, currentLevel));
+
+    if (row.currency < cost) return res.status(409).json({ error: 'Insufficient currency' });
+
+    upgrades[upgradeId] = currentLevel + 1;
+    let tapPower = row.tap_power;
+    if (upgrade.effect === 'tap' && upgradeId === 'iron_paws') {
+      tapPower = parseFloat((parseFloat(row.tap_power) * upgrade.multiplier).toFixed(6));
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = currency - $2,
+             upgrades = $3,
+             tap_power = $4,
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, cost, JSON.stringify(upgrades), tapPower]
+    );
+
+    const updated = rows[0];
+    res.json({
+      currency: updated.currency,
+      upgrades: updated.upgrades || {},
+      tapPower: updated.tap_power,
+    });
+  } catch (err) {
+    console.error('[idle] upgrade failed:', err.message);
+    res.status(500).json({ error: 'Failed to purchase upgrade' });
+  }
+});
+
+app.post('/api/idle/prestige', async (req, res) => {
+  try {
+    const { rows: stateRows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (stateRows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+
+    const row = stateRows[0];
+    const prestigeBonus = Math.floor(Math.sqrt(row.peak_currency / 1000));
+    const newPrestigePoints = row.prestige_points + prestigeBonus;
+
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = 0,
+             prestige_points = $2,
+             tap_power = 1,
+             units_owned = '{}',
+             upgrades = '{}',
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, newPrestigePoints]
+    );
+
+    const updated = rows[0];
+    res.json({
+      prestigePoints: updated.prestige_points,
+      prestigeBonus,
+      currency: updated.currency,
+      unitsOwned: updated.units_owned || {},
+      upgrades: updated.upgrades || {},
+    });
+  } catch (err) {
+    console.error('[idle] prestige failed:', err.message);
+    res.status(500).json({ error: 'Failed to prestige' });
   }
 });
 

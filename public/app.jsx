@@ -2157,6 +2157,391 @@ body {
   .tm-level-grid { grid-template-columns: repeat(10, 1fr); gap: 0.25rem; }
 }
 
+/* ============================================================
+   Classic Games shared shell (.cg-*)
+   ============================================================ */
+.cg-shell {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: ${C.bg};
+  overflow: hidden;
+  overscroll-behavior: none;
+  z-index: 40;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  --cg-chrome: 3.6rem;
+  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem), 560px);
+}
+.cg-topbar {
+  flex: 0 0 auto;
+  height: var(--cg-chrome);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.7rem;
+  border-bottom: 1px solid ${C.border};
+  background: ${C.surface};
+}
+.cg-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: clamp(0.95rem, 3.5vw, 1.15rem);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cg-btn {
+  flex: 0 0 auto;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding: 0 0.6rem;
+  font-family: inherit;
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.cg-btn:hover { border-color: ${C.accent}; }
+.cg-btn:active { background: ${C.accent}22; }
+.cg-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 2vh, 1rem);
+  padding: clamp(0.5rem, 2vh, 1rem) 0.6rem;
+  overflow: hidden;
+}
+.cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
+.cg-statusbar {
+  display: flex;
+  gap: 0.5rem;
+  width: var(--cg-board);
+  max-width: 94vw;
+}
+.cg-stat {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+  min-width: 0;
+}
+.cg-stat .l { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.cg-stat .v { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: clamp(0.9rem, 3.5vw, 1.15rem); margin-top: 0.05rem; }
+
+/* Bottom sheet */
+.cg-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,14,26,0.6);
+  z-index: 45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.cg-sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+.cg-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 46;
+  background: ${C.surface};
+  border-top: 1px solid ${C.border};
+  border-radius: 18px 18px 0 0;
+  padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  max-height: 82dvh;
+  overflow-y: auto;
+  transform: translateY(110%);
+  transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.cg-sheet.open { transform: translateY(0); }
+.cg-sheet-handle { width: 2.5rem; height: 0.28rem; border-radius: 999px; background: ${C.dim}; margin: 0.35rem auto 0.8rem; }
+.cg-sheet-tabs { display: flex; gap: 0.35rem; margin-bottom: 0.8rem; }
+.cg-sheet-tab {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.muted};
+  border-radius: 10px;
+  padding: 0.5rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.cg-sheet-tab.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.cg-sheet h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.6rem; }
+.cg-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid ${C.border};
+}
+.cg-setting-row:last-child { border-bottom: none; }
+.cg-setting-row .name { font-size: 0.9rem; }
+.cg-toggle {
+  width: 2.8rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: ${C.dim};
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex: 0 0 auto;
+}
+.cg-toggle.on { background: ${C.emerald}; }
+.cg-toggle::after {
+  content: '';
+  position: absolute;
+  top: 0.18rem;
+  left: 0.18rem;
+  width: 1.14rem;
+  height: 1.14rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+.cg-toggle.on::after { transform: translateX(1.3rem); }
+.cg-sheet-list { max-height: 50dvh; overflow-y: auto; }
+.cg-sheet-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid ${C.border};
+  font-size: 0.82rem;
+}
+.cg-sheet-empty { color: ${C.muted}; text-align: center; padding: 1.5rem 0; font-size: 0.9rem; }
+.cg-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.cg-stat-card { background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px; padding: 0.7rem; text-align: center; }
+.cg-stat-card .val { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: ${C.gold}; }
+.cg-stat-card .lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: ${C.muted}; margin-top: 0.15rem; }
+.cg-rules { font-size: 0.86rem; line-height: 1.5; color: ${C.text}; }
+.cg-rules li { margin: 0.3rem 0 0.3rem 1rem; }
+.cg-sheet-action {
+  width: 100%;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.7rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+.cg-sheet-action:hover { border-color: ${C.accent}; }
+
+/* Keep existing classic boards fitting inside the shell stage */
+.cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
+.cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
+.cg-stage .ms-bottom-nav, .cg-stage .mnc-bottom-nav, .cg-stage .t2048-bottom-nav { display: none; }
+
+/* ---- Snake ---- */
+.snake-board {
+  width: var(--cg-board);
+  height: var(--cg-board);
+  max-width: 94vw;
+  max-height: 94vw;
+  display: grid;
+  background: ${C.surface};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none;
+  position: relative;
+}
+.snake-cell { width: 100%; height: 100%; }
+.snake-cell.body { background: ${C.emerald}; border-radius: 3px; }
+.snake-cell.head { background: ${C.accent}; border-radius: 4px; }
+.snake-cell.food { background: ${C.rose}; border-radius: 50%; transform: scale(0.8); }
+.snake-hint { color: ${C.muted}; font-size: 0.8rem; text-align: center; }
+
+/* ---- Block Blast ---- */
+.bb-grid {
+  width: var(--cg-board);
+  height: var(--cg-board);
+  max-width: 94vw;
+  max-height: 94vw;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  background: ${C.surface};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 4px;
+  touch-action: none;
+}
+.bb-cell { background: ${C.bg}; border-radius: 4px; aspect-ratio: 1; transition: background 0.1s ease; }
+.bb-cell.filled { background: ${C.accent}; }
+.bb-cell.preview { background: ${C.accent}66; }
+.bb-cell.invalid { background: ${C.rose}55; }
+.bb-tray {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  align-items: center;
+  width: var(--cg-board);
+  max-width: 94vw;
+  min-height: 5rem;
+}
+.bb-piece {
+  display: grid;
+  gap: 2px;
+  cursor: grab;
+  touch-action: none;
+  padding: 0.3rem;
+}
+.bb-piece.dragging { opacity: 0.3; }
+.bb-piece.used { opacity: 0; pointer-events: none; }
+.bb-pcell { width: clamp(0.7rem, 3.5vw, 1.1rem); height: clamp(0.7rem, 3.5vw, 1.1rem); border-radius: 3px; }
+.bb-pcell.on { background: ${C.accent}; }
+.bb-drag-ghost { position: fixed; z-index: 60; pointer-events: none; display: grid; gap: 2px; opacity: 0.9; }
+.bb-drag-ghost .bb-pcell.on { background: ${C.gold}; }
+
+/* ---- Tile Match ---- */
+.tm-grid {
+  width: var(--cg-board);
+  max-width: 94vw;
+  display: grid;
+  gap: clamp(3px, 1vw, 6px);
+  touch-action: manipulation;
+}
+.tm-grid .tm-tile {
+  aspect-ratio: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1rem, 5vw, 1.7rem);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease, background 0.1s ease, opacity 0.18s ease;
+}
+.tm-grid .tm-tile.sel { background: ${C.accent}44; border-color: ${C.accent}; transform: scale(0.92); }
+.tm-grid .tm-tile.gone { opacity: 0; pointer-events: none; }
+
+/* ---- Diamond Rush ---- */
+.dr-grid {
+  width: var(--cg-board);
+  height: var(--cg-board);
+  max-width: 94vw;
+  max-height: 94vw;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  background: ${C.surface};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 4px;
+  touch-action: none;
+}
+.dr-gem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.9rem, 4vw, 1.5rem);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  aspect-ratio: 1;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
+.dr-gem.clearing { opacity: 0; transform: scale(0.4); }
+
+/* ---- Texas Hold 'Em ---- */
+.th-felt {
+  width: var(--cg-board);
+  max-width: 94vw;
+  background: radial-gradient(ellipse at center, #155e3a, #0c3d26);
+  border: 2px solid ${C.gold}66;
+  border-radius: 18px;
+  padding: clamp(0.6rem, 2.5vw, 1.1rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.5rem, 2vh, 0.9rem);
+}
+.th-seat { text-align: center; }
+.th-seat .who { font-size: 0.72rem; color: #d6e8d6; letter-spacing: 0.04em; }
+.th-seat .chips { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: ${C.gold}; font-weight: 600; }
+.th-cards { display: flex; gap: 0.35rem; justify-content: center; }
+.th-card {
+  width: clamp(2rem, 9vw, 3rem);
+  height: clamp(2.8rem, 12.5vw, 4.2rem);
+  border-radius: 7px;
+  background: #fbfbfb;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: clamp(0.85rem, 4vw, 1.25rem);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  line-height: 1;
+}
+.th-card.red { color: ${C.rose}; }
+.th-card.back { background: repeating-linear-gradient(45deg, ${C.accent}, ${C.accent} 6px, ${C.border} 6px, ${C.border} 12px); color: transparent; }
+.th-pot { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; font-size: 0.95rem; }
+.th-msg { color: #d6e8d6; font-size: 0.82rem; min-height: 1.2rem; text-align: center; }
+.th-community { display: flex; gap: 0.3rem; min-height: clamp(2.8rem, 12.5vw, 4.2rem); align-items: center; }
+.th-actions {
+  display: flex;
+  gap: 0.5rem;
+  width: var(--cg-board);
+  max-width: 94vw;
+}
+.th-actions button {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.7rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.th-actions button:hover:not(:disabled) { border-color: ${C.gold}; }
+.th-actions button:disabled { opacity: 0.35; cursor: not-allowed; }
+.th-actions button.bet { background: ${C.gold}; color: #000; border-color: ${C.gold}; }
+.th-betsizer { display: flex; align-items: center; gap: 0.5rem; width: var(--cg-board); max-width: 94vw; }
+.th-betsizer input { flex: 1; }
+.th-betsizer .amt { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; min-width: 3rem; text-align: right; }
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
+  .cg-stage { flex-direction: row; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cg-sheet, .tm-grid .tm-tile, .dr-gem, .snake-cell { transition: none !important; }
+}
+
 /* ---- Idle Clicker ---- */
 .idle-container { display: flex; flex-direction: column; height: 100%; }
 .idle-main { flex: 1; padding: 1.5rem 1.25rem; max-width: 800px; margin: 0 auto; width: 100%; }
@@ -2568,6 +2953,249 @@ body {
 .pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
 .pvp-prize-winner .mono { color: ${C.emerald}; }
 `;
+
+/* ============================================================
+   Classic Games shared subsystems — prefs, sound, haptics, gestures
+   ============================================================ */
+const CG_SOUND_KEY   = 'puzzlechain_cg_sound';
+const CG_HAPTICS_KEY = 'puzzlechain_cg_haptics';
+const CG_MOTION_KEY  = 'puzzlechain_cg_motion';
+
+// Module-level prefs read by cgSound/cgHaptic without prop threading.
+const cgPrefs = {
+  sound:   (() => { try { return localStorage.getItem(CG_SOUND_KEY) !== '0'; } catch { return true; } })(),
+  haptics: (() => { try { return localStorage.getItem(CG_HAPTICS_KEY) !== '0'; } catch { return true; } })(),
+  motion:  (() => { try { return localStorage.getItem(CG_MOTION_KEY) === '1'; } catch { return false; } })(),
+};
+function cgSetPref(key, val) {
+  cgPrefs[key] = val;
+  try {
+    localStorage.setItem(
+      key === 'sound' ? CG_SOUND_KEY : key === 'haptics' ? CG_HAPTICS_KEY : CG_MOTION_KEY,
+      val ? '1' : '0'
+    );
+  } catch {}
+}
+
+let _cgAudioCtx = null;
+function cgAudio() {
+  if (_cgAudioCtx) return _cgAudioCtx;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) _cgAudioCtx = new AC();
+  } catch {}
+  return _cgAudioCtx;
+}
+// Short synthesized cues — no asset files needed.
+const CG_TONES = {
+  move:    { f: 320, d: 0.05, t: 'square',   g: 0.05 },
+  click:   { f: 440, d: 0.04, t: 'triangle', g: 0.05 },
+  merge:   { f: 540, d: 0.09, t: 'sine',     g: 0.07 },
+  clear:   { f: 660, d: 0.10, t: 'sine',     g: 0.08 },
+  capture: { f: 740, d: 0.12, t: 'triangle', g: 0.08 },
+  deal:    { f: 380, d: 0.05, t: 'square',   g: 0.05 },
+  chip:    { f: 500, d: 0.06, t: 'square',   g: 0.06 },
+  win:     { f: 784, d: 0.22, t: 'sine',     g: 0.09 },
+  lose:    { f: 150, d: 0.30, t: 'sawtooth', g: 0.08 },
+};
+function cgSound(name, pitch) {
+  if (!cgPrefs.sound) return;
+  const ctx = cgAudio();
+  if (!ctx) return;
+  try {
+    if (ctx.state === 'suspended') ctx.resume();
+    const spec = CG_TONES[name] || CG_TONES.click;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = spec.t;
+    osc.frequency.value = spec.f * (pitch || 1);
+    gain.gain.value = spec.g;
+    osc.connect(gain).connect(ctx.destination);
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(spec.g, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + spec.d);
+    osc.start(now);
+    osc.stop(now + spec.d + 0.02);
+  } catch {}
+}
+function cgHaptic(ms) {
+  if (!cgPrefs.haptics) return;
+  try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
+}
+
+// Discrete-gesture hook: tap / swipe / long-press / double-tap on an element.
+function useGestures(ref, handlers) {
+  const h = useRef(handlers);
+  h.current = handlers;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let startX = 0, startY = 0, startT = 0, lpTimer = null, lastTap = 0, moved = false;
+    const SWIPE = 30;
+    const clearLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+    const onDown = (e) => {
+      const p = e.touches ? e.touches[0] : e;
+      startX = p.clientX; startY = p.clientY; startT = Date.now(); moved = false;
+      clearLp();
+      if (h.current.onLongPress) {
+        lpTimer = setTimeout(() => {
+          if (!moved) { h.current.onLongPress({ x: startX, y: startY, target: e.target }); lpTimer = null; }
+        }, 480);
+      }
+    };
+    const onMove = (e) => {
+      const p = e.touches ? e.touches[0] : e;
+      if (Math.abs(p.clientX - startX) > 8 || Math.abs(p.clientY - startY) > 8) { moved = true; clearLp(); }
+    };
+    const onUp = (e) => {
+      clearLp();
+      const p = e.changedTouches ? e.changedTouches[0] : e;
+      const dx = p.clientX - startX, dy = p.clientY - startY;
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      if (Math.max(adx, ady) >= SWIPE) {
+        if (h.current.onSwipe) {
+          const dir = adx > ady ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+          h.current.onSwipe(dir, { x: startX, y: startY, target: e.target });
+        }
+        return;
+      }
+      // Treat as tap
+      const now = Date.now();
+      if (now - startT > 480) return; // was a long press
+      if (h.current.onDoubleTap && now - lastTap < 280) {
+        h.current.onDoubleTap({ x: startX, y: startY, target: e.target });
+        lastTap = 0;
+        return;
+      }
+      lastTap = now;
+      if (h.current.onTap) h.current.onTap({ x: startX, y: startY, target: e.target });
+    };
+    el.addEventListener('touchstart', onDown, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchend', onUp, { passive: true });
+    el.addEventListener('mousedown', onDown);
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('mouseup', onUp);
+    return () => {
+      clearLp();
+      el.removeEventListener('touchstart', onDown);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onUp);
+      el.removeEventListener('mousedown', onDown);
+      el.removeEventListener('mousemove', onMove);
+      el.removeEventListener('mouseup', onUp);
+    };
+  }, [ref]);
+}
+
+// Drag tracking for Block Blast pieces / Diamond Rush swaps.
+function pointerXY(e) {
+  const p = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+  return { x: p.clientX, y: p.clientY };
+}
+
+/* ============================================================
+   Classic Games shared shell component
+   ============================================================ */
+function CgToggle({ on, onClick }) {
+  return <button className={'cg-toggle' + (on ? ' on' : '')} onClick={onClick} aria-pressed={on} />;
+}
+
+function CgSettings({ tick }) {
+  const [, force] = useState(0);
+  const flip = (key) => { cgSetPref(key, !cgPrefs[key]); force(n => n + 1); };
+  return (
+    <div>
+      <h4>Settings</h4>
+      <div className="cg-setting-row"><span className="name">Sound</span><CgToggle on={cgPrefs.sound} onClick={() => flip('sound')} /></div>
+      <div className="cg-setting-row"><span className="name">Haptics</span><CgToggle on={cgPrefs.haptics} onClick={() => flip('haptics')} /></div>
+      <div className="cg-setting-row"><span className="name">Reduced motion</span><CgToggle on={cgPrefs.motion} onClick={() => flip('motion')} /></div>
+    </div>
+  );
+}
+
+// game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
+function ClassicShell({ game, onExit, onNewGame, sheetSections, children }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [, force] = useState(0);
+  const sections = [
+    ...(sheetSections || []),
+    { id: 'settings', label: 'Settings', render: () => <CgSettings /> },
+  ];
+  const [active, setActive] = useState(sections[0].id);
+  const open = (id) => { setActive(id || sections[0].id); setSheetOpen(true); cgSound('click'); };
+  const toggleSound = () => { cgSetPref('sound', !cgPrefs.sound); force(n => n + 1); if (cgPrefs.sound) cgSound('click'); };
+  const cur = sections.find(s => s.id === active) || sections[0];
+  return (
+    <div className="cg-shell">
+      <div className="cg-topbar">
+        <button className="cg-btn" onClick={onExit} title="Back to lobby" aria-label="Back">←</button>
+        <div className="cg-title"><span>{game.icon}</span> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{game.name}</span></div>
+        {onNewGame && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
+        <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
+        <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
+      </div>
+      {children}
+      <div className={'cg-sheet-backdrop' + (sheetOpen ? ' open' : '')} onClick={() => setSheetOpen(false)} />
+      <div className={'cg-sheet' + (sheetOpen ? ' open' : '')}>
+        <div className="cg-sheet-handle" />
+        {sections.length > 1 && (
+          <div className="cg-sheet-tabs">
+            {sections.map(s => (
+              <button key={s.id} className={'cg-sheet-tab' + (active === s.id ? ' active' : '')} onClick={() => setActive(s.id)}>{s.label}</button>
+            ))}
+          </div>
+        )}
+        {sheetOpen && cur.render()}
+      </div>
+    </div>
+  );
+}
+
+// Shared status-bar helper for new games.
+function CgStatus({ items }) {
+  return (
+    <div className="cg-statusbar">
+      {items.map((it, i) => (
+        <div className="cg-stat" key={i}><div className="l">{it.l}</div><div className="v">{it.v}</div></div>
+      ))}
+    </div>
+  );
+}
+
+// Generic history list + stats grid section builders for the sheet.
+function cgHistorySection(rows, renderRow) {
+  return {
+    id: 'history', label: 'History',
+    render: () => (
+      <div>
+        <h4>Recent games</h4>
+        {(!rows || rows.length === 0)
+          ? <div className="cg-sheet-empty">No games yet — play one!</div>
+          : <div className="cg-sheet-list">{rows.map((r, i) => <div className="cg-sheet-row" key={i}>{renderRow(r)}</div>)}</div>}
+      </div>
+    ),
+  };
+}
+function cgStatsSection(cards) {
+  return {
+    id: 'stats', label: 'Stats',
+    render: () => (
+      <div>
+        <h4>Stats</h4>
+        <div className="cg-stats-grid">
+          {cards.map((c, i) => <div className="cg-stat-card" key={i}><div className="val">{c.val}</div><div className="lbl">{c.lbl}</div></div>)}
+        </div>
+      </div>
+    ),
+  };
+}
+function cgRulesSection(items) {
+  return {
+    id: 'rules', label: 'How to play',
+    render: () => <div><h4>How to play</h4><ul className="cg-rules">{items.map((t, i) => <li key={i}>{t}</li>)}</ul></div>,
+  };
+}
 
 /* ============================================================
    Shared timer hook
@@ -5396,1153 +6024,901 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
 }
 
 /* ============================================================
-   Texas Hold 'Em — card primitives + game component
+   New Classic Games (Snake, Block Blast, Tile Match, Diamond Rush,
+   Texas Hold 'Em) — all self-wrap in ClassicShell.
    ============================================================ */
+const SNAKE_KEY = 'puzzlechain_snake_history';
+const BB_KEY    = 'puzzlechain_blockblast_history';
+const TM_KEY    = 'puzzlechain_tilematch_history';
+const DR_KEY    = 'puzzlechain_diamondrush_history';
+const TH_KEY    = 'puzzlechain_texas_history';
 
-const POKER_SUITS = ['♠', '♥', '♦', '♣'];
-const POKER_RANKS = [2,3,4,5,6,7,8,9,10,11,12,13,14]; // 11=J,12=Q,13=K,14=A
-const POKER_RANK_NAMES = {2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
-const POKER_SUIT_COLOR = { '♠':'black', '♣':'black', '♥':'red', '♦':'red' };
-const POKER_DIFF_KEY = 'puzzlechain_poker_difficulty';
-const POKER_CHIPS_LOCAL_KEY = 'puzzlechain_poker_chips_local';
-
-function makeDeck() {
-  const deck = [];
-  for (const suit of POKER_SUITS) {
-    for (const rank of POKER_RANKS) {
-      deck.push({ rank, suit });
-    }
-  }
-  return deck;
+function cgLoadHistory(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } }
+function cgSaveHistory(key, entry) {
+  const h = cgLoadHistory(key);
+  h.unshift(entry);
+  const trimmed = h.slice(0, 30);
+  try { localStorage.setItem(key, JSON.stringify(trimmed)); } catch {}
+  return trimmed;
 }
-
-function evaluateHand(five) {
-  const ranks = five.map(c => c.rank).sort((a,b) => b - a);
-  const suits = five.map(c => c.suit);
-  const flush = suits.every(s => s === suits[0]);
-  const freq = {};
-  for (const r of ranks) freq[r] = (freq[r] || 0) + 1;
-  const counts = Object.values(freq).sort((a,b) => b-a);
-  const uniqueRanks = Object.keys(freq).map(Number).sort((a,b) => b-a);
-
-  // Check straight
-  let straight = false;
-  let straightHigh = 0;
-  if (uniqueRanks.length === 5) {
-    if (uniqueRanks[0] - uniqueRanks[4] === 4) { straight = true; straightHigh = uniqueRanks[0]; }
-    // Wheel: A-2-3-4-5
-    if (uniqueRanks[0] === 14 && uniqueRanks[1] === 5 && uniqueRanks[2] === 4 && uniqueRanks[3] === 3 && uniqueRanks[4] === 2) {
-      straight = true; straightHigh = 5;
-    }
-  }
-
-  // Tiebreaker: sorted by frequency desc, then rank desc
-  const tb = Object.entries(freq)
-    .sort((a,b) => b[1]-a[1] || Number(b[0])-Number(a[0]))
-    .map(([r]) => Number(r));
-
-  if (flush && straight) {
-    const name = straightHigh === 14 ? 'Royal Flush' : 'Straight Flush';
-    return { rank: straightHigh === 14 ? 8 : 7, name, tiebreakers: [straightHigh] };
-  }
-  if (counts[0] === 4) return { rank: 6, name: 'Four of a Kind', tiebreakers: tb };
-  if (counts[0] === 3 && counts[1] === 2) return { rank: 5, name: 'Full House', tiebreakers: tb };
-  if (flush) return { rank: 4, name: 'Flush', tiebreakers: ranks };
-  if (straight) return { rank: 3, name: 'Straight', tiebreakers: [straightHigh] };
-  if (counts[0] === 3) return { rank: 2, name: 'Three of a Kind', tiebreakers: tb };
-  if (counts[0] === 2 && counts[1] === 2) return { rank: 1, name: 'Two Pair', tiebreakers: tb };
-  if (counts[0] === 2) return { rank: 0.5, name: 'One Pair', tiebreakers: tb };
-  return { rank: 0, name: 'High Card', tiebreakers: ranks };
-}
-
-function best5of7(hole, community) {
-  const all = [...hole, ...community];
-  let best = null;
-  for (let i = 0; i < all.length; i++) {
-    for (let j = i+1; j < all.length; j++) {
-      const five = all.filter((_, k) => k !== i && k !== j);
-      if (five.length !== 5) continue;
-      const ev = evaluateHand(five);
-      if (!best || ev.rank > best.rank || (ev.rank === best.rank &&
-        ev.tiebreakers.some((t,idx) => t > (best.tiebreakers[idx]||0)))) {
-        best = ev;
-      }
-    }
-  }
-  return best || evaluateHand(all.slice(0,5));
-}
-
-function handStrengthCategory(hole, community) {
-  const ev = best5of7(hole, community.length >= 3 ? community : []);
-  if (ev.rank >= 4) return 'strong';
-  if (ev.rank >= 1) return 'medium';
-  return 'weak';
-}
-
-// Pre-flop strength estimate based on hole cards only
-function preFlopStrength(hole) {
-  const [a, b] = hole;
-  const maxR = Math.max(a.rank, b.rank);
-  const minR = Math.min(a.rank, b.rank);
-  const isPair = a.rank === b.rank;
-  const isSuited = a.suit === b.suit;
-  if (isPair && maxR >= 10) return 'strong';
-  if (isPair) return 'medium';
-  if (maxR === 14) return 'strong';
-  if (maxR >= 12 && minR >= 10) return 'strong';
-  if (maxR >= 11 && isSuited) return 'medium';
-  if (maxR >= 10) return 'medium';
-  return 'weak';
-}
-
-function compareHands(a, b) {
-  if (a.rank !== b.rank) return a.rank > b.rank ? 1 : -1;
-  for (let i = 0; i < Math.max(a.tiebreakers.length, b.tiebreakers.length); i++) {
-    const av = a.tiebreakers[i] || 0, bv = b.tiebreakers[i] || 0;
-    if (av !== bv) return av > bv ? 1 : -1;
-  }
-  return 0;
-}
-
-function pokerAIDecide({ holeCards, communityCards, toCall, potSize, myStack, difficulty }) {
-  const rng = Math.random();
-  if (difficulty === 'easy') {
-    if (toCall === 0) {
-      return rng < 0.20 ? { action: 'raise', amount: potSize } : { action: 'check', amount: 0 };
-    }
-    if (toCall >= myStack) return { action: 'call', amount: myStack };
-    if (rng < 0.15) return { action: 'fold', amount: 0 };
-    if (rng < 0.80) return { action: 'call', amount: toCall };
-    return { action: 'raise', amount: potSize };
-  }
-
-  const str = communityCards.length >= 3
-    ? handStrengthCategory(holeCards, communityCards)
-    : preFlopStrength(holeCards);
-  const isPreflop = communityCards.length === 0;
-
-  if (difficulty === 'medium') {
-    if (toCall === 0) {
-      if (str === 'weak') return rng < 0.85 ? { action: 'check', amount: 0 } : { action: 'raise', amount: 40 };
-      if (str === 'medium') return rng < 0.80 ? { action: 'check', amount: 0 } : { action: 'raise', amount: 40 };
-      return rng < 0.30 ? { action: 'check', amount: 0 } : { action: 'raise', amount: potSize };
-    }
-    if (toCall >= myStack) {
-      if (str === 'strong') return { action: 'call', amount: myStack };
-      return rng < 0.5 ? { action: 'fold', amount: 0 } : { action: 'call', amount: myStack };
-    }
-    if (str === 'weak') {
-      if (isPreflop) return rng < 0.4 ? { action: 'fold', amount: 0 } : { action: 'call', amount: toCall };
-      return rng < 0.60 ? { action: 'fold', amount: 0 } : { action: 'call', amount: toCall };
-    }
-    if (str === 'medium') return rng < 0.20 ? { action: 'raise', amount: 40 } : { action: 'call', amount: toCall };
-    return rng < 0.70 ? { action: 'raise', amount: potSize } : { action: 'call', amount: toCall };
-  }
-
-  // Hard
-  const potOdds = toCall > 0 ? toCall / (potSize + toCall) : 0;
-  const strengthThreshold = str === 'strong' ? 0.2 : str === 'medium' ? 0.4 : 0.65;
-  if (toCall === 0) {
-    if (str === 'weak') {
-      const bluff = rng < 0.12;
-      return bluff ? { action: 'raise', amount: potSize } : { action: 'check', amount: 0 };
-    }
-    if (str === 'medium') return rng < 0.25 ? { action: 'raise', amount: potSize } : { action: 'check', amount: 0 };
-    return rng < 0.65 ? { action: 'raise', amount: potSize } : { action: 'check', amount: 0 };
-  }
-  if (toCall >= myStack) {
-    if (str === 'strong') return { action: 'call', amount: myStack };
-    if (str === 'medium') return rng < 0.4 ? { action: 'call', amount: myStack } : { action: 'fold', amount: 0 };
-    return { action: 'fold', amount: 0 };
-  }
-  if (potOdds < strengthThreshold) return { action: 'call', amount: toCall };
-  return rng < 0.3 ? { action: 'raise', amount: potSize } : { action: 'fold', amount: 0 };
-}
-
-function PokerCard({ card, faceDown, large, empty }) {
-  if (empty) return <div className={'poker-card empty' + (large ? ' lg' : '')} />;
-  if (faceDown || !card) return <div className={'poker-card back' + (large ? ' lg' : '')} />;
-  const col = POKER_SUIT_COLOR[card.suit];
-  const rn = POKER_RANK_NAMES[card.rank];
-  return (
-    <div className={`poker-card ${col}${large ? ' lg' : ''}`}>
-      <div><div className="cr">{rn}</div><div className="cs">{card.suit}</div></div>
-      <div className="cs-bot cs">{card.suit}</div>
-    </div>
-  );
-}
-
-const POKER_START_CHIPS = 1000;
-const BB = 20;
-const SB = 10;
-const AI_DELAY = { easy: 500, medium: 700, hard: 900 };
-
-function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey }) {
-  const [mode, setMode] = useState('select');
-  const [difficulty, setDifficulty] = useState(() =>
-    localStorage.getItem(POKER_DIFF_KEY) || 'medium'
-  );
-
-  const [playerChips, setPlayerChips] = useState(POKER_START_CHIPS);
-  const [authOk, setAuthOk] = useState(true);
-  const [chipsLoaded, setChipsLoaded] = useState(false);
-
-  // Display state (updated synchronously during game logic)
-  const [playerHole, setPlayerHole] = useState([]);
-  const [aiHoles, setAiHoles] = useState([[], []]);
-  const [community, setCommunity] = useState([]);
-  const [phase, setPhase] = useState('preflop');
-  const [pot, setPot] = useState(0);
-  const [bets, setBets] = useState([0, 0, 0]);
-  const [stacks, setStacks] = useState([POKER_START_CHIPS, POKER_START_CHIPS, POKER_START_CHIPS]);
-  const [folded, setFolded] = useState([false, false, false]);
-  const [allIn, setAllIn] = useState([false, false, false]);
-  const [currentBet, setCurrentBet] = useState(0);
-  const [toAct, setToAct] = useState(-1);
-  const [actionBadges, setActionBadges] = useState([null, null, null]);
-  const [aiThinking, setAiThinking] = useState([false, false]);
-  const [handResult, setHandResult] = useState(null);
-  const [handNum, setHandNum] = useState(0);
-  const [dealerIdx, setDealerIdx] = useState(0);
-  const [showRaisePicker, setShowRaisePicker] = useState(false);
-  const [raisePreset, setRaisePreset] = useState(null);
-  const [showdown, setShowdown] = useState(null);
-  const [sessionDone, setSessionDone] = useState(false);
-
-  // Refs: game logic context for player action and session net tracking
-  const playerActionCtx = useRef(null);
-  const sessionStartChipsRef = useRef(POKER_START_CHIPS);
-
-  const { secs } = useTimer(mode === 'playing' && !sessionDone);
-
+function cgFmt(s) { return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
+function useElapsed(resetKey, running) {
+  const [secs, setSecs] = useState(0);
+  const start = useRef(Date.now());
+  useEffect(() => { start.current = Date.now(); setSecs(0); }, [resetKey]);
   useEffect(() => {
-    (async () => {
-      const { ok, body } = await api('/api/poker/chips');
-      if (ok && body && typeof body.chips === 'number') {
-        setPlayerChips(body.chips);
-        setAuthOk(true);
-      } else {
-        const local = localStorage.getItem(POKER_CHIPS_LOCAL_KEY);
-        if (local) setPlayerChips(parseInt(local, 10) || POKER_START_CHIPS);
-        setAuthOk(false);
-      }
-      setChipsLoaded(true);
-    })();
-  }, []);
+    if (!running) return;
+    const id = setInterval(() => setSecs(Math.round((Date.now() - start.current) / 1000)), 500);
+    return () => clearInterval(id);
+  }, [running, resetKey]);
+  return secs;
+}
 
+/* ---------------- Snake ---------------- */
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const N = 15;
+  const [, render] = useState(0);
+  const [done, setDone] = useState(false);
+  const [score, setScore] = useState(0);
+  const [started, setStarted] = useState(false);
+  const st = useRef(null);
+  const doneRef = useRef(false);
+  const boardRef = useRef(null);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const randFood = (snake) => {
+    let c;
+    do { c = { x: Math.floor(Math.random() * N), y: Math.floor(Math.random() * N) }; }
+    while (snake.some(s => s.x === c.x && s.y === c.y));
+    return c;
+  };
+  const init = () => {
+    const m = Math.floor(N / 2);
+    const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
+    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: 200, eaten: 0 };
+    doneRef.current = false;
+    setDone(false); setScore(0); setStarted(false); render(n => n + 1);
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  const gameOver = () => {
+    if (doneRef.current) return;
+    doneRef.current = true; setDone(true);
+    cgSound('lose'); cgHaptic([20, 40, 20]);
+    const sc = st.current.eaten * 10;
+    cgSaveHistory(SNAKE_KEY, { score: sc, len: st.current.snake.length, ts: Date.now() });
+    onWin(sc, st.current.eaten, secsRef.current, { winnerLabel: 'Game Over', share: `🐍 Snake — ${sc} pts, length ${st.current.snake.length}` });
+  };
+  const step = () => {
+    const s = st.current;
+    if (!s || doneRef.current) return;
+    s.dir = s.nextDir;
+    const head = s.snake[0];
+    const nx = head.x + s.dir.x, ny = head.y + s.dir.y;
+    if (nx < 0 || ny < 0 || nx >= N || ny >= N ||
+        s.snake.some((seg, i) => i < s.snake.length - 1 && seg.x === nx && seg.y === ny)) {
+      gameOver(); return;
+    }
+    s.snake.unshift({ x: nx, y: ny });
+    if (nx === s.food.x && ny === s.food.y) {
+      s.eaten++; setScore(s.eaten * 10);
+      cgSound('clear', 1 + s.eaten * 0.02); cgHaptic(15);
+      s.food = randFood(s.snake);
+      s.speed = Math.max(80, 200 - s.eaten * 6);
+      onStepChange && onStepChange(s.eaten);
+    } else {
+      s.snake.pop();
+    }
+    render(n => n + 1);
+  };
   useEffect(() => {
-    if (mode !== 'select') setMode('select');
-  }, [resetKey]);
+    if (done || !started) return;
+    let raf, last = 0, alive = true;
+    const loop = (ts) => {
+      if (!alive) return;
+      const s = st.current;
+      if (s && ts - last >= s.speed) { last = ts; step(); }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { alive = false; cancelAnimationFrame(raf); };
+  }, [done, started, resetKey]);
 
-  async function saveChips(n) {
-    if (authOk) {
-      await api('/api/poker/chips', { method: 'POST', body: JSON.stringify({ chips: n }) });
-    } else {
-      localStorage.setItem(POKER_CHIPS_LOCAL_KEY, String(n));
+  const turn = (dir) => {
+    const s = st.current;
+    if (!s || doneRef.current) return;
+    const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+    const nd = map[dir]; if (!nd) return;
+    if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
+    s.nextDir = nd;
+    if (!started) setStarted(true);
+    cgSound('move');
+  };
+  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started) setStarted(true); } });
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
+      if (k) { e.preventDefault(); turn(k); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [started]);
+
+  const s = st.current;
+  const cells = [];
+  if (s) {
+    const occ = {};
+    s.snake.forEach((seg, i) => { occ[seg.y * N + seg.x] = i === 0 ? 'head' : 'body'; });
+    const fi = s.food.y * N + s.food.x;
+    for (let i = 0; i < N * N; i++) {
+      const o = occ[i];
+      cells.push(<div key={i} className={'snake-cell' + (o ? ' ' + o : '') + (i === fi ? ' food' : '')} />);
     }
   }
-
-  function startGame() {
-    localStorage.setItem(POKER_DIFF_KEY, difficulty);
-    sessionStartChipsRef.current = playerChips;
-    const initStacks = [playerChips, POKER_START_CHIPS, POKER_START_CHIPS];
-    setStacks(initStacks);
-    setHandNum(0);
-    setSessionDone(false);
-    playerActionCtx.current = null;
-    setMode('playing');
-    dealHand(0, 0, initStacks);
-  }
-
-  function dealHand(handIndex, dealer, curStacks) {
-    const d = shuffle(makeDeck());
-    const ph   = [d[0], d[2]];
-    const ai0h = [d[1], d[3]];
-    const ai1h = [d[4], d[5]];
-    const comm = d.slice(6, 11);
-
-    const sbIdx = (dealer + 1) % 3;
-    const bbIdx = (dealer + 2) % 3;
-    const utg   = dealer;
-
-    const ns = curStacks.slice();
-    const nb = [0, 0, 0];
-    const sbAmt = Math.min(SB, ns[sbIdx]);
-    const bbAmt = Math.min(BB, ns[bbIdx]);
-    nb[sbIdx] = sbAmt; ns[sbIdx] -= sbAmt;
-    nb[bbIdx] = bbAmt; ns[bbIdx] -= bbAmt;
-
-    const initAllIn = ns.map(s => s === 0);
-    const initPot   = nb.reduce((s, b) => s + b, 0);
-    const initCurBet = bbAmt;
-
-    playerActionCtx.current = null;
-    setPlayerHole(ph);
-    setAiHoles([ai0h, ai1h]);
-    setCommunity([]);
-    setPhase('preflop');
-    setPot(initPot);
-    setBets(nb.slice());
-    setStacks(ns.slice());
-    setFolded([false, false, false]);
-    setAllIn(initAllIn.slice());
-    setCurrentBet(initCurBet);
-    setDealerIdx(dealer);
-    setActionBadges([null, null, null]);
-    setAiThinking([false, false]);
-    setHandResult(null);
-    setShowRaisePicker(false);
-    setRaisePreset(null);
-    setShowdown(null);
-    setToAct(-1);
-    setHandNum(handIndex + 1);
-    onStepChange(handIndex + 1);
-
-    // actedArr: no voluntary actions yet this round
-    const actedArr = [false, false, false];
-    setTimeout(() => beginAction(
-      utg, [false,false,false], initAllIn, nb, ns,
-      initCurBet, initPot, comm, ph, [ai0h, ai1h],
-      dealer, handIndex + 1, 'preflop', actedArr
-    ), 150);
-  }
-
-  function beginAction(who, foldedArr, allInArr, betsArr, stacksArr, curBet, potVal,
-                       comm, phArr, aiHolesArr, dealer, handIdx, curPhase, actedArr) {
-    const activeAll    = [0,1,2].filter(i => !foldedArr[i]);
-    const activeMovers = [0,1,2].filter(i => !foldedArr[i] && !allInArr[i]);
-
-    if (activeAll.length <= 1 || activeMovers.length === 0) {
-      awardPot(foldedArr, allInArr, stacksArr, potVal, comm, phArr, aiHolesArr, dealer, handIdx);
-      return;
-    }
-
-    setToAct(who);
-
-    if (who === 0) {
-      // Store snapshot for action buttons to read
-      playerActionCtx.current = {
-        foldedArr, allInArr, betsArr, stacksArr, curBet, potVal,
-        comm, phArr, aiHolesArr, dealer, handIdx, curPhase, actedArr,
-      };
-      return;
-    }
-
-    const aiIdx = who - 1;
-    setAiThinking(prev => { const a = [...prev]; a[aiIdx] = true; return a; });
-
-    setTimeout(() => {
-      setAiThinking(prev => { const a = [...prev]; a[aiIdx] = false; return a; });
-      const revCount = { preflop: 0, flop: 3, turn: 4, river: 5 }[curPhase] || 0;
-      const toCall   = Math.max(0, curBet - betsArr[who]);
-      const decision = pokerAIDecide({
-        holeCards:      aiHolesArr[aiIdx],
-        communityCards: comm.slice(0, revCount),
-        toCall,
-        potSize:  potVal,
-        myStack:  stacksArr[who],
-        difficulty,
-      });
-      handleAction(
-        decision.action, decision.amount, who,
-        foldedArr, allInArr, betsArr, stacksArr, curBet, potVal,
-        comm, phArr, aiHolesArr, dealer, handIdx, curPhase, actedArr
-      );
-    }, AI_DELAY[difficulty] || 700);
-  }
-
-  function handleAction(action, raiseAmount, who,
-                        foldedArr, allInArr, betsArr, stacksArr, curBet, potVal,
-                        comm, phArr, aiHolesArr, dealer, handIdx, curPhase, actedArr) {
-    const nf = foldedArr.slice();
-    const na = allInArr.slice();
-    const nb = betsArr.slice();
-    const ns = stacksArr.slice();
-    let newCurBet = curBet;
-    let newPot    = potVal;
-    const newActed = actedArr.slice();
-
-    function addToPot(idx, targetTotal) {
-      const add = Math.min(targetTotal - nb[idx], ns[idx]);
-      ns[idx] -= add; nb[idx] += add; newPot += add;
-      if (ns[idx] === 0) na[idx] = true;
-    }
-
-    if (action === 'fold') {
-      nf[who] = true;
-    } else if (action === 'check') {
-      // no chips change
-    } else if (action === 'call') {
-      addToPot(who, Math.min(curBet, nb[who] + ns[who]));
-    } else if (action === 'raise') {
-      const minRaise = curBet + Math.max(BB, curBet);
-      const raiseTo  = Math.min(Math.max(raiseAmount, minRaise), nb[who] + ns[who]);
-      addToPot(who, raiseTo);
-      newCurBet = nb[who];
-      // Raise forces everyone else to act again
-      for (let i = 0; i < 3; i++) newActed[i] = false;
-    }
-    newActed[who] = true;
-
-    const badge = (() => {
-      if (action === 'fold')  return 'fold';
-      if (action === 'check') return 'check';
-      if (na[who])            return 'allin';
-      if (action === 'call')  return 'call:' + nb[who];
-      if (action === 'raise') return 'raise:' + nb[who];
-      return null;
-    })();
-    setActionBadges(prev => { const a = [...prev]; a[who] = badge; return a; });
-    setBets(nb.slice());
-    setStacks(ns.slice());
-    setPot(newPot);
-    setFolded(nf.slice());
-    setAllIn(na.slice());
-    if (action === 'raise') setCurrentBet(newCurBet);
-
-    const activeAll    = [0,1,2].filter(i => !nf[i]);
-    const activeMovers = [0,1,2].filter(i => !nf[i] && !na[i]);
-
-    if (activeAll.length <= 1 || activeMovers.length === 0) {
-      awardPot(nf, na, ns, newPot, comm, phArr, aiHolesArr, dealer, handIdx);
-      return;
-    }
-
-    const next = nextPlayer(who, nf, na, nb, newCurBet, newActed);
-    if (next === -1) {
-      advanceStreet(nf, na, ns, newPot, comm, phArr, aiHolesArr, dealer, handIdx, curPhase);
-    } else {
-      beginAction(next, nf, na, nb, ns, newCurBet, newPot, comm, phArr, aiHolesArr,
-                  dealer, handIdx, curPhase, newActed);
-    }
-  }
-
-  // nextPlayer: find next player who still needs to act, or -1 if round is over.
-  // A player needs to act if: they haven't acted yet this round, OR their bet
-  // is below the current bet (including after a raise that reset actedArr).
-  function nextPlayer(current, foldedArr, allInArr, betsArr, curBet, actedArr) {
-    for (let step = 1; step <= 3; step++) {
-      const idx = (current + step) % 3;
-      if (foldedArr[idx] || allInArr[idx]) continue;
-      if (!actedArr[idx] || betsArr[idx] < curBet) return idx;
-    }
-    return -1;
-  }
-
-  function advanceStreet(foldedArr, allInArr, stacksArr, potVal,
-                         comm, phArr, aiHolesArr, dealer, handIdx, curPhase) {
-    const phases    = ['preflop', 'flop', 'turn', 'river', 'showdown'];
-    const nextPhase = phases[phases.indexOf(curPhase) + 1] || 'showdown';
-    const newActed  = [false, false, false];
-
-    playerActionCtx.current = null;
-    setBets([0, 0, 0]);
-    setCurrentBet(0);
-    setActionBadges([null, null, null]);
-    setPhase(nextPhase);
-
-    if (nextPhase === 'showdown') {
-      setCommunity(comm.slice(0, 5));
-      awardPot(foldedArr, allInArr, stacksArr, potVal, comm, phArr, aiHolesArr, dealer, handIdx);
-      return;
-    }
-
-    const revCount = { flop: 3, turn: 4, river: 5 }[nextPhase] || 0;
-    setCommunity(comm.slice(0, revCount));
-
-    const first = firstActiveAfter(dealer, foldedArr, allInArr);
-    setTimeout(() => beginAction(
-      first, foldedArr, allInArr, [0,0,0], stacksArr, 0, potVal,
-      comm, phArr, aiHolesArr, dealer, handIdx, nextPhase, newActed
-    ), 250);
-  }
-
-  function firstActiveAfter(dealer, foldedArr, allInArr) {
-    for (let step = 1; step <= 3; step++) {
-      const idx = (dealer + step) % 3;
-      if (!foldedArr[idx] && !allInArr[idx]) return idx;
-    }
-    for (let step = 1; step <= 3; step++) {
-      const idx = (dealer + step) % 3;
-      if (!foldedArr[idx]) return idx;
-    }
-    return dealer;
-  }
-
-  function awardPot(foldedArr, allInArr, stacksArr, potVal,
-                    comm, phArr, aiHolesArr, dealer, handIdx) {
-    const allComm = comm.slice(0, 5);
-    const evals   = [0,1,2].map(i => {
-      if (foldedArr[i]) return null;
-      return best5of7(i === 0 ? phArr : aiHolesArr[i - 1], allComm);
-    });
-
-    let bestEval = null;
-    for (const ev of evals) {
-      if (ev && (!bestEval || compareHands(ev, bestEval) > 0)) bestEval = ev;
-    }
-    const winners = [0,1,2].filter(i => evals[i] && bestEval && compareHands(evals[i], bestEval) === 0);
-
-    const share = Math.floor(potVal / (winners.length || 1));
-    const ns    = stacksArr.slice();
-    for (const w of winners) ns[w] += share;
-    if (winners.length > 0) ns[winners[0]] += potVal - share * winners.length;
-
-    const playerWon  = winners.includes(0);
-    const winnerLabel = playerWon
-      ? '+' + share + ' chips · ' + (evals[0] ? evals[0].name : '')
-      : (winners.map(w => w === 0 ? 'You' : 'AI ' + w).join(', ')) + ' won · ' + ((bestEval || {}).name || '');
-
-    playerActionCtx.current = null;
-    setStacks(ns.slice());
-    setCommunity(allComm);
-    setPhase('showdown');
-    setPot(0);
-    setBets([0,0,0]);
-    setToAct(-1);
-    setAiThinking([false, false]);
-    setShowdown([0,1,2].map(i => ({
-      idx: i,
-      name: i === 0 ? 'You' : 'AI ' + i + ' · ' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1),
-      folded: foldedArr[i],
-      hole:   i === 0 ? phArr : aiHolesArr[i - 1],
-      ev:     evals[i],
-      winner: winners.includes(i),
-    })));
-    setHandResult({ playerWon, winnerLabel, winners });
-
-    const finalChips = ns[0];
-    setPlayerChips(finalChips);
-    saveChips(finalChips);
-
-    const aiDead     = ns[1] <= 0 && ns[2] <= 0;
-    const playerDead = ns[0] <= 0;
-
-    if (aiDead || playerDead) {
-      setSessionDone(true);
-      const sessionNet = finalChips - sessionStartChipsRef.current;
-      const fmtT = s => String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0');
-      setTimeout(() => {
-        if (aiDead) {
-          onWin(Math.max(1, sessionNet), handIdx, secs, {
-            share: "Texas Hold 'Em — 🃏 Champion in " + handIdx + " hands · +" + Math.max(0, sessionNet) + " chips · " + fmtT(secs),
-            winnerLabel: '🏆 Table Champion!',
-          });
-        } else {
-          onLose(handIdx, secs, {
-            share: "Texas Hold 'Em — 🃏 Busted after " + handIdx + " hands · " + fmtT(secs),
-          });
-        }
-      }, 2200);
-      return;
-    }
-
-    const nextDealer = (() => {
-      for (let step = 1; step <= 3; step++) {
-        const d = (dealer + step) % 3;
-        if (ns[d] > 0) return d;
-      }
-      return (dealer + 1) % 3;
-    })();
-    setTimeout(() => dealHand(handIdx, nextDealer, ns), 2200);
-  }
-
-  function onPlayerAction(action, raiseAmt) {
-    if (toAct !== 0 || sessionDone || !playerActionCtx.current) return;
-    setShowRaisePicker(false);
-    setToAct(-1);
-    const ctx = playerActionCtx.current;
-    playerActionCtx.current = null;
-
-    let finalAmount = 0;
-    if (action === 'call') {
-      finalAmount = Math.min(ctx.curBet - ctx.betsArr[0], ctx.stacksArr[0]);
-    } else if (action === 'raise') {
-      finalAmount = raiseAmt || Math.min(Math.max(ctx.curBet * 2, BB * 2), ctx.stacksArr[0] + ctx.betsArr[0]);
-    }
-
-    handleAction(
-      action, finalAmount, 0,
-      ctx.foldedArr, ctx.allInArr, ctx.betsArr, ctx.stacksArr,
-      ctx.curBet, ctx.potVal, ctx.comm, ctx.phArr, ctx.aiHolesArr,
-      ctx.dealer, ctx.handIdx, ctx.curPhase, ctx.actedArr
-    );
-  }
-
-  const ctxNow     = playerActionCtx.current;
-  const toCallAmt  = ctxNow ? Math.max(0, ctxNow.curBet - ctxNow.betsArr[0]) : 0;
-  const canCheck   = toCallAmt === 0;
-  const aiNames    = [1, 2].map(n => 'AI ' + n + ' · ' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1));
-  const phaseLabel = { preflop: 'Pre-Flop', flop: 'Flop', turn: 'Turn', river: 'River', showdown: 'Showdown' }[phase] || phase;
-
-  function badgeClass(b) {
-    if (!b) return '';
-    if (b === 'fold') return ' fold';
-    if (b === 'allin' || (b && b.startsWith('raise'))) return ' raise';
-    return '';
-  }
-  function badgeText(b) {
-    if (!b) return '';
-    if (b === 'fold')  return 'Folded';
-    if (b === 'allin') return 'All-In';
-    if (b === 'check') return 'Checked';
-    if (b.startsWith('call:'))  return 'Called '    + b.slice(5);
-    if (b.startsWith('raise:')) return 'Raised → ' + b.slice(6);
-    return b;
-  }
-
-  const raisePresets = ctxNow ? [
-    { label: '2× BB',   amount: Math.min(BB * 2,                        ctxNow.stacksArr[0] + ctxNow.betsArr[0]) },
-    { label: 'Pot',     amount: Math.min(ctxNow.potVal + ctxNow.curBet, ctxNow.stacksArr[0] + ctxNow.betsArr[0]) },
-    { label: 'All-In',  amount: ctxNow.stacksArr[0] + ctxNow.betsArr[0] },
-  ] : [];
-
-  if (mode === 'select') {
-    return (
-      <div className="poker-wrap">
-        <div className="poker-mode-screen">
-          <div className="poker-mode-title">🃏 Texas Hold 'Em</div>
-          <div className="poker-mode-note">
-            3 players · {chipsLoaded ? playerChips.toLocaleString() : '…'} chips · Blinds {SB}/{BB}
-          </div>
-          {!authOk && <div className="poker-auth-notice">Progress not saved — sign in via Usernode</div>}
-          <div className="poker-diff-row">
-            {['easy','medium','hard'].map(d => (
-              <button key={d}
-                className={'poker-diff-btn' + (difficulty === d ? ' sel' : '')}
-                onClick={() => setDifficulty(d)}
-              >
-                {d.charAt(0).toUpperCase() + d.slice(1)}
-              </button>
-            ))}
-          </div>
-          <button className="poker-deal-btn" onClick={startGame} disabled={!chipsLoaded}>
-            Deal Cards
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  const hist = cgLoadHistory(SNAKE_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const longest = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">len {r.len}</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
+      { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
+    ]),
+    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!']),
+  ];
   return (
-    <div className="poker-wrap">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Hand</div><div className="pvalue">{handNum}</div></div>
-        <div className="pill"><div className="plabel">Pot</div><div className="pvalue">{pot}</div></div>
-        <div className="pill"><div className="plabel">Your Chips</div><div className="pvalue">{stacks[0]}</div></div>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
+          {cells}
+        </div>
+        <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
       </div>
-
-      <div className="poker-table">
-        <div className="poker-ai-row">
-          {[0,1].map(aiIdx => {
-            const pIdx     = aiIdx + 1;
-            const isFolded = folded[pIdx];
-            const isDealer = dealerIdx === pIdx;
-            return (
-              <div key={aiIdx} className={'poker-ai-panel' + (isDealer ? ' dealer-btn' : '')}>
-                <div className="poker-ai-label">
-                  {isDealer && <span style={{color: C.gold}}>🔘 </span>}
-                  {aiNames[aiIdx]}
-                  {stacks[pIdx] === 0 && <span style={{color: C.rose, marginLeft: 4}}>Bust</span>}
-                </div>
-                <div className="poker-ai-stack">{stacks[pIdx].toLocaleString()} chips</div>
-                <div className="poker-ai-cards">
-                  {phase === 'showdown' && showdown && !isFolded
-                    ? (showdown[pIdx] || {hole:[]}).hole.map((c,ci) => <PokerCard key={ci} card={c} />)
-                    : [0,1].map(ci => <PokerCard key={ci} faceDown />)
-                  }
-                </div>
-                {isFolded && <div className="poker-ai-folded-label">Folded</div>}
-                {!isFolded && actionBadges[pIdx] && !aiThinking[aiIdx] && (
-                  <div className={'poker-ai-badge' + badgeClass(actionBadges[pIdx])}>
-                    {badgeText(actionBadges[pIdx])}
-                  </div>
-                )}
-                {aiThinking[aiIdx] && <div className="poker-ai-thinking">thinking…</div>}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="poker-community">
-          <div className="poker-community-cards">
-            {[0,1,2,3,4].map(i => (
-              <PokerCard key={i} card={community[i] || null} empty={!community[i]} />
-            ))}
-          </div>
-          <div className="poker-phase-row">
-            <span className="poker-phase-label">{phaseLabel}</span>
-            {pot > 0 && <span className="poker-pot-label">Pot: {pot}</span>}
-          </div>
-        </div>
-
-        <div className="poker-player-panel">
-          <div className="poker-player-top">
-            <div className="poker-player-cards">
-              {playerHole.map((c,i) => <PokerCard key={i} card={c} large />)}
-            </div>
-            <div className="poker-player-info">
-              <div className="poker-player-label">
-                {dealerIdx === 0 && <span style={{color: C.gold}}>🔘 </span>}You
-              </div>
-              <div className="poker-player-stack">{stacks[0].toLocaleString()} chips</div>
-              {bets[0] > 0 && <div style={{fontSize:'0.75rem',color:C.muted}}>Bet: {bets[0]}</div>}
-            </div>
-          </div>
-
-          {phase === 'showdown' && handResult && (
-            <div className={'poker-hand-result' + (handResult.playerWon ? ' win' : ' lose')}>
-              {handResult.winnerLabel}
-            </div>
-          )}
-
-          {toAct === 0 && !sessionDone && phase !== 'showdown' && (
-            showRaisePicker ? (
-              <div className="poker-raise-picker">
-                <div className="poker-raise-presets">
-                  {raisePresets.map((p,i) => (
-                    <button key={i}
-                      className={'poker-raise-preset-btn' + (raisePreset === i ? ' sel' : '')}
-                      onClick={() => setRaisePreset(i)}
-                    >
-                      {p.label}
-                      <div style={{fontSize:'0.68rem',color:C.muted}}>{p.amount}</div>
-                    </button>
-                  ))}
-                </div>
-                <button className="poker-raise-confirm-btn"
-                  disabled={raisePreset === null}
-                  onClick={() => {
-                    if (raisePreset !== null) {
-                      onPlayerAction('raise', raisePresets[raisePreset].amount);
-                      setRaisePreset(null);
-                    }
-                  }}
-                >Confirm Raise</button>
-              </div>
-            ) : (
-              <div className="poker-actions">
-                <button className="poker-action-btn fold"  onClick={() => onPlayerAction('fold')}>Fold</button>
-                <button className="poker-action-btn" disabled={!canCheck} onClick={() => onPlayerAction('check')}>Check</button>
-                <button className="poker-action-btn call"  onClick={() => onPlayerAction('call')}>
-                  {toCallAmt >= stacks[0] ? 'All-In' : 'Call ' + toCallAmt}
-                </button>
-                <button className="poker-action-btn raise"
-                  onClick={() => { setShowRaisePicker(true); setRaisePreset(null); }}
-                >Raise</button>
-              </div>
-            )
-          )}
-          {toAct !== 0 && !sessionDone && phase !== 'showdown' && (
-            <div className="poker-ai-thinking" style={{textAlign:'center'}}>AI thinking…</div>
-          )}
-        </div>
-
-        {phase === 'showdown' && showdown && (
-          <div className="poker-showdown-hands">
-            {showdown.filter(p => !p.folded).map(p => (
-              <div key={p.idx} className={'poker-showdown-player' + (p.winner ? ' winner' : ' loser')}>
-                <span className="name">{p.name}</span>
-                <span className="hand-name">{p.ev ? p.ev.name : '—'}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    </ClassicShell>
   );
 }
 
-/* ============================================================
-   Block Blast helpers + component
-   ============================================================ */
-
-const BB_COLORS = [
-  '#3b82f6', // accent blue
-  '#10b981', // emerald
-  '#8b5cf6', // violet
-  '#f43f5e', // rose
-  '#f59e0b', // gold
-  '#06b6d4', // cyan
+/* ---------------- Block Blast ---------------- */
+const BB_SHAPES = [
+  [[0, 0]],
+  [[0, 0], [0, 1]], [[0, 0], [1, 0]],
+  [[0, 0], [0, 1], [0, 2]], [[0, 0], [1, 0], [2, 0]],
+  [[0, 0], [0, 1], [1, 0], [1, 1]],
+  [[0, 0], [0, 1], [1, 0]], [[0, 0], [0, 1], [1, 1]], [[0, 0], [1, 0], [1, 1]], [[0, 1], [1, 0], [1, 1]],
+  [[0, 0], [0, 1], [0, 2], [0, 3]], [[0, 0], [1, 0], [2, 0], [3, 0]],
+  [[0, 0], [0, 1], [0, 2], [1, 1]],
+  [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0]],
 ];
-
-// Each piece: array of [row, col] offsets from top-left anchor [0,0]
-const BB_PIECES = [
-  [[0,0]],                                          // 1×1
-  [[0,0],[0,1]],                                    // 1×2 h
-  [[0,0],[1,0]],                                    // 2×1 v
-  [[0,0],[0,1],[0,2]],                              // 1×3 h
-  [[0,0],[1,0],[2,0]],                              // 3×1 v
-  [[0,0],[0,1],[1,0],[1,1]],                        // 2×2 square
-  [[0,0],[1,0],[1,1]],                              // L bottom-right
-  [[0,0],[0,1],[1,0]],                              // L bottom-left (mirror)
-  [[0,1],[1,0],[1,1]],                              // L top-left
-  [[0,0],[0,1],[1,1]],                              // L top-right (mirror)
-  [[0,1],[1,0],[1,1],[1,2]],                        // T pointing up
-  [[0,0],[0,1],[1,1],[0,2]],                        // S-shape
-  [[0,1],[0,2],[1,0],[1,1]],                        // Z-shape
-  [[0,0],[0,1],[0,2],[0,3]],                        // 1×4 h
-  [[0,0],[1,0],[2,0],[3,0]],                        // 4×1 v
-];
-
-function bbNewTray() {
-  const tray = [];
-  while (tray.length < 3) {
-    const idx = Math.floor(Math.random() * BB_PIECES.length);
-    const colorIdx = Math.floor(Math.random() * BB_COLORS.length);
-    tray.push({ cells: BB_PIECES[idx], color: BB_COLORS[colorIdx] });
-  }
-  return tray;
+const BB_COLORS = [C.accent, C.emerald, C.gold, C.violet, C.rose];
+function bbRandPiece() {
+  const cells = BB_SHAPES[Math.floor(Math.random() * BB_SHAPES.length)];
+  return { cells, color: BB_COLORS[Math.floor(Math.random() * BB_COLORS.length)] };
 }
-
-function bbEmptyGrid() {
-  return Array.from({ length: 8 }, () => Array(8).fill(null));
+function bbCanPlace(grid, cells, or, oc) {
+  return cells.every(([r, c]) => {
+    const rr = or + r, cc = oc + c;
+    return rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && !grid[rr * 8 + cc];
+  });
 }
-
-function bbCanPlace(grid, cells, row, col) {
-  for (const [dr, dc] of cells) {
-    const r = row + dr, c = col + dc;
-    if (r < 0 || r >= 8 || c < 0 || c >= 8) return false;
-    if (grid[r][c] !== null) return false;
-  }
-  return true;
-}
-
-function bbHasAnyMove(grid, tray) {
-  for (const piece of tray) {
-    if (!piece) continue;
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        if (bbCanPlace(grid, piece.cells, r, c)) return true;
-      }
-    }
+function bbCanPlaceAny(grid, tray) {
+  for (const p of tray) {
+    if (!p) continue;
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (bbCanPlace(grid, p.cells, r, c)) return true;
   }
   return false;
 }
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const [grid, setGrid] = useState(() => new Array(64).fill(null));
+  const [tray, setTray] = useState(() => [bbRandPiece(), bbRandPiece(), bbRandPiece()]);
+  const [score, setScore] = useState(0);
+  const [drag, setDrag] = useState(null); // { idx, cells, color, x, y }
+  const [done, setDone] = useState(false);
+  const doneRef = useRef(false);
+  const placedRef = useRef(0);
+  const linesRef = useRef(0);
+  const gridRef = useRef(null);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+  const scoreRef = useRef(0); scoreRef.current = score;
 
-function bbPlace(grid, cells, row, col, color) {
-  const next = grid.map(r => r.slice());
-  for (const [dr, dc] of cells) next[row + dr][col + dc] = color;
-  return next;
-}
-
-function bbClearLines(grid) {
-  const fullRows = [];
-  const fullCols = [];
-  for (let r = 0; r < 8; r++) {
-    if (grid[r].every(c => c !== null)) fullRows.push(r);
-  }
-  for (let c = 0; c < 8; c++) {
-    if (grid.every(row => row[c] !== null)) fullCols.push(c);
-  }
-  const linesCleared = fullRows.length + fullCols.length;
-  if (linesCleared === 0) return { newGrid: grid, linesCleared: 0 };
-  const next = grid.map(r => r.slice());
-  for (const r of fullRows) for (let c = 0; c < 8; c++) next[r][c] = null;
-  for (const c of fullCols) for (let r = 0; r < 8; r++) next[r][c] = null;
-  return { newGrid: next, linesCleared };
-}
-
-function bbScorePlacement(cellCount, linesCleared) {
-  return cellCount + linesCleared * 80 + (linesCleared > 1 ? linesCleared * 10 : 0);
-}
-
-function bbShareText(score, pieces, secs) {
-  const mm = String(Math.floor(secs / 60)).padStart(2, '0');
-  const ss = String(secs % 60).padStart(2, '0');
-  return `Block Blast 🧩\nScore: ${score.toLocaleString()} | Pieces: ${pieces} | Time: ${mm}:${ss}`;
-}
-
-// Bounding box dimensions for a piece (for rendering the mini-grid)
-function bbBounds(cells) {
-  let maxR = 0, maxC = 0;
-  for (const [r, c] of cells) { if (r > maxR) maxR = r; if (c > maxC) maxC = c; }
-  return { rows: maxR + 1, cols: maxC + 1 };
-}
-
-const BB_HISTORY_KEY = 'puzzlechain_blockblast_history';
-const BB_BEST_KEY    = 'puzzlechain_blockblast_best';
-
-function bbLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(BB_HISTORY_KEY) || '[]'); } catch { return []; }
-}
-function bbSaveEntry(entry) {
-  try {
-    const h = bbLoadHistory();
-    h.unshift(entry);
-    localStorage.setItem(BB_HISTORY_KEY, JSON.stringify(h.slice(0, 20)));
-  } catch {}
-}
-function bbLoadBest() {
-  try { return parseInt(localStorage.getItem(BB_BEST_KEY) || '0', 10) || 0; } catch { return 0; }
-}
-function bbSaveBest(v) {
-  try { localStorage.setItem(BB_BEST_KEY, String(v)); } catch {}
-}
-
-function BlockBlastGame({ onWin, onStepChange, resetKey }) {
-  const [grid, setGrid]           = useState(() => bbEmptyGrid());
-  const [tray, setTray]           = useState(() => bbNewTray());
-  const [selected, setSelected]   = useState(null);
-  const [hoverCell, setHoverCell] = useState(null);
-  const [score, setScore]         = useState(0);
-  const [pieces, setPieces]       = useState(0);
-  const [elapsedSecs, setElapsedSecs] = useState(0);
-  const [done, setDone]           = useState(false);
-  const [scoreDelta, setScoreDelta] = useState(null);
-  const [activeTab, setActiveTab] = useState('game');
-  const [history, setHistory]     = useState(() => bbLoadHistory());
-  const [bestScore, setBestScore] = useState(() => bbLoadBest());
-  const deltaTimerRef = useRef(null);
-  const lastTouchCell = useRef(null);
-
-  const gameRunning = !done && activeTab === 'game';
-
-  useEffect(() => {
-    if (!gameRunning) return;
-    const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [gameRunning]);
-
-  useEffect(() => {
-    if (!resetKey) return;
-    handleNewGame();
-  }, [resetKey]);
-
-  const fmtSecs = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-  const fmtDate = d => { if (!d) return ''; const [y, m, day] = d.split('-'); return m + '/' + day + '/' + y.slice(2); };
-
-  const handleNewGame = () => {
-    setGrid(bbEmptyGrid());
-    setTray(bbNewTray());
-    setSelected(null);
-    setHoverCell(null);
-    setScore(0);
-    setPieces(0);
-    setElapsedSecs(0);
-    setDone(false);
-    setScoreDelta(null);
+  const init = () => {
+    setGrid(new Array(64).fill(null));
+    setTray([bbRandPiece(), bbRandPiece(), bbRandPiece()]);
+    setScore(0); setDone(false); setDrag(null);
+    doneRef.current = false; placedRef.current = 0; linesRef.current = 0;
   };
+  useEffect(() => { init(); }, [resetKey]);
 
-  const handlePlace = (row, col) => {
-    if (done || selected === null) return;
-    const piece = tray[selected];
-    if (!piece) return;
-    if (!bbCanPlace(grid, piece.cells, row, col)) return;
-
-    const placed = bbPlace(grid, piece.cells, row, col, piece.color);
-    const { newGrid, linesCleared } = bbClearLines(placed);
-    const delta = bbScorePlacement(piece.cells.length, linesCleared);
-    const newScore = score + delta;
-    const newPieces = pieces + 1;
-
-    const newTray = tray.slice();
-    newTray[selected] = null;
-    const allUsed = newTray.every(p => p === null);
-    const nextTray = allUsed ? bbNewTray() : newTray;
-
-    setGrid(newGrid);
-    setTray(nextTray);
-    setSelected(null);
-    setHoverCell(null);
-    setScore(newScore);
-    setPieces(newPieces);
-    onStepChange && onStepChange(newPieces);
-
-    if (delta > 0) {
-      if (deltaTimerRef.current) clearTimeout(deltaTimerRef.current);
-      setScoreDelta('+' + delta);
-      deltaTimerRef.current = setTimeout(() => setScoreDelta(null), 700);
-    }
-
-    if (newScore > bestScore) { setBestScore(newScore); bbSaveBest(newScore); }
-
-    if (!bbHasAnyMove(newGrid, nextTray)) {
-      setDone(true);
-      const entry = {
-        id: Date.now(),
-        date: new Date().toISOString().slice(0, 10),
-        score: newScore,
-        pieces: newPieces,
-        secs: elapsedSecs,
-      };
-      bbSaveEntry(entry);
-      setHistory(bbLoadHistory());
-      onWin && onWin(newScore, newPieces, elapsedSecs, { share: bbShareText(newScore, newPieces, elapsedSecs) });
-    }
+  const originFromPointer = (x, y, cells) => {
+    const el = gridRef.current; if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const cs = rect.width / 8;
+    const maxR = Math.max(...cells.map(c => c[0]));
+    const maxC = Math.max(...cells.map(c => c[1]));
+    let oc = Math.round((x - rect.left) / cs - (maxC + 1) / 2);
+    let or = Math.round((y - rect.top) / cs - (maxR + 1) / 2);
+    oc = Math.max(0, Math.min(7 - maxC, oc));
+    or = Math.max(0, Math.min(7 - maxR, or));
+    return { or, oc };
   };
-
-  // Compute ghost cells for the current hover position
-  const ghostCells = {};
-  if (selected !== null && hoverCell !== null && tray[selected]) {
-    const piece = tray[selected];
-    const [hr, hc] = hoverCell;
-    const valid = bbCanPlace(grid, piece.cells, hr, hc);
-    for (const [dr, dc] of piece.cells) {
-      const r = hr + dr, c = hc + dc;
-      if (r >= 0 && r < 8 && c >= 0 && c < 8) {
-        ghostCells[r + ',' + c] = valid ? 'ghost-valid' : 'ghost-invalid';
+  const commitDrop = (endX, endY) => {
+    setDrag(d => {
+      if (!d) return null;
+      const o = originFromPointer(endX, endY, d.cells);
+      if (o && bbCanPlace(grid, d.cells, o.or, o.oc)) {
+        place(d, o.or, o.oc);
       }
+      return null;
+    });
+  };
+  const place = (piece, or, oc) => {
+    const g = grid.slice();
+    piece.cells.forEach(([r, c]) => { g[(or + r) * 8 + (oc + c)] = piece.color; });
+    // find full rows/cols
+    const fullRows = [], fullCols = [];
+    for (let r = 0; r < 8; r++) if ([0,1,2,3,4,5,6,7].every(c => g[r * 8 + c])) fullRows.push(r);
+    for (let c = 0; c < 8; c++) if ([0,1,2,3,4,5,6,7].every(r => g[r * 8 + c])) fullCols.push(c);
+    const lines = fullRows.length + fullCols.length;
+    fullRows.forEach(r => { for (let c = 0; c < 8; c++) g[r * 8 + c] = null; });
+    fullCols.forEach(c => { for (let r = 0; r < 8; r++) g[r * 8 + c] = null; });
+    const gain = piece.cells.length + (lines > 0 ? lines * 10 + (lines - 1) * 10 : 0);
+    placedRef.current++; linesRef.current += lines;
+    cgSound(lines > 0 ? 'clear' : 'move'); cgHaptic(lines > 0 ? 25 : 10);
+    setScore(s => s + gain);
+    onStepChange && onStepChange(placedRef.current);
+    // consume tray slot
+    let nt = tray.slice();
+    if (piece.idx != null) nt[piece.idx] = null;
+    if (nt.every(p => !p)) nt = [bbRandPiece(), bbRandPiece(), bbRandPiece()];
+    setGrid(g);
+    setTray(nt);
+    // game-over check next frame
+    setTimeout(() => {
+      if (doneRef.current) return;
+      if (!bbCanPlaceAny(g, nt)) {
+        doneRef.current = true; setDone(true);
+        cgSound('lose'); cgHaptic([20, 40]);
+        const sc = scoreRef.current;
+        cgSaveHistory(BB_KEY, { score: sc, lines: linesRef.current, ts: Date.now() });
+        onWin(sc, placedRef.current, secsRef.current, { winnerLabel: 'Game Over', share: `🧱 Block Blast — ${sc} pts` });
+      }
+    }, 0);
+  };
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e) => { if (e.cancelable) e.preventDefault(); const { x, y } = pointerXY(e); setDrag(d => d && { ...d, x, y }); };
+    const up = (e) => { const { x, y } = pointerXY(e); commitDrop(x, y); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', up);
+    };
+  }, [drag, grid, tray]);
+
+  const startDrag = (e, idx) => {
+    if (done || !tray[idx]) return;
+    if (e.cancelable) e.preventDefault();
+    const { x, y } = pointerXY(e);
+    cgSound('click');
+    setDrag({ idx, cells: tray[idx].cells, color: tray[idx].color, x, y });
+  };
+  // preview cells
+  let preview = null;
+  if (drag) {
+    const o = originFromPointer(drag.x, drag.y, drag.cells);
+    if (o) {
+      const ok = bbCanPlace(grid, drag.cells, o.or, o.oc);
+      preview = {};
+      drag.cells.forEach(([r, c]) => { preview[(o.or + r) * 8 + (o.oc + c)] = ok ? 'preview' : 'invalid'; });
     }
   }
-
-  const handleTouchMove = (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (el && el.dataset.row !== undefined) {
-      const r = parseInt(el.dataset.row, 10);
-      const c = parseInt(el.dataset.col, 10);
-      lastTouchCell.current = [r, c];
-      setHoverCell([r, c]);
-    }
-  };
-
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    if (lastTouchCell.current) {
-      handlePlace(lastTouchCell.current[0], lastTouchCell.current[1]);
-      lastTouchCell.current = null;
-    }
-    setHoverCell(null);
-  };
-
+  const hist = cgLoadHistory(BB_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.lines} lines</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
+      { val: linesRef.current, lbl: 'Lines (run)' }, { val: score, lbl: 'This run' },
+    ]),
+    cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
+  ];
   return (
-    <div>
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Score</div>
-          <div className="pvalue" style={{ color: C.gold }}>{score}</div>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="bb-grid" ref={gridRef}>
+          {grid.map((cell, i) => {
+            const pv = preview && preview[i];
+            return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
+              style={cell ? { background: cell } : undefined} />;
+          })}
         </div>
-        <div className="pill">
-          <div className="plabel">Pieces</div>
-          <div className="pvalue">{pieces}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
+        <div className="bb-tray">
+          {tray.map((p, idx) => (
+            <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
+              style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
+              onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
+              {p && (() => {
+                const maxR = Math.max(...p.cells.map(c => c[0]));
+                const maxC = Math.max(...p.cells.map(c => c[1]));
+                const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
+                const out = [];
+                for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
+                  const on = set.has(r * 10 + c);
+                  out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
+                }
+                return out;
+              })()}
+            </div>
+          ))}
         </div>
       </div>
-
-      {activeTab === 'game' && (
-        <div>
-          <div className="bb-board-wrap">
-            {scoreDelta && <div className="bb-score-delta">{scoreDelta}</div>}
-            <div
-              className="bb-grid"
-              onMouseLeave={() => setHoverCell(null)}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            >
-              {Array.from({ length: 8 }, (_, r) =>
-                Array.from({ length: 8 }, (_, c) => {
-                  const key = r + ',' + c;
-                  const ghost = ghostCells[key];
-                  const color = grid[r][c];
-                  let cls = 'bb-cell';
-                  if (ghost) cls += ' ' + ghost;
-                  else if (color) cls += ' occupied';
-                  return (
-                    <div
-                      key={key}
-                      className={cls}
-                      data-row={r}
-                      data-col={c}
-                      style={color && !ghost ? { '--bb-color': color } : undefined}
-                      onMouseEnter={() => setHoverCell([r, c])}
-                      onClick={() => handlePlace(r, c)}
-                    />
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div className="bb-tray">
-            {tray.map((piece, i) => {
-              if (!piece) {
-                return (
-                  <div key={i} className="bb-piece-btn used">
-                    <div style={{ width: 30, height: 30 }} />
-                  </div>
-                );
-              }
-              const { rows, cols } = bbBounds(piece.cells);
-              const cellSet = new Set(piece.cells.map(([r, c]) => r + ',' + c));
-              return (
-                <div
-                  key={i}
-                  className={'bb-piece-btn' + (selected === i ? ' selected' : '')}
-                  onClick={() => setSelected(selected === i ? null : i)}
-                >
-                  <div
-                    className="bb-piece-grid"
-                    style={{
-                      gridTemplateColumns: `repeat(${cols}, 10px)`,
-                      gridTemplateRows: `repeat(${rows}, 10px)`,
-                    }}
-                  >
-                    {Array.from({ length: rows }, (_, r) =>
-                      Array.from({ length: cols }, (_, c) => (
-                        <div
-                          key={r + ',' + c}
-                          className="bb-piece-cell"
-                          style={{
-                            '--bb-color': cellSet.has(r + ',' + c) ? piece.color : 'transparent',
-                            opacity: cellSet.has(r + ',' + c) ? 1 : 0,
-                          }}
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {selected === null && !done && (
-            <p style={{ textAlign: 'center', color: C.muted, fontSize: '0.8rem', marginTop: '0.6rem' }}>
-              Tap a piece to select it, then tap the grid to place it
-            </p>
-          )}
+      {drag && (
+        <div className="bb-drag-ghost" style={{
+          left: drag.x, top: drag.y - 40,
+          transform: 'translate(-50%, -50%)',
+          gridTemplateColumns: `repeat(${Math.max(...drag.cells.map(c => c[1])) + 1}, 1.1rem)`,
+        }}>
+          {(() => {
+            const maxR = Math.max(...drag.cells.map(c => c[0]));
+            const maxC = Math.max(...drag.cells.map(c => c[1]));
+            const set = new Set(drag.cells.map(([r, c]) => r * 10 + c));
+            const out = [];
+            for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
+              const on = set.has(r * 10 + c);
+              out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: drag.color, width: '1.1rem', height: '1.1rem' } : { width: '1.1rem', height: '1.1rem', background: 'transparent' }} />);
+            }
+            return out;
+          })()}
         </div>
       )}
-
-      {activeTab === 'history' && (
-        <div className="bb-history-list">
-          {bestScore > 0 && (
-            <div className="bb-history-row bb-best-row">
-              <span>All-time best</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{bestScore.toLocaleString()} pts</span>
-            </div>
-          )}
-          {history.length === 0
-            ? <div className="bb-empty-state">No games yet — play your first round!</div>
-            : history.map(h => (
-              <div key={h.id} className="bb-history-row">
-                <span style={{ color: C.muted }}>{fmtDate(h.date)}</span>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', color: C.gold }}>{h.score.toLocaleString()}</span>
-                <span style={{ color: C.muted }}>{h.pieces} pcs · {fmtSecs(h.secs)}</span>
-              </div>
-            ))
-          }
-        </div>
-      )}
-
-      <div className="bb-bottom-nav">
-        {['game', 'history'].map(tab => (
-          <button
-            key={tab}
-            className={'bb-tab' + (activeTab === tab ? ' active' : '')}
-            onClick={() => { setActiveTab(tab); if (tab === 'history') setHistory(bbLoadHistory()); }}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
-    </div>
+    </ClassicShell>
   );
 }
 
+/* ---------------- Tile Match ---------------- */
+const TM_ICONS = ['🍎', '🍋', '🍇', '🍑', '🍓', '🥝', '🍒', '🥥', '🍍', '🫐', '🥭', '🍐'];
+function tmDeal(pairs) {
+  const deck = [];
+  for (let i = 0; i < pairs; i++) { const ic = TM_ICONS[i % TM_ICONS.length]; deck.push(ic, ic); }
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  return deck.map((icon, id) => ({ id, icon, gone: false }));
+}
+function TileMatchGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+  const COLS = 4, ROWS = 6;
+  const PAIRS = (COLS * ROWS) / 2;
+  const [tiles, setTiles] = useState(() => tmDeal(PAIRS));
+  const [sel, setSel] = useState(-1);
+  const [moves, setMoves] = useState(PAIRS + 6);
+  const [matched, setMatched] = useState(0);
+  const [done, setDone] = useState(false);
+  const doneRef = useRef(false);
+  const lockRef = useRef(false);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const init = () => {
+    setTiles(tmDeal(PAIRS)); setSel(-1); setMoves(PAIRS + 6); setMatched(0);
+    setDone(false); doneRef.current = false; lockRef.current = false;
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  const finishWin = (m) => {
+    doneRef.current = true; setDone(true);
+    cgSound('win'); cgHaptic([15, 30, 15]);
+    const sc = PAIRS * 100 + m * 25;
+    cgSaveHistory(TM_KEY, { score: sc, win: true, secs: secsRef.current, ts: Date.now() });
+    onWin(sc, PAIRS + 6 - m, secsRef.current, { share: `🀄 Tile Match cleared in ${cgFmt(secsRef.current)}` });
+  };
+  const finishLose = () => {
+    doneRef.current = true; setDone(true);
+    cgSound('lose'); cgHaptic([20, 40]);
+    cgSaveHistory(TM_KEY, { score: 0, win: false, secs: secsRef.current, ts: Date.now() });
+    onLose(PAIRS + 6, secsRef.current, { share: `🀄 Tile Match — ran out of moves` });
+  };
+  const tap = (idx) => {
+    if (done || lockRef.current) return;
+    const t = tiles[idx];
+    if (!t || t.gone) return;
+    if (sel === idx) { setSel(-1); return; }
+    if (sel === -1) { setSel(idx); cgSound('click'); return; }
+    // second pick
+    const a = tiles[sel];
+    if (a.icon === t.icon) {
+      const nt = tiles.slice();
+      nt[sel] = { ...a, gone: true }; nt[idx] = { ...t, gone: true };
+      setTiles(nt); setSel(-1);
+      const m = matched + 1; setMatched(m);
+      cgSound('clear'); cgHaptic(18);
+      onStepChange && onStepChange(m);
+      if (m === PAIRS) finishWin(moves);
+    } else {
+      setSel(-1);
+      const mv = moves - 1; setMoves(mv);
+      cgSound('move');
+      if (mv <= 0) { lockRef.current = true; setTimeout(finishLose, 250); }
+    }
+  };
+  const shuffle = () => {
+    const remaining = tiles.filter(t => !t.gone);
+    const icons = remaining.map(t => t.icon);
+    for (let i = icons.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [icons[i], icons[j]] = [icons[j], icons[i]]; }
+    let k = 0;
+    setTiles(tiles.map(t => t.gone ? t : { ...t, icon: icons[k++] }));
+    setSel(-1); cgSound('click');
+  };
+  const hist = cgLoadHistory(TM_KEY);
+  const wins = hist.filter(r => r.win).length;
+  const bestTime = hist.filter(r => r.win).reduce((m, r) => m === 0 ? r.secs : Math.min(m, r.secs), 0);
+  const sheet = [
+    { id: 'shuffle', label: 'Shuffle', render: () => <div><h4>Stuck?</h4><p style={{ color: C.muted, fontSize: '0.85rem', margin: '0.4rem 0 0.6rem' }}>Reshuffle the remaining tiles (free).</p><button className="cg-sheet-action" onClick={shuffle}>🔀 Shuffle tiles</button></div> },
+    cgHistorySection(hist, r => <><span>{r.win ? '✅ Cleared' : '❌ Out of moves'}</span><span className="mono">{r.win ? cgFmt(r.secs) : '—'}</span></>),
+    cgStatsSection([
+      { val: wins, lbl: 'Cleared' }, { val: hist.length, lbl: 'Games' },
+      { val: bestTime ? cgFmt(bestTime) : '—', lbl: 'Best time' }, { val: matched, lbl: 'This game' },
+    ]),
+    cgRulesSection(['Tap a tile, then tap another with the same icon to clear the pair.', 'Clear the whole board before you run out of moves.', 'A wrong pair costs a move.', 'Use Shuffle from the menu if you get stuck.']),
+  ];
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Pairs', v: `${matched}/${PAIRS}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="tm-grid" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
+          {tiles.map((t, i) => (
+            <div key={t.id} className={'tm-tile' + (t.gone ? ' gone' : '') + (sel === i ? ' sel' : '')} onClick={() => tap(i)}>
+              {t.gone ? '' : t.icon}
+            </div>
+          ))}
+        </div>
+      </div>
+    </ClassicShell>
+  );
+}
+
+/* ---------------- Diamond Rush ---------------- */
+const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵'];
+function drMake() {
+  const g = new Array(64);
+  for (let i = 0; i < 64; i++) {
+    let v;
+    do { v = Math.floor(Math.random() * 6); }
+    while (
+      (i % 8 >= 2 && g[i - 1] === v && g[i - 2] === v) ||
+      (i >= 16 && g[i - 8] === v && g[i - 16] === v)
+    );
+    g[i] = v;
+  }
+  return g;
+}
+function drFindMatches(g) {
+  const m = new Set();
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 6; c++) {
+    const i = r * 8 + c, v = g[i];
+    if (v != null && g[i + 1] === v && g[i + 2] === v) { m.add(i); m.add(i + 1); m.add(i + 2); }
+  }
+  for (let c = 0; c < 8; c++) for (let r = 0; r < 6; r++) {
+    const i = r * 8 + c, v = g[i];
+    if (v != null && g[i + 8] === v && g[i + 16] === v) { m.add(i); m.add(i + 8); m.add(i + 16); }
+  }
+  return m;
+}
+function drResolve(grid) {
+  let g = grid.slice();
+  let total = 0, cascades = 0, maxClear = 0;
+  while (true) {
+    const m = drFindMatches(g);
+    if (!m.size) break;
+    cascades++;
+    maxClear = Math.max(maxClear, m.size);
+    total += m.size * 10 * cascades;
+    m.forEach(i => { g[i] = null; });
+    for (let c = 0; c < 8; c++) {
+      const col = [];
+      for (let r = 7; r >= 0; r--) { const v = g[r * 8 + c]; if (v != null) col.push(v); }
+      for (let r = 7; r >= 0; r--) {
+        const idx = (7 - r);
+        g[r * 8 + c] = idx < col.length ? col[idx] : Math.floor(Math.random() * 6);
+      }
+    }
+  }
+  return { grid: g, total, cascades, maxClear };
+}
+function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+  const TARGET = 800, START_MOVES = 18;
+  const [grid, setGrid] = useState(() => drMake());
+  const [sel, setSel] = useState(-1);
+  const [moves, setMoves] = useState(START_MOVES);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const doneRef = useRef(false);
+  const bestCascadeRef = useRef(0);
+  const touch = useRef(null);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const init = () => {
+    setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0);
+    setDone(false); doneRef.current = false; bestCascadeRef.current = 0;
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  const finish = (sc, win, mv) => {
+    doneRef.current = true; setDone(true);
+    cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
+    cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, ts: Date.now() });
+    if (win) onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
+    else onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+  };
+  const adjacent = (a, b) => {
+    const ar = Math.floor(a / 8), ac = a % 8, br = Math.floor(b / 8), bc = b % 8;
+    return Math.abs(ar - br) + Math.abs(ac - bc) === 1;
+  };
+  const trySwap = (a, b) => {
+    if (done || a === b || !adjacent(a, b)) { setSel(-1); return; }
+    const g = grid.slice();
+    [g[a], g[b]] = [g[b], g[a]];
+    if (!drFindMatches(g).size) { cgSound('move'); setSel(-1); return; } // no match, revert
+    const res = drResolve(g);
+    bestCascadeRef.current = Math.max(bestCascadeRef.current, res.cascades);
+    cgSound('clear', 1 + res.cascades * 0.12); cgHaptic(20);
+    const ns = score + res.total;
+    const nm = moves - 1;
+    setGrid(res.grid); setScore(ns); setMoves(nm); setSel(-1);
+    onStepChange && onStepChange(START_MOVES - nm);
+    if (ns >= TARGET) { setTimeout(() => finish(ns, true, nm), 150); }
+    else if (nm <= 0) { setTimeout(() => finish(ns, false, nm), 150); }
+  };
+  const onGemDown = (e, i) => { const p = pointerXY(e); touch.current = { i, x: p.x, y: p.y }; };
+  const onGemUp = (e, i) => {
+    const start = touch.current; touch.current = null;
+    if (!start) { return; }
+    const p = pointerXY(e);
+    const dx = p.x - start.x, dy = p.y - start.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
+      // swipe from start.i toward neighbor
+      const r = Math.floor(start.i / 8), c = start.i % 8;
+      let nr = r, nc = c;
+      if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
+      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
+      else setSel(-1);
+      return;
+    }
+    // tap
+    if (sel === -1) { setSel(start.i); cgSound('click'); }
+    else if (sel === start.i) { setSel(-1); }
+    else trySwap(sel, start.i);
+  };
+  const hist = cgLoadHistory(DR_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const wins = hist.filter(r => r.win).length;
+  const bigC = hist.reduce((m, r) => Math.max(m, r.cascade || 0), 0);
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.win ? '✅' : '❌'} {r.score} pts</span><span className="mono">x{r.cascade}</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
+      { val: bigC, lbl: 'Best cascade' }, { val: score, lbl: 'This round' },
+    ]),
+    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.']),
+  ];
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="dr-grid">
+          {grid.map((v, i) => (
+            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '')}
+              onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
+              onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
+              {DR_GEMS[v]}
+            </div>
+          ))}
+        </div>
+      </div>
+    </ClassicShell>
+  );
+}
+
+/* ---------------- Texas Hold 'Em ---------------- */
+const TH_SUITS = ['♠', '♥', '♦', '♣'];
+const TH_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+function thDeck() {
+  const d = [];
+  for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) d.push({ r: r + 2, s });
+  for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+  return d;
+}
+function thScore5(cards) {
+  const ranks = cards.map(c => c.r).sort((a, b) => b - a);
+  const suits = cards.map(c => c.s);
+  const flush = suits.every(s => s === suits[0]);
+  const uniq = [...new Set(ranks)];
+  let straightHigh = 0;
+  if (uniq.length === 5) {
+    if (uniq[0] - uniq[4] === 4) straightHigh = uniq[0];
+    else if (uniq[0] === 14 && uniq[1] === 5 && uniq[4] === 2) straightHigh = 5; // wheel
+  }
+  const counts = {};
+  ranks.forEach(r => { counts[r] = (counts[r] || 0) + 1; });
+  const groups = Object.entries(counts).map(([r, n]) => [n, +r]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+  const kick = groups.map(g => g[1]);
+  let cat;
+  if (straightHigh && flush) cat = 8;
+  else if (groups[0][0] === 4) cat = 7;
+  else if (groups[0][0] === 3 && groups[1][0] === 2) cat = 6;
+  else if (flush) cat = 5;
+  else if (straightHigh) cat = 4;
+  else if (groups[0][0] === 3) cat = 3;
+  else if (groups[0][0] === 2 && groups[1][0] === 2) cat = 2;
+  else if (groups[0][0] === 2) cat = 1;
+  else cat = 0;
+  const order = (cat === 4 || cat === 8) ? [straightHigh, 0, 0, 0, 0] : kick;
+  let v = cat;
+  for (let i = 0; i < 5; i++) v = v * 15 + (order[i] || 0);
+  return v;
+}
+function thBest(cards) {
+  if (cards.length < 5) return 0;
+  let best = 0;
+  const n = cards.length;
+  for (let a = 0; a < n - 4; a++) for (let b = a + 1; b < n - 3; b++) for (let c = b + 1; c < n - 2; c++)
+    for (let d = c + 1; d < n - 1; d++) for (let e = d + 1; e < n; e++) {
+      const v = thScore5([cards[a], cards[b], cards[c], cards[d], cards[e]]);
+      if (v > best) best = v;
+    }
+  return best;
+}
+const TH_CATS = ['High card', 'Pair', 'Two pair', 'Three of a kind', 'Straight', 'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
+function thCatName(v) { let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15); return TH_CATS[cat] || ''; }
+function thHandStrength(hole, board) {
+  if (board.length >= 3) {
+    const v = thBest([...hole, ...board]);
+    let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15);
+    return Math.min(1, cat / 6 + (hole[0].r + hole[1].r) / 200);
+  }
+  // preflop heuristic
+  const [a, b] = hole;
+  let s = (a.r + b.r) / 40;
+  if (a.r === b.r) s += 0.35;
+  if (a.s === b.s) s += 0.08;
+  if (Math.abs(a.r - b.r) === 1) s += 0.05;
+  return Math.min(0.95, s);
+}
+function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+  const START = 200, BB = 10;
+  const [state, setState] = useState(null);
+  const [betOpen, setBetOpen] = useState(false);
+  const [betAmt, setBetAmt] = useState(BB);
+  const doneRef = useRef(false);
+  const handsRef = useRef(0);
+  const bigPotRef = useRef(0);
+  const secsRef = useRef(0);
+  const [done, setDone] = useState(false);
+  const secs = useElapsed(resetKey, !done);
+  secsRef.current = secs;
+
+  const newHand = (pc, ac, dealerIsPlayer) => {
+    const deck = thDeck();
+    const player = [deck.pop(), deck.pop()];
+    const ai = [deck.pop(), deck.pop()];
+    // simple blinds: dealer posts SB(BB/2), other posts BB
+    const sb = BB / 2;
+    let playerBet = dealerIsPlayer ? sb : BB;
+    let aiBet = dealerIsPlayer ? BB : sb;
+    playerBet = Math.min(playerBet, pc); aiBet = Math.min(aiBet, ac);
+    return {
+      deck, player, ai, board: [],
+      pot: 0, pc: pc - playerBet, ac: ac - aiBet,
+      playerBet, aiBet, street: 0,
+      toAct: dealerIsPlayer ? 'player' : 'ai', // dealer/SB acts first preflop
+      dealerIsPlayer, msg: 'Your move', reveal: false, phase: 'betting',
+    };
+  };
+  const init = () => {
+    handsRef.current = 0; doneRef.current = false; setDone(false);
+    setState(newHand(START, START, true));
+    setBetOpen(false); setBetAmt(BB);
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  // AI acts when it's their turn
+  useEffect(() => {
+    if (!state || state.phase !== 'betting' || state.toAct !== 'ai' || done) return;
+    const t = setTimeout(() => aiAct(), 700);
+    return () => clearTimeout(t);
+  }, [state, done]);
+
+  const dealNext = (s) => {
+    const d = s.deck.slice();
+    const board = s.board.slice();
+    if (s.street === 0) { board.push(d.pop(), d.pop(), d.pop()); }
+    else { board.push(d.pop()); }
+    return { ...s, deck: d, board, street: s.street + 1 };
+  };
+  const showdown = (s) => {
+    const pv = thBest([...s.player, ...s.board]);
+    const av = thBest([...s.ai, ...s.board]);
+    let pc = s.pc, ac = s.ac, msg;
+    if (pv > av) { pc += s.pot; msg = `You win ${s.pot} with ${thCatName(pv)}`; cgSound('win'); }
+    else if (av > pv) { ac += s.pot; msg = `Opponent wins with ${thCatName(av)}`; cgSound('lose'); }
+    else { pc += Math.floor(s.pot / 2); ac += Math.ceil(s.pot / 2); msg = `Split pot (${thCatName(pv)})`; }
+    bigPotRef.current = Math.max(bigPotRef.current, s.pot);
+    return { ...s, pc, ac, msg, reveal: true, phase: 'handover' };
+  };
+  const advanceStreet = (s) => {
+    const pot = s.pot + s.playerBet + s.aiBet;
+    let ns = { ...s, pot, playerBet: 0, aiBet: 0, _pAct: false, _aAct: false };
+    if (s.street >= 4) return showdown(ns);
+    ns = dealNext(ns);
+    ns.toAct = ns.dealerIsPlayer ? 'ai' : 'player'; // non-dealer acts first post-flop
+    ns.msg = ns.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
+    return ns;
+  };
+  const endFold = (s, who) => {
+    const pot = s.pot + s.playerBet + s.aiBet;
+    let pc = s.pc, ac = s.ac, msg;
+    if (who === 'ai') { pc += pot; msg = `Opponent folds — you win ${pot}`; cgSound('chip'); }
+    else { ac += pot; msg = `You fold — opponent wins ${pot}`; }
+    bigPotRef.current = Math.max(bigPotRef.current, pot);
+    return { ...s, pc, ac, pot, playerBet: 0, aiBet: 0, msg, reveal: who !== 'player', phase: 'handover' };
+  };
+  // Unified heads-up round resolution: a betting round closes when bets are
+  // equal AND the other player has already acted since the last aggression.
+  const resolve = (s, actorIsPlayer) => {
+    const equal = s.playerBet === s.aiBet;
+    const otherActed = actorIsPlayer ? s._aAct : s._pAct;
+    if (equal && otherActed) return advanceStreet(s);
+    s.toAct = actorIsPlayer ? 'ai' : 'player';
+    s.msg = s.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
+    return s;
+  };
+  const playerAction = (action, amount) => {
+    if (!state || state.toAct !== 'player' || state.phase !== 'betting') return;
+    let s = { ...state };
+    const toCall = s.aiBet - s.playerBet;
+    if (action === 'fold') { const ns = endFold(s, 'player'); setState(ns); setTimeout(() => checkMatch(ns), 0); return; }
+    if (action === 'check') {
+      if (toCall > 0) return;
+      s._pAct = true; cgSound('chip');
+      setState(resolve(s, true)); return;
+    }
+    if (action === 'call') {
+      const pay = Math.min(toCall, s.pc);
+      s.pc -= pay; s.playerBet += pay; s._pAct = true; cgSound('chip');
+      setState(resolve(s, true)); return;
+    }
+    if (action === 'bet') {
+      const minAdd = Math.min(toCall > 0 ? toCall + BB : BB, s.pc);
+      let add = Math.min(Math.max(amount || BB, minAdd), s.pc);
+      s.pc -= add; s.playerBet += add; s._pAct = true; s._aAct = false;
+      cgSound('chip'); cgHaptic(12); setBetOpen(false);
+      setState(resolve(s, true)); return;
+    }
+  };
+  const aiAct = () => {
+    setState(prev => {
+      if (!prev || prev.toAct !== 'ai' || prev.phase !== 'betting') return prev;
+      let s = { ...prev };
+      const toCall = s.playerBet - s.aiBet;
+      const strength = thHandStrength(s.ai, s.board);
+      const r = Math.random();
+      if (toCall > 0) {
+        const potOdds = toCall / (s.pot + s.playerBet + s.aiBet + toCall);
+        if (strength < 0.25 && potOdds > 0.18 && r > 0.2) { const ns = endFold(s, 'ai'); setTimeout(() => checkMatch(ns), 0); return ns; }
+        if (strength > 0.7 && s.ac > toCall + BB && r > 0.55) {
+          const add = Math.min(toCall + BB * 2, s.ac);
+          s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
+          return resolve(s, false);
+        }
+        const pay = Math.min(toCall, s.ac);
+        s.ac -= pay; s.aiBet += pay; s._aAct = true; cgSound('chip');
+        return resolve(s, false);
+      }
+      if (strength > 0.6 && r > 0.5 && s.ac > BB) {
+        const add = Math.min(BB * 2, s.ac);
+        s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
+        return resolve(s, false);
+      }
+      s._aAct = true; cgSound('chip');
+      return resolve(s, false);
+    });
+  };
+  const checkMatch = (s) => {
+    if (doneRef.current) return;
+    handsRef.current++;
+    onStepChange && onStepChange(handsRef.current);
+    if (s.pc <= 0 || s.ac <= 0) {
+      doneRef.current = true; setDone(true);
+      const youWin = s.pc > 0;
+      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
+      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
+      if (youWin) onWin(s.pc, handsRef.current, secsRef.current, { winnerLabel: 'You win!', share: `🃏 Won heads-up poker in ${handsRef.current} hands` });
+      else onLose(handsRef.current, secsRef.current, { share: `🃏 Busted after ${handsRef.current} hands`, answer: 'Opponent wins' });
+    }
+  };
+  const nextHand = () => {
+    if (!state || doneRef.current) return;
+    checkMatch(state);
+    if (doneRef.current) return;
+    setState(newHand(state.pc, state.ac, !state.dealerIsPlayer));
+    setBetAmt(BB);
+  };
+
+  const Card = ({ c, hidden }) => {
+    if (hidden) return <div className="th-card back">?</div>;
+    const red = c.s === 1 || c.s === 2;
+    return <div className={'th-card' + (red ? ' red' : '')}><span>{TH_RANKS[c.r - 2]}</span><span>{TH_SUITS[c.s]}</span></div>;
+  };
+
+  const hist = cgLoadHistory(TH_KEY);
+  const wins = hist.filter(r => r.win).length;
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.win ? '🏆 Won match' : '💀 Lost match'}</span><span className="mono">{r.hands} hands</span></>),
+    cgStatsSection([
+      { val: wins, lbl: 'Matches won' }, { val: hist.length, lbl: 'Matches' },
+      { val: bigPotRef.current, lbl: 'Biggest pot' }, { val: handsRef.current, lbl: 'Hands (match)' },
+    ]),
+    cgRulesSection(['Heads-up Texas Hold \'Em vs the computer.', 'Tap Check / Call / Fold to act.', 'Tap Bet/Raise to size a wager.', 'Win all the opponent\'s chips to take the match.']),
+  ];
+
+  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet}><div className="cg-stage" /></ClassicShell>;
+  const s = state;
+  const toCall = Math.max(0, s.aiBet - s.playerBet);
+  const canAct = s.phase === 'betting' && s.toAct === 'player' && !done;
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <div className="th-felt">
+          <div className="th-seat">
+            <div className="who">Opponent</div>
+            <div className="chips">{s.ac} chips{s.aiBet ? ` · bet ${s.aiBet}` : ''}</div>
+          </div>
+          <div className="th-cards">
+            <Card c={s.ai[0]} hidden={!s.reveal} /><Card c={s.ai[1]} hidden={!s.reveal} />
+          </div>
+          <div className="th-pot">Pot {s.pot + s.playerBet + s.aiBet}</div>
+          <div className="th-community">
+            {s.board.length === 0 ? <span className="th-msg">— flop comes after betting —</span> : s.board.map((c, i) => <Card key={i} c={c} />)}
+          </div>
+          <div className="th-msg">{s.msg}</div>
+          <div className="th-cards">
+            <Card c={s.player[0]} /><Card c={s.player[1]} />
+          </div>
+          <div className="th-seat">
+            <div className="who">You{s.dealerIsPlayer ? ' (D)' : ''}</div>
+            <div className="chips">{s.pc} chips{s.playerBet ? ` · bet ${s.playerBet}` : ''}</div>
+          </div>
+        </div>
+        {s.phase === 'handover' ? (
+          <div className="th-actions"><button className="bet" onClick={nextHand}>Next hand →</button></div>
+        ) : betOpen ? (
+          <>
+            <div className="th-betsizer">
+              <input type="range" min={BB} max={Math.max(BB, s.pc)} step={BB} value={betAmt} onChange={e => setBetAmt(+e.target.value)} />
+              <span className="amt">{betAmt}</span>
+            </div>
+            <div className="th-actions">
+              <button onClick={() => setBetOpen(false)}>Cancel</button>
+              <button className="bet" disabled={!canAct} onClick={() => playerAction('bet', betAmt)}>{toCall > 0 ? 'Raise' : 'Bet'} {betAmt}</button>
+            </div>
+          </>
+        ) : (
+          <div className="th-actions">
+            <button disabled={!canAct} onClick={() => playerAction('fold')}>Fold</button>
+            {toCall > 0
+              ? <button disabled={!canAct} onClick={() => playerAction('call')}>Call {toCall}</button>
+              : <button disabled={!canAct} onClick={() => playerAction('check')}>Check</button>}
+            <button className="bet" disabled={!canAct || s.pc <= 0} onClick={() => { setBetAmt(Math.min(Math.max(BB, toCall + BB), s.pc)); setBetOpen(true); cgSound('click'); }}>{toCall > 0 ? 'Raise' : 'Bet'}</button>
+          </div>
+        )}
+      </div>
+    </ClassicShell>
 /* ============================================================
    Game 7 — Tile Match (3-Tiles style)
    ============================================================ */
@@ -7748,829 +8124,6 @@ const DR_LEVELS = [
 const DR_SOUND_KEY = 'puzzlechain_diamondrush_sound';
 const DR_LIVES = 3;
 
-function drKey(r, c) { return r + ',' + c; }
-function drCountGems(grid) {
-  let n = 0;
-  for (const row of grid) for (const ch of row) if (ch === 'G') n++;
-  return n;
-}
-function drFindStart(grid) {
-  for (let r = 0; r < grid.length; r++) {
-    const c = grid[r].indexOf('S');
-    if (c >= 0) return { r, c };
-  }
-  return { r: 1, c: 1 };
-}
-function drLevelScore(gems, timeSecs, lives) {
-  return Math.max(0, 200 + gems * 100 + Math.max(0, 300 - timeSecs * 3) + lives * 50);
-}
-
-function DiamondRushGame({ onStepChange, resetKey }) {
-  const { useState, useEffect, useRef } = React;
-  const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon' | 'levelFailed'
-  const [selectedLevel, setSelectedLevel] = useState(1);
-  const [progress, setProgress] = useState({ clearedLevels: [], bestResults: {}, totalGems: 0 });
-  const [paused, setPaused] = useState(false);
-  const [soundOn, setSoundOn] = useState(() => {
-    try { return localStorage.getItem(DR_SOUND_KEY) !== '0'; } catch { return true; }
-  });
-  const soundOnRef = useRef(soundOn);
-  useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
-
-  // Dynamic per-run state. Kept in a ref too so the keydown listener and the
-  // enemy stepper read fresh values without re-binding every render.
-  const [gs, setGs] = useState(null); // { heroR, heroC, collected:Set, hasKey, keyTaken, opened:Set, lives, enemyIdx, moves }
-  const gsRef = useRef(null);
-  useEffect(() => { gsRef.current = gs; }, [gs]);
-
-  const levelDef = DR_LEVELS[selectedLevel - 1];
-  const running = phase === 'playing' && !paused;
-  const { secs, fmt } = useTimer(running);
-  const secsRef = useRef(0);
-  const startSecsRef = useRef(0);
-  useEffect(() => { secsRef.current = secs; }, [secs]);
-
-  const [lastResult, setLastResult] = useState(null);
-
-  // ---- Audio (synthesized, lazy) ----
-  const audioRef = useRef(null);
-  const playSfx = (type) => {
-    if (!soundOnRef.current) return;
-    try {
-      if (!audioRef.current) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return;
-        audioRef.current = new Ctx();
-      }
-      const ctx = audioRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
-      const tones = {
-        gem:   [880, 0.08, 'triangle'],
-        key:   [660, 0.12, 'square'],
-        door:  [330, 0.16, 'sawtooth'],
-        hit:   [140, 0.22, 'sawtooth'],
-        clear: [990, 0.30, 'triangle'],
-        blocked: [200, 0.05, 'sine'],
-      };
-      const [freq, dur, wave] = tones[type] || tones.gem;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = wave;
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + dur + 0.02);
-      if (type === 'clear') {
-        const osc2 = ctx.createOscillator();
-        const g2 = ctx.createGain();
-        osc2.type = 'triangle';
-        osc2.frequency.setValueAtTime(660, ctx.currentTime);
-        osc2.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.25);
-        g2.gain.setValueAtTime(0.0001, ctx.currentTime);
-        g2.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + 0.02);
-        g2.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
-        osc2.connect(g2).connect(ctx.destination);
-        osc2.start(); osc2.stop(ctx.currentTime + 0.32);
-      }
-    } catch {}
-  };
-
-  const toggleSound = () => {
-    setSoundOn(prev => {
-      const next = !prev;
-      try { localStorage.setItem(DR_SOUND_KEY, next ? '1' : '0'); } catch {}
-      return next;
-    });
-  };
-
-  // ---- Load saved progress on mount (degrade gracefully on 401/error) ----
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { ok, body } = await api('/api/diamond/progress');
-      if (alive && ok && body) {
-        setProgress({
-          clearedLevels: Array.isArray(body.clearedLevels) ? body.clearedLevels : [],
-          bestResults: body.bestResults || {},
-          totalGems: body.totalGems || 0,
-        });
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  // Parent "Play Again" hook — return to level select.
-  useEffect(() => {
-    setPhase('select');
-    setPaused(false);
-    setGs(null);
-  }, [resetKey]);
-
-  const isUnlocked = (lvl) => lvl === 1 || progress.clearedLevels.includes(lvl - 1);
-
-  const startLevel = (lvl) => {
-    const def = DR_LEVELS[lvl - 1];
-    if (!def) return;
-    const start = drFindStart(def.grid);
-    setSelectedLevel(lvl);
-    setGs({
-      heroR: start.r, heroC: start.c,
-      collected: new Set(), hasKey: false, keyTaken: false,
-      opened: new Set(), lives: DR_LIVES, enemyIdx: 0, moves: 0,
-    });
-    setPaused(false);
-    setPhase('playing');
-    startSecsRef.current = secsRef.current;
-    onStepChange && onStepChange(0);
-  };
-
-  const restartLevel = () => startLevel(selectedLevel);
-
-  const finishWin = (state) => {
-    const def = DR_LEVELS[selectedLevel - 1];
-    const totalGems = drCountGems(def.grid);
-    const timeSecs = Math.max(0, secsRef.current - startSecsRef.current);
-    const gems = state.collected.size;
-    const score = drLevelScore(gems, timeSecs, state.lives);
-    playSfx('clear');
-    setLastResult({ level: selectedLevel, gems, totalGems, timeSecs, score, lives: state.lives });
-    setPhase('levelWon');
-
-    // Optimistic local update so Level Select reflects the clear even offline.
-    setProgress(prev => {
-      const cleared = prev.clearedLevels.includes(selectedLevel)
-        ? prev.clearedLevels
-        : [...prev.clearedLevels, selectedLevel].sort((a, b) => a - b);
-      const best = { ...prev.bestResults };
-      const prior = best[String(selectedLevel)];
-      if (!prior || score > prior.score) best[String(selectedLevel)] = { gems, timeSecs, score };
-      return { ...prev, clearedLevels: cleared, bestResults: best };
-    });
-
-    (async () => {
-      const { ok, body } = await api('/api/diamond/level-complete', {
-        method: 'POST',
-        body: JSON.stringify({ level: selectedLevel, gems, timeSecs, score }),
-      });
-      if (ok && body) {
-        setProgress({
-          clearedLevels: Array.isArray(body.clearedLevels) ? body.clearedLevels : [],
-          bestResults: body.bestResults || {},
-          totalGems: body.totalGems || 0,
-        });
-      }
-    })();
-  };
-
-  // ---- Core move logic ----
-  const move = (dr, dc) => {
-    const state = gsRef.current;
-    if (!state || phase !== 'playing' || paused) return;
-    const def = DR_LEVELS[selectedLevel - 1];
-    const grid = def.grid;
-    const tr = state.heroR + dr;
-    const tc = state.heroC + dc;
-    if (tr < 0 || tc < 0 || tr >= grid.length || tc >= grid[0].length) return;
-    let tile = grid[tr][tc];
-    const cellId = drKey(tr, tc);
-
-    if (tile === '#') { return; } // wall — no move
-    if (tile === 'D' && !state.opened.has(cellId)) {
-      if (!state.hasKey) { playSfx('blocked'); return; } // locked, no key
-    }
-
-    // Build the next state immutably.
-    const next = {
-      ...state,
-      collected: new Set(state.collected),
-      opened: new Set(state.opened),
-    };
-    next.heroR = tr;
-    next.heroC = tc;
-    next.moves = state.moves + 1;
-
-    if (tile === 'D' && !next.opened.has(cellId)) {
-      next.opened.add(cellId);
-      next.hasKey = false;
-      playSfx('door');
-    } else if (tile === 'G' && !next.collected.has(cellId)) {
-      next.collected.add(cellId);
-      playSfx('gem');
-    } else if (tile === 'K' && !next.keyTaken) {
-      next.hasKey = true;
-      next.keyTaken = true;
-      playSfx('key');
-    }
-
-    let lostLife = false;
-    if (tile === 'T') lostLife = true;
-
-    // Advance the enemy one step, then check collision with the hero.
-    let enemyPos = null;
-    if (def.enemyPath && def.enemyPath.length) {
-      next.enemyIdx = (state.enemyIdx + 1) % def.enemyPath.length;
-      enemyPos = def.enemyPath[next.enemyIdx];
-      if (enemyPos[0] === next.heroR && enemyPos[1] === next.heroC) lostLife = true;
-    }
-
-    if (lostLife) {
-      playSfx('hit');
-      next.lives = state.lives - 1;
-      if (next.lives <= 0) {
-        setGs(next);
-        gsRef.current = next;
-        setPhase('levelFailed');
-        return;
-      }
-      // Respawn at start; keep gems/key/doors collected so far.
-      const start = drFindStart(grid);
-      next.heroR = start.r;
-      next.heroC = start.c;
-      next.enemyIdx = 0;
-    }
-
-    setGs(next);
-    gsRef.current = next;
-    onStepChange && onStepChange(next.moves);
-
-    // Win check: standing on exit with every gem collected.
-    if (!lostLife && tile === 'X') {
-      const totalGems = drCountGems(grid);
-      if (next.collected.size >= totalGems) finishWin(next);
-    }
-  };
-
-  // Keep a stable ref to move() for the keyboard listener.
-  const moveRef = useRef(move);
-  moveRef.current = move;
-
-  useEffect(() => {
-    if (phase !== 'playing') return;
-    const onKey = (e) => {
-      const k = e.key.toLowerCase();
-      let dir = null;
-      if (k === 'arrowup' || k === 'w') dir = [-1, 0];
-      else if (k === 'arrowdown' || k === 's') dir = [1, 0];
-      else if (k === 'arrowleft' || k === 'a') dir = [0, -1];
-      else if (k === 'arrowright' || k === 'd') dir = [0, 1];
-      if (dir) { e.preventDefault(); moveRef.current(dir[0], dir[1]); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [phase]);
-
-  // ---- Touch swipe ----
-  const touchRef = useRef(null);
-  const onTouchStart = (e) => {
-    const t = e.touches[0];
-    touchRef.current = { x: t.clientX, y: t.clientY };
-  };
-  const onTouchEnd = (e) => {
-    if (!touchRef.current) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchRef.current.x;
-    const dy = t.clientY - touchRef.current.y;
-    touchRef.current = null;
-    if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
-    if (Math.abs(dx) > Math.abs(dy)) move(0, dx > 0 ? 1 : -1);
-    else move(dy > 0 ? 1 : -1, 0);
-  };
-
-  // ---- Level Select screen ----
-  if (phase === 'select') {
-    return (
-      <div className="dr-wrap">
-        <div className="dr-select">
-          <h2>💎 Diamond Rush</h2>
-          <p>Collect every gem, grab keys to open doors, dodge traps and the patrol — then reach the exit 🏁.</p>
-          <div className="dr-level-grid">
-            {DR_LEVELS.map((def, i) => {
-              const lvl = i + 1;
-              const unlocked = isUnlocked(lvl);
-              const done = progress.clearedLevels.includes(lvl);
-              const best = progress.bestResults[String(lvl)];
-              const sel = selectedLevel === lvl;
-              return (
-                <button
-                  key={lvl}
-                  className={`dr-level-btn${sel ? ' selected' : ''}${done ? ' done' : ''}${!unlocked ? ' locked' : ''}`}
-                  onClick={() => unlocked && setSelectedLevel(lvl)}
-                  disabled={!unlocked}
-                >
-                  {!unlocked ? <span className="dr-lock-icon">🔒</span> : <span>{lvl}</span>}
-                  {done && <span className="dr-check">✓</span>}
-                  {best && <span className="dr-level-meta">💎{best.gems} · {best.timeSecs}s</span>}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            className="dr-play-btn"
-            disabled={!isUnlocked(selectedLevel)}
-            onClick={() => startLevel(selectedLevel)}
-          >
-            Play Level {selectedLevel} · {levelDef ? levelDef.name : ''}
-          </button>
-          <p className="dr-hint" style={{ marginTop: '0.8rem' }}>
-            Arrow keys / WASD on desktop · swipe or D-pad on mobile.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Level Cleared screen ----
-  if (phase === 'levelWon' && lastResult) {
-    const isLast = lastResult.level >= DR_LEVELS.length;
-    return (
-      <div className="dr-end">
-        <div className="dr-emoji">🏆</div>
-        <h3>Level {lastResult.level} Cleared!</h3>
-        <div className="dr-stats">
-          💎 {lastResult.gems}/{lastResult.totalGems} · ⏱ {lastResult.timeSecs}s · ❤️ {lastResult.lives} left
-        </div>
-        <div className="dr-stats" style={{ color: C.gold }}>Score +{lastResult.score}</div>
-        <div className="dr-end-btns">
-          {!isLast && (
-            <button className="dr-play-btn" onClick={() => startLevel(lastResult.level + 1)}>
-              Next Level →
-            </button>
-          )}
-          {isLast && <div className="dr-hint">🎉 You cleared every Phase 1 level!</div>}
-          <button className="dr-tool-btn" onClick={() => startLevel(lastResult.level)}>Replay</button>
-          <button className="dr-tool-btn" onClick={() => setPhase('select')}>Level Select</button>
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Level Failed screen ----
-  if (phase === 'levelFailed') {
-    return (
-      <div className="dr-end">
-        <div className="dr-emoji">💥</div>
-        <h3>Level Failed</h3>
-        <div className="dr-stats">Out of lives! Traps and the patrol got the better of you.</div>
-        <div className="dr-end-btns">
-          <button className="dr-play-btn" onClick={restartLevel}>Retry</button>
-          <button className="dr-tool-btn" onClick={() => setPhase('select')}>Level Select</button>
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Playing screen ----
-  const grid = levelDef.grid;
-  const w = grid[0].length;
-  const totalGems = drCountGems(grid);
-  const enemyPos = (levelDef.enemyPath && gs) ? levelDef.enemyPath[gs.enemyIdx] : null;
-  const levelSecs = Math.max(0, secs - startSecsRef.current);
-  const levelFmt = `${String(Math.floor(levelSecs / 60)).padStart(2, '0')}:${String(levelSecs % 60).padStart(2, '0')}`;
-
-  return (
-    <div className="dr-wrap">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Gems</div>
-          <div className="pvalue">{gs ? gs.collected.size : 0}/{totalGems}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Keys</div>
-          <div className="pvalue">{gs && gs.hasKey ? '🔑' : '—'}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Lives</div>
-          <div className="pvalue">{'❤️'.repeat(gs ? gs.lives : 0) || '—'}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{levelFmt}</div>
-        </div>
-      </div>
-
-      <div className="dr-board-shell">
-        <div
-          className="dr-board"
-          style={{ gridTemplateColumns: `repeat(${w}, clamp(30px, 11vw, 42px))`, gridAutoRows: 'clamp(30px, 11vw, 42px)' }}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-        >
-          {grid.map((row, r) => row.split('').map((ch, c) => {
-            const cellId = drKey(r, c);
-            const collected = gs && gs.collected.has(cellId);
-            const opened = gs && gs.opened.has(cellId);
-            const keyTaken = gs && gs.keyTaken;
-            let cls = 'dr-cell floor';
-            let glyph = '';
-            if (ch === '#') cls = 'dr-cell wall';
-            else if (ch === 'X') { cls = 'dr-cell exit'; glyph = '🏁'; }
-            else if (ch === 'T') { cls = 'dr-cell trap'; glyph = '⚠️'; }
-            else if (ch === 'G') { glyph = collected ? '' : '💎'; }
-            else if (ch === 'K') { glyph = keyTaken ? '' : '🔑'; }
-            else if (ch === 'D') { cls = 'dr-cell'; glyph = opened ? '' : '🚪'; }
-            const isHero = gs && gs.heroR === r && gs.heroC === c;
-            const isEnemy = enemyPos && enemyPos[0] === r && enemyPos[1] === c;
-            return (
-              <div key={cellId} className={cls}>
-                {glyph && <span className="dr-sprite">{glyph}</span>}
-                {isEnemy && <span className="dr-sprite dr-enemy">👾</span>}
-                {isHero && <span className="dr-sprite dr-hero">🦸</span>}
-              </div>
-            );
-          }))}
-        </div>
-        {paused && (
-          <div className="dr-overlay-panel">
-            <div className="dr-paused-msg">⏸ Paused</div>
-            <button className="dr-play-btn" style={{ width: 'auto', padding: '0.7rem 1.6rem' }} onClick={() => setPaused(false)}>Resume</button>
-          </div>
-        )}
-      </div>
-
-      <div className="dr-toolbar">
-        <button className="dr-tool-btn" onClick={() => setPaused(p => !p)}>{paused ? '▶ Resume' : '⏸ Pause'}</button>
-        <button className="dr-tool-btn" onClick={restartLevel}>↻ Restart</button>
-        <button className="dr-tool-btn" onClick={toggleSound}>{soundOn ? '🔊 Sound' : '🔇 Muted'}</button>
-        <button className="dr-tool-btn" onClick={() => setPhase('select')}>≡ Levels</button>
-      </div>
-
-      <div className="dr-dpad">
-        <button className="dr-dbtn up" onPointerDown={(e) => { e.preventDefault(); move(-1, 0); }}>▲</button>
-        <button className="dr-dbtn left" onPointerDown={(e) => { e.preventDefault(); move(0, -1); }}>◀</button>
-        <button className="dr-dbtn right" onPointerDown={(e) => { e.preventDefault(); move(0, 1); }}>▶</button>
-        <button className="dr-dbtn down" onPointerDown={(e) => { e.preventDefault(); move(1, 0); }}>▼</button>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   Snake Xenzia helpers + component
-   ============================================================ */
-
-const SNAKE_GRID    = 17;          // square board, cells per side
-const SNAKE_BASE_MS = 140;         // tick interval at length 0
-const SNAKE_MIN_MS  = 70;          // floor for the speed-up curve
-const SNAKE_FOOD_PTS = 10;         // points per food eaten
-const SNAKE_BEST_KEY = 'puzzlechain_snake_best';
-
-// Tick interval shrinks as the snake grows — caps out at SNAKE_MIN_MS.
-function snakeTickMs(length) {
-  const ms = SNAKE_BASE_MS - (length - 3) * 4;
-  return Math.max(SNAKE_MIN_MS, ms);
-}
-
-function snakeLoadBest() {
-  try { return parseInt(localStorage.getItem(SNAKE_BEST_KEY) || '0', 10) || 0; } catch { return 0; }
-}
-function snakeSaveBest(v) {
-  try { localStorage.setItem(SNAKE_BEST_KEY, String(v)); } catch {}
-}
-
-const SNAKE_DIRS = {
-  up:    { dr: -1, dc: 0 },
-  down:  { dr: 1,  dc: 0 },
-  left:  { dr: 0,  dc: -1 },
-  right: { dr: 0,  dc: 1 },
-};
-function snakeOpposite(a, b) {
-  return (a === 'up' && b === 'down') || (a === 'down' && b === 'up') ||
-         (a === 'left' && b === 'right') || (a === 'right' && b === 'left');
-}
-
-// Pick a random cell not occupied by the snake. occupied is a Set of "r,c".
-function snakeSpawnFood(occupied) {
-  const free = [];
-  for (let r = 0; r < SNAKE_GRID; r++) {
-    for (let c = 0; c < SNAKE_GRID; c++) {
-      if (!occupied.has(r + ',' + c)) free.push({ r, c });
-    }
-  }
-  if (free.length === 0) return null; // board full — win-ish edge case
-  return free[Math.floor(Math.random() * free.length)];
-}
-
-function snakeShareText(score, length, secs) {
-  const m = String(Math.floor(secs / 60)).padStart(2, '0');
-  const s = String(secs % 60).padStart(2, '0');
-  return `Snake Xenzia 🐍 ${score} pts · length ${length} · ${m}:${s}`;
-}
-
-function SnakeGame({ onWin, onStepChange, resetKey }) {
-  const startSnake = [
-    { r: 8, c: 6 }, { r: 8, c: 5 }, { r: 8, c: 4 },
-  ];
-  const [snake, setSnake]   = useState(() => startSnake);
-  const [food, setFood]     = useState(() => snakeSpawnFood(new Set(startSnake.map(p => p.r + ',' + p.c))));
-  const [dir, setDir]       = useState('right');
-  const [score, setScore]   = useState(0);
-  const [elapsedSecs, setElapsedSecs] = useState(0);
-  const [started, setStarted] = useState(false);
-  const [done, setDone]     = useState(false);
-  const [activeTab, setActiveTab] = useState('game');
-  const [bestScore, setBestScore] = useState(() => snakeLoadBest());
-  const [isMock, setIsMock] = useState(false);
-
-  // Leaderboard tab state
-  const [lb, setLb]               = useState(null);   // { top: [...], me: {...} } or null
-  const [lbLoading, setLbLoading] = useState(false);
-  const [lbError, setLbError]     = useState(false);
-
-  // Refs so the movement tick always reads fresh state without re-arming.
-  const dirRef        = useRef('right');   // last *committed* direction
-  const queuedDirRef  = useRef('right');   // next direction to apply on tick
-  const snakeRef      = useRef(startSnake);
-  const foodRef       = useRef(food);
-  const scoreRef      = useRef(0);
-  const elapsedRef    = useRef(0);
-  const submittedRef  = useRef(false);
-  const touchStartRef = useRef(null);
-
-  snakeRef.current = snake;
-  foodRef.current  = food;
-  scoreRef.current = score;
-  elapsedRef.current = elapsedSecs;
-
-  const gameRunning = started && !done && activeTab === 'game';
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
-
-  // Elapsed-time clock (pauses when not actively playing).
-  useEffect(() => {
-    if (!gameRunning) return;
-    const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [gameRunning]);
-
-  // Movement tick — re-armed whenever speed (length) changes.
-  useEffect(() => {
-    if (!gameRunning) return;
-    const id = setInterval(() => step(), snakeTickMs(snakeRef.current.length));
-    return () => clearInterval(id);
-  }, [gameRunning, snake.length]);
-
-  useEffect(() => {
-    if (!resetKey) return;
-    handleNewGame();
-  }, [resetKey]);
-
-  const fmtSecs = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-
-  const handleNewGame = () => {
-    const fresh = [{ r: 8, c: 6 }, { r: 8, c: 5 }, { r: 8, c: 4 }];
-    dirRef.current = 'right';
-    queuedDirRef.current = 'right';
-    submittedRef.current = false;
-    setSnake(fresh);
-    setFood(snakeSpawnFood(new Set(fresh.map(p => p.r + ',' + p.c))));
-    setDir('right');
-    setScore(0);
-    setElapsedSecs(0);
-    setStarted(false);
-    setDone(false);
-  };
-
-  // Steer: queue a direction unless it reverses the committed heading.
-  const steer = (d) => {
-    if (done) return;
-    if (snakeOpposite(dirRef.current, d)) return;
-    queuedDirRef.current = d;
-    if (!started) { setStarted(true); }
-  };
-
-  const submitScore = async (finalScore, length, secs) => {
-    if (submittedRef.current) return;
-    submittedRef.current = true;
-    setBestScore(prev => {
-      if (finalScore > prev) { snakeSaveBest(finalScore); return finalScore; }
-      return prev;
-    });
-    try {
-      await api('/api/snake/score', {
-        method: 'POST',
-        body: JSON.stringify({ score: finalScore, length, timeSecs: secs }),
-      });
-    } catch {}
-  };
-
-  const step = () => {
-    const d = queuedDirRef.current;
-    dirRef.current = d;
-    setDir(d);
-    const cur = snakeRef.current;
-    const { dr, dc } = SNAKE_DIRS[d];
-    const head = { r: cur[0].r + dr, c: cur[0].c + dc };
-
-    // Wall collision.
-    if (head.r < 0 || head.r >= SNAKE_GRID || head.c < 0 || head.c >= SNAKE_GRID) {
-      return endGame();
-    }
-    // Self collision — checking against the body that will remain. The tail
-    // cell vacates this tick (unless we're growing), so exclude it.
-    const f = foodRef.current;
-    const eating = f && head.r === f.r && head.c === f.c;
-    const bodyToCheck = eating ? cur : cur.slice(0, cur.length - 1);
-    if (bodyToCheck.some(p => p.r === head.r && p.c === head.c)) {
-      return endGame();
-    }
-
-    let newSnake;
-    if (eating) {
-      newSnake = [head, ...cur];
-      const newScore = scoreRef.current + SNAKE_FOOD_PTS;
-      setScore(newScore);
-      scoreRef.current = newScore;
-      const occupied = new Set(newSnake.map(p => p.r + ',' + p.c));
-      setFood(snakeSpawnFood(occupied));
-      onStepChange && onStepChange(newSnake.length);
-    } else {
-      newSnake = [head, ...cur.slice(0, cur.length - 1)];
-    }
-    snakeRef.current = newSnake;
-    setSnake(newSnake);
-  };
-
-  const endGame = () => {
-    setDone(true);
-    const length = snakeRef.current.length;
-    const finalScore = scoreRef.current;
-    const secs = elapsedRef.current;
-    submitScore(finalScore, length, secs);
-    onWin && onWin(finalScore, length, secs, { share: snakeShareText(finalScore, length, secs) });
-  };
-
-  // Keyboard — ref-to-latest-closure so the listener mounts once.
-  const steerRef = useRef(steer);
-  steerRef.current = steer;
-  useEffect(() => {
-    const handler = (e) => {
-      const map = {
-        ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-        w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right',
-      };
-      const dir2 = map[e.key];
-      if (dir2) { e.preventDefault(); steerRef.current(dir2); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  const handleTouchStart = (e) => {
-    const t = e.touches[0];
-    touchStartRef.current = { x: t.clientX, y: t.clientY };
-  };
-  const handleTouchEnd = (e) => {
-    if (!touchStartRef.current) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStartRef.current.x;
-    const dy = t.clientY - touchStartRef.current.y;
-    touchStartRef.current = null;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
-    steer(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
-  };
-
-  const loadLeaderboard = async () => {
-    setLbLoading(true);
-    setLbError(false);
-    const { ok, body } = await api('/api/snake/leaderboard');
-    if (ok && body) setLb(body);
-    else setLbError(true);
-    setLbLoading(false);
-  };
-
-  // Build a quick lookup of snake/food cells for rendering.
-  const headKey = snake.length ? snake[0].r + ',' + snake[0].c : null;
-  const bodyKeys = new Set(snake.map(p => p.r + ',' + p.c));
-  const foodKey = food ? food.r + ',' + food.c : null;
-
-  return (
-    <div>
-      {isMock && <div className="t2048-banner">Local best score — leaderboard syncs to your account when live</div>}
-
-      {activeTab === 'game' && (
-        <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Score</div>
-              <div className="pvalue mono">{score.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Best</div>
-              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Length</div>
-              <div className="pvalue">{snake.length}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
-            </div>
-          </div>
-
-          <div
-            className="snake-board-wrap"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            <div
-              className="snake-grid"
-              style={{ gridTemplateColumns: `repeat(${SNAKE_GRID}, 1fr)`, gridTemplateRows: `repeat(${SNAKE_GRID}, 1fr)` }}
-            >
-              {Array.from({ length: SNAKE_GRID * SNAKE_GRID }).map((_, i) => {
-                const r = Math.floor(i / SNAKE_GRID);
-                const c = i % SNAKE_GRID;
-                const key = r + ',' + c;
-                let cls = 'snake-cell';
-                if (key === foodKey) cls += ' snake-food';
-                else if (key === headKey) cls += ' snake-head';
-                else if (bodyKeys.has(key)) cls += ' snake-body';
-                return <div key={i} className={cls} />;
-              })}
-            </div>
-
-            {!started && !done && (
-              <div className="snake-start-overlay" onClick={() => steer('right')}>
-                <div style={{ fontSize: '2rem' }}>🐍</div>
-                <div>Swipe, tap a direction, or press an arrow / WASD key to start</div>
-              </div>
-            )}
-          </div>
-
-          <div className="snake-dpad">
-            <button className="snake-dpad-up"    onClick={() => steer('up')}    aria-label="Up">▲</button>
-            <button className="snake-dpad-left"  onClick={() => steer('left')}  aria-label="Left">◀</button>
-            <button className="snake-dpad-down"  onClick={() => steer('down')}  aria-label="Down">▼</button>
-            <button className="snake-dpad-right" onClick={() => steer('right')} aria-label="Right">▶</button>
-          </div>
-
-          <div className="snake-controls">
-            <button onClick={handleNewGame}>↺ New Game</button>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'leaderboard' && (
-        <div>
-          {lbLoading && <div className="snake-lb-empty">Loading…</div>}
-          {!lbLoading && lbError && (
-            <div className="snake-lb-empty">Leaderboard unavailable — your score is still saved locally.</div>
-          )}
-          {!lbLoading && !lbError && lb && (
-            (() => {
-              const top = lb.top || [];
-              const me = lb.me || null;
-              const meInTop = me && top.some(row => row.rank === me.rank);
-              if (top.length === 0) {
-                return <div className="snake-lb-empty">No scores yet — be the first to play!</div>;
-              }
-              return (
-                <div className="snake-lb-list">
-                  {top.map(row => (
-                    <div key={row.rank} className={'snake-lb-row' + (me && row.rank === me.rank ? ' snake-lb-me' : '')}>
-                      <span className="snake-lb-rank">#{row.rank}</span>
-                      <span className="snake-lb-name">{row.username || 'anon'}</span>
-                      <span className="snake-lb-score">{Number(row.bestScore).toLocaleString()}</span>
-                    </div>
-                  ))}
-                  {me && !meInTop && (
-                    <div>
-                      <div className="snake-lb-divider">···</div>
-                      <div className="snake-lb-row snake-lb-me">
-                        <span className="snake-lb-rank">#{me.rank}</span>
-                        <span className="snake-lb-name">{me.username || 'You'}</span>
-                        <span className="snake-lb-score">{Number(me.bestScore).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()
-          )}
-        </div>
-      )}
-
-      <div className="t2048-bottom-nav">
-        {['game', 'leaderboard'].map(tab => (
-          <button
-            key={tab}
-            className={'t2048-tab' + (activeTab === tab ? ' active' : '')}
-            onClick={() => { setActiveTab(tab); if (tab === 'leaderboard') loadLeaderboard(); }}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /* ============================================================
    Bounce (Breakout) helpers + component
@@ -9910,34 +9463,54 @@ const GAMES = [
     component: T2048Game,
   },
   {
-    id: 'texasholdem',
-    name: "Texas Hold 'Em",
-    icon: '🃏',
-    category: 'classic',
-    desc: "Play no-limit Hold 'Em vs. two AI opponents. Grow your chip stack hand by hand.",
-    tag: 'Poker',
-    tagColor: C.gold,
-    component: TexasHoldemGame,
-  },
-  {
-    id: 'blockblast',
-    name: 'Block Blast',
-    icon: '🧩',
-    category: 'classic',
-    desc: 'Place blocks to fill rows and columns. Clear lines to score big.',
-    tag: 'Puzzle',
-    tagColor: C.violet,
-    component: BlockBlastGame,
-  },
-  {
     id: 'snake',
     name: 'Snake',
     icon: '🐍',
     category: 'classic',
-    desc: 'Eat to grow — don\'t hit the walls or yourself. Climb the leaderboard.',
+    desc: 'Swipe to steer, eat to grow, and chase a high score without crashing.',
     tag: 'Arcade',
     tagColor: C.emerald,
     component: SnakeGame,
+  },
+  {
+    id: 'blockblast',
+    name: 'Block Blast',
+    icon: '🧱',
+    category: 'classic',
+    desc: 'Drag blocks onto the grid and clear full lines. How long can you last?',
+    tag: 'Puzzle',
+    tagColor: C.accent,
+    component: BlockBlastGame,
+  },
+  {
+    id: 'tilematch',
+    name: 'Tile Match',
+    icon: '🀄',
+    category: 'classic',
+    desc: 'Tap matching tiles to clear the board before you run out of moves.',
+    tag: 'Match',
+    tagColor: C.violet,
+    component: TileMatchGame,
+  },
+  {
+    id: 'diamondrush',
+    name: 'Diamond Rush',
+    icon: '💎',
+    category: 'classic',
+    desc: 'Swap gems to line up 3+ and cascade your way to the target score.',
+    tag: 'Match',
+    tagColor: C.rose,
+    component: DiamondRushGame,
+  },
+  {
+    id: 'texas',
+    name: "Texas Hold 'Em",
+    icon: '🃏',
+    category: 'classic',
+    desc: 'Heads-up poker vs the computer. Bet smart and take all the chips.',
+    tag: 'Cards',
+    tagColor: C.gold,
+    component: TexasHoldemGame,
   },
   {
     id: 'tilematching',
@@ -9948,16 +9521,6 @@ const GAMES = [
     tag: 'Puzzle',
     tagColor: '#6366f1',
     component: TileMatchingGame,
-  },
-  {
-    id: 'diamondrush',
-    name: 'Diamond Rush',
-    icon: '💎',
-    category: 'classic',
-    desc: 'Guide your hero through tile mazes — grab gems and keys, dodge traps and the patrol, reach the exit.',
-    tag: 'Adventure',
-    tagColor: C.gold,
-    component: DiamondRushGame,
   },
   {
     id: 'bounce',
@@ -9990,6 +9553,9 @@ const GAMES = [
     component: IdleGame,
   },
 ];
+
+// Games that render their own ClassicShell (full-screen, gesture-first).
+const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas']);
 
 /* ============================================================
    Root app
@@ -10111,6 +9677,7 @@ function App() {
         effectiveStreak: 0,
         share: meta && meta.share,
         cashOut: meta && meta.cashOut,
+        winnerLabel: meta && meta.winnerLabel,
         isClassic: true,
       });
       return;
@@ -10386,21 +9953,51 @@ function App() {
       )}
 
       {screen === 'game' && currentGame && !winData && !loseData && (
-        <div className="game-wrap">
-          <div className="game-head">
-            <button className="back-btn" onClick={backToLobby}>← Back</button>
-            <div className="game-title">
-              <span>{currentGame.icon}</span> {currentGame.name}
+        currentGame.category === 'classic' ? (
+          SELF_SHELL_GAMES.has(currentGame.id) ? (
+            <GameComponent
+              game={currentGame}
+              onBack={() => backToLobby('classic')}
+              onWin={handleWin}
+              onLose={handleLose}
+              onStepChange={setStepCount}
+              offset={offset}
+              resetKey={playAgainKey}
+            />
+          ) : (
+            <ClassicShell
+              game={currentGame}
+              onExit={() => backToLobby('classic')}
+              onNewGame={() => setPlayAgainKey(k => k + 1)}
+            >
+              <div className="cg-stage cg-scroll">
+                <GameComponent
+                  onWin={handleWin}
+                  onLose={handleLose}
+                  onStepChange={setStepCount}
+                  offset={offset}
+                  resetKey={playAgainKey}
+                />
+              </div>
+            </ClassicShell>
+          )
+        ) : (
+          <div className="game-wrap">
+            <div className="game-head">
+              <button className="back-btn" onClick={backToLobby}>← Back</button>
+              <div className="game-title">
+                <span>{currentGame.icon}</span> {currentGame.name}
+              </div>
             </div>
+            <GameComponent
+              onWin={handleWin}
+              onLose={handleLose}
+              onStepChange={setStepCount}
+              offset={offset}
+              resetKey={playAgainKey}
+            />
           </div>
-          <GameComponent
-            onWin={handleWin}
-            onLose={handleLose}
-            onStepChange={setStepCount}
-            offset={offset}
-            resetKey={playAgainKey}
-          />
-        </div>
+        )
       )}
 
       {screen === 'game' && winData && (

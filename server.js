@@ -95,6 +95,23 @@ async function migrate() {
     )
   `);
 
+  // diamond_rush_progress is PUBLIC: per-user game progress, no sensitive
+  // data (and a future leaderboard would want it visible). One row per user.
+  // cleared_levels: array of cleared level numbers. best_results: map of
+  // level -> { gems, timeSecs, score }. total_gems: lifetime gems collected.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS diamond_rush_progress (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      cleared_levels JSONB NOT NULL DEFAULT '[]',
+      best_results   JSONB NOT NULL DEFAULT '{}',
+      total_gems     INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   // snake_scores is PUBLIC — high scores for the Snake classic game, shown on
   // a global leaderboard (no sensitive data; gameplay results only). One row
   // per user holding their personal best, upserted with GREATEST so a worse
@@ -834,6 +851,124 @@ app.post('/api/idle/prestige', async (req, res) => {
   } catch (err) {
     console.error('[idle] prestige failed:', err.message);
     res.status(500).json({ error: 'Failed to prestige' });
+  }
+});
+
+// ---- Diamond Rush API -------------------------------------------------------
+
+// Phase 1 ships 5 handcrafted levels. Used to validate level-complete posts.
+const DIAMOND_LEVEL_COUNT = 5;
+
+function shapeDiamondProgress(row) {
+  return {
+    clearedLevels: Array.isArray(row.cleared_levels) ? row.cleared_levels : [],
+    bestResults: row.best_results || {},
+    totalGems: row.total_gems || 0,
+  };
+}
+
+// Today's saved progress for the signed-in user; creates a default row on
+// first access (mirrors GET /api/idle/state's lazy insert).
+app.get('/api/diamond/progress', async (req, res) => {
+  try {
+    // Staging-only demo seed: gives the current viewer a partial save (levels
+    // 1-2 cleared, level 3 unlocked-but-unplayed) so the level-select UI's
+    // cleared/locked/best-result states are demonstrable on a fresh staging
+    // DB. Idempotent, obviously fake (round numbers), strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'progress') {
+      await pool.query(
+        `INSERT INTO diamond_rush_progress
+           (user_id, username, cleared_levels, best_results, total_gems)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          JSON.stringify([1, 2]),
+          JSON.stringify({
+            '1': { gems: 5, timeSecs: 22, score: 780 },
+            '2': { gems: 6, timeSecs: 41, score: 920 },
+          }),
+          11,
+        ]
+      );
+    }
+
+    let { rows } = await pool.query(
+      'SELECT * FROM diamond_rush_progress WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (rows.length === 0) {
+      await pool.query(
+        `INSERT INTO diamond_rush_progress (user_id, username)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id, req.user.username || null]
+      );
+      rows = await pool.query(
+        'SELECT * FROM diamond_rush_progress WHERE user_id = $1',
+        [req.user.id]
+      ).then(r => r.rows);
+    }
+
+    res.json(shapeDiamondProgress(rows[0]));
+  } catch (err) {
+    console.error('[diamond] GET progress failed:', err.message);
+    res.status(500).json({ error: 'Failed to load progress' });
+  }
+});
+
+// Record a cleared level. Upserts the level into cleared_levels, keeps the
+// best (highest-score) result per level, and recomputes total_gems.
+app.post('/api/diamond/level-complete', async (req, res) => {
+  const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
+  const gems = Number.isFinite(req.body.gems) ? Math.max(0, Math.round(req.body.gems)) : 0;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.max(0, Math.round(req.body.timeSecs)) : 0;
+  const score = Number.isFinite(req.body.score) ? Math.max(0, Math.round(req.body.score)) : 0;
+  if (level === null || level < 1 || level > DIAMOND_LEVEL_COUNT) {
+    return res.status(400).json({ error: 'Invalid level' });
+  }
+  try {
+    // Ensure a row exists, then read-modify-write its JSONB fields.
+    await pool.query(
+      `INSERT INTO diamond_rush_progress (user_id, username)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows } = await pool.query(
+      'SELECT * FROM diamond_rush_progress WHERE user_id = $1',
+      [req.user.id]
+    );
+    const row = rows[0];
+    const cleared = new Set(Array.isArray(row.cleared_levels) ? row.cleared_levels : []);
+    cleared.add(level);
+    const best = row.best_results || {};
+    const prev = best[String(level)];
+    if (!prev || score > prev.score) {
+      best[String(level)] = { gems, timeSecs, score };
+    }
+    const totalGems = Object.values(best).reduce((acc, r) => acc + (r.gems || 0), 0);
+
+    const { rows: updated } = await pool.query(
+      `UPDATE diamond_rush_progress
+         SET cleared_levels = $2, best_results = $3, total_gems = $4,
+             username = COALESCE(username, $5), updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [
+        req.user.id,
+        JSON.stringify(Array.from(cleared).sort((a, b) => a - b)),
+        JSON.stringify(best),
+        totalGems,
+        req.user.username || null,
+      ]
+    );
+    res.json(shapeDiamondProgress(updated[0]));
+  } catch (err) {
+    console.error('[diamond] level-complete failed:', err.message);
+    res.status(500).json({ error: 'Failed to record level' });
   }
 });
 

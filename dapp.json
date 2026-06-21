@@ -15,6 +15,7 @@
     { "name": "Block Blast card in Classic Games tab", "path": "/?tab=classic", "expectText": "Block Blast" },
     { "name": "Snake card in Classic Games tab", "path": "/?tab=classic", "expectText": "Snake" },
     { "name": "Tile Match card in Classic Games tab", "path": "/?tab=classic", "expectText": "Tile Match" },
+    { "name": "Diamond Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Diamond Rush" },
     { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" },
     { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
     { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" }

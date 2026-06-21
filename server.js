@@ -16,17 +16,35 @@ const UTGO_CONTRACT_ADDRESS = process.env.UTGO_CONTRACT_ADDRESS;
 const TREASURY_WALLET       = process.env.TREASURY_WALLET;
 const UTGO_RPC_URL          = process.env.UTGO_RPC_URL || '';
 
-const validatorWallet = VALIDATOR_PRIVATE_KEY
-  ? new ethers.Wallet(VALIDATOR_PRIVATE_KEY)
-  : null;
+// Construct the on-chain helpers DEFENSIVELY. These run at module load,
+// before app.listen — so a malformed VALIDATOR_PRIVATE_KEY or RPC URL throwing
+// here would crash the entire process and take every game down with a "won't
+// open" outage. PvP is an optional feature: degrade it, don't kill the app.
+let validatorWallet = null;
+try {
+  validatorWallet = VALIDATOR_PRIVATE_KEY ? new ethers.Wallet(VALIDATOR_PRIVATE_KEY) : null;
+} catch (e) {
+  console.warn('[pvp] invalid VALIDATOR_PRIVATE_KEY — PvP win-signing disabled:', e.message);
+  validatorWallet = null;
+}
 
-const utgoProvider = UTGO_RPC_URL
-  ? new ethers.JsonRpcProvider(UTGO_RPC_URL)
-  : null;
+let utgoProvider = null;
+try {
+  utgoProvider = UTGO_RPC_URL ? new ethers.JsonRpcProvider(UTGO_RPC_URL) : null;
+} catch (e) {
+  console.warn('[pvp] invalid UTGO_RPC_URL — on-chain reads disabled:', e.message);
+  utgoProvider = null;
+}
 
 const UTGO_ABI_BALANCE = ['function balanceOf(address account) view returns (uint256)'];
-const WAGER_IFACE       = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
-const CANCEL_QUEUE_IFACE = new ethers.Interface(['function cancelQueue(bytes32)']);
+let WAGER_IFACE = null;
+let CANCEL_QUEUE_IFACE = null;
+try {
+  WAGER_IFACE = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
+  CANCEL_QUEUE_IFACE = new ethers.Interface(['function cancelQueue(bytes32)']);
+} catch (e) {
+  console.warn('[pvp] failed to build contract interfaces — PvP calldata disabled:', e.message);
+}
 
 // Single shared connection pool to this app's Postgres DB.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -52,6 +70,18 @@ let redisReady = false;
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
 const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle']);
+
+// Run a non-essential migration step (an index, a peripheral table, a staging
+// seed) without ever taking the whole boot down. The essential schema below
+// stays fatal; anything wrapped here logs and continues so one bad seed/index
+// can never reach process.exit(1) and produce a fleet-wide "won't open".
+async function bestEffort(label, fn) {
+  try {
+    await fn();
+  } catch (e) {
+    console.warn(`[migrate] non-essential step "${label}" failed (continuing):`, e.message);
+  }
+}
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -109,11 +139,11 @@ async function migrate() {
   // Staging seed: give staging-demo-user 2500 chips so testers see a
   // non-default chip count in the lobby card. Idempotent, no-op in prod.
   if (IS_STAGING) {
-    await pool.query(
+    await bestEffort('poker_chips staging seed', () => pool.query(
       `INSERT INTO poker_chips (user_id, chips)
        VALUES ('staging-demo-user', 2500)
        ON CONFLICT (user_id) DO NOTHING`
-    );
+    ));
   }
 
   // idle_game_state is PUBLIC: game state, no sensitive data.
@@ -300,25 +330,24 @@ async function migrate() {
     )
   `);
 
-  // Create indices for social queries
-  await pool.query(`
+  // Create indices for social queries. Indices are a performance optimization,
+  // not a correctness requirement — wrap them so a transient index-build error
+  // can't abort boot.
+  await bestEffort('social indices', () => pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_follows_followee
     ON user_follows(followee_id)
-  `);
-  await pool.query(`
+  `).then(() => pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_stats_updated
     ON user_stats_snapshot(updated_at DESC)
-  `);
-  await pool.query(`
+  `)).then(() => pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_achievements_user_created
     ON user_achievements(user_id, created_at DESC)
-  `);
-  await pool.query(`
+  `)).then(() => pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_achievements_created
     ON user_achievements(created_at DESC)
-  `);
+  `)));
 
-  if (IS_STAGING) {
+  if (IS_STAGING) await bestEffort('pvp + social staging seeds', async () => {
     // PvP staging seeds: three match states for UI testing.
     await pool.query(`
       INSERT INTO pvp_matches
@@ -444,11 +473,11 @@ async function migrate() {
         [uid, type, gameId, score, JSON.stringify(meta)]
       );
     }
-  }
+  });
 
   // Staging seeds for mancala_rooms so testers can exercise all states
   // without needing a second device. Strictly a no-op in production.
-  if (IS_STAGING) {
+  if (IS_STAGING) await bestEffort('mancala + snake + bounce staging seeds', async () => {
     const initPits = JSON.stringify([4,4,4,4,4,4,0,4,4,4,4,4,4,0]);
     const finishedPits = JSON.stringify([0,0,0,0,0,0,32,0,0,0,0,0,0,16]);
     const midPits = JSON.stringify([0,0,0,0,0,1,28,2,2,2,2,2,2,5]);
@@ -517,7 +546,7 @@ async function migrate() {
         [uid, uname, best, lvl, secs]
       );
     }
-  }
+  });
 }
 
 // ---- Server-side PvP tile engine (mirrors client mulberry32 + tmGenerateLevel) ------
@@ -720,8 +749,13 @@ const PUBLIC_PREFIXES = ['/explorer-api/'];
 
 app.use((req, res, next) => {
   const token = req.query.token || req.headers['x-usernode-token'];
+  // Record *why* auth failed (a coarse signal only — never the token itself)
+  // so the HTML shell can distinguish "session expired, reopen" from "no token,
+  // open inside Usernode" and offer a recovery action instead of a dead end.
+  req.tokenSupplied = !!token;
   if (token && JWT_SECRET) {
-    try { req.user = jwt.verify(token, JWT_SECRET); } catch {}
+    try { req.user = jwt.verify(token, JWT_SECRET); }
+    catch { req.tokenInvalid = true; }
   }
 
   // Static assets (CSS/JS/images) are always served; the API and the HTML
@@ -2391,18 +2425,36 @@ app.post('/api/pvp/match/:matchId/forfeit', async (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// HTML shell: serve the app if authenticated, otherwise an "open in Usernode"
-// landing page so stray visits to the staging URL don't reveal the app.
-app.get('*', (req, res) => {
-  if (!req.user) {
-    return res.status(401).send(`<!doctype html><meta charset=utf-8><title>Open in Usernode</title>
+// Unauthenticated HTML shell. Branches on the *cause* of the auth miss so a
+// user staring at "the app won't open" gets a recovery path instead of a dead
+// end: a supplied-but-invalid token means an expired session (reopen from
+// Usernode), while no token at all means a direct visit. Both offer Reload +
+// the Usernode link. No token contents are ever interpolated into the page.
+function unauthShell(req) {
+  const expired = !!req.tokenSupplied; // token was sent but didn't verify (expired/rotated)
+  const title = expired ? 'Session expired' : 'Open in Usernode';
+  const heading = expired ? 'Your session expired' : 'Open this app inside Usernode';
+  const message = expired
+    ? 'Your Usernode session is no longer valid — this can happen if the page was left open a while. Reopen PuzzleChain from Usernode to sign back in, or reload to try again.'
+    : "This page is served via the platform; direct visits aren't authenticated. Open PuzzleChain from inside Usernode.";
+  return `<!doctype html><meta charset=utf-8><title>${title}</title>
 <body style="font-family:system-ui;background:#09090b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
   <div style="max-width:24rem;padding:2rem;text-align:center">
-    <h1 style="font-size:1.25rem;margin:0 0 0.5rem">Open this app inside Usernode</h1>
-    <p style="color:#a1a1aa;font-size:0.9rem;margin:0 0 1.25rem">This page is served via the platform; direct visits aren't authenticated.</p>
-    <a href="https://social-vibecoding.usernodelabs.org" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
+    <h1 style="font-size:1.25rem;margin:0 0 0.5rem">${heading}</h1>
+    <p style="color:#a1a1aa;font-size:0.9rem;margin:0 0 1.25rem">${message}</p>
+    <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
+      <button onclick="location.reload()" style="display:inline-block;padding:0.5rem 1rem;background:#27272a;color:#e4e4e7;border:1px solid #3f3f46;border-radius:0.5rem;font-size:0.9rem;cursor:pointer">Reload</button>
+      <a href="https://social-vibecoding.usernodelabs.org" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
+    </div>
   </div>
-</body>`);
+</body>`;
+}
+
+// HTML shell: serve the app if authenticated, otherwise a recoverable landing
+// page so stray/expired visits to the staging URL don't reveal the app.
+app.get('*', (req, res) => {
+  if (!req.user) {
+    return res.status(401).send(unauthShell(req));
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

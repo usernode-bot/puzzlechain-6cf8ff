@@ -32,6 +32,8 @@
   ],
   "tests": [
     { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
+    { "name": "Vendored React served (no CDN dependency)", "path": "/vendor/react.production.min.js", "expectText": "react.production.min.js" },
+    { "name": "Vendored Babel served (no CDN dependency)", "path": "/vendor/babel.min.js", "allowConsoleErrors": true },
     { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" },
     { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" },
     { "name": "Crypto Wordle card in lobby", "path": "/", "expectText": "Crypto Wordle" },

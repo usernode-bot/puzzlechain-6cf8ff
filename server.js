@@ -95,6 +95,23 @@ async function migrate() {
     )
   `);
 
+  // snake_scores is PUBLIC — high scores for the Snake classic game, shown on
+  // a global leaderboard (no sensitive data; gameplay results only). One row
+  // per user holding their personal best, upserted with GREATEST so a worse
+  // run never clobbers a better one. No foreign keys (public-table rule).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS snake_scores (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      best_score     INTEGER NOT NULL DEFAULT 0,
+      best_length    INTEGER,
+      best_time_secs INTEGER,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
 
   // Staging seeds for mancala_rooms so testers can exercise all states
   // without needing a second device. Strictly a no-op in production.
@@ -125,6 +142,27 @@ async function migrate() {
        ON CONFLICT (id) DO NOTHING`,
       [midPits]
     );
+
+    // Snake leaderboard seed — newly created table is empty in staging, so the
+    // leaderboard tab would have nothing to show. Obviously-fake users with a
+    // spread of scores so the ranking is visibly sorted. Idempotent; no-op in
+    // production.
+    const snakeSeed = [
+      ['snake-demo-1', 'staging-snake-pro',    480, 51, 142],
+      ['snake-demo-2', 'staging-snake-ace',    360, 39, 118],
+      ['snake-demo-3', 'staging-snake-rookie', 210, 24, 77],
+      ['snake-demo-4', 'staging-snake-fan',    150, 18, 55],
+      ['snake-demo-5', 'staging-snake-newbie', 90,  12, 33],
+    ];
+    for (const [uid, uname, best, len, secs] of snakeSeed) {
+      await pool.query(
+        `INSERT INTO snake_scores
+           (user_id, username, best_score, best_length, best_time_secs, games_played)
+         VALUES ($1, $2, $3, $4, $5, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, best, len, secs]
+      );
+    }
   }
 }
 
@@ -796,6 +834,98 @@ app.post('/api/idle/prestige', async (req, res) => {
   } catch (err) {
     console.error('[idle] prestige failed:', err.message);
     res.status(500).json({ error: 'Failed to prestige' });
+  }
+});
+
+// ---- Snake leaderboard API -----------------------------------------------
+
+const SNAKE_LB_LIMIT = 20;
+
+function shapeSnakeRow(row) {
+  return {
+    rank: Number(row.rank),
+    username: row.username,
+    bestScore: row.best_score,
+  };
+}
+
+// Submit a finished run. Upserts the caller's personal-best row (GREATEST so a
+// worse run never lowers it) and bumps games_played. Identity from req.user.
+app.post('/api/snake/score', async (req, res) => {
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const length = Number.isFinite(req.body.length) ? Math.round(req.body.length) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  if (score === null) return res.status(400).json({ error: 'score is required' });
+  try {
+    // Update best_length/best_time_secs only when this run set a new best score.
+    const { rows } = await pool.query(
+      `INSERT INTO snake_scores
+         (user_id, username, best_score, best_length, best_time_secs, games_played, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         username       = EXCLUDED.username,
+         best_length    = CASE WHEN EXCLUDED.best_score > snake_scores.best_score
+                               THEN EXCLUDED.best_length ELSE snake_scores.best_length END,
+         best_time_secs = CASE WHEN EXCLUDED.best_score > snake_scores.best_score
+                               THEN EXCLUDED.best_time_secs ELSE snake_scores.best_time_secs END,
+         best_score     = GREATEST(snake_scores.best_score, EXCLUDED.best_score),
+         games_played   = snake_scores.games_played + 1,
+         updated_at     = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, score, length, timeSecs]
+    );
+    const me = rows[0];
+    // Caller's current rank (1-based) by best_score, ties broken by who got
+    // there first — same ordering as the leaderboard query.
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM snake_scores
+        WHERE best_score > $1
+           OR (best_score = $1 AND updated_at < $2)`,
+      [me.best_score, me.updated_at]
+    );
+    res.json({
+      bestScore: me.best_score,
+      rank: Number(rankRows[0].rank),
+      gamesPlayed: me.games_played,
+    });
+  } catch (err) {
+    console.error('[snake] score failed:', err.message);
+    res.status(500).json({ error: 'Failed to record score' });
+  }
+});
+
+// Top scores plus the caller's own standing (even when outside the top N).
+app.get('/api/snake/leaderboard', async (req, res) => {
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM snake_scores
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $1`,
+      [SNAKE_LB_LIMIT]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT username, best_score, updated_at FROM snake_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM snake_scores
+          WHERE best_score > $1
+             OR (best_score = $1 AND updated_at < $2)`,
+        [row.best_score, row.updated_at]
+      );
+      me = { rank: Number(rankRows[0].rank), username: row.username, bestScore: row.best_score };
+    }
+
+    res.json({ top: top.map(shapeSnakeRow), me });
+  } catch (err) {
+    console.error('[snake] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
 

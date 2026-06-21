@@ -6919,6 +6919,9 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
         )}
       </div>
     </ClassicShell>
+  );
+}
+
 /* ============================================================
    Game 7 — Tile Match (3-Tiles style)
    ============================================================ */

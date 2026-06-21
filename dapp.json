@@ -31,6 +31,7 @@
     }
   ],
   "tests": [
+    { "name": "Main screen loads with no console errors", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" },
     { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" },

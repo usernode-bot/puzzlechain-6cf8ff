@@ -7802,7 +7802,9 @@ function IdleGame() {
   const tapPowerRef = useRef(1);
 
   const loadState = async () => {
-    const { ok, body } = await api('/api/idle/state');
+    const demoParam = new URLSearchParams(window.location.search).get('demo');
+    const demoQuery = demoParam ? `?demo=${encodeURIComponent(demoParam)}` : '';
+    const { ok, body } = await api(`/api/idle/state${demoQuery}`);
     if (ok && body) {
       setState(body);
       tapPowerRef.current = parseFloat(body.tapPower) || 1;
@@ -9894,6 +9896,8 @@ function App() {
           </div>
           {lobbyTab === 'pvp' ? (
             <PvpArena user={user} authOk={authOk} />
+          ) : lobbyTab === 'idle' ? (
+            <IdleGame />
           ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {

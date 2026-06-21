@@ -38,6 +38,13 @@ async function migrate() {
       UNIQUE (user_id, game_id, attempt_date)
     )
   `);
+  // Resumability: persist mutable in-progress state (board moves) and the
+  // accumulated active timer so an unfinished daily attempt can be resumed
+  // exactly where the player left off. Idempotent ADD COLUMN per platform DB
+  // convention. `progress` is game-specific JSON; the board itself is
+  // re-derived from the deterministic daily seed, so only player moves live here.
+  await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
+  await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
 }
 
 // Next 00:00:00 UTC after the given instant.
@@ -93,6 +100,8 @@ function shapeAttempt(row) {
     timeSecs: row.time_secs,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
+    progress: row.progress || null,
+    elapsedSecs: row.elapsed_secs != null ? row.elapsed_secs : null,
   };
 }
 
@@ -169,6 +178,55 @@ app.get('/api/daily', async (req, res) => {
           [req.user.id, req.user.username || 'staging-demo-user', i]
         );
       }
+    }
+
+    // Staging-only demo seed: populate today's per-game leaderboards with a
+    // handful of obviously-fake solvers so the ranking (fastest time, then
+    // fewest steps) is demonstrable on a fresh staging DB. Spread time/steps
+    // so order and tiebreakers are visible. Idempotent, strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'leaderboard') {
+      const lbSeed = [
+        { name: 'Staging demo Ada',  time: 47,  steps: 12 },
+        { name: 'Staging demo Borg', time: 63,  steps: 18 },
+        { name: 'Staging demo Cleo', time: 63,  steps: 21 }, // ties Borg on time → steps break
+        { name: 'Staging demo Dax',  time: 88,  steps: 9 },
+        { name: 'Staging demo Evy',  time: 121, steps: 30 },
+        { name: 'Staging demo Finn', time: 210, steps: 44 },
+      ];
+      for (const g of GAME_IDS) {
+        for (let i = 0; i < lbSeed.length; i++) {
+          const r = lbSeed[i];
+          await pool.query(
+            `INSERT INTO daily_attempts
+               (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+             VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+            [`staging-demo-lb-${i + 1}`, r.name, g, 1000 - r.time, r.steps, r.time]
+          );
+        }
+      }
+    }
+
+    // Staging-only demo seed: give the current viewer a CLAIMED, UNFINISHED
+    // sudoku attempt for today (partial board + accumulated timer/steps) so the
+    // "In progress · resume" card and the resume-into-exact-state flow are
+    // demonstrable. Idempotent; today only; strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'resume') {
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'sudoku', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          7,
+          84,
+          // dayNum omitted on purpose so the client treats the board as the
+          // current daily seed; grid carries a few player-entered cells.
+          JSON.stringify({ resumeDemo: true }),
+        ]
+      );
     }
 
     const { rows } = await pool.query(
@@ -266,6 +324,80 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
+  }
+});
+
+// Autosave in-progress state for today's already-claimed, unfinished attempt.
+// Persists the game-specific `progress` JSON, the accumulated `elapsed_secs`
+// timer, and the live `steps` count so the player can resume exactly where
+// they left off. Never creates rows (start owns claiming) and never touches
+// finished_at/score — a finished attempt is immutable here.
+app.post('/api/daily/:gameId/progress', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const steps = Number.isFinite(req.body.steps) ? Math.round(req.body.steps) : null;
+  const elapsedSecs = Number.isFinite(req.body.elapsedSecs) ? Math.round(req.body.elapsedSecs) : null;
+  const progress = req.body.progress != null ? req.body.progress : null;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE daily_attempts
+         SET progress = $3, steps = $4, elapsed_secs = $5
+       WHERE user_id = $1 AND game_id = $2
+         AND attempt_date = (now() AT TIME ZONE 'utc')::date
+         AND finished_at IS NULL
+       RETURNING *`,
+      [req.user.id, gameId, progress, steps, elapsedSecs]
+    );
+    if (rows.length === 0) {
+      // No claimed-and-unfinished attempt today: either never started or
+      // already finished. Tell the client so it stops autosaving.
+      return res.status(409).json({ error: 'No active attempt to save' });
+    }
+    res.json({ ok: true, attempt: shapeAttempt(rows[0]) });
+  } catch (err) {
+    console.error('[daily] progress failed:', err.message);
+    res.status(500).json({ error: 'Failed to save progress' });
+  }
+});
+
+// Per-game daily leaderboard for today's puzzle. Solvers only (finished with a
+// positive score — this excludes Crypto Wordle losses recorded with score 0).
+// Ranked fastest completion time first, then fewest steps, then earliest finish
+// as a final deterministic tiebreak. Returns the top N plus the current user's
+// own row/rank (present even when outside the top N).
+const LEADERBOARD_LIMIT = 20;
+app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, username, score, steps, time_secs,
+              ROW_NUMBER() OVER (
+                ORDER BY time_secs ASC, steps ASC, finished_at ASC
+              ) AS rank
+         FROM daily_attempts
+        WHERE game_id = $1
+          AND attempt_date = (now() AT TIME ZONE 'utc')::date
+          AND finished_at IS NOT NULL
+          AND score IS NOT NULL AND score > 0`,
+      [gameId]
+    );
+    const total = rows.length;
+    const shape = (r) => ({
+      rank: Number(r.rank),
+      username: r.username || 'anon',
+      timeSecs: r.time_secs,
+      steps: r.steps,
+      score: r.score,
+      isCurrentUser: r.user_id === req.user.id,
+    });
+    const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
+    const mineRow = rows.find((r) => r.user_id === req.user.id);
+    const me = mineRow ? shape(mineRow) : null;
+    res.json({ entries, me, total });
+  } catch (err) {
+    console.error('[daily] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
 

@@ -426,6 +426,65 @@ body {
   align-items: center;
   gap: 0.4rem;
 }
+.card.inprogress { border-color: ${C.gold}; }
+.card-resume {
+  margin-top: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: ${C.gold};
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ---- Daily leaderboard ---- */
+.lboard {
+  margin: 1rem 0 0.25rem;
+  text-align: left;
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+}
+.lboard-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lboard-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: ${C.muted};
+  font-weight: 400;
+}
+.lboard-empty { color: ${C.muted}; font-size: 0.82rem; padding: 0.4rem 0; }
+.lboard-note {
+  margin-top: 0.55rem;
+  font-size: 0.76rem;
+  color: ${C.muted};
+  border-top: 1px dashed ${C.border};
+  padding-top: 0.5rem;
+}
+.lboard-rows { display: flex; flex-direction: column; gap: 0.15rem; max-height: 280px; overflow-y: auto; }
+.lrow {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.32rem 0.45rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.lrow .lrank { color: ${C.muted}; font-size: 0.76rem; }
+.lrow .lname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .ltime { color: ${C.text}; font-size: 0.78rem; }
+.lrow .lsteps { color: ${C.muted}; font-size: 0.74rem; }
+.lrow.me { background: ${C.accent}22; }
+.lrow.me .lrank, .lrow.me .lname { color: ${C.accent}; font-weight: 600; }
+.lrow.pinned { margin-top: 0.3rem; border-top: 1px dashed ${C.border}; padding-top: 0.5rem; }
 
 /* ---- Word Hunt ---- */
 .wordsearch {
@@ -566,8 +625,11 @@ body {
 /* ============================================================
    Shared timer hook
    ============================================================ */
-function useTimer(running) {
-  const [secs, setSecs] = useState(0);
+// Counts up from `initialSecs` (default 0) while `running`. Seeding from a
+// non-zero value lets a resumed daily attempt continue the timer from where it
+// left off instead of restarting.
+function useTimer(running, initialSecs = 0) {
+  const [secs, setSecs] = useState(initialSecs);
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setSecs(s => s + 1), 1000);
@@ -575,6 +637,75 @@ function useTimer(running) {
   }, [running]);
   const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return { secs, fmt: fmt(secs) };
+}
+
+/* ============================================================
+   Seeded PRNG — deterministic daily puzzle generation
+   ============================================================ */
+// mulberry32: a tiny, fast, well-distributed 32-bit seeded PRNG. Returns a
+// function yielding floats in [0,1), same contract as Math.random() so it can
+// be threaded through the existing generators.
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Server-anchored UTC day number (offset = serverNow − clientNow) so the daily
+// puzzle can't desync from the lock countdown on a skewed device clock.
+function utcDayNum(offset) {
+  const d = new Date(Date.now() + (offset || 0));
+  return Math.floor(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000
+  );
+}
+
+// Cheap string→int hash, used to salt the seed per game so the three puzzles
+// don't share a PRNG sequence on a given day.
+function hashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// A fresh seeded RNG for (today, gameId). Everyone on the same UTC day gets the
+// identical board for each game — the precondition for a fair leaderboard.
+function dailyRng(offset, gameId) {
+  return mulberry32((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+}
+
+// Periodically persist a game's in-progress state so a resumed attempt picks up
+// the exact board, step count, and accumulated timer. `getState()` returns
+// `{ progress, steps, secs }`; it's read through a ref so the interval and the
+// unmount-flush always see the latest values without re-subscribing. Games also
+// call `onSaveProgress` directly on each move for immediate persistence; this
+// hook covers idle timer advance and the leave-the-tab case.
+function useAutosave(onSaveProgress, getState, active) {
+  const ref = useRef({});
+  ref.current = { onSaveProgress, getState, active };
+  useEffect(() => {
+    const flush = () => {
+      const cur = ref.current;
+      if (!cur.active || !cur.onSaveProgress) return;
+      const s = cur.getState();
+      cur.onSaveProgress(s.progress, s.steps, s.secs);
+    };
+    const id = setInterval(flush, 10000);
+    const onVis = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+      flush(); // best-effort save when leaving the game screen
+    };
+  }, []);
 }
 
 /* ============================================================
@@ -680,36 +811,38 @@ const SUDOKU6_SOLUTION = [
   [6, 4, 5, 3, 1, 2],
 ];
 
-const shuffle = (arr) => {
+// Fisher–Yates using a supplied rng() (defaults to Math.random for any
+// non-daily callers). A seeded rng makes the result deterministic.
+const shuffle = (arr, rng = Math.random) => {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 };
 
-function generateSudoku6() {
+function generateSudoku6(rng = Math.random) {
   // 1. start from the hardcoded valid solution
   let sol = SUDOKU6_SOLUTION.map(row => row.slice());
 
-  // 2. random digit permutation (remap 1..6)
-  const perm = shuffle([1, 2, 3, 4, 5, 6]);
+  // 2. seeded digit permutation (remap 1..6)
+  const perm = shuffle([1, 2, 3, 4, 5, 6], rng);
   const map = {};
   for (let i = 0; i < 6; i++) map[i + 1] = perm[i];
   sol = sol.map(row => row.map(v => map[v]));
 
   // 3. swap rows within each horizontal band (rows 0-1, 2-3, 4-5)
   for (let band = 0; band < 3; band++) {
-    if (Math.random() < 0.5) {
+    if (rng() < 0.5) {
       const r0 = band * 2, r1 = band * 2 + 1;
       [sol[r0], sol[r1]] = [sol[r1], sol[r0]];
     }
   }
 
-  // 4. blank out 14 random cells
+  // 4. blank out 14 cells (seeded)
   const puzzle = sol.map(row => row.slice());
-  const positions = shuffle(Array.from({ length: 36 }, (_, i) => i)).slice(0, 14);
+  const positions = shuffle(Array.from({ length: 36 }, (_, i) => i), rng).slice(0, 14);
   positions.forEach(p => { puzzle[Math.floor(p / 6)][p % 6] = 0; });
 
   return { solution: sol, puzzle };
@@ -717,17 +850,69 @@ function generateSudoku6() {
 
 const boxAt = (r, c) => Math.floor(r / 2) * 2 + Math.floor(c / 3);
 
-function SudokuGame({ onWin, onStepChange }) {
-  const init = useRef(generateSudoku6()).current;
-  const { solution, puzzle } = init;
-  const [grid, setGrid] = useState(() => puzzle.map(row => row.slice()));
+// Real-Sudoku conflict marking: a filled cell is in error if its value repeats
+// elsewhere in its row, column, or 2×3 box. Returns the set of "r,c" keys in
+// conflict — no hidden "correct answer" comparison.
+function sudokuConflicts(grid) {
+  const errs = new Set();
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      const v = grid[r][c];
+      if (!v) continue;
+      for (let k = 0; k < 6; k++) {
+        if (k !== c && grid[r][k] === v) errs.add(`${r},${c}`);
+        if (k !== r && grid[k][c] === v) errs.add(`${r},${c}`);
+      }
+      for (let rr = 0; rr < 6; rr++) {
+        for (let cc = 0; cc < 6; cc++) {
+          if ((rr !== r || cc !== c) && boxAt(rr, cc) === boxAt(r, c) && grid[rr][cc] === v) {
+            errs.add(`${r},${c}`);
+          }
+        }
+      }
+    }
+  }
+  return errs;
+}
+
+// Win = fully filled with zero conflicts (every row/col/box a permutation of
+// 1–6). The true Sudoku rule, decoupled from any single generated solution.
+function sudokuSolved(grid) {
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) if (!grid[r][c]) return false;
+  return sudokuConflicts(grid).size === 0;
+}
+
+function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const init = useRef(generateSudoku6(dailyRng(offset, 'sudoku'))).current;
+  const { puzzle } = init;
+  const dayNum = useRef(utcDayNum(offset)).current;
+
+  // Hydrate from a resumed attempt when the saved board is for today's puzzle.
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+    ? savedProgress
+    : null;
+  const [grid, setGrid] = useState(() =>
+    resumed ? resumed.grid.map(row => row.slice()) : puzzle.map(row => row.slice())
+  );
   const [selected, setSelected] = useState(null); // [r, c]
-  const [errors, setErrors] = useState(() => new Set());
-  const [steps, setSteps] = useState(0);
+  const [errors, setErrors] = useState(() => sudokuConflicts(grid));
+  // Steps is a free counter (not encoded in the grid), so restore it whenever
+  // the attempt carries one — even if the board itself couldn't be rehydrated.
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
   const [done, setDone] = useState(false);
-  const { secs, fmt } = useTimer(!done);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
 
   const isGiven = (r, c) => puzzle[r][c] !== 0;
+
+  // Idle/leave autosave (timer advance + tab close). Per-move saves happen in place().
+  const stateRef = useRef({});
+  stateRef.current = { grid, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, grid: stateRef.current.grid }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
 
   const place = (val) => {
     if (done || !selected) return;
@@ -742,16 +927,14 @@ function SudokuGame({ onWin, onStepChange }) {
     setSteps(newSteps);
     onStepChange(newSteps);
 
-    // track errors
-    const ne = new Set(errors);
-    const key = `${r},${c}`;
-    if (val !== 0 && val !== solution[r][c]) ne.add(key);
-    else ne.delete(key);
-    setErrors(ne);
+    // recompute conflict highlighting from the full grid
+    setErrors(sudokuConflicts(ng));
 
-    // win check
-    const solved = ng.every((row, ri) => row.every((v, ci) => v === solution[ri][ci]));
-    if (solved) {
+    // persist this move immediately
+    onSaveProgress && onSaveProgress({ dayNum, grid: ng }, newSteps, secs);
+
+    // win check — fully filled and no conflicts
+    if (sudokuSolved(ng)) {
       setDone(true);
       const score = Math.max(1200 - newSteps * 15 - secs * 2, 200);
       onWin(score, newSteps, secs);
@@ -855,11 +1038,77 @@ function AccountChip({ loading, authOk, user }) {
 }
 
 /* ============================================================
+   Daily leaderboard — today's solvers for one game, ranked by fastest
+   completion time, then fewest steps. Highlights the current user and
+   pins their row when they're outside the visible top N.
+   ============================================================ */
+const lbFmtTime = s =>
+  s == null ? '—' : `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+function Leaderboard({ gameId, solved }) {
+  const [state, setState] = useState({ loading: true });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard`);
+      if (!alive) return;
+      if (ok && body) setState({ loading: false, ...body });
+      else setState({ loading: false, entries: [], me: null, total: 0, error: true });
+    })();
+    return () => { alive = false; };
+  }, [gameId]);
+
+  if (state.loading) {
+    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><div className="lboard-empty">Loading…</div></div>;
+  }
+
+  const entries = state.entries || [];
+  const me = state.me || null;
+  const meVisible = me && entries.some(e => e.isCurrentUser);
+
+  return (
+    <div className="lboard">
+      <div className="lboard-title">
+        Today's leaderboard
+        {state.total > 0 && <span className="lboard-count">{state.total} solved</span>}
+      </div>
+      {entries.length === 0 ? (
+        <div className="lboard-empty">Be the first to solve today's puzzle.</div>
+      ) : (
+        <div className="lboard-rows">
+          {entries.map(e => (
+            <div key={e.rank} className={`lrow${e.isCurrentUser ? ' me' : ''}`}>
+              <span className="lrank mono">#{e.rank}</span>
+              <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+              <span className="ltime mono">{lbFmtTime(e.timeSecs)}</span>
+              <span className="lsteps mono">{e.steps != null ? `${e.steps} st` : '—'}</span>
+            </div>
+          ))}
+          {me && !meVisible && (
+            <div className="lrow me pinned">
+              <span className="lrank mono">#{me.rank}</span>
+              <span className="lname">{me.username} (you)</span>
+              <span className="ltime mono">{lbFmtTime(me.timeSecs)}</span>
+              <span className="lsteps mono">{me.steps != null ? `${me.steps} st` : '—'}</span>
+            </div>
+          )}
+        </div>
+      )}
+      {solved === false && (
+        <div className="lboard-note">You didn't solve today's puzzle — no ranking this round.</div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Locked screen — shown when today's attempt is already used
    ============================================================ */
 function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const hasResult = attempt && attempt.score != null;
+  const solved = !!(attempt && attempt.score != null && attempt.score > 0);
   const fmtTime = s =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return (
@@ -882,6 +1131,7 @@ function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) 
           )}
         </div>
       )}
+      <Leaderboard gameId={game.id} solved={solved} />
       <button className="primary-btn" onClick={onBack}>Back to Lobby</button>
     </div>
   );
@@ -908,18 +1158,18 @@ const WORD_SETS = [
 ];
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const wsRandLetter = () => ALPHABET[Math.floor(Math.random() * 26)];
+const wsRandLetter = (rng = Math.random) => ALPHABET[Math.floor(rng() * 26)];
 
 // Try to place every word into a fresh grid. Returns the filled letter grid,
 // or null if any word couldn't be placed (caller retries with a new grid).
-function placeWords(words) {
+function placeWords(words, rng = Math.random) {
   const grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
   for (const word of words) {
     let placed = false;
     for (let attempt = 0; attempt < 250 && !placed; attempt++) {
-      const [dr, dc] = WS_DIRS[Math.floor(Math.random() * WS_DIRS.length)];
-      const r0 = Math.floor(Math.random() * WS_SIZE);
-      const c0 = Math.floor(Math.random() * WS_SIZE);
+      const [dr, dc] = WS_DIRS[Math.floor(rng() * WS_DIRS.length)];
+      const r0 = Math.floor(rng() * WS_SIZE);
+      const c0 = Math.floor(rng() * WS_SIZE);
       const rEnd = r0 + dr * (word.length - 1);
       const cEnd = c0 + dc * (word.length - 1);
       if (rEnd < 0 || rEnd >= WS_SIZE || cEnd < 0 || cEnd >= WS_SIZE) continue;
@@ -938,36 +1188,88 @@ function placeWords(words) {
   return grid;
 }
 
-function generateWordSearch() {
-  const set = WORD_SETS[Math.floor(Math.random() * WORD_SETS.length)];
+function generateWordSearch(rng = Math.random) {
+  const set = WORD_SETS[Math.floor(rng() * WORD_SETS.length)];
   const words = set.words.slice();
   let grid = null;
-  for (let attempt = 0; attempt < 60 && !grid; attempt++) grid = placeWords(words);
+  for (let attempt = 0; attempt < 60 && !grid; attempt++) grid = placeWords(words, rng);
   if (!grid) grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
-  // Fill the empty cells with random filler letters.
-  const letters = grid.map(row => row.map(ch => ch || wsRandLetter()));
+  // Fill the empty cells with seeded filler letters.
+  const letters = grid.map(row => row.map(ch => ch || wsRandLetter(rng)));
   return { theme: set.theme, words, letters };
 }
 
-function WordHuntGame({ onWin, onStepChange }) {
-  const board = useRef(generateWordSearch()).current;
+// Locate `word` on the letter grid (any of the 8 directions, forwards or
+// reversed) and return its cell indices, or null. Used to restore highlighted
+// cells for words a resumed player had already found.
+function locateWord(letters, word) {
+  const idx = (r, c) => r * WS_SIZE + c;
+  for (let r = 0; r < WS_SIZE; r++) {
+    for (let c = 0; c < WS_SIZE; c++) {
+      for (const [dr, dc] of WS_DIRS) {
+        const cells = [];
+        let ok = true;
+        for (let i = 0; i < word.length; i++) {
+          const rr = r + dr * i, cc = c + dc * i;
+          if (rr < 0 || rr >= WS_SIZE || cc < 0 || cc >= WS_SIZE || letters[rr][cc] !== word[i]) { ok = false; break; }
+          cells.push(idx(rr, cc));
+        }
+        if (ok) return cells;
+      }
+    }
+  }
+  return null;
+}
+
+function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const board = useRef(generateWordSearch(dailyRng(offset, 'wordhunt'))).current;
   const { theme, words, letters } = board;
   const total = words.length;
+  const dayNum = useRef(utcDayNum(offset)).current;
 
-  const [found, setFound] = useState(() => new Set());       // found word strings
-  const [foundCells, setFoundCells] = useState(() => new Set()); // locked cell indices
+  // Hydrate from a resumed attempt for today's board.
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.found)
+    ? savedProgress
+    : null;
+  const initFound = () => new Set((resumed ? resumed.found : []).filter(w => words.includes(w)));
+  const initCells = () => {
+    const set = new Set();
+    if (resumed) for (const w of resumed.found) {
+      const cells = locateWord(letters, w);
+      if (cells) cells.forEach(i => set.add(i));
+    }
+    return set;
+  };
+
+  const [found, setFound] = useState(initFound);            // found word strings
+  const [foundCells, setFoundCells] = useState(initCells);  // locked cell indices
   const [anchor, setAnchor] = useState(null);                // [r, c] drag start
   const [sel, setSel] = useState([]);                        // cell indices in current drag
-  const [steps, setSteps] = useState(0);
-  const [score, setScore] = useState(0);
+  const [steps, setSteps] = useState(() => (resumed && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [score, setScore] = useState(() => {
+    // Reconstruct score from already-found words so a resumed win scores right.
+    let s = 0;
+    if (resumed) for (const w of resumed.found) if (words.includes(w)) s += w.length * w.length * 10;
+    return s;
+  });
   const [done, setDone] = useState(false);
-  const { secs, fmt } = useTimer(!done);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
 
   // Keep the latest elapsed seconds reachable inside event-handler closures.
-  const secsRef = useRef(0);
+  const secsRef = useRef(initialSecs);
   secsRef.current = secs;
 
   const idx = (r, c) => r * WS_SIZE + c;
+
+  // Idle/leave autosave; per-find saves happen in endSel().
+  const stateRef = useRef({});
+  stateRef.current = { found, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, found: [...stateRef.current.found] }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
 
   // Straight-line path of cell indices from the anchor to (r, c), or null if
   // the target isn't on a horizontal / vertical / 45° diagonal from the anchor.
@@ -1014,6 +1316,9 @@ function WordHuntGame({ onWin, onStepChange }) {
 
       const newScore = score + match.length * match.length * 10;
       setScore(newScore);
+
+      // persist this find immediately
+      onSaveProgress && onSaveProgress({ dayNum, found: [...nf] }, newSteps, secsRef.current);
 
       if (nf.size === total) {
         setDone(true);
@@ -1131,17 +1436,41 @@ function cwScoreGuess(guess, answer) {
   return res;
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset }) {
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
   const answer = useRef(
     CW_ANSWERS[((dayNum % CW_ANSWERS.length) + CW_ANSWERS.length) % CW_ANSWERS.length]
   ).current;
 
-  const [guesses, setGuesses] = useState([]); // [{ word, result: ['green'|'yellow'|'gray', …] }]
+  // Hydrate from a resumed attempt: recompute each guess's colors from the
+  // saved guess words (the answer is deterministic for the day).
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.words)
+    ? savedProgress
+    : null;
+  const initGuesses = () => (resumed ? resumed.words : [])
+    .filter(w => typeof w === 'string' && w.length === CW_LEN)
+    .slice(0, CW_MAX)
+    .map(w => ({ word: w, result: cwScoreGuess(w, answer) }));
+
+  const [guesses, setGuesses] = useState(initGuesses); // [{ word, result: ['green'|'yellow'|'gray', …] }]
   const [cur, setCur] = useState('');          // in-progress letters for the active row
   const [shake, setShake] = useState(false);
   const [done, setDone] = useState(false);
-  const { secs, fmt } = useTimer(!done);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  // Idle/leave autosave; per-guess saves happen in submit().
+  const stateRef = useRef({});
+  stateRef.current = { guesses, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: { dayNum, words: stateRef.current.guesses.map(g => g.word) },
+      steps: stateRef.current.guesses.length,
+      secs: stateRef.current.secs,
+    }),
+    !done
+  );
 
   // Best color seen per letter, for the on-screen keyboard tinting.
   const keyState = {};
@@ -1169,6 +1498,9 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset }) {
     setGuesses(rows);
     setCur('');
     onStepChange(rows.length);
+
+    // persist this guess immediately (before any terminal finish)
+    onSaveProgress && onSaveProgress({ dayNum, words: rows.map(g => g.word) }, rows.length, secs);
 
     if (cur === answer) {
       setDone(true);
@@ -1356,10 +1688,21 @@ function App() {
   };
 
   const launchGame = async (game) => {
-    if (attempts[game.id]) {
-      // Already used today — straight to the locked screen.
-      setCurrentGame(game);
-      setScreen('locked');
+    const existing = attempts[game.id];
+    if (existing) {
+      if (existing.finishedAt) {
+        // Finished today — straight to the locked screen.
+        setCurrentGame(game);
+        setScreen('locked');
+      } else {
+        // Claimed but unfinished — resume into the saved board state. The row
+        // is already claimed, so do NOT call /start again.
+        setCurrentGame(game);
+        setStepCount(existing.steps || 0);
+        setWinData(null);
+        setLoseData(null);
+        setScreen('game');
+      }
       return;
     }
     const { ok, status, body } = await api(`/api/daily/${game.id}/start`, { method: 'POST' });
@@ -1369,14 +1712,41 @@ function App() {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
+      setLoseData(null);
       setScreen('game');
     } else if (status === 409) {
       // Lost the race / already locked — show the locked screen.
       if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
       if (body && body.attempt) setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
       setCurrentGame(game);
-      setScreen('locked');
+      setScreen(body && body.attempt && !body.attempt.finishedAt ? 'game' : 'locked');
     }
+  };
+
+  // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
+  // a game component can hydrate from a single savedProgress object.
+  const progressFor = (attempt) => {
+    if (!attempt || !attempt.progress) return null;
+    return { ...attempt.progress, steps: attempt.steps, elapsedSecs: attempt.elapsedSecs };
+  };
+
+  // Autosave callback handed to every game: persists in-progress state for
+  // today's claimed, unfinished attempt. Best-effort (keepalive) so it survives
+  // a tab close. Never blocks gameplay.
+  const handleSaveProgress = (progress, steps, secs) => {
+    if (!currentGame) return;
+    const gameId = currentGame.id;
+    api(`/api/daily/${gameId}/progress`, {
+      method: 'POST',
+      keepalive: true,
+      body: JSON.stringify({ progress, steps, elapsedSecs: secs }),
+    }).catch(() => {});
+    // Keep local mirror fresh so a same-session re-entry resumes correctly.
+    setAttempts(prev => {
+      const a = prev[gameId];
+      if (!a || a.finishedAt) return prev;
+      return { ...prev, [gameId]: { ...a, progress, steps, elapsedSecs: secs } };
+    });
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
@@ -1514,24 +1884,27 @@ function App() {
           <div className="grid">
             {GAMES.map(g => {
               const a = attempts[g.id];
-              const locked = !!a;
+              const finished = !!(a && a.finishedAt);
+              const inProgress = !!a && !finished;
               return (
                 <div
                   key={g.id}
-                  className={`card${locked ? ' done locked' : ''}`}
+                  className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
                   style={{ '--accent': g.tagColor }}
                   onClick={() => !loading && launchGame(g)}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
                   <div className="card-desc">{g.desc}</div>
-                  {locked ? (
+                  {finished ? (
                     <div className="card-lock">
                       🔒 {a.score != null
                         ? <span>+{a.score} pts · resets in {fmtCountdown(
                             (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
                         : <span>Played · locked until reset</span>}
                     </div>
+                  ) : inProgress ? (
+                    <div className="card-resume">▶ In progress · resume</div>
                   ) : (
                     <span
                       className="tag mono"
@@ -1579,6 +1952,8 @@ function App() {
             onLose={handleLose}
             onStepChange={setStepCount}
             offset={offset}
+            savedProgress={progressFor(attempts[currentGame.id])}
+            onSaveProgress={handleSaveProgress}
           />
         </div>
       )}
@@ -1609,6 +1984,7 @@ function App() {
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
             </div>
+            {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             <button className="primary-btn" onClick={backToLobby}>Back to Lobby</button>
           </div>
@@ -1637,6 +2013,7 @@ function App() {
                 <span className="v mono">+0</span>
               </div>
             </div>
+            {currentGame && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             <button className="primary-btn" onClick={backToLobby}>Back to Lobby</button>
           </div>

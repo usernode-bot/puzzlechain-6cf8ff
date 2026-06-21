@@ -7,6 +7,8 @@
     { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" },
     { "name": "Crypto Wordle card in lobby", "path": "/", "expectText": "Crypto Wordle" },
     { "name": "Lobby shows live reset countdown", "path": "/", "expectText": "Next puzzle in" },
-    { "name": "Streak multiplier hint in lobby", "path": "/?demo=streak", "expectText": "day streak" }
+    { "name": "Streak multiplier hint in lobby", "path": "/?demo=streak", "expectText": "day streak" },
+    { "name": "Leaderboard seed boots cleanly", "path": "/?demo=leaderboard", "expectText": "Daily Puzzles" },
+    { "name": "In-progress resume card in lobby", "path": "/?demo=resume", "expectText": "In progress" }
   ]
 }

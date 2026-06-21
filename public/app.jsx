@@ -2335,6 +2335,116 @@ body {
 .dr-end .dr-stats { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
 .dr-end-btns { display: flex; flex-direction: column; gap: 0.55rem; width: 100%; margin-top: 0.5rem; }
 .dr-hint { color: ${C.muted}; font-size: 0.8rem; }
+
+/* ---- PvP Arena ---- */
+.pvp-lobby { max-width: 680px; margin: 0 auto; padding: 0.25rem 0; }
+.pvp-header { margin-bottom: 1.5rem; text-align: center; }
+.pvp-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.25rem; }
+.pvp-subtitle { color: ${C.muted}; font-size: 0.9rem; }
+.pvp-balance {
+  margin-top: 0.7rem; display: inline-block;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.9rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  color: ${C.gold};
+}
+.pvp-how {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 1.5rem;
+}
+.pvp-how-step { font-size: 0.85rem; color: ${C.muted}; }
+.pvp-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.9rem; }
+.pvp-tier-card {
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 14px; padding: 1.1rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.pvp-tier-card:hover { border-color: var(--pvp-color); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.pvp-tier-label { font-size: 1.15rem; font-weight: 700; color: var(--pvp-color); }
+.pvp-tier-desc { font-size: 0.82rem; color: ${C.muted}; }
+.pvp-tier-payout { font-size: 0.78rem; color: ${C.text}; font-family: 'JetBrains Mono', monospace; }
+.pvp-tier-btn {
+  margin-top: 0.5rem; border: none; border-radius: 10px; color: #fff;
+  font-family: inherit; font-size: 0.9rem; font-weight: 600;
+  padding: 0.65rem; cursor: pointer; transition: opacity 0.12s;
+}
+.pvp-tier-btn:disabled { opacity: 0.5; cursor: default; }
+.pvp-tier-btn:not(:disabled):hover { opacity: 0.85; }
+.pvp-matchmaking {
+  max-width: 400px; margin: 2rem auto; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
+}
+.pvp-mm-icon { font-size: 3rem; }
+.pvp-mm-title { font-size: 1.25rem; font-weight: 700; }
+.pvp-mm-code {
+  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 10px; padding: 0.5rem 1.2rem; color: ${C.accent};
+  letter-spacing: 0.08em;
+}
+.pvp-mm-hint { color: ${C.muted}; font-size: 0.85rem; }
+.pvp-cancel-btn {
+  margin-top: 0.5rem; background: transparent; border: 1px solid ${C.border};
+  color: ${C.muted}; border-radius: 10px; padding: 0.5rem 1.2rem;
+  font-family: inherit; font-size: 0.875rem; cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.pvp-cancel-btn:hover { border-color: ${C.rose}; color: ${C.rose}; }
+.pvp-mm-pulse {
+  width: 2.5rem; height: 2.5rem; border-radius: 50%;
+  border: 3px solid ${C.accent}; border-top-color: transparent;
+  animation: pvp-spin 0.8s linear infinite;
+}
+@keyframes pvp-spin { to { transform: rotate(360deg); } }
+.pvp-deposit {
+  max-width: 360px; margin: 2rem auto; text-align: center;
+  display: flex; flex-direction: column; gap: 0.75rem; align-items: center;
+}
+.pvp-deposit-title { font-size: 1.2rem; font-weight: 700; }
+.pvp-deposit-amount {
+  font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; font-weight: 700;
+  color: ${C.gold};
+}
+.pvp-deposit-hint { color: ${C.muted}; font-size: 0.82rem; }
+.pvp-waiting {
+  max-width: 360px; margin: 2rem auto; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+}
+.pvp-waiting-title { font-size: 1.1rem; font-weight: 600; }
+.pvp-waiting-hint { color: ${C.muted}; font-size: 0.85rem; }
+.pvp-game-wrap .pvp-vs-bar {
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 12px; padding: 0.55rem 1rem; margin-bottom: 0.75rem;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.85rem;
+}
+.pvp-vs-bar .pvp-vs-opp { color: ${C.muted}; }
+.pvp-vs-bar .pvp-vs-label {
+  font-weight: 700; font-size: 0.75rem; letter-spacing: 0.08em;
+  color: ${C.rose}; text-transform: uppercase;
+}
+.pvp-vs-bar .pvp-forfeit-btn {
+  background: transparent; border: 1px solid ${C.border}; color: ${C.muted};
+  border-radius: 8px; padding: 0.3rem 0.65rem; font-size: 0.78rem;
+  font-family: inherit; cursor: pointer; transition: border-color 0.12s, color 0.12s;
+}
+.pvp-vs-bar .pvp-forfeit-btn:hover { border-color: ${C.rose}; color: ${C.rose}; }
+.pvp-result {
+  max-width: 360px; margin: 2rem auto; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+.pvp-result-emoji { font-size: 3rem; }
+.pvp-result-title { font-size: 1.4rem; font-weight: 700; }
+.pvp-result .pvp-result-btns { width: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
+.pvp-auth-msg {
+  text-align: center; color: ${C.muted}; padding: 2rem;
+  font-size: 0.95rem;
+}
 `;
 
 /* ============================================================
@@ -6881,7 +6991,7 @@ const TM_DAILY_CONFIG = {
 };
 const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
 
-function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }) {
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, boardSeedOverride, onMoveTile }) {
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -6917,8 +7027,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }
 
   // Initialise board from day seed
   useEffect(() => {
-    const dayNum = cwDayNum(offset || 0);
-    const seed = dayNum * 31 + 7;
+    const seed = boardSeedOverride != null ? boardSeedOverride : (cwDayNum(offset || 0) * 31 + 7);
     setTiles(tmGenerateLevel(TM_DAILY_CONFIG, seed));
     setBar([]);
     setMoves(0);
@@ -6929,7 +7038,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }
     setClearSlotMode(false);
     setBarFull(false);
     setFlashIds(new Set());
-  }, [resetKey, offset]);
+  }, [resetKey, offset, boardSeedOverride]);
 
   const tilesMap = {};
   tiles.forEach(t => { tilesMap[t.id] = t; });
@@ -6990,6 +7099,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset }
     setMoves(newMoves);
     setLastBarEntry(tileId);
     onStepChange(newMoves);
+    if (onMoveTile) onMoveTile(newMoves);
 
     const boardRemaining = tilesCopy.filter(t => !t.removed && !t.inBar);
     if (boardRemaining.length === 0 && finalBar.length === 0) {
@@ -8340,6 +8450,364 @@ function SnakeGame({ onWin, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   PvP Arena components
+   ============================================================ */
+const PVP_TIERS = [
+  { label: '0.1 UTGO', value: '100000000000000000',   color: C.emerald, payout: '0.18 UTGO' },
+  { label: '1 UTGO',   value: '1000000000000000000',  color: C.gold,    payout: '1.8 UTGO' },
+  { label: '10 UTGO',  value: '10000000000000000000', color: C.rose,    payout: '18 UTGO' },
+];
+
+function PvpLobby({ user, balance, onJoin, joining }) {
+  const balFmt = balance != null
+    ? (Number(BigInt(balance)) / 1e18).toFixed(2) + ' UTGO'
+    : '…';
+  return (
+    <div className="pvp-lobby">
+      <div className="pvp-header">
+        <div className="pvp-title">⚔️ PvP Arena</div>
+        <div className="pvp-subtitle">Stake $UTGO and battle for the best tile-match score</div>
+        <div className="pvp-balance">Balance: {balFmt}</div>
+      </div>
+      <div className="pvp-how">
+        <div className="pvp-how-step">1. Choose a wager tier and get matched with an opponent</div>
+        <div className="pvp-how-step">2. Both players clear the same seeded board — highest score wins, fastest time breaks ties</div>
+        <div className="pvp-how-step">3. Winner claims 90% of the pot · 8% treasury · 2% burned 🔥</div>
+      </div>
+      <div className="pvp-tiers">
+        {PVP_TIERS.map(t => (
+          <div key={t.value} className="pvp-tier-card" style={{ '--pvp-color': t.color }}>
+            <div className="pvp-tier-label">{t.label}</div>
+            <div className="pvp-tier-payout">Win → {t.payout}</div>
+            <button
+              className="pvp-tier-btn"
+              style={{ background: t.color }}
+              disabled={joining !== null}
+              onClick={() => onJoin(t.value)}
+            >
+              {joining === t.value ? 'Finding…' : 'Find Match'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PvpMatchmaking({ match, onCancel }) {
+  return (
+    <div className="pvp-matchmaking">
+      <div className="pvp-mm-icon">⚔️</div>
+      <div className="pvp-mm-pulse" />
+      <div className="pvp-mm-title">Finding opponent…</div>
+      <div className="pvp-mm-code">Room · {match && match.matchId}</div>
+      <div className="pvp-mm-hint">Waiting for another player at this wager tier</div>
+      <button className="pvp-cancel-btn" onClick={onCancel}>Cancel</button>
+    </div>
+  );
+}
+
+function PvpDepositScreen({ match, playerIsP1, onDeposit, depositing }) {
+  const alreadyDeposited = playerIsP1 ? match.p1Deposited : match.p2Deposited;
+  const oppDeposited = playerIsP1 ? match.p2Deposited : match.p1Deposited;
+  const wagerFmt = match.wagerUtgo
+    ? (Number(BigInt(match.wagerUtgo)) / 1e18).toFixed(2) + ' UTGO'
+    : '?';
+  return (
+    <div className="pvp-deposit">
+      <div className="pvp-deposit-title">Deposit Wager</div>
+      <div className="pvp-deposit-amount">{wagerFmt}</div>
+      <div className="pvp-deposit-hint">
+        {alreadyDeposited
+          ? (oppDeposited ? 'Both deposited — starting!' : 'Waiting for opponent to deposit…')
+          : 'Deposit your wager to lock in the match'}
+      </div>
+      {!alreadyDeposited && (
+        <button className="primary-btn" disabled={depositing} onClick={onDeposit}>
+          {depositing ? 'Depositing…' : 'Deposit & Play'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PvpGameScreen({ match, playerIsP1, onResult }) {
+  const [depositing, setDepositing] = useState(false);
+  const [deposited, setDeposited] = useState(
+    playerIsP1 ? match.p1Deposited : match.p2Deposited
+  );
+  const [oppDeposited, setOppDeposited] = useState(
+    playerIsP1 ? match.p2Deposited : match.p1Deposited
+  );
+  const [playing, setPlaying] = useState(deposited && oppDeposited);
+  const [waiting, setWaiting] = useState(false);
+  const pollRef = useRef(null);
+
+  // Poll for opponent deposit
+  useEffect(() => {
+    if (playing || !deposited) return;
+    const poll = async () => {
+      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
+      if (!ok) return;
+      const oppNow = playerIsP1 ? body.p2Deposited : body.p1Deposited;
+      if (oppNow) {
+        setOppDeposited(true);
+        setPlaying(true);
+        clearInterval(pollRef.current);
+      }
+    };
+    pollRef.current = setInterval(poll, 2000);
+    return () => clearInterval(pollRef.current);
+  }, [deposited, playing]);
+
+  // Poll for opponent finish result
+  const resultPollRef = useRef(null);
+  useEffect(() => {
+    if (!waiting) return;
+    const poll = async () => {
+      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
+      if (!ok) return;
+      if (body.status === 'finished') {
+        clearInterval(resultPollRef.current);
+        onResult({ match: body, isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id) });
+      }
+    };
+    resultPollRef.current = setInterval(poll, 2000);
+    return () => clearInterval(resultPollRef.current);
+  }, [waiting]);
+
+  const handleDeposit = async () => {
+    setDepositing(true);
+    const isMock = !window.usernode || (window.usernode.isMockEnabled && window.usernode.isMockEnabled());
+    if (!isMock && window.usernode && UTGO_CONTRACT_ADDRESS) {
+      // Production: call on-chain deposit — skip for staging
+    }
+    await api(`/api/pvp/match/${match.matchId}/deposit-confirmed`, {
+      method: 'POST',
+      body: JSON.stringify({ txHash: '0xstaging' }),
+    });
+    setDeposited(true);
+    setDepositing(false);
+  };
+
+  const handleMove = async (moveSeq) => {
+    api(`/api/pvp/match/${match.matchId}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ moveSeq }),
+    });
+  };
+
+  const handleWin = async (score, steps, secs) => {
+    const { ok, body } = await api(`/api/pvp/match/${match.matchId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify({ score, steps, timeSecs: secs }),
+    });
+    if (!ok) return;
+    if (body.waiting) {
+      setWaiting(true);
+    } else {
+      onResult({
+        match: body.match,
+        isWinner: body.isWinner,
+        claimCalldata: body.claimCalldata,
+        contractAddr: body.contractAddr,
+      });
+    }
+  };
+
+  const handleLose = async (_steps, _secs) => {
+    const { ok, body } = await api(`/api/pvp/match/${match.matchId}/forfeit`, { method: 'POST' });
+    onResult({ isWinner: false, match: ok && body ? body : null });
+  };
+
+  const oppName = playerIsP1 ? (match.player2Name || 'Opponent') : (match.player1Name || 'Opponent');
+
+  if (!deposited || !oppDeposited) {
+    return (
+      <PvpDepositScreen
+        match={match}
+        playerIsP1={playerIsP1}
+        onDeposit={handleDeposit}
+        depositing={depositing}
+      />
+    );
+  }
+
+  if (waiting) {
+    return (
+      <div className="pvp-waiting">
+        <div className="pvp-mm-pulse" />
+        <div className="pvp-waiting-title">Waiting for {oppName}…</div>
+        <div className="pvp-waiting-hint">Your result has been submitted</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pvp-game-wrap game-wrap">
+      <div className="pvp-vs-bar">
+        <span>vs <span style={{ color: C.violet }}>{oppName}</span></span>
+        <span className="pvp-vs-label">PvP</span>
+        <button className="pvp-forfeit-btn" onClick={() => handleLose(0, 0)}>Forfeit</button>
+      </div>
+      <TileMatchingDailyGame
+        boardSeedOverride={match.boardSeed}
+        onWin={handleWin}
+        onLose={handleLose}
+        onStepChange={() => {}}
+        onMoveTile={handleMove}
+        resetKey={match.matchId}
+        offset={0}
+      />
+    </div>
+  );
+}
+
+function PvpResult({ result, onBack }) {
+  const { isWinner, match, claimCalldata, contractAddr } = result || {};
+  const [claiming, setClaiming] = useState(false);
+  const [claimed, setClaimed] = useState(false);
+  const [claimErr, setClaimErr] = useState(null);
+
+  const handleClaim = async () => {
+    if (!claimCalldata || !contractAddr) return;
+    setClaiming(true);
+    setClaimErr(null);
+    try {
+      await window.usernode.sendTransaction({ to: contractAddr, data: claimCalldata });
+      setClaimed(true);
+    } catch (e) {
+      setClaimErr(e && e.message ? e.message : 'Transaction failed');
+    }
+    setClaiming(false);
+  };
+
+  return (
+    <div className="pvp-result">
+      <div className="pvp-result-emoji">{isWinner ? '🏆' : '💀'}</div>
+      <div className="pvp-result-title">{isWinner ? 'You Won!' : 'You Lost'}</div>
+      {match && (
+        <div className="score-rows" style={{ width: '100%', textAlign: 'left' }}>
+          <div className="score-row">
+            <span className="k">Your score</span>
+            <span className="v mono">{match.p1Score != null ? match.p1Score : match.p2Score}</span>
+          </div>
+          <div className="score-row">
+            <span className="k">Opponent</span>
+            <span className="v mono">{match.p2Score != null && match.p1Score != null
+              ? (match.p1Score === (match.p1Score != null ? match.p1Score : 0) ? match.p2Score : match.p1Score)
+              : '—'}</span>
+          </div>
+        </div>
+      )}
+      {claimErr && <div style={{ color: C.rose, fontSize: '0.8rem' }}>{claimErr}</div>}
+      <div className="pvp-result-btns">
+        {isWinner && claimCalldata && !claimed && (
+          <button className="primary-btn" onClick={handleClaim} disabled={claiming}>
+            {claiming ? 'Claiming…' : 'Claim Winnings'}
+          </button>
+        )}
+        {claimed && <div style={{ color: C.emerald, fontWeight: 600 }}>Winnings claimed!</div>}
+        <button
+          className="primary-btn"
+          style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+          onClick={onBack}
+        >
+          Back to Arena
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PvpArena({ user, authOk }) {
+  const [phase, setPhase] = useState('lobby'); // lobby | matchmaking | game | result
+  const [match, setMatch] = useState(null);
+  const [joining, setJoining] = useState(null);
+  const [pvpResult, setPvpResult] = useState(null);
+  const [playerAddr, setPlayerAddr] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const pollRef = useRef(null);
+
+  useEffect(() => {
+    if (!window.usernode || !window.usernode.getNodeAddress) return;
+    window.usernode.getNodeAddress().then(addr => {
+      if (!addr) return;
+      setPlayerAddr(addr);
+      api(`/api/pvp/balance?addr=${encodeURIComponent(addr)}`)
+        .then(({ ok, body }) => { if (ok && body) setBalance(body.balance); })
+        .catch(() => {});
+    }).catch(() => {});
+  }, []);
+
+  // Poll for opponent joining while in matchmaking
+  useEffect(() => {
+    if (phase !== 'matchmaking' || !match) return;
+    const poll = async () => {
+      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
+      if (!ok) return;
+      if (body.status === 'active') {
+        clearInterval(pollRef.current);
+        setMatch(body);
+        setPhase('game');
+      }
+    };
+    pollRef.current = setInterval(poll, 2000);
+    return () => clearInterval(pollRef.current);
+  }, [phase, match && match.matchId]);
+
+  const handleJoin = async (wagerUtgo) => {
+    if (!playerAddr) return;
+    setJoining(wagerUtgo);
+    const { ok, body } = await api('/api/pvp/join', {
+      method: 'POST',
+      body: JSON.stringify({ wagerUtgo, playerAddr }),
+    });
+    setJoining(null);
+    if (!ok || !body) return;
+    setMatch(body);
+    setPhase(body.status === 'active' ? 'game' : 'matchmaking');
+  };
+
+  const handleCancel = async () => {
+    if (match) {
+      await api(`/api/pvp/match/${match.matchId}/cancel`, { method: 'DELETE' });
+    }
+    clearInterval(pollRef.current);
+    setMatch(null);
+    setPhase('lobby');
+  };
+
+  const handleResult = (result) => {
+    setPvpResult(result);
+    setPhase('result');
+  };
+
+  if (!authOk) {
+    return <div className="pvp-auth-msg">Sign in to play PvP matches.</div>;
+  }
+
+  const playerIsP1 = match && user && match.player1Id === user.id;
+
+  if (phase === 'lobby') {
+    return <PvpLobby user={user} balance={balance} onJoin={handleJoin} joining={joining} />;
+  }
+  if (phase === 'matchmaking') {
+    return <PvpMatchmaking match={match} onCancel={handleCancel} />;
+  }
+  if (phase === 'game' && match) {
+    return <PvpGameScreen match={match} playerIsP1={playerIsP1} onResult={handleResult} />;
+  }
+  if (phase === 'result') {
+    return <PvpResult result={pvpResult} onBack={() => { setMatch(null); setPhase('lobby'); }} />;
+  }
+  return null;
+}
+
+// UTGO_CONTRACT_ADDRESS exposed for PvpGameScreen (staging: undefined)
+const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -8496,10 +8964,10 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
-  // Lobby tab: 'daily' or 'classic', initialized from ?tab= URL param
+  // Lobby tab: 'daily', 'classic', 'idle', or 'pvp' — initialized from ?tab= URL param
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : 'daily';
+    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : 'daily';
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
@@ -8733,14 +9201,16 @@ function App() {
         <div className="lobby">
           <div className="lobby-head">
             <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : 'Idle Empire'}
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : 'PvP Arena'}
             </h1>
             <p>
               {lobbyTab === 'daily'
                 ? 'One attempt each, per day. Resets at midnight UTC.'
                 : lobbyTab === 'classic'
                 ? 'Play anytime — track your best scores.'
-                : 'Tap, upgrade, and build your empire. Progress saved automatically.'}
+                : lobbyTab === 'idle'
+                ? 'Tap, upgrade, and build your empire. Progress saved automatically.'
+                : 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
               <p className="lobby-hint">
@@ -8769,7 +9239,15 @@ function App() {
               className={'lobby-tab' + (lobbyTab === 'idle' ? ' active' : '')}
               onClick={() => setLobbyTab('idle')}
             >Idle Empire</button>
+            <button
+              className={'lobby-tab' + (lobbyTab === 'pvp' ? ' active' : '')}
+              onClick={() => setLobbyTab('pvp')}
+              style={lobbyTab !== 'pvp' ? { borderColor: C.rose + '60', color: C.rose } : {}}
+            >⚔️ PvP Arena</button>
           </div>
+          {lobbyTab === 'pvp' ? (
+            <PvpArena user={user} authOk={authOk} />
+          ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
               const isClassicOrIdle = g.category === 'classic' || g.category === 'idle';
@@ -8804,6 +9282,7 @@ function App() {
               );
             })}
           </div>
+          )}
         </div>
       )}
 

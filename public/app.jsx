@@ -10418,3 +10418,6 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+// Signal to the boot-shell watchdog (index.html) that React has mounted, so
+// it clears the "taking longer than usual" timer and never flashes the card.
+window.__puzzlechainMounted = true;

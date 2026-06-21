@@ -9,6 +9,17 @@
     { "name": "Lobby shows live reset countdown", "path": "/", "expectText": "Next puzzle in" },
     { "name": "Streak multiplier hint in lobby", "path": "/?demo=streak", "expectText": "day streak" },
     { "name": "Leaderboard seed boots cleanly", "path": "/?demo=leaderboard", "expectText": "Daily Puzzles" },
-    { "name": "In-progress resume card in lobby", "path": "/?demo=resume", "expectText": "In progress" }
+    { "name": "In-progress resume card in lobby", "path": "/?demo=resume", "expectText": "In progress" },
+    { "name": "Minesweeper card in Classic Games tab", "path": "/?tab=classic", "expectText": "Minesweeper" },
+    { "name": "Mancala card in Classic Games tab", "path": "/?tab=classic", "expectText": "Mancala" },
+    { "name": "2048 card in Classic Games tab", "path": "/?tab=classic", "expectText": "2048" },
+    { "name": "Texas Hold Em card in Classic Games tab", "path": "/?tab=classic", "expectText": "Texas Hold 'Em" },
+    { "name": "Block Blast card in Classic Games tab", "path": "/?tab=classic", "expectText": "Block Blast" },
+    { "name": "Snake card in Classic Games tab", "path": "/?tab=classic", "expectText": "Snake" },
+    { "name": "Tile Match card in Classic Games tab", "path": "/?tab=classic", "expectText": "Tile Match" },
+    { "name": "Diamond Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Diamond Rush" },
+    { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" },
+    { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
+    { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" }
   ]
 }

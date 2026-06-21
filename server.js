@@ -175,6 +175,25 @@ async function migrate() {
     )
   `);
 
+  // breakout_scores is PUBLIC — high scores for the Bounce classic game, shown
+  // on a global leaderboard (no sensitive data; gameplay results only). One row
+  // per user holding their personal best, upserted with GREATEST so a worse run
+  // never clobbers a better one. No foreign keys (public-table rule). Mirrors
+  // snake_scores.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS breakout_scores (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      best_score     INTEGER NOT NULL DEFAULT 0,
+      best_level     INTEGER,
+      best_time_secs INTEGER,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   // pvp_matches is PUBLIC — match results contain no sensitive data.
   // One row per PvP wager match; status: waiting|active|finished|cancelled.
   await pool.query(`
@@ -482,6 +501,27 @@ async function migrate() {
          VALUES ($1, $2, $3, $4, $5, 3)
          ON CONFLICT (user_id) DO NOTHING`,
         [uid, uname, best, len, secs]
+      );
+    }
+
+    // Bounce (Breakout) leaderboard seed — same rationale as Snake: a freshly
+    // created table is empty in staging, so the leaderboard tab would have
+    // nothing to show. Obviously-fake users with a descending spread.
+    // Idempotent; no-op in production.
+    const bounceSeed = [
+      ['bounce-demo-1', 'staging-bounce-pro',    2400, 6, 188],
+      ['bounce-demo-2', 'staging-bounce-ace',    1500, 4, 140],
+      ['bounce-demo-3', 'staging-bounce-rookie', 900,  3, 96],
+      ['bounce-demo-4', 'staging-bounce-fan',    450,  2, 64],
+      ['bounce-demo-5', 'staging-bounce-newbie', 180,  1, 38],
+    ];
+    for (const [uid, uname, best, lvl, secs] of bounceSeed) {
+      await pool.query(
+        `INSERT INTO breakout_scores
+           (user_id, username, best_score, best_level, best_time_secs, games_played)
+         VALUES ($1, $2, $3, $4, $5, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, best, lvl, secs]
       );
     }
   }
@@ -1774,6 +1814,129 @@ app.get('/api/snake/leaderboard', async (req, res) => {
   } catch (err) {
     console.error('[snake] leaderboard failed:', err.message);
 
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ---- Bounce (Breakout) leaderboard API -----------------------------------
+// Mirrors the Snake leaderboard exactly: one personal-best row per user,
+// upserted with GREATEST, ranked by best_score then earliest-to-reach.
+
+const BOUNCE_LB_LIMIT = 20;
+
+function shapeBounceRow(row) {
+  return {
+    rank: Number(row.rank),
+    username: row.username,
+    bestScore: row.best_score,
+  };
+}
+
+// Submit a finished run. Upserts the caller's personal-best row (GREATEST so a
+// worse run never lowers it) and bumps games_played. Identity from req.user.
+// Also updates user stats snapshot and creates achievements (Snake parity).
+app.post('/api/bounce/score', async (req, res) => {
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  if (score === null) return res.status(400).json({ error: 'score is required' });
+  try {
+    // Get previous best before updating
+    const { rows: prevRows } = await pool.query(
+      `SELECT best_score FROM breakout_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const prevBest = prevRows.length > 0 ? prevRows[0].best_score : null;
+
+    // Update best_level/best_time_secs only when this run set a new best score.
+    const { rows } = await pool.query(
+      `INSERT INTO breakout_scores
+         (user_id, username, best_score, best_level, best_time_secs, games_played, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         username       = EXCLUDED.username,
+         best_level     = CASE WHEN EXCLUDED.best_score > breakout_scores.best_score
+                               THEN EXCLUDED.best_level ELSE breakout_scores.best_level END,
+         best_time_secs = CASE WHEN EXCLUDED.best_score > breakout_scores.best_score
+                               THEN EXCLUDED.best_time_secs ELSE breakout_scores.best_time_secs END,
+         best_score     = GREATEST(breakout_scores.best_score, EXCLUDED.best_score),
+         games_played   = breakout_scores.games_played + 1,
+         updated_at     = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, score, level, timeSecs]
+    );
+    const me = rows[0];
+
+    // Update user stats snapshot
+    await pool.query(
+      `UPDATE user_stats_snapshot
+         SET total_score = total_score + $2,
+             classics_played = classics_played + 1,
+             last_win_at = now(),
+             updated_at = now()
+       WHERE user_id = $1`,
+      [req.user.id, score]
+    );
+
+    // Create achievement if this is a personal best
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', 'bounce', $2, $3)`,
+        [req.user.id, score, JSON.stringify({ previousBest: prevBest })]
+      );
+    }
+
+    // Caller's current rank (1-based) by best_score, ties broken by who got
+    // there first — same ordering as the leaderboard query.
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM breakout_scores
+        WHERE best_score > $1
+           OR (best_score = $1 AND updated_at < $2)`,
+      [me.best_score, me.updated_at]
+    );
+    res.json({
+      bestScore: me.best_score,
+      rank: Number(rankRows[0].rank),
+      gamesPlayed: me.games_played,
+    });
+  } catch (err) {
+    console.error('[bounce] score failed:', err.message);
+    res.status(500).json({ error: 'Failed to record score' });
+  }
+});
+
+// Top scores plus the caller's own standing (even when outside the top N).
+app.get('/api/bounce/leaderboard', async (req, res) => {
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM breakout_scores
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $1`,
+      [BOUNCE_LB_LIMIT]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT username, best_score, updated_at FROM breakout_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM breakout_scores
+          WHERE best_score > $1
+             OR (best_score = $1 AND updated_at < $2)`,
+        [row.best_score, row.updated_at]
+      );
+      me = { rank: Number(rankRows[0].rank), username: row.username, bestScore: row.best_score };
+    }
+
+    res.json({ top: top.map(shapeBounceRow), me });
+  } catch (err) {
+    console.error('[bounce] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });

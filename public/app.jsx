@@ -1396,6 +1396,116 @@ body {
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
 
+/* ---- Snake ---- */
+.snake-board-wrap {
+  position: relative;
+  max-width: 360px;
+  margin: 0 auto;
+  aspect-ratio: 1;
+}
+.snake-grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  background: ${C.card};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 6px;
+  gap: 1px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.snake-cell {
+  border-radius: 2px;
+  background: ${C.bg};
+}
+.snake-cell.snake-body { background: ${C.emerald}; border-radius: 3px; }
+.snake-cell.snake-head { background: ${C.emerald}; border-radius: 4px; box-shadow: 0 0 8px ${C.emerald}aa; }
+.snake-cell.snake-food { background: ${C.gold}; border-radius: 50%; box-shadow: 0 0 8px ${C.gold}aa; }
+.snake-controls {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 360px;
+  margin: 0.8rem auto 0;
+}
+.snake-controls button {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.5rem 0.3rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: border-color 0.12s;
+  white-space: nowrap;
+}
+.snake-controls button:hover { border-color: ${C.accent}; }
+.snake-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(2, 56px);
+  gap: 0.4rem;
+  justify-content: center;
+  margin: 0.9rem auto 0;
+}
+.snake-dpad button {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+.snake-dpad button:active { background: ${C.accent}; border-color: ${C.accent}; }
+.snake-dpad .snake-dpad-up    { grid-column: 2; grid-row: 1; }
+.snake-dpad .snake-dpad-left  { grid-column: 1; grid-row: 2; }
+.snake-dpad .snake-dpad-down  { grid-column: 2; grid-row: 2; }
+.snake-dpad .snake-dpad-right { grid-column: 3; grid-row: 2; }
+.snake-start-overlay {
+  position: absolute;
+  inset: 0;
+  background: ${C.bg}cc;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  z-index: 5;
+  cursor: pointer;
+  color: ${C.text};
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1rem;
+}
+.snake-lb-list { overflow-y: auto; max-height: 60vh; padding: 0.5rem 0; }
+.snake-lb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom: 1px solid ${C.border};
+  padding: 0.55rem 0.3rem;
+  font-size: 0.85rem;
+}
+.snake-lb-row.snake-lb-me { background: ${C.accent}1a; border-radius: 8px; }
+.snake-lb-row .snake-lb-rank {
+  font-family: 'JetBrains Mono', monospace;
+  color: ${C.muted};
+  width: 2.2rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+.snake-lb-row .snake-lb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snake-lb-row .snake-lb-score { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; }
+.snake-lb-divider { text-align: center; color: ${C.muted}; padding: 0.4rem 0; font-size: 0.8rem; letter-spacing: 0.2em; }
+.snake-lb-empty { color: ${C.muted}; text-align: center; padding: 2rem 0; font-size: 0.9rem; }
+
 /* ---- Block Blast ---- */
 .bb-board-wrap {
   position: relative;
@@ -6316,6 +6426,371 @@ function IdleGame() {
 }
 
 /* ============================================================
+   Snake Xenzia helpers + component
+   ============================================================ */
+
+const SNAKE_GRID    = 17;          // square board, cells per side
+const SNAKE_BASE_MS = 140;         // tick interval at length 0
+const SNAKE_MIN_MS  = 70;          // floor for the speed-up curve
+const SNAKE_FOOD_PTS = 10;         // points per food eaten
+const SNAKE_BEST_KEY = 'puzzlechain_snake_best';
+
+// Tick interval shrinks as the snake grows — caps out at SNAKE_MIN_MS.
+function snakeTickMs(length) {
+  const ms = SNAKE_BASE_MS - (length - 3) * 4;
+  return Math.max(SNAKE_MIN_MS, ms);
+}
+
+function snakeLoadBest() {
+  try { return parseInt(localStorage.getItem(SNAKE_BEST_KEY) || '0', 10) || 0; } catch { return 0; }
+}
+function snakeSaveBest(v) {
+  try { localStorage.setItem(SNAKE_BEST_KEY, String(v)); } catch {}
+}
+
+const SNAKE_DIRS = {
+  up:    { dr: -1, dc: 0 },
+  down:  { dr: 1,  dc: 0 },
+  left:  { dr: 0,  dc: -1 },
+  right: { dr: 0,  dc: 1 },
+};
+function snakeOpposite(a, b) {
+  return (a === 'up' && b === 'down') || (a === 'down' && b === 'up') ||
+         (a === 'left' && b === 'right') || (a === 'right' && b === 'left');
+}
+
+// Pick a random cell not occupied by the snake. occupied is a Set of "r,c".
+function snakeSpawnFood(occupied) {
+  const free = [];
+  for (let r = 0; r < SNAKE_GRID; r++) {
+    for (let c = 0; c < SNAKE_GRID; c++) {
+      if (!occupied.has(r + ',' + c)) free.push({ r, c });
+    }
+  }
+  if (free.length === 0) return null; // board full — win-ish edge case
+  return free[Math.floor(Math.random() * free.length)];
+}
+
+function snakeShareText(score, length, secs) {
+  const m = String(Math.floor(secs / 60)).padStart(2, '0');
+  const s = String(secs % 60).padStart(2, '0');
+  return `Snake Xenzia 🐍 ${score} pts · length ${length} · ${m}:${s}`;
+}
+
+function SnakeGame({ onWin, onStepChange, resetKey }) {
+  const startSnake = [
+    { r: 8, c: 6 }, { r: 8, c: 5 }, { r: 8, c: 4 },
+  ];
+  const [snake, setSnake]   = useState(() => startSnake);
+  const [food, setFood]     = useState(() => snakeSpawnFood(new Set(startSnake.map(p => p.r + ',' + p.c))));
+  const [dir, setDir]       = useState('right');
+  const [score, setScore]   = useState(0);
+  const [elapsedSecs, setElapsedSecs] = useState(0);
+  const [started, setStarted] = useState(false);
+  const [done, setDone]     = useState(false);
+  const [activeTab, setActiveTab] = useState('game');
+  const [bestScore, setBestScore] = useState(() => snakeLoadBest());
+  const [isMock, setIsMock] = useState(false);
+
+  // Leaderboard tab state
+  const [lb, setLb]               = useState(null);   // { top: [...], me: {...} } or null
+  const [lbLoading, setLbLoading] = useState(false);
+  const [lbError, setLbError]     = useState(false);
+
+  // Refs so the movement tick always reads fresh state without re-arming.
+  const dirRef        = useRef('right');   // last *committed* direction
+  const queuedDirRef  = useRef('right');   // next direction to apply on tick
+  const snakeRef      = useRef(startSnake);
+  const foodRef       = useRef(food);
+  const scoreRef      = useRef(0);
+  const elapsedRef    = useRef(0);
+  const submittedRef  = useRef(false);
+  const touchStartRef = useRef(null);
+
+  snakeRef.current = snake;
+  foodRef.current  = food;
+  scoreRef.current = score;
+  elapsedRef.current = elapsedSecs;
+
+  const gameRunning = started && !done && activeTab === 'game';
+
+  useEffect(() => {
+    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
+      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
+    }
+  }, []);
+
+  // Elapsed-time clock (pauses when not actively playing).
+  useEffect(() => {
+    if (!gameRunning) return;
+    const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [gameRunning]);
+
+  // Movement tick — re-armed whenever speed (length) changes.
+  useEffect(() => {
+    if (!gameRunning) return;
+    const id = setInterval(() => step(), snakeTickMs(snakeRef.current.length));
+    return () => clearInterval(id);
+  }, [gameRunning, snake.length]);
+
+  useEffect(() => {
+    if (!resetKey) return;
+    handleNewGame();
+  }, [resetKey]);
+
+  const fmtSecs = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+
+  const handleNewGame = () => {
+    const fresh = [{ r: 8, c: 6 }, { r: 8, c: 5 }, { r: 8, c: 4 }];
+    dirRef.current = 'right';
+    queuedDirRef.current = 'right';
+    submittedRef.current = false;
+    setSnake(fresh);
+    setFood(snakeSpawnFood(new Set(fresh.map(p => p.r + ',' + p.c))));
+    setDir('right');
+    setScore(0);
+    setElapsedSecs(0);
+    setStarted(false);
+    setDone(false);
+  };
+
+  // Steer: queue a direction unless it reverses the committed heading.
+  const steer = (d) => {
+    if (done) return;
+    if (snakeOpposite(dirRef.current, d)) return;
+    queuedDirRef.current = d;
+    if (!started) { setStarted(true); }
+  };
+
+  const submitScore = async (finalScore, length, secs) => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setBestScore(prev => {
+      if (finalScore > prev) { snakeSaveBest(finalScore); return finalScore; }
+      return prev;
+    });
+    try {
+      await api('/api/snake/score', {
+        method: 'POST',
+        body: JSON.stringify({ score: finalScore, length, timeSecs: secs }),
+      });
+    } catch {}
+  };
+
+  const step = () => {
+    const d = queuedDirRef.current;
+    dirRef.current = d;
+    setDir(d);
+    const cur = snakeRef.current;
+    const { dr, dc } = SNAKE_DIRS[d];
+    const head = { r: cur[0].r + dr, c: cur[0].c + dc };
+
+    // Wall collision.
+    if (head.r < 0 || head.r >= SNAKE_GRID || head.c < 0 || head.c >= SNAKE_GRID) {
+      return endGame();
+    }
+    // Self collision — checking against the body that will remain. The tail
+    // cell vacates this tick (unless we're growing), so exclude it.
+    const f = foodRef.current;
+    const eating = f && head.r === f.r && head.c === f.c;
+    const bodyToCheck = eating ? cur : cur.slice(0, cur.length - 1);
+    if (bodyToCheck.some(p => p.r === head.r && p.c === head.c)) {
+      return endGame();
+    }
+
+    let newSnake;
+    if (eating) {
+      newSnake = [head, ...cur];
+      const newScore = scoreRef.current + SNAKE_FOOD_PTS;
+      setScore(newScore);
+      scoreRef.current = newScore;
+      const occupied = new Set(newSnake.map(p => p.r + ',' + p.c));
+      setFood(snakeSpawnFood(occupied));
+      onStepChange && onStepChange(newSnake.length);
+    } else {
+      newSnake = [head, ...cur.slice(0, cur.length - 1)];
+    }
+    snakeRef.current = newSnake;
+    setSnake(newSnake);
+  };
+
+  const endGame = () => {
+    setDone(true);
+    const length = snakeRef.current.length;
+    const finalScore = scoreRef.current;
+    const secs = elapsedRef.current;
+    submitScore(finalScore, length, secs);
+    onWin && onWin(finalScore, length, secs, { share: snakeShareText(finalScore, length, secs) });
+  };
+
+  // Keyboard — ref-to-latest-closure so the listener mounts once.
+  const steerRef = useRef(steer);
+  steerRef.current = steer;
+  useEffect(() => {
+    const handler = (e) => {
+      const map = {
+        ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+        w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right',
+      };
+      const dir2 = map[e.key];
+      if (dir2) { e.preventDefault(); steerRef.current(dir2); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const handleTouchStart = (e) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+  const handleTouchEnd = (e) => {
+    if (!touchStartRef.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartRef.current.x;
+    const dy = t.clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    steer(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  };
+
+  const loadLeaderboard = async () => {
+    setLbLoading(true);
+    setLbError(false);
+    const { ok, body } = await api('/api/snake/leaderboard');
+    if (ok && body) setLb(body);
+    else setLbError(true);
+    setLbLoading(false);
+  };
+
+  // Build a quick lookup of snake/food cells for rendering.
+  const headKey = snake.length ? snake[0].r + ',' + snake[0].c : null;
+  const bodyKeys = new Set(snake.map(p => p.r + ',' + p.c));
+  const foodKey = food ? food.r + ',' + food.c : null;
+
+  return (
+    <div>
+      {isMock && <div className="t2048-banner">Local best score — leaderboard syncs to your account when live</div>}
+
+      {activeTab === 'game' && (
+        <div>
+          <div className="status-bar">
+            <div className="pill">
+              <div className="plabel">Score</div>
+              <div className="pvalue mono">{score.toLocaleString()}</div>
+            </div>
+            <div className="pill">
+              <div className="plabel">Best</div>
+              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
+            </div>
+            <div className="pill">
+              <div className="plabel">Length</div>
+              <div className="pvalue">{snake.length}</div>
+            </div>
+            <div className="pill">
+              <div className="plabel">Time</div>
+              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
+            </div>
+          </div>
+
+          <div
+            className="snake-board-wrap"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div
+              className="snake-grid"
+              style={{ gridTemplateColumns: `repeat(${SNAKE_GRID}, 1fr)`, gridTemplateRows: `repeat(${SNAKE_GRID}, 1fr)` }}
+            >
+              {Array.from({ length: SNAKE_GRID * SNAKE_GRID }).map((_, i) => {
+                const r = Math.floor(i / SNAKE_GRID);
+                const c = i % SNAKE_GRID;
+                const key = r + ',' + c;
+                let cls = 'snake-cell';
+                if (key === foodKey) cls += ' snake-food';
+                else if (key === headKey) cls += ' snake-head';
+                else if (bodyKeys.has(key)) cls += ' snake-body';
+                return <div key={i} className={cls} />;
+              })}
+            </div>
+
+            {!started && !done && (
+              <div className="snake-start-overlay" onClick={() => steer('right')}>
+                <div style={{ fontSize: '2rem' }}>🐍</div>
+                <div>Swipe, tap a direction, or press an arrow / WASD key to start</div>
+              </div>
+            )}
+          </div>
+
+          <div className="snake-dpad">
+            <button className="snake-dpad-up"    onClick={() => steer('up')}    aria-label="Up">▲</button>
+            <button className="snake-dpad-left"  onClick={() => steer('left')}  aria-label="Left">◀</button>
+            <button className="snake-dpad-down"  onClick={() => steer('down')}  aria-label="Down">▼</button>
+            <button className="snake-dpad-right" onClick={() => steer('right')} aria-label="Right">▶</button>
+          </div>
+
+          <div className="snake-controls">
+            <button onClick={handleNewGame}>↺ New Game</button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'leaderboard' && (
+        <div>
+          {lbLoading && <div className="snake-lb-empty">Loading…</div>}
+          {!lbLoading && lbError && (
+            <div className="snake-lb-empty">Leaderboard unavailable — your score is still saved locally.</div>
+          )}
+          {!lbLoading && !lbError && lb && (
+            (() => {
+              const top = lb.top || [];
+              const me = lb.me || null;
+              const meInTop = me && top.some(row => row.rank === me.rank);
+              if (top.length === 0) {
+                return <div className="snake-lb-empty">No scores yet — be the first to play!</div>;
+              }
+              return (
+                <div className="snake-lb-list">
+                  {top.map(row => (
+                    <div key={row.rank} className={'snake-lb-row' + (me && row.rank === me.rank ? ' snake-lb-me' : '')}>
+                      <span className="snake-lb-rank">#{row.rank}</span>
+                      <span className="snake-lb-name">{row.username || 'anon'}</span>
+                      <span className="snake-lb-score">{Number(row.bestScore).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  {me && !meInTop && (
+                    <div>
+                      <div className="snake-lb-divider">···</div>
+                      <div className="snake-lb-row snake-lb-me">
+                        <span className="snake-lb-rank">#{me.rank}</span>
+                        <span className="snake-lb-name">{me.username || 'You'}</span>
+                        <span className="snake-lb-score">{Number(me.bestScore).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          )}
+        </div>
+      )}
+
+      <div className="t2048-bottom-nav">
+        {['game', 'leaderboard'].map(tab => (
+          <button
+            key={tab}
+            className={'t2048-tab' + (activeTab === tab ? ' active' : '')}
+            onClick={() => { setActiveTab(tab); if (tab === 'leaderboard') loadLeaderboard(); }}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -6389,6 +6864,16 @@ const GAMES = [
     tag: 'Puzzle',
     tagColor: C.violet,
     component: BlockBlastGame,
+  },
+  {
+    id: 'snake',
+    name: 'Snake',
+    icon: '🐍',
+    category: 'classic',
+    desc: 'Eat to grow — don\'t hit the walls or yourself. Climb the leaderboard.',
+    tag: 'Arcade',
+    tagColor: C.emerald,
+    component: SnakeGame,
   },
   {
     id: 'tilematching',

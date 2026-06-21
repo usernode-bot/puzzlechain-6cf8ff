@@ -130,6 +130,157 @@ async function migrate() {
     )
   `);
 
+  // users is PUBLIC: centralized user metadata. Lazy init on first API call.
+  // No sensitive data — just identity.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id             TEXT PRIMARY KEY,
+      username       TEXT NOT NULL UNIQUE,
+      usernode_pubkey TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // user_follows is PUBLIC: directional follow relationships.
+  // One row per (follower_id, followee_id) pair.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_follows (
+      follower_id    TEXT NOT NULL,
+      followee_id    TEXT NOT NULL,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY    (follower_id, followee_id)
+    )
+  `);
+
+  // user_stats_snapshot is PUBLIC: denormalized stats cache for fast profile
+  // rendering. Updated on win and daily resets. One row per user.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_stats_snapshot (
+      user_id        TEXT PRIMARY KEY,
+      username       TEXT,
+      total_score    INTEGER NOT NULL DEFAULT 0,
+      current_streak INTEGER NOT NULL DEFAULT 0,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      dailies_completed INTEGER NOT NULL DEFAULT 0,
+      classics_played   INTEGER NOT NULL DEFAULT 0,
+      last_win_at    TIMESTAMPTZ,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // user_achievements is PUBLIC: recent milestones and notable events.
+  // One row per achievement. Indexed for efficient friend-feed queries.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_achievements (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL,
+      type           TEXT NOT NULL,
+      game_id        TEXT,
+      score          INTEGER,
+      metadata       JSONB,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Create indices for social queries
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_follows_followee
+    ON user_follows(followee_id)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_stats_updated
+    ON user_stats_snapshot(updated_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_achievements_user_created
+    ON user_achievements(user_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_achievements_created
+    ON user_achievements(created_at DESC)
+  `);
+
+  // Staging seeds for social features: create demo users with follow
+  // relationships, stats, and achievements. Idempotent, no-op in production.
+  if (IS_STAGING) {
+    const demoUsers = [
+      { id: 'staging-demo-user', username: 'staging-demo-user' },
+      { id: 'staging-alice', username: 'staging-alice' },
+      { id: 'staging-bob', username: 'staging-bob' },
+      { id: 'staging-charlie', username: 'staging-charlie' },
+    ];
+
+    for (const u of demoUsers) {
+      await pool.query(
+        `INSERT INTO users (id, username)
+         VALUES ($1, $2)
+         ON CONFLICT (id) DO NOTHING`,
+        [u.id, u.username]
+      );
+    }
+
+    // Seed follow relationships: demo-user follows alice and bob,
+    // alice follows bob
+    const follows = [
+      ['staging-demo-user', 'staging-alice'],
+      ['staging-demo-user', 'staging-bob'],
+      ['staging-alice', 'staging-bob'],
+      ['staging-bob', 'staging-charlie'],
+    ];
+
+    for (const [follower, followee] of follows) {
+      await pool.query(
+        `INSERT INTO user_follows (follower_id, followee_id)
+         VALUES ($1, $2)
+         ON CONFLICT (follower_id, followee_id) DO NOTHING`,
+        [follower, followee]
+      );
+    }
+
+    // Seed stats for each demo user
+    const stats = [
+      ['staging-demo-user', 'staging-demo-user', 4850, 12, 45, 8, 37],
+      ['staging-alice', 'staging-alice', 3200, 7, 28, 5, 23],
+      ['staging-bob', 'staging-bob', 5600, 15, 52, 12, 40],
+      ['staging-charlie', 'staging-charlie', 1900, 3, 15, 2, 13],
+    ];
+
+    for (const [uid, uname, score, streak, games, dailies, classics] of stats) {
+      await pool.query(
+        `INSERT INTO user_stats_snapshot
+           (user_id, username, total_score, current_streak, games_played,
+            dailies_completed, classics_played, last_win_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now() - interval '2 hours')
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, score, streak, games, dailies, classics]
+      );
+    }
+
+    // Seed achievements for demo users
+    const achievements = [
+      ['staging-demo-user', 'personal_best', 'sudoku', 980, { previousBest: 850 }],
+      ['staging-demo-user', 'personal_best', 'wordhunt', 1120, { previousBest: 900 }],
+      ['staging-demo-user', 'streak_milestone', null, null, { streak: 10 }],
+      ['staging-alice', 'personal_best', 'sudoku', 750, { previousBest: 620 }],
+      ['staging-alice', 'personal_best', 'cryptowordle', 890, { previousBest: 700 }],
+      ['staging-bob', 'personal_best', 'sudoku', 1100, { previousBest: 1050 }],
+      ['staging-bob', 'streak_milestone', null, null, { streak: 15 }],
+      ['staging-bob', 'personal_best', 'wordhunt', 1350, { previousBest: 1200 }],
+      ['staging-charlie', 'personal_best', 'sudoku', 550, { previousBest: null }],
+    ];
+
+    for (const [uid, type, gameId, score, meta] of achievements) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata, created_at)
+         VALUES ($1, $2, $3, $4, $5, now() - interval '1 day')
+         ON CONFLICT DO NOTHING`,
+        [uid, type, gameId, score, JSON.stringify(meta)]
+      );
+    }
+  }
+
   // Staging seeds for mancala_rooms so testers can exercise all states
   // without needing a second device. Strictly a no-op in production.
   if (IS_STAGING) {
@@ -309,6 +460,25 @@ function shapeAttempt(row) {
 
 app.use(express.json());
 
+// ---- Social feature helpers -----------------------------------------------
+
+// Lazy init: ensure a user row exists, creating if needed.
+async function ensureUser(userId, username, usernode_pubkey) {
+  await pool.query(
+    `INSERT INTO users (id, username, usernode_pubkey)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO NOTHING`,
+    [userId, username, usernode_pubkey]
+  );
+  // Also ensure stats row exists
+  await pool.query(
+    `INSERT INTO user_stats_snapshot (user_id, username)
+     VALUES ($1, $2)
+     ON CONFLICT (user_id) DO NOTHING`,
+    [userId, username]
+  );
+}
+
 // Verify platform-issued JWT if one was passed, then enforce auth on
 // anything not explicitly marked public. The iframe adds `?token=…`
 // on load; the frontend script forwards the token via `x-usernode-token`
@@ -335,6 +505,162 @@ app.use((req, res, next) => {
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
+// ---- Social API ----------------------------------------------------------
+
+// GET /api/social/profile/:userId or /api/social/profile/:username
+// Returns public profile data
+app.get('/api/social/profile/:userIdOrName', async (req, res) => {
+  try {
+    const idOrName = req.params.userIdOrName;
+
+    // Try to find by ID first, then by username
+    let { rows: users } = await pool.query(
+      `SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+      [idOrName, idOrName]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const viewedUserId = users[0].id;
+
+    // Get user info and stats
+    const { rows: userRows } = await pool.query(
+      `SELECT u.id, u.username, u.created_at,
+              s.total_score, s.current_streak, s.games_played,
+              s.dailies_completed, s.classics_played, s.last_win_at
+       FROM users u
+       LEFT JOIN user_stats_snapshot s ON u.id = s.user_id
+       WHERE u.id = $1`,
+      [viewedUserId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRows[0];
+
+    // Check if signed-in user follows this user
+    let following = false;
+    if (req.user) {
+      const { rows: followRows } = await pool.query(
+        `SELECT 1 FROM user_follows WHERE follower_id = $1 AND followee_id = $2`,
+        [req.user.id, viewedUserId]
+      );
+      following = followRows.length > 0;
+    }
+
+    // Count followers and following
+    const { rows: followerRows } = await pool.query(
+      `SELECT COUNT(*) as count FROM user_follows WHERE followee_id = $1`,
+      [viewedUserId]
+    );
+    const followerCount = parseInt(followerRows[0].count);
+
+    const { rows: followingRows } = await pool.query(
+      `SELECT COUNT(*) as count FROM user_follows WHERE follower_id = $1`,
+      [viewedUserId]
+    );
+    const followingCount = parseInt(followingRows[0].count);
+
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.created_at,
+      },
+      stats: {
+        totalScore: user.total_score || 0,
+        currentStreak: user.current_streak || 0,
+        gamesPlayed: user.games_played || 0,
+        dailiesCompleted: user.dailies_completed || 0,
+        classicsPlayed: user.classics_played || 0,
+        lastWinAt: user.last_win_at,
+      },
+      following,
+      followerCount,
+      followingCount,
+    });
+  } catch (err) {
+    console.error('[social] profile failed:', err.message);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+// GET /api/social/friends
+// Returns the signed-in user's friend list
+app.get('/api/social/friends', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id, u.username, s.total_score, s.current_streak, s.last_win_at
+       FROM users u
+       LEFT JOIN user_stats_snapshot s ON u.id = s.user_id
+       WHERE u.id IN (
+         SELECT followee_id FROM user_follows WHERE follower_id = $1
+       )
+       ORDER BY u.username ASC`,
+      [req.user.id]
+    );
+
+    res.json({
+      friends: rows.map(r => ({
+        id: r.id,
+        username: r.username,
+        totalScore: r.total_score || 0,
+        currentStreak: r.current_streak || 0,
+        lastWinAt: r.last_win_at,
+      })),
+      count: rows.length,
+    });
+  } catch (err) {
+    console.error('[social] friends failed:', err.message);
+    res.status(500).json({ error: 'Failed to load friends' });
+  }
+});
+
+// POST /api/social/follow/:userId
+// Follow another user
+app.post('/api/social/follow/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  if (userId === req.user.id) {
+    return res.status(409).json({ error: 'Cannot follow yourself' });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO user_follows (follower_id, followee_id)
+       VALUES ($1, $2)
+       ON CONFLICT (follower_id, followee_id) DO NOTHING`,
+      [req.user.id, userId]
+    );
+    res.status(204).send();
+  } catch (err) {
+    console.error('[social] follow failed:', err.message);
+    res.status(500).json({ error: 'Failed to follow user' });
+  }
+});
+
+// DELETE /api/social/unfollow/:userId
+// Unfollow another user
+app.delete('/api/social/unfollow/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    await pool.query(
+      `DELETE FROM user_follows
+       WHERE follower_id = $1 AND followee_id = $2`,
+      [req.user.id, userId]
+    );
+    res.status(204).send();
+  } catch (err) {
+    console.error('[social] unfollow failed:', err.message);
+    res.status(500).json({ error: 'Failed to unfollow user' });
+  }
+});
+
 // ---- Daily attempts API --------------------------------------------------
 
 // Current UTC-day state for the signed-in user: which games are locked
@@ -342,6 +668,8 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // can drive a clock-skew-proof countdown.
 app.get('/api/daily', async (req, res) => {
   try {
+    // Lazy init: ensure user and stats rows exist
+    await ensureUser(req.user.id, req.user.username, req.user.usernode_pubkey);
     // Staging-only demo seed: gives the current viewer a finished attempt
     // for today so they immediately see the locked screen + countdown.
     // Idempotent, obviously fake (round score), strict no-op in production.
@@ -450,7 +778,7 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
 });
 
 // Record the result of today's attempt (score/steps/time). Only touches
-// today's already-claimed row.
+// today's already-claimed row. Also updates user stats and creates achievements.
 app.post('/api/daily/:gameId/finish', async (req, res) => {
   const { gameId } = req.params;
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
@@ -470,6 +798,38 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       // No claimed attempt today (client out of sync) — surface so it resyncs.
       return res.status(409).json({ error: 'No active attempt to finish' });
     }
+
+    // Update stats snapshot if this is a win (score > 0)
+    if (score && score > 0) {
+      await pool.query(
+        `UPDATE user_stats_snapshot
+           SET total_score = total_score + $2,
+               last_win_at = now(),
+               updated_at = now()
+         WHERE user_id = $1`,
+        [req.user.id, score]
+      );
+
+      // Check if this is a personal best for this game and create achievement
+      const { rows: bestRows } = await pool.query(
+        `SELECT MAX(score) as max_score FROM daily_attempts
+         WHERE user_id = $1 AND game_id = $2 AND score IS NOT NULL
+           AND finished_at IS NOT NULL`,
+        [req.user.id, gameId]
+      );
+
+      if (bestRows.length > 0) {
+        const prevBest = bestRows[0].max_score;
+        if (!prevBest || score > prevBest) {
+          await pool.query(
+            `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+             VALUES ($1, 'personal_best', $2, $3, $4)`,
+            [req.user.id, gameId, score, JSON.stringify({ previousBest: prevBest })]
+          );
+        }
+      }
+    }
+
     // Recompute the streak now that today is finished so the client can
     // reconcile its optimistic value without a full reload.
     const streak = await computeStreak(req.user.id);
@@ -986,12 +1346,20 @@ function shapeSnakeRow(row) {
 
 // Submit a finished run. Upserts the caller's personal-best row (GREATEST so a
 // worse run never lowers it) and bumps games_played. Identity from req.user.
+// Also updates user stats snapshot and creates achievements.
 app.post('/api/snake/score', async (req, res) => {
   const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
   const length = Number.isFinite(req.body.length) ? Math.round(req.body.length) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
   try {
+    // Get previous best before updating
+    const { rows: prevRows } = await pool.query(
+      `SELECT best_score FROM snake_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const prevBest = prevRows.length > 0 ? prevRows[0].best_score : null;
+
     // Update best_length/best_time_secs only when this run set a new best score.
     const { rows } = await pool.query(
       `INSERT INTO snake_scores
@@ -1010,6 +1378,27 @@ app.post('/api/snake/score', async (req, res) => {
       [req.user.id, req.user.username || null, score, length, timeSecs]
     );
     const me = rows[0];
+
+    // Update user stats snapshot
+    await pool.query(
+      `UPDATE user_stats_snapshot
+         SET total_score = total_score + $2,
+             classics_played = classics_played + 1,
+             last_win_at = now(),
+             updated_at = now()
+       WHERE user_id = $1`,
+      [req.user.id, score]
+    );
+
+    // Create achievement if this is a personal best
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', 'snake', $2, $3)`,
+        [req.user.id, score, JSON.stringify({ previousBest: prevBest })]
+      );
+    }
+
     // Caller's current rank (1-based) by best_score, ties broken by who got
     // there first — same ordering as the leaderboard query.
     const { rows: rankRows } = await pool.query(

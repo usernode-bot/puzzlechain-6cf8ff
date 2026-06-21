@@ -1395,7 +1395,635 @@ body {
 .t2048-keep-btn:hover   { opacity: 0.88; }
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
+
+/* ============================================================
+   Classic Games shared shell (.cg-*)
+   ============================================================ */
+.cg-shell {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: ${C.bg};
+  overflow: hidden;
+  overscroll-behavior: none;
+  z-index: 40;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  --cg-chrome: 3.6rem;
+  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem), 560px);
+}
+.cg-topbar {
+  flex: 0 0 auto;
+  height: var(--cg-chrome);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.7rem;
+  border-bottom: 1px solid ${C.border};
+  background: ${C.surface};
+}
+.cg-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: clamp(0.95rem, 3.5vw, 1.15rem);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cg-btn {
+  flex: 0 0 auto;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding: 0 0.6rem;
+  font-family: inherit;
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.cg-btn:hover { border-color: ${C.accent}; }
+.cg-btn:active { background: ${C.accent}22; }
+.cg-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 2vh, 1rem);
+  padding: clamp(0.5rem, 2vh, 1rem) 0.6rem;
+  overflow: hidden;
+}
+.cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
+.cg-statusbar {
+  display: flex;
+  gap: 0.5rem;
+  width: var(--cg-board);
+  max-width: 94vw;
+}
+.cg-stat {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+  min-width: 0;
+}
+.cg-stat .l { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.cg-stat .v { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: clamp(0.9rem, 3.5vw, 1.15rem); margin-top: 0.05rem; }
+
+/* Bottom sheet */
+.cg-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,14,26,0.6);
+  z-index: 45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.cg-sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+.cg-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 46;
+  background: ${C.surface};
+  border-top: 1px solid ${C.border};
+  border-radius: 18px 18px 0 0;
+  padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  max-height: 82dvh;
+  overflow-y: auto;
+  transform: translateY(110%);
+  transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.cg-sheet.open { transform: translateY(0); }
+.cg-sheet-handle { width: 2.5rem; height: 0.28rem; border-radius: 999px; background: ${C.dim}; margin: 0.35rem auto 0.8rem; }
+.cg-sheet-tabs { display: flex; gap: 0.35rem; margin-bottom: 0.8rem; }
+.cg-sheet-tab {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.muted};
+  border-radius: 10px;
+  padding: 0.5rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.cg-sheet-tab.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.cg-sheet h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.6rem; }
+.cg-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid ${C.border};
+}
+.cg-setting-row:last-child { border-bottom: none; }
+.cg-setting-row .name { font-size: 0.9rem; }
+.cg-toggle {
+  width: 2.8rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: ${C.dim};
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex: 0 0 auto;
+}
+.cg-toggle.on { background: ${C.emerald}; }
+.cg-toggle::after {
+  content: '';
+  position: absolute;
+  top: 0.18rem;
+  left: 0.18rem;
+  width: 1.14rem;
+  height: 1.14rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+.cg-toggle.on::after { transform: translateX(1.3rem); }
+.cg-sheet-list { max-height: 50dvh; overflow-y: auto; }
+.cg-sheet-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid ${C.border};
+  font-size: 0.82rem;
+}
+.cg-sheet-empty { color: ${C.muted}; text-align: center; padding: 1.5rem 0; font-size: 0.9rem; }
+.cg-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.cg-stat-card { background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px; padding: 0.7rem; text-align: center; }
+.cg-stat-card .val { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: ${C.gold}; }
+.cg-stat-card .lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: ${C.muted}; margin-top: 0.15rem; }
+.cg-rules { font-size: 0.86rem; line-height: 1.5; color: ${C.text}; }
+.cg-rules li { margin: 0.3rem 0 0.3rem 1rem; }
+.cg-sheet-action {
+  width: 100%;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.7rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+.cg-sheet-action:hover { border-color: ${C.accent}; }
+
+/* Keep existing classic boards fitting inside the shell stage */
+.cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
+.cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
+.cg-stage .ms-bottom-nav, .cg-stage .mnc-bottom-nav, .cg-stage .t2048-bottom-nav { display: none; }
+
+/* ---- Snake ---- */
+.snake-board {
+  width: var(--cg-board);
+  height: var(--cg-board);
+  max-width: 94vw;
+  max-height: 94vw;
+  display: grid;
+  background: ${C.surface};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none;
+  position: relative;
+}
+.snake-cell { width: 100%; height: 100%; }
+.snake-cell.body { background: ${C.emerald}; border-radius: 3px; }
+.snake-cell.head { background: ${C.accent}; border-radius: 4px; }
+.snake-cell.food { background: ${C.rose}; border-radius: 50%; transform: scale(0.8); }
+.snake-hint { color: ${C.muted}; font-size: 0.8rem; text-align: center; }
+
+/* ---- Block Blast ---- */
+.bb-grid {
+  width: var(--cg-board);
+  height: var(--cg-board);
+  max-width: 94vw;
+  max-height: 94vw;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  background: ${C.surface};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 4px;
+  touch-action: none;
+}
+.bb-cell { background: ${C.bg}; border-radius: 4px; aspect-ratio: 1; transition: background 0.1s ease; }
+.bb-cell.filled { background: ${C.accent}; }
+.bb-cell.preview { background: ${C.accent}66; }
+.bb-cell.invalid { background: ${C.rose}55; }
+.bb-tray {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  align-items: center;
+  width: var(--cg-board);
+  max-width: 94vw;
+  min-height: 5rem;
+}
+.bb-piece {
+  display: grid;
+  gap: 2px;
+  cursor: grab;
+  touch-action: none;
+  padding: 0.3rem;
+}
+.bb-piece.dragging { opacity: 0.3; }
+.bb-piece.used { opacity: 0; pointer-events: none; }
+.bb-pcell { width: clamp(0.7rem, 3.5vw, 1.1rem); height: clamp(0.7rem, 3.5vw, 1.1rem); border-radius: 3px; }
+.bb-pcell.on { background: ${C.accent}; }
+.bb-drag-ghost { position: fixed; z-index: 60; pointer-events: none; display: grid; gap: 2px; opacity: 0.9; }
+.bb-drag-ghost .bb-pcell.on { background: ${C.gold}; }
+
+/* ---- Tile Match ---- */
+.tm-grid {
+  width: var(--cg-board);
+  max-width: 94vw;
+  display: grid;
+  gap: clamp(3px, 1vw, 6px);
+  touch-action: manipulation;
+}
+.tm-tile {
+  aspect-ratio: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1rem, 5vw, 1.7rem);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease, background 0.1s ease, opacity 0.18s ease;
+}
+.tm-tile.sel { background: ${C.accent}44; border-color: ${C.accent}; transform: scale(0.92); }
+.tm-tile.gone { opacity: 0; pointer-events: none; }
+
+/* ---- Diamond Rush ---- */
+.dr-grid {
+  width: var(--cg-board);
+  height: var(--cg-board);
+  max-width: 94vw;
+  max-height: 94vw;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  background: ${C.surface};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 4px;
+  touch-action: none;
+}
+.dr-gem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.9rem, 4vw, 1.5rem);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  aspect-ratio: 1;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
+.dr-gem.clearing { opacity: 0; transform: scale(0.4); }
+
+/* ---- Texas Hold 'Em ---- */
+.th-felt {
+  width: var(--cg-board);
+  max-width: 94vw;
+  background: radial-gradient(ellipse at center, #155e3a, #0c3d26);
+  border: 2px solid ${C.gold}66;
+  border-radius: 18px;
+  padding: clamp(0.6rem, 2.5vw, 1.1rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.5rem, 2vh, 0.9rem);
+}
+.th-seat { text-align: center; }
+.th-seat .who { font-size: 0.72rem; color: #d6e8d6; letter-spacing: 0.04em; }
+.th-seat .chips { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: ${C.gold}; font-weight: 600; }
+.th-cards { display: flex; gap: 0.35rem; justify-content: center; }
+.th-card {
+  width: clamp(2rem, 9vw, 3rem);
+  height: clamp(2.8rem, 12.5vw, 4.2rem);
+  border-radius: 7px;
+  background: #fbfbfb;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: clamp(0.85rem, 4vw, 1.25rem);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  line-height: 1;
+}
+.th-card.red { color: ${C.rose}; }
+.th-card.back { background: repeating-linear-gradient(45deg, ${C.accent}, ${C.accent} 6px, ${C.border} 6px, ${C.border} 12px); color: transparent; }
+.th-pot { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; font-size: 0.95rem; }
+.th-msg { color: #d6e8d6; font-size: 0.82rem; min-height: 1.2rem; text-align: center; }
+.th-community { display: flex; gap: 0.3rem; min-height: clamp(2.8rem, 12.5vw, 4.2rem); align-items: center; }
+.th-actions {
+  display: flex;
+  gap: 0.5rem;
+  width: var(--cg-board);
+  max-width: 94vw;
+}
+.th-actions button {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.7rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.th-actions button:hover:not(:disabled) { border-color: ${C.gold}; }
+.th-actions button:disabled { opacity: 0.35; cursor: not-allowed; }
+.th-actions button.bet { background: ${C.gold}; color: #000; border-color: ${C.gold}; }
+.th-betsizer { display: flex; align-items: center; gap: 0.5rem; width: var(--cg-board); max-width: 94vw; }
+.th-betsizer input { flex: 1; }
+.th-betsizer .amt { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; min-width: 3rem; text-align: right; }
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
+  .cg-stage { flex-direction: row; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cg-sheet, .tm-tile, .dr-gem, .snake-cell { transition: none !important; }
+}
 `;
+
+/* ============================================================
+   Classic Games shared subsystems — prefs, sound, haptics, gestures
+   ============================================================ */
+const CG_SOUND_KEY   = 'puzzlechain_cg_sound';
+const CG_HAPTICS_KEY = 'puzzlechain_cg_haptics';
+const CG_MOTION_KEY  = 'puzzlechain_cg_motion';
+
+// Module-level prefs read by cgSound/cgHaptic without prop threading.
+const cgPrefs = {
+  sound:   (() => { try { return localStorage.getItem(CG_SOUND_KEY) !== '0'; } catch { return true; } })(),
+  haptics: (() => { try { return localStorage.getItem(CG_HAPTICS_KEY) !== '0'; } catch { return true; } })(),
+  motion:  (() => { try { return localStorage.getItem(CG_MOTION_KEY) === '1'; } catch { return false; } })(),
+};
+function cgSetPref(key, val) {
+  cgPrefs[key] = val;
+  try {
+    localStorage.setItem(
+      key === 'sound' ? CG_SOUND_KEY : key === 'haptics' ? CG_HAPTICS_KEY : CG_MOTION_KEY,
+      val ? '1' : '0'
+    );
+  } catch {}
+}
+
+let _cgAudioCtx = null;
+function cgAudio() {
+  if (_cgAudioCtx) return _cgAudioCtx;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) _cgAudioCtx = new AC();
+  } catch {}
+  return _cgAudioCtx;
+}
+// Short synthesized cues — no asset files needed.
+const CG_TONES = {
+  move:    { f: 320, d: 0.05, t: 'square',   g: 0.05 },
+  click:   { f: 440, d: 0.04, t: 'triangle', g: 0.05 },
+  merge:   { f: 540, d: 0.09, t: 'sine',     g: 0.07 },
+  clear:   { f: 660, d: 0.10, t: 'sine',     g: 0.08 },
+  capture: { f: 740, d: 0.12, t: 'triangle', g: 0.08 },
+  deal:    { f: 380, d: 0.05, t: 'square',   g: 0.05 },
+  chip:    { f: 500, d: 0.06, t: 'square',   g: 0.06 },
+  win:     { f: 784, d: 0.22, t: 'sine',     g: 0.09 },
+  lose:    { f: 150, d: 0.30, t: 'sawtooth', g: 0.08 },
+};
+function cgSound(name, pitch) {
+  if (!cgPrefs.sound) return;
+  const ctx = cgAudio();
+  if (!ctx) return;
+  try {
+    if (ctx.state === 'suspended') ctx.resume();
+    const spec = CG_TONES[name] || CG_TONES.click;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = spec.t;
+    osc.frequency.value = spec.f * (pitch || 1);
+    gain.gain.value = spec.g;
+    osc.connect(gain).connect(ctx.destination);
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(spec.g, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + spec.d);
+    osc.start(now);
+    osc.stop(now + spec.d + 0.02);
+  } catch {}
+}
+function cgHaptic(ms) {
+  if (!cgPrefs.haptics) return;
+  try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
+}
+
+// Discrete-gesture hook: tap / swipe / long-press / double-tap on an element.
+function useGestures(ref, handlers) {
+  const h = useRef(handlers);
+  h.current = handlers;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let startX = 0, startY = 0, startT = 0, lpTimer = null, lastTap = 0, moved = false;
+    const SWIPE = 30;
+    const clearLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+    const onDown = (e) => {
+      const p = e.touches ? e.touches[0] : e;
+      startX = p.clientX; startY = p.clientY; startT = Date.now(); moved = false;
+      clearLp();
+      if (h.current.onLongPress) {
+        lpTimer = setTimeout(() => {
+          if (!moved) { h.current.onLongPress({ x: startX, y: startY, target: e.target }); lpTimer = null; }
+        }, 480);
+      }
+    };
+    const onMove = (e) => {
+      const p = e.touches ? e.touches[0] : e;
+      if (Math.abs(p.clientX - startX) > 8 || Math.abs(p.clientY - startY) > 8) { moved = true; clearLp(); }
+    };
+    const onUp = (e) => {
+      clearLp();
+      const p = e.changedTouches ? e.changedTouches[0] : e;
+      const dx = p.clientX - startX, dy = p.clientY - startY;
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      if (Math.max(adx, ady) >= SWIPE) {
+        if (h.current.onSwipe) {
+          const dir = adx > ady ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+          h.current.onSwipe(dir, { x: startX, y: startY, target: e.target });
+        }
+        return;
+      }
+      // Treat as tap
+      const now = Date.now();
+      if (now - startT > 480) return; // was a long press
+      if (h.current.onDoubleTap && now - lastTap < 280) {
+        h.current.onDoubleTap({ x: startX, y: startY, target: e.target });
+        lastTap = 0;
+        return;
+      }
+      lastTap = now;
+      if (h.current.onTap) h.current.onTap({ x: startX, y: startY, target: e.target });
+    };
+    el.addEventListener('touchstart', onDown, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchend', onUp, { passive: true });
+    el.addEventListener('mousedown', onDown);
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('mouseup', onUp);
+    return () => {
+      clearLp();
+      el.removeEventListener('touchstart', onDown);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onUp);
+      el.removeEventListener('mousedown', onDown);
+      el.removeEventListener('mousemove', onMove);
+      el.removeEventListener('mouseup', onUp);
+    };
+  }, [ref]);
+}
+
+// Drag tracking for Block Blast pieces / Diamond Rush swaps.
+function pointerXY(e) {
+  const p = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+  return { x: p.clientX, y: p.clientY };
+}
+
+/* ============================================================
+   Classic Games shared shell component
+   ============================================================ */
+function CgToggle({ on, onClick }) {
+  return <button className={'cg-toggle' + (on ? ' on' : '')} onClick={onClick} aria-pressed={on} />;
+}
+
+function CgSettings({ tick }) {
+  const [, force] = useState(0);
+  const flip = (key) => { cgSetPref(key, !cgPrefs[key]); force(n => n + 1); };
+  return (
+    <div>
+      <h4>Settings</h4>
+      <div className="cg-setting-row"><span className="name">Sound</span><CgToggle on={cgPrefs.sound} onClick={() => flip('sound')} /></div>
+      <div className="cg-setting-row"><span className="name">Haptics</span><CgToggle on={cgPrefs.haptics} onClick={() => flip('haptics')} /></div>
+      <div className="cg-setting-row"><span className="name">Reduced motion</span><CgToggle on={cgPrefs.motion} onClick={() => flip('motion')} /></div>
+    </div>
+  );
+}
+
+// game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
+function ClassicShell({ game, onExit, onNewGame, sheetSections, children }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [, force] = useState(0);
+  const sections = [
+    ...(sheetSections || []),
+    { id: 'settings', label: 'Settings', render: () => <CgSettings /> },
+  ];
+  const [active, setActive] = useState(sections[0].id);
+  const open = (id) => { setActive(id || sections[0].id); setSheetOpen(true); cgSound('click'); };
+  const toggleSound = () => { cgSetPref('sound', !cgPrefs.sound); force(n => n + 1); if (cgPrefs.sound) cgSound('click'); };
+  const cur = sections.find(s => s.id === active) || sections[0];
+  return (
+    <div className="cg-shell">
+      <div className="cg-topbar">
+        <button className="cg-btn" onClick={onExit} title="Back to lobby" aria-label="Back">←</button>
+        <div className="cg-title"><span>{game.icon}</span> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{game.name}</span></div>
+        {onNewGame && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
+        <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
+        <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
+      </div>
+      {children}
+      <div className={'cg-sheet-backdrop' + (sheetOpen ? ' open' : '')} onClick={() => setSheetOpen(false)} />
+      <div className={'cg-sheet' + (sheetOpen ? ' open' : '')}>
+        <div className="cg-sheet-handle" />
+        {sections.length > 1 && (
+          <div className="cg-sheet-tabs">
+            {sections.map(s => (
+              <button key={s.id} className={'cg-sheet-tab' + (active === s.id ? ' active' : '')} onClick={() => setActive(s.id)}>{s.label}</button>
+            ))}
+          </div>
+        )}
+        {sheetOpen && cur.render()}
+      </div>
+    </div>
+  );
+}
+
+// Shared status-bar helper for new games.
+function CgStatus({ items }) {
+  return (
+    <div className="cg-statusbar">
+      {items.map((it, i) => (
+        <div className="cg-stat" key={i}><div className="l">{it.l}</div><div className="v">{it.v}</div></div>
+      ))}
+    </div>
+  );
+}
+
+// Generic history list + stats grid section builders for the sheet.
+function cgHistorySection(rows, renderRow) {
+  return {
+    id: 'history', label: 'History',
+    render: () => (
+      <div>
+        <h4>Recent games</h4>
+        {(!rows || rows.length === 0)
+          ? <div className="cg-sheet-empty">No games yet — play one!</div>
+          : <div className="cg-sheet-list">{rows.map((r, i) => <div className="cg-sheet-row" key={i}>{renderRow(r)}</div>)}</div>}
+      </div>
+    ),
+  };
+}
+function cgStatsSection(cards) {
+  return {
+    id: 'stats', label: 'Stats',
+    render: () => (
+      <div>
+        <h4>Stats</h4>
+        <div className="cg-stats-grid">
+          {cards.map((c, i) => <div className="cg-stat-card" key={i}><div className="val">{c.val}</div><div className="lbl">{c.lbl}</div></div>)}
+        </div>
+      </div>
+    ),
+  };
+}
+function cgRulesSection(items) {
+  return {
+    id: 'rules', label: 'How to play',
+    render: () => <div><h4>How to play</h4><ul className="cg-rules">{items.map((t, i) => <li key={i}>{t}</li>)}</ul></div>,
+  };
+}
 
 /* ============================================================
    Shared timer hook
@@ -4224,6 +4852,905 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   New Classic Games (Snake, Block Blast, Tile Match, Diamond Rush,
+   Texas Hold 'Em) — all self-wrap in ClassicShell.
+   ============================================================ */
+const SNAKE_KEY = 'puzzlechain_snake_history';
+const BB_KEY    = 'puzzlechain_blockblast_history';
+const TM_KEY    = 'puzzlechain_tilematch_history';
+const DR_KEY    = 'puzzlechain_diamondrush_history';
+const TH_KEY    = 'puzzlechain_texas_history';
+
+function cgLoadHistory(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } }
+function cgSaveHistory(key, entry) {
+  const h = cgLoadHistory(key);
+  h.unshift(entry);
+  const trimmed = h.slice(0, 30);
+  try { localStorage.setItem(key, JSON.stringify(trimmed)); } catch {}
+  return trimmed;
+}
+function cgFmt(s) { return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
+function useElapsed(resetKey, running) {
+  const [secs, setSecs] = useState(0);
+  const start = useRef(Date.now());
+  useEffect(() => { start.current = Date.now(); setSecs(0); }, [resetKey]);
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setSecs(Math.round((Date.now() - start.current) / 1000)), 500);
+    return () => clearInterval(id);
+  }, [running, resetKey]);
+  return secs;
+}
+
+/* ---------------- Snake ---------------- */
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const N = 15;
+  const [, render] = useState(0);
+  const [done, setDone] = useState(false);
+  const [score, setScore] = useState(0);
+  const [started, setStarted] = useState(false);
+  const st = useRef(null);
+  const doneRef = useRef(false);
+  const boardRef = useRef(null);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const randFood = (snake) => {
+    let c;
+    do { c = { x: Math.floor(Math.random() * N), y: Math.floor(Math.random() * N) }; }
+    while (snake.some(s => s.x === c.x && s.y === c.y));
+    return c;
+  };
+  const init = () => {
+    const m = Math.floor(N / 2);
+    const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
+    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: 200, eaten: 0 };
+    doneRef.current = false;
+    setDone(false); setScore(0); setStarted(false); render(n => n + 1);
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  const gameOver = () => {
+    if (doneRef.current) return;
+    doneRef.current = true; setDone(true);
+    cgSound('lose'); cgHaptic([20, 40, 20]);
+    const sc = st.current.eaten * 10;
+    cgSaveHistory(SNAKE_KEY, { score: sc, len: st.current.snake.length, ts: Date.now() });
+    onWin(sc, st.current.eaten, secsRef.current, { winnerLabel: 'Game Over', share: `🐍 Snake — ${sc} pts, length ${st.current.snake.length}` });
+  };
+  const step = () => {
+    const s = st.current;
+    if (!s || doneRef.current) return;
+    s.dir = s.nextDir;
+    const head = s.snake[0];
+    const nx = head.x + s.dir.x, ny = head.y + s.dir.y;
+    if (nx < 0 || ny < 0 || nx >= N || ny >= N ||
+        s.snake.some((seg, i) => i < s.snake.length - 1 && seg.x === nx && seg.y === ny)) {
+      gameOver(); return;
+    }
+    s.snake.unshift({ x: nx, y: ny });
+    if (nx === s.food.x && ny === s.food.y) {
+      s.eaten++; setScore(s.eaten * 10);
+      cgSound('clear', 1 + s.eaten * 0.02); cgHaptic(15);
+      s.food = randFood(s.snake);
+      s.speed = Math.max(80, 200 - s.eaten * 6);
+      onStepChange && onStepChange(s.eaten);
+    } else {
+      s.snake.pop();
+    }
+    render(n => n + 1);
+  };
+  useEffect(() => {
+    if (done || !started) return;
+    let raf, last = 0, alive = true;
+    const loop = (ts) => {
+      if (!alive) return;
+      const s = st.current;
+      if (s && ts - last >= s.speed) { last = ts; step(); }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { alive = false; cancelAnimationFrame(raf); };
+  }, [done, started, resetKey]);
+
+  const turn = (dir) => {
+    const s = st.current;
+    if (!s || doneRef.current) return;
+    const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+    const nd = map[dir]; if (!nd) return;
+    if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
+    s.nextDir = nd;
+    if (!started) setStarted(true);
+    cgSound('move');
+  };
+  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started) setStarted(true); } });
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
+      if (k) { e.preventDefault(); turn(k); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [started]);
+
+  const s = st.current;
+  const cells = [];
+  if (s) {
+    const occ = {};
+    s.snake.forEach((seg, i) => { occ[seg.y * N + seg.x] = i === 0 ? 'head' : 'body'; });
+    const fi = s.food.y * N + s.food.x;
+    for (let i = 0; i < N * N; i++) {
+      const o = occ[i];
+      cells.push(<div key={i} className={'snake-cell' + (o ? ' ' + o : '') + (i === fi ? ' food' : '')} />);
+    }
+  }
+  const hist = cgLoadHistory(SNAKE_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const longest = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">len {r.len}</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
+      { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
+    ]),
+    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!']),
+  ];
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
+          {cells}
+        </div>
+        <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
+      </div>
+    </ClassicShell>
+  );
+}
+
+/* ---------------- Block Blast ---------------- */
+const BB_SHAPES = [
+  [[0, 0]],
+  [[0, 0], [0, 1]], [[0, 0], [1, 0]],
+  [[0, 0], [0, 1], [0, 2]], [[0, 0], [1, 0], [2, 0]],
+  [[0, 0], [0, 1], [1, 0], [1, 1]],
+  [[0, 0], [0, 1], [1, 0]], [[0, 0], [0, 1], [1, 1]], [[0, 0], [1, 0], [1, 1]], [[0, 1], [1, 0], [1, 1]],
+  [[0, 0], [0, 1], [0, 2], [0, 3]], [[0, 0], [1, 0], [2, 0], [3, 0]],
+  [[0, 0], [0, 1], [0, 2], [1, 1]],
+  [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0]],
+];
+const BB_COLORS = [C.accent, C.emerald, C.gold, C.violet, C.rose];
+function bbRandPiece() {
+  const cells = BB_SHAPES[Math.floor(Math.random() * BB_SHAPES.length)];
+  return { cells, color: BB_COLORS[Math.floor(Math.random() * BB_COLORS.length)] };
+}
+function bbCanPlace(grid, cells, or, oc) {
+  return cells.every(([r, c]) => {
+    const rr = or + r, cc = oc + c;
+    return rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && !grid[rr * 8 + cc];
+  });
+}
+function bbCanPlaceAny(grid, tray) {
+  for (const p of tray) {
+    if (!p) continue;
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (bbCanPlace(grid, p.cells, r, c)) return true;
+  }
+  return false;
+}
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const [grid, setGrid] = useState(() => new Array(64).fill(null));
+  const [tray, setTray] = useState(() => [bbRandPiece(), bbRandPiece(), bbRandPiece()]);
+  const [score, setScore] = useState(0);
+  const [drag, setDrag] = useState(null); // { idx, cells, color, x, y }
+  const [done, setDone] = useState(false);
+  const doneRef = useRef(false);
+  const placedRef = useRef(0);
+  const linesRef = useRef(0);
+  const gridRef = useRef(null);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+  const scoreRef = useRef(0); scoreRef.current = score;
+
+  const init = () => {
+    setGrid(new Array(64).fill(null));
+    setTray([bbRandPiece(), bbRandPiece(), bbRandPiece()]);
+    setScore(0); setDone(false); setDrag(null);
+    doneRef.current = false; placedRef.current = 0; linesRef.current = 0;
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  const originFromPointer = (x, y, cells) => {
+    const el = gridRef.current; if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const cs = rect.width / 8;
+    const maxR = Math.max(...cells.map(c => c[0]));
+    const maxC = Math.max(...cells.map(c => c[1]));
+    let oc = Math.round((x - rect.left) / cs - (maxC + 1) / 2);
+    let or = Math.round((y - rect.top) / cs - (maxR + 1) / 2);
+    oc = Math.max(0, Math.min(7 - maxC, oc));
+    or = Math.max(0, Math.min(7 - maxR, or));
+    return { or, oc };
+  };
+  const commitDrop = (endX, endY) => {
+    setDrag(d => {
+      if (!d) return null;
+      const o = originFromPointer(endX, endY, d.cells);
+      if (o && bbCanPlace(grid, d.cells, o.or, o.oc)) {
+        place(d, o.or, o.oc);
+      }
+      return null;
+    });
+  };
+  const place = (piece, or, oc) => {
+    const g = grid.slice();
+    piece.cells.forEach(([r, c]) => { g[(or + r) * 8 + (oc + c)] = piece.color; });
+    // find full rows/cols
+    const fullRows = [], fullCols = [];
+    for (let r = 0; r < 8; r++) if ([0,1,2,3,4,5,6,7].every(c => g[r * 8 + c])) fullRows.push(r);
+    for (let c = 0; c < 8; c++) if ([0,1,2,3,4,5,6,7].every(r => g[r * 8 + c])) fullCols.push(c);
+    const lines = fullRows.length + fullCols.length;
+    fullRows.forEach(r => { for (let c = 0; c < 8; c++) g[r * 8 + c] = null; });
+    fullCols.forEach(c => { for (let r = 0; r < 8; r++) g[r * 8 + c] = null; });
+    const gain = piece.cells.length + (lines > 0 ? lines * 10 + (lines - 1) * 10 : 0);
+    placedRef.current++; linesRef.current += lines;
+    cgSound(lines > 0 ? 'clear' : 'move'); cgHaptic(lines > 0 ? 25 : 10);
+    setScore(s => s + gain);
+    onStepChange && onStepChange(placedRef.current);
+    // consume tray slot
+    let nt = tray.slice();
+    if (piece.idx != null) nt[piece.idx] = null;
+    if (nt.every(p => !p)) nt = [bbRandPiece(), bbRandPiece(), bbRandPiece()];
+    setGrid(g);
+    setTray(nt);
+    // game-over check next frame
+    setTimeout(() => {
+      if (doneRef.current) return;
+      if (!bbCanPlaceAny(g, nt)) {
+        doneRef.current = true; setDone(true);
+        cgSound('lose'); cgHaptic([20, 40]);
+        const sc = scoreRef.current;
+        cgSaveHistory(BB_KEY, { score: sc, lines: linesRef.current, ts: Date.now() });
+        onWin(sc, placedRef.current, secsRef.current, { winnerLabel: 'Game Over', share: `🧱 Block Blast — ${sc} pts` });
+      }
+    }, 0);
+  };
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e) => { if (e.cancelable) e.preventDefault(); const { x, y } = pointerXY(e); setDrag(d => d && { ...d, x, y }); };
+    const up = (e) => { const { x, y } = pointerXY(e); commitDrop(x, y); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', up);
+    };
+  }, [drag, grid, tray]);
+
+  const startDrag = (e, idx) => {
+    if (done || !tray[idx]) return;
+    if (e.cancelable) e.preventDefault();
+    const { x, y } = pointerXY(e);
+    cgSound('click');
+    setDrag({ idx, cells: tray[idx].cells, color: tray[idx].color, x, y });
+  };
+  // preview cells
+  let preview = null;
+  if (drag) {
+    const o = originFromPointer(drag.x, drag.y, drag.cells);
+    if (o) {
+      const ok = bbCanPlace(grid, drag.cells, o.or, o.oc);
+      preview = {};
+      drag.cells.forEach(([r, c]) => { preview[(o.or + r) * 8 + (o.oc + c)] = ok ? 'preview' : 'invalid'; });
+    }
+  }
+  const hist = cgLoadHistory(BB_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.lines} lines</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
+      { val: linesRef.current, lbl: 'Lines (run)' }, { val: score, lbl: 'This run' },
+    ]),
+    cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
+  ];
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="bb-grid" ref={gridRef}>
+          {grid.map((cell, i) => {
+            const pv = preview && preview[i];
+            return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
+              style={cell ? { background: cell } : undefined} />;
+          })}
+        </div>
+        <div className="bb-tray">
+          {tray.map((p, idx) => (
+            <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
+              style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
+              onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
+              {p && (() => {
+                const maxR = Math.max(...p.cells.map(c => c[0]));
+                const maxC = Math.max(...p.cells.map(c => c[1]));
+                const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
+                const out = [];
+                for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
+                  const on = set.has(r * 10 + c);
+                  out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
+                }
+                return out;
+              })()}
+            </div>
+          ))}
+        </div>
+      </div>
+      {drag && (
+        <div className="bb-drag-ghost" style={{
+          left: drag.x, top: drag.y - 40,
+          transform: 'translate(-50%, -50%)',
+          gridTemplateColumns: `repeat(${Math.max(...drag.cells.map(c => c[1])) + 1}, 1.1rem)`,
+        }}>
+          {(() => {
+            const maxR = Math.max(...drag.cells.map(c => c[0]));
+            const maxC = Math.max(...drag.cells.map(c => c[1]));
+            const set = new Set(drag.cells.map(([r, c]) => r * 10 + c));
+            const out = [];
+            for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
+              const on = set.has(r * 10 + c);
+              out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: drag.color, width: '1.1rem', height: '1.1rem' } : { width: '1.1rem', height: '1.1rem', background: 'transparent' }} />);
+            }
+            return out;
+          })()}
+        </div>
+      )}
+    </ClassicShell>
+  );
+}
+
+/* ---------------- Tile Match ---------------- */
+const TM_ICONS = ['🍎', '🍋', '🍇', '🍑', '🍓', '🥝', '🍒', '🥥', '🍍', '🫐', '🥭', '🍐'];
+function tmDeal(pairs) {
+  const deck = [];
+  for (let i = 0; i < pairs; i++) { const ic = TM_ICONS[i % TM_ICONS.length]; deck.push(ic, ic); }
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  return deck.map((icon, id) => ({ id, icon, gone: false }));
+}
+function TileMatchGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+  const COLS = 4, ROWS = 6;
+  const PAIRS = (COLS * ROWS) / 2;
+  const [tiles, setTiles] = useState(() => tmDeal(PAIRS));
+  const [sel, setSel] = useState(-1);
+  const [moves, setMoves] = useState(PAIRS + 6);
+  const [matched, setMatched] = useState(0);
+  const [done, setDone] = useState(false);
+  const doneRef = useRef(false);
+  const lockRef = useRef(false);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const init = () => {
+    setTiles(tmDeal(PAIRS)); setSel(-1); setMoves(PAIRS + 6); setMatched(0);
+    setDone(false); doneRef.current = false; lockRef.current = false;
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  const finishWin = (m) => {
+    doneRef.current = true; setDone(true);
+    cgSound('win'); cgHaptic([15, 30, 15]);
+    const sc = PAIRS * 100 + m * 25;
+    cgSaveHistory(TM_KEY, { score: sc, win: true, secs: secsRef.current, ts: Date.now() });
+    onWin(sc, PAIRS + 6 - m, secsRef.current, { share: `🀄 Tile Match cleared in ${cgFmt(secsRef.current)}` });
+  };
+  const finishLose = () => {
+    doneRef.current = true; setDone(true);
+    cgSound('lose'); cgHaptic([20, 40]);
+    cgSaveHistory(TM_KEY, { score: 0, win: false, secs: secsRef.current, ts: Date.now() });
+    onLose(PAIRS + 6, secsRef.current, { share: `🀄 Tile Match — ran out of moves` });
+  };
+  const tap = (idx) => {
+    if (done || lockRef.current) return;
+    const t = tiles[idx];
+    if (!t || t.gone) return;
+    if (sel === idx) { setSel(-1); return; }
+    if (sel === -1) { setSel(idx); cgSound('click'); return; }
+    // second pick
+    const a = tiles[sel];
+    if (a.icon === t.icon) {
+      const nt = tiles.slice();
+      nt[sel] = { ...a, gone: true }; nt[idx] = { ...t, gone: true };
+      setTiles(nt); setSel(-1);
+      const m = matched + 1; setMatched(m);
+      cgSound('clear'); cgHaptic(18);
+      onStepChange && onStepChange(m);
+      if (m === PAIRS) finishWin(moves);
+    } else {
+      setSel(-1);
+      const mv = moves - 1; setMoves(mv);
+      cgSound('move');
+      if (mv <= 0) { lockRef.current = true; setTimeout(finishLose, 250); }
+    }
+  };
+  const shuffle = () => {
+    const remaining = tiles.filter(t => !t.gone);
+    const icons = remaining.map(t => t.icon);
+    for (let i = icons.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [icons[i], icons[j]] = [icons[j], icons[i]]; }
+    let k = 0;
+    setTiles(tiles.map(t => t.gone ? t : { ...t, icon: icons[k++] }));
+    setSel(-1); cgSound('click');
+  };
+  const hist = cgLoadHistory(TM_KEY);
+  const wins = hist.filter(r => r.win).length;
+  const bestTime = hist.filter(r => r.win).reduce((m, r) => m === 0 ? r.secs : Math.min(m, r.secs), 0);
+  const sheet = [
+    { id: 'shuffle', label: 'Shuffle', render: () => <div><h4>Stuck?</h4><p style={{ color: C.muted, fontSize: '0.85rem', margin: '0.4rem 0 0.6rem' }}>Reshuffle the remaining tiles (free).</p><button className="cg-sheet-action" onClick={shuffle}>🔀 Shuffle tiles</button></div> },
+    cgHistorySection(hist, r => <><span>{r.win ? '✅ Cleared' : '❌ Out of moves'}</span><span className="mono">{r.win ? cgFmt(r.secs) : '—'}</span></>),
+    cgStatsSection([
+      { val: wins, lbl: 'Cleared' }, { val: hist.length, lbl: 'Games' },
+      { val: bestTime ? cgFmt(bestTime) : '—', lbl: 'Best time' }, { val: matched, lbl: 'This game' },
+    ]),
+    cgRulesSection(['Tap a tile, then tap another with the same icon to clear the pair.', 'Clear the whole board before you run out of moves.', 'A wrong pair costs a move.', 'Use Shuffle from the menu if you get stuck.']),
+  ];
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Pairs', v: `${matched}/${PAIRS}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="tm-grid" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
+          {tiles.map((t, i) => (
+            <div key={t.id} className={'tm-tile' + (t.gone ? ' gone' : '') + (sel === i ? ' sel' : '')} onClick={() => tap(i)}>
+              {t.gone ? '' : t.icon}
+            </div>
+          ))}
+        </div>
+      </div>
+    </ClassicShell>
+  );
+}
+
+/* ---------------- Diamond Rush ---------------- */
+const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵'];
+function drMake() {
+  const g = new Array(64);
+  for (let i = 0; i < 64; i++) {
+    let v;
+    do { v = Math.floor(Math.random() * 6); }
+    while (
+      (i % 8 >= 2 && g[i - 1] === v && g[i - 2] === v) ||
+      (i >= 16 && g[i - 8] === v && g[i - 16] === v)
+    );
+    g[i] = v;
+  }
+  return g;
+}
+function drFindMatches(g) {
+  const m = new Set();
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 6; c++) {
+    const i = r * 8 + c, v = g[i];
+    if (v != null && g[i + 1] === v && g[i + 2] === v) { m.add(i); m.add(i + 1); m.add(i + 2); }
+  }
+  for (let c = 0; c < 8; c++) for (let r = 0; r < 6; r++) {
+    const i = r * 8 + c, v = g[i];
+    if (v != null && g[i + 8] === v && g[i + 16] === v) { m.add(i); m.add(i + 8); m.add(i + 16); }
+  }
+  return m;
+}
+function drResolve(grid) {
+  let g = grid.slice();
+  let total = 0, cascades = 0, maxClear = 0;
+  while (true) {
+    const m = drFindMatches(g);
+    if (!m.size) break;
+    cascades++;
+    maxClear = Math.max(maxClear, m.size);
+    total += m.size * 10 * cascades;
+    m.forEach(i => { g[i] = null; });
+    for (let c = 0; c < 8; c++) {
+      const col = [];
+      for (let r = 7; r >= 0; r--) { const v = g[r * 8 + c]; if (v != null) col.push(v); }
+      for (let r = 7; r >= 0; r--) {
+        const idx = (7 - r);
+        g[r * 8 + c] = idx < col.length ? col[idx] : Math.floor(Math.random() * 6);
+      }
+    }
+  }
+  return { grid: g, total, cascades, maxClear };
+}
+function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+  const TARGET = 800, START_MOVES = 18;
+  const [grid, setGrid] = useState(() => drMake());
+  const [sel, setSel] = useState(-1);
+  const [moves, setMoves] = useState(START_MOVES);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const doneRef = useRef(false);
+  const bestCascadeRef = useRef(0);
+  const touch = useRef(null);
+  const secs = useElapsed(resetKey, !done);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const init = () => {
+    setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0);
+    setDone(false); doneRef.current = false; bestCascadeRef.current = 0;
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  const finish = (sc, win, mv) => {
+    doneRef.current = true; setDone(true);
+    cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
+    cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, ts: Date.now() });
+    if (win) onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
+    else onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+  };
+  const adjacent = (a, b) => {
+    const ar = Math.floor(a / 8), ac = a % 8, br = Math.floor(b / 8), bc = b % 8;
+    return Math.abs(ar - br) + Math.abs(ac - bc) === 1;
+  };
+  const trySwap = (a, b) => {
+    if (done || a === b || !adjacent(a, b)) { setSel(-1); return; }
+    const g = grid.slice();
+    [g[a], g[b]] = [g[b], g[a]];
+    if (!drFindMatches(g).size) { cgSound('move'); setSel(-1); return; } // no match, revert
+    const res = drResolve(g);
+    bestCascadeRef.current = Math.max(bestCascadeRef.current, res.cascades);
+    cgSound('clear', 1 + res.cascades * 0.12); cgHaptic(20);
+    const ns = score + res.total;
+    const nm = moves - 1;
+    setGrid(res.grid); setScore(ns); setMoves(nm); setSel(-1);
+    onStepChange && onStepChange(START_MOVES - nm);
+    if (ns >= TARGET) { setTimeout(() => finish(ns, true, nm), 150); }
+    else if (nm <= 0) { setTimeout(() => finish(ns, false, nm), 150); }
+  };
+  const onGemDown = (e, i) => { const p = pointerXY(e); touch.current = { i, x: p.x, y: p.y }; };
+  const onGemUp = (e, i) => {
+    const start = touch.current; touch.current = null;
+    if (!start) { return; }
+    const p = pointerXY(e);
+    const dx = p.x - start.x, dy = p.y - start.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
+      // swipe from start.i toward neighbor
+      const r = Math.floor(start.i / 8), c = start.i % 8;
+      let nr = r, nc = c;
+      if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
+      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
+      else setSel(-1);
+      return;
+    }
+    // tap
+    if (sel === -1) { setSel(start.i); cgSound('click'); }
+    else if (sel === start.i) { setSel(-1); }
+    else trySwap(sel, start.i);
+  };
+  const hist = cgLoadHistory(DR_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const wins = hist.filter(r => r.win).length;
+  const bigC = hist.reduce((m, r) => Math.max(m, r.cascade || 0), 0);
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.win ? '✅' : '❌'} {r.score} pts</span><span className="mono">x{r.cascade}</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
+      { val: bigC, lbl: 'Best cascade' }, { val: score, lbl: 'This round' },
+    ]),
+    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.']),
+  ];
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="dr-grid">
+          {grid.map((v, i) => (
+            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '')}
+              onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
+              onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
+              {DR_GEMS[v]}
+            </div>
+          ))}
+        </div>
+      </div>
+    </ClassicShell>
+  );
+}
+
+/* ---------------- Texas Hold 'Em ---------------- */
+const TH_SUITS = ['♠', '♥', '♦', '♣'];
+const TH_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+function thDeck() {
+  const d = [];
+  for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) d.push({ r: r + 2, s });
+  for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+  return d;
+}
+function thScore5(cards) {
+  const ranks = cards.map(c => c.r).sort((a, b) => b - a);
+  const suits = cards.map(c => c.s);
+  const flush = suits.every(s => s === suits[0]);
+  const uniq = [...new Set(ranks)];
+  let straightHigh = 0;
+  if (uniq.length === 5) {
+    if (uniq[0] - uniq[4] === 4) straightHigh = uniq[0];
+    else if (uniq[0] === 14 && uniq[1] === 5 && uniq[4] === 2) straightHigh = 5; // wheel
+  }
+  const counts = {};
+  ranks.forEach(r => { counts[r] = (counts[r] || 0) + 1; });
+  const groups = Object.entries(counts).map(([r, n]) => [n, +r]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+  const kick = groups.map(g => g[1]);
+  let cat;
+  if (straightHigh && flush) cat = 8;
+  else if (groups[0][0] === 4) cat = 7;
+  else if (groups[0][0] === 3 && groups[1][0] === 2) cat = 6;
+  else if (flush) cat = 5;
+  else if (straightHigh) cat = 4;
+  else if (groups[0][0] === 3) cat = 3;
+  else if (groups[0][0] === 2 && groups[1][0] === 2) cat = 2;
+  else if (groups[0][0] === 2) cat = 1;
+  else cat = 0;
+  const order = (cat === 4 || cat === 8) ? [straightHigh, 0, 0, 0, 0] : kick;
+  let v = cat;
+  for (let i = 0; i < 5; i++) v = v * 15 + (order[i] || 0);
+  return v;
+}
+function thBest(cards) {
+  if (cards.length < 5) return 0;
+  let best = 0;
+  const n = cards.length;
+  for (let a = 0; a < n - 4; a++) for (let b = a + 1; b < n - 3; b++) for (let c = b + 1; c < n - 2; c++)
+    for (let d = c + 1; d < n - 1; d++) for (let e = d + 1; e < n; e++) {
+      const v = thScore5([cards[a], cards[b], cards[c], cards[d], cards[e]]);
+      if (v > best) best = v;
+    }
+  return best;
+}
+const TH_CATS = ['High card', 'Pair', 'Two pair', 'Three of a kind', 'Straight', 'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
+function thCatName(v) { let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15); return TH_CATS[cat] || ''; }
+function thHandStrength(hole, board) {
+  if (board.length >= 3) {
+    const v = thBest([...hole, ...board]);
+    let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15);
+    return Math.min(1, cat / 6 + (hole[0].r + hole[1].r) / 200);
+  }
+  // preflop heuristic
+  const [a, b] = hole;
+  let s = (a.r + b.r) / 40;
+  if (a.r === b.r) s += 0.35;
+  if (a.s === b.s) s += 0.08;
+  if (Math.abs(a.r - b.r) === 1) s += 0.05;
+  return Math.min(0.95, s);
+}
+function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+  const START = 200, BB = 10;
+  const [state, setState] = useState(null);
+  const [betOpen, setBetOpen] = useState(false);
+  const [betAmt, setBetAmt] = useState(BB);
+  const doneRef = useRef(false);
+  const handsRef = useRef(0);
+  const bigPotRef = useRef(0);
+  const secsRef = useRef(0);
+  const [done, setDone] = useState(false);
+  const secs = useElapsed(resetKey, !done);
+  secsRef.current = secs;
+
+  const newHand = (pc, ac, dealerIsPlayer) => {
+    const deck = thDeck();
+    const player = [deck.pop(), deck.pop()];
+    const ai = [deck.pop(), deck.pop()];
+    // simple blinds: dealer posts SB(BB/2), other posts BB
+    const sb = BB / 2;
+    let playerBet = dealerIsPlayer ? sb : BB;
+    let aiBet = dealerIsPlayer ? BB : sb;
+    playerBet = Math.min(playerBet, pc); aiBet = Math.min(aiBet, ac);
+    return {
+      deck, player, ai, board: [],
+      pot: 0, pc: pc - playerBet, ac: ac - aiBet,
+      playerBet, aiBet, street: 0,
+      toAct: dealerIsPlayer ? 'player' : 'ai', // dealer/SB acts first preflop
+      dealerIsPlayer, msg: 'Your move', reveal: false, phase: 'betting',
+    };
+  };
+  const init = () => {
+    handsRef.current = 0; doneRef.current = false; setDone(false);
+    setState(newHand(START, START, true));
+    setBetOpen(false); setBetAmt(BB);
+  };
+  useEffect(() => { init(); }, [resetKey]);
+
+  // AI acts when it's their turn
+  useEffect(() => {
+    if (!state || state.phase !== 'betting' || state.toAct !== 'ai' || done) return;
+    const t = setTimeout(() => aiAct(), 700);
+    return () => clearTimeout(t);
+  }, [state, done]);
+
+  const dealNext = (s) => {
+    const d = s.deck.slice();
+    const board = s.board.slice();
+    if (s.street === 0) { board.push(d.pop(), d.pop(), d.pop()); }
+    else { board.push(d.pop()); }
+    return { ...s, deck: d, board, street: s.street + 1 };
+  };
+  const showdown = (s) => {
+    const pv = thBest([...s.player, ...s.board]);
+    const av = thBest([...s.ai, ...s.board]);
+    let pc = s.pc, ac = s.ac, msg;
+    if (pv > av) { pc += s.pot; msg = `You win ${s.pot} with ${thCatName(pv)}`; cgSound('win'); }
+    else if (av > pv) { ac += s.pot; msg = `Opponent wins with ${thCatName(av)}`; cgSound('lose'); }
+    else { pc += Math.floor(s.pot / 2); ac += Math.ceil(s.pot / 2); msg = `Split pot (${thCatName(pv)})`; }
+    bigPotRef.current = Math.max(bigPotRef.current, s.pot);
+    return { ...s, pc, ac, msg, reveal: true, phase: 'handover' };
+  };
+  const advanceStreet = (s) => {
+    const pot = s.pot + s.playerBet + s.aiBet;
+    let ns = { ...s, pot, playerBet: 0, aiBet: 0, _pAct: false, _aAct: false };
+    if (s.street >= 4) return showdown(ns);
+    ns = dealNext(ns);
+    ns.toAct = ns.dealerIsPlayer ? 'ai' : 'player'; // non-dealer acts first post-flop
+    ns.msg = ns.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
+    return ns;
+  };
+  const endFold = (s, who) => {
+    const pot = s.pot + s.playerBet + s.aiBet;
+    let pc = s.pc, ac = s.ac, msg;
+    if (who === 'ai') { pc += pot; msg = `Opponent folds — you win ${pot}`; cgSound('chip'); }
+    else { ac += pot; msg = `You fold — opponent wins ${pot}`; }
+    bigPotRef.current = Math.max(bigPotRef.current, pot);
+    return { ...s, pc, ac, pot, playerBet: 0, aiBet: 0, msg, reveal: who !== 'player', phase: 'handover' };
+  };
+  // Unified heads-up round resolution: a betting round closes when bets are
+  // equal AND the other player has already acted since the last aggression.
+  const resolve = (s, actorIsPlayer) => {
+    const equal = s.playerBet === s.aiBet;
+    const otherActed = actorIsPlayer ? s._aAct : s._pAct;
+    if (equal && otherActed) return advanceStreet(s);
+    s.toAct = actorIsPlayer ? 'ai' : 'player';
+    s.msg = s.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
+    return s;
+  };
+  const playerAction = (action, amount) => {
+    if (!state || state.toAct !== 'player' || state.phase !== 'betting') return;
+    let s = { ...state };
+    const toCall = s.aiBet - s.playerBet;
+    if (action === 'fold') { const ns = endFold(s, 'player'); setState(ns); setTimeout(() => checkMatch(ns), 0); return; }
+    if (action === 'check') {
+      if (toCall > 0) return;
+      s._pAct = true; cgSound('chip');
+      setState(resolve(s, true)); return;
+    }
+    if (action === 'call') {
+      const pay = Math.min(toCall, s.pc);
+      s.pc -= pay; s.playerBet += pay; s._pAct = true; cgSound('chip');
+      setState(resolve(s, true)); return;
+    }
+    if (action === 'bet') {
+      const minAdd = Math.min(toCall > 0 ? toCall + BB : BB, s.pc);
+      let add = Math.min(Math.max(amount || BB, minAdd), s.pc);
+      s.pc -= add; s.playerBet += add; s._pAct = true; s._aAct = false;
+      cgSound('chip'); cgHaptic(12); setBetOpen(false);
+      setState(resolve(s, true)); return;
+    }
+  };
+  const aiAct = () => {
+    setState(prev => {
+      if (!prev || prev.toAct !== 'ai' || prev.phase !== 'betting') return prev;
+      let s = { ...prev };
+      const toCall = s.playerBet - s.aiBet;
+      const strength = thHandStrength(s.ai, s.board);
+      const r = Math.random();
+      if (toCall > 0) {
+        const potOdds = toCall / (s.pot + s.playerBet + s.aiBet + toCall);
+        if (strength < 0.25 && potOdds > 0.18 && r > 0.2) { const ns = endFold(s, 'ai'); setTimeout(() => checkMatch(ns), 0); return ns; }
+        if (strength > 0.7 && s.ac > toCall + BB && r > 0.55) {
+          const add = Math.min(toCall + BB * 2, s.ac);
+          s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
+          return resolve(s, false);
+        }
+        const pay = Math.min(toCall, s.ac);
+        s.ac -= pay; s.aiBet += pay; s._aAct = true; cgSound('chip');
+        return resolve(s, false);
+      }
+      if (strength > 0.6 && r > 0.5 && s.ac > BB) {
+        const add = Math.min(BB * 2, s.ac);
+        s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
+        return resolve(s, false);
+      }
+      s._aAct = true; cgSound('chip');
+      return resolve(s, false);
+    });
+  };
+  const checkMatch = (s) => {
+    if (doneRef.current) return;
+    handsRef.current++;
+    onStepChange && onStepChange(handsRef.current);
+    if (s.pc <= 0 || s.ac <= 0) {
+      doneRef.current = true; setDone(true);
+      const youWin = s.pc > 0;
+      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
+      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
+      if (youWin) onWin(s.pc, handsRef.current, secsRef.current, { winnerLabel: 'You win!', share: `🃏 Won heads-up poker in ${handsRef.current} hands` });
+      else onLose(handsRef.current, secsRef.current, { share: `🃏 Busted after ${handsRef.current} hands`, answer: 'Opponent wins' });
+    }
+  };
+  const nextHand = () => {
+    if (!state || doneRef.current) return;
+    checkMatch(state);
+    if (doneRef.current) return;
+    setState(newHand(state.pc, state.ac, !state.dealerIsPlayer));
+    setBetAmt(BB);
+  };
+
+  const Card = ({ c, hidden }) => {
+    if (hidden) return <div className="th-card back">?</div>;
+    const red = c.s === 1 || c.s === 2;
+    return <div className={'th-card' + (red ? ' red' : '')}><span>{TH_RANKS[c.r - 2]}</span><span>{TH_SUITS[c.s]}</span></div>;
+  };
+
+  const hist = cgLoadHistory(TH_KEY);
+  const wins = hist.filter(r => r.win).length;
+  const sheet = [
+    cgHistorySection(hist, r => <><span>{r.win ? '🏆 Won match' : '💀 Lost match'}</span><span className="mono">{r.hands} hands</span></>),
+    cgStatsSection([
+      { val: wins, lbl: 'Matches won' }, { val: hist.length, lbl: 'Matches' },
+      { val: bigPotRef.current, lbl: 'Biggest pot' }, { val: handsRef.current, lbl: 'Hands (match)' },
+    ]),
+    cgRulesSection(['Heads-up Texas Hold \'Em vs the computer.', 'Tap Check / Call / Fold to act.', 'Tap Bet/Raise to size a wager.', 'Win all the opponent\'s chips to take the match.']),
+  ];
+
+  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet}><div className="cg-stage" /></ClassicShell>;
+  const s = state;
+  const toCall = Math.max(0, s.aiBet - s.playerBet);
+  const canAct = s.phase === 'betting' && s.toAct === 'player' && !done;
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+      <div className="cg-stage">
+        <div className="th-felt">
+          <div className="th-seat">
+            <div className="who">Opponent</div>
+            <div className="chips">{s.ac} chips{s.aiBet ? ` · bet ${s.aiBet}` : ''}</div>
+          </div>
+          <div className="th-cards">
+            <Card c={s.ai[0]} hidden={!s.reveal} /><Card c={s.ai[1]} hidden={!s.reveal} />
+          </div>
+          <div className="th-pot">Pot {s.pot + s.playerBet + s.aiBet}</div>
+          <div className="th-community">
+            {s.board.length === 0 ? <span className="th-msg">— flop comes after betting —</span> : s.board.map((c, i) => <Card key={i} c={c} />)}
+          </div>
+          <div className="th-msg">{s.msg}</div>
+          <div className="th-cards">
+            <Card c={s.player[0]} /><Card c={s.player[1]} />
+          </div>
+          <div className="th-seat">
+            <div className="who">You{s.dealerIsPlayer ? ' (D)' : ''}</div>
+            <div className="chips">{s.pc} chips{s.playerBet ? ` · bet ${s.playerBet}` : ''}</div>
+          </div>
+        </div>
+        {s.phase === 'handover' ? (
+          <div className="th-actions"><button className="bet" onClick={nextHand}>Next hand →</button></div>
+        ) : betOpen ? (
+          <>
+            <div className="th-betsizer">
+              <input type="range" min={BB} max={Math.max(BB, s.pc)} step={BB} value={betAmt} onChange={e => setBetAmt(+e.target.value)} />
+              <span className="amt">{betAmt}</span>
+            </div>
+            <div className="th-actions">
+              <button onClick={() => setBetOpen(false)}>Cancel</button>
+              <button className="bet" disabled={!canAct} onClick={() => playerAction('bet', betAmt)}>{toCall > 0 ? 'Raise' : 'Bet'} {betAmt}</button>
+            </div>
+          </>
+        ) : (
+          <div className="th-actions">
+            <button disabled={!canAct} onClick={() => playerAction('fold')}>Fold</button>
+            {toCall > 0
+              ? <button disabled={!canAct} onClick={() => playerAction('call')}>Call {toCall}</button>
+              : <button disabled={!canAct} onClick={() => playerAction('check')}>Check</button>}
+            <button className="bet" disabled={!canAct || s.pc <= 0} onClick={() => { setBetAmt(Math.min(Math.max(BB, toCall + BB), s.pc)); setBetOpen(true); cgSound('click'); }}>{toCall > 0 ? 'Raise' : 'Bet'}</button>
+          </div>
+        )}
+      </div>
+    </ClassicShell>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -4288,7 +5815,60 @@ const GAMES = [
     tagColor: C.emerald,
     component: T2048Game,
   },
+  {
+    id: 'snake',
+    name: 'Snake',
+    icon: '🐍',
+    category: 'classic',
+    desc: 'Swipe to steer, eat to grow, and chase a high score without crashing.',
+    tag: 'Arcade',
+    tagColor: C.emerald,
+    component: SnakeGame,
+  },
+  {
+    id: 'blockblast',
+    name: 'Block Blast',
+    icon: '🧱',
+    category: 'classic',
+    desc: 'Drag blocks onto the grid and clear full lines. How long can you last?',
+    tag: 'Puzzle',
+    tagColor: C.accent,
+    component: BlockBlastGame,
+  },
+  {
+    id: 'tilematch',
+    name: 'Tile Match',
+    icon: '🀄',
+    category: 'classic',
+    desc: 'Tap matching tiles to clear the board before you run out of moves.',
+    tag: 'Match',
+    tagColor: C.violet,
+    component: TileMatchGame,
+  },
+  {
+    id: 'diamondrush',
+    name: 'Diamond Rush',
+    icon: '💎',
+    category: 'classic',
+    desc: 'Swap gems to line up 3+ and cascade your way to the target score.',
+    tag: 'Match',
+    tagColor: C.rose,
+    component: DiamondRushGame,
+  },
+  {
+    id: 'texas',
+    name: "Texas Hold 'Em",
+    icon: '🃏',
+    category: 'classic',
+    desc: 'Heads-up poker vs the computer. Bet smart and take all the chips.',
+    tag: 'Cards',
+    tagColor: C.gold,
+    component: TexasHoldemGame,
+  },
 ];
+
+// Games that render their own ClassicShell (full-screen, gesture-first).
+const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas']);
 
 /* ============================================================
    Root app
@@ -4408,6 +5988,7 @@ function App() {
         effectiveStreak: 0,
         share: meta && meta.share,
         cashOut: meta && meta.cashOut,
+        winnerLabel: meta && meta.winnerLabel,
         isClassic: true,
       });
       return;
@@ -4632,21 +6213,51 @@ function App() {
       )}
 
       {screen === 'game' && currentGame && !winData && !loseData && (
-        <div className="game-wrap">
-          <div className="game-head">
-            <button className="back-btn" onClick={backToLobby}>← Back</button>
-            <div className="game-title">
-              <span>{currentGame.icon}</span> {currentGame.name}
+        currentGame.category === 'classic' ? (
+          SELF_SHELL_GAMES.has(currentGame.id) ? (
+            <GameComponent
+              game={currentGame}
+              onBack={() => backToLobby('classic')}
+              onWin={handleWin}
+              onLose={handleLose}
+              onStepChange={setStepCount}
+              offset={offset}
+              resetKey={playAgainKey}
+            />
+          ) : (
+            <ClassicShell
+              game={currentGame}
+              onExit={() => backToLobby('classic')}
+              onNewGame={() => setPlayAgainKey(k => k + 1)}
+            >
+              <div className="cg-stage cg-scroll">
+                <GameComponent
+                  onWin={handleWin}
+                  onLose={handleLose}
+                  onStepChange={setStepCount}
+                  offset={offset}
+                  resetKey={playAgainKey}
+                />
+              </div>
+            </ClassicShell>
+          )
+        ) : (
+          <div className="game-wrap">
+            <div className="game-head">
+              <button className="back-btn" onClick={backToLobby}>← Back</button>
+              <div className="game-title">
+                <span>{currentGame.icon}</span> {currentGame.name}
+              </div>
             </div>
+            <GameComponent
+              onWin={handleWin}
+              onLose={handleLose}
+              onStepChange={setStepCount}
+              offset={offset}
+              resetKey={playAgainKey}
+            />
           </div>
-          <GameComponent
-            onWin={handleWin}
-            onLose={handleLose}
-            onStepChange={setStepCount}
-            offset={offset}
-            resetKey={playAgainKey}
-          />
-        </div>
+        )
       )}
 
       {screen === 'game' && winData && (

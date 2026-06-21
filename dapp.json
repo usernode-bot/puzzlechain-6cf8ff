@@ -13,14 +13,21 @@
       "description": "Deployed WagerEscrow contract address on Usernode EVM chain. Staging uses a placeholder (no real contract).",
       "required": false,
       "private": false,
-      "staging_default": "0x0000000000000000000000000000000000000000"
+      "staging_default": "0x0000000000000000000000000000000000000001"
     },
     {
       "name": "TREASURY_WALLET",
       "description": "EVM address receiving the 8% treasury cut of each wager pot.",
       "required": false,
       "private": false,
-      "staging_default": "0x0000000000000000000000000000000000000000"
+      "staging_default": "0x0000000000000000000000000000000000000002"
+    },
+    {
+      "name": "REDIS_URL",
+      "description": "Redis connection URL for PvP matchmaking queue and match timers.",
+      "required": true,
+      "private": false,
+      "staging_default": "redis://localhost:6379"
     }
   ],
   "tests": [

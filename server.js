@@ -25,10 +25,29 @@ const utgoProvider = UTGO_RPC_URL
   : null;
 
 const UTGO_ABI_BALANCE = ['function balanceOf(address account) view returns (uint256)'];
-const WAGER_IFACE = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
+const WAGER_IFACE       = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
+const CANCEL_QUEUE_IFACE = new ethers.Interface(['function cancelQueue(bytes32)']);
 
 // Single shared connection pool to this app's Postgres DB.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Redis client for PvP matchmaking queue (120s TTL keys). Graceful fallback to
+// Postgres-only CAS queue if REDIS_URL is unset or connection fails.
+let redis = null;
+let redisReady = false;
+(function initRedis() {
+  const REDIS_URL = process.env.REDIS_URL;
+  if (!REDIS_URL) return;
+  try {
+    const Redis = require('ioredis');
+    redis = new Redis(REDIS_URL, { lazyConnect: true, enableOfflineQueue: false, maxRetriesPerRequest: 1 });
+    redis.on('ready', () => { redisReady = true; console.log('[redis] connected'); });
+    redis.on('error', (err) => { redisReady = false; console.warn('[redis] error:', err.message); });
+    redis.connect().catch(err => console.warn('[redis] connect failed:', err.message));
+  } catch (e) {
+    console.warn('[redis] ioredis unavailable, using Postgres-only queue:', e.message);
+  }
+})();
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
@@ -191,40 +210,70 @@ async function migrate() {
     )
   `);
 
+  // Schema migrations — add new columns idempotently (safe to run on every boot).
+  await pool.query(`
+    ALTER TABLE pvp_matches
+      ADD COLUMN IF NOT EXISTS bet_tier          INTEGER DEFAULT 10,
+      ADD COLUMN IF NOT EXISTS p1_remaining      INTEGER,
+      ADD COLUMN IF NOT EXISTS p2_remaining      INTEGER,
+      ADD COLUMN IF NOT EXISTS contract_tx       TEXT,
+      ADD COLUMN IF NOT EXISTS started_at        TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS p1_last_seen_at   TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS p2_last_seen_at   TIMESTAMPTZ
+  `);
+  await pool.query(`
+    ALTER TABLE pvp_moves
+      ADD COLUMN IF NOT EXISTS tile_type  INTEGER,
+      ADD COLUMN IF NOT EXISTS ts_client  TIMESTAMPTZ
+  `);
+
   if (IS_STAGING) {
     // PvP staging seeds: three match states for UI testing.
     await pool.query(`
-      INSERT INTO pvp_matches (id, player1_id, player1_name, player1_addr, wager_utgo, status)
+      INSERT INTO pvp_matches
+        (id, player1_id, player1_name, player1_addr, bet_tier, wager_utgo, status)
       VALUES ('PVPWAIT', 'staging-demo-user', 'staging-p1',
               '0x1000000000000000000000000000000000000001',
-              '1000000000000000000', 'waiting')
+              10, '10000000000000000000', 'waiting')
       ON CONFLICT (id) DO NOTHING
     `);
     await pool.query(`
       INSERT INTO pvp_matches
         (id, player1_id, player2_id, player1_name, player2_name,
-         player1_addr, player2_addr, wager_utgo, board_seed, status,
-         p1_deposited, p2_deposited)
+         player1_addr, player2_addr, bet_tier, wager_utgo, board_seed, status,
+         p1_deposited, p2_deposited, started_at)
       VALUES ('PVPACTV', 'staging-demo-user', 'staging-opponent', 'staging-p1', 'staging-p2',
               '0x1000000000000000000000000000000000000001',
               '0x2000000000000000000000000000000000000002',
-              '1000000000000000000', 42317893, 'active', true, true)
+              10, '10000000000000000000', 42317893, 'active', true, true, now())
       ON CONFLICT (id) DO NOTHING
     `);
+    // Seed 5 pvp_moves for each player in the active match
+    for (let seq = 0; seq < 5; seq++) {
+      await pool.query(`
+        INSERT INTO pvp_moves (match_id, player_id, move_seq, tile_type)
+        VALUES ('PVPACTV', 'staging-demo-user', $1, $2),
+               ('PVPACTV', 'staging-opponent',  $1, $3)
+        ON CONFLICT (match_id, player_id, move_seq) DO NOTHING
+      `, [seq, seq % 8, (seq + 3) % 8]);
+    }
     await pool.query(`
       INSERT INTO pvp_matches
         (id, player1_id, player2_id, player1_name, player2_name,
-         player1_addr, player2_addr, wager_utgo, board_seed, status, winner_id,
+         player1_addr, player2_addr, bet_tier, wager_utgo, board_seed, status, winner_id,
          p1_deposited, p2_deposited,
-         p1_score, p1_steps, p1_time_secs, p2_score, p2_steps, p2_time_secs,
-         p1_finished_at, p2_finished_at)
+         p1_score, p1_steps, p1_time_secs, p1_remaining,
+         p2_score, p2_steps, p2_time_secs, p2_remaining,
+         p1_finished_at, p2_finished_at, started_at)
       VALUES ('PVPFINI', 'staging-demo-user', 'staging-opponent', 'staging-p1', 'staging-p2',
               '0x1000000000000000000000000000000000000001',
               '0x2000000000000000000000000000000000000002',
-              '1000000000000000000', 73518249, 'finished', 'staging-demo-user',
+              10, '10000000000000000000', 73518249, 'finished', 'staging-demo-user',
               true, true,
-              850, 36, 67, 720, 42, 95,
-              now() - interval '5 minutes', now() - interval '3 minutes')
+              850, 72, 67, 0,
+              720, 72, 95, 0,
+              now() - interval '5 minutes', now() - interval '3 minutes',
+              now() - interval '8 minutes')
       ON CONFLICT (id) DO NOTHING
     `);
   }
@@ -281,6 +330,52 @@ async function migrate() {
     }
   }
 }
+
+// ---- Server-side PvP tile engine (mirrors client mulberry32 + tmGenerateLevel) ------
+// Used for anti-cheat board reconstruction in POST /api/pvp/match/:id/finish.
+
+function pvpMulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function pvpGenerateLevel(cfg, seed) {
+  const rng = pvpMulberry32(seed);
+  const { tileTypes, setsPerType, boardCols, boardRows, maxLayer } = cfg;
+  const typeList = [];
+  for (let t = 0; t < tileTypes; t++) {
+    for (let s = 0; s < setsPerType; s++) {
+      typeList.push(t, t, t);
+    }
+  }
+  for (let i = typeList.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [typeList[i], typeList[j]] = [typeList[j], typeList[i]];
+  }
+  const tiles = [];
+  let idx = 0, tileId = 0;
+  for (let layer = 0; layer <= maxLayer && idx < typeList.length; layer++) {
+    const offset = layer * 0.5;
+    const cols = boardCols - layer;
+    const rows = boardRows - layer;
+    if (cols <= 0 || rows <= 0) break;
+    for (let r = 0; r < rows && idx < typeList.length; r++) {
+      for (let c = 0; c < cols && idx < typeList.length; c++) {
+        tiles.push({ id: tileId++, type: typeList[idx++], removed: false });
+      }
+    }
+  }
+  return tiles;
+}
+
+const TM_PVP_CONFIG = { tileTypes: 8, setsPerType: 3, boardCols: 8, boardRows: 5, maxLayer: 3 };
+
+// Valid bet tiers (UTGO whole amounts)
+const PVP_VALID_TIERS = new Set([10, 50, 100]);
 
 // ---- Mancala room helpers ------------------------------------------------
 
@@ -1170,28 +1265,33 @@ function pvpMatchBytes32(matchId) {
   return ethers.keccak256(ethers.toUtf8Bytes(matchId));
 }
 
-function shapePvpMatch(r, requesterId) {
+function shapePvpMatch(r, requesterId, opts = {}) {
   const isPlayer = requesterId === r.player1_id || requesterId === r.player2_id;
   return {
-    matchId:      r.id,
-    status:       r.status,
-    wagerUtgo:    r.wager_utgo,
-    player1Id:    r.player1_id,
-    player2Id:    r.player2_id,
-    player1Name:  r.player1_name,
-    player2Name:  r.player2_name,
-    p1Deposited:  r.p1_deposited,
-    p2Deposited:  r.p2_deposited,
-    p1Score:      r.p1_score,
-    p2Score:      r.p2_score,
-    p1Steps:      r.p1_steps,
-    p2Steps:      r.p2_steps,
-    p1TimeSecs:   r.p1_time_secs,
-    p2TimeSecs:   r.p2_time_secs,
-    winnerId:     r.winner_id,
-    boardSeed:    (isPlayer && r.status === 'active') ? r.board_seed : null,
-    createdAt:    r.created_at,
-    updatedAt:    r.updated_at,
+    matchId:              r.id,
+    status:               r.status,
+    betTier:              r.bet_tier || 10,
+    wagerUtgo:            r.wager_utgo,
+    player1Id:            r.player1_id,
+    player2Id:            r.player2_id,
+    player1Name:          r.player1_name,
+    player2Name:          r.player2_name,
+    p1Deposited:          r.p1_deposited,
+    p2Deposited:          r.p2_deposited,
+    p1Score:              r.p1_score,
+    p2Score:              r.p2_score,
+    p1Steps:              r.p1_steps,
+    p2Steps:              r.p2_steps,
+    p1TimeSecs:           r.p1_time_secs,
+    p2TimeSecs:           r.p2_time_secs,
+    p1Remaining:          r.p1_remaining,
+    p2Remaining:          r.p2_remaining,
+    winnerId:             r.winner_id,
+    boardSeed:            (isPlayer && r.status === 'active') ? r.board_seed : null,
+    cancelQueueCalldata:  opts.cancelQueueCalldata || null,
+    startedAt:            r.started_at,
+    createdAt:            r.created_at,
+    updatedAt:            r.updated_at,
   };
 }
 
@@ -1215,18 +1315,91 @@ app.get('/api/pvp/balance', async (req, res) => {
   }
 });
 
-// POST /api/pvp/join { wagerUtgo, playerAddr }
-// Creates or joins a waiting match for this wager amount.
+// POST /api/pvp/join { betTier, playerAddr }
+// Creates or joins a waiting match for this bet tier (10, 50, or 100 UTGO).
+// Uses Redis queue (pvp:queue:{tier}:{matchId} TTL=120s) with Postgres CAS fallback.
 app.post('/api/pvp/join', async (req, res) => {
-  const { wagerUtgo, playerAddr } = req.body;
-  if (!wagerUtgo || typeof wagerUtgo !== 'string') {
-    return res.status(400).json({ error: 'wagerUtgo required as string (wei)' });
+  const tier = Number.isFinite(req.body.betTier) ? Math.round(req.body.betTier) : null;
+  const { playerAddr } = req.body;
+  if (!tier || !PVP_VALID_TIERS.has(tier)) {
+    return res.status(400).json({ error: 'betTier must be 10, 50, or 100' });
   }
   if (!playerAddr || !/^0x[0-9a-fA-F]{40}$/.test(playerAddr)) {
     return res.status(400).json({ error: 'Valid EVM playerAddr required' });
   }
+  const wagerUtgo = (BigInt(tier) * BigInt('1000000000000000000')).toString();
+
   try {
-    // CAS join: atomically grab a waiting match for this wager from another player
+    // ── Redis-backed path ──────────────────────────────────────────────────
+    if (redisReady && redis) {
+      try {
+        // Scan for available waiting-match keys for this tier
+        const pattern = `pvp:queue:${tier}:*`;
+        let cursor = '0';
+        let matchedKey = null;
+        let matchedMatchId = null;
+        do {
+          const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 20);
+          cursor = nextCursor;
+          for (const key of keys) {
+            const creatorId = await redis.get(key);
+            if (creatorId && creatorId !== req.user.id) {
+              matchedKey = key;
+              matchedMatchId = key.split(':')[3];
+              break;
+            }
+          }
+          if (matchedKey) break;
+        } while (cursor !== '0');
+
+        if (matchedKey && matchedMatchId) {
+          const seed = Math.floor(Math.random() * 4294967295);
+          const { rows: joined } = await pool.query(`
+            UPDATE pvp_matches
+              SET player2_id   = $1,
+                  player2_name = $2,
+                  player2_addr = $3,
+                  board_seed   = $4,
+                  status       = 'active',
+                  started_at   = now(),
+                  updated_at   = now()
+            WHERE id = $5
+              AND status = 'waiting'
+              AND player1_id != $1
+            RETURNING *
+          `, [req.user.id, req.user.username || null, playerAddr, seed, matchedMatchId]);
+
+          await redis.del(matchedKey);
+          if (joined.length > 0) {
+            return res.json({ ...shapePvpMatch(joined[0], req.user.id), isCreator: false });
+          }
+          // Key was stale — fall through to create new match
+        }
+
+        // Create new waiting match + queue key
+        let newMatchId = generateRoomId();
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const { rows } = await pool.query(`
+              INSERT INTO pvp_matches (id, player1_id, player1_name, player1_addr, bet_tier, wager_utgo)
+              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+            `, [newMatchId, req.user.id, req.user.username || null, playerAddr, tier, wagerUtgo]);
+            await redis.set(`pvp:queue:${tier}:${newMatchId}`, req.user.id, 'EX', 120);
+            return res.json({ ...shapePvpMatch(rows[0], req.user.id), isCreator: true });
+          } catch (err) {
+            if (err.code === '23505') { newMatchId = generateRoomId(); continue; }
+            throw err;
+          }
+        }
+        return res.status(500).json({ error: 'Failed to generate unique match ID' });
+      } catch (redisErr) {
+        console.warn('[pvp] Redis op failed, falling back to Postgres queue:', redisErr.message);
+        // Fall through to Postgres CAS path
+      }
+    }
+
+    // ── Postgres-only CAS fallback ─────────────────────────────────────────
+    const seed = Math.floor(Math.random() * 4294967295);
     const { rows: joined } = await pool.query(`
       UPDATE pvp_matches
         SET player2_id   = $1,
@@ -1234,35 +1407,35 @@ app.post('/api/pvp/join', async (req, res) => {
             player2_addr = $3,
             board_seed   = $4,
             status       = 'active',
+            started_at   = now(),
             updated_at   = now()
       WHERE id = (
         SELECT id FROM pvp_matches
         WHERE status = 'waiting'
-          AND wager_utgo = $5
+          AND bet_tier = $5
           AND player1_id != $1
+          AND created_at > now() - interval '120 seconds'
         ORDER BY created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
       RETURNING *
-    `, [req.user.id, req.user.username || null, playerAddr,
-        Math.floor(Math.random() * 4294967295), wagerUtgo]);
+    `, [req.user.id, req.user.username || null, playerAddr, seed, tier]);
 
     if (joined.length > 0) {
       return res.json({ ...shapePvpMatch(joined[0], req.user.id), isCreator: false });
     }
 
-    // No match to join — create a new waiting room
-    let matchId = generateRoomId();
+    let newMatchId = generateRoomId();
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const { rows } = await pool.query(`
-          INSERT INTO pvp_matches (id, player1_id, player1_name, player1_addr, wager_utgo)
-          VALUES ($1, $2, $3, $4, $5) RETURNING *
-        `, [matchId, req.user.id, req.user.username || null, playerAddr, wagerUtgo]);
+          INSERT INTO pvp_matches (id, player1_id, player1_name, player1_addr, bet_tier, wager_utgo)
+          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        `, [newMatchId, req.user.id, req.user.username || null, playerAddr, tier, wagerUtgo]);
         return res.json({ ...shapePvpMatch(rows[0], req.user.id), isCreator: true });
       } catch (err) {
-        if (err.code === '23505') { matchId = generateRoomId(); continue; }
+        if (err.code === '23505') { newMatchId = generateRoomId(); continue; }
         throw err;
       }
     }
@@ -1273,13 +1446,98 @@ app.post('/api/pvp/join', async (req, res) => {
   }
 });
 
-// GET /api/pvp/match/:matchId — poll match state
+// GET /api/pvp/match/:matchId?remaining=N
+// Poll match state. Optional ?remaining=N updates calling player's tile count (progress bar).
+// While active, updates p_last_seen_at; detects 30s inactivity and auto-forfeits.
 app.get('/api/pvp/match/:matchId', async (req, res) => {
   const { matchId } = req.params;
+  const remainingParam = req.query.remaining !== undefined ? Number(req.query.remaining) : null;
+  const remaining = Number.isFinite(remainingParam) ? Math.round(remainingParam) : null;
   try {
     const { rows } = await pool.query('SELECT * FROM pvp_matches WHERE id = $1', [matchId]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Match not found' });
-    res.json(shapePvpMatch(rows[0], req.user.id));
+    if (!rows.length) return res.status(404).json({ error: 'Match not found' });
+    let m = rows[0];
+
+    const isP1 = req.user.id === m.player1_id;
+    const isP2 = req.user.id === m.player2_id;
+
+    if ((isP1 || isP2) && m.status === 'active') {
+      // Update last-seen timestamp and optional remaining tile count
+      const seenCol = isP1 ? 'p1_last_seen_at' : 'p2_last_seen_at';
+      const remPart = remaining !== null
+        ? `, ${isP1 ? 'p1_remaining' : 'p2_remaining'} = $2`
+        : '';
+      const params = remaining !== null ? [matchId, remaining] : [matchId];
+      await pool.query(
+        `UPDATE pvp_matches SET ${seenCol} = now()${remPart}, updated_at = now() WHERE id = $1`,
+        params
+      );
+
+      const { rows: fresh } = await pool.query('SELECT * FROM pvp_matches WHERE id = $1', [matchId]);
+      m = fresh[0];
+
+      // 30s inactivity forfeit — only applies after match has been active for ≥30s
+      const INACTIVITY_MS = 30000;
+      const now = Date.now();
+      const startedMs = m.started_at ? new Date(m.started_at).getTime() : new Date(m.created_at).getTime();
+      if (now - startedMs > INACTIVITY_MS) {
+        const p1Seen = m.p1_last_seen_at ? new Date(m.p1_last_seen_at).getTime() : null;
+        const p2Seen = m.p2_last_seen_at ? new Date(m.p2_last_seen_at).getTime() : null;
+        let forfeiteeId = null;
+        let winnerAddr = null;
+        if (isP2 && p1Seen && now - p1Seen > INACTIVITY_MS) {
+          forfeiteeId = m.player1_id; winnerAddr = m.player2_addr;
+        } else if (isP1 && p2Seen && now - p2Seen > INACTIVITY_MS) {
+          forfeiteeId = m.player2_id; winnerAddr = m.player1_addr;
+        }
+        if (forfeiteeId) {
+          const winnerId = forfeiteeId === m.player1_id ? m.player2_id : m.player1_id;
+          const { rows: forfeited } = await pool.query(`
+            UPDATE pvp_matches SET status = 'finished', winner_id = $2, updated_at = now()
+            WHERE id = $1 AND status = 'active' RETURNING *
+          `, [matchId, winnerId]);
+          if (forfeited.length) {
+            m = forfeited[0];
+            let claimCalldata = null;
+            if (validatorWallet && winnerAddr && /^0x[0-9a-fA-F]{40}$/.test(winnerAddr)) {
+              try {
+                const matchId32 = pvpMatchBytes32(matchId);
+                const innerHash = ethers.keccak256(
+                  ethers.solidityPacked(['bytes32', 'address'], [matchId32, winnerAddr])
+                );
+                const sig = await validatorWallet.signMessage(ethers.getBytes(innerHash));
+                claimCalldata = WAGER_IFACE.encodeFunctionData('claimWin', [matchId32, winnerAddr, sig]);
+              } catch (sigErr) {
+                console.error('[pvp] inactivity forfeit signing failed:', sigErr.message);
+              }
+            }
+            return res.json({
+              ...shapePvpMatch(m, req.user.id),
+              forfeitedBy: forfeiteeId,
+              claimCalldata,
+              contractAddr: UTGO_CONTRACT_ADDRESS || null,
+            });
+          }
+        }
+      }
+    }
+
+    // Compute cancelQueueCalldata for creator when match is waiting and 120s have elapsed
+    let cancelQueueCalldata = null;
+    const isCreator = req.user.id === m.player1_id;
+    if (isCreator && m.status === 'waiting' && UTGO_CONTRACT_ADDRESS) {
+      const ageMs = Date.now() - new Date(m.created_at).getTime();
+      if (ageMs > 120000) {
+        try {
+          const matchId32 = pvpMatchBytes32(matchId);
+          cancelQueueCalldata = CANCEL_QUEUE_IFACE.encodeFunctionData('cancelQueue', [matchId32]);
+        } catch (e) {
+          console.warn('[pvp] cancelQueueCalldata encode failed:', e.message);
+        }
+      }
+    }
+
+    res.json(shapePvpMatch(m, req.user.id, { cancelQueueCalldata }));
   } catch (err) {
     console.error('[pvp] get match failed:', err.message);
     res.status(500).json({ error: 'Failed to get match' });
@@ -1332,100 +1590,136 @@ app.post('/api/pvp/match/:matchId/deposit-confirmed', async (req, res) => {
   }
 });
 
-// POST /api/pvp/match/:matchId/move { moveSeq } — log a tile selection for anti-cheat
-app.post('/api/pvp/match/:matchId/move', async (req, res) => {
-  const { matchId } = req.params;
-  const moveSeq = Number.isFinite(req.body.moveSeq) ? Math.round(req.body.moveSeq) : null;
-  if (moveSeq === null) return res.status(400).json({ error: 'moveSeq required' });
-  try {
-    const { rows: matchRows } = await pool.query(
-      'SELECT player1_id, player2_id, status FROM pvp_matches WHERE id = $1', [matchId]
-    );
-    if (matchRows.length === 0) return res.status(404).json({ error: 'Match not found' });
-    const m = matchRows[0];
-    if (m.status !== 'active') return res.status(409).json({ error: 'Match not active' });
-    if (req.user.id !== m.player1_id && req.user.id !== m.player2_id) {
-      return res.status(403).json({ error: 'Not a player' });
-    }
-
-    await pool.query(`
-      INSERT INTO pvp_moves (match_id, player_id, move_seq)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (match_id, player_id, move_seq) DO NOTHING
-    `, [matchId, req.user.id, moveSeq]);
-
-    // Rate check: >3.0 moves/sec over last 6 moves is suspicious
-    const { rows: recent } = await pool.query(`
-      SELECT ts FROM pvp_moves
-      WHERE match_id = $1 AND player_id = $2
-      ORDER BY move_seq DESC LIMIT 6
-    `, [matchId, req.user.id]);
-
-    let suspicious = false;
-    if (recent.length >= 2) {
-      const elapsedMs = new Date(recent[0].ts) - new Date(recent[recent.length - 1].ts);
-      if (elapsedMs > 0 && ((recent.length - 1) / (elapsedMs / 1000)) > 3.0) {
-        suspicious = true;
-        console.warn(`[pvp] anti-cheat: suspicious rate from ${req.user.id} in ${matchId}`);
-      }
-    }
-
-    res.json({ ok: true, suspicious });
-  } catch (err) {
-    console.error('[pvp] move failed:', err.message);
-    res.status(500).json({ error: 'Failed to log move' });
-  }
-});
-
-// POST /api/pvp/match/:matchId/finish { score, steps, timeSecs }
-// Record player's result. When both done: determine winner + return claimWin calldata.
+// POST /api/pvp/match/:matchId/finish { score, steps, timeSecs, remainingTiles, telemetry }
+// Batch-telemetry finish: client sends full move array at game end (no per-move calls).
+// Bulk-inserts telemetry, runs anti-cheat, then records result and (if both done) picks winner.
 app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
   const { matchId } = req.params;
-  const score    = Number.isFinite(req.body.score)    ? Math.round(req.body.score)    : 0;
-  const steps    = Number.isFinite(req.body.steps)    ? Math.round(req.body.steps)    : 0;
-  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : 0;
+  const score          = Number.isFinite(req.body.score)          ? Math.round(req.body.score)          : 0;
+  const steps          = Number.isFinite(req.body.steps)          ? Math.round(req.body.steps)          : 0;
+  const timeSecs       = Number.isFinite(req.body.timeSecs)       ? Math.round(req.body.timeSecs)       : 0;
+  const remainingTiles = Number.isFinite(req.body.remainingTiles) ? Math.round(req.body.remainingTiles) : 0;
+  const telemetry      = Array.isArray(req.body.telemetry) ? req.body.telemetry.slice(0, 500) : [];
+
   try {
-    const { rows: matchRows } = await pool.query(
-      'SELECT * FROM pvp_matches WHERE id = $1', [matchId]
-    );
-    if (matchRows.length === 0) return res.status(404).json({ error: 'Match not found' });
+    const { rows: matchRows } = await pool.query('SELECT * FROM pvp_matches WHERE id = $1', [matchId]);
+    if (!matchRows.length) return res.status(404).json({ error: 'Match not found' });
     const m = matchRows[0];
     if (m.status !== 'active') return res.status(409).json({ error: 'Match not active' });
-
     const isP1 = req.user.id === m.player1_id;
     const isP2 = req.user.id === m.player2_id;
     if (!isP1 && !isP2) return res.status(403).json({ error: 'Not a player' });
 
-    // Minimum 24 moves (72 tiles / 3 per matched set)
+    // Hard floor: must have at least 24 tile taps
     if (steps < 24) return res.status(400).json({ error: 'Invalid step count' });
 
-    // Aggregate timing anti-cheat: reject if >3.0 moves/sec over all logged moves
-    const { rows: moves } = await pool.query(`
-      SELECT ts FROM pvp_moves
-      WHERE match_id = $1 AND player_id = $2
-      ORDER BY move_seq ASC
-    `, [matchId, req.user.id]);
-
-    if (moves.length >= 20) {
-      const elapsed = (new Date(moves[moves.length - 1].ts) - new Date(moves[0].ts)) / 1000;
-      if (elapsed > 0 && (moves.length / elapsed) > 3.0) {
-        console.warn(`[pvp] anti-cheat BLOCK: ${req.user.id} in ${matchId}`);
-        return res.status(409).json({ error: 'Result rejected by anti-cheat' });
+    // Bulk-insert telemetry into pvp_moves
+    if (telemetry.length > 0) {
+      const params = [];
+      const clauses = [];
+      telemetry.forEach((t, i) => {
+        const base = i * 5;
+        params.push(
+          matchId,
+          req.user.id,
+          Number.isFinite(t.moveSeq) ? Math.round(t.moveSeq) : i,
+          Number.isFinite(t.tileType) ? Math.round(t.tileType) : null,
+          t.tsClient ? new Date(t.tsClient).toISOString() : null
+        );
+        clauses.push(`($${base+1},$${base+2},$${base+3},$${base+4},$${base+5})`);
+      });
+      try {
+        await pool.query(
+          `INSERT INTO pvp_moves (match_id, player_id, move_seq, tile_type, ts_client)
+           VALUES ${clauses.join(',')}
+           ON CONFLICT (match_id, player_id, move_seq) DO NOTHING`,
+          params
+        );
+      } catch (insertErr) {
+        console.error('[pvp] telemetry insert failed:', insertErr.message);
       }
     }
 
+    // Anti-cheat validation against client timestamps
+    let disputed = false;
+    const clientTimes = telemetry
+      .filter(t => Number.isFinite(t.tsClient))
+      .map(t => t.tsClient)
+      .sort((a, b) => a - b);
+
+    if (clientTimes.length >= 2) {
+      // Per-move interval: >5% under 250ms = suspicious, >15% = disputed
+      const intervals = [];
+      for (let i = 1; i < clientTimes.length; i++) intervals.push(clientTimes[i] - clientTimes[i - 1]);
+      const fastCount = intervals.filter(iv => iv < 250).length;
+      const fastRatio = fastCount / intervals.length;
+      if (fastRatio > 0.15) {
+        console.warn(`[pvp] anti-cheat disputed (${(fastRatio*100).toFixed(1)}% fast intervals): ${req.user.id} in ${matchId}`);
+        disputed = true;
+      } else if (fastRatio > 0.05) {
+        console.warn(`[pvp] anti-cheat suspicious: ${req.user.id} in ${matchId}`);
+      }
+
+      // Aggregate rate: >3.0 moves/sec = disputed
+      const spanMs = clientTimes[clientTimes.length - 1] - clientTimes[0];
+      if (!disputed && spanMs > 0 && (clientTimes.length / (spanMs / 1000)) > 3.0) {
+        console.warn(`[pvp] anti-cheat disputed (aggregate rate): ${req.user.id} in ${matchId}`);
+        disputed = true;
+      }
+
+      // Timestamp drift: >15s beyond match duration = disputed
+      if (!disputed) {
+        const matchStartMs = m.started_at
+          ? new Date(m.started_at).getTime()
+          : new Date(m.created_at).getTime();
+        const matchDurationMs = Date.now() - matchStartMs;
+        const clientSpanMs = clientTimes[clientTimes.length - 1] - clientTimes[0];
+        if (clientSpanMs > matchDurationMs + 15000) {
+          console.warn(`[pvp] anti-cheat disputed (ts drift ${clientSpanMs}ms vs ${matchDurationMs}ms): ${req.user.id} in ${matchId}`);
+          disputed = true;
+        }
+      }
+    }
+
+    // Board reconstruction: validate reported tile types exist on this board
+    if (!disputed && m.board_seed && telemetry.length > 0) {
+      const tiles = pvpGenerateLevel(TM_PVP_CONFIG, Number(m.board_seed));
+      const validTypes = new Set(tiles.map(t => t.type));
+      const invalidCount = telemetry.filter(t =>
+        Number.isFinite(t.tileType) && !validTypes.has(t.tileType)
+      ).length;
+      if (invalidCount > 0) {
+        console.warn(`[pvp] anti-cheat disputed (${invalidCount} invalid tile types): ${req.user.id} in ${matchId}`);
+        disputed = true;
+      }
+    }
+
+    if (disputed) {
+      await pool.query(
+        `UPDATE pvp_matches SET status = 'disputed', updated_at = now() WHERE id = $1 AND status = 'active'`,
+        [matchId]
+      );
+      return res.status(409).json({ error: 'Result rejected by anti-cheat', disputed: true });
+    }
+
     // Record result for this player
-    const scoreCol  = isP1 ? 'p1_score'       : 'p2_score';
-    const stepsCol  = isP1 ? 'p1_steps'       : 'p2_steps';
-    const timeCol   = isP1 ? 'p1_time_secs'   : 'p2_time_secs';
-    const finCol    = isP1 ? 'p1_finished_at' : 'p2_finished_at';
+    const scoreCol = isP1 ? 'p1_score'       : 'p2_score';
+    const stepsCol = isP1 ? 'p1_steps'       : 'p2_steps';
+    const timeCol  = isP1 ? 'p1_time_secs'   : 'p2_time_secs';
+    const finCol   = isP1 ? 'p1_finished_at' : 'p2_finished_at';
+    const remCol   = isP1 ? 'p1_remaining'   : 'p2_remaining';
 
     const { rows: updated } = await pool.query(`
       UPDATE pvp_matches
         SET ${scoreCol} = $2, ${stepsCol} = $3, ${timeCol} = $4,
-            ${finCol} = now(), updated_at = now()
-      WHERE id = $1 RETURNING *
-    `, [matchId, score, steps, timeSecs]);
+            ${finCol} = now(), ${remCol} = $5, updated_at = now()
+      WHERE id = $1 AND status = 'active' RETURNING *
+    `, [matchId, score, steps, timeSecs, remainingTiles]);
+
+    if (!updated.length) {
+      const { rows: cur } = await pool.query('SELECT * FROM pvp_matches WHERE id = $1', [matchId]);
+      return res.json({ match: shapePvpMatch(cur[0], req.user.id) });
+    }
     const mu = updated[0];
 
     if (!mu.p1_finished_at || !mu.p2_finished_at) {
@@ -1433,9 +1727,9 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
     }
 
     // Both done — higher score wins; ties go to faster time
-    const p1Wins = mu.p1_score > mu.p2_score ||
-                   (mu.p1_score === mu.p2_score && mu.p1_time_secs < mu.p2_time_secs);
-    const winnerId  = p1Wins ? mu.player1_id   : mu.player2_id;
+    const p1Wins    = mu.p1_score > mu.p2_score ||
+                      (mu.p1_score === mu.p2_score && mu.p1_time_secs < mu.p2_time_secs);
+    const winnerId  = p1Wins ? mu.player1_id  : mu.player2_id;
     const winnerAddr = p1Wins ? mu.player1_addr : mu.player2_addr;
 
     const { rows: finishedRows } = await pool.query(`
@@ -1443,7 +1737,7 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
       WHERE id = $1 AND status = 'active' RETURNING *
     `, [matchId, winnerId]);
 
-    if (finishedRows.length === 0) {
+    if (!finishedRows.length) {
       const { rows: cur } = await pool.query('SELECT * FROM pvp_matches WHERE id = $1', [matchId]);
       return res.json({ match: shapePvpMatch(cur[0], req.user.id) });
     }
@@ -1464,11 +1758,27 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
       }
     }
 
+    const betTier   = final.bet_tier || 10;
+    const pot       = betTier * 2;
+    const winnerPrize = Math.floor(pot * 0.9);
+
     res.json({
-      match:         shapePvpMatch(final, req.user.id),
-      isWinner:      req.user.id === winnerId,
+      match:        shapePvpMatch(final, req.user.id),
+      isWinner:     req.user.id === winnerId,
       claimCalldata,
-      contractAddr:  UTGO_CONTRACT_ADDRESS || null,
+      contractAddr: UTGO_CONTRACT_ADDRESS || null,
+      prize: {
+        betTier,
+        pot,
+        winnerPrize,
+        treasuryFee: Math.floor(pot * 0.08),
+        burned: pot - winnerPrize - Math.floor(pot * 0.08),
+      },
+      telemetrySummary: {
+        moveCount:    telemetry.length,
+        timeTaken:    timeSecs,
+        tilesCleared: 72 - remainingTiles,
+      },
     });
   } catch (err) {
     console.error('[pvp] finish failed:', err.message);

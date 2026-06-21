@@ -2445,6 +2445,51 @@ body {
   text-align: center; color: ${C.muted}; padding: 2rem;
   font-size: 0.95rem;
 }
+.pvp-mm-countdown {
+  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
+  color: ${C.accent}; letter-spacing: 0.06em;
+}
+.pvp-mm-countdown-expired { color: ${C.rose}; }
+.pvp-mm-btns { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
+.pvp-reclaim-btn {
+  background: ${C.rose}; border: none; border-radius: 10px; color: #fff;
+  font-family: inherit; font-size: 0.9rem; font-weight: 600;
+  padding: 0.6rem 1.4rem; cursor: pointer; transition: opacity 0.12s;
+}
+.pvp-reclaim-btn:disabled { opacity: 0.55; cursor: default; }
+.pvp-reclaim-btn:not(:disabled):hover { opacity: 0.85; }
+.pvp-opp-bar { flex: 1; margin: 0 0.75rem; }
+.pvp-opp-bar-label { font-size: 0.72rem; color: ${C.muted}; margin-bottom: 0.2rem; }
+.pvp-opp-bar-track {
+  height: 6px; background: ${C.surface}; border-radius: 99px; overflow: hidden;
+}
+.pvp-opp-bar-fill {
+  height: 100%; background: ${C.violet}; border-radius: 99px;
+  transition: width 0.5s ease;
+}
+.pvp-telem-summary {
+  width: 100%; background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 10px; padding: 0.65rem 0.9rem;
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.pvp-telem-row {
+  display: flex; justify-content: space-between; font-size: 0.82rem; color: ${C.muted};
+}
+.pvp-telem-row .mono { color: ${C.text}; }
+.pvp-prize-anim {
+  width: 100%; background: ${C.surface}; border: 1px solid ${C.emerald};
+  border-radius: 10px; padding: 0.65rem 0.9rem;
+  display: flex; flex-direction: column; gap: 0.35rem;
+  animation: pvp-prize-fade 0.5s ease;
+}
+@keyframes pvp-prize-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.pvp-prize-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: ${C.emerald}; margin-bottom: 0.15rem; }
+.pvp-prize-row {
+  display: flex; justify-content: space-between; font-size: 0.82rem; color: ${C.muted};
+}
+.pvp-prize-row .mono { color: ${C.text}; }
+.pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
+.pvp-prize-winner .mono { color: ${C.emerald}; }
 `;
 
 /* ============================================================
@@ -7022,7 +7067,8 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   useEffect(() => {
     if (!timeUp) return;
     setDone(true);
-    onLose(movesRef.current, secsRef.current, { share: 'Daily Tile Match ⏱ time\'s up' });
+    const remaining = tiles.filter(t => !t.removed).length;
+    onLose(movesRef.current, secsRef.current, { share: 'Daily Tile Match ⏱ time\'s up', remainingTiles: remaining, isTimeUp: true });
   }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialise board from day seed
@@ -7099,7 +7145,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     setMoves(newMoves);
     setLastBarEntry(tileId);
     onStepChange(newMoves);
-    if (onMoveTile) onMoveTile(newMoves);
+    if (onMoveTile) onMoveTile({ tileType: tile.type, moveSeq: newMoves - 1, tsClient: Date.now() });
 
     const boardRemaining = tilesCopy.filter(t => !t.removed && !t.inBar);
     if (boardRemaining.length === 0 && finalBar.length === 0) {
@@ -8453,9 +8499,9 @@ function SnakeGame({ onWin, onStepChange, resetKey }) {
    PvP Arena components
    ============================================================ */
 const PVP_TIERS = [
-  { label: '0.1 UTGO', value: '100000000000000000',   color: C.emerald, payout: '0.18 UTGO' },
-  { label: '1 UTGO',   value: '1000000000000000000',  color: C.gold,    payout: '1.8 UTGO' },
-  { label: '10 UTGO',  value: '10000000000000000000', color: C.rose,    payout: '18 UTGO' },
+  { label: '10 UTGO',  value: 10,  color: C.emerald, payout: '18 UTGO' },
+  { label: '50 UTGO',  value: 50,  color: C.gold,    payout: '90 UTGO' },
+  { label: '100 UTGO', value: 100, color: C.rose,    payout: '180 UTGO' },
 ];
 
 function PvpLobby({ user, balance, onJoin, joining }) {
@@ -8494,15 +8540,61 @@ function PvpLobby({ user, balance, onJoin, joining }) {
   );
 }
 
-function PvpMatchmaking({ match, onCancel }) {
+function PvpMatchmaking({ match, onCancel, onReclaim, cancelQueueCalldata }) {
+  const { useState: useS, useEffect: useE } = React;
+  const [secsLeft, setSecsLeft] = useS(() => {
+    if (!match || !match.createdAt) return 120;
+    const elapsed = Math.floor((Date.now() - new Date(match.createdAt).getTime()) / 1000);
+    return Math.max(0, 120 - elapsed);
+  });
+  const [reclaiming, setReclaiming] = useS(false);
+
+  useE(() => {
+    if (secsLeft <= 0) return;
+    const id = setInterval(() => setSecsLeft(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [secsLeft > 0]);
+
+  const canReclaim = secsLeft === 0;
+  const mm = String(Math.floor(secsLeft / 60)).padStart(2, '0');
+  const ss = String(secsLeft % 60).padStart(2, '0');
+
+  const handleReclaim = async () => {
+    setReclaiming(true);
+    try {
+      const cd = cancelQueueCalldata || (match && match.cancelQueueCalldata);
+      if (cd && UTGO_CONTRACT_ADDRESS && window.usernode && window.usernode.sendTransaction) {
+        await window.usernode.sendTransaction({ to: UTGO_CONTRACT_ADDRESS, data: cd });
+      }
+      onReclaim && onReclaim();
+    } catch (e) {
+      console.error('[pvp] reclaim failed:', e && e.message);
+      onReclaim && onReclaim(); // fall back to cancel even if tx fails
+    } finally {
+      setReclaiming(false);
+    }
+  };
+
   return (
     <div className="pvp-matchmaking">
       <div className="pvp-mm-icon">⚔️</div>
       <div className="pvp-mm-pulse" />
       <div className="pvp-mm-title">Finding opponent…</div>
       <div className="pvp-mm-code">Room · {match && match.matchId}</div>
-      <div className="pvp-mm-hint">Waiting for another player at this wager tier</div>
-      <button className="pvp-cancel-btn" onClick={onCancel}>Cancel</button>
+      <div className={`pvp-mm-countdown${canReclaim ? ' pvp-mm-countdown-expired' : ''}`}>{mm}:{ss}</div>
+      <div className="pvp-mm-hint">
+        {canReclaim
+          ? 'Queue timed out — reclaim your deposit below'
+          : `Waiting for a ${match && match.betTier ? match.betTier + ' UTGO' : ''} opponent`}
+      </div>
+      <div className="pvp-mm-btns">
+        {canReclaim && (
+          <button className="pvp-reclaim-btn" onClick={handleReclaim} disabled={reclaiming}>
+            {reclaiming ? 'Reclaiming…' : 'Reclaim Deposit'}
+          </button>
+        )}
+        <button className="pvp-cancel-btn" onClick={onCancel}>Cancel</button>
+      </div>
     </div>
   );
 }
@@ -8541,7 +8633,12 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
   );
   const [playing, setPlaying] = useState(deposited && oppDeposited);
   const [waiting, setWaiting] = useState(false);
+  const [oppPct, setOppPct] = useState(null); // opponent tile-clear %, rounded to 10
+  const [myRemaining, setMyRemaining] = useState(72);
   const pollRef = useRef(null);
+  const resultPollRef = useRef(null);
+  // Accumulate telemetry locally — useRef avoids stale closures in handleWin/handleLose
+  const telemetryRef = useRef([]);
 
   // Poll for opponent deposit
   useEffect(() => {
@@ -8560,20 +8657,52 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
     return () => clearInterval(pollRef.current);
   }, [deposited, playing]);
 
-  // Poll for opponent finish result
-  const resultPollRef = useRef(null);
+  // During play: poll every 2s for opponent progress + inactivity forfeit
+  useEffect(() => {
+    if (!playing || waiting) return;
+    const poll = async () => {
+      const rem = myRemaining;
+      const { ok, body } = await api(`/api/pvp/match/${match.matchId}?remaining=${rem}`);
+      if (!ok) return;
+      if (body.forfeitedBy) {
+        clearInterval(resultPollRef.current);
+        onResult({
+          match: body,
+          isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id),
+          claimCalldata: body.claimCalldata,
+          contractAddr: body.contractAddr,
+        });
+        return;
+      }
+      if (body.status === 'finished' || body.status === 'disputed') {
+        clearInterval(resultPollRef.current);
+        onResult({ match: body, isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id) });
+        return;
+      }
+      // Update opponent progress bar (rounded to nearest 10%)
+      const oppRem = playerIsP1 ? body.p2Remaining : body.p1Remaining;
+      if (oppRem != null) {
+        const cleared = 72 - oppRem;
+        setOppPct(Math.round(cleared / 72 * 10) * 10);
+      }
+    };
+    resultPollRef.current = setInterval(poll, 2000);
+    return () => clearInterval(resultPollRef.current);
+  }, [playing, waiting]);
+
+  // Poll for opponent finish result while waiting
   useEffect(() => {
     if (!waiting) return;
     const poll = async () => {
       const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
       if (!ok) return;
-      if (body.status === 'finished') {
-        clearInterval(resultPollRef.current);
+      if (body.status === 'finished' || body.status === 'disputed') {
+        clearInterval(pollRef.current);
         onResult({ match: body, isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id) });
       }
     };
-    resultPollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(resultPollRef.current);
+    pollRef.current = setInterval(poll, 2000);
+    return () => clearInterval(pollRef.current);
   }, [waiting]);
 
   const handleDeposit = async () => {
@@ -8590,17 +8719,19 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
     setDepositing(false);
   };
 
-  const handleMove = async (moveSeq) => {
-    api(`/api/pvp/match/${match.matchId}/move`, {
-      method: 'POST',
-      body: JSON.stringify({ moveSeq }),
-    });
+  // Accumulate tile moves locally — no per-move API call
+  const handleMoveTile = ({ tileType, moveSeq, tsClient }) => {
+    telemetryRef.current.push({ tileType, moveSeq, tsClient });
   };
 
   const handleWin = async (score, steps, secs) => {
+    clearInterval(resultPollRef.current);
     const { ok, body } = await api(`/api/pvp/match/${match.matchId}/finish`, {
       method: 'POST',
-      body: JSON.stringify({ score, steps, timeSecs: secs }),
+      body: JSON.stringify({
+        score, steps, timeSecs: secs, remainingTiles: 0,
+        telemetry: telemetryRef.current,
+      }),
     });
     if (!ok) return;
     if (body.waiting) {
@@ -8611,13 +8742,44 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
         isWinner: body.isWinner,
         claimCalldata: body.claimCalldata,
         contractAddr: body.contractAddr,
+        prize: body.prize,
+        telemetrySummary: body.telemetrySummary,
       });
     }
   };
 
-  const handleLose = async (_steps, _secs) => {
-    const { ok, body } = await api(`/api/pvp/match/${match.matchId}/forfeit`, { method: 'POST' });
-    onResult({ isWinner: false, match: ok && body ? body : null });
+  const handleLose = async (steps, secs, meta) => {
+    clearInterval(resultPollRef.current);
+    if (meta && meta.isTimeUp) {
+      // Time expired — submit finish with score 0
+      const { ok, body } = await api(`/api/pvp/match/${match.matchId}/finish`, {
+        method: 'POST',
+        body: JSON.stringify({
+          score: 0, steps, timeSecs: secs,
+          remainingTiles: meta.remainingTiles || 0,
+          telemetry: telemetryRef.current,
+        }),
+      });
+      if (ok && body) {
+        if (body.waiting) { setWaiting(true); return; }
+        onResult({
+          match: body.match,
+          isWinner: body.isWinner,
+          claimCalldata: body.claimCalldata,
+          contractAddr: body.contractAddr,
+          prize: body.prize,
+          telemetrySummary: body.telemetrySummary,
+        });
+      }
+    } else {
+      // Bar full / manual forfeit
+      const { ok, body } = await api(`/api/pvp/match/${match.matchId}/forfeit`, { method: 'POST' });
+      onResult({ isWinner: false, match: ok && body ? body : null });
+    }
+  };
+
+  const handleStepChange = (n) => {
+    setMyRemaining(Math.max(0, 72 - n));
   };
 
   const oppName = playerIsP1 ? (match.player2Name || 'Opponent') : (match.player1Name || 'Opponent');
@@ -8647,15 +8809,20 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
     <div className="pvp-game-wrap game-wrap">
       <div className="pvp-vs-bar">
         <span>vs <span style={{ color: C.violet }}>{oppName}</span></span>
-        <span className="pvp-vs-label">PvP</span>
-        <button className="pvp-forfeit-btn" onClick={() => handleLose(0, 0)}>Forfeit</button>
+        <div className="pvp-opp-bar">
+          <div className="pvp-opp-bar-label">{oppName} {oppPct !== null ? `${oppPct}%` : '—'}</div>
+          <div className="pvp-opp-bar-track">
+            <div className="pvp-opp-bar-fill" style={{ width: `${oppPct || 0}%` }} />
+          </div>
+        </div>
+        <button className="pvp-forfeit-btn" onClick={() => handleLose(0, 0, {})}>Forfeit</button>
       </div>
       <TileMatchingDailyGame
         boardSeedOverride={match.boardSeed}
         onWin={handleWin}
         onLose={handleLose}
-        onStepChange={() => {}}
-        onMoveTile={handleMove}
+        onStepChange={handleStepChange}
+        onMoveTile={handleMoveTile}
         resetKey={match.matchId}
         offset={0}
       />
@@ -8664,17 +8831,19 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
 }
 
 function PvpResult({ result, onBack }) {
-  const { isWinner, match, claimCalldata, contractAddr } = result || {};
+  const { isWinner, match, claimCalldata, contractAddr, prize, telemetrySummary } = result || {};
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [claimErr, setClaimErr] = useState(null);
+  const [txHash, setTxHash] = useState(null);
 
   const handleClaim = async () => {
     if (!claimCalldata || !contractAddr) return;
     setClaiming(true);
     setClaimErr(null);
     try {
-      await window.usernode.sendTransaction({ to: contractAddr, data: claimCalldata });
+      const tx = await window.usernode.sendTransaction({ to: contractAddr, data: claimCalldata });
+      setTxHash(tx && tx.hash ? tx.hash : null);
       setClaimed(true);
     } catch (e) {
       setClaimErr(e && e.message ? e.message : 'Transaction failed');
@@ -8682,25 +8851,72 @@ function PvpResult({ result, onBack }) {
     setClaiming(false);
   };
 
+  const myScore = match && (result.playerIsP1 !== false
+    ? (match.p1Score != null ? match.p1Score : match.p2Score)
+    : (match.p2Score != null ? match.p2Score : match.p1Score));
+  const oppScore = match && (result.playerIsP1 !== false
+    ? match.p2Score
+    : match.p1Score);
+
   return (
     <div className="pvp-result">
       <div className="pvp-result-emoji">{isWinner ? '🏆' : '💀'}</div>
       <div className="pvp-result-title">{isWinner ? 'You Won!' : 'You Lost'}</div>
+
+      {telemetrySummary && (
+        <div className="pvp-telem-summary">
+          <div className="pvp-telem-row">
+            <span>Moves</span><span className="mono">{telemetrySummary.moveCount}</span>
+          </div>
+          <div className="pvp-telem-row">
+            <span>Time</span><span className="mono">{telemetrySummary.timeTaken}s</span>
+          </div>
+          <div className="pvp-telem-row">
+            <span>Tiles cleared</span><span className="mono">{telemetrySummary.tilesCleared}/72</span>
+          </div>
+        </div>
+      )}
+
       {match && (
         <div className="score-rows" style={{ width: '100%', textAlign: 'left' }}>
           <div className="score-row">
             <span className="k">Your score</span>
-            <span className="v mono">{match.p1Score != null ? match.p1Score : match.p2Score}</span>
+            <span className="v mono">{myScore != null ? myScore : '—'}</span>
           </div>
           <div className="score-row">
             <span className="k">Opponent</span>
-            <span className="v mono">{match.p2Score != null && match.p1Score != null
-              ? (match.p1Score === (match.p1Score != null ? match.p1Score : 0) ? match.p2Score : match.p1Score)
-              : '—'}</span>
+            <span className="v mono">{oppScore != null ? oppScore : '—'}</span>
           </div>
         </div>
       )}
-      {claimErr && <div style={{ color: C.rose, fontSize: '0.8rem' }}>{claimErr}</div>}
+
+      {isWinner && prize && (
+        <div className="pvp-prize-anim">
+          <div className="pvp-prize-title">Prize Distribution</div>
+          <div className="pvp-prize-row pvp-prize-winner">
+            <span>You (90%)</span><span className="mono">+{prize.winnerPrize} UTGO</span>
+          </div>
+          <div className="pvp-prize-row">
+            <span>Treasury (8%)</span><span className="mono">{prize.treasuryFee} UTGO</span>
+          </div>
+          <div className="pvp-prize-row">
+            <span>Burned (2%)</span><span className="mono">{prize.burned} UTGO 🔥</span>
+          </div>
+        </div>
+      )}
+
+      {claiming && (
+        <div style={{ color: C.text, fontSize: '0.85rem', margin: '0.5rem 0' }}>
+          Funds are being sent to your wallet…
+        </div>
+      )}
+      {claimed && txHash && (
+        <div style={{ color: C.emerald, fontSize: '0.8rem', wordBreak: 'break-all', margin: '0.25rem 0' }}>
+          Tx: {txHash}
+        </div>
+      )}
+      {claimErr && <div style={{ color: C.rose, fontSize: '0.8rem', margin: '0.25rem 0' }}>{claimErr}</div>}
+
       <div className="pvp-result-btns">
         {isWinner && claimCalldata && !claimed && (
           <button className="primary-btn" onClick={handleClaim} disabled={claiming}>
@@ -8740,7 +8956,7 @@ function PvpArena({ user, authOk }) {
     }).catch(() => {});
   }, []);
 
-  // Poll for opponent joining while in matchmaking
+  // Poll for opponent joining while in matchmaking; also refresh cancelQueueCalldata
   useEffect(() => {
     if (phase !== 'matchmaking' || !match) return;
     const poll = async () => {
@@ -8750,18 +8966,21 @@ function PvpArena({ user, authOk }) {
         clearInterval(pollRef.current);
         setMatch(body);
         setPhase('game');
+      } else {
+        // Refresh cancelQueueCalldata when it becomes available after 120s
+        setMatch(prev => prev ? { ...prev, cancelQueueCalldata: body.cancelQueueCalldata || prev.cancelQueueCalldata } : prev);
       }
     };
     pollRef.current = setInterval(poll, 2000);
     return () => clearInterval(pollRef.current);
   }, [phase, match && match.matchId]);
 
-  const handleJoin = async (wagerUtgo) => {
+  const handleJoin = async (betTier) => {
     if (!playerAddr) return;
-    setJoining(wagerUtgo);
+    setJoining(betTier);
     const { ok, body } = await api('/api/pvp/join', {
       method: 'POST',
-      body: JSON.stringify({ wagerUtgo, playerAddr }),
+      body: JSON.stringify({ betTier, playerAddr }),
     });
     setJoining(null);
     if (!ok || !body) return;
@@ -8773,6 +8992,12 @@ function PvpArena({ user, authOk }) {
     if (match) {
       await api(`/api/pvp/match/${match.matchId}/cancel`, { method: 'DELETE' });
     }
+    clearInterval(pollRef.current);
+    setMatch(null);
+    setPhase('lobby');
+  };
+
+  const handleReclaim = () => {
     clearInterval(pollRef.current);
     setMatch(null);
     setPhase('lobby');
@@ -8793,7 +9018,12 @@ function PvpArena({ user, authOk }) {
     return <PvpLobby user={user} balance={balance} onJoin={handleJoin} joining={joining} />;
   }
   if (phase === 'matchmaking') {
-    return <PvpMatchmaking match={match} onCancel={handleCancel} />;
+    return <PvpMatchmaking
+      match={match}
+      onCancel={handleCancel}
+      onReclaim={handleReclaim}
+      cancelQueueCalldata={match && match.cancelQueueCalldata}
+    />;
   }
   if (phase === 'game' && match) {
     return <PvpGameScreen match={match} playerIsP1={playerIsP1} onResult={handleResult} />;

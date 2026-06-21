@@ -13,8 +13,22 @@ interface IERC20 {
  *         Players deposit equal wagers; backend signs the winner via ECDSA;
  *         winner calls claimWin to collect 90% of pot; 8% to treasury; 2% burned.
  *         emergencyWithdraw allows trustless refunds after 24 h with no activity.
+ *         cancelQueue allows trustless refunds after 120 s if no opponent joined.
  */
 contract WagerEscrow {
+    // ── Reentrancy guard ───────────────────────────────────────────────────
+
+    uint256 private _reentrancyStatus;
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED     = 2;
+
+    modifier nonReentrant() {
+        require(_reentrancyStatus != _ENTERED, "ReentrancyGuard: reentrant call");
+        _reentrancyStatus = _ENTERED;
+        _;
+        _reentrancyStatus = _NOT_ENTERED;
+    }
+
     // ── Types ──────────────────────────────────────────────────────────────
 
     enum MatchStatus { Pending, Active, Settled, Cancelled }
@@ -39,15 +53,18 @@ contract WagerEscrow {
     address public immutable treasury;
     address public constant  BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    uint256 public constant  WINNER_BPS   = 9000;  // 90%
-    uint256 public constant  TREASURY_BPS = 800;   // 8%
-    uint256 public constant  BURN_BPS     = 200;   // 2%
+    uint256 public constant  WINNER_BPS     = 9000;   // 90%
+    uint256 public constant  TREASURY_BPS   = 800;    // 8%
+    uint256 public constant  BURN_BPS       = 200;    // 2%
     uint256 public constant  EMERGENCY_DELAY = 24 hours;
+    uint256 public constant  QUEUE_TIMEOUT   = 120;   // seconds
 
     // matchId => Match
     mapping(bytes32 => Match) public matches;
-    // prevent signature replay
+    // prevent signature replay (legacy — kept for compatibility)
     mapping(bytes32 => bool)  public usedSigs;
+    // anti-replay registry: matchId consumed after claimWin distributes funds
+    mapping(bytes32 => bool)  public executedMatches;
 
     // ── Events ─────────────────────────────────────────────────────────────
 
@@ -57,6 +74,7 @@ contract WagerEscrow {
     event WinClaimed(bytes32 indexed matchId, address winner, uint256 payout);
     event Refunded(bytes32 indexed matchId, address player, uint256 amount);
     event EmergencyWithdrawn(bytes32 indexed matchId, address player, uint256 amount);
+    event QueueCancelled(bytes32 indexed matchId, address player, uint256 amount);
 
     // ── Constructor ────────────────────────────────────────────────────────
 
@@ -67,6 +85,7 @@ contract WagerEscrow {
         utgoToken = IERC20(_utgoToken);
         validator = _validator;
         treasury  = _treasury;
+        _reentrancyStatus = _NOT_ENTERED;
     }
 
     // ── External: setup ────────────────────────────────────────────────────
@@ -135,17 +154,41 @@ contract WagerEscrow {
     }
 
     /**
+     * @notice Trustless 120-second queue withdrawal. Player1 can call this after
+     *         QUEUE_TIMEOUT seconds have elapsed since first deposit, provided no
+     *         opponent has deposited yet. No server signature required.
+     */
+    function cancelQueue(bytes32 matchId) external nonReentrant {
+        Match storage m = matches[matchId];
+        require(m.player1 != address(0), "no match");
+        require(msg.sender == m.player1, "not player1");
+        require(m.p1Deposited, "nothing to cancel");
+        require(!m.p2Deposited, "match already filled");
+        require(m.status == MatchStatus.Pending, "not pending");
+        require(block.timestamp > m.createdAt + QUEUE_TIMEOUT, "timeout not reached");
+
+        m.status    = MatchStatus.Cancelled;
+        m.settledAt = uint64(block.timestamp);
+        m.p1Deposited = false;
+
+        require(utgoToken.transfer(m.player1, m.wagerAmount), "refund failed");
+        emit QueueCancelled(matchId, m.player1, m.wagerAmount);
+    }
+
+    /**
      * @notice Winner claims their payout. Backend provides an ECDSA signature
      *         over (matchId, winner). Payout: 90% to winner, 8% treasury, 2% burn.
+     *         Protected by nonReentrant and executedMatches anti-replay registry.
      */
     function claimWin(
         bytes32 matchId,
         address winner,
         bytes calldata signature
-    ) external {
+    ) external nonReentrant {
         Match storage m = matches[matchId];
         require(m.status == MatchStatus.Active, "not active");
         require(winner == m.player1 || winner == m.player2, "not a player");
+        require(!executedMatches[matchId], "already executed");
 
         // Verify backend ECDSA signature
         bytes32 msgHash = keccak256(abi.encodePacked(
@@ -156,7 +199,8 @@ contract WagerEscrow {
         address signer = _recoverSigner(msgHash, signature);
         require(signer == validator, "bad sig");
 
-        usedSigs[msgHash] = true;
+        usedSigs[msgHash]       = true;
+        executedMatches[matchId] = true;   // burn matchId — cannot be replayed
         m.status    = MatchStatus.Settled;
         m.settledAt = uint64(block.timestamp);
 
@@ -165,8 +209,8 @@ contract WagerEscrow {
         uint256 tresPay  = pot * TREASURY_BPS / 10000;
         uint256 burnPay  = pot - winPay - tresPay;  // remainder = 2%
 
-        require(utgoToken.transfer(winner,      winPay),  "winner transfer");
-        require(utgoToken.transfer(treasury,    tresPay), "treasury transfer");
+        require(utgoToken.transfer(winner,       winPay),  "winner transfer");
+        require(utgoToken.transfer(treasury,     tresPay), "treasury transfer");
         require(utgoToken.transfer(BURN_ADDRESS, burnPay), "burn transfer");
 
         emit WinClaimed(matchId, winner, winPay);
@@ -175,14 +219,19 @@ contract WagerEscrow {
     /**
      * @notice Refund both players if match was cancelled before both deposited.
      *         Only callable by validator (backend cancels on timeout / disconnect).
+     *         Protected by nonReentrant.
      */
-    function refund(bytes32 matchId) external {
+    function refund(bytes32 matchId) external nonReentrant {
         require(msg.sender == validator, "not validator");
         Match storage m = matches[matchId];
         require(m.player1 != address(0), "no match");
-        require(m.status == MatchStatus.Pending, "not pending");
+        require(
+            m.status == MatchStatus.Pending || m.status == MatchStatus.Active,
+            "not refundable"
+        );
 
-        m.status = MatchStatus.Cancelled;
+        m.status    = MatchStatus.Cancelled;
+        m.settledAt = uint64(block.timestamp);
 
         if (m.p1Deposited) {
             m.p1Deposited = false;

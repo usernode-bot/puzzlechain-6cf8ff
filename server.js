@@ -13,7 +13,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -58,6 +58,78 @@ async function migrate() {
     )
   `);
 
+  // poker_chips is PUBLIC — chip counts contain no sensitive data.
+  // One row per user; upserted after every hand.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS poker_chips (
+      user_id    TEXT        PRIMARY KEY,
+      chips      INTEGER     NOT NULL DEFAULT 1000,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Staging seed: give staging-demo-user 2500 chips so testers see a
+  // non-default chip count in the lobby card. Idempotent, no-op in prod.
+  if (IS_STAGING) {
+    await pool.query(
+      `INSERT INTO poker_chips (user_id, chips)
+       VALUES ('staging-demo-user', 2500)
+       ON CONFLICT (user_id) DO NOTHING`
+    );
+  }
+
+  // idle_game_state is PUBLIC: game state, no sensitive data.
+  // One row per user; tracks currency, prestige, units owned, upgrades.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS idle_game_state (
+      id              SERIAL PRIMARY KEY,
+      user_id         TEXT NOT NULL UNIQUE,
+      currency        BIGINT NOT NULL DEFAULT 0,
+      peak_currency   BIGINT NOT NULL DEFAULT 0,
+      prestige_points INTEGER NOT NULL DEFAULT 0,
+      tap_power       DECIMAL NOT NULL DEFAULT 1,
+      units_owned     JSONB NOT NULL DEFAULT '{}',
+      upgrades        JSONB NOT NULL DEFAULT '{}',
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // diamond_rush_progress is PUBLIC: per-user game progress, no sensitive
+  // data (and a future leaderboard would want it visible). One row per user.
+  // cleared_levels: array of cleared level numbers. best_results: map of
+  // level -> { gems, timeSecs, score }. total_gems: lifetime gems collected.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS diamond_rush_progress (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      cleared_levels JSONB NOT NULL DEFAULT '[]',
+      best_results   JSONB NOT NULL DEFAULT '{}',
+      total_gems     INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // snake_scores is PUBLIC — high scores for the Snake classic game, shown on
+  // a global leaderboard (no sensitive data; gameplay results only). One row
+  // per user holding their personal best, upserted with GREATEST so a worse
+  // run never clobbers a better one. No foreign keys (public-table rule).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS snake_scores (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      best_score     INTEGER NOT NULL DEFAULT 0,
+      best_length    INTEGER,
+      best_time_secs INTEGER,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   // Staging seeds for mancala_rooms so testers can exercise all states
   // without needing a second device. Strictly a no-op in production.
   if (IS_STAGING) {
@@ -87,6 +159,27 @@ async function migrate() {
        ON CONFLICT (id) DO NOTHING`,
       [midPits]
     );
+
+    // Snake leaderboard seed — newly created table is empty in staging, so the
+    // leaderboard tab would have nothing to show. Obviously-fake users with a
+    // spread of scores so the ranking is visibly sorted. Idempotent; no-op in
+    // production.
+    const snakeSeed = [
+      ['snake-demo-1', 'staging-snake-pro',    480, 51, 142],
+      ['snake-demo-2', 'staging-snake-ace',    360, 39, 118],
+      ['snake-demo-3', 'staging-snake-rookie', 210, 24, 77],
+      ['snake-demo-4', 'staging-snake-fan',    150, 18, 55],
+      ['snake-demo-5', 'staging-snake-newbie', 90,  12, 33],
+    ];
+    for (const [uid, uname, best, len, secs] of snakeSeed) {
+      await pool.query(
+        `INSERT INTO snake_scores
+           (user_id, username, best_score, best_length, best_time_secs, games_played)
+         VALUES ($1, $2, $3, $4, $5, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, best, len, secs]
+      );
+    }
   }
 }
 
@@ -494,6 +587,480 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
   } catch (err) {
     console.error('[mancala] move failed:', err.message);
     res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// ---- Poker chips API -----------------------------------------------------
+
+// GET /api/poker/chips — returns the player's persistent chip count.
+// Lazy init: no row yet → return the default 1000 without inserting.
+app.get('/api/poker/chips', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT chips FROM poker_chips WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json({ chips: rows.length > 0 ? rows[0].chips : 1000 });
+  } catch (err) {
+    console.error('[poker] GET chips failed:', err.message);
+    res.status(500).json({ error: 'Failed to load chips' });
+  }
+});
+
+// POST /api/poker/chips { chips: N } — upsert the player's chip count.
+app.post('/api/poker/chips', async (req, res) => {
+  const chips = Math.round(Number(req.body.chips));
+  if (!Number.isFinite(chips) || chips < 0) {
+    return res.status(400).json({ error: 'chips must be a non-negative integer' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO poker_chips (user_id, chips)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET chips = EXCLUDED.chips, updated_at = now()
+       RETURNING chips`,
+      [req.user.id, chips]
+    );
+    res.json({ chips: rows[0].chips });
+  } catch (err) {
+    console.error('[poker] POST chips failed:', err.message);
+    res.status(500).json({ error: 'Failed to save chips' });
+  }
+});
+
+// ---- Idle clicker API -------------------------------------------------------
+
+app.get('/api/idle/state', async (req, res) => {
+  try {
+    const demo = req.query.demo;
+    if (IS_STAGING && demo === 'progress') {
+      await pool.query(
+        `INSERT INTO idle_game_state
+           (user_id, currency, peak_currency, prestige_points, units_owned, upgrades)
+         VALUES ($1, 50000, 100000, 5, $2, $3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [
+          req.user.id,
+          JSON.stringify({ worker: 10, coinpress: 5, goldenwheel: 2 }),
+          JSON.stringify({ iron_paws: 3, worker_motivation: 2 })
+        ]
+      );
+    }
+
+    let { rows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (rows.length === 0) {
+      await pool.query(
+        `INSERT INTO idle_game_state (user_id)
+         VALUES ($1)
+         ON CONFLICT (user_id) DO NOTHING
+         RETURNING *`,
+        [req.user.id]
+      );
+      rows = await pool.query(
+        'SELECT * FROM idle_game_state WHERE user_id = $1',
+        [req.user.id]
+      ).then(r => r.rows);
+    }
+
+    const row = rows[0];
+    res.json({
+      currency: row.currency,
+      peakCurrency: row.peak_currency,
+      prestigePoints: row.prestige_points,
+      tapPower: row.tap_power,
+      unitsOwned: row.units_owned || {},
+      upgrades: row.upgrades || {},
+    });
+  } catch (err) {
+    console.error('[idle] GET state failed:', err.message);
+    res.status(500).json({ error: 'Failed to load state' });
+  }
+});
+
+app.post('/api/idle/tap', async (req, res) => {
+  try {
+    const tapCount = Number.isFinite(req.body.tapCount) ? Math.max(1, Math.round(req.body.tapCount)) : 1;
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = currency + $2,
+             peak_currency = GREATEST(peak_currency, currency + $2),
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, tapCount]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+    const row = rows[0];
+    res.json({
+      currency: row.currency,
+      unitsOwned: row.units_owned || {},
+    });
+  } catch (err) {
+    console.error('[idle] tap failed:', err.message);
+    res.status(500).json({ error: 'Failed to record tap' });
+  }
+});
+
+app.post('/api/idle/buy-unit', async (req, res) => {
+  try {
+    const unitId = req.body.unitId;
+    if (!unitId || typeof unitId !== 'string') return res.status(400).json({ error: 'Invalid unitId' });
+
+    const IDLE_UNITS = {
+      worker: { baseCost: 10, incomePerSec: 0.1 },
+      coinpress: { baseCost: 100, incomePerSec: 1 },
+      goldenwheel: { baseCost: 1000, incomePerSec: 10 },
+      vault: { baseCost: 10000, incomePerSec: 100 },
+    };
+
+    if (!IDLE_UNITS[unitId]) return res.status(400).json({ error: 'Unknown unit' });
+
+    const { rows: stateRows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (stateRows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+
+    const row = stateRows[0];
+    const unitsOwned = row.units_owned || {};
+    const count = unitsOwned[unitId] || 0;
+    const cost = Math.ceil(IDLE_UNITS[unitId].baseCost * Math.pow(1.15, count));
+
+    if (row.currency < cost) return res.status(409).json({ error: 'Insufficient currency' });
+
+    unitsOwned[unitId] = count + 1;
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = currency - $2,
+             units_owned = $3,
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, cost, JSON.stringify(unitsOwned)]
+    );
+
+    const updated = rows[0];
+    res.json({
+      currency: updated.currency,
+      unitsOwned: updated.units_owned || {},
+    });
+  } catch (err) {
+    console.error('[idle] buy-unit failed:', err.message);
+    res.status(500).json({ error: 'Failed to purchase unit' });
+  }
+});
+
+app.post('/api/idle/upgrade', async (req, res) => {
+  try {
+    const upgradeId = req.body.upgradeId;
+    if (!upgradeId || typeof upgradeId !== 'string') return res.status(400).json({ error: 'Invalid upgradeId' });
+
+    const IDLE_UPGRADES = {
+      iron_paws: { baseCost: 50, maxLevel: 10, effect: 'tap', multiplier: 1.1 },
+      worker_motivation: { baseCost: 150, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+      coinpress_boost: { baseCost: 500, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+      goldenwheel_boost: { baseCost: 5000, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+      vault_boost: { baseCost: 50000, maxLevel: 5, effect: 'unit', multiplier: 1.25 },
+    };
+
+    if (!IDLE_UPGRADES[upgradeId]) return res.status(400).json({ error: 'Unknown upgrade' });
+
+    const { rows: stateRows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (stateRows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+
+    const row = stateRows[0];
+    const upgrades = row.upgrades || {};
+    const currentLevel = upgrades[upgradeId] || 0;
+    const upgrade = IDLE_UPGRADES[upgradeId];
+
+    if (currentLevel >= upgrade.maxLevel) return res.status(409).json({ error: 'Upgrade already maxed' });
+
+    const cost = Math.ceil(upgrade.baseCost * Math.pow(1.1, currentLevel));
+
+    if (row.currency < cost) return res.status(409).json({ error: 'Insufficient currency' });
+
+    upgrades[upgradeId] = currentLevel + 1;
+    let tapPower = row.tap_power;
+    if (upgrade.effect === 'tap' && upgradeId === 'iron_paws') {
+      tapPower = parseFloat((parseFloat(row.tap_power) * upgrade.multiplier).toFixed(6));
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = currency - $2,
+             upgrades = $3,
+             tap_power = $4,
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, cost, JSON.stringify(upgrades), tapPower]
+    );
+
+    const updated = rows[0];
+    res.json({
+      currency: updated.currency,
+      upgrades: updated.upgrades || {},
+      tapPower: updated.tap_power,
+    });
+  } catch (err) {
+    console.error('[idle] upgrade failed:', err.message);
+    res.status(500).json({ error: 'Failed to purchase upgrade' });
+  }
+});
+
+app.post('/api/idle/prestige', async (req, res) => {
+  try {
+    const { rows: stateRows } = await pool.query(
+      'SELECT * FROM idle_game_state WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (stateRows.length === 0) return res.status(404).json({ error: 'Game state not found' });
+
+    const row = stateRows[0];
+    const prestigeBonus = Math.floor(Math.sqrt(row.peak_currency / 1000));
+    const newPrestigePoints = row.prestige_points + prestigeBonus;
+
+    const { rows } = await pool.query(
+      `UPDATE idle_game_state
+         SET currency = 0,
+             prestige_points = $2,
+             tap_power = 1,
+             units_owned = '{}',
+             upgrades = '{}',
+             updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [req.user.id, newPrestigePoints]
+    );
+
+    const updated = rows[0];
+    res.json({
+      prestigePoints: updated.prestige_points,
+      prestigeBonus,
+      currency: updated.currency,
+      unitsOwned: updated.units_owned || {},
+      upgrades: updated.upgrades || {},
+    });
+  } catch (err) {
+    console.error('[idle] prestige failed:', err.message);
+    res.status(500).json({ error: 'Failed to prestige' });
+  }
+});
+
+// ---- Diamond Rush API -------------------------------------------------------
+
+// Phase 1 ships 5 handcrafted levels. Used to validate level-complete posts.
+const DIAMOND_LEVEL_COUNT = 5;
+
+function shapeDiamondProgress(row) {
+  return {
+    clearedLevels: Array.isArray(row.cleared_levels) ? row.cleared_levels : [],
+    bestResults: row.best_results || {},
+    totalGems: row.total_gems || 0,
+  };
+}
+
+// Today's saved progress for the signed-in user; creates a default row on
+// first access (mirrors GET /api/idle/state's lazy insert).
+app.get('/api/diamond/progress', async (req, res) => {
+  try {
+    // Staging-only demo seed: gives the current viewer a partial save (levels
+    // 1-2 cleared, level 3 unlocked-but-unplayed) so the level-select UI's
+    // cleared/locked/best-result states are demonstrable on a fresh staging
+    // DB. Idempotent, obviously fake (round numbers), strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'progress') {
+      await pool.query(
+        `INSERT INTO diamond_rush_progress
+           (user_id, username, cleared_levels, best_results, total_gems)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          JSON.stringify([1, 2]),
+          JSON.stringify({
+            '1': { gems: 5, timeSecs: 22, score: 780 },
+            '2': { gems: 6, timeSecs: 41, score: 920 },
+          }),
+          11,
+        ]
+      );
+    }
+
+    let { rows } = await pool.query(
+      'SELECT * FROM diamond_rush_progress WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (rows.length === 0) {
+      await pool.query(
+        `INSERT INTO diamond_rush_progress (user_id, username)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id, req.user.username || null]
+      );
+      rows = await pool.query(
+        'SELECT * FROM diamond_rush_progress WHERE user_id = $1',
+        [req.user.id]
+      ).then(r => r.rows);
+    }
+
+    res.json(shapeDiamondProgress(rows[0]));
+  } catch (err) {
+    console.error('[diamond] GET progress failed:', err.message);
+    res.status(500).json({ error: 'Failed to load progress' });
+  }
+});
+
+// Record a cleared level. Upserts the level into cleared_levels, keeps the
+// best (highest-score) result per level, and recomputes total_gems.
+app.post('/api/diamond/level-complete', async (req, res) => {
+  const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
+  const gems = Number.isFinite(req.body.gems) ? Math.max(0, Math.round(req.body.gems)) : 0;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.max(0, Math.round(req.body.timeSecs)) : 0;
+  const score = Number.isFinite(req.body.score) ? Math.max(0, Math.round(req.body.score)) : 0;
+  if (level === null || level < 1 || level > DIAMOND_LEVEL_COUNT) {
+    return res.status(400).json({ error: 'Invalid level' });
+  }
+  try {
+    // Ensure a row exists, then read-modify-write its JSONB fields.
+    await pool.query(
+      `INSERT INTO diamond_rush_progress (user_id, username)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows } = await pool.query(
+      'SELECT * FROM diamond_rush_progress WHERE user_id = $1',
+      [req.user.id]
+    );
+    const row = rows[0];
+    const cleared = new Set(Array.isArray(row.cleared_levels) ? row.cleared_levels : []);
+    cleared.add(level);
+    const best = row.best_results || {};
+    const prev = best[String(level)];
+    if (!prev || score > prev.score) {
+      best[String(level)] = { gems, timeSecs, score };
+    }
+    const totalGems = Object.values(best).reduce((acc, r) => acc + (r.gems || 0), 0);
+
+    const { rows: updated } = await pool.query(
+      `UPDATE diamond_rush_progress
+         SET cleared_levels = $2, best_results = $3, total_gems = $4,
+             username = COALESCE(username, $5), updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [
+        req.user.id,
+        JSON.stringify(Array.from(cleared).sort((a, b) => a - b)),
+        JSON.stringify(best),
+        totalGems,
+        req.user.username || null,
+      ]
+    );
+    res.json(shapeDiamondProgress(updated[0]));
+  } catch (err) {
+    console.error('[diamond] level-complete failed:', err.message);
+    res.status(500).json({ error: 'Failed to record level' });
+  }
+});
+
+// ---- Snake leaderboard API -----------------------------------------------
+
+const SNAKE_LB_LIMIT = 20;
+
+function shapeSnakeRow(row) {
+  return {
+    rank: Number(row.rank),
+    username: row.username,
+    bestScore: row.best_score,
+  };
+}
+
+// Submit a finished run. Upserts the caller's personal-best row (GREATEST so a
+// worse run never lowers it) and bumps games_played. Identity from req.user.
+app.post('/api/snake/score', async (req, res) => {
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const length = Number.isFinite(req.body.length) ? Math.round(req.body.length) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  if (score === null) return res.status(400).json({ error: 'score is required' });
+  try {
+    // Update best_length/best_time_secs only when this run set a new best score.
+    const { rows } = await pool.query(
+      `INSERT INTO snake_scores
+         (user_id, username, best_score, best_length, best_time_secs, games_played, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         username       = EXCLUDED.username,
+         best_length    = CASE WHEN EXCLUDED.best_score > snake_scores.best_score
+                               THEN EXCLUDED.best_length ELSE snake_scores.best_length END,
+         best_time_secs = CASE WHEN EXCLUDED.best_score > snake_scores.best_score
+                               THEN EXCLUDED.best_time_secs ELSE snake_scores.best_time_secs END,
+         best_score     = GREATEST(snake_scores.best_score, EXCLUDED.best_score),
+         games_played   = snake_scores.games_played + 1,
+         updated_at     = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, score, length, timeSecs]
+    );
+    const me = rows[0];
+    // Caller's current rank (1-based) by best_score, ties broken by who got
+    // there first — same ordering as the leaderboard query.
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM snake_scores
+        WHERE best_score > $1
+           OR (best_score = $1 AND updated_at < $2)`,
+      [me.best_score, me.updated_at]
+    );
+    res.json({
+      bestScore: me.best_score,
+      rank: Number(rankRows[0].rank),
+      gamesPlayed: me.games_played,
+    });
+  } catch (err) {
+    console.error('[snake] score failed:', err.message);
+    res.status(500).json({ error: 'Failed to record score' });
+  }
+});
+
+// Top scores plus the caller's own standing (even when outside the top N).
+app.get('/api/snake/leaderboard', async (req, res) => {
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM snake_scores
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $1`,
+      [SNAKE_LB_LIMIT]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT username, best_score, updated_at FROM snake_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM snake_scores
+          WHERE best_score > $1
+             OR (best_score = $1 AND updated_at < $2)`,
+        [row.best_score, row.updated_at]
+      );
+      me = { rank: Number(rankRows[0].rank), username: row.username, bestScore: row.best_score };
+    }
+
+    res.json({ top: top.map(shapeSnakeRow), me });
+  } catch (err) {
+    console.error('[snake] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
 

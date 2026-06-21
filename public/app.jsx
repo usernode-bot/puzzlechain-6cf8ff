@@ -2335,7 +2335,220 @@ body {
 .dr-end .dr-stats { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
 .dr-end-btns { display: flex; flex-direction: column; gap: 0.55rem; width: 100%; margin-top: 0.5rem; }
 .dr-hint { color: ${C.muted}; font-size: 0.8rem; }
+
+/* ---- Wallet Dashboard ---- */
+.wallet-section {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem;
+  width: 100%;
+}
+.wallet-head { margin-bottom: 1.5rem; }
+.wallet-head h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+.wallet-head p { color: ${C.muted}; margin-top: 0.25rem; font-size: 0.92rem; }
+
+.wallet-balance-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 480px) {
+  .wallet-balance-row { grid-template-columns: 1fr; }
+}
+.wallet-balance-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 14px;
+  padding: 1.1rem;
+  position: relative;
+  overflow: hidden;
+}
+.wallet-balance-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--wallet-accent, ${C.accent});
+}
+.wallet-balance-card .wbc-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin-bottom: 0.35rem;
+}
+.wallet-balance-card .wbc-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--wallet-accent, ${C.accent});
+  line-height: 1.1;
+}
+.wallet-balance-card .wbc-sub {
+  font-size: 0.72rem;
+  color: ${C.muted};
+  margin-top: 0.25rem;
+}
+.wbc-spinner {
+  display: inline-block;
+  width: 1rem; height: 1rem;
+  border: 2px solid ${C.border};
+  border-top-color: ${C.accent};
+  border-radius: 50%;
+  animation: wbc-spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 0.4rem;
+}
+@keyframes wbc-spin { to { transform: rotate(360deg); } }
+
+.wallet-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.wallet-action-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.6rem 1rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  color: ${C.text};
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.wallet-action-btn:hover:not(:disabled) {
+  border-color: ${C.accent};
+  background: ${C.accent}1a;
+}
+.wallet-action-btn.primary-wallet {
+  background: ${C.accent};
+  border-color: ${C.accent};
+  color: #fff;
+}
+.wallet-action-btn.primary-wallet:hover:not(:disabled) {
+  background: ${C.accent}cc;
+  border-color: ${C.accent};
+}
+.wallet-action-btn:disabled { opacity: 0.5; cursor: default; }
+.wallet-faucet-countdown {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: ${C.muted};
+  margin-top: 0.15rem;
+}
+
+.wallet-action-form {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+.wallet-action-form h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.wallet-form-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.wallet-amount-input {
+  flex: 1;
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 8px;
+  color: ${C.text};
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+}
+.wallet-amount-input:focus { border-color: ${C.accent}; }
+.wallet-form-hint { font-size: 0.75rem; color: ${C.muted}; margin-top: 0.4rem; }
+.wallet-banner {
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+.wallet-banner.success { background: ${C.emerald}22; color: ${C.emerald}; border: 1px solid ${C.emerald}44; }
+.wallet-banner.error   { background: ${C.rose}22;    color: ${C.rose};    border: 1px solid ${C.rose}44; }
+
+.wallet-tx-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+.wallet-tx-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+.wallet-tx-tab {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid ${C.border};
+  background: transparent;
+  color: ${C.muted};
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.wallet-tx-tab.active {
+  background: ${C.accent};
+  border-color: ${C.accent};
+  color: #fff;
+}
+.wallet-tx-tab:not(.active):hover { border-color: ${C.accent}; color: ${C.text}; }
+.wallet-tx-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.wallet-tx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  gap: 0.75rem;
+}
+.wallet-tx-icon { font-size: 1.1rem; flex: 0 0 auto; }
+.wallet-tx-body { flex: 1; min-width: 0; }
+.wallet-tx-type { font-size: 0.82rem; font-weight: 600; text-transform: capitalize; }
+.wallet-tx-time { font-size: 0.72rem; color: ${C.muted}; margin-top: 0.05rem; }
+.wallet-tx-hash {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: ${C.accent};
+  margin-top: 0.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+.wallet-tx-right { text-align: right; flex: 0 0 auto; }
+.wallet-tx-amount { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; }
+.wallet-tx-amount-in  { color: ${C.emerald}; }
+.wallet-tx-amount-out { color: ${C.rose}; }
+.wallet-tx-empty {
+  text-align: center;
+  color: ${C.muted};
+  font-size: 0.88rem;
+  padding: 2rem 0;
+}
+.wallet-no-wallet {
+  text-align: center;
+  color: ${C.muted};
+  font-size: 0.88rem;
+  padding: 1rem 0;
+}
 `;
+
 
 /* ============================================================
    Shared timer hook
@@ -2379,6 +2592,31 @@ function fmtCountdown(ms) {
   const m = Math.floor((t % 3600) / 60);
   const s = t % 60;
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+}
+
+// Encode an ERC-20 transfer(address,uint256) call without ethers.js.
+function encodeERC20Transfer(toAddr, amountWei) {
+  const selector = 'a9059cbb';
+  const paddedTo  = toAddr.replace(/^0x/, '').toLowerCase().padStart(64, '0');
+  const hex       = amountWei.toString(16);
+  const paddedAmt = hex.padStart(64, '0');
+  return '0x' + selector + paddedTo + paddedAmt;
+}
+
+// Convert whole-UTGO string → BigInt 18-decimal wei string.
+function toUtgo18(wholeUtgo) {
+  const [int, dec = ''] = String(wholeUtgo).split('.');
+  const full = (int + dec.padEnd(18, '0').slice(0, 18)).replace(/^0+/, '') || '0';
+  return full;
+}
+
+// Human-relative time ("2 min ago", "just now").
+function relativeTime(isoStr) {
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60)   return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
+  return `${Math.floor(diff / 86400)} d ago`;
 }
 
 // "12h 45m" for a millisecond remainder — hours + minutes only.
@@ -2591,6 +2829,292 @@ function SudokuGame({ onWin, onStepChange }) {
       </div>
       <div className="numpad" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
         <button className="numkey erase" onClick={() => place(0)}>Erase</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Wallet Dashboard
+   ============================================================ */
+function WalletScreen({ walletData, onRefresh, onBack, isStaging }) {
+  const [activeForm, setActiveForm]     = useState(null); // 'deposit' | 'withdraw' | null
+  const [txTab, setTxTab]               = useState('all');
+  const [amount, setAmount]             = useState('');
+  const [txRows, setTxRows]             = useState(null);
+  const [txLoading, setTxLoading]       = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [banner, setBanner]             = useState(null); // { type: 'success'|'error', msg }
+  const [faucetSecs, setFaucetSecs]     = useState(0);
+
+  const wd = walletData || {};
+  const inGame    = wd.inGameBalance    != null ? Number(wd.inGameBalance).toFixed(2)    : '—';
+  const walletBal = wd.walletBalance    != null ? Number(wd.walletBalance).toFixed(2)    : '—';
+  const walletAddr = wd.walletAddr || null;
+  const depositWallet = wd.depositWallet || null;
+  const demoUtgoAddress = wd.demoUtgoAddress || null;
+
+  // Faucet countdown ticker
+  useEffect(() => {
+    const initial = wd.faucetCooldownSecs ? Math.max(0, Math.round(wd.faucetCooldownSecs)) : 0;
+    setFaucetSecs(initial);
+    if (!initial) return;
+    const id = setInterval(() => setFaucetSecs(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [wd.faucetCooldownSecs]);
+
+  // Load transactions
+  useEffect(() => {
+    loadTx(txTab);
+  }, [txTab]);
+
+  async function loadTx(tab) {
+    setTxLoading(true);
+    const typeQ = tab !== 'all' ? `?type=${tab}` : '';
+    const r = await api(`/api/wallet/transactions${typeQ}`);
+    setTxLoading(false);
+    if (r.ok) setTxRows(r.body.transactions || []);
+  }
+
+  function showBanner(type, msg) {
+    setBanner({ type, msg });
+    setTimeout(() => setBanner(null), 5000);
+  }
+
+  async function handleFaucet() {
+    setActionLoading(true);
+    const r = await api('/api/wallet/faucet', { method: 'POST' });
+    setActionLoading(false);
+    if (r.ok) {
+      showBanner('success', `Claimed 1,000 UTGO! In-game balance updated.`);
+      onRefresh && onRefresh();
+      loadTx(txTab);
+    } else {
+      showBanner('error', r.body?.error || 'Faucet claim failed.');
+    }
+  }
+
+  async function handleDeposit() {
+    if (!walletAddr || !depositWallet || !demoUtgoAddress) {
+      showBanner('error', 'Wallet not connected or contract address unavailable.');
+      return;
+    }
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { showBanner('error', 'Enter a valid amount.'); return; }
+    setActionLoading(true);
+    try {
+      const amountWei = toUtgo18(amount);
+      const data = encodeERC20Transfer(depositWallet, BigInt(amountWei));
+      const txHash = await window.usernode.sendTransaction({
+        to: demoUtgoAddress,
+        data,
+        value: '0x0',
+      });
+      const r = await api('/api/wallet/deposit-confirmed', {
+        method: 'POST',
+        body: JSON.stringify({ txHash, amount: amt }),
+      });
+      if (r.ok) {
+        showBanner('success', `Deposited ${amt} UTGO! In-game balance updated.`);
+        setAmount('');
+        setActiveForm(null);
+        onRefresh && onRefresh();
+        loadTx(txTab);
+      } else {
+        showBanner('error', r.body?.error || 'Deposit confirmation failed.');
+      }
+    } catch (e) {
+      showBanner('error', e.message || 'Transaction failed.');
+    }
+    setActionLoading(false);
+  }
+
+  async function handleWithdraw() {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { showBanner('error', 'Enter a valid amount.'); return; }
+    setActionLoading(true);
+    const r = await api('/api/wallet/withdraw', {
+      method: 'POST',
+      body: JSON.stringify({ amount: amt }),
+    });
+    setActionLoading(false);
+    if (r.ok) {
+      showBanner('success', `Withdrew ${amt} UTGO to your wallet!`);
+      setAmount('');
+      setActiveForm(null);
+      onRefresh && onRefresh();
+      loadTx(txTab);
+    } else {
+      showBanner('error', r.body?.error || 'Withdrawal failed.');
+    }
+  }
+
+  const TX_TYPE_ICONS = { faucet: '🚰', deposit: '⬇️', withdrawal: '⬆️', win: '🏆', wager_win: '🎲', wager_lose: '🎲' };
+  const TX_TABS = ['all', 'faucet', 'deposit', 'withdrawal', 'win'];
+
+  return (
+    <div className="wallet-section">
+      <div className="wallet-head">
+        <button className="back-btn" onClick={onBack} style={{marginBottom:'0.75rem'}}>← Back</button>
+        <h1>Wallet</h1>
+        <p>Manage your $UTGO balance</p>
+      </div>
+
+      {banner && (
+        <div className={`wallet-banner ${banner.type}`}>{banner.msg}</div>
+      )}
+
+      <div className="wallet-balance-row">
+        <div className="wallet-balance-card" style={{'--wallet-accent': C.emerald}}>
+          <div className="wbc-label">In-Game Balance</div>
+          <div className="wbc-value">{walletData ? inGame : <span><span className="wbc-spinner"/>—</span>}</div>
+          <div className="wbc-sub">$UTGO · saved server-side</div>
+        </div>
+        <div className="wallet-balance-card" style={{'--wallet-accent': C.violet}}>
+          <div className="wbc-label">Wallet Balance</div>
+          <div className="wbc-value">{walletData ? walletBal : <span><span className="wbc-spinner"/>—</span>}</div>
+          <div className="wbc-sub">
+            {walletAddr
+              ? <span className="mono" style={{fontSize:'0.68rem'}}>{walletAddr.slice(0,6)}…{walletAddr.slice(-4)}</span>
+              : <span style={{color:C.muted}}>Not connected</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="wallet-actions">
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'0.2rem',flex:'1',minWidth:'100px'}}>
+          <button
+            className="wallet-action-btn primary-wallet"
+            onClick={handleFaucet}
+            disabled={actionLoading || faucetSecs > 0}
+          >
+            🚰 {faucetSecs > 0 ? 'Claimed' : 'Claim 1,000 UTGO'}
+          </button>
+          {faucetSecs > 0 && (
+            <div className="wallet-faucet-countdown">Next in {fmtCountdown(faucetSecs * 1000)}</div>
+          )}
+        </div>
+        <button
+          className={`wallet-action-btn ${activeForm === 'deposit' ? 'primary-wallet' : ''}`}
+          onClick={() => { setActiveForm(activeForm === 'deposit' ? null : 'deposit'); setAmount(''); setBanner(null); }}
+          disabled={actionLoading}
+        >
+          ⬇️ Deposit
+        </button>
+        <button
+          className={`wallet-action-btn ${activeForm === 'withdraw' ? 'primary-wallet' : ''}`}
+          onClick={() => { setActiveForm(activeForm === 'withdraw' ? null : 'withdraw'); setAmount(''); setBanner(null); }}
+          disabled={actionLoading}
+        >
+          ⬆️ Withdraw
+        </button>
+      </div>
+
+      {activeForm === 'deposit' && (
+        <div className="wallet-action-form">
+          <h3>Deposit $UTGO</h3>
+          {!walletAddr ? (
+            <div className="wallet-no-wallet">Connect your wallet in Usernode to deposit.</div>
+          ) : (
+            <>
+              <div className="wallet-form-row">
+                <input
+                  className="wallet-amount-input"
+                  type="number"
+                  min="0.01"
+                  step="any"
+                  placeholder="Amount"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                />
+                <button
+                  className="wallet-action-btn primary-wallet"
+                  style={{flex:'0 0 auto',minWidth:'80px'}}
+                  onClick={handleDeposit}
+                  disabled={actionLoading || !amount}
+                >
+                  {actionLoading ? '…' : 'Send'}
+                </button>
+              </div>
+              <div className="wallet-form-hint">
+                Sends tokens from your wallet to the deposit address. Requires wallet approval.
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {activeForm === 'withdraw' && (
+        <div className="wallet-action-form">
+          <h3>Withdraw $UTGO</h3>
+          <div className="wallet-form-row">
+            <input
+              className="wallet-amount-input"
+              type="number"
+              min="0.01"
+              step="any"
+              placeholder="Amount"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+            />
+            <button
+              className="wallet-action-btn primary-wallet"
+              style={{flex:'0 0 auto',minWidth:'80px'}}
+              onClick={handleWithdraw}
+              disabled={actionLoading || !amount}
+            >
+              {actionLoading ? '…' : 'Send'}
+            </button>
+          </div>
+          <div className="wallet-form-hint">
+            Withdraws from your in-game balance to your connected wallet.
+            {!walletAddr && <span style={{color:C.rose}}> No wallet connected — connect in Usernode first.</span>}
+          </div>
+        </div>
+      )}
+
+      <div className="wallet-tx-section">
+        <h3>Transaction History</h3>
+        <div className="wallet-tx-tabs">
+          {TX_TABS.map(tab => (
+            <button
+              key={tab}
+              className={`wallet-tx-tab ${txTab === tab ? 'active' : ''}`}
+              onClick={() => setTxTab(tab)}
+            >
+              {tab === 'all' ? 'All' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+        {txLoading ? (
+          <div className="wallet-tx-empty"><span className="wbc-spinner"/>Loading…</div>
+        ) : !txRows || txRows.length === 0 ? (
+          <div className="wallet-tx-empty">No transactions yet.</div>
+        ) : (
+          <div className="wallet-tx-list">
+            {txRows.map(tx => {
+              const isIn = ['faucet','deposit','win','wager_win'].includes(tx.type);
+              return (
+                <div className="wallet-tx-row" key={tx.id}>
+                  <span className="wallet-tx-icon">{TX_TYPE_ICONS[tx.type] || '💸'}</span>
+                  <div className="wallet-tx-body">
+                    <div className="wallet-tx-type">{tx.type.replace(/_/g,' ')}</div>
+                    <div className="wallet-tx-time">{relativeTime(tx.created_at)}</div>
+                    {tx.tx_hash && (
+                      <div className="wallet-tx-hash">{tx.tx_hash.slice(0,10)}…{tx.tx_hash.slice(-6)}</div>
+                    )}
+                  </div>
+                  <div className="wallet-tx-right">
+                    <div className={`wallet-tx-amount ${isIn ? 'wallet-tx-amount-in' : 'wallet-tx-amount-out'}`}>
+                      {isIn ? '+' : '-'}{Number(tx.amount_utgo).toFixed(2)}
+                    </div>
+                    <div style={{fontSize:'0.72rem',color:C.muted}}>UTGO</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -8690,7 +9214,10 @@ const GAMES = [
    Root app
    ============================================================ */
 function App() {
-  const [screen, setScreen] = useState('lobby'); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends'
+  const [screen, setScreen] = useState(() => {
+    const s = new URLSearchParams(window.location.search).get('screen');
+    return s === 'wallet' ? 'wallet' : 'lobby';
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet'
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -8715,6 +9242,8 @@ function App() {
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
+  // Wallet dashboard state
+  const [walletData, setWalletData] = useState(null);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -8748,7 +9277,15 @@ function App() {
     setLoading(false);
   };
 
-  useEffect(() => { loadDaily(); }, []);
+  const loadWalletState = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo');
+    const path = '/api/wallet/state' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
+    const { ok, body } = await api(path);
+    if (ok && body) setWalletData(body);
+  };
+
+  useEffect(() => { loadDaily(); loadWalletState(); }, []);
 
   // Midnight UTC reached — reload state so everything unlocks.
   const onReset = () => {
@@ -8936,6 +9473,14 @@ function App() {
                 {activeMult > 1 && <span className="mult-badge">×{activeMult}</span>}
               </div>
             </div>
+            {authOk && walletData && walletData.inGameBalance != null && (
+              <div className="nav-stat" style={{cursor:'pointer'}} onClick={() => setScreen('wallet')} title="Open Wallet">
+                <div className="label">$UTGO</div>
+                <div className="value mono" style={{color: C.emerald}}>
+                  {Number(walletData.inGameBalance).toFixed(0)}
+                </div>
+              </div>
+            )}
           </div>
           {authOk && (
             <button
@@ -8951,6 +9496,22 @@ function App() {
               onClick={() => setScreen('friends')}
             >
               👥 Friends
+            </button>
+          )}
+          {authOk && (
+            <button
+              className="primary-btn"
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                borderRadius: '8px'
+              }}
+              onClick={() => setScreen('wallet')}
+            >
+              💰 Wallet
             </button>
           )}
           <AccountChip loading={loading} authOk={authOk} user={user} />
@@ -8969,6 +9530,15 @@ function App() {
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
           onBack={() => setScreen('lobby')}
+        />
+      )}
+
+      {screen === 'wallet' && (
+        <WalletScreen
+          walletData={walletData}
+          onRefresh={loadWalletState}
+          onBack={() => setScreen('lobby')}
+          isStaging={false}
         />
       )}
 

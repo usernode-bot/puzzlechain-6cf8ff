@@ -2,11 +2,51 @@ const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
+const ethers = require('ethers');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 const IS_STAGING = process.env.USERNODE_ENV === 'staging';
+
+// ---- Wallet / DemoUTGO config -----------------------------------------------
+const VALIDATOR_PRIVATE_KEY = process.env.VALIDATOR_PRIVATE_KEY;
+const DEMO_UTGO_ADDRESS     = process.env.DEMO_UTGO_ADDRESS || null;
+const NODE_RPC_URL          = process.env.NODE_RPC_URL || '';
+
+const validatorWallet = VALIDATOR_PRIVATE_KEY
+  ? new ethers.Wallet(VALIDATOR_PRIVATE_KEY)
+  : null;
+
+// DEPOSIT_WALLET is the validator EOA that receives user deposits and sends withdrawals.
+const DEPOSIT_WALLET = validatorWallet ? validatorWallet.address : null;
+
+const demoUtgoProvider = NODE_RPC_URL
+  ? new ethers.JsonRpcProvider(NODE_RPC_URL)
+  : null;
+
+const demoUtgoWallet = (validatorWallet && demoUtgoProvider)
+  ? validatorWallet.connect(demoUtgoProvider)
+  : null;
+
+// Minimal ABI fragments needed for DemoUTGO operations.
+const DEMO_UTGO_ABI = [
+  'function balanceOf(address account) view returns (uint256)',
+  'function mint(address to, uint256 amount)',
+  'function transfer(address to, uint256 amount) returns (bool)',
+];
+
+// Returns a read-only DemoUTGO contract instance, or null in staging/unconfigured.
+function getDemoUtgoReadonly() {
+  if (!demoUtgoProvider || !DEMO_UTGO_ADDRESS) return null;
+  return new ethers.Contract(DEMO_UTGO_ADDRESS, DEMO_UTGO_ABI, demoUtgoProvider);
+}
+
+// Returns a signing DemoUTGO contract instance (validator wallet), or null.
+function getDemoUtgoSigner() {
+  if (!demoUtgoWallet || !DEMO_UTGO_ADDRESS) return null;
+  return new ethers.Contract(DEMO_UTGO_ADDRESS, DEMO_UTGO_ABI, demoUtgoWallet);
+}
 
 // Single shared connection pool to this app's Postgres DB.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -200,6 +240,52 @@ async function migrate() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_achievements_created
     ON user_achievements(created_at DESC)
+  `);
+
+  // utgo_balances is PRIVATE — tracks per-user in-game $UTGO balance.
+  // Financial data; must not be visible to other users in staging.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS utgo_balances (
+      user_id        TEXT PRIMARY KEY,
+      ingame_balance NUMERIC(20,8) NOT NULL DEFAULT 0,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE utgo_balances IS 'staging:private'`);
+
+  // utgo_faucet_claims is PRIVATE — per-user faucet cooldown tracking.
+  // Reveals user activity; must not leak across staging sessions.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS utgo_faucet_claims (
+      user_id    TEXT PRIMARY KEY,
+      claimed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE utgo_faucet_claims IS 'staging:private'`);
+
+  // utgo_transactions is PRIVATE — per-user financial history.
+  // type: 'faucet' | 'deposit' | 'withdraw' | 'pvp_win' | 'pvp_loss'
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS utgo_transactions (
+      id          BIGSERIAL PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      type        TEXT NOT NULL,
+      amount_utgo NUMERIC(20,8) NOT NULL,
+      tx_hash     TEXT,
+      status      TEXT NOT NULL DEFAULT 'confirmed',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE utgo_transactions IS 'staging:private'`);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_utgo_tx_user_created
+    ON utgo_transactions(user_id, created_at DESC)
+  `);
+  // Unique partial index on tx_hash to prevent double-crediting a deposit.
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_utgo_tx_hash_unique
+    ON utgo_transactions(tx_hash)
+    WHERE tx_hash IS NOT NULL
   `);
 
   // Staging seeds for social features: create demo users with follow
@@ -1450,6 +1536,336 @@ app.get('/api/snake/leaderboard', async (req, res) => {
   } catch (err) {
     console.error('[snake] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ---- Wallet API ---------------------------------------------------------------
+
+// Helper: format a NUMERIC(20,8) DB value as a 2-dp display string.
+function fmtUtgo(raw) {
+  return parseFloat(raw || 0).toFixed(2);
+}
+
+// Helper: read in-game balance for a user (returns "0.00" if no row yet).
+async function getInGameBalance(userId) {
+  const { rows } = await pool.query(
+    'SELECT ingame_balance FROM utgo_balances WHERE user_id = $1',
+    [userId]
+  );
+  return rows.length ? fmtUtgo(rows[0].ingame_balance) : '0.00';
+}
+
+// GET /api/wallet/state — current wallet state for the signed-in user.
+// Returns walletAddr, inGameBalance, walletBalance (on-chain or mock),
+// faucetCooldownSecs, faucetAvailableAt, depositWallet, demoUtgoAddress.
+// Demo mode: IS_STAGING && ?demo=wallet upserts seed data for the viewer.
+app.get('/api/wallet/state', async (req, res) => {
+  try {
+    const walletAddr = req.user.usernode_pubkey || null;
+
+    // Staging-only demo seed: gives the viewer 500 in-game UTGO and 5
+    // seeded transactions so the wallet screen is testable on a fresh DB.
+    if (IS_STAGING && req.query.demo === 'wallet') {
+      await pool.query(
+        `INSERT INTO utgo_balances (user_id, ingame_balance)
+         VALUES ($1, 500)
+         ON CONFLICT (user_id) DO UPDATE SET ingame_balance = 500, updated_at = now()`,
+        [req.user.id]
+      );
+      const demoTxs = [
+        ['faucet',  1000, '0xstagedemo0001'],
+        ['faucet',  1000, '0xstagedemo0002'],
+        ['deposit',  250, '0xstagedemo0003'],
+        ['deposit',  500, '0xstagedemo0004'],
+        ['withdraw', 100, null],
+      ];
+      for (const [type, amount, txHash] of demoTxs) {
+        await pool.query(
+          `INSERT INTO utgo_transactions (user_id, type, amount_utgo, tx_hash, status, created_at)
+           VALUES ($1, $2, $3, $4, 'confirmed', now() - interval '1 hour')
+           ON CONFLICT (id) DO NOTHING`,
+          [req.user.id, type, amount, txHash]
+        );
+      }
+    }
+
+    const inGameBalance = await getInGameBalance(req.user.id);
+
+    // Wallet balance: read from chain in production; mock in staging/unconfigured.
+    let walletBalance = null;
+    if (!walletAddr) {
+      walletBalance = null;
+    } else if (IS_STAGING || !demoUtgoProvider || !DEMO_UTGO_ADDRESS) {
+      walletBalance = '10000.00';
+    } else {
+      try {
+        const contract = getDemoUtgoReadonly();
+        const raw = await contract.balanceOf(walletAddr);
+        walletBalance = (Number(raw) / 1e18).toFixed(2);
+      } catch (chainErr) {
+        console.error('[wallet] balanceOf failed:', chainErr.message);
+        walletBalance = null;
+      }
+    }
+
+    // Faucet cooldown: check last claim.
+    let faucetCooldownSecs = 0;
+    let faucetAvailableAt = null;
+    const { rows: claimRows } = await pool.query(
+      `SELECT claimed_at FROM utgo_faucet_claims WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (claimRows.length) {
+      const lastClaim = new Date(claimRows[0].claimed_at);
+      const nextClaim = new Date(lastClaim.getTime() + 24 * 60 * 60 * 1000);
+      const remaining = Math.ceil((nextClaim - Date.now()) / 1000);
+      if (remaining > 0) {
+        faucetCooldownSecs = remaining;
+        faucetAvailableAt = nextClaim.toISOString();
+      }
+    }
+
+    res.json({
+      walletAddr,
+      inGameBalance,
+      walletBalance,
+      faucetCooldownSecs,
+      faucetAvailableAt,
+      depositWallet: DEPOSIT_WALLET,
+      demoUtgoAddress: DEMO_UTGO_ADDRESS,
+    });
+  } catch (err) {
+    console.error('[wallet] state failed:', err.message);
+    res.status(500).json({ error: 'Failed to load wallet state' });
+  }
+});
+
+// POST /api/wallet/faucet — mint 1000 DemoUTGO to the user's wallet (24h cooldown).
+app.post('/api/wallet/faucet', async (req, res) => {
+  try {
+    const walletAddr = req.user.usernode_pubkey || null;
+    if (!walletAddr) {
+      return res.status(400).json({ error: 'No linked wallet — link your wallet in Usernode settings' });
+    }
+
+    // Cooldown check.
+    const { rows: claimRows } = await pool.query(
+      `SELECT claimed_at FROM utgo_faucet_claims WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (claimRows.length) {
+      const lastClaim = new Date(claimRows[0].claimed_at);
+      const nextClaim = new Date(lastClaim.getTime() + 24 * 60 * 60 * 1000);
+      const remaining = Math.ceil((nextClaim - Date.now()) / 1000);
+      if (remaining > 0) {
+        return res.status(429).json({
+          error: 'Faucet on cooldown',
+          cooldownSecs: remaining,
+          faucetAvailableAt: nextClaim.toISOString(),
+        });
+      }
+    }
+
+    // Mint tokens.
+    let txHash = null;
+    if (IS_STAGING || !getDemoUtgoSigner()) {
+      // Staging / unconfigured: return a mock hash.
+      txHash = '0x' + 'staging' + Date.now().toString(16).padStart(57, '0');
+    } else {
+      const contract = getDemoUtgoSigner();
+      const tx = await contract.mint(walletAddr, ethers.parseUnits('1000', 18));
+      await tx.wait();
+      txHash = tx.hash;
+    }
+
+    // Record claim and transaction.
+    await pool.query(
+      `INSERT INTO utgo_faucet_claims (user_id, claimed_at)
+       VALUES ($1, now())
+       ON CONFLICT (user_id) DO UPDATE SET claimed_at = now()`,
+      [req.user.id]
+    );
+    await pool.query(
+      `INSERT INTO utgo_transactions (user_id, type, amount_utgo, tx_hash, status)
+       VALUES ($1, 'faucet', 1000, $2, 'confirmed')`,
+      [req.user.id, txHash]
+    );
+
+    const faucetAvailableAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    res.json({ amount: 1000, txHash, faucetAvailableAt });
+  } catch (err) {
+    console.error('[wallet] faucet failed:', err.message);
+    res.status(500).json({ error: 'Faucet failed' });
+  }
+});
+
+// POST /api/wallet/deposit-confirmed { txHash, amount }
+// User reports a successful on-chain transfer to DEPOSIT_WALLET.
+// Backend verifies (in production), credits in-game balance idempotently.
+app.post('/api/wallet/deposit-confirmed', async (req, res) => {
+  try {
+    const walletAddr = req.user.usernode_pubkey || null;
+    const { txHash, amount } = req.body;
+
+    if (!txHash || typeof txHash !== 'string' || !/^0x[0-9a-fA-F]+$/.test(txHash)) {
+      return res.status(400).json({ error: 'Valid txHash required' });
+    }
+    const amt = parseFloat(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return res.status(400).json({ error: 'amount must be a positive number' });
+    }
+
+    // Idempotency: if we already processed this tx, return current balance.
+    const { rows: existingTx } = await pool.query(
+      `SELECT id FROM utgo_transactions WHERE tx_hash = $1`,
+      [txHash]
+    );
+    if (existingTx.length) {
+      const inGameBalance = await getInGameBalance(req.user.id);
+      return res.json({ inGameBalance });
+    }
+
+    // Production: verify on-chain. Skip in staging/unconfigured.
+    if (!IS_STAGING && demoUtgoProvider && DEMO_UTGO_ADDRESS && walletAddr) {
+      try {
+        const receipt = await demoUtgoProvider.getTransactionReceipt(txHash);
+        if (!receipt || receipt.status !== 1) {
+          return res.status(400).json({ error: 'Transaction not confirmed on-chain' });
+        }
+        if (receipt.to?.toLowerCase() !== DEMO_UTGO_ADDRESS.toLowerCase()) {
+          return res.status(400).json({ error: 'Transaction not sent to DemoUTGO contract' });
+        }
+        if (receipt.from?.toLowerCase() !== walletAddr.toLowerCase()) {
+          return res.status(400).json({ error: 'Transaction from address does not match your wallet' });
+        }
+      } catch (chainErr) {
+        console.error('[wallet] deposit verify failed:', chainErr.message);
+        return res.status(500).json({ error: 'Could not verify transaction on-chain' });
+      }
+    }
+
+    // Credit in-game balance atomically.
+    await pool.query(
+      `INSERT INTO utgo_balances (user_id, ingame_balance)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE
+         SET ingame_balance = utgo_balances.ingame_balance + $2,
+             updated_at = now()`,
+      [req.user.id, amt]
+    );
+    await pool.query(
+      `INSERT INTO utgo_transactions (user_id, type, amount_utgo, tx_hash, status)
+       VALUES ($1, 'deposit', $2, $3, 'confirmed')`,
+      [req.user.id, amt, txHash]
+    );
+
+    const inGameBalance = await getInGameBalance(req.user.id);
+    res.json({ inGameBalance });
+  } catch (err) {
+    console.error('[wallet] deposit-confirmed failed:', err.message);
+    res.status(500).json({ error: 'Failed to process deposit' });
+  }
+});
+
+// POST /api/wallet/withdraw { amount }
+// Debit in-game balance and send DemoUTGO to user's wallet.
+app.post('/api/wallet/withdraw', async (req, res) => {
+  try {
+    const walletAddr = req.user.usernode_pubkey || null;
+    const amt = parseFloat(req.body.amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return res.status(400).json({ error: 'amount must be a positive number' });
+    }
+    if (!walletAddr) {
+      return res.status(400).json({ error: 'No linked wallet — link your wallet in Usernode settings' });
+    }
+
+    // Atomic debit: only succeeds if ingame_balance >= amt.
+    const { rows } = await pool.query(
+      `UPDATE utgo_balances
+         SET ingame_balance = ingame_balance - $2,
+             updated_at = now()
+       WHERE user_id = $1 AND ingame_balance >= $2
+       RETURNING ingame_balance`,
+      [req.user.id, amt]
+    );
+    if (rows.length === 0) {
+      return res.status(409).json({ error: 'Insufficient in-game balance' });
+    }
+
+    // Send tokens in production; skip in staging/unconfigured.
+    let txHash = null;
+    if (IS_STAGING || !getDemoUtgoSigner()) {
+      txHash = '0x' + 'withdraw' + Date.now().toString(16).padStart(55, '0');
+    } else {
+      try {
+        const contract = getDemoUtgoSigner();
+        const tx = await contract.transfer(walletAddr, ethers.parseUnits(String(amt), 18));
+        await tx.wait();
+        txHash = tx.hash;
+      } catch (chainErr) {
+        console.error('[wallet] withdraw transfer failed:', chainErr.message);
+        // Re-credit the balance since the on-chain transfer failed.
+        await pool.query(
+          `UPDATE utgo_balances SET ingame_balance = ingame_balance + $2, updated_at = now()
+           WHERE user_id = $1`,
+          [req.user.id, amt]
+        );
+        return res.status(500).json({ error: 'On-chain transfer failed — balance restored' });
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO utgo_transactions (user_id, type, amount_utgo, tx_hash, status)
+       VALUES ($1, 'withdraw', $2, $3, 'confirmed')`,
+      [req.user.id, amt, txHash]
+    );
+
+    const inGameBalance = fmtUtgo(rows[0].ingame_balance);
+    res.json({ txHash, inGameBalance });
+  } catch (err) {
+    console.error('[wallet] withdraw failed:', err.message);
+    res.status(500).json({ error: 'Withdraw failed' });
+  }
+});
+
+// GET /api/wallet/transactions?type= — last 50 transactions for the user.
+// Optional ?type= filters to a specific transaction type.
+app.get('/api/wallet/transactions', async (req, res) => {
+  try {
+    const { type } = req.query;
+    const validTypes = ['faucet', 'deposit', 'withdraw', 'pvp_win', 'pvp_loss'];
+    let query;
+    let params;
+    if (type && validTypes.includes(type)) {
+      query = `SELECT id, user_id, type, amount_utgo, tx_hash, status, created_at
+               FROM utgo_transactions
+               WHERE user_id = $1 AND type = $2
+               ORDER BY created_at DESC
+               LIMIT 50`;
+      params = [req.user.id, type];
+    } else {
+      query = `SELECT id, user_id, type, amount_utgo, tx_hash, status, created_at
+               FROM utgo_transactions
+               WHERE user_id = $1
+               ORDER BY created_at DESC
+               LIMIT 50`;
+      params = [req.user.id];
+    }
+    const { rows } = await pool.query(query, params);
+    res.json({
+      transactions: rows.map(r => ({
+        id: r.id,
+        type: r.type,
+        amountUtgo: fmtUtgo(r.amount_utgo),
+        txHash: r.tx_hash,
+        status: r.status,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('[wallet] transactions failed:', err.message);
+    res.status(500).json({ error: 'Failed to load transactions' });
   }
 });
 

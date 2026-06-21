@@ -1,35 +1,6 @@
 {
   "name": "PuzzleChain",
-  "secrets": [
-    {
-      "name": "VALIDATOR_PRIVATE_KEY",
-      "description": "ECDSA private key for the validator wallet that signs claimWin messages. Staging default is Hardhat account #0.",
-      "required": true,
-      "private": true,
-      "staging_default": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-    },
-    {
-      "name": "UTGO_CONTRACT_ADDRESS",
-      "description": "Deployed WagerEscrow contract address on Usernode EVM chain. Staging uses a placeholder (no real contract).",
-      "required": false,
-      "private": false,
-      "staging_default": "0x0000000000000000000000000000000000000001"
-    },
-    {
-      "name": "TREASURY_WALLET",
-      "description": "EVM address receiving the 8% treasury cut of each wager pot.",
-      "required": false,
-      "private": false,
-      "staging_default": "0x0000000000000000000000000000000000000002"
-    },
-    {
-      "name": "REDIS_URL",
-      "description": "Redis connection URL for PvP matchmaking queue and match timers.",
-      "required": true,
-      "private": false,
-      "staging_default": "redis://localhost:6379"
-    }
-  ],
+  "secrets": [],
   "tests": [
     { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" },
@@ -47,7 +18,6 @@
     { "name": "Diamond Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Diamond Rush" },
     { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" },
     { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
-    { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" },
-    { "name": "PvP Arena tab renders", "path": "/?tab=pvp", "expectText": "PvP Arena" }
+    { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" }
   ]
 }

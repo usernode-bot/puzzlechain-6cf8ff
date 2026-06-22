@@ -69,7 +69,7 @@ let redisReady = false;
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle', 'zuma']);
 
 // Run a non-essential migration step (an index, a peripheral table, a staging
 // seed) without ever taking the whole boot down. The essential schema below
@@ -244,6 +244,24 @@ async function migrate() {
       p2_finished_at  TIMESTAMPTZ,
       created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // zuma_scores is PUBLIC — high scores for the Zuma classic game, shown on
+  // a global leaderboard (no sensitive data; gameplay results only). One row
+  // per user holding their personal best, upserted with GREATEST so a worse
+  // run never clobbers a better one. No foreign keys (public-table rule).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS zuma_scores (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      best_score     INTEGER NOT NULL DEFAULT 0,
+      best_level     INTEGER,
+      best_time_secs INTEGER,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
 
@@ -681,6 +699,26 @@ async function migrate() {
     for (const [uid, uname, best, lvl, secs] of bounceSeed) {
       await pool.query(
         `INSERT INTO breakout_scores
+           (user_id, username, best_score, best_level, best_time_secs, games_played)
+         VALUES ($1, $2, $3, $4, $5, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, best, lvl, secs]
+      );
+    }
+
+    // Zuma leaderboard seed — newly created table is empty in staging, so the
+    // leaderboard tab would have nothing to show. Obviously-fake users with a
+    // spread of scores. Idempotent; no-op in production.
+    const zumaSeed = [
+      ['zuma-demo-1', 'staging-zuma-master',  4200, 3, 210],
+      ['zuma-demo-2', 'staging-zuma-ace',     2900, 3, 275],
+      ['zuma-demo-3', 'staging-zuma-rookie',  1600, 2, 188],
+      ['zuma-demo-4', 'staging-zuma-fan',      750, 2, 130],
+      ['zuma-demo-5', 'staging-zuma-newbie',   280, 1,  60],
+    ];
+    for (const [uid, uname, best, lvl, secs] of zumaSeed) {
+      await pool.query(
+        `INSERT INTO zuma_scores
            (user_id, username, best_score, best_level, best_time_secs, games_played)
          VALUES ($1, $2, $3, $4, $5, 3)
          ON CONFLICT (user_id) DO NOTHING`,
@@ -2356,6 +2394,119 @@ app.get('/api/bounce/leaderboard', async (req, res) => {
     res.json({ top: top.map(shapeBounceRow), me });
   } catch (err) {
     console.error('[bounce] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ---- Zuma leaderboard API ------------------------------------------------
+// Mirrors Bounce/Snake exactly: one personal-best row per user, upserted with
+// GREATEST, ranked by best_score then earliest-to-reach.
+
+const ZUMA_LB_LIMIT = 20;
+
+function shapeZumaRow(row) {
+  return {
+    rank: Number(row.rank),
+    username: row.username,
+    bestScore: row.best_score,
+  };
+}
+
+app.post('/api/zuma/score', async (req, res) => {
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  if (score === null) return res.status(400).json({ error: 'score is required' });
+  try {
+    const { rows: prevRows } = await pool.query(
+      `SELECT best_score FROM zuma_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const prevBest = prevRows.length > 0 ? prevRows[0].best_score : null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO zuma_scores
+         (user_id, username, best_score, best_level, best_time_secs, games_played, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         username       = EXCLUDED.username,
+         best_level     = CASE WHEN EXCLUDED.best_score > zuma_scores.best_score
+                               THEN EXCLUDED.best_level ELSE zuma_scores.best_level END,
+         best_time_secs = CASE WHEN EXCLUDED.best_score > zuma_scores.best_score
+                               THEN EXCLUDED.best_time_secs ELSE zuma_scores.best_time_secs END,
+         best_score     = GREATEST(zuma_scores.best_score, EXCLUDED.best_score),
+         games_played   = zuma_scores.games_played + 1,
+         updated_at     = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, score, level, timeSecs]
+    );
+    const me = rows[0];
+
+    await pool.query(
+      `UPDATE user_stats_snapshot
+         SET total_score = total_score + $2,
+             classics_played = classics_played + 1,
+             last_win_at = now(),
+             updated_at = now()
+       WHERE user_id = $1`,
+      [req.user.id, score]
+    );
+
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', 'zuma', $2, $3)`,
+        [req.user.id, score, JSON.stringify({ previousBest: prevBest })]
+      );
+    }
+
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM zuma_scores
+        WHERE best_score > $1
+           OR (best_score = $1 AND updated_at < $2)`,
+      [me.best_score, me.updated_at]
+    );
+    res.json({
+      bestScore: me.best_score,
+      rank: Number(rankRows[0].rank),
+      gamesPlayed: me.games_played,
+    });
+  } catch (err) {
+    console.error('[zuma] score failed:', err.message);
+    res.status(500).json({ error: 'Failed to record score' });
+  }
+});
+
+app.get('/api/zuma/leaderboard', async (req, res) => {
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM zuma_scores
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $1`,
+      [ZUMA_LB_LIMIT]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT username, best_score, updated_at FROM zuma_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM zuma_scores
+          WHERE best_score > $1
+             OR (best_score = $1 AND updated_at < $2)`,
+        [row.best_score, row.updated_at]
+      );
+      me = { rank: Number(rankRows[0].rank), username: row.username, bestScore: row.best_score };
+    }
+
+    res.json({ top: top.map(shapeZumaRow), me });
+  } catch (err) {
+    console.error('[zuma] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });

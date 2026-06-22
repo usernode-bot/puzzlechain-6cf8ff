@@ -3039,6 +3039,99 @@ body {
 .pvp-prize-row .mono { color: ${C.text}; }
 .pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
 .pvp-prize-winner .mono { color: ${C.emerald}; }
+
+/* ---- Wallet screen ---- */
+.wallet-screen {
+  max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem;
+}
+.wallet-screen h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.25rem; }
+.wallet-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.25rem; margin-bottom: 1rem;
+}
+.wallet-card-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: ${C.muted}; margin-bottom: 0.6rem;
+}
+.wallet-addr {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  color: ${C.text}; word-break: break-all; flex: 1;
+}
+.wallet-addr-row {
+  display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
+}
+.wallet-balance-big {
+  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
+  color: ${C.emerald};
+}
+.wallet-balance-sub { font-size: 0.8rem; color: ${C.muted}; margin-top: 0.2rem; }
+.wallet-pending-big {
+  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
+  color: ${C.gold};
+}
+.wallet-mock-badge {
+  display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px;
+  background: ${C.dim}; border: 1px solid ${C.border};
+  font-size: 0.68rem; color: ${C.muted}; margin-bottom: 1rem;
+}
+.wallet-activity-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.45rem 0; border-bottom: 1px solid ${C.border}40;
+  font-size: 0.83rem;
+}
+.wallet-activity-row:last-child { border-bottom: none; }
+.wallet-activity-kind { color: ${C.muted}; }
+.wallet-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.wallet-activity-earned { color: ${C.emerald}; }
+.wallet-activity-tip-recv { color: ${C.gold}; }
+.wallet-activity-tip-sent { color: ${C.rose}; }
+.wallet-no-wallet {
+  text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
+}
+.wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
+.wallet-freeze-info {
+  font-size: 0.8rem; color: ${C.muted}; margin-top: 0.35rem;
+}
+/* ---- Nav wallet chip ---- */
+.nav-wallet-chip {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.7rem;
+  cursor: pointer; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
+  color: ${C.emerald}; transition: border-color 0.15s;
+}
+.nav-wallet-chip:hover { border-color: ${C.emerald}; }
+/* ---- Tip modal ---- */
+.tip-modal-backdrop {
+  position: fixed; inset: 0; background: #00000099; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+}
+.tip-modal {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
+  padding: 1.5rem; width: min(95vw, 380px);
+}
+.tip-modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+.tip-presets { display: flex; gap: 0.5rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
+.tip-preset-btn {
+  padding: 0.35rem 0.8rem; border-radius: 8px; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem; cursor: pointer; transition: border-color 0.12s;
+}
+.tip-preset-btn.active { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
+.tip-input {
+  width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px;
+  border: 1px solid ${C.border}; background: ${C.surface}; color: ${C.text};
+  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
+  margin-bottom: 0.85rem;
+}
+.tip-input:focus { outline: none; border-color: ${C.accent}; }
+/* ---- Win overlay reward line ---- */
+.win-reward-row {
+  display: flex; justify-content: space-between; padding: 0.4rem 0;
+  border-top: 1px solid ${C.border}40; margin-top: 0.4rem;
+}
+.win-reward-row .k { color: ${C.muted}; font-size: 0.88rem; }
+.win-reward-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; }
 `;
 
 /* ============================================================
@@ -9414,25 +9507,29 @@ function PvpResult({ result, onBack }) {
   );
 }
 
-function PvpArena({ user, authOk }) {
+function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appWalletBalance }) {
   const [phase, setPhase] = useState('lobby'); // lobby | matchmaking | game | result
   const [match, setMatch] = useState(null);
   const [joining, setJoining] = useState(null);
   const [pvpResult, setPvpResult] = useState(null);
-  const [playerAddr, setPlayerAddr] = useState(null);
-  const [balance, setBalance] = useState(null);
+  // Use app-level wallet addr/balance when available; fall back to own fetch
+  const [localAddr, setLocalAddr] = useState(null);
+  const [localBalance, setLocalBalance] = useState(null);
+  const playerAddr = appWalletAddr || localAddr;
+  const balance = appWalletBalance || localBalance;
   const pollRef = useRef(null);
 
   useEffect(() => {
+    if (appWalletAddr) return; // already have it from app level
     if (!window.usernode || !window.usernode.getNodeAddress) return;
     window.usernode.getNodeAddress().then(addr => {
       if (!addr) return;
-      setPlayerAddr(addr);
+      setLocalAddr(addr);
       api(`/api/pvp/balance?addr=${encodeURIComponent(addr)}`)
-        .then(({ ok, body }) => { if (ok && body) setBalance(body.balance); })
+        .then(({ ok, body }) => { if (ok && body) setLocalBalance(body.balance); })
         .catch(() => {});
     }).catch(() => {});
-  }, []);
+  }, [appWalletAddr]);
 
   // Poll for opponent joining while in matchmaking; also refresh cancelQueueCalldata
   useEffect(() => {
@@ -9516,6 +9613,370 @@ function PvpArena({ user, authOk }) {
 const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
 
 /* ============================================================
+   Wallet helpers
+   ============================================================ */
+function fmtUtgo(weiStr) {
+  if (!weiStr || weiStr === '0') return '0.00 UTGO';
+  try {
+    const n = Number(BigInt(weiStr)) / 1e18;
+    return n.toFixed(2) + ' UTGO';
+  } catch { return '0.00 UTGO'; }
+}
+
+function shortAddr(addr) {
+  if (!addr) return '';
+  return addr.slice(0, 6) + '…' + addr.slice(-4);
+}
+
+/* ============================================================
+   TipModal — send $UTGO to another user
+   ============================================================ */
+function TipModal({ toUser, onClose, onSuccess }) {
+  const TIP_PRESETS = ['1', '5', '10'];
+  const [amount, setAmount] = React.useState('1');
+  const [customAmount, setCustomAmount] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const [done, setDone] = React.useState(null);
+
+  const selectedAmount = customAmount || amount;
+
+  const handleSend = async () => {
+    const amountFloat = parseFloat(selectedAmount);
+    if (!amountFloat || amountFloat <= 0) {
+      setErr('Enter a valid amount');
+      return;
+    }
+    const amountWei = BigInt(Math.round(amountFloat * 1e18)).toString();
+    setSending(true);
+    setErr(null);
+    try {
+      // Prepare: get calldata + recipient addr
+      const { ok: prepOk, body: prep } = await api('/api/wallet/tip/prepare', {
+        method: 'POST',
+        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei }),
+      });
+      if (!prepOk) {
+        setErr(prep && prep.error ? prep.error : 'Failed to prepare tip');
+        setSending(false);
+        return;
+      }
+
+      let txHash = '0xmock';
+      const isMock = !window.usernode || !prep.calldata || !prep.contractAddr
+        || (window.usernode.isMockEnabled && await window.usernode.isMockEnabled());
+      if (!isMock && window.usernode && window.usernode.sendTransaction) {
+        const tx = await window.usernode.sendTransaction({
+          to: prep.contractAddr,
+          data: prep.calldata,
+        });
+        txHash = tx && tx.hash ? tx.hash : '0xunknown';
+      }
+
+      // Confirm
+      const { ok: confOk } = await api('/api/wallet/tip/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei, txHash }),
+      });
+      if (!confOk) {
+        setErr('Tip sent but confirmation failed — check your wallet history');
+        setSending(false);
+        return;
+      }
+      setDone({ txHash, amount: fmtUtgo(amountWei), isMock });
+    } catch (e) {
+      setErr(e && e.message ? e.message : 'Transaction failed');
+    }
+    setSending(false);
+  };
+
+  return (
+    <div className="tip-modal-backdrop" onClick={onClose}>
+      <div className="tip-modal" onClick={e => e.stopPropagation()}>
+        <h3>Tip {toUser.username}</h3>
+        {done ? (
+          <div>
+            <div style={{ color: C.emerald, fontWeight: 600, marginBottom: '0.5rem' }}>
+              Sent {done.amount}! {done.isMock && <span style={{ color: C.muted, fontSize: '0.8rem' }}>(demo)</span>}
+            </div>
+            {done.txHash && !done.isMock && (
+              <div style={{ fontSize: '0.72rem', color: C.muted, wordBreak: 'break-all', marginBottom: '0.75rem' }}>
+                Tx: {done.txHash}
+              </div>
+            )}
+            <button className="primary-btn" onClick={() => { onSuccess && onSuccess(); onClose(); }}>Done</button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: '0.82rem', color: C.muted, marginBottom: '0.75rem' }}>
+              Quick amounts (UTGO):
+            </div>
+            <div className="tip-presets">
+              {TIP_PRESETS.map(p => (
+                <button
+                  key={p}
+                  className={'tip-preset-btn' + (amount === p && !customAmount ? ' active' : '')}
+                  onClick={() => { setAmount(p); setCustomAmount(''); }}
+                >{p}</button>
+              ))}
+            </div>
+            <input
+              className="tip-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Custom amount"
+              value={customAmount}
+              onChange={e => { setCustomAmount(e.target.value); setAmount(''); }}
+            />
+            {err && <div style={{ color: C.rose, fontSize: '0.82rem', marginBottom: '0.5rem' }}>{err}</div>}
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="primary-btn" disabled={sending} onClick={handleSend} style={{ flex: 1 }}>
+                {sending ? 'Sending…' : `Send ${selectedAmount || '?'} UTGO`}
+              </button>
+              <button
+                className="primary-btn"
+                style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+                onClick={onClose}
+              >Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   WalletScreen — the full wallet management view
+   ============================================================ */
+function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh }) {
+  const [walletData, setWalletData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [claiming, setClaiming] = React.useState(false);
+  const [claimResult, setClaimResult] = React.useState(null);
+  const [buyingFreeze, setBuyingFreeze] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [freezeMsg, setFreezeMsg] = React.useState(null);
+
+  const loadWallet = async () => {
+    const demo = new URLSearchParams(window.location.search).get('demo');
+    const path = '/api/wallet' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
+    const { ok, body } = await api(path);
+    if (ok && body) setWalletData(body);
+    setLoading(false);
+  };
+
+  React.useEffect(() => { loadWallet(); }, []);
+
+  const handleCopy = async () => {
+    if (!walletData || !walletData.addr) return;
+    try {
+      await navigator.clipboard.writeText(walletData.addr);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    setClaimResult(null);
+    try {
+      const { ok, body } = await api('/api/wallet/rewards/claim', { method: 'POST' });
+      if (!ok) {
+        setClaimResult({ err: (body && body.error) || 'Failed to claim' });
+        setClaiming(false);
+        return;
+      }
+      // Mock or signed claim
+      if (body.mock || !body.claimCalldata) {
+        setClaimResult({ txHash: body.txHash || '0xstagingclaim', mock: true, amount: fmtUtgo(body.amountWei) });
+        await loadWallet();
+        onBalanceRefresh && onBalanceRefresh();
+        setClaiming(false);
+        return;
+      }
+      // Real on-chain claim
+      const tx = await window.usernode.sendTransaction({
+        to: body.contractAddr,
+        data: body.claimCalldata,
+      });
+      const txHash = tx && tx.hash ? tx.hash : '0xunknown';
+      await api('/api/wallet/rewards/claim/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ txHash }),
+      });
+      setClaimResult({ txHash, mock: false, amount: fmtUtgo(body.amountWei) });
+      await loadWallet();
+      onBalanceRefresh && onBalanceRefresh();
+    } catch (e) {
+      setClaimResult({ err: e && e.message ? e.message : 'Transaction failed' });
+    }
+    setClaiming(false);
+  };
+
+  const handleBuyFreeze = async () => {
+    setBuyingFreeze(true);
+    setFreezeMsg(null);
+    const { ok, body } = await api('/api/wallet/spend/streak-freeze', { method: 'POST' });
+    if (ok && body) {
+      setFreezeMsg(`Freeze purchased! You now have ${body.streakFreezes} freeze${body.streakFreezes === 1 ? '' : 's'}.`);
+      await loadWallet();
+    } else {
+      setFreezeMsg((body && body.error) || 'Insufficient pending rewards');
+    }
+    setBuyingFreeze(false);
+  };
+
+  if (!authOk) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <div className="wallet-no-wallet" style={{ marginTop: '2rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔐</div>
+          <div>Sign in to PuzzleChain to access your wallet.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <p style={{ color: C.muted, marginTop: '1rem' }}>Loading wallet…</p>
+      </div>
+    );
+  }
+
+  if (!walletData || !walletData.addr) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <h2>My Wallet</h2>
+        <div className="wallet-no-wallet">
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔗</div>
+          <div>No wallet linked yet.</div>
+          <div style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
+            Open this app inside Usernode with a linked wallet to see your balance.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const d = walletData;
+  const isMock = d.mock || walletMock;
+  const hasPending = d.pendingWei && d.pendingWei !== '0';
+  const FREEZE_PRICE = '5.00 UTGO';
+
+  return (
+    <div className="wallet-screen">
+      <button className="back-btn" onClick={onBack}>← Back</button>
+      <h2>My Wallet</h2>
+
+      {isMock && (
+        <div className="wallet-mock-badge">Demo wallet — balances are simulated</div>
+      )}
+
+      {/* Address */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Linked Address</div>
+        <div className="wallet-addr-row">
+          <span className="wallet-addr mono">{d.addr}</span>
+          <button
+            className="primary-btn"
+            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
+            onClick={handleCopy}
+          >{copied ? 'Copied!' : 'Copy'}</button>
+        </div>
+      </div>
+
+      {/* On-chain balance */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">On-Chain Balance</div>
+        <div className="wallet-balance-big">{fmtUtgo(d.balanceWei)}</div>
+        {isMock && <div className="wallet-balance-sub">(simulated)</div>}
+      </div>
+
+      {/* Pending rewards */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Pending Puzzle Rewards</div>
+        <div className="wallet-pending-big">{fmtUtgo(d.pendingWei)}</div>
+        <div className="wallet-balance-sub">
+          {fmtUtgo(d.lifetimeEarnedWei)} lifetime earned · {fmtUtgo(d.lifetimeClaimedWei)} claimed
+        </div>
+        {claimResult && !claimResult.err && (
+          <div style={{ color: C.emerald, fontSize: '0.83rem', margin: '0.5rem 0' }}>
+            Claimed {claimResult.amount}! {claimResult.mock && '(demo)'}
+            {claimResult.txHash && !claimResult.mock && (
+              <div style={{ fontSize: '0.7rem', color: C.muted, wordBreak: 'break-all' }}>
+                Tx: {claimResult.txHash}
+              </div>
+            )}
+          </div>
+        )}
+        {claimResult && claimResult.err && (
+          <div style={{ color: C.rose, fontSize: '0.82rem', margin: '0.5rem 0' }}>{claimResult.err}</div>
+        )}
+        <div className="wallet-btn-row">
+          <button
+            className="primary-btn"
+            disabled={!hasPending || claiming}
+            onClick={handleClaim}
+            style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
+          >
+            {claiming ? 'Claiming…' : 'Claim to Wallet'}
+          </button>
+        </div>
+      </div>
+
+      {/* Streak freeze */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Streak Freeze</div>
+        <div style={{ fontSize: '0.88rem', marginBottom: '0.6rem' }}>
+          You have <strong style={{ color: C.gold }}>{d.streakFreezes}</strong> freeze{d.streakFreezes === 1 ? '' : 's'} banked.
+          A freeze protects your streak against one missed day.
+        </div>
+        {freezeMsg && (
+          <div style={{ fontSize: '0.82rem', color: C.emerald, marginBottom: '0.5rem' }}>{freezeMsg}</div>
+        )}
+        <button
+          className="primary-btn"
+          disabled={buyingFreeze || !hasPending}
+          onClick={handleBuyFreeze}
+          style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : { background: C.gold + 'cc' }}
+        >
+          {buyingFreeze ? 'Purchasing…' : `Buy Freeze (${FREEZE_PRICE})`}
+        </button>
+        {!hasPending && <div className="wallet-freeze-info">Earn rewards by solving daily puzzles first.</div>}
+      </div>
+
+      {/* Recent activity */}
+      {d.recent && d.recent.length > 0 && (
+        <div className="wallet-card">
+          <div className="wallet-card-title">Recent Activity</div>
+          {d.recent.map((ev, i) => {
+            const isReward = ev.kind === 'reward';
+            const isTipRecv = ev.kind === 'tip_received';
+            const isTipSent = ev.kind === 'tip_sent';
+            const label = isReward ? '🪙 Puzzle reward' : isTipRecv ? '💰 Tip received' : '→ Tip sent';
+            const amtClass = isReward ? 'wallet-activity-earned' : isTipRecv ? 'wallet-activity-tip-recv' : 'wallet-activity-tip-sent';
+            const prefix = isReward || isTipRecv ? '+' : '-';
+            return (
+              <div className="wallet-activity-row" key={i}>
+                <span className="wallet-activity-kind">{label}</span>
+                <span className={`wallet-activity-amt ${amtClass}`}>{prefix}{fmtUtgo(ev.amount_wei)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -9526,17 +9987,15 @@ const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
 function ProfileScreen({ userId, user: loggedInUser, onBack }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showTip, setShowTip] = useState(false);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      const { ok, body } = await api(`/api/social/profile/${userId}`);
-      if (ok && body) {
-        setProfile(body);
-      }
-      setLoading(false);
-    };
-    loadProfile();
-  }, [userId]);
+  const loadProfile = async () => {
+    const { ok, body } = await api(`/api/social/profile/${userId}`);
+    if (ok && body) setProfile(body);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadProfile(); }, [userId]);
 
   const handleFollow = async () => {
     if (!profile) return;
@@ -9594,18 +10053,37 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             {isOwnProfile && <p style={{ color: C.emerald, fontSize: '0.8rem', margin: '0.5rem 0 0' }}>Your Profile</p>}
           </div>
           {!isOwnProfile && (
-            <button
-              className="primary-btn"
-              style={{
-                background: profile.following ? C.surface : C.accent,
-                border: `1px solid ${profile.following ? C.border : C.accent}`,
-                color: profile.following ? C.text : 'white',
-                padding: '0.5rem 1rem',
-              }}
-              onClick={profile.following ? handleUnfollow : handleFollow}
-            >
-              {profile.following ? 'Unfollow' : 'Follow'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <button
+                className="primary-btn"
+                style={{
+                  background: profile.following ? C.surface : C.accent,
+                  border: `1px solid ${profile.following ? C.border : C.accent}`,
+                  color: profile.following ? C.text : 'white',
+                  padding: '0.5rem 1rem',
+                }}
+                onClick={profile.following ? handleUnfollow : handleFollow}
+              >
+                {profile.following ? 'Unfollow' : 'Follow'}
+              </button>
+              <button
+                className="primary-btn"
+                disabled={!profile.walletLinked}
+                title={!profile.walletLinked ? "This user hasn't set up a wallet yet" : `Tip ${profile.user.username}`}
+                style={{
+                  padding: '0.4rem 0.9rem',
+                  background: profile.walletLinked ? C.gold + 'cc' : C.surface,
+                  border: `1px solid ${profile.walletLinked ? C.gold : C.border}`,
+                  color: profile.walletLinked ? C.bg : C.muted,
+                  cursor: profile.walletLinked ? 'pointer' : 'not-allowed',
+                  fontSize: '0.85rem',
+                  opacity: profile.walletLinked ? 1 : 0.5,
+                }}
+                onClick={() => profile.walletLinked && setShowTip(true)}
+              >
+                🪙 Tip
+              </button>
+            </div>
           )}
         </div>
 
@@ -9638,8 +10116,33 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             <span style={{ color: C.muted }}>Following:</span>{' '}
             <span style={{ fontWeight: 600, color: C.accent }}>{profile.followingCount}</span>
           </p>
+          {profile.tipsReceivedWei && profile.tipsReceivedWei !== '0' && (
+            <p style={{ margin: '0.5rem 0' }}>
+              <span style={{ color: C.muted }}>Tips received:</span>{' '}
+              <span style={{ fontWeight: 600, color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
+                {fmtUtgo(profile.tipsReceivedWei)}
+              </span>
+            </p>
+          )}
+          {profile.recentTippers && profile.recentTippers.length > 0 && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: '0.25rem' }}>Recent tips:</div>
+              {profile.recentTippers.slice(0, 3).map((t, i) => (
+                <div key={i} style={{ fontSize: '0.82rem', color: C.text }}>
+                  {t.fromUserId} → <span style={{ color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>{fmtUtgo(t.amountWei)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+      {showTip && (
+        <TipModal
+          toUser={profile.user}
+          onClose={() => setShowTip(false)}
+          onSuccess={loadProfile}
+        />
+      )}
     </div>
   );
 }
@@ -9899,7 +10402,11 @@ const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondru
    Root app
    ============================================================ */
 function App() {
-  const [screen, setScreen] = useState('lobby'); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends'
+  const [screen, setScreen] = useState(() => {
+    // Support ?screen=wallet deep link for testing
+    const s = new URLSearchParams(window.location.search).get('screen');
+    return s === 'wallet' ? 'wallet' : 'lobby';
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet'
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -9924,6 +10431,10 @@ function App() {
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
+  // Wallet state (app-level so PvP and nav share one source)
+  const [walletAddr, setWalletAddr] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null); // wei string
+  const [walletMock, setWalletMock] = useState(true);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -9958,6 +10469,35 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  // Wallet: get EVM address from bridge, link it to the account, fetch balance.
+  // Promoted to app-level so PvP Arena and the nav chip share one source.
+  useEffect(() => {
+    if (!window.usernode || !window.usernode.getNodeAddress) return;
+    window.usernode.getNodeAddress().then(addr => {
+      if (!addr) return;
+      setWalletAddr(addr);
+      // Link address server-side so tipping lookups work
+      api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }).catch(() => {});
+      // Fetch on-chain balance
+      api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`)
+        .then(({ ok, body }) => {
+          if (ok && body) {
+            setWalletBalance(body.balance);
+            setWalletMock(!!body.mock);
+          }
+        }).catch(() => {});
+    }).catch(() => {});
+  }, []);
+
+  // Refresh balance on demand (called after claim/tip)
+  const refreshWalletBalance = () => {
+    if (!walletAddr) return;
+    api(`/api/wallet/balance?addr=${encodeURIComponent(walletAddr)}`)
+      .then(({ ok, body }) => {
+        if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
+      }).catch(() => {});
+  };
 
   // Midnight UTC reached — reload state so everything unlocks.
   const onReset = () => {
@@ -10044,6 +10584,10 @@ function App() {
     // Reconcile against the server's authoritative streak (now that today is
     // finished) so a reload and the live nav badge agree.
     if (ok && body && typeof body.streak === 'number') setStreak(body.streak);
+    // Store reward amount from server so win overlay can show it
+    if (ok && body && body.rewardWei) {
+      setWinData(prev => prev ? { ...prev, rewardWei: body.rewardWei } : prev);
+    }
   };
 
   // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
@@ -10147,6 +10691,16 @@ function App() {
               </div>
             </div>
           </div>
+          {authOk && walletBalance && (
+            <button
+              className="nav-wallet-chip"
+              title="Open Wallet"
+              onClick={() => setScreen('wallet')}
+            >
+              🪙 {fmtUtgo(walletBalance)}
+              {walletMock && <span style={{ fontSize: '0.6rem', color: C.muted, marginLeft: '0.2rem' }}>(demo)</span>}
+            </button>
+          )}
           {authOk && (
             <button
               className="primary-btn"
@@ -10179,6 +10733,17 @@ function App() {
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
           onBack={() => setScreen('lobby')}
+        />
+      )}
+
+      {screen === 'wallet' && (
+        <WalletScreen
+          user={user}
+          authOk={authOk}
+          walletAddr={walletAddr}
+          walletMock={walletMock}
+          onBack={() => setScreen('lobby')}
+          onBalanceRefresh={refreshWalletBalance}
         />
       )}
 
@@ -10231,7 +10796,7 @@ function App() {
             >⚔️ PvP Arena</button>
           </div>
           {lobbyTab === 'pvp' ? (
-            <PvpArena user={user} authOk={authOk} />
+            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
           ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
@@ -10369,6 +10934,12 @@ function App() {
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
+              {winData.rewardWei && winData.rewardWei !== '0' && !winData.isClassic && (
+                <div className="win-reward-row">
+                  <span className="k">🪙 Token reward</span>
+                  <span className="v">+{fmtUtgo(winData.rewardWei)}</span>
+                </div>
+              )}
             </div>
             <ShareButton text={winData.share} />
             {winData.isClassic && (

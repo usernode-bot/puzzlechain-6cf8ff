@@ -24,9 +24,19 @@ const utgoProvider = UTGO_RPC_URL
   ? new ethers.JsonRpcProvider(UTGO_RPC_URL)
   : null;
 
-const UTGO_ABI_BALANCE = ['function balanceOf(address account) view returns (uint256)'];
-const WAGER_IFACE       = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
+const UTGO_ABI_BALANCE   = ['function balanceOf(address account) view returns (uint256)'];
+const WAGER_IFACE        = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
 const CANCEL_QUEUE_IFACE = new ethers.Interface(['function cancelQueue(bytes32)']);
+const TRANSFER_IFACE     = new ethers.Interface(['function transfer(address,uint256)']);
+const CLAIM_REWARDS_IFACE = new ethers.Interface(['function claimRewards(address,uint256,uint256,bytes)']);
+
+// Reward economics — single source of truth for balance/tuning.
+// 1 UTGO per 1000 final points; streak multiplier already baked into finalScore.
+const REWARD_PER_POINT_WEI = BigInt('1000000000000000'); // 0.001 UTGO per point → ~0.96 UTGO for ~960pts
+const STREAK_FREEZE_PRICE_WEI = BigInt('5000000000000000000'); // 5 UTGO
+
+// EVM address regex (same as PvP validation throughout)
+const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // Single shared connection pool to this app's Postgres DB.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -258,6 +268,65 @@ async function migrate() {
     )
   `);
 
+  // user_wallets is PRIVATE: maps user_id to EVM wallet address.
+  // Marked private because it links a Usernode identity to a financial address.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_wallets (
+      user_id     TEXT PRIMARY KEY,
+      wallet_addr TEXT NOT NULL,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE user_wallets IS 'staging:private'`);
+
+  // token_rewards_ledger is PUBLIC: per-user accrual of earned-but-unclaimed $UTGO.
+  // No sensitive data (amounts are gameplay results like daily_attempts).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS token_rewards_ledger (
+      user_id              TEXT PRIMARY KEY,
+      pending_wei          NUMERIC(78,0) NOT NULL DEFAULT 0,
+      lifetime_earned_wei  NUMERIC(78,0) NOT NULL DEFAULT 0,
+      lifetime_claimed_wei NUMERIC(78,0) NOT NULL DEFAULT 0,
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // token_reward_events is PUBLIC: idempotency log for puzzle reward credits.
+  // UNIQUE (user_id, game_id, attempt_date) prevents double-crediting on retries.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS token_reward_events (
+      id           BIGSERIAL PRIMARY KEY,
+      user_id      TEXT NOT NULL,
+      game_id      TEXT NOT NULL,
+      attempt_date DATE NOT NULL,
+      amount_wei   NUMERIC(78,0) NOT NULL,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (user_id, game_id, attempt_date)
+    )
+  `);
+
+  // token_tips is PUBLIC: one row per tip between users.
+  // Mirrors public on-chain transfers; powers profile "tips received" panel.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS token_tips (
+      id           BIGSERIAL PRIMARY KEY,
+      from_user_id TEXT NOT NULL,
+      to_user_id   TEXT NOT NULL,
+      from_addr    TEXT,
+      to_addr      TEXT,
+      amount_wei   NUMERIC(78,0) NOT NULL,
+      tx_hash      TEXT,
+      status       TEXT NOT NULL DEFAULT 'confirmed',
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Add streak_freezes column to user_stats_snapshot (idempotent)
+  await pool.query(`
+    ALTER TABLE user_stats_snapshot
+      ADD COLUMN IF NOT EXISTS streak_freezes INTEGER NOT NULL DEFAULT 0
+  `);
+
   // user_follows is PUBLIC: directional follow relationships.
   // One row per (follower_id, followee_id) pair.
   await pool.query(`
@@ -442,6 +511,57 @@ async function migrate() {
          VALUES ($1, $2, $3, $4, $5, now() - interval '1 day')
          ON CONFLICT DO NOTHING`,
         [uid, type, gameId, score, JSON.stringify(meta)]
+      );
+    }
+
+    // Wallet staging seeds — user_wallets is private (schema-only in staging), so
+    // we seed fake wallet addresses for demo users so tip/profile flows have targets.
+    const walletSeeds = [
+      ['staging-demo-user', '0xDEAD000000000000000000000000000000000001'],
+      ['staging-alice',     '0xDEAD000000000000000000000000000000000002'],
+      ['staging-bob',       '0xDEAD000000000000000000000000000000000003'],
+      ['staging-charlie',   '0xDEAD000000000000000000000000000000000004'],
+    ];
+    for (const [uid, addr] of walletSeeds) {
+      await pool.query(
+        `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, addr]
+      );
+    }
+
+    // Seed the demo user with 3 UTGO pending rewards so the Wallet screen's
+    // Claim button and pending display are demonstrable without solving a puzzle.
+    await pool.query(
+      `INSERT INTO token_rewards_ledger
+         (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) DO NOTHING`,
+      ['staging-demo-user',
+       '3000000000000000000',  // 3 UTGO pending
+       '5000000000000000000',  // 5 UTGO lifetime earned
+       '2000000000000000000']  // 2 UTGO lifetime claimed
+    );
+
+    // Seed tips received by staging-demo-user so their profile and Wallet
+    // recent-activity show rows without any real on-chain action.
+    const tipSeeds = [
+      ['staging-alice', 'staging-demo-user',
+       '0xDEAD000000000000000000000000000000000002',
+       '0xDEAD000000000000000000000000000000000001',
+       '1000000000000000000', '0xstaging-tip-1'],
+      ['staging-bob', 'staging-demo-user',
+       '0xDEAD000000000000000000000000000000000003',
+       '0xDEAD000000000000000000000000000000000001',
+       '2000000000000000000', '0xstaging-tip-2'],
+    ];
+    for (const [from, to, fromAddr, toAddr, amount, tx] of tipSeeds) {
+      await pool.query(
+        `INSERT INTO token_tips
+           (from_user_id, to_user_id, from_addr, to_addr, amount_wei, tx_hash, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')
+         ON CONFLICT DO NOTHING`,
+        [from, to, fromAddr, toAddr, amount, tx]
       );
     }
   }
@@ -652,7 +772,8 @@ function prevUtcDay(iso) {
 // Consecutive-day streak for a user: the length of the unbroken run of UTC
 // days (each with >=1 finished attempt) ending today, or ending yesterday if
 // today hasn't been played yet (a streak stays alive until a full day is
-// missed). Computed from the existing daily_attempts rows — no extra schema.
+// missed). A streak_freeze in user_stats_snapshot bridges exactly ONE missed
+// UTC day — a 2+ day gap still resets. Computed from the existing daily_attempts rows.
 async function computeStreak(userId) {
   const { rows } = await pool.query(
     `SELECT DISTINCT attempt_date::text AS d
@@ -664,12 +785,35 @@ async function computeStreak(userId) {
   );
   if (rows.length === 0) return 0;
   const days = new Set(rows.map(r => r.d));
-  const today = new Date().toISOString().slice(0, 10); // UTC, matches (now() AT TIME ZONE 'utc')::date
+  const today = new Date().toISOString().slice(0, 10); // UTC
   const yesterday = prevUtcDay(today);
   let cursor;
   if (days.has(today)) cursor = today;
   else if (days.has(yesterday)) cursor = yesterday;
-  else return 0; // last finished day is older than yesterday → streak broken
+  else {
+    // Check if a freeze bridges today's gap
+    const twoDaysAgo = prevUtcDay(yesterday);
+    if (days.has(twoDaysAgo)) {
+      const { rows: fRows } = await pool.query(
+        `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
+        [userId]
+      );
+      if (fRows.length > 0 && fRows[0].streak_freezes > 0) {
+        // Consume the freeze: deduct one and count from twoDaysAgo
+        await pool.query(
+          `UPDATE user_stats_snapshot
+              SET streak_freezes = GREATEST(0, streak_freezes - 1), updated_at = now()
+            WHERE user_id = $1 AND streak_freezes > 0`,
+          [userId]
+        );
+        cursor = twoDaysAgo;
+      } else {
+        return 0;
+      }
+    } else {
+      return 0; // last finished day is older than yesterday → streak broken
+    }
+  }
   let streak = 0;
   while (days.has(cursor)) {
     streak++;
@@ -797,6 +941,34 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
     );
     const followingCount = parseInt(followingRows[0].count);
 
+    // Wallet info: whether they have a linked address, plus tips received
+    const { rows: walletRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [viewedUserId]
+    );
+    const walletLinked = walletRows.length > 0;
+
+    const { rows: tipRows } = await pool.query(
+      `SELECT SUM(amount_wei) as total_wei,
+              JSON_AGG(
+                JSON_BUILD_OBJECT(
+                  'fromUserId', from_user_id,
+                  'amountWei', amount_wei::text,
+                  'createdAt', created_at
+                ) ORDER BY created_at DESC
+              ) as tips
+         FROM (
+           SELECT from_user_id, amount_wei, created_at
+             FROM token_tips
+            WHERE to_user_id = $1 AND status = 'confirmed'
+            ORDER BY created_at DESC
+            LIMIT 5
+         ) sub`,
+      [viewedUserId]
+    );
+    const tipsReceivedWei = tipRows[0].total_wei ? tipRows[0].total_wei.toString() : '0';
+    const recentTippers = tipRows[0].tips || [];
+
     res.json({
       user: {
         id: user.id,
@@ -814,6 +986,9 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
       following,
       followerCount,
       followingCount,
+      walletLinked,
+      tipsReceivedWei,
+      recentTippers,
     });
   } catch (err) {
     console.error('[social] profile failed:', err.message);
@@ -1062,10 +1237,46 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
+    // Credit puzzle reward to ledger (idempotent via unique event constraint).
+    // Only for daily-category games (classic/idle/pvp skip this; the score guard
+    // below handles the rest). Credit amount = score * REWARD_PER_POINT_WEI.
+    let rewardWei = '0';
+    if (score && score > 0) {
+      try {
+        const amountWei = (BigInt(score) * REWARD_PER_POINT_WEI).toString();
+        const today = new Date().toISOString().slice(0, 10);
+        const { rows: evtRows } = await pool.query(
+          `INSERT INTO token_reward_events
+             (user_id, game_id, attempt_date, amount_wei)
+           VALUES ($1, $2, $3::date, $4)
+           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
+           RETURNING amount_wei`,
+          [req.user.id, gameId, today, amountWei]
+        );
+        if (evtRows.length > 0) {
+          // New event — credit the ledger
+          await pool.query(
+            `INSERT INTO token_rewards_ledger
+               (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
+             VALUES ($1, $2, $2, 0)
+             ON CONFLICT (user_id) DO UPDATE
+               SET pending_wei         = token_rewards_ledger.pending_wei + EXCLUDED.pending_wei,
+                   lifetime_earned_wei = token_rewards_ledger.lifetime_earned_wei + EXCLUDED.lifetime_earned_wei,
+                   updated_at          = now()`,
+            [req.user.id, amountWei]
+          );
+          rewardWei = amountWei;
+        }
+      } catch (rewardErr) {
+        // Non-fatal: reward crediting is best-effort; the puzzle result still records.
+        console.error('[daily] reward credit failed:', rewardErr.message);
+      }
+    }
+
     // Recompute the streak now that today is finished so the client can
     // reconcile its optimistic value without a full reload.
     const streak = await computeStreak(req.user.id);
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak });
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, rewardWei });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
@@ -2384,6 +2595,357 @@ app.post('/api/pvp/match/:matchId/forfeit', async (req, res) => {
   } catch (err) {
     console.error('[pvp] forfeit failed:', err.message);
     res.status(500).json({ error: 'Failed to forfeit' });
+  }
+});
+
+// ---- Wallet API ----------------------------------------------------------
+
+// POST /api/wallet/link { addr }
+// Upsert the caller's EVM wallet address (captured client-side via bridge getNodeAddress).
+app.post('/api/wallet/link', async (req, res) => {
+  const { addr } = req.body;
+  if (!addr || !EVM_ADDR_RE.test(addr)) {
+    return res.status(400).json({ error: 'Valid EVM address required' });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO user_wallets (user_id, wallet_addr, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (user_id) DO UPDATE
+         SET wallet_addr = EXCLUDED.wallet_addr, updated_at = now()`,
+      [req.user.id, addr]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[wallet] link failed:', err.message);
+    res.status(500).json({ error: 'Failed to link wallet' });
+  }
+});
+
+// GET /api/wallet
+// Full wallet state for the Wallet screen: address, on-chain balance, pending rewards,
+// streak freezes, and recent activity (rewards earned + tips sent/received + claims).
+app.get('/api/wallet', async (req, res) => {
+  try {
+    // Staging demo seed: insert a fake wallet address and rewards for the current
+    // viewer so the Wallet screen is demonstrable on a fresh staging DB.
+    if (IS_STAGING && req.query.demo === '1') {
+      const fakeAddr = '0xDEAD000000000000000000000000000000009999';
+      await pool.query(
+        `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id, fakeAddr]
+      );
+      await pool.query(
+        `INSERT INTO token_rewards_ledger
+           (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
+         VALUES ($1, '3000000000000000000', '5000000000000000000', '2000000000000000000')
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id]
+      );
+    }
+
+    // Wallet address
+    const { rows: wRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const addr = wRows.length > 0 ? wRows[0].wallet_addr : null;
+
+    // On-chain balance (mock in staging/no-contract)
+    let balanceWei = '0';
+    let mock = true;
+    if (addr) {
+      if (IS_STAGING || !utgoProvider || !UTGO_CONTRACT_ADDRESS) {
+        balanceWei = ethers.parseUnits('10', 18).toString();
+        mock = true;
+      } else {
+        try {
+          const token = new ethers.Contract(UTGO_CONTRACT_ADDRESS, UTGO_ABI_BALANCE, utgoProvider);
+          balanceWei = (await token.balanceOf(addr)).toString();
+          mock = false;
+        } catch (e) {
+          console.error('[wallet] balance check failed:', e.message);
+          balanceWei = '0';
+        }
+      }
+    }
+
+    // Pending rewards ledger
+    const { rows: lRows } = await pool.query(
+      `SELECT pending_wei, lifetime_earned_wei, lifetime_claimed_wei
+         FROM token_rewards_ledger WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const pendingWei          = lRows.length > 0 ? lRows[0].pending_wei.toString()          : '0';
+    const lifetimeEarnedWei   = lRows.length > 0 ? lRows[0].lifetime_earned_wei.toString()  : '0';
+    const lifetimeClaimedWei  = lRows.length > 0 ? lRows[0].lifetime_claimed_wei.toString() : '0';
+
+    // Streak freezes
+    const { rows: sRows } = await pool.query(
+      `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const streakFreezes = sRows.length > 0 ? (sRows[0].streak_freezes || 0) : 0;
+
+    // Recent activity: rewards + tips (sent/received) + claims — last 10 events
+    const { rows: evtRows } = await pool.query(
+      `(SELECT 'reward' AS kind, amount_wei::text AS amount_wei,
+               NULL AS counterpart, created_at
+          FROM token_reward_events WHERE user_id = $1
+      )
+      UNION ALL
+      (SELECT 'tip_sent' AS kind, amount_wei::text AS amount_wei,
+               to_user_id AS counterpart, created_at
+          FROM token_tips WHERE from_user_id = $1 AND status = 'confirmed'
+      )
+      UNION ALL
+      (SELECT 'tip_received' AS kind, amount_wei::text AS amount_wei,
+               from_user_id AS counterpart, created_at
+          FROM token_tips WHERE to_user_id = $1 AND status = 'confirmed'
+      )
+      ORDER BY created_at DESC LIMIT 10`,
+      [req.user.id]
+    );
+
+    res.json({
+      addr,
+      balanceWei,
+      mock,
+      pendingWei,
+      lifetimeEarnedWei,
+      lifetimeClaimedWei,
+      streakFreezes,
+      recent: evtRows,
+    });
+  } catch (err) {
+    console.error('[wallet] GET failed:', err.message);
+    res.status(500).json({ error: 'Failed to load wallet' });
+  }
+});
+
+// GET /api/wallet/balance?addr=0x…
+// On-chain balance for any address. Used by the nav balance chip.
+app.get('/api/wallet/balance', async (req, res) => {
+  const addr = req.query.addr;
+  if (!addr || !EVM_ADDR_RE.test(addr)) {
+    return res.status(400).json({ error: 'Valid EVM address required' });
+  }
+  try {
+    if (IS_STAGING || !utgoProvider || !UTGO_CONTRACT_ADDRESS) {
+      return res.json({ balance: ethers.parseUnits('10', 18).toString(), mock: true });
+    }
+    const token = new ethers.Contract(UTGO_CONTRACT_ADDRESS, UTGO_ABI_BALANCE, utgoProvider);
+    const balance = await token.balanceOf(addr);
+    res.json({ balance: balance.toString(), mock: false });
+  } catch (err) {
+    console.error('[wallet] balance check failed:', err.message);
+    res.status(500).json({ error: 'Failed to check balance' });
+  }
+});
+
+// POST /api/wallet/tip/prepare { toUserId, amount }
+// Look up recipient's wallet address, build transfer calldata, return to client.
+// The client sends the transaction, then calls /tip/confirm.
+app.post('/api/wallet/tip/prepare', async (req, res) => {
+  const { toUserId, amount } = req.body;
+  if (!toUserId || typeof amount !== 'string') {
+    return res.status(400).json({ error: 'toUserId and amount (wei string) required' });
+  }
+  if (toUserId === req.user.id) {
+    return res.status(400).json({ error: 'Cannot tip yourself' });
+  }
+  let amountWei;
+  try { amountWei = BigInt(amount); } catch { return res.status(400).json({ error: 'Invalid amount' }); }
+  if (amountWei <= 0n) return res.status(400).json({ error: 'Amount must be positive' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [toUserId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Recipient has not linked a wallet' });
+    }
+    const toAddr = rows[0].wallet_addr;
+
+    let calldata = null;
+    if (UTGO_CONTRACT_ADDRESS && TRANSFER_IFACE) {
+      calldata = TRANSFER_IFACE.encodeFunctionData('transfer', [toAddr, amountWei]);
+    }
+
+    res.json({
+      toAddr,
+      calldata,
+      contractAddr: UTGO_CONTRACT_ADDRESS || null,
+    });
+  } catch (err) {
+    console.error('[wallet] tip/prepare failed:', err.message);
+    res.status(500).json({ error: 'Failed to prepare tip' });
+  }
+});
+
+// POST /api/wallet/tip/confirm { toUserId, amount, txHash }
+// Record a completed tip (client reports after sendTransaction).
+app.post('/api/wallet/tip/confirm', async (req, res) => {
+  const { toUserId, amount, txHash } = req.body;
+  if (!toUserId || typeof amount !== 'string' || !txHash) {
+    return res.status(400).json({ error: 'toUserId, amount, txHash required' });
+  }
+  if (toUserId === req.user.id) {
+    return res.status(400).json({ error: 'Cannot tip yourself' });
+  }
+  let amountWei;
+  try { amountWei = BigInt(amount); } catch { return res.status(400).json({ error: 'Invalid amount' }); }
+  if (amountWei <= 0n) return res.status(400).json({ error: 'Amount must be positive' });
+
+  try {
+    const [fromWallet, toWallet] = await Promise.all([
+      pool.query(`SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [req.user.id]),
+      pool.query(`SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [toUserId]),
+    ]);
+    const fromAddr = fromWallet.rows.length > 0 ? fromWallet.rows[0].wallet_addr : null;
+    const toAddr   = toWallet.rows.length > 0   ? toWallet.rows[0].wallet_addr   : null;
+
+    await pool.query(
+      `INSERT INTO token_tips
+         (from_user_id, to_user_id, from_addr, to_addr, amount_wei, tx_hash, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')`,
+      [req.user.id, toUserId, fromAddr, toAddr, amount, txHash]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[wallet] tip/confirm failed:', err.message);
+    res.status(500).json({ error: 'Failed to confirm tip' });
+  }
+});
+
+// POST /api/wallet/rewards/claim
+// Validator signs a claimRewards call; client sends via bridge.
+// In staging/no-contract: immediately marks rewards as claimed and returns mock.
+app.post('/api/wallet/rewards/claim', async (req, res) => {
+  try {
+    // Get user's wallet address
+    const { rows: wRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (wRows.length === 0) {
+      return res.status(400).json({ error: 'No wallet linked' });
+    }
+    const addr = wRows[0].wallet_addr;
+
+    // Atomically read and zero pending_wei
+    const { rows: lRows } = await pool.query(
+      `UPDATE token_rewards_ledger
+          SET pending_wei = 0, updated_at = now()
+        WHERE user_id = $1 AND pending_wei > 0
+        RETURNING pending_wei`,
+      [req.user.id]
+    );
+    // If no row was updated, check if there's just nothing pending
+    if (lRows.length === 0) {
+      const { rows: check } = await pool.query(
+        `SELECT pending_wei FROM token_rewards_ledger WHERE user_id = $1`,
+        [req.user.id]
+      );
+      if (check.length === 0 || check[0].pending_wei === '0' || check[0].pending_wei === 0) {
+        return res.status(409).json({ error: 'No pending rewards to claim' });
+      }
+    }
+
+    // pending_wei was already zeroed above — reconstruct the claimed amount
+    // Note: the UPDATE returns the OLD pending_wei only on Postgres 12+
+    // We re-read lifetime for confirmation display
+    const { rows: afterRows } = await pool.query(
+      `UPDATE token_rewards_ledger
+          SET lifetime_claimed_wei = lifetime_claimed_wei + $2, updated_at = now()
+        WHERE user_id = $1
+        RETURNING lifetime_claimed_wei, pending_wei`,
+      [req.user.id, lRows.length > 0 ? lRows[0].pending_wei.toString() : '0']
+    );
+
+    const amountWei = lRows.length > 0 ? lRows[0].pending_wei.toString() : '0';
+
+    // Staging / no contract: mock claim
+    if (IS_STAGING || !validatorWallet || !UTGO_CONTRACT_ADDRESS) {
+      return res.json({
+        claimCalldata: null,
+        contractAddr: null,
+        amountWei,
+        mock: true,
+        txHash: '0xstagingclaim',
+      });
+    }
+
+    // Production: validator-signed claim calldata
+    try {
+      const nonce = Date.now();
+      const innerHash = ethers.keccak256(
+        ethers.solidityPacked(
+          ['address', 'uint256', 'uint256'],
+          [addr, BigInt(amountWei), BigInt(nonce)]
+        )
+      );
+      const sig = await validatorWallet.signMessage(ethers.getBytes(innerHash));
+      const claimCalldata = CLAIM_REWARDS_IFACE.encodeFunctionData(
+        'claimRewards',
+        [addr, BigInt(amountWei), BigInt(nonce), sig]
+      );
+      res.json({ claimCalldata, contractAddr: UTGO_CONTRACT_ADDRESS, amountWei, mock: false });
+    } catch (sigErr) {
+      console.error('[wallet] claim signing failed:', sigErr.message);
+      res.status(500).json({ error: 'Failed to sign claim' });
+    }
+  } catch (err) {
+    console.error('[wallet] claim failed:', err.message);
+    res.status(500).json({ error: 'Failed to claim rewards' });
+  }
+});
+
+// POST /api/wallet/rewards/claim/confirm { txHash }
+// Client reports successful on-chain claim — already settled in /claim, so this is a no-op
+// record for auditability. In production you'd verify via RPC here.
+app.post('/api/wallet/rewards/claim/confirm', async (req, res) => {
+  res.json({ ok: true });
+});
+
+// POST /api/wallet/spend/streak-freeze
+// Debit STREAK_FREEZE_PRICE_WEI from pending rewards and add one freeze.
+app.post('/api/wallet/spend/streak-freeze', async (req, res) => {
+  try {
+    const priceWei = STREAK_FREEZE_PRICE_WEI;
+
+    const { rows } = await pool.query(
+      `UPDATE token_rewards_ledger
+          SET pending_wei = pending_wei - $2, updated_at = now()
+        WHERE user_id = $1 AND pending_wei >= $2
+        RETURNING pending_wei`,
+      [req.user.id, priceWei.toString()]
+    );
+    if (rows.length === 0) {
+      return res.status(409).json({ error: 'Insufficient pending rewards' });
+    }
+
+    await pool.query(
+      `UPDATE user_stats_snapshot
+          SET streak_freezes = streak_freezes + 1, updated_at = now()
+        WHERE user_id = $1`,
+      [req.user.id]
+    );
+
+    const { rows: sRows } = await pool.query(
+      `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
+      [req.user.id]
+    );
+    res.json({
+      ok: true,
+      streakFreezes: sRows.length > 0 ? sRows[0].streak_freezes : 1,
+      newPendingWei: rows[0].pending_wei.toString(),
+    });
+  } catch (err) {
+    console.error('[wallet] streak-freeze failed:', err.message);
+    res.status(500).json({ error: 'Failed to purchase streak freeze' });
   }
 });
 

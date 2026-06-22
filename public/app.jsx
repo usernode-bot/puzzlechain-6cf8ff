@@ -3059,6 +3059,42 @@ body {
 .pvp-prize-row .mono { color: ${C.text}; }
 .pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
 .pvp-prize-winner .mono { color: ${C.emerald}; }
+
+/* ---- Hash Rush ---- */
+.hr-wrap {
+  position: relative; width: 100%; flex: 1; align-self: stretch; overflow: hidden; min-height: 0;
+}
+.hr-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hr-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0.75rem;
+  background: ${C.bg}; color: ${C.muted}; font-size: 0.9rem; text-align: center; padding: 1.5rem;
+}
+.hr-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid ${C.border}; border-top-color: ${C.accent};
+  animation: pc-spin 0.8s linear infinite;
+}
+.hr-hud {
+  position: absolute; top: 0.75rem; left: 0; right: 0;
+  display: flex; justify-content: center; gap: 0.5rem; padding: 0 0.5rem;
+  pointer-events: none;
+}
+.hr-pill {
+  background: rgba(17,24,39,0.82); border: 1px solid ${C.border}; border-radius: 10px;
+  padding: 0.4rem 0.9rem; text-align: center; min-width: 72px; backdrop-filter: blur(4px);
+}
+.hr-plabel { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.hr-pvalue { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1rem; color: ${C.text}; }
+.hr-lane-btn {
+  position: absolute; bottom: 2.5rem; width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(17,24,39,0.75); border: 1px solid ${C.border}; color: ${C.muted};
+  font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; z-index: 5;
+}
+.hr-lane-left { left: 1rem; }
+.hr-lane-right { right: 1rem; }
+.hr-lane-btn:active { background: ${C.accent}30; border-color: ${C.accent}; color: ${C.accent}; }
 `;
 
 /* ============================================================
@@ -7028,6 +7064,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     </ClassicShell>
   );
 }
+
 /* ============================================================
    Game 7 — Tile Match (3-Tiles style)
    ============================================================ */
@@ -10225,6 +10262,512 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   );
 }
 
+/* ============================================================
+   Game — Hash Rush (3D endless runner, Three.js, Classic tab)
+   ============================================================ */
+const HR_HISTORY_KEY = 'puzzlechain_hashrush_history';
+const HR_LANE_X      = [-3, 0, 3];
+const HR_CHUNK_LEN   = 40;
+const HR_NUM_CHUNKS  = 4;
+
+function hrMakeGridTex(THREE) {
+  const sz = 256;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = sz;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#04101e';
+  ctx.fillRect(0, 0, sz, sz);
+  ctx.strokeStyle = '#0d3358';
+  ctx.lineWidth = 1;
+  const step = sz / 8;
+  for (let i = 0; i <= 8; i++) {
+    ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, sz); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(sz, i * step); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 4);
+  return tex;
+}
+
+function hrSpawnChunk(THREE, scene, centerZ, isFirst, gridTex) {
+  const allMeshes = [];
+  const obstacles = [];
+  const collectibles = [];
+
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, HR_CHUNK_LEN),
+    new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.85, emissive: new THREE.Color(0x081520), emissiveIntensity: 0.5 })
+  );
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(0, 0, centerZ);
+  scene.add(road);
+  allMeshes.push(road);
+
+  [-1.5, 1.5].forEach(lx => {
+    const d = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.05, HR_CHUNK_LEN),
+      new THREE.MeshBasicMaterial({ color: 0x1e3d6a })
+    );
+    d.position.set(lx, 0.02, centerZ);
+    scene.add(d);
+    allMeshes.push(d);
+  });
+
+  if (!isFirst) {
+    const chunkFarZ  = centerZ - HR_CHUNK_LEN / 2;
+    const occupied   = new Set();
+    const numObs     = Math.random() < 0.45 ? 1 : 2;
+
+    for (let i = 0; i < numObs; i++) {
+      const lane = Math.floor(Math.random() * 3);
+      const zOff = 6 + Math.random() * (HR_CHUNK_LEN - 12);
+      const slot = `o_${lane}_${Math.floor(zOff / 7)}`;
+      if (occupied.has(slot)) continue;
+      occupied.add(slot);
+
+      const type = Math.random() < 0.38 ? 'firewall' : Math.random() < 0.55 ? 'congestion' : 'failedtx';
+      let geo, mat;
+      if (type === 'firewall') {
+        geo = new THREE.BoxGeometry(2.0, 3.0, 0.5);
+        mat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xa01030, emissiveIntensity: 0.35 });
+      } else if (type === 'congestion') {
+        geo = new THREE.BoxGeometry(2.0, 1.2, 1.2);
+        mat = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x7a3508, emissiveIntensity: 0.25 });
+      } else {
+        geo = new THREE.SphereGeometry(0.7, 8, 6);
+        mat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0x880020, emissiveIntensity: 0.5, wireframe: true });
+      }
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(HR_LANE_X[lane], type === 'firewall' ? 1.5 : 0.65, chunkFarZ + zOff);
+      scene.add(mesh);
+      allMeshes.push(mesh);
+      obstacles.push({ mesh, type, alive: true });
+    }
+
+    const numCol = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < numCol; i++) {
+      const lane   = Math.floor(Math.random() * 3);
+      const zOff   = 4 + Math.random() * (HR_CHUNK_LEN - 8);
+      const slot   = `c_${lane}_${Math.floor(zOff / 6)}`;
+      if (occupied.has(slot)) continue;
+      occupied.add(slot);
+
+      const isShard = Math.random() < 0.22;
+      const geo2 = isShard
+        ? new THREE.IcosahedronGeometry(0.6, 0)
+        : new THREE.OctahedronGeometry(0.65, 0);
+      const mat2 = new THREE.MeshStandardMaterial(
+        isShard
+          ? { color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 0.7 }
+          : { color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.5 }
+      );
+      const mesh2 = new THREE.Mesh(geo2, mat2);
+      mesh2.position.set(HR_LANE_X[lane], 1.0, chunkFarZ + zOff);
+      scene.add(mesh2);
+      allMeshes.push(mesh2);
+      collectibles.push({ mesh: mesh2, isShard, alive: true });
+    }
+  }
+
+  return { centerZ, allMeshes, obstacles, collectibles };
+}
+
+function hrDisposeChunk(THREE, scene, chunk) {
+  chunk.allMeshes.forEach(m => {
+    scene.remove(m);
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) {
+      if (m.material.map) m.material.map.dispose();
+      m.material.dispose();
+    }
+  });
+}
+
+function HashRushGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const [loading, setLoading] = useState(true);
+  const [webglErr, setWebglErr] = useState(false);
+  const [score, setScore] = useState(0);
+  const [dist, setDist] = useState(0);
+  const [mult, setMult] = useState(1);
+
+  const mountRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef    = useRef(null);
+  const uiTmrRef  = useRef(null);
+  const roRef     = useRef(null);
+  const gameRef   = useRef(null); // holds live game state object
+  const onWinRef  = useRef(onWin);
+  const onStepRef = useRef(onStepChange);
+  onWinRef.current  = onWin;
+  onStepRef.current = onStepChange;
+
+  const histRef = useRef(cgLoadHistory(HR_HISTORY_KEY));
+
+  const sheet = [
+    cgRulesSection([
+      'Tap left / right side of screen (or ← → arrow keys) to switch lanes.',
+      'Dodge red Firewalls, orange Congestion blocks, and spinning Failed-Tx spheres.',
+      'Collect gold Tokens (+50 pts) and cyan Hash Shards (×2 score rate for 5 s).',
+      'The rig speeds up over time — survive as long as possible!',
+    ]),
+    cgHistorySection(histRef.current, r => (
+      React.createElement(React.Fragment, null,
+        React.createElement('span', null, `${(r.score || 0).toLocaleString()} pts`),
+        React.createElement('span', { className: 'mono' }, `${r.distance || 0}m · ${r.tokens || 0}⛏`)
+      )
+    )),
+    cgStatsSection([
+      { val: histRef.current.length > 0 ? Math.max(...histRef.current.map(r => r.score || 0)).toLocaleString() : 0, lbl: 'Best Score' },
+      { val: histRef.current.length, lbl: 'Total Runs' },
+      { val: histRef.current.reduce((a, r) => a + (r.distance || 0), 0), lbl: 'Total Metres' },
+      { val: histRef.current.reduce((a, r) => a + (r.tokens || 0), 0), lbl: 'Total Tokens' },
+    ]),
+  ];
+
+  // Keyboard input — reads from gameRef.current so always fresh
+  useEffect(() => {
+    const onKey = (e) => {
+      const g = gameRef.current;
+      if (!g || g.done) return;
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        e.preventDefault();
+        if (g.targetLane > 0) { g.targetLane--; cgHaptic(10); }
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        e.preventDefault();
+        if (g.targetLane < 2) { g.targetLane++; cgHaptic(10); }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Main init effect (re-runs on resetKey to restart)
+  useEffect(() => {
+    // Reset display state
+    setScore(0); setDist(0); setMult(1); setLoading(true); setWebglErr(false);
+
+    // Cancel previous loop / timer
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
+    if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
+
+    // Fresh game state (shared by loop + cleanup via closure)
+    let renderer = null, scene = null;
+    const chunks = [];
+    const g = {
+      targetLane: 1, speed: 8,
+      score: 0, dist: 0, tokens: 0, multEnd: 0,
+      done: false, elapsed: 0, lastTs: null,
+    };
+    gameRef.current = g;
+
+    const endRun = () => {
+      if (g.done) return;
+      g.done = true;
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
+      setScore(g.score);
+      setDist(Math.floor(g.dist));
+      cgSaveHistory(HR_HISTORY_KEY, { score: g.score, distance: Math.floor(g.dist), tokens: g.tokens, ts: Date.now() });
+      cgHaptic([20, 40, 20]);
+      onWinRef.current(g.score, g.tokens, Math.floor(g.elapsed), {
+        winnerLabel: 'Run Over',
+        share: `⛏️ Hash Rush — ${g.score.toLocaleString()} pts · ${Math.floor(g.dist)}m · ${g.tokens} tokens`,
+      });
+    };
+
+    const initWithThree = (THREE) => {
+      const canvas = canvasRef.current;
+      const mount  = mountRef.current;
+      if (!canvas || !mount) return;
+
+      // Create renderer (throws if WebGL unavailable)
+      try {
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      } catch (e) {
+        setWebglErr(true); setLoading(false); return;
+      }
+      const W = mount.clientWidth  || window.innerWidth;
+      const H = mount.clientHeight || Math.round(window.innerHeight * 0.65);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(W, H);
+      renderer.setClearColor(0x030609);
+      renderer.shadowMap.enabled = false;
+
+      scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(70, W / H, 0.1, 500);
+      camera.position.set(0, 5, 12);
+      camera.lookAt(0, 0, -20);
+
+      // Lighting
+      scene.add(new THREE.AmbientLight(0x334466, 0.8));
+      const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+      dir.position.set(5, 10, 5);
+      scene.add(dir);
+      const rigLight = new THREE.PointLight(0x3b82f6, 4, 16);
+      rigLight.position.set(0, 2, 0);
+      scene.add(rigLight);
+
+      // Sky dome
+      scene.add(new THREE.Mesh(
+        new THREE.SphereGeometry(220, 16, 8),
+        new THREE.MeshBasicMaterial({ color: 0x020407, side: THREE.BackSide })
+      ));
+
+      // Distant city blocks (decorative)
+      [
+        [-20, -130, 18], [-15, -110, 13], [20, -120, 22],
+        [15, -145, 14],  [-25, -160, 26], [25, -170, 20],
+      ].forEach(([x, z, h]) => {
+        const cm = new THREE.Mesh(
+          new THREE.BoxGeometry(2.5, h, 2.5),
+          new THREE.MeshStandardMaterial({ color: 0x050e1c, emissive: new THREE.Color(0x0c2845), emissiveIntensity: 0.65 })
+        );
+        cm.position.set(x, h / 2, z);
+        scene.add(cm);
+      });
+
+      // Player rig
+      const rig = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 1, 3),
+        new THREE.MeshStandardMaterial({
+          color: 0x3b82f6, emissive: new THREE.Color(0x1a4fc4),
+          emissiveIntensity: 0.5, roughness: 0.3, metalness: 0.7,
+        })
+      );
+      rig.position.set(0, 0.5, 0);
+      scene.add(rig);
+
+      // Grid texture (shared across all chunks this session)
+      const gridTex = hrMakeGridTex(THREE);
+
+      // Initial road chunks: centers at -20, -60, -100, -140
+      for (let i = 0; i < HR_NUM_CHUNKS; i++) {
+        const centerZ = -(i * HR_CHUNK_LEN) - HR_CHUNK_LEN / 2;
+        chunks.push(hrSpawnChunk(THREE, scene, centerZ, i === 0, gridTex));
+      }
+
+      // Resize observer
+      const ro = new ResizeObserver(([entry]) => {
+        const { width, height } = entry.contentRect;
+        if (width < 1 || height < 1 || !renderer) return;
+        renderer.setSize(width, height);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      });
+      ro.observe(mount);
+      roRef.current = ro;
+
+      setLoading(false);
+
+      // Game loop
+      const loop = (ts) => {
+        if (g.done) return;
+        rafRef.current = requestAnimationFrame(loop);
+
+        const dt = g.lastTs ? Math.min((ts - g.lastTs) / 1000, 0.1) : 0.016;
+        g.lastTs = ts;
+        g.elapsed += dt;
+
+        const scroll = g.speed * dt;
+        g.dist += scroll;
+
+        // Move all chunk meshes toward camera (+z)
+        for (let ci = 0; ci < chunks.length; ci++) {
+          const ch = chunks[ci];
+          ch.centerZ += scroll;
+          for (let mi = 0; mi < ch.allMeshes.length; mi++) {
+            ch.allMeshes[mi].position.z += scroll;
+          }
+        }
+
+        // Lerp rig x
+        const targetX = HR_LANE_X[g.targetLane];
+        rig.position.x += (targetX - rig.position.x) * Math.min(dt * 10, 0.9);
+        rigLight.position.x = rig.position.x;
+
+        // Animate collectibles and failed-tx obstacles
+        for (let ci = 0; ci < chunks.length; ci++) {
+          const ch = chunks[ci];
+          for (let oi = 0; oi < ch.obstacles.length; oi++) {
+            const obs = ch.obstacles[oi];
+            if (!obs.alive || obs.type !== 'failedtx') continue;
+            obs.mesh.rotation.x += dt * 2;
+            obs.mesh.rotation.z += dt * 1.5;
+          }
+          for (let ki = 0; ki < ch.collectibles.length; ki++) {
+            const col = ch.collectibles[ki];
+            if (!col.alive) continue;
+            col.mesh.rotation.y += dt * (col.isShard ? 3.5 : 2);
+            col.mesh.rotation.x += dt * 0.8;
+          }
+        }
+
+        // Collision + collection — only within reasonable z range
+        const rx = rig.position.x;
+        outer: for (let ci = 0; ci < chunks.length; ci++) {
+          const ch = chunks[ci];
+          for (let oi = 0; oi < ch.obstacles.length; oi++) {
+            const obs = ch.obstacles[oi];
+            if (!obs.alive) continue;
+            const oz = obs.mesh.position.z;
+            if (oz > 4 || oz < -3) continue; // z cull: only near z=0
+            const ox = obs.mesh.position.x;
+            const dx = Math.abs(rx - ox);
+            const hz = obs.type === 'firewall' ? 1.5 : obs.type === 'congestion' ? 1.8 : 1.4;
+            if (dx < 1.8 && Math.abs(oz) < hz) { endRun(); break outer; }
+          }
+          for (let ki = 0; ki < ch.collectibles.length; ki++) {
+            const col = ch.collectibles[ki];
+            if (!col.alive) continue;
+            const oz = col.mesh.position.z;
+            if (oz > 3 || oz < -3) continue;
+            const dx = Math.abs(rx - col.mesh.position.x);
+            if (dx < 1.6 && Math.abs(oz) < 1.8) {
+              col.alive = false;
+              scene.remove(col.mesh);
+              if (col.isShard) {
+                g.multEnd = performance.now() + 5000;
+              } else {
+                g.tokens++;
+                if (onStepRef.current) onStepRef.current(g.tokens);
+              }
+            }
+          }
+        }
+
+        // Update score
+        const multActive = performance.now() < g.multEnd;
+        g.score = Math.round(g.dist * (multActive ? 2 : 1) * 10) + g.tokens * 50;
+
+        // Increase speed gently
+        g.speed = Math.min(8 + g.dist * 0.016, 32);
+
+        // Retire far chunks (centerZ > 40 means they're well past the camera)
+        for (let ci = chunks.length - 1; ci >= 0; ci--) {
+          if (chunks[ci].centerZ > 40) {
+            hrDisposeChunk(THREE, scene, chunks[ci]);
+            chunks.splice(ci, 1);
+          }
+        }
+        // Spawn replacements
+        while (chunks.length < HR_NUM_CHUNKS) {
+          const minCZ = chunks.length > 0 ? Math.min(...chunks.map(c => c.centerZ)) : -HR_CHUNK_LEN / 2;
+          chunks.push(hrSpawnChunk(THREE, scene, minCZ - HR_CHUNK_LEN, false, gridTex));
+        }
+
+        renderer.render(scene, camera);
+      };
+
+      rafRef.current = requestAnimationFrame(loop);
+
+      // UI update timer — updates React state without spamming RAF
+      uiTmrRef.current = setInterval(() => {
+        if (g.done) return;
+        setScore(g.score);
+        setDist(Math.floor(g.dist));
+        setMult(performance.now() < g.multEnd ? 2 : 1);
+      }, 100);
+    }; // end initWithThree
+
+    // Load Three.js lazily (cached on window.THREE)
+    if (window.THREE) {
+      initWithThree(window.THREE);
+    } else {
+      let s = document.getElementById('three-js-cdn');
+      if (!s) {
+        s = document.createElement('script');
+        s.id = 'three-js-cdn';
+        s.src = 'https://unpkg.com/three@0.161.0/build/three.min.js';
+        s.addEventListener('load', () => initWithThree(window.THREE), { once: true });
+        s.addEventListener('error', () => { setWebglErr(true); setLoading(false); }, { once: true });
+        document.head.appendChild(s);
+      } else {
+        // Script tag exists — might still be loading
+        if (window.THREE) {
+          initWithThree(window.THREE);
+        } else {
+          s.addEventListener('load', () => initWithThree(window.THREE), { once: true });
+        }
+      }
+    }
+
+    return () => {
+      g.done = true;
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
+      if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
+      const THREE = window.THREE;
+      if (THREE && scene) chunks.forEach(ch => hrDisposeChunk(THREE, scene, ch));
+      if (renderer) { renderer.dispose(); renderer = null; }
+    };
+  }, [resetKey]);
+
+  // Touch controls on canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onTouch = (e) => {
+      const g = gameRef.current;
+      if (!g || g.done) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      if (!t) return;
+      const rect = canvas.getBoundingClientRect();
+      if (t.clientX < rect.left + rect.width / 2) {
+        if (g.targetLane > 0) { g.targetLane--; cgHaptic(10); }
+      } else {
+        if (g.targetLane < 2) { g.targetLane++; cgHaptic(10); }
+      }
+    };
+    canvas.addEventListener('touchstart', onTouch, { passive: false });
+    return () => canvas.removeEventListener('touchstart', onTouch);
+  }, []);
+
+  const moveLane = (dir) => {
+    const g = gameRef.current;
+    if (!g || g.done) return;
+    const next = g.targetLane + dir;
+    if (next >= 0 && next <= 2) { g.targetLane = next; cgHaptic(10); }
+  };
+
+  return (
+    React.createElement(ClassicShell, { game, onExit: onBack, sheetSections: sheet },
+      React.createElement('div', { ref: mountRef, className: 'hr-wrap' },
+        React.createElement('canvas', { ref: canvasRef, className: 'hr-canvas' }),
+        loading && !webglErr && React.createElement('div', { className: 'hr-overlay' },
+          React.createElement('div', { className: 'hr-spinner' }),
+          React.createElement('div', null, 'Initializing 3D engine…')
+        ),
+        webglErr && React.createElement('div', { className: 'hr-overlay' },
+          React.createElement('div', { style: { fontSize: '2rem' } }, '⚠️'),
+          React.createElement('div', null, 'WebGL is not available in your browser.')
+        ),
+        !loading && !webglErr && React.createElement(React.Fragment, null,
+          React.createElement('div', { className: 'hr-hud' },
+            React.createElement('div', { className: 'hr-pill' },
+              React.createElement('div', { className: 'hr-plabel' }, 'Score'),
+              React.createElement('div', { className: 'hr-pvalue' }, score.toLocaleString())
+            ),
+            React.createElement('div', { className: 'hr-pill' },
+              React.createElement('div', { className: 'hr-plabel' }, 'Distance'),
+              React.createElement('div', { className: 'hr-pvalue' }, dist + 'm')
+            ),
+            React.createElement('div', { className: 'hr-pill', style: mult > 1 ? { borderColor: C.gold } : {} },
+              React.createElement('div', { className: 'hr-plabel' }, 'Mult'),
+              React.createElement('div', { className: 'hr-pvalue', style: mult > 1 ? { color: C.gold } : {} }, '\xd7' + mult)
+            )
+          ),
+          React.createElement('button', { className: 'hr-lane-btn hr-lane-left', onClick: () => moveLane(-1) }, '◄'),
+          React.createElement('button', { className: 'hr-lane-btn hr-lane-right', onClick: () => moveLane(1) }, '►')
+        )
+      )
+    )
+  );
+}
+
 const GAMES = [
   {
     id: 'sudoku',
@@ -10377,6 +10920,16 @@ const GAMES = [
     component: ZumaGame,
   },
   {
+    id: 'hashrush',
+    name: 'Hash Rush',
+    icon: '⛏️',
+    category: 'classic',
+    desc: 'Dodge blockchain obstacles and collect tokens in a crypto-themed 3D endless runner.',
+    tag: '3D',
+    tagColor: C.accent,
+    component: HashRushGame,
+  },
+  {
     id: 'tilematchingdaily',
     name: 'Daily Tile Match Puzzle',
     icon: '🀄',
@@ -10399,7 +10952,245 @@ const GAMES = [
 ];
 
 // Games that render their own ClassicShell (full-screen, gesture-first).
-const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas']);
+const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas', 'hashrush']);
+
+/* ============================================================
+   Social: Feed & Posts
+   ============================================================ */
+
+function FeedScreen({ user, setScreen }) {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+
+  useEffect(() => {
+    const loadFeed = async () => {
+      const { ok, body } = await api('/api/posts/feed?limit=20&offset=0');
+      if (ok && body) setPosts(body.posts || []);
+      setLoading(false);
+    };
+    loadFeed();
+    const id = setInterval(loadFeed, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (selectedPostId) {
+    const post = posts.find(p => p.id === selectedPostId);
+    if (post) {
+      return (
+        <PostDetail
+          post={post}
+          onBack={() => setSelectedPostId(null)}
+        />
+      );
+    }
+  }
+
+  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading feed...</div>;
+
+  const gameNameMap = {};
+  GAMES.forEach(g => gameNameMap[g.id] = g);
+
+  return (
+    <div className="lobby" style={{ maxWidth: '600px' }}>
+      {posts.length === 0 ? (
+        <div style={{ textAlign: 'center', color: C.muted, padding: '2rem' }}>
+          <p>No posts yet. Play a game and share your wins!</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {posts.map(p => {
+            const game = gameNameMap[p.gameId];
+            return (
+              <div
+                key={p.id}
+                className="card"
+                style={{ cursor: 'pointer', '--accent': game?.tagColor || C.accent }}
+                onClick={() => setSelectedPostId(p.id)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{
+                    width: '1.8rem', height: '1.8rem', borderRadius: '50%',
+                    background: C.accent, color: '#fff', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: '600'
+                  }}>
+                    {(p.username || 'U')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{p.username}</div>
+                    <div style={{ fontSize: '0.75rem', color: C.muted }}>
+                      {p.createdAt ? new Date(p.createdAt).toLocaleString() : 'now'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>{game?.icon || '🎮'}</span>
+                  <span style={{ fontWeight: '600' }}>{game?.name || p.gameId}</span>
+                </div>
+                <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  {p.score} pts
+                </div>
+                {p.caption && <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>{p.caption}</div>}
+                <div style={{ fontSize: '0.8rem', color: C.muted }}>
+                  💬 {p.commentCount} comment{p.commentCount !== 1 ? 's' : ''}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostDetail({ post, onBack }) {
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPost = async () => {
+      const { ok: userOk, body: userData } = await api('/api/daily');
+      if (userOk) setUser(userData.user);
+
+      const { ok, body } = await api(`/api/posts/${post.id}/comments?limit=50&offset=0`);
+      if (ok && body) setComments(body.comments || []);
+      setLoading(false);
+    };
+    loadPost();
+  }, [post.id]);
+
+  const addComment = async () => {
+    if (!commentText.trim()) return;
+    const { ok, body } = await api(`/api/posts/${post.id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ text: commentText }),
+    });
+    if (ok && body) {
+      setComments(prev => [body, ...prev]);
+      setCommentText('');
+    }
+  };
+
+  const deleteComment = async (commentId) => {
+    const { ok } = await api(`/api/posts/${post.id}/comments/${commentId}`, {
+      method: 'DELETE',
+    });
+    if (ok) {
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    }
+  };
+
+  const gameNameMap = {};
+  GAMES.forEach(g => gameNameMap[g.id] = g);
+  const game = gameNameMap[post.gameId];
+
+  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+
+  return (
+    <div className="game-wrap">
+      <button className="back-btn" onClick={onBack}>← Back</button>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{
+              width: '2rem', height: '2rem', borderRadius: '50%',
+              background: C.accent, color: '#fff', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontWeight: '600'
+            }}>
+              {(post.username || 'U')[0].toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: '600' }}>{post.username}</div>
+              <div style={{ fontSize: '0.8rem', color: C.muted }}>
+                {post.createdAt ? new Date(post.createdAt).toLocaleString() : 'now'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>{game?.icon || '🎮'}</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: '600' }}>{game?.name || post.gameId}</span>
+          </div>
+          <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', fontSize: '1.1rem', marginBottom: '0.75rem' }}>
+            {post.score} pts{post.timeSecs ? ` · ${Math.floor(post.timeSecs / 60)}:${String(post.timeSecs % 60).padStart(2, '0')}` : ''}
+          </div>
+          {post.caption && <div style={{ fontSize: '0.95rem', marginTop: '0.75rem' }}>{post.caption}</div>}
+        </div>
+
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Comments ({comments.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            {comments.map(c => (
+              <div key={c.id} className="card" style={{ padding: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.username}</div>
+                    <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.4rem' }}>
+                      {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'now'}
+                    </div>
+                    <div style={{ fontSize: '0.9rem' }}>{c.text}</div>
+                  </div>
+                  {user && user.id === c.userId && (
+                    <button
+                      onClick={() => deleteComment(c.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: C.rose,
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        marginLeft: '0.5rem',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              placeholder="Add a comment..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value.slice(0, 280))}
+              onKeyDown={(e) => e.key === 'Enter' && addComment()}
+              style={{
+                flex: 1,
+                padding: '0.6rem 0.8rem',
+                background: C.card,
+                border: `1px solid ${C.border}`,
+                borderRadius: '10px',
+                color: C.text,
+                fontFamily: 'inherit',
+                fontSize: '0.9rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={addComment}
+              style={{
+                padding: '0.6rem 1rem',
+                background: C.accent,
+                color: '#fff',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+              }}
+            >
+              Reply
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ============================================================
    Root app
@@ -10430,6 +11221,8 @@ function App() {
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
+  // Share modal for posting wins to feed
+  const [shareModal, setShareModal] = useState({ show: false, caption: '' });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -10535,7 +11328,12 @@ function App() {
     const finalScore = Math.round(score * multiplier);
     const bonus = finalScore - score;
     setStreak(effectiveStreak);
-    setWinData({ score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak, share: meta && meta.share });
+    setWinData({
+      score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+      share: meta && meta.share,
+      canPost: true,
+      gameId: gameId,
+    });
 
     const gameId = currentGame.id;
     const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
@@ -10692,7 +11490,7 @@ function App() {
         <div className="lobby">
           <div className="lobby-head">
             <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : 'PvP Arena'}
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : lobbyTab === 'pvp' ? 'PvP Arena' : 'Community Feed'}
             </h1>
             <p>
               {lobbyTab === 'daily'
@@ -10701,7 +11499,9 @@ function App() {
                 ? 'Play anytime — track your best scores.'
                 : lobbyTab === 'idle'
                 ? 'Tap, upgrade, and build your empire. Progress saved automatically.'
-                : 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'}
+                : lobbyTab === 'pvp'
+                ? 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'
+                : 'See what your friends have been playing'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
               <p className="lobby-hint">
@@ -10735,9 +11535,17 @@ function App() {
               onClick={() => setLobbyTab('pvp')}
               style={lobbyTab !== 'pvp' ? { borderColor: C.rose + '60', color: C.rose } : {}}
             >⚔️ PvP Arena</button>
+            {authOk && (
+              <button
+                className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
+                onClick={() => setLobbyTab('feed')}
+              >Feed</button>
+            )}
           </div>
           {lobbyTab === 'pvp' ? (
             <PvpArena user={user} authOk={authOk} />
+          ) : lobbyTab === 'feed' ? (
+            <FeedScreen user={user} setScreen={setScreen} />
           ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
@@ -10877,6 +11685,15 @@ function App() {
               </div>
             </div>
             <ShareButton text={winData.share} />
+            {!winData.isClassic && authOk && (
+              <button
+                className="primary-btn"
+                style={{ marginBottom: '0.6rem', background: C.emerald }}
+                onClick={() => setShareModal({ show: true, caption: '', gameId: winData.gameId, score: winData.finalScore, steps: winData.steps, timeSecs: winData.timeSecs })}
+              >
+                📤 Share to Feed
+              </button>
+            )}
             {winData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
                 Play Again
@@ -10916,6 +11733,67 @@ function App() {
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+          </div>
+        </div>
+      )}
+
+      {shareModal.show && (
+        <div className="win-overlay">
+          <div className="win-card">
+            <h2>Share to Feed</h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <textarea
+                placeholder="Add a caption (optional, max 280 chars)"
+                value={shareModal.caption}
+                onChange={(e) => setShareModal(prev => ({ ...prev, caption: e.target.value.slice(0, 280) }))}
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: '10px',
+                  color: C.text,
+                  fontFamily: 'inherit',
+                  fontSize: '0.9rem',
+                  minHeight: '80px',
+                  resize: 'vertical',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ fontSize: '0.75rem', color: C.muted, marginTop: '0.4rem', textAlign: 'right' }}>
+                {shareModal.caption.length}/280
+              </div>
+            </div>
+            <button
+              className="primary-btn"
+              onClick={async () => {
+                const { ok } = await api('/api/posts', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    gameId: shareModal.gameId,
+                    score: shareModal.score,
+                    steps: shareModal.steps,
+                    timeSecs: shareModal.timeSecs,
+                    caption: shareModal.caption || null,
+                  }),
+                });
+                if (ok) {
+                  setShareModal({ show: false, caption: '' });
+                  // Show brief success message
+                  setTimeout(() => backToLobby(), 1500);
+                }
+              }}
+              style={{ marginBottom: '0.6rem' }}
+            >
+              ✓ Post to Feed
+            </button>
+            <button
+              className="primary-btn"
+              style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+              onClick={() => setShareModal({ show: false, caption: '' })}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

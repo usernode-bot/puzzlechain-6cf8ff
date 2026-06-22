@@ -7009,7 +7009,6 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
   );
 }
 
-
 /* ============================================================
    Game 7 — Tile Match (3-Tiles style)
    ============================================================ */

@@ -31,6 +31,7 @@
     }
   ],
   "tests": [
+    { "name": "Main screen loads with no console errors", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Vendored React served (no CDN dependency)", "path": "/vendor/react.production.min.js", "expectText": "react.production.min.js" },
     { "name": "Vendored Babel served (no CDN dependency)", "path": "/vendor/babel.min.js", "allowConsoleErrors": true },

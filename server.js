@@ -318,6 +318,72 @@ async function migrate() {
     ON user_achievements(created_at DESC)
   `);
 
+  // tilematch_scores is PUBLIC: personal-best scores for the Tile Match Puzzle
+  // (1000-level mode). One row per user, upserted with GREATEST.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tilematch_scores (
+      user_id            TEXT PRIMARY KEY,
+      username           TEXT,
+      highest_level      INTEGER NOT NULL DEFAULT 0,
+      total_cleared      INTEGER NOT NULL DEFAULT 0,
+      best_session_score INTEGER NOT NULL DEFAULT 0,
+      games_played       INTEGER NOT NULL DEFAULT 0,
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // tilematch_tokens is PUBLIC: off-chain MATCH token balance per user.
+  // Server enforces balance >= 0 on every write.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tilematch_tokens (
+      user_id    TEXT PRIMARY KEY,
+      username   TEXT,
+      balance    INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // tilematch_daily_tasks is PUBLIC: per-user per-day task progress.
+  // Uses the same UTC date reset semantics as daily_attempts.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tilematch_daily_tasks (
+      user_id    TEXT NOT NULL,
+      task_date  DATE NOT NULL,
+      task_id    TEXT NOT NULL,
+      progress   INTEGER NOT NULL DEFAULT 0,
+      claimed_at TIMESTAMPTZ,
+      PRIMARY KEY (user_id, task_date, task_id)
+    )
+  `);
+
+  // tilematch_duels is PUBLIC: in-app MATCH token 1v1 duels.
+  // Mirrors pvp_matches but uses MATCH tokens (off-chain), no on-chain fields.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tilematch_duels (
+      id               TEXT PRIMARY KEY,
+      player1_id       TEXT NOT NULL,
+      player2_id       TEXT,
+      player1_name     TEXT,
+      player2_name     TEXT,
+      stake_tokens     INTEGER NOT NULL DEFAULT 10,
+      board_seed       BIGINT,
+      status           TEXT NOT NULL DEFAULT 'waiting',
+      winner_id        TEXT,
+      p1_score         INTEGER,
+      p2_score         INTEGER,
+      p1_steps         INTEGER,
+      p2_steps         INTEGER,
+      p1_time_secs     INTEGER,
+      p2_time_secs     INTEGER,
+      p1_finished_at   TIMESTAMPTZ,
+      p2_finished_at   TIMESTAMPTZ,
+      p1_last_seen_at  TIMESTAMPTZ,
+      p2_last_seen_at  TIMESTAMPTZ,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   if (IS_STAGING) {
     // PvP staging seeds: three match states for UI testing.
     await pool.query(`
@@ -518,6 +584,83 @@ async function migrate() {
       );
     }
   }
+
+  // Tilematch Puzzle staging seeds: populate leaderboard, wallet, tasks, duels,
+  // and daily attempts for the daily leaderboard tab. All idempotent; no-op in prod.
+  if (IS_STAGING) {
+    // Global leaderboard — 5 fake users with spread of highest levels
+    const tmScoreSeed = [
+      ['tm-demo-1', 'staging-tm-legend',  480, 510, 12400],
+      ['tm-demo-2', 'staging-tm-expert',  310, 325,  8200],
+      ['tm-demo-3', 'staging-tm-veteran', 195, 205,  5100],
+      ['tm-demo-4', 'staging-tm-player',   88,  92,  2300],
+      ['tm-demo-5', 'staging-tm-newbie',   25,  27,   650],
+    ];
+    for (const [uid, uname, hl, tc, bs] of tmScoreSeed) {
+      await pool.query(
+        `INSERT INTO tilematch_scores
+           (user_id, username, highest_level, total_cleared, best_session_score, games_played)
+         VALUES ($1, $2, $3, $4, $5, 10)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, hl, tc, bs]
+      );
+    }
+
+    // Wallet: give staging-demo-user 500 MATCH tokens
+    await pool.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ('staging-demo-user', 'staging-demo-user', 500)
+       ON CONFLICT (user_id) DO NOTHING`
+    );
+
+    // Daily tasks for staging-demo-user: one completable, one in-progress, one not started
+    const today = new Date().toISOString().slice(0, 10);
+    await pool.query(
+      `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+       VALUES ('staging-demo-user', $1, 'clear_3_levels', 3),
+              ('staging-demo-user', $1, 'daily_match_2min', 0),
+              ('staging-demo-user', $1, 'match_50_tiles', 30)
+       ON CONFLICT (user_id, task_date, task_id) DO NOTHING`,
+      [today]
+    );
+
+    // Duels: one waiting, one finished
+    await pool.query(
+      `INSERT INTO tilematch_duels
+         (id, player1_id, player1_name, stake_tokens, status)
+       VALUES ('TMWAIT1', 'staging-demo-user', 'staging-demo-user', 10, 'waiting')
+       ON CONFLICT (id) DO NOTHING`
+    );
+    await pool.query(
+      `INSERT INTO tilematch_duels
+         (id, player1_id, player2_id, player1_name, player2_name,
+          stake_tokens, board_seed, status, winner_id,
+          p1_score, p2_score, p1_steps, p2_steps, p1_time_secs, p2_time_secs,
+          p1_finished_at, p2_finished_at)
+       VALUES ('TMFINI1', 'staging-demo-user', 'staging-opponent',
+               'staging-demo-user', 'staging-opponent',
+               10, 54321, 'finished', 'staging-demo-user',
+               850, 720, 72, 80, 67, 95,
+               now() - interval '5 minutes', now() - interval '3 minutes')
+       ON CONFLICT (id) DO NOTHING`
+    );
+
+    // Daily attempts for daily leaderboard tab
+    const dailySeeds = [
+      ['staging-alice',   'staging-alice',   85,  960],
+      ['staging-bob',     'staging-bob',    112,  840],
+      ['staging-charlie', 'staging-charlie', 137, 720],
+    ];
+    for (const [uid, uname, timeSecs, score] of dailySeeds) {
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+         VALUES ($1, $2, 'tilematchingdaily', $3, $4, 72, $5, now() - interval '1 hour')
+         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+        [uid, uname, today, score, timeSecs]
+      );
+    }
+  }
 }
 
 // ---- Server-side PvP tile engine (mirrors client mulberry32 + tmGenerateLevel) ------
@@ -565,6 +708,16 @@ const TM_PVP_CONFIG = { tileTypes: 8, setsPerType: 3, boardCols: 8, boardRows: 5
 
 // Valid bet tiers (UTGO whole amounts)
 const PVP_VALID_TIERS = new Set([10, 50, 100]);
+
+// Valid stake tiers for off-chain MATCH token duels
+const TILEMATCH_DUEL_VALID_STAKES = new Set([10, 50, 100]);
+
+// Task definitions — used by GET /api/tilematch/tasks and claim validation
+const TILEMATCH_TASK_DEFS = {
+  clear_3_levels:   { label: 'Clear 3 levels',          description: 'Clear 3 levels in Tile Match Puzzle today.',                  rewardTokens: 100, target: 3  },
+  daily_match_2min: { label: 'Daily in 2 minutes',       description: 'Complete the Daily Tile Match Puzzle in under 2 minutes.',    rewardTokens: 200, target: 1  },
+  match_50_tiles:   { label: '50 tile taps',             description: 'Make 50 tile selections in Tile Match Puzzle in one session.', rewardTokens: 150, target: 50 },
+};
 
 // ---- Mancala room helpers ------------------------------------------------
 
@@ -1065,6 +1218,24 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
     // Recompute the streak now that today is finished so the client can
     // reconcile its optimistic value without a full reload.
     const streak = await computeStreak(req.user.id);
+
+    // Auto-report the "daily_match_2min" task when tilematchingdaily is finished
+    // under 2 minutes with a positive score. Idempotent via GREATEST.
+    if (gameId === 'tilematchingdaily' && timeSecs !== null && timeSecs <= 119 && score && score > 0) {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+           VALUES ($1, $2, 'daily_match_2min', 1)
+           ON CONFLICT (user_id, task_date, task_id)
+           DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
+          [req.user.id, today]
+        );
+      } catch (taskErr) {
+        console.warn('[daily] task report failed (non-fatal):', taskErr.message);
+      }
+    }
+
     res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
@@ -2392,6 +2563,652 @@ app.post('/api/pvp/match/:matchId/forfeit', async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated, otherwise an "open in Usernode"
+// ---- Tile Match Puzzle API (/api/tilematch/*) --------------------------------
+// Off-chain MATCH token economy: leaderboard, wallet, daily tasks, 1v1 duels.
+// All routes are auth-gated (req.user is always present here).
+
+// --- Leaderboard ---
+
+app.get('/api/tilematch/leaderboard', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Global: top 25 by highest_level (ties: earliest updated_at)
+    const { rows: global } = await pool.query(
+      `SELECT user_id, username, highest_level, total_cleared,
+              ROW_NUMBER() OVER (ORDER BY highest_level DESC, updated_at ASC) AS rank
+         FROM tilematch_scores
+        ORDER BY highest_level DESC, updated_at ASC
+        LIMIT 25`
+    );
+
+    // Daily: top 25 daily completions by time_secs for today
+    const { rows: daily } = await pool.query(
+      `SELECT user_id, username, time_secs, score,
+              ROW_NUMBER() OVER (ORDER BY time_secs ASC, finished_at ASC) AS rank
+         FROM daily_attempts
+        WHERE game_id = 'tilematchingdaily'
+          AND attempt_date = $1
+          AND finished_at IS NOT NULL
+          AND score > 0
+        ORDER BY time_secs ASC, finished_at ASC
+        LIMIT 25`,
+      [today]
+    );
+
+    // Me — global rank
+    let meGlobal = null;
+    const { rows: myGlobal } = await pool.query(
+      `SELECT username, highest_level, total_cleared, updated_at FROM tilematch_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (myGlobal.length) {
+      const r = myGlobal[0];
+      const { rows: gr } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM tilematch_scores
+          WHERE highest_level > $1
+             OR (highest_level = $1 AND updated_at < $2)`,
+        [r.highest_level, r.updated_at]
+      );
+      meGlobal = { rank: Number(gr[0].rank), username: r.username, highestLevel: r.highest_level, totalCleared: r.total_cleared };
+    }
+
+    // Me — daily rank
+    let meDaily = null;
+    const { rows: myDaily } = await pool.query(
+      `SELECT username, time_secs, score, finished_at FROM daily_attempts
+        WHERE user_id = $1 AND game_id = 'tilematchingdaily'
+          AND attempt_date = $2 AND finished_at IS NOT NULL AND score > 0`,
+      [req.user.id, today]
+    );
+    if (myDaily.length) {
+      const r = myDaily[0];
+      const { rows: dr } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM daily_attempts
+          WHERE game_id = 'tilematchingdaily' AND attempt_date = $1
+            AND finished_at IS NOT NULL AND score > 0
+            AND (time_secs < $2 OR (time_secs = $2 AND finished_at < $3))`,
+        [today, r.time_secs, r.finished_at]
+      );
+      meDaily = { rank: Number(dr[0].rank), username: r.username, timeSecs: r.time_secs, score: r.score };
+    }
+
+    res.json({
+      global: global.map(r => ({ rank: Number(r.rank), username: r.username, highestLevel: r.highest_level, totalCleared: r.total_cleared })),
+      daily:  daily.map(r => ({ rank: Number(r.rank), username: r.username, timeSecs: r.time_secs, score: r.score })),
+      me: { global: meGlobal, daily: meDaily },
+    });
+  } catch (err) {
+    console.error('[tilematch] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// --- Score submit ---
+
+app.post('/api/tilematch/scores/submit', async (req, res) => {
+  const highestLevel  = Number.isFinite(req.body.highestLevel)  ? Math.round(req.body.highestLevel)  : 0;
+  const totalCleared  = Number.isFinite(req.body.totalCleared)  ? Math.round(req.body.totalCleared)  : 0;
+  const sessionScore  = Number.isFinite(req.body.sessionScore)  ? Math.round(req.body.sessionScore)  : 0;
+  try {
+    await pool.query(
+      `INSERT INTO tilematch_scores
+         (user_id, username, highest_level, total_cleared, best_session_score, games_played)
+       VALUES ($1, $2, $3, $4, $5, 1)
+       ON CONFLICT (user_id) DO UPDATE SET
+         username           = EXCLUDED.username,
+         highest_level      = GREATEST(tilematch_scores.highest_level, EXCLUDED.highest_level),
+         total_cleared      = tilematch_scores.total_cleared + EXCLUDED.total_cleared,
+         best_session_score = GREATEST(tilematch_scores.best_session_score, EXCLUDED.best_session_score),
+         games_played       = tilematch_scores.games_played + 1,
+         updated_at         = now()`,
+      [req.user.id, req.user.username || null, highestLevel, totalCleared, sessionScore]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[tilematch] score submit failed:', err.message);
+    res.status(500).json({ error: 'Failed to submit score' });
+  }
+});
+
+// --- Wallet ---
+
+app.get('/api/tilematch/wallet', async (req, res) => {
+  try {
+    await pool.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows } = await pool.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1`,
+      [req.user.id]
+    );
+    res.json({ balance: rows.length ? rows[0].balance : 0 });
+  } catch (err) {
+    console.error('[tilematch] wallet failed:', err.message);
+    res.status(500).json({ error: 'Failed to load wallet' });
+  }
+});
+
+// --- Daily tasks ---
+
+function shapeTmTask(row, def) {
+  return {
+    id:           row.task_id,
+    label:        def.label,
+    description:  def.description,
+    rewardTokens: def.rewardTokens,
+    target:       def.target,
+    progress:     row.progress,
+    completable:  row.progress >= def.target && !row.claimed_at,
+    claimed:      !!row.claimed_at,
+  };
+}
+
+app.get('/api/tilematch/tasks', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    // Upsert today's rows (ensures they exist)
+    for (const taskId of Object.keys(TILEMATCH_TASK_DEFS)) {
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+         VALUES ($1, $2, $3, 0)
+         ON CONFLICT (user_id, task_date, task_id) DO NOTHING`,
+        [req.user.id, today, taskId]
+      );
+    }
+    const { rows } = await pool.query(
+      `SELECT task_id, progress, claimed_at FROM tilematch_daily_tasks
+        WHERE user_id = $1 AND task_date = $2`,
+      [req.user.id, today]
+    );
+    const taskMap = {};
+    rows.forEach(r => { taskMap[r.task_id] = r; });
+    const tasks = Object.entries(TILEMATCH_TASK_DEFS).map(([id, def]) => {
+      const row = taskMap[id] || { task_id: id, progress: 0, claimed_at: null };
+      return shapeTmTask(row, def);
+    });
+    // Next reset: midnight UTC
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    res.json({ tasks, resetAt: tomorrow.toISOString() });
+  } catch (err) {
+    console.error('[tilematch] tasks failed:', err.message);
+    res.status(500).json({ error: 'Failed to load tasks' });
+  }
+});
+
+app.post('/api/tilematch/tasks/report', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const levelsCleared = Number.isFinite(req.body.levelsCleared) ? Math.max(0, Math.round(req.body.levelsCleared)) : 0;
+    const tileTaps      = Number.isFinite(req.body.tileTaps)      ? Math.max(0, Math.round(req.body.tileTaps))      : 0;
+
+    if (levelsCleared > 0) {
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+         VALUES ($1, $2, 'clear_3_levels', $3)
+         ON CONFLICT (user_id, task_date, task_id)
+         DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + $3)`,
+        [req.user.id, today, levelsCleared]
+      );
+    }
+    if (tileTaps > 0) {
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+         VALUES ($1, $2, 'match_50_tiles', $3)
+         ON CONFLICT (user_id, task_date, task_id)
+         DO UPDATE SET progress = LEAST(50, tilematch_daily_tasks.progress + $3)`,
+        [req.user.id, today, tileTaps]
+      );
+    }
+
+    const { rows } = await pool.query(
+      `SELECT task_id, progress, claimed_at FROM tilematch_daily_tasks
+        WHERE user_id = $1 AND task_date = $2`,
+      [req.user.id, today]
+    );
+    const taskMap = {};
+    rows.forEach(r => { taskMap[r.task_id] = r; });
+    const tasks = Object.entries(TILEMATCH_TASK_DEFS).map(([id, def]) => {
+      const row = taskMap[id] || { task_id: id, progress: 0, claimed_at: null };
+      return shapeTmTask(row, def);
+    });
+    res.json({ tasks });
+  } catch (err) {
+    console.error('[tilematch] task report failed:', err.message);
+    res.status(500).json({ error: 'Failed to report task progress' });
+  }
+});
+
+app.post('/api/tilematch/tasks/:taskId/claim', async (req, res) => {
+  const { taskId } = req.params;
+  const def = TILEMATCH_TASK_DEFS[taskId];
+  if (!def) return res.status(400).json({ error: 'Unknown task' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const today = new Date().toISOString().slice(0, 10);
+    const { rows } = await client.query(
+      `SELECT progress, claimed_at FROM tilematch_daily_tasks
+        WHERE user_id = $1 AND task_date = $2 AND task_id = $3
+        FOR UPDATE`,
+      [req.user.id, today, taskId]
+    );
+    if (!rows.length || rows[0].progress < def.target) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Task not yet completable' });
+    }
+    if (rows[0].claimed_at) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Already claimed' });
+    }
+    await client.query(
+      `UPDATE tilematch_daily_tasks SET claimed_at = now()
+        WHERE user_id = $1 AND task_date = $2 AND task_id = $3`,
+      [req.user.id, today, taskId]
+    );
+    const { rows: balRows } = await client.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE SET
+         balance    = tilematch_tokens.balance + $3,
+         updated_at = now()
+       RETURNING balance`,
+      [req.user.id, req.user.username || null, def.rewardTokens]
+    );
+    await client.query('COMMIT');
+    res.json({ newBalance: balRows[0].balance, task: { id: taskId, claimed: true } });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] claim failed:', err.message);
+    res.status(500).json({ error: 'Failed to claim reward' });
+  } finally {
+    client.release();
+  }
+});
+
+// --- Duels ---
+
+function shapeDuel(d) {
+  return {
+    id:           d.id,
+    status:       d.status,
+    stakeTokens:  d.stake_tokens,
+    boardSeed:    d.board_seed,
+    player1Id:    d.player1_id,
+    player2Id:    d.player2_id,
+    player1Name:  d.player1_name,
+    player2Name:  d.player2_name,
+    winnerId:     d.winner_id,
+    p1Score:      d.p1_score,   p2Score:    d.p2_score,
+    p1Steps:      d.p1_steps,   p2Steps:    d.p2_steps,
+    p1TimeSecs:   d.p1_time_secs, p2TimeSecs: d.p2_time_secs,
+    p1FinishedAt: d.p1_finished_at, p2FinishedAt: d.p2_finished_at,
+    createdAt:    d.created_at,
+  };
+}
+
+// Generate a random duel id
+function generateDuelId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = 'TM';
+  for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+
+app.post('/api/tilematch/duel/join', async (req, res) => {
+  const stakeTokens = Number.isFinite(req.body.stakeTokens) ? Math.round(req.body.stakeTokens) : 0;
+  if (!TILEMATCH_DUEL_VALID_STAKES.has(stakeTokens)) {
+    return res.status(400).json({ error: 'Invalid stake amount' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+
+    // Check and deduct balance
+    const { rows: balRows } = await client.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1 FOR UPDATE`,
+      [req.user.id]
+    );
+    const balance = balRows.length ? balRows[0].balance : 0;
+    if (balance < stakeTokens) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Insufficient tokens' });
+    }
+    // Lazy-init row if needed, then deduct
+    await client.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0)
+       ON CONFLICT (user_id) DO UPDATE SET
+         balance    = tilematch_tokens.balance - $3,
+         updated_at = now()`,
+      [req.user.id, req.user.username || null, stakeTokens]
+    );
+
+    // Try to join an existing waiting duel with the same stake (not own)
+    const seed = Math.floor(Math.random() * 2147483647) + 1;
+    const { rows: waiting } = await client.query(
+      `SELECT id FROM tilematch_duels
+        WHERE status = 'waiting' AND stake_tokens = $1 AND player1_id != $2
+        ORDER BY created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED`,
+      [stakeTokens, req.user.id]
+    );
+
+    if (waiting.length) {
+      // Join existing duel
+      const duelId = waiting[0].id;
+      await client.query(
+        `UPDATE tilematch_duels
+            SET player2_id   = $1,
+                player2_name = $2,
+                board_seed   = $3,
+                status       = 'active',
+                updated_at   = now()
+          WHERE id = $4`,
+        [req.user.id, req.user.username || null, seed, duelId]
+      );
+      const { rows: duelRows } = await client.query(
+        `SELECT * FROM tilematch_duels WHERE id = $1`, [duelId]
+      );
+      await client.query('COMMIT');
+      return res.json({ duelId, status: 'active', boardSeed: seed, isCreator: false, duel: shapeDuel(duelRows[0]) });
+    }
+
+    // Create new waiting duel
+    let duelId = generateDuelId();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await client.query(
+          `INSERT INTO tilematch_duels (id, player1_id, player1_name, stake_tokens, status)
+           VALUES ($1, $2, $3, $4, 'waiting')`,
+          [duelId, req.user.id, req.user.username || null, stakeTokens]
+        );
+        break;
+      } catch (e) {
+        if (e.code === '23505') { duelId = generateDuelId(); continue; }
+        throw e;
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ duelId, status: 'waiting', isCreator: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] duel join failed:', err.message);
+    res.status(500).json({ error: 'Failed to join duel' });
+  } finally {
+    client.release();
+  }
+});
+
+// Poll duel state; apply 30s inactivity forfeit
+app.get('/api/tilematch/duel/:duelId', async (req, res) => {
+  const { duelId } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT * FROM tilematch_duels WHERE id = $1 FOR UPDATE`, [duelId]
+    );
+    if (!rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Duel not found' }); }
+    let d = rows[0];
+
+    const isP1 = d.player1_id === req.user.id;
+    const isP2 = d.player2_id === req.user.id;
+    if (!isP1 && !isP2) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Not a player' }); }
+
+    // Update last_seen_at
+    const seenCol = isP1 ? 'p1_last_seen_at' : 'p2_last_seen_at';
+    await client.query(
+      `UPDATE tilematch_duels SET ${seenCol} = now(), updated_at = now() WHERE id = $1`,
+      [duelId]
+    );
+
+    // Apply 30s inactivity forfeit on active duels
+    if (d.status === 'active') {
+      const opponentSeen = isP1 ? d.p2_last_seen_at : d.p1_last_seen_at;
+      const opponentFinished = isP1 ? d.p2_finished_at : d.p1_finished_at;
+      if (!opponentFinished && opponentSeen) {
+        const idleSecs = (Date.now() - new Date(opponentSeen).getTime()) / 1000;
+        if (idleSecs > 30) {
+          const winnerId = req.user.id;
+          const prize = Math.floor(d.stake_tokens * 2 * 0.9);
+          await client.query(
+            `UPDATE tilematch_duels SET status = 'finished', winner_id = $1, updated_at = now() WHERE id = $2`,
+            [winnerId, duelId]
+          );
+          await client.query(
+            `INSERT INTO tilematch_tokens (user_id, username, balance)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+            [winnerId, req.user.username || null, prize]
+          );
+          const { rows: updated } = await client.query(`SELECT * FROM tilematch_duels WHERE id = $1`, [duelId]);
+          await client.query('COMMIT');
+          return res.json({ duel: shapeDuel(updated[0]), inactivityForfeit: true });
+        }
+      }
+    }
+
+    // Matchmaking timeout: refund after 2 minutes if no opponent joined
+    if (d.status === 'waiting' && isP1) {
+      const ageSecs = (Date.now() - new Date(d.created_at).getTime()) / 1000;
+      if (ageSecs > 120) {
+        await client.query(
+          `UPDATE tilematch_duels SET status = 'cancelled', updated_at = now() WHERE id = $1`,
+          [duelId]
+        );
+        // Refund stake
+        await client.query(
+          `INSERT INTO tilematch_tokens (user_id, username, balance)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+          [req.user.id, req.user.username || null, d.stake_tokens]
+        );
+        const { rows: updated } = await client.query(`SELECT * FROM tilematch_duels WHERE id = $1`, [duelId]);
+        await client.query('COMMIT');
+        return res.json({ duel: shapeDuel(updated[0]), timedOut: true });
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ duel: shapeDuel(d) });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] duel get failed:', err.message);
+    res.status(500).json({ error: 'Failed to get duel' });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/tilematch/duel/:duelId/finish', async (req, res) => {
+  const { duelId } = req.params;
+  const score     = Number.isFinite(req.body.score)     ? Math.round(req.body.score)     : 0;
+  const steps     = Number.isFinite(req.body.steps)     ? Math.round(req.body.steps)     : 0;
+  const timeSecs  = Number.isFinite(req.body.timeSecs)  ? Math.round(req.body.timeSecs)  : 0;
+  const remaining = Number.isFinite(req.body.remainingTiles) ? Math.round(req.body.remainingTiles) : 0;
+  const telemetry = Array.isArray(req.body.telemetry)   ? req.body.telemetry : [];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT * FROM tilematch_duels WHERE id = $1 FOR UPDATE`, [duelId]
+    );
+    if (!rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Duel not found' }); }
+    const d = rows[0];
+
+    const isP1 = d.player1_id === req.user.id;
+    const isP2 = d.player2_id === req.user.id;
+    if (!isP1 && !isP2) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Not a player' }); }
+    if (d.status !== 'active') { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Duel not active' }); }
+
+    // Anti-cheat: reconstruct board and check tile counts
+    const board = pvpGenerateLevel(TM_PVP_CONFIG, d.board_seed);
+    const totalTiles = board.length;
+    if (steps > totalTiles + 10) { // sanity: can't tap more than tiles + some slack
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Invalid move count' });
+    }
+
+    // Record telemetry moves
+    if (telemetry.length > 0) {
+      for (let i = 0; i < telemetry.length; i++) {
+        const m = telemetry[i];
+        await client.query(
+          `INSERT INTO pvp_moves (match_id, player_id, move_seq, tile_type, ts_client)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (match_id, player_id, move_seq) DO NOTHING`,
+          [duelId, req.user.id, i, m.tileType || null, m.ts ? new Date(m.ts) : null]
+        );
+      }
+
+      // Interval ratio anti-cheat (same as PvP)
+      if (telemetry.length >= 3) {
+        const intervals = [];
+        for (let i = 1; i < telemetry.length; i++) {
+          const dt = (new Date(telemetry[i].ts) - new Date(telemetry[i-1].ts));
+          if (dt > 0 && dt < 60000) intervals.push(dt);
+        }
+        if (intervals.length >= 2) {
+          const minI = Math.min(...intervals);
+          const maxI = Math.max(...intervals);
+          if (minI > 0 && maxI / minI > 200) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Suspicious timing pattern' });
+          }
+        }
+      }
+    }
+
+    // Update this player's finish
+    const scoreCol   = isP1 ? 'p1_score'       : 'p2_score';
+    const stepsCol   = isP1 ? 'p1_steps'       : 'p2_steps';
+    const timeCol    = isP1 ? 'p1_time_secs'   : 'p2_time_secs';
+    const finishedCol= isP1 ? 'p1_finished_at' : 'p2_finished_at';
+    await client.query(
+      `UPDATE tilematch_duels
+          SET ${scoreCol} = $1, ${stepsCol} = $2, ${timeCol} = $3, ${finishedCol} = now(), updated_at = now()
+        WHERE id = $4`,
+      [score, steps, timeSecs, duelId]
+    );
+
+    // Reload
+    const { rows: after } = await client.query(`SELECT * FROM tilematch_duels WHERE id = $1`, [duelId]);
+    const updated = after[0];
+
+    // Check if both finished
+    if (updated.p1_finished_at && updated.p2_finished_at) {
+      // Determine winner: higher score; tie → lower timeSecs
+      let winnerId;
+      if ((updated.p1_score || 0) > (updated.p2_score || 0)) {
+        winnerId = updated.player1_id;
+      } else if ((updated.p2_score || 0) > (updated.p1_score || 0)) {
+        winnerId = updated.player2_id;
+      } else {
+        winnerId = (updated.p1_time_secs || 999) <= (updated.p2_time_secs || 999)
+          ? updated.player1_id : updated.player2_id;
+      }
+      const prize = Math.floor(updated.stake_tokens * 2 * 0.9);
+      await client.query(
+        `UPDATE tilematch_duels SET status = 'finished', winner_id = $1, updated_at = now() WHERE id = $2`,
+        [winnerId, duelId]
+      );
+      await client.query(
+        `INSERT INTO tilematch_tokens (user_id, username, balance)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+        [winnerId, req.user.username || null, prize]
+      );
+      const { rows: balRows } = await client.query(
+        `SELECT balance FROM tilematch_tokens WHERE user_id = $1`, [req.user.id]
+      );
+      await client.query('COMMIT');
+      const isWinner = winnerId === req.user.id;
+      return res.json({
+        isWinner,
+        newBalance: isWinner ? (balRows[0]?.balance ?? 0) : undefined,
+        prize: { stakeTokens: updated.stake_tokens, pot: updated.stake_tokens * 2, winnerPayout: prize },
+      });
+    }
+
+    await client.query('COMMIT');
+    res.json({ waiting: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] duel finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish duel' });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/tilematch/duel/:duelId/forfeit', async (req, res) => {
+  const { duelId } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT * FROM tilematch_duels WHERE id = $1 FOR UPDATE`, [duelId]
+    );
+    if (!rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Duel not found' }); }
+    const d = rows[0];
+
+    const isP1 = d.player1_id === req.user.id;
+    const isP2 = d.player2_id === req.user.id;
+    if (!isP1 && !isP2) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Not a player' }); }
+    if (d.status !== 'active' && d.status !== 'waiting') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Duel not active' });
+    }
+
+    const opponentId = isP1 ? d.player2_id : d.player1_id;
+    await client.query(
+      `UPDATE tilematch_duels SET status = 'finished', winner_id = $1, updated_at = now() WHERE id = $2`,
+      [opponentId, duelId]
+    );
+
+    // Credit opponent if there was one (and it's an active duel)
+    if (opponentId && d.status === 'active') {
+      const prize = Math.floor(d.stake_tokens * 2 * 0.9);
+      await client.query(
+        `INSERT INTO tilematch_tokens (user_id, balance)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()`,
+        [opponentId, prize]
+      );
+    } else if (d.status === 'waiting') {
+      // Refund creator if no opponent
+      await client.query(
+        `UPDATE tilematch_duels SET status = 'cancelled', winner_id = NULL, updated_at = now() WHERE id = $1`,
+        [duelId]
+      );
+      await client.query(
+        `INSERT INTO tilematch_tokens (user_id, balance)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()`,
+        [req.user.id, d.stake_tokens]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ forfeited: true, opponentId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] forfeit failed:', err.message);
+    res.status(500).json({ error: 'Failed to forfeit duel' });
+  } finally {
+    client.release();
+  }
+});
+
 // landing page so stray visits to the staging URL don't reveal the app.
 app.get('*', (req, res) => {
   if (!req.user) {

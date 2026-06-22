@@ -426,6 +426,65 @@ body {
   align-items: center;
   gap: 0.4rem;
 }
+.card.inprogress { border-color: ${C.gold}; }
+.card-resume {
+  margin-top: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: ${C.gold};
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ---- Daily leaderboard ---- */
+.lboard {
+  margin: 1rem 0 0.25rem;
+  text-align: left;
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+}
+.lboard-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lboard-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: ${C.muted};
+  font-weight: 400;
+}
+.lboard-empty { color: ${C.muted}; font-size: 0.82rem; padding: 0.4rem 0; }
+.lboard-note {
+  margin-top: 0.55rem;
+  font-size: 0.76rem;
+  color: ${C.muted};
+  border-top: 1px dashed ${C.border};
+  padding-top: 0.5rem;
+}
+.lboard-rows { display: flex; flex-direction: column; gap: 0.15rem; max-height: 280px; overflow-y: auto; }
+.lrow {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.32rem 0.45rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.lrow .lrank { color: ${C.muted}; font-size: 0.76rem; }
+.lrow .lname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .ltime { color: ${C.text}; font-size: 0.78rem; }
+.lrow .lsteps { color: ${C.muted}; font-size: 0.74rem; }
+.lrow.me { background: ${C.accent}22; }
+.lrow.me .lrank, .lrow.me .lname { color: ${C.accent}; font-weight: 600; }
+.lrow.pinned { margin-top: 0.3rem; border-top: 1px dashed ${C.border}; padding-top: 0.5rem; }
 
 /* ---- Word Hunt ---- */
 .wordsearch {
@@ -3060,6 +3119,99 @@ body {
 .pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
 .pvp-prize-winner .mono { color: ${C.emerald}; }
 
+/* ---- Wallet screen ---- */
+.wallet-screen {
+  max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem;
+}
+.wallet-screen h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.25rem; }
+.wallet-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.25rem; margin-bottom: 1rem;
+}
+.wallet-card-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: ${C.muted}; margin-bottom: 0.6rem;
+}
+.wallet-addr {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  color: ${C.text}; word-break: break-all; flex: 1;
+}
+.wallet-addr-row {
+  display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
+}
+.wallet-balance-big {
+  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
+  color: ${C.emerald};
+}
+.wallet-balance-sub { font-size: 0.8rem; color: ${C.muted}; margin-top: 0.2rem; }
+.wallet-pending-big {
+  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
+  color: ${C.gold};
+}
+.wallet-mock-badge {
+  display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px;
+  background: ${C.dim}; border: 1px solid ${C.border};
+  font-size: 0.68rem; color: ${C.muted}; margin-bottom: 1rem;
+}
+.wallet-activity-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.45rem 0; border-bottom: 1px solid ${C.border}40;
+  font-size: 0.83rem;
+}
+.wallet-activity-row:last-child { border-bottom: none; }
+.wallet-activity-kind { color: ${C.muted}; }
+.wallet-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.wallet-activity-earned { color: ${C.emerald}; }
+.wallet-activity-tip-recv { color: ${C.gold}; }
+.wallet-activity-tip-sent { color: ${C.rose}; }
+.wallet-no-wallet {
+  text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
+}
+.wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
+.wallet-freeze-info {
+  font-size: 0.8rem; color: ${C.muted}; margin-top: 0.35rem;
+}
+/* ---- Nav wallet chip ---- */
+.nav-wallet-chip {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.7rem;
+  cursor: pointer; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
+  color: ${C.emerald}; transition: border-color 0.15s;
+}
+.nav-wallet-chip:hover { border-color: ${C.emerald}; }
+/* ---- Tip modal ---- */
+.tip-modal-backdrop {
+  position: fixed; inset: 0; background: #00000099; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+}
+.tip-modal {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
+  padding: 1.5rem; width: min(95vw, 380px);
+}
+.tip-modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+.tip-presets { display: flex; gap: 0.5rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
+.tip-preset-btn {
+  padding: 0.35rem 0.8rem; border-radius: 8px; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem; cursor: pointer; transition: border-color 0.12s;
+}
+.tip-preset-btn.active { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
+.tip-input {
+  width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px;
+  border: 1px solid ${C.border}; background: ${C.surface}; color: ${C.text};
+  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
+  margin-bottom: 0.85rem;
+}
+.tip-input:focus { outline: none; border-color: ${C.accent}; }
+/* ---- Win overlay reward line ---- */
+.win-reward-row {
+  display: flex; justify-content: space-between; padding: 0.4rem 0;
+  border-top: 1px solid ${C.border}40; margin-top: 0.4rem;
+}
+.win-reward-row .k { color: ${C.muted}; font-size: 0.88rem; }
+.win-reward-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; }
+
 /* ---- Hash Rush ---- */
 .hr-wrap {
   position: relative; width: 100%; flex: 1; align-self: stretch; overflow: hidden; min-height: 0;
@@ -3343,8 +3495,11 @@ function cgRulesSection(items) {
 /* ============================================================
    Shared timer hook
    ============================================================ */
-function useTimer(running) {
-  const [secs, setSecs] = useState(0);
+// Counts up from `initialSecs` (default 0) while `running`. Seeding from a
+// non-zero value lets a resumed daily attempt continue the timer from where it
+// left off instead of restarting.
+function useTimer(running, initialSecs = 0) {
+  const [secs, setSecs] = useState(initialSecs);
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setSecs(s => s + 1), 1000);
@@ -3352,6 +3507,75 @@ function useTimer(running) {
   }, [running]);
   const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return { secs, fmt: fmt(secs) };
+}
+
+/* ============================================================
+   Seeded PRNG — deterministic daily puzzle generation
+   ============================================================ */
+// mulberry32: a tiny, fast, well-distributed 32-bit seeded PRNG. Returns a
+// function yielding floats in [0,1), same contract as Math.random() so it can
+// be threaded through the existing generators.
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Server-anchored UTC day number (offset = serverNow − clientNow) so the daily
+// puzzle can't desync from the lock countdown on a skewed device clock.
+function utcDayNum(offset) {
+  const d = new Date(Date.now() + (offset || 0));
+  return Math.floor(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000
+  );
+}
+
+// Cheap string→int hash, used to salt the seed per game so the three puzzles
+// don't share a PRNG sequence on a given day.
+function hashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// A fresh seeded RNG for (today, gameId). Everyone on the same UTC day gets the
+// identical board for each game — the precondition for a fair leaderboard.
+function dailyRng(offset, gameId) {
+  return mulberry32((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+}
+
+// Periodically persist a game's in-progress state so a resumed attempt picks up
+// the exact board, step count, and accumulated timer. `getState()` returns
+// `{ progress, steps, secs }`; it's read through a ref so the interval and the
+// unmount-flush always see the latest values without re-subscribing. Games also
+// call `onSaveProgress` directly on each move for immediate persistence; this
+// hook covers idle timer advance and the leave-the-tab case.
+function useAutosave(onSaveProgress, getState, active) {
+  const ref = useRef({});
+  ref.current = { onSaveProgress, getState, active };
+  useEffect(() => {
+    const flush = () => {
+      const cur = ref.current;
+      if (!cur.active || !cur.onSaveProgress) return;
+      const s = cur.getState();
+      cur.onSaveProgress(s.progress, s.steps, s.secs);
+    };
+    const id = setInterval(flush, 10000);
+    const onVis = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+      flush(); // best-effort save when leaving the game screen
+    };
+  }, []);
 }
 
 /* ============================================================
@@ -3457,36 +3681,38 @@ const SUDOKU6_SOLUTION = [
   [6, 4, 5, 3, 1, 2],
 ];
 
-const shuffle = (arr) => {
+// Fisher–Yates using a supplied rng() (defaults to Math.random for any
+// non-daily callers). A seeded rng makes the result deterministic.
+const shuffle = (arr, rng = Math.random) => {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 };
 
-function generateSudoku6() {
+function generateSudoku6(rng = Math.random) {
   // 1. start from the hardcoded valid solution
   let sol = SUDOKU6_SOLUTION.map(row => row.slice());
 
-  // 2. random digit permutation (remap 1..6)
-  const perm = shuffle([1, 2, 3, 4, 5, 6]);
+  // 2. seeded digit permutation (remap 1..6)
+  const perm = shuffle([1, 2, 3, 4, 5, 6], rng);
   const map = {};
   for (let i = 0; i < 6; i++) map[i + 1] = perm[i];
   sol = sol.map(row => row.map(v => map[v]));
 
   // 3. swap rows within each horizontal band (rows 0-1, 2-3, 4-5)
   for (let band = 0; band < 3; band++) {
-    if (Math.random() < 0.5) {
+    if (rng() < 0.5) {
       const r0 = band * 2, r1 = band * 2 + 1;
       [sol[r0], sol[r1]] = [sol[r1], sol[r0]];
     }
   }
 
-  // 4. blank out 14 random cells
+  // 4. blank out 14 cells (seeded)
   const puzzle = sol.map(row => row.slice());
-  const positions = shuffle(Array.from({ length: 36 }, (_, i) => i)).slice(0, 14);
+  const positions = shuffle(Array.from({ length: 36 }, (_, i) => i), rng).slice(0, 14);
   positions.forEach(p => { puzzle[Math.floor(p / 6)][p % 6] = 0; });
 
   return { solution: sol, puzzle };
@@ -3494,17 +3720,69 @@ function generateSudoku6() {
 
 const boxAt = (r, c) => Math.floor(r / 2) * 2 + Math.floor(c / 3);
 
-function SudokuGame({ onWin, onStepChange }) {
-  const init = useRef(generateSudoku6()).current;
-  const { solution, puzzle } = init;
-  const [grid, setGrid] = useState(() => puzzle.map(row => row.slice()));
+// Real-Sudoku conflict marking: a filled cell is in error if its value repeats
+// elsewhere in its row, column, or 2×3 box. Returns the set of "r,c" keys in
+// conflict — no hidden "correct answer" comparison.
+function sudokuConflicts(grid) {
+  const errs = new Set();
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      const v = grid[r][c];
+      if (!v) continue;
+      for (let k = 0; k < 6; k++) {
+        if (k !== c && grid[r][k] === v) errs.add(`${r},${c}`);
+        if (k !== r && grid[k][c] === v) errs.add(`${r},${c}`);
+      }
+      for (let rr = 0; rr < 6; rr++) {
+        for (let cc = 0; cc < 6; cc++) {
+          if ((rr !== r || cc !== c) && boxAt(rr, cc) === boxAt(r, c) && grid[rr][cc] === v) {
+            errs.add(`${r},${c}`);
+          }
+        }
+      }
+    }
+  }
+  return errs;
+}
+
+// Win = fully filled with zero conflicts (every row/col/box a permutation of
+// 1–6). The true Sudoku rule, decoupled from any single generated solution.
+function sudokuSolved(grid) {
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) if (!grid[r][c]) return false;
+  return sudokuConflicts(grid).size === 0;
+}
+
+function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const init = useRef(generateSudoku6(dailyRng(offset, 'sudoku'))).current;
+  const { puzzle } = init;
+  const dayNum = useRef(utcDayNum(offset)).current;
+
+  // Hydrate from a resumed attempt when the saved board is for today's puzzle.
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+    ? savedProgress
+    : null;
+  const [grid, setGrid] = useState(() =>
+    resumed ? resumed.grid.map(row => row.slice()) : puzzle.map(row => row.slice())
+  );
   const [selected, setSelected] = useState(null); // [r, c]
-  const [errors, setErrors] = useState(() => new Set());
-  const [steps, setSteps] = useState(0);
+  const [errors, setErrors] = useState(() => sudokuConflicts(grid));
+  // Steps is a free counter (not encoded in the grid), so restore it whenever
+  // the attempt carries one — even if the board itself couldn't be rehydrated.
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
   const [done, setDone] = useState(false);
-  const { secs, fmt } = useTimer(!done);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
 
   const isGiven = (r, c) => puzzle[r][c] !== 0;
+
+  // Idle/leave autosave (timer advance + tab close). Per-move saves happen in place().
+  const stateRef = useRef({});
+  stateRef.current = { grid, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, grid: stateRef.current.grid }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
 
   const place = (val) => {
     if (done || !selected) return;
@@ -3519,16 +3797,14 @@ function SudokuGame({ onWin, onStepChange }) {
     setSteps(newSteps);
     onStepChange(newSteps);
 
-    // track errors
-    const ne = new Set(errors);
-    const key = `${r},${c}`;
-    if (val !== 0 && val !== solution[r][c]) ne.add(key);
-    else ne.delete(key);
-    setErrors(ne);
+    // recompute conflict highlighting from the full grid
+    setErrors(sudokuConflicts(ng));
 
-    // win check
-    const solved = ng.every((row, ri) => row.every((v, ci) => v === solution[ri][ci]));
-    if (solved) {
+    // persist this move immediately
+    onSaveProgress && onSaveProgress({ dayNum, grid: ng }, newSteps, secs);
+
+    // win check — fully filled and no conflicts
+    if (sudokuSolved(ng)) {
       setDone(true);
       const score = Math.max(1200 - newSteps * 15 - secs * 2, 200);
       onWin(score, newSteps, secs);
@@ -3632,11 +3908,77 @@ function AccountChip({ loading, authOk, user }) {
 }
 
 /* ============================================================
+   Daily leaderboard — today's solvers for one game, ranked by fastest
+   completion time, then fewest steps. Highlights the current user and
+   pins their row when they're outside the visible top N.
+   ============================================================ */
+const lbFmtTime = s =>
+  s == null ? '—' : `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+function Leaderboard({ gameId, solved }) {
+  const [state, setState] = useState({ loading: true });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard`);
+      if (!alive) return;
+      if (ok && body) setState({ loading: false, ...body });
+      else setState({ loading: false, entries: [], me: null, total: 0, error: true });
+    })();
+    return () => { alive = false; };
+  }, [gameId]);
+
+  if (state.loading) {
+    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><div className="lboard-empty">Loading…</div></div>;
+  }
+
+  const entries = state.entries || [];
+  const me = state.me || null;
+  const meVisible = me && entries.some(e => e.isCurrentUser);
+
+  return (
+    <div className="lboard">
+      <div className="lboard-title">
+        Today's leaderboard
+        {state.total > 0 && <span className="lboard-count">{state.total} solved</span>}
+      </div>
+      {entries.length === 0 ? (
+        <div className="lboard-empty">Be the first to solve today's puzzle.</div>
+      ) : (
+        <div className="lboard-rows">
+          {entries.map(e => (
+            <div key={e.rank} className={`lrow${e.isCurrentUser ? ' me' : ''}`}>
+              <span className="lrank mono">#{e.rank}</span>
+              <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+              <span className="ltime mono">{lbFmtTime(e.timeSecs)}</span>
+              <span className="lsteps mono">{e.steps != null ? `${e.steps} st` : '—'}</span>
+            </div>
+          ))}
+          {me && !meVisible && (
+            <div className="lrow me pinned">
+              <span className="lrank mono">#{me.rank}</span>
+              <span className="lname">{me.username} (you)</span>
+              <span className="ltime mono">{lbFmtTime(me.timeSecs)}</span>
+              <span className="lsteps mono">{me.steps != null ? `${me.steps} st` : '—'}</span>
+            </div>
+          )}
+        </div>
+      )}
+      {solved === false && (
+        <div className="lboard-note">You didn't solve today's puzzle — no ranking this round.</div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Locked screen — shown when today's attempt is already used
    ============================================================ */
 function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const hasResult = attempt && attempt.score != null;
+  const solved = !!(attempt && attempt.score != null && attempt.score > 0);
   const fmtTime = s =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return (
@@ -3659,6 +4001,7 @@ function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) 
           )}
         </div>
       )}
+      <Leaderboard gameId={game.id} solved={solved} />
       <button className="primary-btn" onClick={onBack}>Back to Lobby</button>
     </div>
   );
@@ -3685,18 +4028,18 @@ const WORD_SETS = [
 ];
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const wsRandLetter = () => ALPHABET[Math.floor(Math.random() * 26)];
+const wsRandLetter = (rng = Math.random) => ALPHABET[Math.floor(rng() * 26)];
 
 // Try to place every word into a fresh grid. Returns the filled letter grid,
 // or null if any word couldn't be placed (caller retries with a new grid).
-function placeWords(words) {
+function placeWords(words, rng = Math.random) {
   const grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
   for (const word of words) {
     let placed = false;
     for (let attempt = 0; attempt < 250 && !placed; attempt++) {
-      const [dr, dc] = WS_DIRS[Math.floor(Math.random() * WS_DIRS.length)];
-      const r0 = Math.floor(Math.random() * WS_SIZE);
-      const c0 = Math.floor(Math.random() * WS_SIZE);
+      const [dr, dc] = WS_DIRS[Math.floor(rng() * WS_DIRS.length)];
+      const r0 = Math.floor(rng() * WS_SIZE);
+      const c0 = Math.floor(rng() * WS_SIZE);
       const rEnd = r0 + dr * (word.length - 1);
       const cEnd = c0 + dc * (word.length - 1);
       if (rEnd < 0 || rEnd >= WS_SIZE || cEnd < 0 || cEnd >= WS_SIZE) continue;
@@ -3715,36 +4058,88 @@ function placeWords(words) {
   return grid;
 }
 
-function generateWordSearch() {
-  const set = WORD_SETS[Math.floor(Math.random() * WORD_SETS.length)];
+function generateWordSearch(rng = Math.random) {
+  const set = WORD_SETS[Math.floor(rng() * WORD_SETS.length)];
   const words = set.words.slice();
   let grid = null;
-  for (let attempt = 0; attempt < 60 && !grid; attempt++) grid = placeWords(words);
+  for (let attempt = 0; attempt < 60 && !grid; attempt++) grid = placeWords(words, rng);
   if (!grid) grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
-  // Fill the empty cells with random filler letters.
-  const letters = grid.map(row => row.map(ch => ch || wsRandLetter()));
+  // Fill the empty cells with seeded filler letters.
+  const letters = grid.map(row => row.map(ch => ch || wsRandLetter(rng)));
   return { theme: set.theme, words, letters };
 }
 
-function WordHuntGame({ onWin, onStepChange }) {
-  const board = useRef(generateWordSearch()).current;
+// Locate `word` on the letter grid (any of the 8 directions, forwards or
+// reversed) and return its cell indices, or null. Used to restore highlighted
+// cells for words a resumed player had already found.
+function locateWord(letters, word) {
+  const idx = (r, c) => r * WS_SIZE + c;
+  for (let r = 0; r < WS_SIZE; r++) {
+    for (let c = 0; c < WS_SIZE; c++) {
+      for (const [dr, dc] of WS_DIRS) {
+        const cells = [];
+        let ok = true;
+        for (let i = 0; i < word.length; i++) {
+          const rr = r + dr * i, cc = c + dc * i;
+          if (rr < 0 || rr >= WS_SIZE || cc < 0 || cc >= WS_SIZE || letters[rr][cc] !== word[i]) { ok = false; break; }
+          cells.push(idx(rr, cc));
+        }
+        if (ok) return cells;
+      }
+    }
+  }
+  return null;
+}
+
+function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const board = useRef(generateWordSearch(dailyRng(offset, 'wordhunt'))).current;
   const { theme, words, letters } = board;
   const total = words.length;
+  const dayNum = useRef(utcDayNum(offset)).current;
 
-  const [found, setFound] = useState(() => new Set());       // found word strings
-  const [foundCells, setFoundCells] = useState(() => new Set()); // locked cell indices
+  // Hydrate from a resumed attempt for today's board.
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.found)
+    ? savedProgress
+    : null;
+  const initFound = () => new Set((resumed ? resumed.found : []).filter(w => words.includes(w)));
+  const initCells = () => {
+    const set = new Set();
+    if (resumed) for (const w of resumed.found) {
+      const cells = locateWord(letters, w);
+      if (cells) cells.forEach(i => set.add(i));
+    }
+    return set;
+  };
+
+  const [found, setFound] = useState(initFound);            // found word strings
+  const [foundCells, setFoundCells] = useState(initCells);  // locked cell indices
   const [anchor, setAnchor] = useState(null);                // [r, c] drag start
   const [sel, setSel] = useState([]);                        // cell indices in current drag
-  const [steps, setSteps] = useState(0);
-  const [score, setScore] = useState(0);
+  const [steps, setSteps] = useState(() => (resumed && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [score, setScore] = useState(() => {
+    // Reconstruct score from already-found words so a resumed win scores right.
+    let s = 0;
+    if (resumed) for (const w of resumed.found) if (words.includes(w)) s += w.length * w.length * 10;
+    return s;
+  });
   const [done, setDone] = useState(false);
-  const { secs, fmt } = useTimer(!done);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
 
   // Keep the latest elapsed seconds reachable inside event-handler closures.
-  const secsRef = useRef(0);
+  const secsRef = useRef(initialSecs);
   secsRef.current = secs;
 
   const idx = (r, c) => r * WS_SIZE + c;
+
+  // Idle/leave autosave; per-find saves happen in endSel().
+  const stateRef = useRef({});
+  stateRef.current = { found, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, found: [...stateRef.current.found] }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
 
   // Straight-line path of cell indices from the anchor to (r, c), or null if
   // the target isn't on a horizontal / vertical / 45° diagonal from the anchor.
@@ -3791,6 +4186,9 @@ function WordHuntGame({ onWin, onStepChange }) {
 
       const newScore = score + match.length * match.length * 10;
       setScore(newScore);
+
+      // persist this find immediately
+      onSaveProgress && onSaveProgress({ dayNum, found: [...nf] }, newSteps, secsRef.current);
 
       if (nf.size === total) {
         setDone(true);
@@ -3908,17 +4306,41 @@ function cwScoreGuess(guess, answer) {
   return res;
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset }) {
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
   const answer = useRef(
     CW_ANSWERS[((dayNum % CW_ANSWERS.length) + CW_ANSWERS.length) % CW_ANSWERS.length]
   ).current;
 
-  const [guesses, setGuesses] = useState([]); // [{ word, result: ['green'|'yellow'|'gray', …] }]
+  // Hydrate from a resumed attempt: recompute each guess's colors from the
+  // saved guess words (the answer is deterministic for the day).
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.words)
+    ? savedProgress
+    : null;
+  const initGuesses = () => (resumed ? resumed.words : [])
+    .filter(w => typeof w === 'string' && w.length === CW_LEN)
+    .slice(0, CW_MAX)
+    .map(w => ({ word: w, result: cwScoreGuess(w, answer) }));
+
+  const [guesses, setGuesses] = useState(initGuesses); // [{ word, result: ['green'|'yellow'|'gray', …] }]
   const [cur, setCur] = useState('');          // in-progress letters for the active row
   const [shake, setShake] = useState(false);
   const [done, setDone] = useState(false);
-  const { secs, fmt } = useTimer(!done);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  // Idle/leave autosave; per-guess saves happen in submit().
+  const stateRef = useRef({});
+  stateRef.current = { guesses, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: { dayNum, words: stateRef.current.guesses.map(g => g.word) },
+      steps: stateRef.current.guesses.length,
+      secs: stateRef.current.secs,
+    }),
+    !done
+  );
 
   // Best color seen per letter, for the on-screen keyboard tinting.
   const keyState = {};
@@ -3946,6 +4368,9 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset }) {
     setGuesses(rows);
     setCur('');
     onStepChange(rows.length);
+
+    // persist this guess immediately (before any terminal finish)
+    onSaveProgress && onSaveProgress({ dayNum, words: rows.map(g => g.word) }, rows.length, secs);
 
     if (cur === answer) {
       setDone(true);
@@ -7065,6 +7490,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
   );
 }
 
+
 /* ============================================================
    Game 7 — Tile Match (3-Tiles style)
    ============================================================ */
@@ -7635,7 +8061,7 @@ const TM_DAILY_CONFIG = {
 };
 const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
 
-function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, boardSeedOverride, onMoveTile }) {
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile }) {
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -7648,6 +8074,12 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   const [secs, setSecs] = useState(0);
   const secsRef = useRef(0);
   const movesRef = useRef(0);
+
+  // Server-anchored UTC day; the board is re-derived deterministically from it,
+  // so persisted progress only carries the mutable player state.
+  const dayNum = cwDayNum(offset || 0);
+  // `hydrated` guards the autosave effects from firing before the board exists.
+  const hydratedRef = useRef(false);
 
   useEffect(() => { secsRef.current = secs; }, [secs]);
   useEffect(() => { movesRef.current = moves; }, [moves]);
@@ -7670,20 +8102,58 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     onLose(movesRef.current, secsRef.current, { share: 'Daily Tile Match ⏱ time\'s up', remainingTiles: remaining, isTimeUp: true });
   }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialise board from day seed
+  // Initialise board from the day seed, hydrating today's saved progress when
+  // present so a resumed attempt restores the exact tiles/bar/moves/boosters
+  // and continues the timer from where it stopped.
   useEffect(() => {
-    const seed = boardSeedOverride != null ? boardSeedOverride : (cwDayNum(offset || 0) * 31 + 7);
-    setTiles(tmGenerateLevel(TM_DAILY_CONFIG, seed));
-    setBar([]);
-    setMoves(0);
-    setSecs(0);
+    const seed = boardSeedOverride != null ? boardSeedOverride : (dayNum * 31 + 7);
+    const freshTiles = tmGenerateLevel(TM_DAILY_CONFIG, seed);
+    const resume = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.tiles)
+      ? savedProgress
+      : null;
+    if (resume) {
+      setTiles(resume.tiles.map(t => ({ ...t })));
+      setBar(Array.isArray(resume.bar) ? resume.bar.slice() : []);
+      setMoves(Number.isFinite(resume.moves) ? resume.moves : 0);
+      setSecs(Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0);
+      setBoosters(resume.boosters ? { ...resume.boosters } : { ...TM_DAILY_CONFIG.boosters });
+    } else {
+      setTiles(freshTiles);
+      setBar([]);
+      setMoves(0);
+      setSecs(0);
+      setBoosters({ ...TM_DAILY_CONFIG.boosters });
+    }
     setDone(false);
-    setBoosters({ ...TM_DAILY_CONFIG.boosters });
     setLastBarEntry(null);
     setClearSlotMode(false);
     setBarFull(false);
     setFlashIds(new Set());
+    hydratedRef.current = true;
   }, [resetKey, offset, boardSeedOverride]);
+
+  // Autosave the mutable board state. The per-change effect captures every move
+  // (tile placed, undo, shuffle, clear); useAutosave covers idle timer advance
+  // and the tab-close case. Both are no-ops once finished.
+  const tmStateRef = useRef({});
+  tmStateRef.current = { tiles, bar, moves, boosters, secs };
+  const buildTmProgress = () => ({
+    progress: {
+      dayNum,
+      tiles: tmStateRef.current.tiles,
+      bar: tmStateRef.current.bar,
+      moves: tmStateRef.current.moves,
+      boosters: tmStateRef.current.boosters,
+    },
+    steps: tmStateRef.current.moves,
+    secs: tmStateRef.current.secs,
+  });
+  useAutosave(onSaveProgress, buildTmProgress, !done);
+  useEffect(() => {
+    if (done || !hydratedRef.current || tiles.length === 0 || !onSaveProgress) return;
+    const s = buildTmProgress();
+    onSaveProgress(s.progress, s.steps, s.secs);
+  }, [tiles, bar, moves, boosters, done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tilesMap = {};
   tiles.forEach(t => { tilesMap[t.id] = t; });
@@ -9471,25 +9941,29 @@ function PvpResult({ result, onBack }) {
   );
 }
 
-function PvpArena({ user, authOk }) {
+function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appWalletBalance }) {
   const [phase, setPhase] = useState('lobby'); // lobby | matchmaking | game | result
   const [match, setMatch] = useState(null);
   const [joining, setJoining] = useState(null);
   const [pvpResult, setPvpResult] = useState(null);
-  const [playerAddr, setPlayerAddr] = useState(null);
-  const [balance, setBalance] = useState(null);
+  // Use app-level wallet addr/balance when available; fall back to own fetch
+  const [localAddr, setLocalAddr] = useState(null);
+  const [localBalance, setLocalBalance] = useState(null);
+  const playerAddr = appWalletAddr || localAddr;
+  const balance = appWalletBalance || localBalance;
   const pollRef = useRef(null);
 
   useEffect(() => {
+    if (appWalletAddr) return; // already have it from app level
     if (!window.usernode || !window.usernode.getNodeAddress) return;
     window.usernode.getNodeAddress().then(addr => {
       if (!addr) return;
-      setPlayerAddr(addr);
+      setLocalAddr(addr);
       api(`/api/pvp/balance?addr=${encodeURIComponent(addr)}`)
-        .then(({ ok, body }) => { if (ok && body) setBalance(body.balance); })
+        .then(({ ok, body }) => { if (ok && body) setLocalBalance(body.balance); })
         .catch(() => {});
     }).catch(() => {});
-  }, []);
+  }, [appWalletAddr]);
 
   // Poll for opponent joining while in matchmaking; also refresh cancelQueueCalldata
   useEffect(() => {
@@ -9573,6 +10047,370 @@ function PvpArena({ user, authOk }) {
 const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
 
 /* ============================================================
+   Wallet helpers
+   ============================================================ */
+function fmtUtgo(weiStr) {
+  if (!weiStr || weiStr === '0') return '0.00 UTGO';
+  try {
+    const n = Number(BigInt(weiStr)) / 1e18;
+    return n.toFixed(2) + ' UTGO';
+  } catch { return '0.00 UTGO'; }
+}
+
+function shortAddr(addr) {
+  if (!addr) return '';
+  return addr.slice(0, 6) + '…' + addr.slice(-4);
+}
+
+/* ============================================================
+   TipModal — send $UTGO to another user
+   ============================================================ */
+function TipModal({ toUser, onClose, onSuccess }) {
+  const TIP_PRESETS = ['1', '5', '10'];
+  const [amount, setAmount] = React.useState('1');
+  const [customAmount, setCustomAmount] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const [done, setDone] = React.useState(null);
+
+  const selectedAmount = customAmount || amount;
+
+  const handleSend = async () => {
+    const amountFloat = parseFloat(selectedAmount);
+    if (!amountFloat || amountFloat <= 0) {
+      setErr('Enter a valid amount');
+      return;
+    }
+    const amountWei = BigInt(Math.round(amountFloat * 1e18)).toString();
+    setSending(true);
+    setErr(null);
+    try {
+      // Prepare: get calldata + recipient addr
+      const { ok: prepOk, body: prep } = await api('/api/wallet/tip/prepare', {
+        method: 'POST',
+        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei }),
+      });
+      if (!prepOk) {
+        setErr(prep && prep.error ? prep.error : 'Failed to prepare tip');
+        setSending(false);
+        return;
+      }
+
+      let txHash = '0xmock';
+      const isMock = !window.usernode || !prep.calldata || !prep.contractAddr
+        || (window.usernode.isMockEnabled && await window.usernode.isMockEnabled());
+      if (!isMock && window.usernode && window.usernode.sendTransaction) {
+        const tx = await window.usernode.sendTransaction({
+          to: prep.contractAddr,
+          data: prep.calldata,
+        });
+        txHash = tx && tx.hash ? tx.hash : '0xunknown';
+      }
+
+      // Confirm
+      const { ok: confOk } = await api('/api/wallet/tip/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei, txHash }),
+      });
+      if (!confOk) {
+        setErr('Tip sent but confirmation failed — check your wallet history');
+        setSending(false);
+        return;
+      }
+      setDone({ txHash, amount: fmtUtgo(amountWei), isMock });
+    } catch (e) {
+      setErr(e && e.message ? e.message : 'Transaction failed');
+    }
+    setSending(false);
+  };
+
+  return (
+    <div className="tip-modal-backdrop" onClick={onClose}>
+      <div className="tip-modal" onClick={e => e.stopPropagation()}>
+        <h3>Tip {toUser.username}</h3>
+        {done ? (
+          <div>
+            <div style={{ color: C.emerald, fontWeight: 600, marginBottom: '0.5rem' }}>
+              Sent {done.amount}! {done.isMock && <span style={{ color: C.muted, fontSize: '0.8rem' }}>(demo)</span>}
+            </div>
+            {done.txHash && !done.isMock && (
+              <div style={{ fontSize: '0.72rem', color: C.muted, wordBreak: 'break-all', marginBottom: '0.75rem' }}>
+                Tx: {done.txHash}
+              </div>
+            )}
+            <button className="primary-btn" onClick={() => { onSuccess && onSuccess(); onClose(); }}>Done</button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: '0.82rem', color: C.muted, marginBottom: '0.75rem' }}>
+              Quick amounts (UTGO):
+            </div>
+            <div className="tip-presets">
+              {TIP_PRESETS.map(p => (
+                <button
+                  key={p}
+                  className={'tip-preset-btn' + (amount === p && !customAmount ? ' active' : '')}
+                  onClick={() => { setAmount(p); setCustomAmount(''); }}
+                >{p}</button>
+              ))}
+            </div>
+            <input
+              className="tip-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Custom amount"
+              value={customAmount}
+              onChange={e => { setCustomAmount(e.target.value); setAmount(''); }}
+            />
+            {err && <div style={{ color: C.rose, fontSize: '0.82rem', marginBottom: '0.5rem' }}>{err}</div>}
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="primary-btn" disabled={sending} onClick={handleSend} style={{ flex: 1 }}>
+                {sending ? 'Sending…' : `Send ${selectedAmount || '?'} UTGO`}
+              </button>
+              <button
+                className="primary-btn"
+                style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+                onClick={onClose}
+              >Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   WalletScreen — the full wallet management view
+   ============================================================ */
+function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh }) {
+  const [walletData, setWalletData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [claiming, setClaiming] = React.useState(false);
+  const [claimResult, setClaimResult] = React.useState(null);
+  const [buyingFreeze, setBuyingFreeze] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [freezeMsg, setFreezeMsg] = React.useState(null);
+
+  const loadWallet = async () => {
+    const demo = new URLSearchParams(window.location.search).get('demo');
+    const path = '/api/wallet' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
+    const { ok, body } = await api(path);
+    if (ok && body) setWalletData(body);
+    setLoading(false);
+  };
+
+  React.useEffect(() => { loadWallet(); }, []);
+
+  const handleCopy = async () => {
+    if (!walletData || !walletData.addr) return;
+    try {
+      await navigator.clipboard.writeText(walletData.addr);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    setClaimResult(null);
+    try {
+      const { ok, body } = await api('/api/wallet/rewards/claim', { method: 'POST' });
+      if (!ok) {
+        setClaimResult({ err: (body && body.error) || 'Failed to claim' });
+        setClaiming(false);
+        return;
+      }
+      // Mock or signed claim
+      if (body.mock || !body.claimCalldata) {
+        setClaimResult({ txHash: body.txHash || '0xstagingclaim', mock: true, amount: fmtUtgo(body.amountWei) });
+        await loadWallet();
+        onBalanceRefresh && onBalanceRefresh();
+        setClaiming(false);
+        return;
+      }
+      // Real on-chain claim
+      const tx = await window.usernode.sendTransaction({
+        to: body.contractAddr,
+        data: body.claimCalldata,
+      });
+      const txHash = tx && tx.hash ? tx.hash : '0xunknown';
+      await api('/api/wallet/rewards/claim/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ txHash }),
+      });
+      setClaimResult({ txHash, mock: false, amount: fmtUtgo(body.amountWei) });
+      await loadWallet();
+      onBalanceRefresh && onBalanceRefresh();
+    } catch (e) {
+      setClaimResult({ err: e && e.message ? e.message : 'Transaction failed' });
+    }
+    setClaiming(false);
+  };
+
+  const handleBuyFreeze = async () => {
+    setBuyingFreeze(true);
+    setFreezeMsg(null);
+    const { ok, body } = await api('/api/wallet/spend/streak-freeze', { method: 'POST' });
+    if (ok && body) {
+      setFreezeMsg(`Freeze purchased! You now have ${body.streakFreezes} freeze${body.streakFreezes === 1 ? '' : 's'}.`);
+      await loadWallet();
+    } else {
+      setFreezeMsg((body && body.error) || 'Insufficient pending rewards');
+    }
+    setBuyingFreeze(false);
+  };
+
+  if (!authOk) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <div className="wallet-no-wallet" style={{ marginTop: '2rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔐</div>
+          <div>Sign in to PuzzleChain to access your wallet.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <p style={{ color: C.muted, marginTop: '1rem' }}>Loading wallet…</p>
+      </div>
+    );
+  }
+
+  if (!walletData || !walletData.addr) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <h2>My Wallet</h2>
+        <div className="wallet-no-wallet">
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔗</div>
+          <div>No wallet linked yet.</div>
+          <div style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
+            Open this app inside Usernode with a linked wallet to see your balance.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const d = walletData;
+  const isMock = d.mock || walletMock;
+  const hasPending = d.pendingWei && d.pendingWei !== '0';
+  const FREEZE_PRICE = '5.00 UTGO';
+
+  return (
+    <div className="wallet-screen">
+      <button className="back-btn" onClick={onBack}>← Back</button>
+      <h2>My Wallet</h2>
+
+      {isMock && (
+        <div className="wallet-mock-badge">Demo wallet — balances are simulated</div>
+      )}
+
+      {/* Address */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Linked Address</div>
+        <div className="wallet-addr-row">
+          <span className="wallet-addr mono">{d.addr}</span>
+          <button
+            className="primary-btn"
+            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
+            onClick={handleCopy}
+          >{copied ? 'Copied!' : 'Copy'}</button>
+        </div>
+      </div>
+
+      {/* On-chain balance */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">On-Chain Balance</div>
+        <div className="wallet-balance-big">{fmtUtgo(d.balanceWei)}</div>
+        {isMock && <div className="wallet-balance-sub">(simulated)</div>}
+      </div>
+
+      {/* Pending rewards */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Pending Puzzle Rewards</div>
+        <div className="wallet-pending-big">{fmtUtgo(d.pendingWei)}</div>
+        <div className="wallet-balance-sub">
+          {fmtUtgo(d.lifetimeEarnedWei)} lifetime earned · {fmtUtgo(d.lifetimeClaimedWei)} claimed
+        </div>
+        {claimResult && !claimResult.err && (
+          <div style={{ color: C.emerald, fontSize: '0.83rem', margin: '0.5rem 0' }}>
+            Claimed {claimResult.amount}! {claimResult.mock && '(demo)'}
+            {claimResult.txHash && !claimResult.mock && (
+              <div style={{ fontSize: '0.7rem', color: C.muted, wordBreak: 'break-all' }}>
+                Tx: {claimResult.txHash}
+              </div>
+            )}
+          </div>
+        )}
+        {claimResult && claimResult.err && (
+          <div style={{ color: C.rose, fontSize: '0.82rem', margin: '0.5rem 0' }}>{claimResult.err}</div>
+        )}
+        <div className="wallet-btn-row">
+          <button
+            className="primary-btn"
+            disabled={!hasPending || claiming}
+            onClick={handleClaim}
+            style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
+          >
+            {claiming ? 'Claiming…' : 'Claim to Wallet'}
+          </button>
+        </div>
+      </div>
+
+      {/* Streak freeze */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Streak Freeze</div>
+        <div style={{ fontSize: '0.88rem', marginBottom: '0.6rem' }}>
+          You have <strong style={{ color: C.gold }}>{d.streakFreezes}</strong> freeze{d.streakFreezes === 1 ? '' : 's'} banked.
+          A freeze protects your streak against one missed day.
+        </div>
+        {freezeMsg && (
+          <div style={{ fontSize: '0.82rem', color: C.emerald, marginBottom: '0.5rem' }}>{freezeMsg}</div>
+        )}
+        <button
+          className="primary-btn"
+          disabled={buyingFreeze || !hasPending}
+          onClick={handleBuyFreeze}
+          style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : { background: C.gold + 'cc' }}
+        >
+          {buyingFreeze ? 'Purchasing…' : `Buy Freeze (${FREEZE_PRICE})`}
+        </button>
+        {!hasPending && <div className="wallet-freeze-info">Earn rewards by solving daily puzzles first.</div>}
+      </div>
+
+      {/* Recent activity */}
+      {d.recent && d.recent.length > 0 && (
+        <div className="wallet-card">
+          <div className="wallet-card-title">Recent Activity</div>
+          {d.recent.map((ev, i) => {
+            const isReward = ev.kind === 'reward';
+            const isTipRecv = ev.kind === 'tip_received';
+            const isTipSent = ev.kind === 'tip_sent';
+            const label = isReward ? '🪙 Puzzle reward' : isTipRecv ? '💰 Tip received' : '→ Tip sent';
+            const amtClass = isReward ? 'wallet-activity-earned' : isTipRecv ? 'wallet-activity-tip-recv' : 'wallet-activity-tip-sent';
+            const prefix = isReward || isTipRecv ? '+' : '-';
+            return (
+              <div className="wallet-activity-row" key={i}>
+                <span className="wallet-activity-kind">{label}</span>
+                <span className={`wallet-activity-amt ${amtClass}`}>{prefix}{fmtUtgo(ev.amount_wei)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -9583,17 +10421,15 @@ const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
 function ProfileScreen({ userId, user: loggedInUser, onBack }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showTip, setShowTip] = useState(false);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      const { ok, body } = await api(`/api/social/profile/${userId}`);
-      if (ok && body) {
-        setProfile(body);
-      }
-      setLoading(false);
-    };
-    loadProfile();
-  }, [userId]);
+  const loadProfile = async () => {
+    const { ok, body } = await api(`/api/social/profile/${userId}`);
+    if (ok && body) setProfile(body);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadProfile(); }, [userId]);
 
   const handleFollow = async () => {
     if (!profile) return;
@@ -9651,18 +10487,37 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             {isOwnProfile && <p style={{ color: C.emerald, fontSize: '0.8rem', margin: '0.5rem 0 0' }}>Your Profile</p>}
           </div>
           {!isOwnProfile && (
-            <button
-              className="primary-btn"
-              style={{
-                background: profile.following ? C.surface : C.accent,
-                border: `1px solid ${profile.following ? C.border : C.accent}`,
-                color: profile.following ? C.text : 'white',
-                padding: '0.5rem 1rem',
-              }}
-              onClick={profile.following ? handleUnfollow : handleFollow}
-            >
-              {profile.following ? 'Unfollow' : 'Follow'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <button
+                className="primary-btn"
+                style={{
+                  background: profile.following ? C.surface : C.accent,
+                  border: `1px solid ${profile.following ? C.border : C.accent}`,
+                  color: profile.following ? C.text : 'white',
+                  padding: '0.5rem 1rem',
+                }}
+                onClick={profile.following ? handleUnfollow : handleFollow}
+              >
+                {profile.following ? 'Unfollow' : 'Follow'}
+              </button>
+              <button
+                className="primary-btn"
+                disabled={!profile.walletLinked}
+                title={!profile.walletLinked ? "This user hasn't set up a wallet yet" : `Tip ${profile.user.username}`}
+                style={{
+                  padding: '0.4rem 0.9rem',
+                  background: profile.walletLinked ? C.gold + 'cc' : C.surface,
+                  border: `1px solid ${profile.walletLinked ? C.gold : C.border}`,
+                  color: profile.walletLinked ? C.bg : C.muted,
+                  cursor: profile.walletLinked ? 'pointer' : 'not-allowed',
+                  fontSize: '0.85rem',
+                  opacity: profile.walletLinked ? 1 : 0.5,
+                }}
+                onClick={() => profile.walletLinked && setShowTip(true)}
+              >
+                🪙 Tip
+              </button>
+            </div>
           )}
         </div>
 
@@ -9695,8 +10550,33 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             <span style={{ color: C.muted }}>Following:</span>{' '}
             <span style={{ fontWeight: 600, color: C.accent }}>{profile.followingCount}</span>
           </p>
+          {profile.tipsReceivedWei && profile.tipsReceivedWei !== '0' && (
+            <p style={{ margin: '0.5rem 0' }}>
+              <span style={{ color: C.muted }}>Tips received:</span>{' '}
+              <span style={{ fontWeight: 600, color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
+                {fmtUtgo(profile.tipsReceivedWei)}
+              </span>
+            </p>
+          )}
+          {profile.recentTippers && profile.recentTippers.length > 0 && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: '0.25rem' }}>Recent tips:</div>
+              {profile.recentTippers.slice(0, 3).map((t, i) => (
+                <div key={i} style={{ fontSize: '0.82rem', color: C.text }}>
+                  {t.fromUserId} → <span style={{ color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>{fmtUtgo(t.amountWei)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+      {showTip && (
+        <TipModal
+          toUser={profile.user}
+          onClose={() => setShowTip(false)}
+          onSuccess={loadProfile}
+        />
+      )}
     </div>
   );
 }
@@ -11196,7 +12076,11 @@ function PostDetail({ post, onBack }) {
    Root app
    ============================================================ */
 function App() {
-  const [screen, setScreen] = useState('lobby'); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends'
+  const [screen, setScreen] = useState(() => {
+    // Support ?screen=wallet deep link for testing
+    const s = new URLSearchParams(window.location.search).get('screen');
+    return s === 'wallet' ? 'wallet' : 'lobby';
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet'
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -11221,6 +12105,10 @@ function App() {
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
+  // Wallet state (app-level so PvP and nav share one source)
+  const [walletAddr, setWalletAddr] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null); // wei string
+  const [walletMock, setWalletMock] = useState(true);
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
 
@@ -11258,6 +12146,35 @@ function App() {
 
   useEffect(() => { loadDaily(); }, []);
 
+  // Wallet: get EVM address from bridge, link it to the account, fetch balance.
+  // Promoted to app-level so PvP Arena and the nav chip share one source.
+  useEffect(() => {
+    if (!window.usernode || !window.usernode.getNodeAddress) return;
+    window.usernode.getNodeAddress().then(addr => {
+      if (!addr) return;
+      setWalletAddr(addr);
+      // Link address server-side so tipping lookups work
+      api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }).catch(() => {});
+      // Fetch on-chain balance
+      api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`)
+        .then(({ ok, body }) => {
+          if (ok && body) {
+            setWalletBalance(body.balance);
+            setWalletMock(!!body.mock);
+          }
+        }).catch(() => {});
+    }).catch(() => {});
+  }, []);
+
+  // Refresh balance on demand (called after claim/tip)
+  const refreshWalletBalance = () => {
+    if (!walletAddr) return;
+    api(`/api/wallet/balance?addr=${encodeURIComponent(walletAddr)}`)
+      .then(({ ok, body }) => {
+        if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
+      }).catch(() => {});
+  };
+
   // Midnight UTC reached — reload state so everything unlocks.
   const onReset = () => {
     setScreen('lobby');
@@ -11277,10 +12194,21 @@ function App() {
       setScreen('game');
       return;
     }
-    if (attempts[game.id]) {
-      // Already used today — straight to the locked screen.
-      setCurrentGame(game);
-      setScreen('locked');
+    const existing = attempts[game.id];
+    if (existing) {
+      if (existing.finishedAt) {
+        // Finished today — straight to the locked screen.
+        setCurrentGame(game);
+        setScreen('locked');
+      } else {
+        // Claimed but unfinished — resume into the saved board state. The row
+        // is already claimed, so do NOT call /start again.
+        setCurrentGame(game);
+        setStepCount(existing.steps || 0);
+        setWinData(null);
+        setLoseData(null);
+        setScreen('game');
+      }
       return;
     }
     const { ok, status, body } = await api(`/api/daily/${game.id}/start`, { method: 'POST' });
@@ -11290,14 +12218,41 @@ function App() {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
+      setLoseData(null);
       setScreen('game');
     } else if (status === 409) {
       // Lost the race / already locked — show the locked screen.
       if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
       if (body && body.attempt) setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
       setCurrentGame(game);
-      setScreen('locked');
+      setScreen(body && body.attempt && !body.attempt.finishedAt ? 'game' : 'locked');
     }
+  };
+
+  // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
+  // a game component can hydrate from a single savedProgress object.
+  const progressFor = (attempt) => {
+    if (!attempt || !attempt.progress) return null;
+    return { ...attempt.progress, steps: attempt.steps, elapsedSecs: attempt.elapsedSecs };
+  };
+
+  // Autosave callback handed to every game: persists in-progress state for
+  // today's claimed, unfinished attempt. Best-effort (keepalive) so it survives
+  // a tab close. Never blocks gameplay.
+  const handleSaveProgress = (progress, steps, secs) => {
+    if (!currentGame) return;
+    const gameId = currentGame.id;
+    api(`/api/daily/${gameId}/progress`, {
+      method: 'POST',
+      keepalive: true,
+      body: JSON.stringify({ progress, steps, elapsedSecs: secs }),
+    }).catch(() => {});
+    // Keep local mirror fresh so a same-session re-entry resumes correctly.
+    setAttempts(prev => {
+      const a = prev[gameId];
+      if (!a || a.finishedAt) return prev;
+      return { ...prev, [gameId]: { ...a, progress, steps, elapsedSecs: secs } };
+    });
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
@@ -11348,6 +12303,10 @@ function App() {
     // Reconcile against the server's authoritative streak (now that today is
     // finished) so a reload and the live nav badge agree.
     if (ok && body && typeof body.streak === 'number') setStreak(body.streak);
+    // Store reward amount from server so win overlay can show it
+    if (ok && body && body.rewardWei) {
+      setWinData(prev => prev ? { ...prev, rewardWei: body.rewardWei } : prev);
+    }
   };
 
   // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
@@ -11451,6 +12410,16 @@ function App() {
               </div>
             </div>
           </div>
+          {authOk && walletBalance && (
+            <button
+              className="nav-wallet-chip"
+              title="Open Wallet"
+              onClick={() => setScreen('wallet')}
+            >
+              🪙 {fmtUtgo(walletBalance)}
+              {walletMock && <span style={{ fontSize: '0.6rem', color: C.muted, marginLeft: '0.2rem' }}>(demo)</span>}
+            </button>
+          )}
           {authOk && (
             <button
               className="primary-btn"
@@ -11483,6 +12452,17 @@ function App() {
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
           onBack={() => setScreen('lobby')}
+        />
+      )}
+
+      {screen === 'wallet' && (
+        <WalletScreen
+          user={user}
+          authOk={authOk}
+          walletAddr={walletAddr}
+          walletMock={walletMock}
+          onBack={() => setScreen('lobby')}
+          onBalanceRefresh={refreshWalletBalance}
         />
       )}
 
@@ -11543,7 +12523,7 @@ function App() {
             )}
           </div>
           {lobbyTab === 'pvp' ? (
-            <PvpArena user={user} authOk={authOk} />
+            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
           ) : lobbyTab === 'feed' ? (
             <FeedScreen user={user} setScreen={setScreen} />
           ) : (
@@ -11551,24 +12531,27 @@ function App() {
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
               const isClassicOrIdle = g.category === 'classic' || g.category === 'idle';
               const a = attempts[g.id];
-              const locked = !isClassicOrIdle && !!a;
+              const finished = !isClassicOrIdle && !!(a && a.finishedAt);
+              const inProgress = !isClassicOrIdle && !!a && !finished;
               return (
                 <div
                   key={g.id}
-                  className={`card${locked ? ' done locked' : ''}`}
+                  className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
                   style={{ '--accent': g.tagColor }}
                   onClick={() => !loading && launchGame(g)}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
                   <div className="card-desc">{g.desc}</div>
-                  {locked ? (
+                  {finished ? (
                     <div className="card-lock">
                       🔒 {a.score != null
                         ? <span>+{a.score} pts · resets in {fmtCountdown(
                             (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
                         : <span>Played · locked until reset</span>}
                     </div>
+                  ) : inProgress ? (
+                    <div className="card-resume">▶ In progress · resume</div>
                   ) : (
                     <span
                       className="tag mono"
@@ -11646,6 +12629,8 @@ function App() {
               onLose={handleLose}
               onStepChange={setStepCount}
               offset={offset}
+              savedProgress={progressFor(attempts[currentGame.id])}
+              onSaveProgress={handleSaveProgress}
               resetKey={playAgainKey}
             />
           </div>
@@ -11683,7 +12668,14 @@ function App() {
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
+              {winData.rewardWei && winData.rewardWei !== '0' && !winData.isClassic && (
+                <div className="win-reward-row">
+                  <span className="k">🪙 Token reward</span>
+                  <span className="v">+{fmtUtgo(winData.rewardWei)}</span>
+                </div>
+              )}
             </div>
+            {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             {!winData.isClassic && authOk && (
               <button
@@ -11726,6 +12718,7 @@ function App() {
                 <span className="v mono">+0</span>
               </div>
             </div>
+            {currentGame && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>

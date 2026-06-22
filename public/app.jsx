@@ -129,6 +129,9 @@ body {
   .account-chip .who { display: none; }
   .account-chip { padding: 0.35rem; }
   .nav-right { gap: 0.8rem; }
+  .lobby { padding: 1rem 0.75rem; }
+  .lobby-head h1 { font-size: 1.3rem; }
+  .lobby-head p { font-size: 0.85rem; }
 }
 
 /* ---- Lobby ---- */
@@ -152,8 +155,14 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
+}
+
+@media (max-width: 380px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
@@ -622,7 +631,7 @@ body {
 .cw-key.gray   { background: ${C.dim};     color: ${C.muted}; }
 
 /* ---- Lobby tab switcher ---- */
-.lobby-tabs { display: flex; gap: 0.35rem; margin-bottom: 1.1rem; }
+.lobby-tabs { display: flex; gap: 0.35rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
 .lobby-tab {
   padding: 0.45rem 1.1rem;
   background: ${C.card};
@@ -637,6 +646,10 @@ body {
 }
 .lobby-tab.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
 .lobby-tab:not(.active):hover { border-color: ${C.accent}; }
+
+@media (max-width: 480px) {
+  .lobby-tab { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+}
 
 /* ---- Minesweeper ---- */
 .ms-grid {
@@ -12202,11 +12215,21 @@ const GAMES = [
     id: 'idle',
     name: 'Idle Empire',
     icon: '🐹',
-    category: 'idle',
+    category: 'classic',
     desc: 'Tap, upgrade, and build your hamster empire with prestige rewards.',
     tag: 'Idle',
     tagColor: C.gold,
     component: IdleGame,
+  },
+  {
+    id: 'pvp-arena',
+    name: 'PvP Arena',
+    icon: '⚔️',
+    category: 'classic',
+    desc: 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.',
+    tag: 'Wager',
+    tagColor: C.rose,
+    component: () => null,
   },
 ];
 
@@ -12564,8 +12587,8 @@ function App() {
   };
 
   const launchGame = async (game) => {
-    // Classic games and idle games skip the daily system
-    if (game.category === 'classic' || game.category === 'idle') {
+    // Classic games and idle games skip the daily system; PvP Arena is handled specially
+    if (game.category === 'classic' || game.category === 'idle' || game.id === 'pvp-arena') {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -12849,17 +12872,13 @@ function App() {
         <div className="lobby">
           <div className="lobby-head">
             <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : lobbyTab === 'pvp' ? 'PvP Arena' : 'Community Feed'}
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : 'Community Feed'}
             </h1>
             <p>
               {lobbyTab === 'daily'
                 ? 'One attempt each, per day. Resets at midnight UTC.'
                 : lobbyTab === 'classic'
                 ? 'Play anytime — track your best scores.'
-                : lobbyTab === 'idle'
-                ? 'Tap, upgrade, and build your empire. Progress saved automatically.'
-                : lobbyTab === 'pvp'
-                ? 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'
                 : 'See what your friends have been playing'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
@@ -12885,15 +12904,6 @@ function App() {
               className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
               onClick={() => setLobbyTab('classic')}
             >Classic Games</button>
-            <button
-              className={'lobby-tab' + (lobbyTab === 'idle' ? ' active' : '')}
-              onClick={() => setLobbyTab('idle')}
-            >Idle Empire</button>
-            <button
-              className={'lobby-tab' + (lobbyTab === 'pvp' ? ' active' : '')}
-              onClick={() => setLobbyTab('pvp')}
-              style={lobbyTab !== 'pvp' ? { borderColor: C.rose + '60', color: C.rose } : {}}
-            >⚔️ PvP Arena</button>
             {authOk && (
               <button
                 className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
@@ -12901,9 +12911,7 @@ function App() {
               >Feed</button>
             )}
           </div>
-          {lobbyTab === 'pvp' ? (
-            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
-          ) : lobbyTab === 'feed' ? (
+          {lobbyTab === 'feed' ? (
             <FeedScreen user={user} setScreen={setScreen} />
           ) : (
           <div className="grid">
@@ -12917,7 +12925,7 @@ function App() {
                   key={g.id}
                   className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
                   style={{ '--accent': g.tagColor }}
-                  onClick={() => !loading && launchGame(g)}
+                  onClick={() => !loading && (g.id === 'pvp-arena' ? setCurrentGame(g) : launchGame(g))}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
@@ -12966,7 +12974,19 @@ function App() {
         </div>
       )}
 
-      {screen === 'game' && currentGame && !winData && !loseData && (
+      {screen === 'game' && currentGame && !winData && !loseData && currentGame.id === 'pvp-arena' && (
+        <div className="game-wrap">
+          <div className="game-head">
+            <button className="back-btn" onClick={backToLobby}>← Back</button>
+            <div className="game-title">
+              <span>{currentGame.icon}</span> {currentGame.name}
+            </div>
+          </div>
+          <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
+        </div>
+      )}
+
+      {screen === 'game' && currentGame && !winData && !loseData && currentGame.id !== 'pvp-arena' && (
         currentGame.category === 'classic' ? (
           SELF_SHELL_GAMES.has(currentGame.id) ? (
             <GameComponent

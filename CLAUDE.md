@@ -190,10 +190,13 @@ describe it as static-only.
   win. `GET /api/daily?demo=leaderboard` upserts ~6 obviously-fake
   solvers ("Staging demo Ada/Borg/…") per game for today so the per-game
   leaderboard ranking + tiebreakers are demonstrable.
-  `GET /api/daily?demo=resume` upserts one **claimed, unfinished** sudoku
-  row for the current viewer (partial timer/steps) so the "In progress ·
-  resume" card and resume flow are demonstrable. All strict no-ops in
-  production.
+  `GET /api/daily?demo=resume` upserts one **claimed, unfinished**
+  `wordhunt` row for the current viewer (partial timer/steps) so the
+  "In progress · resume" card and resume flow are demonstrable. It uses
+  `wordhunt` (not `sudoku`) on purpose: `demo=locked`/`demo=streak`
+  finish the viewer's sudoku row for today, and proposal checks share
+  one staging DB, so a sudoku resume seed would collide and render
+  locked instead. All strict no-ops in production.
 - The nav **`Score`** is rehydrated from today's finished attempts.
   A per-game **daily leaderboard** now ships (see the API above);
   cross-day / all-time history remains **out of scope** (the public table

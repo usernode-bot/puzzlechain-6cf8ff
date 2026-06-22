@@ -979,22 +979,38 @@ app.get('/api/daily', async (req, res) => {
     }
 
     // Staging-only demo seed: give the current viewer a CLAIMED, UNFINISHED
-    // sudoku attempt for today (partial board + accumulated timer/steps) so the
-    // "In progress · resume" card and the resume-into-exact-state flow are
-    // demonstrable. Idempotent; today only; strict no-op in prod.
+    // WORD HUNT attempt for today (accumulated timer/steps, no finished_at) so
+    // the "In progress · resume" card and the resume flow are demonstrable.
+    //
+    // Deliberately targets `wordhunt`, NOT `sudoku`: the `demo=locked` and
+    // `demo=streak` seeds finish the viewer's sudoku (and cryptowordle) rows
+    // for today, and proposal checks share one staging DB across tests run in
+    // order. If this used sudoku too, a prior `demo=locked` visit would have
+    // left a FINISHED sudoku row, and `ON CONFLICT DO NOTHING` here would be a
+    // no-op — the card would render LOCKED and the "In progress" text would
+    // never appear. wordhunt is untouched by the other viewer seeds, so it's
+    // collision-free. The DO UPDATE additionally forces the row back to an
+    // unfinished state, making this order-independent and re-run safe.
+    // Idempotent; today only; strict no-op in prod.
     if (IS_STAGING && req.query.demo === 'resume') {
       await pool.query(
         `INSERT INTO daily_attempts
            (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
-         VALUES ($1, $2, 'sudoku', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
-         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+         VALUES ($1, $2, 'wordhunt', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL,
+               score = NULL,
+               time_secs = NULL,
+               steps = EXCLUDED.steps,
+               elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
         [
           req.user.id,
           req.user.username || 'staging-demo-user',
           7,
           84,
           // dayNum omitted on purpose so the client treats the board as the
-          // current daily seed; grid carries a few player-entered cells.
+          // current daily seed; this just marks a claimed, in-progress row.
           JSON.stringify({ resumeDemo: true }),
         ]
       );

@@ -383,12 +383,6 @@ async function migrate() {
     )
   `);
 
-  // Add streak_freezes column to user_stats_snapshot (idempotent)
-  await pool.query(`
-    ALTER TABLE user_stats_snapshot
-      ADD COLUMN IF NOT EXISTS streak_freezes INTEGER NOT NULL DEFAULT 0
-  `);
-
   // user_follows is PUBLIC: directional follow relationships.
   // One row per (follower_id, followee_id) pair.
   await pool.query(`
@@ -415,6 +409,12 @@ async function migrate() {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     )
+  `);
+
+  // Add streak_freezes column to user_stats_snapshot (idempotent)
+  await pool.query(`
+    ALTER TABLE user_stats_snapshot
+      ADD COLUMN IF NOT EXISTS streak_freezes INTEGER NOT NULL DEFAULT 0
   `);
 
   // user_achievements is PUBLIC: recent milestones and notable events.

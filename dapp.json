@@ -28,6 +28,13 @@
       "required": true,
       "private": false,
       "staging_default": "redis://localhost:6379"
+    },
+    {
+      "key": "MINESWEEPER_REGISTRY_ADDRESS",
+      "description": "Deployed MinesweeperRegistry contract address on Usernode EVM chain. Game works without it — on-chain recording is skipped when unset.",
+      "required": false,
+      "private": false,
+      "staging_default": "0x0000000000000000000000000000000000000003"
     }
   ],
   "tests": [

@@ -3,6 +3,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const ethers = require('ethers');
+const crypto = require('crypto');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -23,6 +24,17 @@ const validatorWallet = VALIDATOR_PRIVATE_KEY
 const utgoProvider = UTGO_RPC_URL
   ? new ethers.JsonRpcProvider(UTGO_RPC_URL)
   : null;
+
+// ---- Minesweeper integrity config -------------------------------------------
+
+const MINESWEEPER_REGISTRY_ADDRESS = process.env.MINESWEEPER_REGISTRY_ADDRESS || null;
+const NODE_RPC_URL = process.env.NODE_RPC_URL || '';
+const nodeProvider = NODE_RPC_URL ? new ethers.JsonRpcProvider(NODE_RPC_URL) : null;
+
+const MS_REGISTRY_ABI = [
+  'function recordGameCreated(bytes32 sessionId, bytes32 initialHash) external',
+  'function recordScoreSubmitted(bytes32 sessionId, bytes32 finalHash, uint256 score) external',
+];
 
 const UTGO_ABI_BALANCE = ['function balanceOf(address account) view returns (uint256)'];
 const WAGER_IFACE       = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
@@ -51,7 +63,7 @@ let redisReady = false;
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle', 'minesweeper']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -226,6 +238,28 @@ async function migrate() {
       move_seq    INTEGER NOT NULL,
       ts          TIMESTAMPTZ NOT NULL DEFAULT now(),
       UNIQUE (match_id, player_id, move_seq)
+    )
+  `);
+
+  // minesweeper_sessions is PUBLIC — gameplay results, no sensitive data.
+  // One row per game session; tracks board layout, hash chain state, and outcome.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS minesweeper_sessions (
+      session_id         TEXT PRIMARY KEY,
+      user_id            TEXT NOT NULL,
+      username           TEXT,
+      board_nonce        TEXT NOT NULL,
+      mine_indices       JSONB NOT NULL,
+      initial_hash       TEXT NOT NULL,
+      status             TEXT NOT NULL DEFAULT 'active',
+      started_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at        TIMESTAMPTZ,
+      final_hash         TEXT,
+      score              INTEGER,
+      steps              INTEGER,
+      time_secs          INTEGER,
+      on_chain_start_tx  TEXT,
+      on_chain_finish_tx TEXT
     )
   `);
 
@@ -1069,6 +1103,187 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
+  }
+});
+
+// ---- Minesweeper integrity API -------------------------------------------
+
+const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10;
+
+// Server-side SHA-256 hex hash of a string.
+function sha256hex(str) {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
+
+// Deterministic mine generation seeded from a nonce hex string.
+// Mirrors the client's generateMines() but uses mulberry32 instead of Math.random().
+function msGenerateMines(firstCell, nonceHex) {
+  const firstR = Math.floor(firstCell / MS_COLS);
+  const firstC = firstCell % MS_COLS;
+
+  const protected_ = new Set();
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const r = firstR + dr, c = firstC + dc;
+      if (r >= 0 && r < MS_ROWS && c >= 0 && c < MS_COLS)
+        protected_.add(r * MS_COLS + c);
+    }
+  }
+
+  const indices = [];
+  for (let i = 0; i < MS_ROWS * MS_COLS; i++) if (!protected_.has(i)) indices.push(i);
+
+  // Seed from first 8 hex chars of the nonce (32 bits)
+  const seed = parseInt(nonceHex.slice(0, 8), 16);
+  const rng = pvpMulberry32(seed);
+
+  // Fisher-Yates shuffle using deterministic PRNG
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  return indices.slice(0, MS_MINES).sort((a, b) => a - b);
+}
+
+// Verify a hash chain submitted by the client.
+// Returns { valid: true, finalHash } or { valid: false, detail: string }.
+function msVerifyChain(initialHash, chainLinks, mineIndices, outcome) {
+  const mineSet = new Set(mineIndices);
+  let prevHash = initialHash;
+
+  for (let i = 0; i < chainLinks.length; i++) {
+    const link = chainLinks[i];
+    if (link.seq !== i) return { valid: false, detail: `seq mismatch at index ${i}` };
+    if (!['reveal', 'flag', 'unflag'].includes(link.type))
+      return { valid: false, detail: `invalid type "${link.type}" at seq ${i}` };
+
+    const expectedActionHash = sha256hex(JSON.stringify({ seq: link.seq, type: link.type, cellIdx: link.cellIdx }));
+    if (link.actionHash !== expectedActionHash)
+      return { valid: false, detail: `actionHash mismatch at seq ${i}` };
+
+    const expectedChainedHash = sha256hex(prevHash + ':' + expectedActionHash);
+    if (link.chainedHash !== expectedChainedHash)
+      return { valid: false, detail: `chainedHash mismatch at seq ${i}` };
+
+    prevHash = expectedChainedHash;
+  }
+
+  // Outcome plausibility
+  const mineReveals = chainLinks.filter(l => l.type === 'reveal' && mineSet.has(l.cellIdx));
+  if (outcome === 'lost') {
+    if (mineReveals.length === 0)
+      return { valid: false, detail: 'lost outcome but no mine reveal in chain' };
+  } else {
+    if (mineReveals.length > 0)
+      return { valid: false, detail: 'won/cashed_out but chain contains mine reveal' };
+  }
+
+  return { valid: true, finalHash: prevHash };
+}
+
+// POST /api/minesweeper/session — create a new server-seeded game session.
+// Returns { sessionId, initialHash, mineIndices } so the client can build the board.
+app.post('/api/minesweeper/session', async (req, res) => {
+  try {
+    const firstCell = (typeof req.body.firstCell === 'number' &&
+      req.body.firstCell >= 0 && req.body.firstCell < MS_ROWS * MS_COLS)
+      ? req.body.firstCell
+      : 27; // default centre-ish cell if not provided
+
+    const nonce = crypto.randomBytes(32).toString('hex');
+    const mineIndices = msGenerateMines(firstCell, nonce);
+    const initialHash = sha256hex(`${nonce}:${mineIndices.join(',')}`);
+    const sessionId = crypto.randomUUID();
+
+    await pool.query(
+      `INSERT INTO minesweeper_sessions
+         (session_id, user_id, username, board_nonce, mine_indices, initial_hash)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [sessionId, req.user.id, req.user.username || null, nonce, JSON.stringify(mineIndices), initialHash]
+    );
+
+    // Fire-and-forget on-chain GameCreated event
+    if (MINESWEEPER_REGISTRY_ADDRESS && nodeProvider && validatorWallet) {
+      const registry = new ethers.Contract(
+        MINESWEEPER_REGISTRY_ADDRESS,
+        MS_REGISTRY_ABI,
+        validatorWallet.connect(nodeProvider)
+      );
+      const sessionId32 = ethers.keccak256(ethers.toUtf8Bytes(sessionId));
+      const initialHashBytes32 = `0x${initialHash}`;
+      registry.recordGameCreated(sessionId32, initialHashBytes32)
+        .then(tx => pool.query(
+          `UPDATE minesweeper_sessions SET on_chain_start_tx = $2 WHERE session_id = $1`,
+          [sessionId, tx.hash]
+        ).catch(() => {}))
+        .catch(e => console.warn('[minesweeper] GameCreated on-chain failed:', e.message));
+    }
+
+    res.json({ sessionId, initialHash, mineIndices });
+  } catch (err) {
+    console.error('[minesweeper] session create failed:', err.message);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+// POST /api/minesweeper/session/:sessionId/finish — verify hash chain and record result.
+app.post('/api/minesweeper/session/:sessionId/finish', async (req, res) => {
+  const { sessionId } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM minesweeper_sessions WHERE session_id = $1`,
+      [sessionId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+    const session = rows[0];
+    if (session.user_id !== req.user.id) return res.status(403).json({ error: 'Not your session' });
+    if (session.status !== 'active') return res.status(409).json({ error: 'Session already finished' });
+
+    const { score, steps, timeSecs, outcome, cashoutMultiplier, chainLinks } = req.body;
+    if (!['won', 'lost', 'cashed_out'].includes(outcome))
+      return res.status(400).json({ error: 'Invalid outcome' });
+    if (!Array.isArray(chainLinks))
+      return res.status(400).json({ error: 'chainLinks must be an array' });
+
+    const mineIndices = session.mine_indices;
+    const result = msVerifyChain(session.initial_hash, chainLinks, mineIndices, outcome);
+    if (!result.valid)
+      return res.status(409).json({ error: 'Hash chain invalid', detail: result.detail });
+
+    const finalScore = Number.isFinite(score) ? Math.round(score) : 0;
+    const finalSteps = Number.isFinite(steps) ? Math.round(steps) : chainLinks.length;
+    const finalSecs  = Number.isFinite(timeSecs) ? Math.round(timeSecs) : 0;
+
+    await pool.query(
+      `UPDATE minesweeper_sessions
+         SET status = $2, final_hash = $3, score = $4, steps = $5,
+             time_secs = $6, finished_at = now()
+       WHERE session_id = $1`,
+      [sessionId, outcome, result.finalHash, finalScore, finalSteps, finalSecs]
+    );
+
+    // Fire-and-forget on-chain ScoreSubmitted event
+    if (MINESWEEPER_REGISTRY_ADDRESS && nodeProvider && validatorWallet) {
+      const registry = new ethers.Contract(
+        MINESWEEPER_REGISTRY_ADDRESS,
+        MS_REGISTRY_ABI,
+        validatorWallet.connect(nodeProvider)
+      );
+      const sessionId32 = ethers.keccak256(ethers.toUtf8Bytes(sessionId));
+      const finalHashBytes32 = `0x${result.finalHash}`;
+      registry.recordScoreSubmitted(sessionId32, finalHashBytes32, BigInt(finalScore))
+        .then(tx => pool.query(
+          `UPDATE minesweeper_sessions SET on_chain_finish_tx = $2 WHERE session_id = $1`,
+          [sessionId, tx.hash]
+        ).catch(() => {}))
+        .catch(e => console.warn('[minesweeper] ScoreSubmitted on-chain failed:', e.message));
+    }
+
+    res.json({ verified: true, score: finalScore });
+  } catch (err) {
+    console.error('[minesweeper] session finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish session' });
   }
 });
 

@@ -782,6 +782,25 @@ body {
 [data-ms-theme="light"] .ms-grid { background: #9ca3af; border-color: #9ca3af; }
 [data-ms-theme="light"] .ms-cell.ms-mine-dead { background: #fca5a5; }
 [data-ms-theme="light"] .ms-cell.ms-exploded { background: #f87171; }
+/* Minesweeper integrity verify overlay */
+.ms-verify-status {
+  max-width: 360px;
+  margin: 0.6rem auto 0;
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  text-align: center;
+}
+.ms-verify-status.verifying {
+  background: ${C.card};
+  color: ${C.muted};
+  border: 1px solid ${C.border};
+}
+.ms-verify-status.error {
+  background: ${C.rose}22;
+  color: ${C.rose};
+  border: 1px solid ${C.rose}44;
+}
 
 /* ---- Mancala ---- */
 .mnc-board {
@@ -3981,6 +4000,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset }) {
 /* ============================================================
    Game 4 — Minesweeper (8×8, 10 mines, classic game)
    ============================================================ */
+// SHA-256 hex digest using Web Crypto API (available in all modern browsers).
+async function msSha256hex(str) {
+  const enc = new TextEncoder();
+  const buf = await window.crypto.subtle.digest('SHA-256', enc.encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10, MS_SAFE = MS_ROWS * MS_COLS - MS_MINES; // 54
 
 const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
@@ -4065,8 +4090,23 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [steps, setSteps] = useState(0);
   const [isMock, setIsMock] = useState(false);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState(null);
   const flagTimerRef = useRef(null);
+  // Hash chain state (refs to avoid stale closure issues across async operations)
+  const sessionIdRef = useRef(null);
+  const sessionHashRef = useRef(null);
+  const chainLinksRef = useRef([]);
+  const chainSeqRef = useRef(0);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
+
+  const resetSessionState = () => {
+    sessionIdRef.current = null;
+    sessionHashRef.current = null;
+    chainLinksRef.current = [];
+    chainSeqRef.current = 0;
+  };
 
   // Reset when parent increments resetKey
   useEffect(() => {
@@ -4078,6 +4118,8 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     setGameOverMine(null);
     setSteps(0);
     setActiveTab('game');
+    setVerifyError(null);
+    resetSessionState();
   }, [resetKey]);
 
   // Bridge: detect mock mode
@@ -4093,17 +4135,82 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const cashOutActive = safeRevealed >= 10 && !done;
   const cashoutMultiplier = parseFloat((1.0 + safeRevealed / MS_SAFE).toFixed(2));
 
-  const handleReveal = (idx) => {
-    if (done || revealed.has(idx) || flagged.has(idx)) return;
+  // Append one link to the hash chain. Mutates refs — no re-render.
+  const appendChainLink = async (type, cellIdx) => {
+    const seq = chainSeqRef.current;
+    const actionStr = JSON.stringify({ seq, type, cellIdx });
+    const actionHash = await msSha256hex(actionStr);
+    const chainedHash = await msSha256hex(sessionHashRef.current + ':' + actionHash);
+    chainLinksRef.current.push({ seq, type, cellIdx, actionHash, chainedHash });
+    chainSeqRef.current = seq + 1;
+    sessionHashRef.current = chainedHash;
+  };
+
+  // Submit the finished chain to the server for verification.
+  // Returns true on success; sets verifyError on failure.
+  const submitFinish = async (score, stepsCount, secsCount, outcome, coMult) => {
+    if (!sessionIdRef.current) return true; // no session (fallback mode) — skip
+    setVerifying(true);
+    try {
+      const { ok, body } = await api(`/api/minesweeper/session/${sessionIdRef.current}/finish`, {
+        method: 'POST',
+        body: JSON.stringify({
+          score, steps: stepsCount, timeSecs: secsCount, outcome,
+          cashoutMultiplier: coMult || null,
+          chainLinks: chainLinksRef.current,
+        }),
+      });
+      if (ok && body && body.verified) {
+        setVerifying(false);
+        return true;
+      }
+      const detail = (body && body.detail) || (body && body.error) || 'Verification failed';
+      setVerifyError(detail);
+      setVerifying(false);
+      return false;
+    } catch {
+      setVerifying(false);
+      return true; // network error — let the game proceed unverified
+    }
+  };
+
+  const handleReveal = async (idx) => {
+    if (done || revealed.has(idx) || flagged.has(idx) || sessionLoading || verifying) return;
     const r = Math.floor(idx / MS_COLS), c = idx % MS_COLS;
+    const secsSnapshot = secs;
 
     let mines = mineSet, adj = adjacency;
     if (!mines) {
-      mines = generateMines(r, c);
-      adj = computeAdjacency(mines);
+      // First click: create a server-side session to get a verified board layout
+      setSessionLoading(true);
+      try {
+        const { ok, body } = await api('/api/minesweeper/session', {
+          method: 'POST',
+          body: JSON.stringify({ firstCell: idx }),
+        });
+        if (ok && body && body.mineIndices) {
+          sessionIdRef.current = body.sessionId;
+          sessionHashRef.current = body.initialHash;
+          chainLinksRef.current = [];
+          chainSeqRef.current = 0;
+          mines = new Set(body.mineIndices);
+          adj = computeAdjacency(mines);
+        } else {
+          // Server unavailable — fall back to client-side generation
+          mines = generateMines(r, c);
+          adj = computeAdjacency(mines);
+        }
+      } catch {
+        mines = generateMines(r, c);
+        adj = computeAdjacency(mines);
+      }
       setMineSet(mines);
       setAdjacency(adj);
+      setSessionLoading(false);
     }
+
+    // Append chain link for this reveal (if session is active)
+    if (sessionIdRef.current) await appendChainLink('reveal', idx);
 
     const newSteps = steps + 1;
     setSteps(newSteps);
@@ -4112,16 +4219,17 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (mines.has(idx)) {
       setGameOverMine(idx);
       setDone(true);
-      const baseScore = 0;
+      const dateStr = new Date().toISOString().slice(0, 10);
       const entry = {
         id: String(Date.now()),
-        date: new Date().toISOString().slice(0, 10),
-        outcome: 'loss', score: 0, steps: newSteps, secs, safeRevealed, cashOut: false, cashoutMultiplier: null,
+        date: dateStr,
+        outcome: 'loss', score: 0, steps: newSteps, secs: secsSnapshot, safeRevealed, cashOut: false, cashoutMultiplier: null,
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
-      const shareText = `Minesweeper ${entry.date} — 💥 Game Over · ${safeRevealed}/54 safe · ${secs}s · +0 pts`;
-      onLose(newSteps, secs, { share: shareText });
+      const shareText = `Minesweeper ${dateStr} — 💥 Game Over · ${safeRevealed}/54 safe · ${secsSnapshot}s · +0 pts`;
+      const ok = await submitFinish(0, newSteps, secsSnapshot, 'lost', null);
+      if (ok) onLose(newSteps, secsSnapshot, { share: shareText });
       return;
     }
 
@@ -4130,41 +4238,48 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
     const newSafeRevealed = Array.from(newRevealed).filter(i => !mines.has(i)).length;
     if (newSafeRevealed >= MS_SAFE) {
-      // Full board clear
       setDone(true);
-      const baseScore = Math.max(newSafeRevealed * 30 - secs * 2, 100) + 200;
+      const baseScore = Math.max(newSafeRevealed * 30 - secsSnapshot * 2, 100) + 200;
       const dateStr = new Date().toISOString().slice(0, 10);
       const entry = {
         id: String(Date.now()),
         date: dateStr,
-        outcome: 'win', score: baseScore, steps: newSteps, secs, safeRevealed: newSafeRevealed, cashOut: false, cashoutMultiplier: 1.0,
+        outcome: 'win', score: baseScore, steps: newSteps, secs: secsSnapshot, safeRevealed: newSafeRevealed, cashOut: false, cashoutMultiplier: 1.0,
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
-      const shareText = `Minesweeper ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secs}s · +${baseScore} pts`;
-      onWin(baseScore, newSteps, secs, { share: shareText, cashOut: false });
+      const shareText = `Minesweeper ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secsSnapshot}s · +${baseScore} pts`;
+      const ok = await submitFinish(baseScore, newSteps, secsSnapshot, 'won', null);
+      if (ok) onWin(baseScore, newSteps, secsSnapshot, { share: shareText, cashOut: false });
     }
   };
 
-  const handleCashOut = () => {
-    if (!cashOutActive || !mineSet) return;
+  const handleCashOut = async () => {
+    if (!cashOutActive || !mineSet || verifying) return;
+    const secsSnapshot = secs;
     setDone(true);
-    const baseScore = Math.max(safeRevealed * 30 - secs * 2, 100);
+    const baseScore = Math.max(safeRevealed * 30 - secsSnapshot * 2, 100);
     const finalScore = Math.round(baseScore * cashoutMultiplier);
     const dateStr = new Date().toISOString().slice(0, 10);
     const entry = {
       id: String(Date.now()),
       date: dateStr,
-      outcome: 'win', score: finalScore, steps, secs, safeRevealed, cashOut: true, cashoutMultiplier,
+      outcome: 'win', score: finalScore, steps, secs: secsSnapshot, safeRevealed, cashOut: true, cashoutMultiplier,
     };
     msSaveEntry(entry);
     setGameHistory(msLoadHistory());
-    const shareText = `Minesweeper ${dateStr} — 💰×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
-    onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
+    const shareText = `Minesweeper ${dateStr} — 💰×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secsSnapshot}s · +${finalScore} pts`;
+    const ok = await submitFinish(finalScore, steps, secsSnapshot, 'cashed_out', cashoutMultiplier);
+    if (ok) onWin(finalScore, steps, secsSnapshot, { share: shareText, cashOut: true, cashoutMultiplier });
   };
 
-  const handleFlag = (idx) => {
-    if (done || revealed.has(idx)) return;
+  const handleFlag = async (idx) => {
+    if (done || revealed.has(idx) || sessionLoading) return;
+    // Track flag/unflag in chain only after a session has been created
+    if (sessionIdRef.current) {
+      const type = flagged.has(idx) ? 'unflag' : 'flag';
+      await appendChainLink(type, idx);
+    }
     setFlagged(prev => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx); else next.add(idx);
@@ -4243,33 +4358,46 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
                 <div
                   key={idx}
                   className={cls}
-                  onClick={() => !done && !isFlagged && handleReveal(idx)}
+                  onClick={() => !done && !isFlagged && !sessionLoading && !verifying && handleReveal(idx)}
                   onContextMenu={e => { e.preventDefault(); handleFlag(idx); }}
                   onPointerDown={() => onPointerDown(idx)}
                   onPointerUp={onPointerUp}
                   onPointerLeave={onPointerUp}
                 >
-                  {content}
+                  {sessionLoading && !mineSet ? '·' : content}
                 </div>
               );
             })}
           </div>
 
+          {verifying && (
+            <div className="ms-verify-status verifying">Verifying score…</div>
+          )}
+          {verifyError && !verifying && (
+            <div className="ms-verify-status error">Score could not be verified: {verifyError}</div>
+          )}
+
           <div className="ms-action-row">
             <div className="ms-cashout-wrap">
               <button
-                className={'ms-cashout-btn' + (cashOutActive ? '' : ' disabled')}
+                className={'ms-cashout-btn' + (cashOutActive && !verifying ? '' : ' disabled')}
                 onClick={handleCashOut}
-                disabled={!cashOutActive}
+                disabled={!cashOutActive || verifying}
               >
                 Cash Out 💰 ×{cashoutMultiplier}
               </button>
               {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
-            <button className="ms-newgame-btn" onClick={() => {
-              setMineSet(null); setAdjacency(null); setRevealed(new Set());
-              setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
-            }}>↺ New</button>
+            <button
+              className="ms-newgame-btn"
+              disabled={sessionLoading || verifying}
+              onClick={() => {
+                setMineSet(null); setAdjacency(null); setRevealed(new Set());
+                setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+                setVerifyError(null);
+                resetSessionState();
+              }}
+            >↺ New</button>
           </div>
         </div>
       )}
@@ -4536,13 +4664,26 @@ function mncAIMove(pits, difficulty) {
   const moves = mncGetValidMoves(pits, 2);
   if (moves.length === 0) return -1;
   if (difficulty === 'easy') return shuffle(moves)[0];
-  // Medium: greedy single-ply
+  // Medium: greedy single-ply (with extra-turn chaining)
   if (difficulty === 'medium') {
     let bestIdx = moves[0], bestScore = Infinity;
     for (const idx of moves) {
-      const { pits: np } = mncDistribute(pits, idx, 2);
-      const s = mncEval(np);
-      if (s < bestScore) { bestScore = s; bestIdx = idx; }
+      const { pits: np, extraTurn } = mncDistribute(pits, idx, 2);
+      let s = mncEval(np);
+      if (extraTurn) {
+        // Extra turn: chain the best follow-up move greedily
+        const followMoves = mncGetValidMoves(np, 2);
+        if (followMoves.length > 0) {
+          let followBest = Infinity;
+          for (const fi of followMoves) {
+            const { pits: fnp } = mncDistribute(np, fi, 2);
+            const fs = mncEval(fnp);
+            if (fs < followBest) followBest = fs;
+          }
+          s = followBest;
+        }
+      }
+      if (s <= bestScore) { bestScore = s; bestIdx = idx; }
     }
     return bestIdx;
   }
@@ -4551,7 +4692,7 @@ function mncAIMove(pits, difficulty) {
   for (const idx of moves) {
     const { pits: np, extraTurn } = mncDistribute(pits, idx, 2);
     const s = mncMinimax(np, extraTurn ? 2 : 1, 6, -Infinity, Infinity);
-    if (s < bestScore) { bestScore = s; bestIdx = idx; }
+    if (s <= bestScore) { bestScore = s; bestIdx = idx; }
   }
   return bestIdx;
 }

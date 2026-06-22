@@ -5,7 +5,8 @@
   "description": "PuzzleChain",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node scripts/check-jsx.js"
   },
   "dependencies": {
     "ethers": "^6.13.0",
@@ -13,5 +14,9 @@
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.24.0"
   }
 }

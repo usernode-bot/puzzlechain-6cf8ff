@@ -69,6 +69,54 @@
        tripping the no-console-errors check). -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230A0E1A'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%233b82f6'%3E%E2%AC%A2%3C/text%3E%3C/svg%3E">
 
+  <!-- Boot-shell styles only. Self-contained: these must work even when
+       app.jsx fails to load/compile, so they do NOT depend on the app's
+       design system. Keyframes can't be inlined per-element, hence this
+       small block. -->
+  <style>
+    html, body { margin: 0; }
+    body {
+      background: #0A0E1A; color: #e7ebf3;
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    }
+    #boot-loader {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem;
+    }
+    #boot-loader .pc-spinner {
+      width: 38px; height: 38px; border-radius: 50%;
+      border: 3px solid rgba(59,130,246,0.25); border-top-color: #3b82f6;
+      animation: pc-spin 0.8s linear infinite;
+    }
+    #boot-loader .pc-loading-text { color: #8b95a8; font-size: 0.9rem; letter-spacing: 0.02em; }
+    @keyframes pc-spin { to { transform: rotate(360deg); } }
+    .pc-boot-error {
+      position: fixed; inset: 0; display: flex; align-items: center;
+      justify-content: center; padding: 1.5rem; box-sizing: border-box;
+    }
+    .pc-boot-error .card {
+      max-width: 26rem; width: 100%; box-sizing: border-box; text-align: center;
+      background: #121726; border: 1px solid #25304a; border-radius: 1rem;
+      padding: 1.75rem 1.5rem;
+    }
+    .pc-boot-error .glyph { font-size: 2.2rem; line-height: 1; margin-bottom: 0.75rem; }
+    .pc-boot-error h1 { font-size: 1.2rem; margin: 0 0 0.5rem; color: #e7ebf3; }
+    .pc-boot-error p { margin: 0 0 1.25rem; color: #8b95a8; font-size: 0.92rem; line-height: 1.45; }
+    .pc-boot-error .btns { display: flex; flex-direction: column; gap: 0.6rem; }
+    .pc-boot-error button {
+      font: inherit; font-size: 0.92rem; padding: 0.6rem 1rem; border-radius: 0.6rem;
+      cursor: pointer; border: 1px solid transparent;
+    }
+    .pc-boot-error .primary { background: #3b82f6; color: #fff; }
+    .pc-boot-error .secondary { background: transparent; color: #cdd5e3; border-color: #25304a; }
+    .pc-boot-error .secondary.done { color: #4ade80; border-color: #2f5a3f; }
+    .pc-boot-error textarea {
+      width: 100%; box-sizing: border-box; margin-top: 0.9rem; height: 5.5rem; resize: vertical;
+      background: #0A0E1A; color: #8b95a8; border: 1px solid #25304a; border-radius: 0.5rem;
+      padding: 0.5rem; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.72rem;
+    }
+  </style>
+
   <!-- React, ReactDOM, and Babel Standalone are VENDORED locally (public/vendor)
        rather than loaded from a third-party CDN. A blocked/throttled CDN was a
        single point of failure that could leave the app stuck on a blank screen;
@@ -109,15 +157,13 @@
   </style>
 </head>
 <body>
-  <!-- Initial loading indicator so the user never faces a blank white screen
-       while React + Babel load and the ~10k-line app compiles in-browser
-       (several seconds on a slow device). React replaces #root on mount, so
-       this disappears automatically once the app renders. -->
   <div id="root">
-    <div id="pc-boot">
-      <div class="pc-spin"></div>
-      <div class="pc-title">Loading PuzzleChain…</div>
-      <div class="pc-sub">Setting up today's puzzles.</div>
+    <!-- Lightweight pre-mount loading state so the gap between page open and
+         React mount isn't a frozen blank screen. React replaces #root's
+         contents on mount, removing this. -->
+    <div id="boot-loader">
+      <div class="pc-spinner"></div>
+      <div class="pc-loading-text">Loading PuzzleChain…</div>
     </div>
   </div>
   <!-- Deterministic JSX bootstrap. Babel Standalone's automatic
@@ -127,56 +173,108 @@
        preset in classic-script mode (React.createElement runtime, no ES
        module imports), and inject the compiled code as a plain script so
        it runs in global scope with React/ReactDOM available as globals.
-       Any failure surfaces loudly in the console. -->
+       Any failure surfaces loudly in the console AND in an on-screen
+       error card so a non-technical player can retry and report it. -->
   <script>
     (function () {
-      var booted = false; // set true once we hand off to app.jsx successfully
+      var WATCHDOG_MS = 15000;
+      var watchdog = null;
+      var settled = false; // true once we've either mounted or shown an error
 
-      function clearRoot() {
+      // Plain-English reason derived from the failure stage, so the card
+      // tells a player *what kind* of problem this is without a console.
+      function reasonFor(stage) {
+        var s = String(stage || '');
+        if (/compile|run/.test(s)) return "There's a problem with the latest update. Try reloading — if it keeps happening, please report it.";
+        if (/load|fetch|babel|react|vendor/i.test(s)) return "A required file couldn't be loaded. Check your connection and reload.";
+        if (/longer|slow|watchdog/i.test(s)) return "This is taking longer than usual — check your connection and reload.";
+        return "Something went wrong while starting the app. Try reloading.";
+      }
+
+      function clearWatchdog() {
+        if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      // Render the self-contained error card into #root. Always replaces
+      // #root's contents (loader or stale fallback) so the latest state wins.
+      function showError(stage, err) {
+        settled = true;
+        clearWatchdog();
         var root = document.getElementById('root');
-        if (root) root.innerHTML = '';
-        return root;
-      }
-
-      // Replace the boot screen with a styled, recoverable error panel instead
-      // of a bare line of text the user can't act on.
-      function fail(stage, err) {
-        booted = true; // stop the watchdog from also firing
-        console.error('[PuzzleChain] failed to ' + stage + ':', err && (err.stack || err.message || err));
-        var root = clearRoot();
         if (!root) return;
-        var panel = document.createElement('div');
-        panel.id = 'pc-fail';
-        panel.innerHTML =
-          '<div class="pc-mark">⚠️</div>' +
-          '<div class="pc-title">PuzzleChain didn\'t load</div>' +
-          '<div class="pc-sub">Something went wrong while starting up. This is usually a temporary network hiccup — reloading should fix it.</div>' +
-          '<button class="pc-btn" type="button">Reload</button>';
-        panel.querySelector('button').addEventListener('click', function () { location.reload(); });
-        root.appendChild(panel);
+        var detail = stage + ': ' + (err && (err.stack || err.message || err) || 'unknown error');
+
+        var wrap = document.createElement('div');
+        wrap.className = 'pc-boot-error';
+        wrap.innerHTML =
+          '<div class="card">' +
+            '<div class="glyph">⬢</div>' +
+            '<h1>PuzzleChain couldn’t start</h1>' +
+            '<p>' + escapeHtml(reasonFor(stage)) + '</p>' +
+            '<div class="btns">' +
+              '<button type="button" class="primary" data-act="reload">Reload</button>' +
+              '<button type="button" class="secondary" data-act="copy">Copy error details</button>' +
+            '</div>' +
+          '</div>';
+        root.innerHTML = '';
+        root.appendChild(wrap);
+
+        var card = wrap.querySelector('.card');
+        wrap.querySelector('[data-act="reload"]').addEventListener('click', function () {
+          location.reload();
+        });
+
+        var copyBtn = wrap.querySelector('[data-act="copy"]');
+        copyBtn.addEventListener('click', function () {
+          function markCopied() {
+            copyBtn.textContent = 'Copied ✓';
+            copyBtn.className = 'secondary done';
+          }
+          // navigator.clipboard is unavailable in insecure contexts / older
+          // mobile browsers — fall back to a selectable textarea.
+          function fallback() {
+            if (card.querySelector('textarea')) { card.querySelector('textarea').select(); return; }
+            var ta = document.createElement('textarea');
+            ta.readOnly = true;
+            ta.value = detail;
+            card.appendChild(ta);
+            ta.focus(); ta.select();
+            try { document.execCommand && document.execCommand('copy'); markCopied(); } catch (_) {}
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(detail).then(markCopied, fallback);
+          } else {
+            fallback();
+          }
+        });
       }
 
-      // Watchdog: if the app hasn't mounted (or failed) within ~9s, the boot
-      // screen is still on-screen and probably stuck. Offer a one-tap reload
-      // instead of leaving the user on a frozen spinner.
-      setTimeout(function () {
-        if (booted) return;
-        var boot = document.getElementById('pc-boot');
-        if (!boot) return; // React already mounted and replaced #root
-        var sub = boot.querySelector('.pc-sub');
-        if (sub) sub.textContent = 'This is taking longer than usual.';
-        if (!boot.querySelector('.pc-btn')) {
-          var btn = document.createElement('button');
-          btn.className = 'pc-btn';
-          btn.type = 'button';
-          btn.textContent = 'Still loading — Reload';
-          btn.addEventListener('click', function () { location.reload(); });
-          boot.appendChild(btn);
-        }
-      }, 9000);
+      function fail(stage, err) {
+        console.error('[PuzzleChain] failed to ' + stage + ':', err && (err.stack || err.message || err));
+        showError(stage, err);
+      }
 
-      if (typeof Babel === 'undefined') { fail('load Babel (script blocked?)', new Error('Babel undefined')); return; }
-      if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') { fail('load React (script blocked?)', new Error('React/ReactDOM undefined')); return; }
+      if (typeof Babel === 'undefined') { fail('load Babel (vendor script blocked?)', new Error('Babel undefined')); return; }
+      if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') { fail('load React (vendor script blocked?)', new Error('React/ReactDOM undefined')); return; }
+
+      // Mount watchdog: if React hasn't replaced the loader with real content
+      // within WATCHDOG_MS, surface the "taking longer than usual" card rather
+      // than leaving a player on an indefinitely blank/spinning screen.
+      watchdog = setTimeout(function () {
+        if (settled) return;
+        var root = document.getElementById('root');
+        var mounted = window.__puzzlechainMounted ||
+          (root && root.firstElementChild && root.firstElementChild.id !== 'boot-loader');
+        if (mounted) { settled = true; return; }
+        fail('start (taking longer than usual)', new Error('mount watchdog timed out after ' + WATCHDOG_MS + 'ms'));
+      }, WATCHDOG_MS);
+
       fetch('/app.jsx')
         .then(function (r) {
           if (!r.ok) throw new Error('HTTP ' + r.status + ' fetching /app.jsx');
@@ -187,10 +285,19 @@
           try {
             compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script' }).code;
           } catch (e) { fail('compile app.jsx', e); return; }
-          booted = true; // compiled OK; app.jsx now owns the screen
-          var s = document.createElement('script');
-          s.textContent = compiled + '\n//# sourceURL=app.compiled.js';
-          document.body.appendChild(s);
+          // Wrap execution so a runtime throw during eval is routed to the
+          // error card instead of dying silently with a blank #root.
+          try {
+            var run = new Function(compiled + '\n//# sourceURL=app.compiled.js');
+            run();
+          } catch (e) { fail('run app.jsx', e); return; }
+          // App marks itself mounted; also detect via real #root content.
+          requestAnimationFrame(function () {
+            var root = document.getElementById('root');
+            var mounted = window.__puzzlechainMounted ||
+              (root && root.firstElementChild && root.firstElementChild.id !== 'boot-loader');
+            if (mounted) { settled = true; clearWatchdog(); }
+          });
         })
         .catch(function (e) { fail('fetch app.jsx', e); });
     })();

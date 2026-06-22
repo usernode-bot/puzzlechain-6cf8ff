@@ -28,6 +28,19 @@
       "required": true,
       "private": false,
       "staging_default": "redis://localhost:6379"
+    },
+    {
+      "name": "APP_PUBKEY",
+      "description": "Application public key",
+      "required": false,
+      "private": false
+    },
+    {
+      "name": "APP_SECRET_KEY",
+      "description": "Application secret key",
+      "required": true,
+      "private": true,
+      "staging_default": "0x2a871d0798f97d308287f1bd8254e4e96cecc5f0cfa1d93fcff5fb3f87f81947"
     }
   ],
   "tests": [

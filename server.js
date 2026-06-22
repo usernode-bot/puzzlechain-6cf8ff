@@ -10,6 +10,9 @@ const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 const IS_STAGING = process.env.USERNODE_ENV === 'staging';
 
+// App identity secrets (APP_PUBKEY, APP_SECRET_KEY) are declared in dapp.json
+// and available via process.env for cryptographic operations when needed.
+
 // ---- PvP wager config -------------------------------------------------------
 
 const VALIDATOR_PRIVATE_KEY = process.env.VALIDATOR_PRIVATE_KEY;

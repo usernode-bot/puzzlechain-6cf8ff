@@ -49,6 +49,7 @@
     { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" },
     { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
     { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" },
-    { "name": "PvP Arena tab renders", "path": "/?tab=pvp", "expectText": "PvP Arena" }
+    { "name": "PvP Arena tab renders", "path": "/?tab=pvp", "expectText": "PvP Arena" },
+    { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" }
   ]
 }

@@ -30,13 +30,13 @@
       "staging_default": "redis://localhost:6379"
     },
     {
-      "key": "APP_PUBKEY",
+      "name": "APP_PUBKEY",
       "description": "Application public key",
       "required": false,
       "private": false
     },
     {
-      "key": "APP_SECRET_KEY",
+      "name": "APP_SECRET_KEY",
       "description": "Application secret key",
       "required": true,
       "private": true,

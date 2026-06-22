@@ -52,6 +52,7 @@
     { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
     { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" },
     { "name": "PvP Arena tab renders", "path": "/?tab=pvp", "expectText": "PvP Arena" },
+    { "name": "Wallet screen shows pending rewards", "path": "/?screen=wallet&demo=1", "expectText": "Pending Rewards" },
     { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" }
   ]
 }

@@ -55,6 +55,12 @@
     { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" },
     { "name": "PvP Arena tab renders", "path": "/?tab=pvp", "expectText": "PvP Arena" },
     { "name": "Wallet screen shows pending rewards", "path": "/?screen=wallet&demo=1", "expectText": "Pending Rewards" },
-    { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" }
+    { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" },
+    { "name": "Wallet shows Verified identity badge", "path": "/?screen=wallet&demo=1", "expectText": "Verified identity" },
+    { "name": "Wallet shows Disconnect control", "path": "/?screen=wallet&demo=1", "expectText": "Disconnect" },
+    { "name": "DApp session receipt renders", "path": "/?demo=dapp", "expectText": "Session Receipt" },
+    { "name": "DApp receipt shows chain hash", "path": "/?demo=dapp", "expectText": "Chain hash" },
+    { "name": "Verified leaderboard renders demo rows", "path": "/?demo=dapp", "expectText": "Staging demo Ada" },
+    { "name": "Disputed session shows rejection copy", "path": "/?screen=session&sid=DAPPDEMOBAD", "expectText": "could not be verified" }
   ]
 }

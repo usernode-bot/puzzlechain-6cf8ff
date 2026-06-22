@@ -632,9 +632,11 @@ async function migrate() {
       status              TEXT NOT NULL DEFAULT 'upcoming',
       entry_count         INTEGER NOT NULL DEFAULT 0,
       board_seed          BIGINT,
-      created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  await pool.query(`ALTER TABLE tilematch_tournaments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
 
   // tilematch_tournament_entries is PUBLIC: one entry per user per tournament.
   await pool.query(`
@@ -5426,7 +5428,7 @@ app.post('/api/tilematch/tournaments/:id/enter', async (req, res) => {
     const tileCount = board.length;
     const minTimeMs = Math.ceil(tileCount / 3) * 400;
     const sessionId = generateTmSessionId();
-    await pool.query(
+    await client.query(
       `INSERT INTO tilematch_game_sessions (id, user_id, session_type, tournament_id, board_seed, tile_count, min_time_ms)
        VALUES ($1, $2, 'tournament', $3, $4, $5, $6)`,
       [sessionId, req.user.id, id, seed, tileCount, minTimeMs]
@@ -5874,13 +5876,6 @@ async function ensureTournamentsExist() {
     // Daily tournament: midnight UTC today → tomorrow
     const tomorrow = new Date(today); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
     const dailySeed = Math.floor(Math.random() * 2147483647) + 1;
-    await pool.query(
-      `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
-       VALUES ($1, 'daily', $2, $3, 50, 5000, 10.00, 'active', $4)
-       ON CONFLICT (id) DO NOTHING`,
-      [generateTournamentId('daily') + today.replace(/-/g,''), today + 'T00:00:00Z', tomorrow.toISOString(), dailySeed]
-    );
-    // Ensure we only have one active daily tournament
     await pool.query(
       `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
        SELECT 'daily-' || $1, 'daily', $2, $3, 50, 5000, 10.00, 'active', $4

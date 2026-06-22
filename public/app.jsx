@@ -3119,6 +3119,125 @@ body {
 .pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
 .pvp-prize-winner .mono { color: ${C.emerald}; }
 
+/* ---- Tile Match Puzzle menu & competitive tabs ---- */
+.tm-menu { display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; width: 100%; }
+.tm-menu-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem 0 0.6rem; gap: 0.5rem;
+}
+.tm-menu-header h2 { font-size: 1rem; font-weight: 700; margin: 0; flex: 1; }
+.tm-wallet-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 20px; padding: 0.25rem 0.65rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+  font-weight: 600; color: ${C.gold}; white-space: nowrap;
+}
+.tm-menu-tabs {
+  display: flex; gap: 0.15rem;
+  border-bottom: 1px solid ${C.border};
+  margin-bottom: 0.9rem; overflow-x: auto;
+}
+.tm-menu-tab {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 0.45rem 0.75rem; font-family: inherit; font-size: 0.85rem;
+  font-weight: 500; color: ${C.muted}; cursor: pointer;
+  transition: color 0.12s, border-color 0.12s; white-space: nowrap;
+  margin-bottom: -1px;
+}
+.tm-menu-tab:hover { color: ${C.text}; }
+.tm-menu-tab.active { color: ${C.accent}; border-bottom-color: ${C.accent}; font-weight: 600; }
+
+/* Leaderboard */
+.tm-lb-tabs { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+.tm-lb-sub-tab {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 8px;
+  padding: 0.3rem 0.7rem; font-family: inherit; font-size: 0.8rem;
+  font-weight: 500; color: ${C.muted}; cursor: pointer; transition: all 0.12s;
+}
+.tm-lb-sub-tab.active { background: ${C.accent}18; border-color: ${C.accent}; color: ${C.accent}; font-weight: 600; }
+.tm-lb-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.45rem 0.5rem; border-radius: 8px;
+  font-size: 0.84rem; transition: background 0.1s;
+}
+.tm-lb-row:hover { background: ${C.surface}; }
+.tm-lb-row.me { background: ${C.accent}12; border: 1px solid ${C.accent}30; margin-top: 0.4rem; }
+.tm-lb-rank { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; min-width: 1.8rem; font-size: 0.78rem; }
+.tm-lb-name { flex: 1; color: ${C.text}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-lb-stat { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: ${C.accent}; font-weight: 600; }
+.tm-lb-empty { color: ${C.muted}; font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
+
+/* Duel Arena */
+.tm-duel-tiers { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
+.tm-duel-tier-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
+  padding: 0.85rem 1rem; display: flex; align-items: center; gap: 0.75rem;
+}
+.tm-duel-tier-card .tm-duel-stake { font-size: 1.1rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${C.gold}; min-width: 5rem; }
+.tm-duel-tier-card .tm-duel-payout { flex: 1; font-size: 0.82rem; color: ${C.muted}; }
+.tm-duel-tier-card .tm-duel-payout strong { color: ${C.emerald}; }
+.tm-duel-find-btn {
+  background: ${C.accent}; color: #fff; border: none; border-radius: 8px;
+  padding: 0.45rem 0.85rem; font-family: inherit; font-size: 0.83rem;
+  font-weight: 600; cursor: pointer; transition: background 0.12s;
+}
+.tm-duel-find-btn:hover:not(:disabled) { background: #2f6fe0; }
+.tm-duel-find-btn:disabled { opacity: 0.35; cursor: not-allowed; background: ${C.muted}; }
+.tm-duel-matchmaking {
+  text-align: center; padding: 2rem 1rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
+}
+.tm-duel-pulse {
+  width: 3rem; height: 3rem; border-radius: 50%;
+  background: ${C.accent}33; border: 2px solid ${C.accent};
+  animation: tm-duel-pulse-anim 1.2s ease-in-out infinite;
+}
+@keyframes tm-duel-pulse-anim {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.6; }
+}
+.tm-duel-timer { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; color: ${C.accent}; }
+.tm-duel-result {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.25rem; text-align: center;
+}
+.tm-duel-result .tm-duel-outcome { font-size: 1.6rem; margin-bottom: 0.2rem; }
+.tm-duel-result h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; }
+.tm-duel-result .tm-duel-balance { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-size: 0.9rem; margin-bottom: 0.5rem; }
+.tm-duel-back-btn {
+  margin-top: 0.75rem; background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 8px; padding: 0.5rem 1rem; font-family: inherit;
+  font-size: 0.85rem; color: ${C.text}; cursor: pointer; transition: border-color 0.12s;
+}
+.tm-duel-back-btn:hover { border-color: ${C.accent}; }
+
+/* Daily Tasks */
+.tm-task-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
+  padding: 0.85rem 1rem; margin-bottom: 0.6rem;
+}
+.tm-task-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; }
+.tm-task-label { font-weight: 600; font-size: 0.9rem; }
+.tm-task-reward { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: ${C.gold}; font-weight: 600; }
+.tm-task-desc { font-size: 0.8rem; color: ${C.muted}; margin-bottom: 0.55rem; }
+.tm-task-bar-wrap { background: ${C.surface}; border-radius: 4px; height: 5px; margin-bottom: 0.5rem; }
+.tm-task-bar-fill { height: 5px; border-radius: 4px; background: ${C.accent}; transition: width 0.3s; }
+.tm-task-footer { display: flex; align-items: center; justify-content: space-between; }
+.tm-task-progress-lbl { font-size: 0.76rem; color: ${C.muted}; font-family: 'JetBrains Mono', monospace; }
+.tm-task-claim-btn {
+  background: ${C.emerald}; color: #fff; border: none; border-radius: 7px;
+  padding: 0.3rem 0.75rem; font-family: inherit; font-size: 0.8rem;
+  font-weight: 600; cursor: pointer; transition: background 0.12s;
+}
+.tm-task-claim-btn:hover:not(:disabled) { background: #059669; }
+.tm-task-claim-btn:disabled { opacity: 0.4; cursor: not-allowed; background: ${C.muted}; }
+.tm-task-claimed { font-size: 0.8rem; color: ${C.emerald}; font-weight: 600; }
+.tm-tasks-all-done {
+  text-align: center; padding: 1.5rem 0;
+  color: ${C.muted}; font-size: 0.88rem;
+}
+
 /* ---- Wallet screen ---- */
 .wallet-screen {
   max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem;
@@ -6597,7 +6716,6 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
    ============================================================ */
 const SNAKE_KEY = 'puzzlechain_snake_history';
 const BB_KEY    = 'puzzlechain_blockblast_history';
-const TM_KEY    = 'puzzlechain_tilematch_history';
 const DR_KEY    = 'puzzlechain_diamondrush_history';
 const TH_KEY    = 'puzzlechain_texas_history';
 
@@ -6947,105 +7065,6 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
           })()}
         </div>
       )}
-    </ClassicShell>
-  );
-}
-
-/* ---------------- Tile Match ---------------- */
-const TM_ICONS = ['🍎', '🍋', '🍇', '🍑', '🍓', '🥝', '🍒', '🥥', '🍍', '🫐', '🥭', '🍐'];
-function tmDeal(pairs) {
-  const deck = [];
-  for (let i = 0; i < pairs; i++) { const ic = TM_ICONS[i % TM_ICONS.length]; deck.push(ic, ic); }
-  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
-  return deck.map((icon, id) => ({ id, icon, gone: false }));
-}
-function TileMatchGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
-  const COLS = 4, ROWS = 6;
-  const PAIRS = (COLS * ROWS) / 2;
-  const [tiles, setTiles] = useState(() => tmDeal(PAIRS));
-  const [sel, setSel] = useState(-1);
-  const [moves, setMoves] = useState(PAIRS + 6);
-  const [matched, setMatched] = useState(0);
-  const [done, setDone] = useState(false);
-  const doneRef = useRef(false);
-  const lockRef = useRef(false);
-  const secs = useElapsed(resetKey, !done);
-  const secsRef = useRef(0); secsRef.current = secs;
-
-  const init = () => {
-    setTiles(tmDeal(PAIRS)); setSel(-1); setMoves(PAIRS + 6); setMatched(0);
-    setDone(false); doneRef.current = false; lockRef.current = false;
-  };
-  useEffect(() => { init(); }, [resetKey]);
-
-  const finishWin = (m) => {
-    doneRef.current = true; setDone(true);
-    cgSound('win'); cgHaptic([15, 30, 15]);
-    const sc = PAIRS * 100 + m * 25;
-    cgSaveHistory(TM_KEY, { score: sc, win: true, secs: secsRef.current, ts: Date.now() });
-    onWin(sc, PAIRS + 6 - m, secsRef.current, { share: `🀄 Tile Match cleared in ${cgFmt(secsRef.current)}` });
-  };
-  const finishLose = () => {
-    doneRef.current = true; setDone(true);
-    cgSound('lose'); cgHaptic([20, 40]);
-    cgSaveHistory(TM_KEY, { score: 0, win: false, secs: secsRef.current, ts: Date.now() });
-    onLose(PAIRS + 6, secsRef.current, { share: `🀄 Tile Match — ran out of moves` });
-  };
-  const tap = (idx) => {
-    if (done || lockRef.current) return;
-    const t = tiles[idx];
-    if (!t || t.gone) return;
-    if (sel === idx) { setSel(-1); return; }
-    if (sel === -1) { setSel(idx); cgSound('click'); return; }
-    // second pick
-    const a = tiles[sel];
-    if (a.icon === t.icon) {
-      const nt = tiles.slice();
-      nt[sel] = { ...a, gone: true }; nt[idx] = { ...t, gone: true };
-      setTiles(nt); setSel(-1);
-      const m = matched + 1; setMatched(m);
-      cgSound('clear'); cgHaptic(18);
-      onStepChange && onStepChange(m);
-      if (m === PAIRS) finishWin(moves);
-    } else {
-      setSel(-1);
-      const mv = moves - 1; setMoves(mv);
-      cgSound('move');
-      if (mv <= 0) { lockRef.current = true; setTimeout(finishLose, 250); }
-    }
-  };
-  const shuffle = () => {
-    const remaining = tiles.filter(t => !t.gone);
-    const icons = remaining.map(t => t.icon);
-    for (let i = icons.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [icons[i], icons[j]] = [icons[j], icons[i]]; }
-    let k = 0;
-    setTiles(tiles.map(t => t.gone ? t : { ...t, icon: icons[k++] }));
-    setSel(-1); cgSound('click');
-  };
-  const hist = cgLoadHistory(TM_KEY);
-  const wins = hist.filter(r => r.win).length;
-  const bestTime = hist.filter(r => r.win).reduce((m, r) => m === 0 ? r.secs : Math.min(m, r.secs), 0);
-  const sheet = [
-    { id: 'shuffle', label: 'Shuffle', render: () => <div><h4>Stuck?</h4><p style={{ color: C.muted, fontSize: '0.85rem', margin: '0.4rem 0 0.6rem' }}>Reshuffle the remaining tiles (free).</p><button className="cg-sheet-action" onClick={shuffle}>🔀 Shuffle tiles</button></div> },
-    cgHistorySection(hist, r => <><span>{r.win ? '✅ Cleared' : '❌ Out of moves'}</span><span className="mono">{r.win ? cgFmt(r.secs) : '—'}</span></>),
-    cgStatsSection([
-      { val: wins, lbl: 'Cleared' }, { val: hist.length, lbl: 'Games' },
-      { val: bestTime ? cgFmt(bestTime) : '—', lbl: 'Best time' }, { val: matched, lbl: 'This game' },
-    ]),
-    cgRulesSection(['Tap a tile, then tap another with the same icon to clear the pair.', 'Clear the whole board before you run out of moves.', 'A wrong pair costs a move.', 'Use Shuffle from the menu if you get stuck.']),
-  ];
-  return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
-      <div className="cg-stage">
-        <CgStatus items={[{ l: 'Pairs', v: `${matched}/${PAIRS}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="tm-grid" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
-          {tiles.map((t, i) => (
-            <div key={t.id} className={'tm-tile' + (t.gone ? ' gone' : '') + (sel === i ? ' sel' : '')} onClick={() => tap(i)}>
-              {t.gone ? '' : t.icon}
-            </div>
-          ))}
-        </div>
-      </div>
     </ClassicShell>
   );
 }
@@ -7619,6 +7638,301 @@ function tmSortBar(bar, tilesMap) {
   return bar.slice().sort((a, b) => tilesMap[a].type - tilesMap[b].type);
 }
 
+/* ============================================================
+   Tile Match Puzzle — competitive sub-components
+   ============================================================ */
+
+function TileMatchWalletChip({ balance }) {
+  return (
+    <div className="tm-wallet-chip">
+      🪙 {balance != null ? balance : '—'} MATCH
+    </div>
+  );
+}
+
+function TileMatchLeaderboard({ user }) {
+  const [sub, setSub] = useState('global');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch('/api/tilematch/leaderboard', { headers: { 'x-usernode-token': window._unToken || '' } })
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  if (loading) return <div className="tm-lb-empty">Loading…</div>;
+  if (!data) return <div className="tm-lb-empty">Failed to load leaderboard.</div>;
+
+  const rows = sub === 'global' ? data.global : data.daily;
+  const me = sub === 'global' ? data.me?.global : data.me?.daily;
+
+  return (
+    <div>
+      <div className="tm-lb-tabs">
+        <button className={'tm-lb-sub-tab' + (sub === 'global' ? ' active' : '')} onClick={() => setSub('global')}>Global</button>
+        <button className={'tm-lb-sub-tab' + (sub === 'daily' ? ' active' : '')} onClick={() => setSub('daily')}>Daily</button>
+      </div>
+      {sub === 'daily' && !me && (
+        <div className="tm-lb-empty">Complete today's Daily Tile Match to appear here.</div>
+      )}
+      {rows.length === 0 && sub === 'global' && (
+        <div className="tm-lb-empty">No scores yet — be the first!</div>
+      )}
+      {rows.map(r => (
+        <div key={r.rank} className="tm-lb-row">
+          <span className="tm-lb-rank">#{r.rank}</span>
+          <span className="tm-lb-name">{r.username || '—'}</span>
+          <span className="tm-lb-stat">
+            {sub === 'global' ? `L${r.highestLevel}` : fmtTime(r.timeSecs)}
+          </span>
+        </div>
+      ))}
+      {me && !rows.find(r => r.rank === me.rank) && (
+        <div className="tm-lb-row me">
+          <span className="tm-lb-rank">#{me.rank}</span>
+          <span className="tm-lb-name">{me.username || 'You'} (you)</span>
+          <span className="tm-lb-stat">
+            {sub === 'global' ? `L${me.highestLevel}` : fmtTime(me.timeSecs)}
+          </span>
+        </div>
+      )}
+      {!me && sub === 'global' && user && (
+        <div className="tm-lb-row me" style={{ color: 'var(--c-muted,#888)' }}>
+          <span className="tm-lb-rank">—</span>
+          <span className="tm-lb-name">{user.username} (you)</span>
+          <span className="tm-lb-stat">not ranked yet</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TileMatchDuelArena({ user, balance, onBalanceChange }) {
+  const [duelPhase, setDuelPhase] = useState('lobby'); // lobby|matchmaking|game|result
+  const [duelId, setDuelId] = useState(null);
+  const [duelData, setDuelData] = useState(null);
+  const [resultData, setResultData] = useState(null);
+  const [mmCountdown, setMmCountdown] = useState(120);
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState(null);
+  const pollRef = useRef(null);
+  const mmRef = useRef(null);
+
+  const authHeader = { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' };
+
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (mmRef.current) { clearInterval(mmRef.current); mmRef.current = null; }
+  };
+
+  useEffect(() => () => stopPolling(), []);
+
+  const startMatchmaking = async (stakeTokens) => {
+    setError(null);
+    setJoining(true);
+    try {
+      const r = await fetch('/api/tilematch/duel/join', {
+        method: 'POST', headers: authHeader,
+        body: JSON.stringify({ stakeTokens }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setError(d.error || 'Failed to join'); setJoining(false); return; }
+      if (d.status === 'active') {
+        setDuelId(d.duelId); setDuelData(d.duel); setDuelPhase('game');
+        if (onBalanceChange) onBalanceChange(b => b - stakeTokens);
+      } else {
+        setDuelId(d.duelId); setDuelPhase('matchmaking');
+        setMmCountdown(120);
+        if (onBalanceChange) onBalanceChange(b => b - stakeTokens);
+        let c = 120;
+        mmRef.current = setInterval(() => { c--; setMmCountdown(c); }, 1000);
+        pollRef.current = setInterval(async () => {
+          try {
+            const pr = await fetch(`/api/tilematch/duel/${d.duelId}`, { headers: { 'x-usernode-token': window._unToken || '' } });
+            const pd = await pr.json();
+            if (pd.duel && pd.duel.status === 'active') {
+              stopPolling();
+              setDuelData(pd.duel); setDuelPhase('game');
+            } else if (pd.timedOut || (pd.duel && pd.duel.status === 'cancelled')) {
+              stopPolling();
+              setError('No opponent found — your tokens have been returned.');
+              if (onBalanceChange) onBalanceChange(b => b + stakeTokens);
+              setDuelPhase('lobby');
+            }
+          } catch {}
+        }, 2000);
+      }
+    } catch (e) {
+      setError('Connection error. Please try again.');
+    }
+    setJoining(false);
+  };
+
+  const handleForfeit = async () => {
+    if (!duelId) return;
+    await fetch(`/api/tilematch/duel/${duelId}/forfeit`, {
+      method: 'POST', headers: authHeader, body: '{}',
+    }).catch(() => {});
+    stopPolling();
+    setResultData({ isWinner: false, forfeited: true });
+    setDuelPhase('result');
+  };
+
+  const handleDuelWin = async (score, steps, timeSecs) => {
+    if (!duelId || !duelData) return;
+    stopPolling();
+    try {
+      const r = await fetch(`/api/tilematch/duel/${duelId}/finish`, {
+        method: 'POST', headers: authHeader,
+        body: JSON.stringify({ score, steps, timeSecs, remainingTiles: 0, telemetry: [] }),
+      });
+      const d = await r.json();
+      if (d.waiting) {
+        // Poll for opponent
+        pollRef.current = setInterval(async () => {
+          try {
+            const pr = await fetch(`/api/tilematch/duel/${duelId}`, { headers: { 'x-usernode-token': window._unToken || '' } });
+            const pd = await pr.json();
+            if (pd.duel && pd.duel.status === 'finished') {
+              stopPolling();
+              const won = pd.duel.winner_id === user.id;
+              const prize = pd.duel ? Math.floor(pd.duel.stakeTokens * 2 * 0.9) : 0;
+              setResultData({ isWinner: won, prize: { winnerPayout: prize, stakeTokens: pd.duel?.stakeTokens } });
+              if (won && onBalanceChange) onBalanceChange(b => b + prize);
+              setDuelPhase('result');
+            }
+          } catch {}
+        }, 2000);
+      } else {
+        if (d.isWinner && onBalanceChange && d.newBalance != null) onBalanceChange(() => d.newBalance);
+        setResultData(d);
+        setDuelPhase('result');
+      }
+    } catch {}
+  };
+
+  const handleDuelLose = async (steps, timeSecs) => {
+    await handleDuelWin(0, steps, timeSecs);
+  };
+
+  const TIERS = [10, 50, 100];
+
+  if (duelPhase === 'lobby') return (
+    <div>
+      {error && <div style={{ background: '#ef444420', border: '1px solid #ef4444', borderRadius: 8, padding: '0.5rem 0.75rem', marginBottom: '0.75rem', fontSize: '0.84rem', color: '#ef4444' }}>{error}</div>}
+      <p style={{ fontSize: '0.84rem', color: 'var(--c-muted,#888)', marginBottom: '0.75rem' }}>
+        Stake MATCH tokens and race the same board as your opponent. Winner takes 90% of the pot.
+      </p>
+      <div className="tm-duel-tiers">
+        {TIERS.map(stake => {
+          const payout = Math.floor(stake * 2 * 0.9);
+          const canAfford = (balance || 0) >= stake;
+          return (
+            <div key={stake} className="tm-duel-tier-card">
+              <div className="tm-duel-stake">🪙 {stake}</div>
+              <div className="tm-duel-payout">Stake {stake} MATCH → win <strong>{payout} MATCH</strong></div>
+              <button className="tm-duel-find-btn" disabled={!canAfford || joining} onClick={() => startMatchmaking(stake)}>
+                {joining ? '…' : 'Find Match'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {(balance || 0) < 10 && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--c-muted,#888)', textAlign: 'center', marginTop: '0.5rem' }}>
+          Complete daily tasks to earn MATCH tokens.
+        </p>
+      )}
+    </div>
+  );
+
+  if (duelPhase === 'matchmaking') return (
+    <div className="tm-duel-matchmaking">
+      <div className="tm-duel-pulse" />
+      <div style={{ fontSize: '0.9rem', color: 'var(--c-text,#e4e4e7)', fontWeight: 600 }}>Finding opponent…</div>
+      <div className="tm-duel-timer">{String(Math.floor(mmCountdown / 60)).padStart(2,'0')}:{String(mmCountdown % 60).padStart(2,'0')}</div>
+      <button className="tm-duel-back-btn" onClick={handleForfeit}>Cancel</button>
+    </div>
+  );
+
+  if (duelPhase === 'game' && duelData) return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+        <button className="tm-duel-back-btn" onClick={handleForfeit}>Forfeit</button>
+      </div>
+      <TileMatchingDailyGame
+        onWin={(score, steps, secs) => handleDuelWin(score, steps, secs)}
+        onLose={(steps, secs) => handleDuelLose(steps, secs)}
+        onStepChange={() => {}}
+        resetKey={duelId}
+        boardSeedOverride={duelData.boardSeed}
+      />
+    </div>
+  );
+
+  if (duelPhase === 'result') return (
+    <div className="tm-duel-result">
+      <div className="tm-duel-outcome">{resultData?.isWinner ? '🏆' : resultData?.forfeited ? '🏳' : '😤'}</div>
+      <h3>{resultData?.isWinner ? 'You won!' : resultData?.forfeited ? 'You forfeited' : 'Better luck next time!'}</h3>
+      {resultData?.prize && <div className="tm-duel-balance">Prize: 🪙 {resultData.prize.winnerPayout} MATCH</div>}
+      {resultData?.newBalance != null && <div className="tm-duel-balance">Balance: 🪙 {resultData.newBalance} MATCH</div>}
+      <button className="tm-duel-back-btn" onClick={() => { setDuelPhase('lobby'); setResultData(null); setDuelId(null); setError(null); }}>
+        Back to Duel Lobby
+      </button>
+    </div>
+  );
+
+  return null;
+}
+
+function TileMatchDailyTasks({ tasks, onClaim }) {
+  const allDone = tasks.length > 0 && tasks.every(t => t.claimed);
+  if (allDone) return (
+    <div className="tm-tasks-all-done">
+      <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>🎉</div>
+      All tasks done — come back tomorrow!
+    </div>
+  );
+  return (
+    <div>
+      {tasks.map(task => {
+        const pct = Math.min(100, Math.round((task.progress / task.target) * 100));
+        return (
+          <div key={task.id} className="tm-task-card">
+            <div className="tm-task-header">
+              <span className="tm-task-label">{task.label}</span>
+              <span className="tm-task-reward">+{task.rewardTokens} 🪙</span>
+            </div>
+            <div className="tm-task-desc">{task.description}</div>
+            <div className="tm-task-bar-wrap">
+              <div className="tm-task-bar-fill" style={{ width: pct + '%' }} />
+            </div>
+            <div className="tm-task-footer">
+              <span className="tm-task-progress-lbl">{task.progress} / {task.target}</span>
+              {task.claimed ? (
+                <span className="tm-task-claimed">Claimed ✓</span>
+              ) : (
+                <button
+                  className="tm-task-claim-btn"
+                  disabled={!task.completable}
+                  onClick={() => onClaim(task.id)}
+                >
+                  Claim
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
   const [selectedLevel, setSelectedLevel] = useState(1);
@@ -7637,6 +7951,10 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const [flashIds, setFlashIds] = useState(new Set());
   const [levelScore, setLevelScore] = useState(0);
   const [timeLimit, setTimeLimit] = useState(0);
+  // Competitive menu state
+  const [tmMenuTab, setTmMenuTab] = useState('play');
+  const [tmBalance, setTmBalance] = useState(null);
+  const [tmTasks, setTmTasks] = useState([]);
   const { secs } = useTimer(!done && phase === 'playing');
   const secsRef = useRef(0);
   const totalSecsRef = useRef(0);
@@ -7845,10 +8163,42 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     setBarFull(false);
   };
 
+  // Load wallet + tasks when the select screen is shown for the first time
+  useEffect(() => {
+    const token = window._unToken || '';
+    const headers = { 'x-usernode-token': token };
+    Promise.all([
+      fetch('/api/tilematch/wallet', { headers }).then(r => r.json()).catch(() => null),
+      fetch('/api/tilematch/tasks', { headers }).then(r => r.json()).catch(() => null),
+    ]).then(([walletData, tasksData]) => {
+      if (walletData && walletData.balance != null) setTmBalance(walletData.balance);
+      if (tasksData && tasksData.tasks) setTmTasks(tasksData.tasks);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reportProgress = (lvlCleared, tileTaps) => {
+    fetch('/api/tilematch/tasks/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
+      body: JSON.stringify({ levelsCleared: lvlCleared || 0, tileTaps: tileTaps || 0 }),
+    }).then(r => r.json()).then(d => { if (d.tasks) setTmTasks(d.tasks); }).catch(() => {});
+  };
+
+  const submitScore = (highestLevel, totalCleared, sessionScore) => {
+    fetch('/api/tilematch/scores/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
+      body: JSON.stringify({ highestLevel, totalCleared, sessionScore }),
+    }).catch(() => {});
+  };
+
   const handleNextLevel = () => {
     const ns = sessionScore + levelScore;
     setSessionScore(ns);
     setCompletedLevels(prev => new Set([...prev, selectedLevel]));
+    // Fire-and-forget: report task progress + submit score
+    reportProgress(1, moves);
+    submitScore(selectedLevel, completedLevels.size + 1, ns);
     const nextLvl = selectedLevel < 1000 ? selectedLevel + 1 : null;
     if (nextLvl) {
       startLevel(nextLvl);
@@ -7861,17 +8211,38 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     const totalS = totalSecsRef.current;
     const newTotalMoves = totalMoves + moves;
     const share = `Tile Match ⬢ L${completedLevels.size + 1} cleared | ${ns} pts 🀄✨`;
+    // Fire-and-forget: report task progress + submit score
+    reportProgress(1, moves);
+    submitScore(selectedLevel, completedLevels.size + 1, ns);
     onWin(ns, newTotalMoves, totalS, { share });
+  };
+
+  const handleTaskClaim = (taskId) => {
+    fetch(`/api/tilematch/tasks/${taskId}/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
+      body: '{}',
+    }).then(r => r.json()).then(d => {
+      if (d.newBalance != null) setTmBalance(d.newBalance);
+      if (d.task) setTmTasks(prev => prev.map(t => t.id === taskId ? { ...t, claimed: true, completable: false } : t));
+    }).catch(() => {});
   };
 
   // ---- Level selector screen ----
   if (phase === 'select') {
-    // Tier overview
-    if (tierPage === null) {
-      return (
-        <div className="tm-level-select">
-          <h2>Tile Match Puzzle</h2>
-          <p>Click tiles off the layered board into your 7-slot bar — match three to clear them.</p>
+    const menuContent = () => {
+      if (tmMenuTab === 'leaderboard') return <TileMatchLeaderboard />;
+      if (tmMenuTab === 'duel') return (
+        <TileMatchDuelArena
+          balance={tmBalance}
+          onBalanceChange={(fn) => setTmBalance(b => typeof fn === 'function' ? fn(b || 0) : fn)}
+        />
+      );
+      if (tmMenuTab === 'tasks') return <TileMatchDailyTasks tasks={tmTasks} onClaim={handleTaskClaim} />;
+      // 'play' tab — existing level selector
+      if (tierPage === null) return (
+        <div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--c-muted,#888)', marginBottom: '1rem' }}>Click tiles off the layered board into your 7-slot bar — match three to clear them.</p>
           <div className="tm-tier-overview">
             {TM_TIER_LABELS.map((tier, idx) => {
               const doneCount = Array.from(completedLevels).filter(l => l >= tier.start + 1 && l <= tier.end + 1).length;
@@ -7886,37 +8257,55 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
           </div>
         </div>
       );
-    }
-    // Per-tier grid
-    const tier = TM_TIER_LABELS[tierPage];
-    return (
-      <div className="tm-level-select">
-        <button className="tm-tier-back-btn" onClick={() => setTierPage(null)}>← Tiers</button>
-        <div className="tm-tier-page-title">{tier.label} <span style={{color:'var(--c-muted,#888)',fontWeight:400,fontSize:'0.85rem'}}>L{tier.start+1}–{tier.end+1}</span></div>
-        <div className="tm-level-grid">
-          {Array.from({ length: 100 }, (_, i) => {
-            const lvl = tier.start + i + 1;
-            const isDone = completedLevels.has(lvl);
-            const isSel = selectedLevel === lvl;
-            return (
-              <button
-                key={lvl}
-                className={`tm-level-btn${isSel ? ' selected' : ''}${isDone ? ' done' : ''}`}
-                onClick={() => setSelectedLevel(lvl)}
-              >
-                {lvl}
-                {isDone && <span className="tm-check">✓</span>}
-              </button>
-            );
-          })}
+      // Per-tier grid
+      const tier = TM_TIER_LABELS[tierPage];
+      return (
+        <div>
+          <button className="tm-tier-back-btn" onClick={() => setTierPage(null)}>← Tiers</button>
+          <div className="tm-tier-page-title">{tier.label} <span style={{color:'var(--c-muted,#888)',fontWeight:400,fontSize:'0.85rem'}}>L{tier.start+1}–{tier.end+1}</span></div>
+          <div className="tm-level-grid">
+            {Array.from({ length: 100 }, (_, i) => {
+              const lvl = tier.start + i + 1;
+              const isDone = completedLevels.has(lvl);
+              const isSel = selectedLevel === lvl;
+              return (
+                <button
+                  key={lvl}
+                  className={`tm-level-btn${isSel ? ' selected' : ''}${isDone ? ' done' : ''}`}
+                  onClick={() => setSelectedLevel(lvl)}
+                >
+                  {lvl}
+                  {isDone && <span className="tm-check">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+          <button className="tm-play-btn" onClick={() => startLevel(selectedLevel)}>
+            Play Level {selectedLevel}
+          </button>
         </div>
-        <button className="tm-play-btn" onClick={() => startLevel(selectedLevel)}>
-          Play Level {selectedLevel}
-        </button>
+      );
+    };
+
+    return (
+      <div className="tm-menu">
+        <div className="tm-menu-header">
+          <h2>Tile Match Puzzle</h2>
+          <TileMatchWalletChip balance={tmBalance} />
+        </div>
+        <div className="tm-menu-tabs">
+          {['play', 'leaderboard', 'duel', 'tasks'].map(tab => (
+            <button key={tab} className={'tm-menu-tab' + (tmMenuTab === tab ? ' active' : '')} onClick={() => setTmMenuTab(tab)}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+        {menuContent()}
       </div>
     );
   }
 
+  // ---- Level selector (old path kept for tierPage within play tab — now dead code guarded above) ----
   // ---- Level won screen ----
   if (phase === 'levelWon') {
     const isLast = selectedLevel >= 1000;
@@ -11740,16 +12129,6 @@ const GAMES = [
     component: BlockBlastGame,
   },
   {
-    id: 'tilematch',
-    name: 'Tile Match',
-    icon: '🀄',
-    category: 'classic',
-    desc: 'Tap matching tiles to clear the board before you run out of moves.',
-    tag: 'Match',
-    tagColor: C.violet,
-    component: TileMatchGame,
-  },
-  {
     id: 'diamondrush',
     name: 'Diamond Rush',
     icon: '💎',
@@ -11832,7 +12211,7 @@ const GAMES = [
 ];
 
 // Games that render their own ClassicShell (full-screen, gesture-first).
-const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas', 'hashrush']);
+const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'diamondrush', 'texas', 'hashrush']);
 
 /* ============================================================
    Social: Feed & Posts

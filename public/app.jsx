@@ -1,5 +1,14 @@
 const { useState, useEffect, useRef } = React;
 
+// Web3 stub — replace this object with a real Wagmi/Ethers.js adapter at mainnet launch.
+const walletStub = {
+  connected: false, address: null,
+  connect: async () => ({ connected: false, address: null }),
+  disconnect: async () => {},
+  deposit: async (amount, currency) => ({ tx: null, simulated: true }),
+  withdraw: async (amount, currency) => ({ tx: null, simulated: true }),
+};
+
 /* ============================================================
    Design system — color palette
    ============================================================ */
@@ -3249,6 +3258,107 @@ body {
 .tm-tasks-all-done {
   text-align: center; padding: 1.5rem 0;
   color: ${C.muted}; font-size: 0.88rem;
+}
+
+/* Task sub-tabs */
+.tm-task-subtabs { display: flex; gap: 0.3rem; margin-bottom: 0.7rem; }
+.tm-task-subtab {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 8px;
+  padding: 0.3rem 0.7rem; font-family: inherit; font-size: 0.8rem;
+  font-weight: 500; color: ${C.muted}; cursor: pointer; transition: all 0.12s;
+}
+.tm-task-subtab.active { background: ${C.accent}18; border-color: ${C.accent}; color: ${C.accent}; font-weight: 600; }
+.tm-task-reset-hint { font-size: 0.75rem; color: ${C.muted}; text-align: right; margin-bottom: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+
+/* Arena tab */
+.tm-arena-strip {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;
+  background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px;
+  padding: 0.65rem 0.8rem; margin-bottom: 0.75rem;
+}
+.tm-arena-balances { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.tm-arena-balance-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  border-radius: 20px; padding: 0.2rem 0.55rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 700;
+}
+.tm-arena-balance-chip.match { background: ${C.gold}18; color: ${C.gold}; }
+.tm-arena-balance-chip.points { background: ${C.violet}18; color: ${C.violet}; }
+.tm-arena-balance-chip.stable { background: ${C.emerald}18; color: ${C.emerald}; }
+.tm-arena-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.tm-arena-action-btn {
+  background: none; border: 1px solid ${C.dim}; border-radius: 7px;
+  padding: 0.25rem 0.55rem; font-family: inherit; font-size: 0.74rem;
+  color: ${C.muted}; cursor: pointer; transition: border-color 0.12s, color 0.12s;
+}
+.tm-arena-action-btn:hover { border-color: ${C.accent}; color: ${C.text}; }
+.tm-arena-subtabs { display: flex; gap: 0.15rem; border-bottom: 1px solid ${C.border}; margin-bottom: 0.85rem; overflow-x: auto; }
+.tm-arena-subtab {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 0.4rem 0.7rem; font-family: inherit; font-size: 0.83rem;
+  font-weight: 500; color: ${C.muted}; cursor: pointer; white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s; margin-bottom: -1px;
+}
+.tm-arena-subtab.active { color: ${C.accent}; border-bottom-color: ${C.accent}; font-weight: 600; }
+
+/* Tournament cards */
+.tm-tournament-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 0.9rem 1rem; margin-bottom: 0.75rem;
+}
+.tm-tournament-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.tm-tournament-type-badge {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 0.15rem 0.45rem; border-radius: 5px;
+}
+.tm-tournament-type-badge.daily  { background: ${C.accent}22; color: ${C.accent}; }
+.tm-tournament-type-badge.weekly { background: ${C.violet}22; color: ${C.violet}; }
+.tm-tournament-type-badge.monthly{ background: ${C.gold}22;   color: ${C.gold}; }
+.tm-tournament-prize { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: ${C.emerald}; font-weight: 700; }
+.tm-tournament-meta { font-size: 0.78rem; color: ${C.muted}; display: flex; gap: 0.75rem; margin-bottom: 0.55rem; flex-wrap: wrap; }
+.tm-tournament-mini-lb { margin-bottom: 0.65rem; }
+.tm-tournament-mini-lb-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; padding: 0.2rem 0; }
+.tm-tournament-mini-lb-rank { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 700; min-width: 1.4rem; }
+.tm-tournament-mini-lb-name { flex: 1; color: ${C.text}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-tournament-mini-lb-score { font-family: 'JetBrains Mono', monospace; color: ${C.accent}; font-size: 0.76rem; }
+.tm-tournament-enter-btn {
+  background: ${C.accent}; color: #fff; border: none; border-radius: 8px;
+  padding: 0.45rem 0.9rem; font-family: inherit; font-size: 0.83rem;
+  font-weight: 600; cursor: pointer; transition: background 0.12s; width: 100%;
+}
+.tm-tournament-enter-btn:hover:not(:disabled) { background: #2f6fe0; }
+.tm-tournament-enter-btn:disabled { opacity: 0.4; cursor: not-allowed; background: ${C.muted}; }
+.tm-tournament-my-rank { font-size: 0.82rem; color: ${C.emerald}; font-weight: 600; text-align: center; padding: 0.35rem 0; }
+
+/* VIP panel */
+.tm-vip-panel { padding: 0.25rem 0; }
+.tm-vip-crown { font-size: 2rem; text-align: center; margin-bottom: 0.5rem; }
+.tm-vip-perks { list-style: none; margin-bottom: 1rem; }
+.tm-vip-perks li { font-size: 0.85rem; color: ${C.text}; padding: 0.35rem 0; border-bottom: 1px solid ${C.dim}; display: flex; gap: 0.5rem; align-items: center; }
+.tm-vip-subscribe-btn {
+  width: 100%; background: ${C.gold}; color: #000; border: none; border-radius: 10px;
+  padding: 0.65rem 1rem; font-family: inherit; font-size: 0.9rem;
+  font-weight: 700; cursor: pointer; transition: opacity 0.12s;
+}
+.tm-vip-subscribe-btn:hover { opacity: 0.85; }
+.tm-vip-active { text-align: center; font-size: 0.9rem; color: ${C.emerald}; font-weight: 700; padding: 0.75rem; background: ${C.emerald}15; border-radius: 10px; }
+
+/* Coming-soon modal */
+.tm-coming-soon-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+}
+.tm-coming-soon-modal {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
+  padding: 1.5rem 1.75rem; max-width: 340px; width: 90%; text-align: center;
+}
+.tm-coming-soon-modal h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+.tm-coming-soon-modal p { font-size: 0.85rem; color: ${C.muted}; margin-bottom: 1rem; line-height: 1.5; }
+.tm-coming-soon-close {
+  background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 8px;
+  padding: 0.45rem 1.1rem; font-family: inherit; font-size: 0.85rem;
+  color: ${C.text}; cursor: pointer;
 }
 
 /* ---- Wallet screen ---- */
@@ -8037,6 +8147,225 @@ function TileMatchDailyTasks({ tasks, onClaim }) {
   );
 }
 
+function fmtResetCountdown(isoStr) {
+  if (!isoStr) return '';
+  const diff = new Date(isoStr) - Date.now();
+  if (diff <= 0) return 'resetting...';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  if (h > 23) { const d = Math.floor(h/24); return `resets in ${d}d ${h%24}h`; }
+  return `resets in ${h}h ${m}m ${s}s`;
+}
+
+function TileMatchTasksPanel({ daily, weekly, monthly, resetAts, onClaim }) {
+  const [sub, setSub] = useState('daily');
+  const [, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => setTick(n => n+1), 1000); return () => clearInterval(t); }, []);
+  const lists = { daily, weekly, monthly };
+  const tasks = lists[sub] || [];
+  const resetAt = resetAts ? resetAts[sub] : null;
+  const allDone = tasks.length > 0 && tasks.every(t => t.claimed);
+  const periodLabel = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }[sub];
+  return (
+    <div>
+      <div className="tm-task-subtabs">
+        {['daily','weekly','monthly'].map(p => (
+          <button key={p} className={'tm-task-subtab' + (sub === p ? ' active' : '')} onClick={() => setSub(p)}>
+            {p.charAt(0).toUpperCase() + p.slice(1)}
+          </button>
+        ))}
+      </div>
+      {resetAt && <div className="tm-task-reset-hint">{fmtResetCountdown(resetAt)}</div>}
+      {allDone ? (
+        <div className="tm-tasks-all-done">
+          <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>🎉</div>
+          All {periodLabel} tasks done!
+        </div>
+      ) : tasks.map(task => {
+        const pct = Math.min(100, Math.round((task.progress / task.target) * 100));
+        return (
+          <div key={task.id} className="tm-task-card">
+            <div className="tm-task-header">
+              <span className="tm-task-label">{task.label}</span>
+              <span className="tm-task-reward">+{task.rewardTokens} 🪙</span>
+            </div>
+            <div className="tm-task-desc">{task.description}</div>
+            <div className="tm-task-bar-wrap"><div className="tm-task-bar-fill" style={{ width: pct + '%' }} /></div>
+            <div className="tm-task-footer">
+              <span className="tm-task-progress-lbl">{task.progress} / {task.target}</span>
+              {task.claimed ? (
+                <span className="tm-task-claimed">Claimed ✓</span>
+              ) : (
+                <button className="tm-task-claim-btn" disabled={!task.completable} onClick={() => onClaim(task.id)}>Claim</button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TileMatchComingSoonModal({ title, body, onClose }) {
+  return (
+    <div className="tm-coming-soon-overlay" onClick={onClose}>
+      <div className="tm-coming-soon-modal" onClick={e => e.stopPropagation()}>
+        <h3>{title}</h3>
+        <p>{body}</p>
+        <button className="tm-coming-soon-close" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+function TileMatchVipPanel({ isVip }) {
+  const [showModal, setShowModal] = useState(false);
+  const perks = [
+    { icon: '🎟', text: 'Free daily tournament entry (no Points fee)' },
+    { icon: '2×', text: '2× MATCH token task rewards' },
+    { icon: '👑', text: 'VIP crown badge on all leaderboards' },
+    { icon: '⚡', text: 'Priority matchmaking in Points/Stable duels' },
+  ];
+  return (
+    <div className="tm-vip-panel">
+      <div className="tm-vip-crown">👑</div>
+      <ul className="tm-vip-perks">
+        {perks.map(p => <li key={p.icon}><span>{p.icon}</span>{p.text}</li>)}
+      </ul>
+      {isVip ? (
+        <div className="tm-vip-active">VIP Active ✓</div>
+      ) : (
+        <button className="tm-vip-subscribe-btn" onClick={() => setShowModal(true)}>Subscribe to VIP</button>
+      )}
+      {showModal && (
+        <TileMatchComingSoonModal
+          title="VIP Membership"
+          body="VIP membership will be purchasable with Stable balance at mainnet launch — stay tuned!"
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TileMatchTournamentCard({ tournament, isVip }) {
+  const [showModal, setShowModal] = useState(false);
+  const now = Date.now();
+  const endAt = new Date(tournament.endAt).getTime();
+  const diff = endAt - now;
+  const timeLeft = diff > 0 ? (() => {
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    if (h > 23) return `${Math.floor(h/24)}d ${h%24}h`;
+    return `${h}h ${m}m`;
+  })() : 'Ended';
+  const freeEntry = isVip && tournament.type === 'daily';
+  const entryLabel = freeEntry ? 'Free (VIP)' : `${tournament.entryFeePoints} pts`;
+
+  return (
+    <div className="tm-tournament-card">
+      <div className="tm-tournament-card-header">
+        <span className={`tm-tournament-type-badge ${tournament.type}`}>{tournament.type}</span>
+        <span className="tm-tournament-prize">🏆 {tournament.prizePoolPoints.toLocaleString()} pts + ${tournament.prizePoolStable}</span>
+      </div>
+      <div className="tm-tournament-meta">
+        <span>⏱ {timeLeft}</span>
+        <span>👥 {tournament.entryCount} entered</span>
+        <span>🎟 {entryLabel}</span>
+      </div>
+      {tournament.top3 && tournament.top3.length > 0 && (
+        <div className="tm-tournament-mini-lb">
+          {tournament.top3.map((e, i) => (
+            <div key={i} className="tm-tournament-mini-lb-row">
+              <span className="tm-tournament-mini-lb-rank">#{i+1}</span>
+              <span className="tm-tournament-mini-lb-name">{e.username || 'Player'}</span>
+              <span className="tm-tournament-mini-lb-score">{e.score || 0} pts</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {tournament.myEntry ? (
+        <div className="tm-tournament-my-rank">
+          {tournament.myEntry.rank ? `Your rank: #${tournament.myEntry.rank}` : 'Your result submitted'}
+          {tournament.myEntry.score != null ? ` — ${tournament.myEntry.score} pts` : ''}
+        </div>
+      ) : (
+        <button className="tm-tournament-enter-btn" disabled={tournament.status !== 'active' || diff <= 0} onClick={() => setShowModal(true)}>
+          Enter Tournament
+        </button>
+      )}
+      {showModal && (
+        <TileMatchComingSoonModal
+          title="Enter Tournament"
+          body={`Tournament entry will deduct ${entryLabel} from your Points balance. Full tournament game flow coming soon!`}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TileMatchTournamentHub({ tournaments, isVip }) {
+  if (!tournaments || tournaments.length === 0) {
+    return <div style={{ color: 'var(--c-muted,#888)', textAlign: 'center', padding: '1.5rem 0', fontSize: '0.85rem' }}>Loading tournaments...</div>;
+  }
+  const order = ['daily', 'weekly', 'monthly'];
+  const sorted = [...tournaments].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
+  return (
+    <div>
+      {sorted.map(t => <TileMatchTournamentCard key={t.id} tournament={t} isVip={isVip} />)}
+    </div>
+  );
+}
+
+function TileMatchArenaTab({ balance, pointsBalance, stableBalance, isVip, subTab, onSubTabChange, tournaments, onDuelBalanceChange }) {
+  const [modal, setModal] = useState(null); // null | { title, body }
+
+  const showComing = (title, body) => setModal({ title, body });
+
+  return (
+    <div>
+      {/* Wallet strip */}
+      <div className="tm-arena-strip">
+        <div className="tm-arena-balances">
+          <span className="tm-arena-balance-chip match">🪙 {balance != null ? balance : '—'}</span>
+          <span className="tm-arena-balance-chip points">🏆 {pointsBalance != null ? pointsBalance : '—'}</span>
+          <span className="tm-arena-balance-chip stable">${stableBalance != null ? parseFloat(stableBalance).toFixed(2) : '—'}</span>
+        </div>
+        <div className="tm-arena-actions">
+          <button className="tm-arena-action-btn" onClick={() => showComing('Deposit', 'On-chain deposits will be available at mainnet launch.')}>Deposit</button>
+          <button className="tm-arena-action-btn" onClick={() => showComing('Withdraw', 'On-chain withdrawals will be available at mainnet launch.')}>Withdraw</button>
+          <button className="tm-arena-action-btn" onClick={() => { walletStub.connect(); showComing('Connect Wallet', 'Web3 wallet connection coming soon — your competitive earnings are tracked off-chain until mainnet launch.'); }}>Connect Wallet</button>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="tm-arena-subtabs">
+        {['1v1','tournaments','vip'].map(t => (
+          <button key={t} className={'tm-arena-subtab' + (subTab === t ? ' active' : '')} onClick={() => onSubTabChange(t)}>
+            {t === '1v1' ? '1v1' : t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      {subTab === '1v1' && (
+        <TileMatchDuelArena
+          balance={balance}
+          onBalanceChange={onDuelBalanceChange}
+        />
+      )}
+      {subTab === 'tournaments' && <TileMatchTournamentHub tournaments={tournaments} isVip={isVip} />}
+      {subTab === 'vip' && <TileMatchVipPanel isVip={isVip} />}
+
+      {modal && (
+        <TileMatchComingSoonModal title={modal.title} body={modal.body} onClose={() => setModal(null)} />
+      )}
+    </div>
+  );
+}
+
 function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
   const [selectedLevel, setSelectedLevel] = useState(1);
@@ -8058,7 +8387,16 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   // Competitive menu state
   const [tmMenuTab, setTmMenuTab] = useState('play');
   const [tmBalance, setTmBalance] = useState(null);
-  const [tmTasks, setTmTasks] = useState([]);
+  const [tmPointsBalance, setTmPointsBalance] = useState(null);
+  const [tmStableBalance, setTmStableBalance] = useState(null);
+  const [tmIsVip, setTmIsVip] = useState(false);
+  const [tmDailyTasks, setTmDailyTasks] = useState([]);
+  const [tmWeeklyTasks, setTmWeeklyTasks] = useState([]);
+  const [tmMonthlyTasks, setTmMonthlyTasks] = useState([]);
+  const [tmTaskResetAts, setTmTaskResetAts] = useState(null);
+  const [tmTaskSubTab, setTmTaskSubTab] = useState('daily');
+  const [tmArenaSubTab, setTmArenaSubTab] = useState('1v1');
+  const [tmTournaments, setTmTournaments] = useState([]);
   const { secs } = useTimer(!done && phase === 'playing');
   const secsRef = useRef(0);
   const totalSecsRef = useRef(0);
@@ -8275,17 +8613,39 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
       fetch('/api/tilematch/wallet', { headers }).then(r => r.json()).catch(() => null),
       fetch('/api/tilematch/tasks', { headers }).then(r => r.json()).catch(() => null),
     ]).then(([walletData, tasksData]) => {
-      if (walletData && walletData.balance != null) setTmBalance(walletData.balance);
-      if (tasksData && tasksData.tasks) setTmTasks(tasksData.tasks);
+      if (walletData) {
+        if (walletData.balance != null) setTmBalance(walletData.balance);
+        if (walletData.balancePoints != null) setTmPointsBalance(walletData.balancePoints);
+        if (walletData.balanceStable != null) setTmStableBalance(walletData.balanceStable);
+        if (walletData.isVip != null) setTmIsVip(walletData.isVip);
+      }
+      if (tasksData) {
+        if (tasksData.daily)   setTmDailyTasks(tasksData.daily);
+        if (tasksData.weekly)  setTmWeeklyTasks(tasksData.weekly);
+        if (tasksData.monthly) setTmMonthlyTasks(tasksData.monthly);
+        if (tasksData.resetAts) setTmTaskResetAts(tasksData.resetAts);
+      }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lazy-load tournaments when Arena tab is first opened
+  useEffect(() => {
+    if (tmMenuTab !== 'arena' || tmTournaments.length > 0) return;
+    const token = window._unToken || '';
+    fetch('/api/tilematch/tournaments', { headers: { 'x-usernode-token': token } })
+      .then(r => r.json()).then(d => { if (d.tournaments) setTmTournaments(d.tournaments); }).catch(() => {});
+  }, [tmMenuTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reportProgress = (lvlCleared, tileTaps) => {
     fetch('/api/tilematch/tasks/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
       body: JSON.stringify({ levelsCleared: lvlCleared || 0, tileTaps: tileTaps || 0 }),
-    }).then(r => r.json()).then(d => { if (d.tasks) setTmTasks(d.tasks); }).catch(() => {});
+    }).then(r => r.json()).then(d => {
+      if (d.daily)   setTmDailyTasks(d.daily);
+      if (d.weekly)  setTmWeeklyTasks(d.weekly);
+      if (d.monthly) setTmMonthlyTasks(d.monthly);
+    }).catch(() => {});
   };
 
   const submitScore = (highestLevel, totalCleared, sessionScore) => {
@@ -8328,7 +8688,12 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
       body: '{}',
     }).then(r => r.json()).then(d => {
       if (d.newBalance != null) setTmBalance(d.newBalance);
-      if (d.task) setTmTasks(prev => prev.map(t => t.id === taskId ? { ...t, claimed: true, completable: false } : t));
+      if (d.task) {
+        const markClaimed = arr => arr.map(t => t.id === taskId ? { ...t, claimed: true, completable: false } : t);
+        setTmDailyTasks(markClaimed);
+        setTmWeeklyTasks(markClaimed);
+        setTmMonthlyTasks(markClaimed);
+      }
     }).catch(() => {});
   };
 
@@ -8336,13 +8701,27 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   if (phase === 'select') {
     const menuContent = () => {
       if (tmMenuTab === 'leaderboard') return <TileMatchLeaderboard />;
-      if (tmMenuTab === 'duel') return (
-        <TileMatchDuelArena
+      if (tmMenuTab === 'arena') return (
+        <TileMatchArenaTab
           balance={tmBalance}
-          onBalanceChange={(fn) => setTmBalance(b => typeof fn === 'function' ? fn(b || 0) : fn)}
+          pointsBalance={tmPointsBalance}
+          stableBalance={tmStableBalance}
+          isVip={tmIsVip}
+          subTab={tmArenaSubTab}
+          onSubTabChange={setTmArenaSubTab}
+          tournaments={tmTournaments}
+          onDuelBalanceChange={(fn) => setTmBalance(b => typeof fn === 'function' ? fn(b || 0) : fn)}
         />
       );
-      if (tmMenuTab === 'tasks') return <TileMatchDailyTasks tasks={tmTasks} onClaim={handleTaskClaim} />;
+      if (tmMenuTab === 'tasks') return (
+        <TileMatchTasksPanel
+          daily={tmDailyTasks}
+          weekly={tmWeeklyTasks}
+          monthly={tmMonthlyTasks}
+          resetAts={tmTaskResetAts}
+          onClaim={handleTaskClaim}
+        />
+      );
       // 'play' tab — existing level selector
       if (tierPage === null) return (
         <div>
@@ -8398,7 +8777,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
           <TileMatchWalletChip balance={tmBalance} />
         </div>
         <div className="tm-menu-tabs">
-          {['play', 'leaderboard', 'duel', 'tasks'].map(tab => (
+          {['play', 'leaderboard', 'tasks', 'arena'].map(tab => (
             <button key={tab} className={'tm-menu-tab' + (tmMenuTab === tab ? ' active' : '')} onClick={() => setTmMenuTab(tab)}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -12792,8 +13171,9 @@ function App() {
     const s = params.get('screen');
     if (s === 'wallet') return 'wallet';
     if (s === 'session' || params.get('demo') === 'dapp') return 'session';
+    if (params.get('demo') === 'arena') return 'arena-demo';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'session' | 'arena-demo'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   const [receiptSessionId, setReceiptSessionId] = useState(() =>
     new URLSearchParams(window.location.search).get('sid') || null);
@@ -13220,6 +13600,27 @@ function App() {
           sessionId={receiptSessionId}
           onBack={() => setScreen('lobby')}
         />
+      )}
+
+      {screen === 'arena-demo' && (
+        <div style={{ maxWidth: 480, margin: '0 auto', padding: '1rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Arena Preview</h2>
+          <div className="tm-arena-strip">
+            <div className="tm-arena-balances">
+              <span className="tm-arena-balance-chip match">🪙 500 MATCH</span>
+              <span className="tm-arena-balance-chip points">🏆 1500 Points</span>
+              <span className="tm-arena-balance-chip stable">$25.00 Stable</span>
+            </div>
+            <div className="tm-arena-actions">
+              <button className="tm-arena-action-btn">Deposit</button>
+              <button className="tm-arena-action-btn">Withdraw</button>
+              <button className="tm-arena-action-btn">Connect Wallet</button>
+            </div>
+          </div>
+          <p style={{ fontSize: '0.83rem', color: C.muted, textAlign: 'center', marginTop: '0.5rem' }}>
+            Arena competitive hub — open the Tile Match Puzzle and click Arena to explore.
+          </p>
+        </div>
       )}
 
       {screen === 'lobby' && (

@@ -547,6 +547,10 @@ async function migrate() {
     )
   `);
 
+  await pool.query(`ALTER TABLE tilematch_tokens ADD COLUMN IF NOT EXISTS balance_points INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE tilematch_tokens ADD COLUMN IF NOT EXISTS balance_stable NUMERIC(12,2) NOT NULL DEFAULT 0.00`);
+  await pool.query(`ALTER TABLE tilematch_tokens ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false`);
+
   // tilematch_daily_tasks is PUBLIC: per-user per-day task progress.
   // Uses the same UTC date reset semantics as daily_attempts.
   await pool.query(`
@@ -585,6 +589,70 @@ async function migrate() {
       p2_last_seen_at  TIMESTAMPTZ,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS currency_type TEXT NOT NULL DEFAULT 'match'`);
+  await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS stake_points INTEGER`);
+  await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS stake_stable NUMERIC(12,2)`);
+  await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS session_id_p1 TEXT`);
+  await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS session_id_p2 TEXT`);
+
+  // tilematch_game_sessions is PUBLIC: server-side anti-cheat timing for Points/Stable duels and tournaments.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tilematch_game_sessions (
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL,
+      session_type  TEXT NOT NULL DEFAULT 'practice',
+      duel_id       TEXT,
+      tournament_id TEXT,
+      board_seed    BIGINT NOT NULL,
+      tile_count    INTEGER NOT NULL,
+      min_time_ms   INTEGER NOT NULL,
+      started_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      submitted_at  TIMESTAMPTZ,
+      elapsed_ms    INTEGER,
+      score         INTEGER,
+      status        TEXT NOT NULL DEFAULT 'active',
+      flag_reason   TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // tilematch_tournaments is PUBLIC: daily/weekly/monthly tournament metadata.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tilematch_tournaments (
+      id                  TEXT PRIMARY KEY,
+      type                TEXT NOT NULL,
+      start_at            TIMESTAMPTZ NOT NULL,
+      end_at              TIMESTAMPTZ NOT NULL,
+      entry_fee_points    INTEGER NOT NULL DEFAULT 0,
+      prize_pool_points   INTEGER NOT NULL DEFAULT 0,
+      prize_pool_stable   NUMERIC(12,2) NOT NULL DEFAULT 0,
+      status              TEXT NOT NULL DEFAULT 'upcoming',
+      entry_count         INTEGER NOT NULL DEFAULT 0,
+      board_seed          BIGINT,
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // tilematch_tournament_entries is PUBLIC: one entry per user per tournament.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tilematch_tournament_entries (
+      id              TEXT PRIMARY KEY,
+      tournament_id   TEXT NOT NULL REFERENCES tilematch_tournaments(id),
+      user_id         TEXT NOT NULL,
+      username        TEXT,
+      session_id      TEXT,
+      score           INTEGER,
+      steps           INTEGER,
+      time_secs       INTEGER,
+      rank            INTEGER,
+      prize_points    INTEGER DEFAULT 0,
+      prize_stable    NUMERIC(12,2) DEFAULT 0,
+      entered_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at     TIMESTAMPTZ,
+      UNIQUE (tournament_id, user_id)
     )
   `);
 
@@ -1021,10 +1089,16 @@ async function migrate() {
       );
     }
 
-    // Wallet: give staging-demo-user 500 MATCH tokens
+    // Wallet: give staging-demo-user 500 MATCH tokens + economy balances
     await pool.query(
-      `INSERT INTO tilematch_tokens (user_id, username, balance)
-       VALUES ('staging-demo-user', 'staging-demo-user', 500)
+      `INSERT INTO tilematch_tokens (user_id, username, balance, balance_points, balance_stable, is_vip)
+       VALUES ('staging-demo-user', 'staging-demo-user', 500, 1500, 25.00, false)
+       ON CONFLICT (user_id) DO NOTHING`
+    );
+    // staging-demo-vip: VIP account for VIP panel demo
+    await pool.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance, balance_points, balance_stable, is_vip)
+       VALUES ('staging-demo-vip', 'staging-demo-vip', 200, 3000, 50.00, true)
        ON CONFLICT (user_id) DO NOTHING`
     );
 
@@ -1205,12 +1279,72 @@ const PVP_VALID_TIERS = new Set([10, 50, 100]);
 // Valid stake tiers for off-chain MATCH token duels
 const TILEMATCH_DUEL_VALID_STAKES = new Set([10, 50, 100]);
 
-// Task definitions — used by GET /api/tilematch/tasks and claim validation
+// Valid stake tiers for Points and Stable duels
+const TILEMATCH_DUEL_VALID_POINTS_STAKES = new Set([100, 500, 1000]);
+const TILEMATCH_DUEL_VALID_STABLE_STAKES = new Set(['1.00', '5.00', '10.00']);
+
+// Task definitions — daily period
 const TILEMATCH_TASK_DEFS = {
-  clear_3_levels:   { label: 'Clear 3 levels',          description: 'Clear 3 levels in Tile Match Puzzle today.',                  rewardTokens: 100, target: 3  },
-  daily_match_2min: { label: 'Daily in 2 minutes',       description: 'Complete the Daily Tile Match Puzzle in under 2 minutes.',    rewardTokens: 200, target: 1  },
-  match_50_tiles:   { label: '50 tile taps',             description: 'Make 50 tile selections in Tile Match Puzzle in one session.', rewardTokens: 150, target: 50 },
+  clear_3_levels:   { label: 'Clear 3 levels',       description: 'Clear 3 levels in Tile Match Puzzle today.',                  rewardTokens: 100, target: 3  },
+  win_daily_puzzle: { label: 'Play the Daily',        description: 'Finish the Daily Tile Match Puzzle today.',                   rewardTokens: 100, target: 1  },
+  match_50_tiles:   { label: '50 tile taps',          description: 'Make 50 tile selections in Tile Match Puzzle in one session.', rewardTokens: 150, target: 50 },
+  daily_match_2min: { label: 'Daily in 2 minutes',    description: 'Complete the Daily Tile Match Puzzle in under 2 minutes.',    rewardTokens: 200, target: 1  },
+  win_1_duel:       { label: 'Win a Duel',            description: 'Win any 1v1 duel in Tile Match Puzzle today.',               rewardTokens: 250, target: 1  },
 };
+
+// Weekly task definitions (task_id prefixed w_)
+const TILEMATCH_WEEKLY_TASK_DEFS = {
+  w_enter_5_duels:  { label: 'Play 5 duels',          description: 'Enter 5 duels this week (any outcome).',                      rewardTokens: 300, target: 5  },
+  w_tile_taps_500:  { label: '500 tile taps',          description: 'Make 500 tile taps this week.',                               rewardTokens: 350, target: 500},
+  w_play_daily_5:   { label: 'Daily 5 days',           description: 'Complete the Daily puzzle on 5 days this week.',              rewardTokens: 400, target: 5  },
+  w_clear_20_levels:{ label: 'Clear 20 levels',        description: 'Clear 20 levels this week.',                                  rewardTokens: 500, target: 20 },
+  w_win_3_duels:    { label: 'Win 3 duels',            description: 'Win 3 duels this week.',                                      rewardTokens: 600, target: 3  },
+};
+
+// Monthly task definitions (task_id prefixed m_)
+const TILEMATCH_MONTHLY_TASK_DEFS = {
+  m_enter_20_duels:    { label: 'Play 20 duels',            description: 'Enter 20 duels (any outcome) this month.',                 rewardTokens: 800,  target: 20  },
+  m_tile_taps_2000:    { label: '2,000 tile taps',          description: 'Make 2,000 tile taps this month.',                         rewardTokens: 900,  target: 2000},
+  m_win_100stake_duel: { label: 'Win a 100-MATCH duel',     description: 'Win a duel at the 100-MATCH stake tier.',                  rewardTokens: 1000, target: 1   },
+  m_clear_50_levels:   { label: 'Clear 50 levels',          description: 'Clear 50 levels this month.',                              rewardTokens: 1000, target: 50  },
+  m_tile_taps_5000:    { label: '5,000 tile taps',          description: 'Make 5,000 tile taps this month.',                         rewardTokens: 1200, target: 5000},
+  m_daily_2min_3x:     { label: 'Daily speed run ×3',       description: 'Finish the Daily in under 2 min, 3 times this month.',     rewardTokens: 1500, target: 3   },
+  m_win_100stake_3x:   { label: 'Win 100-MATCH duels ×3',   description: 'Win 3 duels at the 100-MATCH stake tier this month.',      rewardTokens: 1500, target: 3   },
+  m_play_daily_15:     { label: 'Play the Daily 15 times',  description: 'Finish the Daily puzzle 15 times this month.',             rewardTokens: 1500, target: 15  },
+  m_clear_100_levels:  { label: 'Clear 100 levels',         description: 'Clear 100 levels this month.',                             rewardTokens: 2000, target: 100 },
+  m_win_10_duels:      { label: 'Win 10 duels',             description: 'Win 10 duels this month.',                                 rewardTokens: 2500, target: 10  },
+};
+
+// Period date helpers
+function utcToday() { return new Date().toISOString().slice(0, 10); }
+function utcWeekAnchor() {
+  const d = new Date(); d.setUTCHours(0,0,0,0);
+  const day = d.getUTCDay(); const diff = (day + 6) % 7; d.setUTCDate(d.getUTCDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+function utcMonthAnchor() { return new Date().toISOString().slice(0, 7) + '-01'; }
+
+function findTaskDef(taskId) {
+  if (TILEMATCH_TASK_DEFS[taskId])         return { def: TILEMATCH_TASK_DEFS[taskId],         period: 'daily',   periodDate: utcToday() };
+  if (TILEMATCH_WEEKLY_TASK_DEFS[taskId])  return { def: TILEMATCH_WEEKLY_TASK_DEFS[taskId],  period: 'weekly',  periodDate: utcWeekAnchor() };
+  if (TILEMATCH_MONTHLY_TASK_DEFS[taskId]) return { def: TILEMATCH_MONTHLY_TASK_DEFS[taskId], period: 'monthly', periodDate: utcMonthAnchor() };
+  return null;
+}
+
+function generateTmSessionId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let id = 'tms-'; for (let i = 0; i < 12; i++) id += chars[Math.floor(Math.random() * chars.length)]; return id;
+}
+function generateTournamentId(type) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = type.slice(0,1).toUpperCase() + 'T';
+  for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+function generateTournamentEntryId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let id = 'te-'; for (let i = 0; i < 10; i++) id += chars[Math.floor(Math.random() * chars.length)]; return id;
+}
 
 // ---- Mancala room helpers ------------------------------------------------
 
@@ -2247,18 +2381,47 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
     // reconcile its optimistic value without a full reload.
     const streak = await computeStreak(req.user.id);
 
-    // Auto-report the "daily_match_2min" task when tilematchingdaily is finished
-    // under 2 minutes with a positive score. Idempotent via GREATEST.
-    if (gameId === 'tilematchingdaily' && timeSecs !== null && timeSecs <= 119 && score && score > 0) {
+    // Auto-report tilematchingdaily task hooks (non-fatal)
+    if (gameId === 'tilematchingdaily' && score && score > 0) {
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = utcToday(); const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
+        // Daily: win_daily_puzzle
         await pool.query(
           `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
-           VALUES ($1, $2, 'daily_match_2min', 1)
-           ON CONFLICT (user_id, task_date, task_id)
-           DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
+           VALUES ($1, $2, 'win_daily_puzzle', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
           [req.user.id, today]
         );
+        // Weekly: w_play_daily_5
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+           VALUES ($1, $2, 'w_play_daily_5', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(5, tilematch_daily_tasks.progress + 1)`,
+          [req.user.id, weekAnchor]
+        );
+        // Monthly: m_play_daily_15
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+           VALUES ($1, $2, 'm_play_daily_15', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(15, tilematch_daily_tasks.progress + 1)`,
+          [req.user.id, monthAnchor]
+        );
+        if (timeSecs !== null && timeSecs <= 119) {
+          // Daily: daily_match_2min
+          await pool.query(
+            `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+             VALUES ($1, $2, 'daily_match_2min', 1)
+             ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
+            [req.user.id, today]
+          );
+          // Monthly: m_daily_2min_3x
+          await pool.query(
+            `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+             VALUES ($1, $2, 'm_daily_2min_3x', 1)
+             ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + 1)`,
+            [req.user.id, monthAnchor]
+          );
+        }
       } catch (taskErr) {
         console.warn('[daily] task report failed (non-fatal):', taskErr.message);
       }
@@ -4347,14 +4510,32 @@ app.get('/api/tilematch/wallet', async (req, res) => {
       [req.user.id, req.user.username || null]
     );
     const { rows } = await pool.query(
-      `SELECT balance FROM tilematch_tokens WHERE user_id = $1`,
+      `SELECT balance, balance_points, balance_stable, is_vip FROM tilematch_tokens WHERE user_id = $1`,
       [req.user.id]
     );
-    res.json({ balance: rows.length ? rows[0].balance : 0 });
+    const row = rows.length ? rows[0] : { balance: 0, balance_points: 0, balance_stable: '0.00', is_vip: false };
+    res.json({
+      balance: row.balance,
+      balancePoints: row.balance_points,
+      balanceStable: row.balance_stable,
+      isVip: row.is_vip,
+    });
   } catch (err) {
     console.error('[tilematch] wallet failed:', err.message);
     res.status(500).json({ error: 'Failed to load wallet' });
   }
+});
+
+app.post('/api/tilematch/wallet/deposit', async (req, res) => {
+  res.json({ status: 'coming_soon', message: 'On-chain deposits will be available at mainnet launch.' });
+});
+
+app.post('/api/tilematch/wallet/withdraw', async (req, res) => {
+  res.json({ status: 'coming_soon', message: 'On-chain withdrawals will be available at mainnet launch.' });
+});
+
+app.post('/api/tilematch/vip/subscribe', async (req, res) => {
+  res.json({ status: 'coming_soon', message: 'VIP subscriptions open at mainnet launch.' });
 });
 
 // --- Daily tasks ---
@@ -4374,31 +4555,74 @@ function shapeTmTask(row, def) {
 
 app.get('/api/tilematch/tasks', async (req, res) => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    // Upsert today's rows (ensures they exist)
-    for (const taskId of Object.keys(TILEMATCH_TASK_DEFS)) {
-      await pool.query(
-        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
-         VALUES ($1, $2, $3, 0)
-         ON CONFLICT (user_id, task_date, task_id) DO NOTHING`,
-        [req.user.id, today, taskId]
-      );
+    // Demo seed for staging testing
+    if (IS_STAGING && req.query.demo === 'tasks') {
+      const td = utcToday(); const wa = utcWeekAnchor(); const ma = utcMonthAnchor();
+      const demoRows = [
+        [td, 'win_1_duel', 1, null],
+        [td, 'clear_3_levels', 2, null],
+        [td, 'match_50_tiles', 50, new Date().toISOString()],
+        [wa, 'w_win_3_duels', 2, null],
+        [wa, 'w_play_daily_5', 5, new Date().toISOString()],
+        [ma, 'm_win_10_duels', 10, null],
+        [ma, 'm_clear_100_levels', 45, null],
+      ];
+      for (const [pd, tid, prog, claimedAt] of demoRows) {
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress, claimed_at)
+           VALUES ('staging-demo-user', $1, $2, $3, $4)
+           ON CONFLICT (user_id, task_date, task_id) DO NOTHING`,
+          [pd, tid, prog, claimedAt]
+        );
+      }
     }
+
+    const userId = req.user.id;
+    const today = utcToday(); const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
+
+    // Upsert zero-progress rows for all periods
+    const allPeriods = [
+      [TILEMATCH_TASK_DEFS, today],
+      [TILEMATCH_WEEKLY_TASK_DEFS, weekAnchor],
+      [TILEMATCH_MONTHLY_TASK_DEFS, monthAnchor],
+    ];
+    for (const [defs, pd] of allPeriods) {
+      for (const taskId of Object.keys(defs)) {
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
+           VALUES ($1, $2, $3, 0) ON CONFLICT (user_id, task_date, task_id) DO NOTHING`,
+          [userId, pd, taskId]
+        );
+      }
+    }
+
+    // Fetch all rows across all three periods
     const { rows } = await pool.query(
-      `SELECT task_id, progress, claimed_at FROM tilematch_daily_tasks
-        WHERE user_id = $1 AND task_date = $2`,
-      [req.user.id, today]
+      `SELECT task_id, task_date, progress, claimed_at FROM tilematch_daily_tasks
+        WHERE user_id = $1 AND task_date IN ($2, $3, $4)`,
+      [userId, today, weekAnchor, monthAnchor]
     );
-    const taskMap = {};
-    rows.forEach(r => { taskMap[r.task_id] = r; });
-    const tasks = Object.entries(TILEMATCH_TASK_DEFS).map(([id, def]) => {
-      const row = taskMap[id] || { task_id: id, progress: 0, claimed_at: null };
+    const taskMap = {}; rows.forEach(r => { taskMap[r.task_date + ':' + r.task_id] = r; });
+
+    const mapDefs = (defs, pd) => Object.entries(defs).map(([id, def]) => {
+      const row = taskMap[pd + ':' + id] || { task_id: id, progress: 0, claimed_at: null };
       return shapeTmTask(row, def);
     });
-    // Next reset: midnight UTC
-    const tomorrow = new Date(today);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-    res.json({ tasks, resetAt: tomorrow.toISOString() });
+
+    const tomorrow = new Date(today); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const nextMonday = new Date(weekAnchor); nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
+    const nextMonth1 = new Date(monthAnchor); nextMonth1.setUTCMonth(nextMonth1.getUTCMonth() + 1);
+
+    res.json({
+      daily:   mapDefs(TILEMATCH_TASK_DEFS,         today),
+      weekly:  mapDefs(TILEMATCH_WEEKLY_TASK_DEFS,  weekAnchor),
+      monthly: mapDefs(TILEMATCH_MONTHLY_TASK_DEFS, monthAnchor),
+      resetAts: {
+        daily:   tomorrow.toISOString(),
+        weekly:  nextMonday.toISOString(),
+        monthly: nextMonth1.toISOString(),
+      },
+    });
   } catch (err) {
     console.error('[tilematch] tasks failed:', err.message);
     res.status(500).json({ error: 'Failed to load tasks' });
@@ -4407,41 +4631,77 @@ app.get('/api/tilematch/tasks', async (req, res) => {
 
 app.post('/api/tilematch/tasks/report', async (req, res) => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = utcToday(); const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
     const levelsCleared = Number.isFinite(req.body.levelsCleared) ? Math.max(0, Math.round(req.body.levelsCleared)) : 0;
     const tileTaps      = Number.isFinite(req.body.tileTaps)      ? Math.max(0, Math.round(req.body.tileTaps))      : 0;
+    const uid = req.user.id;
 
     if (levelsCleared > 0) {
+      // Daily: clear_3_levels
       await pool.query(
-        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
-         VALUES ($1, $2, 'clear_3_levels', $3)
-         ON CONFLICT (user_id, task_date, task_id)
-         DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + $3)`,
-        [req.user.id, today, levelsCleared]
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'clear_3_levels', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + $3)`,
+        [uid, today, levelsCleared]
+      );
+      // Weekly: w_clear_20_levels
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'w_clear_20_levels', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(20, tilematch_daily_tasks.progress + $3)`,
+        [uid, weekAnchor, levelsCleared]
+      );
+      // Monthly: m_clear_50_levels, m_clear_100_levels
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_clear_50_levels', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(50, tilematch_daily_tasks.progress + $3)`,
+        [uid, monthAnchor, levelsCleared]
+      );
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_clear_100_levels', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(100, tilematch_daily_tasks.progress + $3)`,
+        [uid, monthAnchor, levelsCleared]
       );
     }
     if (tileTaps > 0) {
+      // Daily: match_50_tiles
       await pool.query(
-        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
-         VALUES ($1, $2, 'match_50_tiles', $3)
-         ON CONFLICT (user_id, task_date, task_id)
-         DO UPDATE SET progress = LEAST(50, tilematch_daily_tasks.progress + $3)`,
-        [req.user.id, today, tileTaps]
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'match_50_tiles', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(50, tilematch_daily_tasks.progress + $3)`,
+        [uid, today, tileTaps]
+      );
+      // Weekly: w_tile_taps_500
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'w_tile_taps_500', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(500, tilematch_daily_tasks.progress + $3)`,
+        [uid, weekAnchor, tileTaps]
+      );
+      // Monthly: m_tile_taps_2000, m_tile_taps_5000
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_tile_taps_2000', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(2000, tilematch_daily_tasks.progress + $3)`,
+        [uid, monthAnchor, tileTaps]
+      );
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_tile_taps_5000', $3)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(5000, tilematch_daily_tasks.progress + $3)`,
+        [uid, monthAnchor, tileTaps]
       );
     }
 
     const { rows } = await pool.query(
-      `SELECT task_id, progress, claimed_at FROM tilematch_daily_tasks
-        WHERE user_id = $1 AND task_date = $2`,
-      [req.user.id, today]
+      `SELECT task_id, task_date, progress, claimed_at FROM tilematch_daily_tasks
+        WHERE user_id = $1 AND task_date IN ($2, $3, $4)`,
+      [uid, today, weekAnchor, monthAnchor]
     );
-    const taskMap = {};
-    rows.forEach(r => { taskMap[r.task_id] = r; });
-    const tasks = Object.entries(TILEMATCH_TASK_DEFS).map(([id, def]) => {
-      const row = taskMap[id] || { task_id: id, progress: 0, claimed_at: null };
+    const taskMap = {}; rows.forEach(r => { taskMap[r.task_date + ':' + r.task_id] = r; });
+    const mapDefs = (defs, pd) => Object.entries(defs).map(([id, def]) => {
+      const row = taskMap[pd + ':' + id] || { task_id: id, progress: 0, claimed_at: null };
       return shapeTmTask(row, def);
     });
-    res.json({ tasks });
+    res.json({
+      daily:   mapDefs(TILEMATCH_TASK_DEFS,         today),
+      weekly:  mapDefs(TILEMATCH_WEEKLY_TASK_DEFS,  weekAnchor),
+      monthly: mapDefs(TILEMATCH_MONTHLY_TASK_DEFS, monthAnchor),
+    });
   } catch (err) {
     console.error('[tilematch] task report failed:', err.message);
     res.status(500).json({ error: 'Failed to report task progress' });
@@ -4450,18 +4710,18 @@ app.post('/api/tilematch/tasks/report', async (req, res) => {
 
 app.post('/api/tilematch/tasks/:taskId/claim', async (req, res) => {
   const { taskId } = req.params;
-  const def = TILEMATCH_TASK_DEFS[taskId];
-  if (!def) return res.status(400).json({ error: 'Unknown task' });
+  const found = findTaskDef(taskId);
+  if (!found) return res.status(400).json({ error: 'Unknown task' });
+  const { def, periodDate } = found;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const today = new Date().toISOString().slice(0, 10);
     const { rows } = await client.query(
       `SELECT progress, claimed_at FROM tilematch_daily_tasks
         WHERE user_id = $1 AND task_date = $2 AND task_id = $3
         FOR UPDATE`,
-      [req.user.id, today, taskId]
+      [req.user.id, periodDate, taskId]
     );
     if (!rows.length || rows[0].progress < def.target) {
       await client.query('ROLLBACK');
@@ -4474,7 +4734,7 @@ app.post('/api/tilematch/tasks/:taskId/claim', async (req, res) => {
     await client.query(
       `UPDATE tilematch_daily_tasks SET claimed_at = now()
         WHERE user_id = $1 AND task_date = $2 AND task_id = $3`,
-      [req.user.id, today, taskId]
+      [req.user.id, periodDate, taskId]
     );
     const { rows: balRows } = await client.query(
       `INSERT INTO tilematch_tokens (user_id, username, balance)
@@ -4583,6 +4843,20 @@ app.post('/api/tilematch/duel/join', async (req, res) => {
         `SELECT * FROM tilematch_duels WHERE id = $1`, [duelId]
       );
       await client.query('COMMIT');
+      // Non-fatal: report "enter duel" task progress after COMMIT
+      try {
+        const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'w_enter_5_duels', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(5, tilematch_daily_tasks.progress + 1)`,
+          [req.user.id, weekAnchor]
+        );
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_enter_20_duels', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(20, tilematch_daily_tasks.progress + 1)`,
+          [req.user.id, monthAnchor]
+        );
+      } catch (taskErr) { console.warn('[tilematch] join task hook failed (non-fatal):', taskErr.message); }
       return res.json({ duelId, status: 'active', boardSeed: seed, isCreator: false, duel: shapeDuel(duelRows[0]) });
     }
 
@@ -4602,6 +4876,20 @@ app.post('/api/tilematch/duel/join', async (req, res) => {
       }
     }
     await client.query('COMMIT');
+    // Non-fatal: report "enter duel" task progress after COMMIT (creator enters on join too)
+    try {
+      const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'w_enter_5_duels', 1)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(5, tilematch_daily_tasks.progress + 1)`,
+        [req.user.id, weekAnchor]
+      );
+      await pool.query(
+        `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_enter_20_duels', 1)
+         ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(20, tilematch_daily_tasks.progress + 1)`,
+        [req.user.id, monthAnchor]
+      );
+    } catch (taskErr) { console.warn('[tilematch] join task hook failed (non-fatal):', taskErr.message); }
     res.json({ duelId, status: 'waiting', isCreator: true });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -4797,6 +5085,39 @@ app.post('/api/tilematch/duel/:duelId/finish', async (req, res) => {
       );
       await client.query('COMMIT');
       const isWinner = winnerId === req.user.id;
+      // Non-fatal: auto-report win task progress after COMMIT
+      if (isWinner) {
+        try {
+          const today = utcToday(); const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
+          await pool.query(
+            `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'win_1_duel', 1)
+             ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
+            [winnerId, today]
+          );
+          await pool.query(
+            `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'w_win_3_duels', 1)
+             ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + 1)`,
+            [winnerId, weekAnchor]
+          );
+          await pool.query(
+            `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_win_10_duels', 1)
+             ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(10, tilematch_daily_tasks.progress + 1)`,
+            [winnerId, monthAnchor]
+          );
+          if (updated.stake_tokens === 100) {
+            await pool.query(
+              `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_win_100stake_duel', 1)
+               ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
+              [winnerId, monthAnchor]
+            );
+            await pool.query(
+              `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_win_100stake_3x', 1)
+               ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + 1)`,
+              [winnerId, monthAnchor]
+            );
+          }
+        } catch (taskErr) { console.warn('[tilematch] finish task hook failed (non-fatal):', taskErr.message); }
+      }
       return res.json({
         isWinner,
         newBalance: isWinner ? (balRows[0]?.balance ?? 0) : undefined,
@@ -4864,6 +5185,39 @@ app.post('/api/tilematch/duel/:duelId/forfeit', async (req, res) => {
     }
 
     await client.query('COMMIT');
+    // Non-fatal: auto-report win tasks for the opponent (surviving winner) on active forfeit
+    if (opponentId && d.status === 'active') {
+      try {
+        const today = utcToday(); const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'win_1_duel', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
+          [opponentId, today]
+        );
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'w_win_3_duels', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + 1)`,
+          [opponentId, weekAnchor]
+        );
+        await pool.query(
+          `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_win_10_duels', 1)
+           ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(10, tilematch_daily_tasks.progress + 1)`,
+          [opponentId, monthAnchor]
+        );
+        if (d.stake_tokens === 100) {
+          await pool.query(
+            `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_win_100stake_duel', 1)
+             ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = GREATEST(tilematch_daily_tasks.progress, 1)`,
+            [opponentId, monthAnchor]
+          );
+          await pool.query(
+            `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress) VALUES ($1, $2, 'm_win_100stake_3x', 1)
+             ON CONFLICT (user_id, task_date, task_id) DO UPDATE SET progress = LEAST(3, tilematch_daily_tasks.progress + 1)`,
+            [opponentId, monthAnchor]
+          );
+        }
+      } catch (taskErr) { console.warn('[tilematch] forfeit task hook failed (non-fatal):', taskErr.message); }
+    }
     res.json({ forfeited: true, opponentId });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -4871,6 +5225,303 @@ app.post('/api/tilematch/duel/:duelId/forfeit', async (req, res) => {
     res.status(500).json({ error: 'Failed to forfeit duel' });
   } finally {
     client.release();
+  }
+});
+
+// ============================================================
+// Tilematch: Anti-cheat game session
+// ============================================================
+
+app.post('/api/tilematch/session/start', async (req, res) => {
+  try {
+    const { sessionType = 'practice', duelId = null, tournamentId = null } = req.body || {};
+    const seed = Math.floor(Math.random() * 2147483647) + 1;
+    const board = pvpGenerateLevel(TM_PVP_CONFIG, seed);
+    const tileCount = board.length;
+    const minTimeMs = Math.ceil(tileCount / 3) * 400;
+    const sessionId = generateTmSessionId();
+    await pool.query(
+      `INSERT INTO tilematch_game_sessions (id, user_id, session_type, duel_id, tournament_id, board_seed, tile_count, min_time_ms, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')`,
+      [sessionId, req.user.id, sessionType, duelId, tournamentId, seed, tileCount, minTimeMs]
+    );
+    res.json({ sessionId, seed, tileCount });
+  } catch (err) {
+    console.error('[tilematch] session start failed:', err.message);
+    res.status(500).json({ error: 'Failed to start session' });
+  }
+});
+
+// ============================================================
+// Tilematch: Tournaments
+// ============================================================
+
+// Prize distribution percentages
+const TOURNAMENT_PRIZES = [0.30, 0.20, 0.15, 0.075, 0.075, 0.02, 0.02, 0.02, 0.02, 0.02];
+
+async function finalizeTournament(tournamentId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: tRows } = await client.query(
+      `SELECT * FROM tilematch_tournaments WHERE id = $1 FOR UPDATE`, [tournamentId]
+    );
+    if (!tRows.length || tRows[0].status === 'finished') { await client.query('ROLLBACK'); return; }
+    const t = tRows[0];
+
+    const { rows: entries } = await client.query(
+      `SELECT * FROM tilematch_tournament_entries
+        WHERE tournament_id = $1 AND finished_at IS NOT NULL AND score IS NOT NULL
+        ORDER BY score DESC, time_secs ASC, entered_at ASC`,
+      [tournamentId]
+    );
+    for (let i = 0; i < entries.length; i++) {
+      const rank = i + 1;
+      const pct = i < TOURNAMENT_PRIZES.length ? TOURNAMENT_PRIZES[i] : 0;
+      const prizePoints = Math.floor(t.prize_pool_points * pct);
+      const prizeStable = (parseFloat(t.prize_pool_stable) * pct).toFixed(2);
+      await client.query(
+        `UPDATE tilematch_tournament_entries SET rank = $1, prize_points = $2, prize_stable = $3 WHERE id = $4`,
+        [rank, prizePoints, prizeStable, entries[i].id]
+      );
+      if (prizePoints > 0 || parseFloat(prizeStable) > 0) {
+        await client.query(
+          `INSERT INTO tilematch_tokens (user_id, username, balance_points, balance_stable)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (user_id) DO UPDATE SET
+             balance_points = tilematch_tokens.balance_points + $3,
+             balance_stable = tilematch_tokens.balance_stable + $4,
+             updated_at = now()`,
+          [entries[i].user_id, entries[i].username, prizePoints, prizeStable]
+        );
+      }
+    }
+    await client.query(`UPDATE tilematch_tournaments SET status = 'finished', updated_at = now() WHERE id = $1`, [tournamentId]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] tournament finalize failed:', err.message);
+  } finally {
+    client.release();
+  }
+}
+
+app.get('/api/tilematch/tournaments', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM tilematch_tournaments WHERE type IN ('daily','weekly','monthly')
+        ORDER BY CASE type WHEN 'daily' THEN 1 WHEN 'weekly' THEN 2 ELSE 3 END`
+    );
+
+    // Lazy finalization for any tournaments that ended but aren't finished
+    for (const t of rows) {
+      if (t.status === 'active' && new Date(t.end_at) < new Date()) {
+        finalizeTournament(t.id).catch(e => console.warn('[tilematch] lazy finalize failed:', e.message));
+      }
+    }
+
+    const { rows: myEntries } = await pool.query(
+      `SELECT te.*, t.type FROM tilematch_tournament_entries te
+         JOIN tilematch_tournaments t ON t.id = te.tournament_id
+        WHERE te.user_id = $1 AND t.type IN ('daily','weekly','monthly')`,
+      [req.user.id]
+    );
+    const myEntryMap = {};
+    myEntries.forEach(e => { myEntryMap[e.tournament_id] = e; });
+
+    const result = await Promise.all(rows.map(async t => {
+      const { rows: top3 } = await pool.query(
+        `SELECT username, score, time_secs FROM tilematch_tournament_entries
+          WHERE tournament_id = $1 AND finished_at IS NOT NULL
+          ORDER BY score DESC, time_secs ASC LIMIT 3`,
+        [t.id]
+      );
+      const myEntry = myEntryMap[t.id] || null;
+      return {
+        id: t.id, type: t.type, status: t.status,
+        startAt: t.start_at, endAt: t.end_at,
+        entryFeePoints: t.entry_fee_points,
+        prizePoolPoints: t.prize_pool_points,
+        prizePoolStable: t.prize_pool_stable,
+        entryCount: t.entry_count,
+        boardSeed: myEntry ? t.board_seed : null,
+        myEntry: myEntry ? { rank: myEntry.rank, score: myEntry.score, timeSecs: myEntry.time_secs, prizePoints: myEntry.prize_points, prizeStable: myEntry.prize_stable, finishedAt: myEntry.finished_at } : null,
+        top3,
+      };
+    }));
+    res.json({ tournaments: result });
+  } catch (err) {
+    console.error('[tilematch] tournaments failed:', err.message);
+    res.status(500).json({ error: 'Failed to load tournaments' });
+  }
+});
+
+app.get('/api/tilematch/tournaments/:id/leaderboard', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query(
+      `SELECT id, user_id, username, score, steps, time_secs, rank, prize_points, prize_stable, finished_at
+         FROM tilematch_tournament_entries
+        WHERE tournament_id = $1 AND finished_at IS NOT NULL
+        ORDER BY score DESC, time_secs ASC, entered_at ASC LIMIT 10`,
+      [id]
+    );
+    const { rows: myRows } = await pool.query(
+      `SELECT id, user_id, username, score, steps, time_secs, rank, prize_points, prize_stable, finished_at
+         FROM tilematch_tournament_entries
+        WHERE tournament_id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) FROM tilematch_tournament_entries WHERE tournament_id = $1 AND finished_at IS NOT NULL`, [id]
+    );
+    const entries = rows.map((r, i) => ({ rank: r.rank || i+1, username: r.username, score: r.score, timeSecs: r.time_secs, prizePoints: r.prize_points, prizeStable: r.prize_stable, isMe: r.user_id === req.user.id }));
+    const me = myRows.length ? { rank: myRows[0].rank, score: myRows[0].score, timeSecs: myRows[0].time_secs, prizePoints: myRows[0].prize_points, prizeStable: myRows[0].prize_stable } : null;
+    res.json({ entries, me, total: parseInt(countRows[0].count) });
+  } catch (err) {
+    console.error('[tilematch] tournament leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+app.post('/api/tilematch/tournaments/:id/enter', async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: tRows } = await client.query(`SELECT * FROM tilematch_tournaments WHERE id = $1 FOR UPDATE`, [id]);
+    if (!tRows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Tournament not found' }); }
+    const t = tRows[0];
+    if (t.status !== 'active') { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Tournament not active' }); }
+    if (new Date(t.end_at) < new Date()) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Tournament has ended' }); }
+
+    const { rows: existing } = await client.query(
+      `SELECT id FROM tilematch_tournament_entries WHERE tournament_id = $1 AND user_id = $2`, [id, req.user.id]
+    );
+    if (existing.length) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Already entered' }); }
+
+    // Check/deduct entry fee (VIP = free for daily tournaments)
+    const { rows: walletRows } = await client.query(
+      `SELECT balance_points, is_vip FROM tilematch_tokens WHERE user_id = $1 FOR UPDATE`, [req.user.id]
+    );
+    const wallet = walletRows.length ? walletRows[0] : { balance_points: 0, is_vip: false };
+    const freeEntry = wallet.is_vip && t.type === 'daily';
+    const entryFee = freeEntry ? 0 : t.entry_fee_points;
+    if (!freeEntry && wallet.balance_points < entryFee) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Insufficient Points balance' });
+    }
+    if (entryFee > 0) {
+      await client.query(
+        `UPDATE tilematch_tokens SET balance_points = balance_points - $1, updated_at = now() WHERE user_id = $2`,
+        [entryFee, req.user.id]
+      );
+    }
+
+    const seed = t.board_seed || (Math.floor(Math.random() * 2147483647) + 1);
+    if (!t.board_seed) {
+      await client.query(`UPDATE tilematch_tournaments SET board_seed = $1, updated_at = now() WHERE id = $2`, [seed, id]);
+    }
+    const board = pvpGenerateLevel(TM_PVP_CONFIG, seed);
+    const tileCount = board.length;
+    const minTimeMs = Math.ceil(tileCount / 3) * 400;
+    const sessionId = generateTmSessionId();
+    await pool.query(
+      `INSERT INTO tilematch_game_sessions (id, user_id, session_type, tournament_id, board_seed, tile_count, min_time_ms)
+       VALUES ($1, $2, 'tournament', $3, $4, $5, $6)`,
+      [sessionId, req.user.id, id, seed, tileCount, minTimeMs]
+    );
+
+    const entryId = generateTournamentEntryId();
+    await client.query(
+      `INSERT INTO tilematch_tournament_entries (id, tournament_id, user_id, username, session_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [entryId, id, req.user.id, req.user.username || null, sessionId]
+    );
+    await client.query(
+      `UPDATE tilematch_tournaments SET entry_count = entry_count + 1, updated_at = now() WHERE id = $1`, [id]
+    );
+    await client.query('COMMIT');
+    res.json({ entryId, sessionId, seed });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] tournament enter failed:', err.message);
+    res.status(500).json({ error: 'Failed to enter tournament' });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/tilematch/tournaments/:id/submit', async (req, res) => {
+  const { id } = req.params;
+  const { sessionId, score, steps, timeSecs } = req.body || {};
+  if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
+  const finalScore = Number.isFinite(score) ? Math.round(score) : 0;
+  const finalSteps = Number.isFinite(steps) ? Math.round(steps) : 0;
+  const finalTime  = Number.isFinite(timeSecs) ? Math.round(timeSecs) : 0;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: sRows } = await client.query(
+      `SELECT * FROM tilematch_game_sessions WHERE id = $1 FOR UPDATE`, [sessionId]
+    );
+    if (!sRows.length || sRows[0].user_id !== req.user.id) {
+      await client.query('ROLLBACK'); return res.status(403).json({ error: 'Invalid session' });
+    }
+    const sess = sRows[0];
+    if (sess.status !== 'active') { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Session not active' }); }
+
+    const elapsed = Date.now() - new Date(sess.started_at).getTime();
+    if (elapsed < sess.min_time_ms) {
+      await client.query(`UPDATE tilematch_game_sessions SET status = 'flagged', flag_reason = 'impossible_time', submitted_at = now() WHERE id = $1`, [sessionId]);
+      await client.query('COMMIT');
+      console.warn('[tilematch] tournament session flagged: impossible_time', { sessionId, elapsed, minTimeMs: sess.min_time_ms });
+      return res.status(409).json({ error: 'Submission rejected: timing check failed' });
+    }
+
+    await client.query(
+      `UPDATE tilematch_game_sessions SET status = 'completed', elapsed_ms = $1, score = $2, submitted_at = now() WHERE id = $3`,
+      [elapsed, finalScore, sessionId]
+    );
+
+    const { rows: eRows } = await client.query(
+      `SELECT * FROM tilematch_tournament_entries WHERE tournament_id = $1 AND user_id = $2 FOR UPDATE`,
+      [id, req.user.id]
+    );
+    if (!eRows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Entry not found' }); }
+
+    await client.query(
+      `UPDATE tilematch_tournament_entries SET score = $1, steps = $2, time_secs = $3, finished_at = now() WHERE id = $4`,
+      [finalScore, finalSteps, finalTime, eRows[0].id]
+    );
+
+    const { rows: tRows } = await client.query(`SELECT * FROM tilematch_tournaments WHERE id = $1`, [id]);
+    const t = tRows[0];
+
+    await client.query('COMMIT');
+
+    if (t && new Date(t.end_at) < new Date()) {
+      finalizeTournament(id).catch(e => console.warn('[tilematch] lazy finalize failed:', e.message));
+    }
+
+    res.json({ submitted: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[tilematch] tournament submit failed:', err.message);
+    res.status(500).json({ error: 'Failed to submit tournament result' });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/tilematch/tournaments/:id/finalize', async (req, res) => {
+  try {
+    await finalizeTournament(req.params.id);
+    res.json({ finalized: true });
+  } catch (err) {
+    console.error('[tilematch] finalize failed:', err.message);
+    res.status(500).json({ error: 'Failed to finalize tournament' });
   }
 });
 
@@ -5216,7 +5867,55 @@ try {
   console.error('[dapp] verification self-test FAILED:', e.message);
 }
 
+async function ensureTournamentsExist() {
+  try {
+    const today = utcToday(); const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
+
+    // Daily tournament: midnight UTC today → tomorrow
+    const tomorrow = new Date(today); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const dailySeed = Math.floor(Math.random() * 2147483647) + 1;
+    await pool.query(
+      `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
+       VALUES ($1, 'daily', $2, $3, 50, 5000, 10.00, 'active', $4)
+       ON CONFLICT (id) DO NOTHING`,
+      [generateTournamentId('daily') + today.replace(/-/g,''), today + 'T00:00:00Z', tomorrow.toISOString(), dailySeed]
+    );
+    // Ensure we only have one active daily tournament
+    await pool.query(
+      `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
+       SELECT 'daily-' || $1, 'daily', $2, $3, 50, 5000, 10.00, 'active', $4
+       WHERE NOT EXISTS (SELECT 1 FROM tilematch_tournaments WHERE type = 'daily' AND status = 'active' AND start_at::date = $1::date)`,
+      [today, today + 'T00:00:00Z', tomorrow.toISOString(), dailySeed]
+    );
+
+    // Weekly tournament: Monday → next Monday
+    const nextMonday = new Date(weekAnchor); nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
+    const weeklySeed = Math.floor(Math.random() * 2147483647) + 1;
+    await pool.query(
+      `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
+       SELECT 'weekly-' || $1, 'weekly', $2, $3, 200, 20000, 50.00, 'active', $4
+       WHERE NOT EXISTS (SELECT 1 FROM tilematch_tournaments WHERE type = 'weekly' AND status = 'active' AND start_at::date = $1::date)`,
+      [weekAnchor, weekAnchor + 'T00:00:00Z', nextMonday.toISOString(), weeklySeed]
+    );
+
+    // Monthly tournament: 1st → 1st of next month
+    const nextMonth1 = new Date(monthAnchor); nextMonth1.setUTCMonth(nextMonth1.getUTCMonth() + 1);
+    const monthlySeed = Math.floor(Math.random() * 2147483647) + 1;
+    await pool.query(
+      `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
+       SELECT 'monthly-' || $1, 'monthly', $2, $3, 500, 75000, 200.00, 'active', $4
+       WHERE NOT EXISTS (SELECT 1 FROM tilematch_tournaments WHERE type = 'monthly' AND status = 'active' AND start_at::date = $1::date)`,
+      [monthAnchor, monthAnchor + 'T00:00:00Z', nextMonth1.toISOString(), monthlySeed]
+    );
+
+    console.log('[tilematch] tournaments ensured');
+  } catch (err) {
+    console.error('[tilematch] ensureTournamentsExist failed (non-fatal):', err.message);
+  }
+}
+
 migrate()
+  .then(() => ensureTournamentsExist())
   .then(() => app.listen(port, () => console.log(`Listening on :${port}`)))
   .catch((err) => {
     console.error('Migration failed:', err);

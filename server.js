@@ -51,7 +51,7 @@ let redisReady = false;
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle', 'zuma']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -217,6 +217,24 @@ async function migrate() {
     )
   `);
 
+  // zuma_scores is PUBLIC — high scores for the Zuma classic game, shown on
+  // a global leaderboard (no sensitive data; gameplay results only). One row
+  // per user holding their personal best, upserted with GREATEST so a worse
+  // run never clobbers a better one. No foreign keys (public-table rule).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS zuma_scores (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      best_score     INTEGER NOT NULL DEFAULT 0,
+      best_level     INTEGER,
+      best_time_secs INTEGER,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   // pvp_moves: per-move log for anti-cheat timing analysis. PUBLIC.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pvp_moves (
@@ -300,6 +318,56 @@ async function migrate() {
     )
   `);
 
+  // posts is PUBLIC: shared game results and scores. No sensitive data.
+  // One row per post. user_id is the author.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id              SERIAL PRIMARY KEY,
+      user_id         TEXT NOT NULL,
+      game_id         TEXT NOT NULL,
+      score           INTEGER NOT NULL,
+      steps           INTEGER,
+      time_secs       INTEGER,
+      caption         TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // post_comments is PUBLIC: comments on shared posts. No sensitive data.
+  // One row per comment. Cascades delete when post is deleted.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS post_comments (
+      id              SERIAL PRIMARY KEY,
+      post_id         INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+      user_id         TEXT NOT NULL,
+      text            TEXT NOT NULL,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // collab_sessions is PUBLIC: collaborative puzzle-solving sessions.
+  // One row per co-op game session. status: waiting|active|finished.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS collab_sessions (
+      id              TEXT PRIMARY KEY,
+      game_id         TEXT NOT NULL,
+      initiator_id    TEXT NOT NULL,
+      invitee_id      TEXT,
+      initiator_name  TEXT,
+      invitee_name    TEXT,
+      status          TEXT NOT NULL DEFAULT 'waiting',
+      state           JSONB,
+      seed            BIGINT,
+      initiator_score INTEGER,
+      invitee_score   INTEGER,
+      started_at      TIMESTAMPTZ,
+      finished_at     TIMESTAMPTZ,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_activity   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   // Create indices for social queries
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_follows_followee
@@ -316,6 +384,26 @@ async function migrate() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_achievements_created
     ON user_achievements(created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_posts_user_created
+    ON posts(user_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_posts_created
+    ON posts(created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_post_comments_post_created
+    ON post_comments(post_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_collab_sessions_initiator
+    ON collab_sessions(initiator_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_collab_sessions_invitee
+    ON collab_sessions(invitee_id)
   `);
 
   // tilematch_scores is PUBLIC: personal-best scores for the Tile Match Puzzle
@@ -510,6 +598,82 @@ async function migrate() {
         [uid, type, gameId, score, JSON.stringify(meta)]
       );
     }
+
+    // Seed posts from demo users with varied games
+    const posts = [
+      ['staging-demo-user', 'sudoku', 980, 17, 132, 'Finally beat my PB! 🎉'],
+      ['staging-alice', 'wordhunt', 1050, 28, 95, 'Had so much fun with this one'],
+      ['staging-bob', 'mancala', 750, null, 180, 'Mancala champion right here'],
+      ['staging-demo-user', 'wordhunt', 920, 31, 108, ''],
+      ['staging-charlie', 'sudoku', 620, 22, 156, 'Still learning but enjoying it'],
+      ['staging-alice', 'cryptowordle', 890, 4, 85, 'Got the daily crypto word!'],
+      ['staging-bob', 'sudoku', 1100, 19, 145, 'Personal record on sudoku today'],
+    ];
+
+    for (const [userId, gameId, score, steps, timeSecs, caption] of posts) {
+      await pool.query(
+        `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, now() - interval '${Math.floor(Math.random() * 48)}' hours)
+         ON CONFLICT DO NOTHING`,
+        [userId, gameId, score, steps, timeSecs, caption || null]
+      );
+    }
+
+    // Seed comments on a few posts (fetch post IDs for linking)
+    const postsForComments = await pool.query(
+      `SELECT id FROM posts WHERE user_id IN ('staging-demo-user', 'staging-alice', 'staging-bob')
+       LIMIT 3`
+    );
+
+    if (postsForComments.rows.length > 0) {
+      const comments = [
+        [postsForComments.rows[0].id, 'staging-alice', 'Nice score! 👍'],
+        [postsForComments.rows[0].id, 'staging-bob', 'How did you solve that so fast?'],
+        [postsForComments.rows[0].id, 'staging-charlie', 'Amazing!'],
+      ];
+      if (postsForComments.rows.length > 1) {
+        comments.push([postsForComments.rows[1].id, 'staging-demo-user', 'Congrats Alice!']);
+        comments.push([postsForComments.rows[1].id, 'staging-charlie', 'Great work']);
+      }
+      if (postsForComments.rows.length > 2) {
+        comments.push([postsForComments.rows[2].id, 'staging-alice', 'Awesome!']);
+      }
+
+      for (const [postId, userId, text] of comments) {
+        await pool.query(
+          `INSERT INTO post_comments (post_id, user_id, text, created_at)
+           VALUES ($1, $2, $3, now() - interval '${Math.floor(Math.random() * 24)}' hours)
+           ON CONFLICT DO NOTHING`,
+          [postId, userId, text]
+        );
+      }
+    }
+
+    // Seed collab sessions: one finished, one active
+    const finishedPits = JSON.stringify([0,0,0,0,0,0,32,0,0,0,0,0,0,16]);
+    const activePits = JSON.stringify([0,0,0,0,0,1,28,2,2,2,2,2,2,5]);
+
+    await pool.query(
+      `INSERT INTO collab_sessions
+         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
+          status, state, seed, initiator_score, invitee_score, started_at, finished_at, created_at, last_activity)
+       VALUES ($1, 'mancala', 'staging-demo-user', 'staging-alice', 'staging-demo-user', 'staging-alice',
+               'finished', $2, 42317893, 750, 620,
+               now() - interval '2 hours', now() - interval '1 hour 50 minutes',
+               now() - interval '2 hours', now() - interval '1 hour 50 minutes')
+       ON CONFLICT (id) DO NOTHING`,
+      ['COLL1', finishedPits]
+    );
+
+    await pool.query(
+      `INSERT INTO collab_sessions
+         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
+          status, state, seed, created_at, last_activity)
+       VALUES ($1, 'mancala', 'staging-bob', 'staging-charlie', 'staging-bob', 'staging-charlie',
+               'waiting', $2, 12345678, now() - interval '15 minutes', now() - interval '5 minutes')
+       ON CONFLICT (id) DO NOTHING`,
+      ['COLL2', activePits]
+    );
   }
 
   // Staging seeds for mancala_rooms so testers can exercise all states
@@ -577,6 +741,26 @@ async function migrate() {
     for (const [uid, uname, best, lvl, secs] of bounceSeed) {
       await pool.query(
         `INSERT INTO breakout_scores
+           (user_id, username, best_score, best_level, best_time_secs, games_played)
+         VALUES ($1, $2, $3, $4, $5, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, best, lvl, secs]
+      );
+    }
+
+    // Zuma leaderboard seed — newly created table is empty in staging, so the
+    // leaderboard tab would have nothing to show. Obviously-fake users with a
+    // spread of scores. Idempotent; no-op in production.
+    const zumaSeed = [
+      ['zuma-demo-1', 'staging-zuma-master',  4200, 3, 210],
+      ['zuma-demo-2', 'staging-zuma-ace',     2900, 3, 275],
+      ['zuma-demo-3', 'staging-zuma-rookie',  1600, 2, 188],
+      ['zuma-demo-4', 'staging-zuma-fan',      750, 2, 130],
+      ['zuma-demo-5', 'staging-zuma-newbie',   280, 1,  60],
+    ];
+    for (const [uid, uname, best, lvl, secs] of zumaSeed) {
+      await pool.query(
+        `INSERT INTO zuma_scores
            (user_id, username, best_score, best_level, best_time_secs, games_played)
          VALUES ($1, $2, $3, $4, $5, 3)
          ON CONFLICT (user_id) DO NOTHING`,
@@ -1043,6 +1227,383 @@ app.delete('/api/social/unfollow/:userId', async (req, res) => {
   } catch (err) {
     console.error('[social] unfollow failed:', err.message);
     res.status(500).json({ error: 'Failed to unfollow user' });
+  }
+});
+
+// ---- Posts API (sharing) -----------------------------------------------
+
+// POST /api/posts — create a post from a win
+app.post('/api/posts', async (req, res) => {
+  const { gameId, score, steps, timeSecs, caption } = req.body;
+  if (!gameId || !Number.isFinite(score)) {
+    return res.status(400).json({ error: 'gameId and score are required' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, user_id, game_id, score, steps, time_secs, caption, created_at`,
+      [req.user.id, gameId, score, steps || null, timeSecs || null, caption || null]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[posts] create failed:', err.message);
+    res.status(500).json({ error: 'Failed to create post' });
+  }
+});
+
+// GET /api/posts/feed — fetch feed for signed-in user
+app.get('/api/posts/feed', async (req, res) => {
+  try {
+    const limit = Math.min(50, parseInt(req.query.limit) || 20);
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+    // Get user's posts + posts from followed users, ordered by created_at DESC
+    const { rows: posts } = await pool.query(
+      `SELECT p.id, p.user_id, u.username, p.game_id, p.score, p.steps, p.time_secs, p.caption, p.created_at,
+              (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.user_id = $1
+          OR p.user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1)
+       ORDER BY p.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) as total FROM posts p
+       WHERE p.user_id = $1
+          OR p.user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1)`,
+      [req.user.id]
+    );
+
+    res.json({
+      posts: posts.map(p => ({
+        id: p.id,
+        userId: p.user_id,
+        username: p.username,
+        gameId: p.game_id,
+        score: p.score,
+        steps: p.steps,
+        timeSecs: p.time_secs,
+        caption: p.caption,
+        createdAt: p.created_at,
+        commentCount: parseInt(p.comment_count),
+      })),
+      total: parseInt(countRows[0].total),
+    });
+  } catch (err) {
+    console.error('[posts] feed failed:', err.message);
+    res.status(500).json({ error: 'Failed to load feed' });
+  }
+});
+
+// GET /api/posts/:postId — fetch single post
+app.get('/api/posts/:postId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.id, p.user_id, u.username, p.game_id, p.score, p.steps, p.time_secs, p.caption, p.created_at,
+              (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`,
+      [req.params.postId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    const p = rows[0];
+    res.json({
+      id: p.id,
+      userId: p.user_id,
+      username: p.username,
+      gameId: p.game_id,
+      score: p.score,
+      steps: p.steps,
+      timeSecs: p.time_secs,
+      caption: p.caption,
+      createdAt: p.created_at,
+      commentCount: parseInt(p.comment_count),
+    });
+  } catch (err) {
+    console.error('[posts] get failed:', err.message);
+    res.status(500).json({ error: 'Failed to load post' });
+  }
+});
+
+// ---- Post comments API ---------------------------------------------------
+
+// GET /api/posts/:postId/comments — fetch comments on a post
+app.get('/api/posts/:postId/comments', async (req, res) => {
+  try {
+    const limit = Math.min(100, parseInt(req.query.limit) || 50);
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+    // Verify post exists
+    const { rows: postRows } = await pool.query(
+      `SELECT id FROM posts WHERE id = $1`,
+      [req.params.postId]
+    );
+    if (postRows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const { rows: comments } = await pool.query(
+      `SELECT c.id, c.post_id, c.user_id, u.username, c.text, c.created_at
+       FROM post_comments c
+       JOIN users u ON c.user_id = u.id
+       WHERE c.post_id = $1
+       ORDER BY c.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.params.postId, limit, offset]
+    );
+
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) as total FROM post_comments WHERE post_id = $1`,
+      [req.params.postId]
+    );
+
+    res.json({
+      comments: comments.map(c => ({
+        id: c.id,
+        postId: c.post_id,
+        userId: c.user_id,
+        username: c.username,
+        text: c.text,
+        createdAt: c.created_at,
+      })),
+      total: parseInt(countRows[0].total),
+    });
+  } catch (err) {
+    console.error('[comments] get failed:', err.message);
+    res.status(500).json({ error: 'Failed to load comments' });
+  }
+});
+
+// POST /api/posts/:postId/comments — add a comment
+app.post('/api/posts/:postId/comments', async (req, res) => {
+  const { text } = req.body;
+  if (!text || text.length > 280) {
+    return res.status(400).json({ error: 'text is required and must be <= 280 chars' });
+  }
+  try {
+    // Verify post exists
+    const { rows: postRows } = await pool.query(
+      `SELECT id FROM posts WHERE id = $1`,
+      [req.params.postId]
+    );
+    if (postRows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO post_comments (post_id, user_id, text)
+       VALUES ($1, $2, $3)
+       RETURNING id, post_id, user_id, text, created_at`,
+      [req.params.postId, req.user.id, text]
+    );
+    const c = rows[0];
+    res.json({
+      id: c.id,
+      postId: c.post_id,
+      userId: c.user_id,
+      text: c.text,
+      createdAt: c.created_at,
+    });
+  } catch (err) {
+    console.error('[comments] create failed:', err.message);
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
+});
+
+// DELETE /api/posts/:postId/comments/:commentId — delete own comment
+app.delete('/api/posts/:postId/comments/:commentId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM post_comments
+       WHERE id = $1 AND post_id = $2 AND user_id = $3
+       RETURNING id`,
+      [req.params.commentId, req.params.postId, req.user.id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Comment not found or not owned by you' });
+    }
+    res.status(204).send();
+  } catch (err) {
+    console.error('[comments] delete failed:', err.message);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
+// ---- Collaborative sessions API ----------------------------------------
+
+// POST /api/collab/sessions — initiate a collaborative session
+app.post('/api/collab/sessions', async (req, res) => {
+  const { gameId, inviteeId } = req.body;
+  if (!gameId || !inviteeId) {
+    return res.status(400).json({ error: 'gameId and inviteeId are required' });
+  }
+  if (inviteeId === req.user.id) {
+    return res.status(409).json({ error: 'Cannot invite yourself' });
+  }
+  try {
+    // Generate room ID (6-char code)
+    let roomId = '';
+    const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let i = 0; i < 6; i++) {
+      roomId += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    }
+
+    // Get invitee name
+    const { rows: inviteeRows } = await pool.query(
+      `SELECT username FROM users WHERE id = $1`,
+      [inviteeId]
+    );
+    if (inviteeRows.length === 0) {
+      return res.status(404).json({ error: 'Invitee not found' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO collab_sessions
+         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'waiting')
+       RETURNING id, game_id, initiator_id, invitee_id, initiator_name, invitee_name, status, created_at`,
+      [roomId, gameId, req.user.id, inviteeId, req.user.username, inviteeRows[0].username]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[collab] create failed:', err.message);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+// GET /api/collab/sessions/:roomId — poll session state
+app.get('/api/collab/sessions/:roomId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
+              status, state, seed, initiator_score, invitee_score, started_at, finished_at, created_at
+       FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    const s = rows[0];
+    res.json({
+      id: s.id,
+      gameId: s.game_id,
+      initiatorId: s.initiator_id,
+      inviteeId: s.invitee_id,
+      initiatorName: s.initiator_name,
+      inviteeName: s.invitee_name,
+      status: s.status,
+      state: s.state,
+      seed: s.seed,
+      initiatorScore: s.initiator_score,
+      inviteeScore: s.invitee_score,
+      startedAt: s.started_at,
+      finishedAt: s.finished_at,
+      createdAt: s.created_at,
+    });
+  } catch (err) {
+    console.error('[collab] get failed:', err.message);
+    res.status(500).json({ error: 'Failed to load session' });
+  }
+});
+
+// POST /api/collab/sessions/:roomId/move — apply a move (game-dependent)
+app.post('/api/collab/sessions/:roomId/move', async (req, res) => {
+  const { move, moveSeq } = req.body;
+  if (typeof move !== 'object' || typeof moveSeq !== 'number') {
+    return res.status(400).json({ error: 'move (object) and moveSeq (number) are required' });
+  }
+  try {
+    const { rows: sessionRows } = await pool.query(
+      `SELECT game_id, state FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    if (sessionRows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // For now, stub with success. In future: game-specific move validation.
+    // Update state (placeholder: just track moves)
+    const session = sessionRows[0];
+    const newState = session.state || { moves: [] };
+    newState.moves = (newState.moves || []).concat([move]);
+
+    await pool.query(
+      `UPDATE collab_sessions SET state = $2, last_activity = now()
+       WHERE id = $1`,
+      [req.params.roomId, JSON.stringify(newState)]
+    );
+
+    const { rows } = await pool.query(
+      `SELECT id, game_id, status, state FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[collab] move failed:', err.message);
+    res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// POST /api/collab/sessions/:roomId/finish — finish the session and record score
+app.post('/api/collab/sessions/:roomId/finish', async (req, res) => {
+  const { initiatorScore, inviteeScore } = req.body;
+  try {
+    const { rows: sessionRows } = await pool.query(
+      `SELECT game_id, initiator_id, status FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    if (sessionRows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const session = sessionRows[0];
+    // Only initiator records a daily attempt
+    if (GAME_IDS.has(session.game_id)) {
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, finished_at)
+         VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, now())
+         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+        [session.initiator_id, req.user.username || null, session.game_id, initiatorScore]
+      );
+
+      // Update stats if this is a win
+      if (initiatorScore && initiatorScore > 0) {
+        await pool.query(
+          `UPDATE user_stats_snapshot
+             SET total_score = total_score + $2, last_win_at = now(), updated_at = now()
+           WHERE user_id = $1`,
+          [session.initiator_id, initiatorScore]
+        );
+      }
+    }
+
+    // Mark session as finished
+    const { rows } = await pool.query(
+      `UPDATE collab_sessions
+         SET status = 'finished', initiator_score = $2, invitee_score = $3, finished_at = now()
+       WHERE id = $1
+       RETURNING id, game_id, status, initiator_score, invitee_score`,
+      [req.params.roomId, initiatorScore, inviteeScore]
+    );
+
+    // Recompute streak
+    const streak = await computeStreak(session.initiator_id);
+
+    res.json({
+      ...rows[0],
+      streak,
+    });
+  } catch (err) {
+    console.error('[collab] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish session' });
   }
 });
 
@@ -1975,6 +2536,119 @@ app.get('/api/bounce/leaderboard', async (req, res) => {
     res.json({ top: top.map(shapeBounceRow), me });
   } catch (err) {
     console.error('[bounce] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ---- Zuma leaderboard API ------------------------------------------------
+// Mirrors Bounce/Snake exactly: one personal-best row per user, upserted with
+// GREATEST, ranked by best_score then earliest-to-reach.
+
+const ZUMA_LB_LIMIT = 20;
+
+function shapeZumaRow(row) {
+  return {
+    rank: Number(row.rank),
+    username: row.username,
+    bestScore: row.best_score,
+  };
+}
+
+app.post('/api/zuma/score', async (req, res) => {
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  if (score === null) return res.status(400).json({ error: 'score is required' });
+  try {
+    const { rows: prevRows } = await pool.query(
+      `SELECT best_score FROM zuma_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const prevBest = prevRows.length > 0 ? prevRows[0].best_score : null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO zuma_scores
+         (user_id, username, best_score, best_level, best_time_secs, games_played, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         username       = EXCLUDED.username,
+         best_level     = CASE WHEN EXCLUDED.best_score > zuma_scores.best_score
+                               THEN EXCLUDED.best_level ELSE zuma_scores.best_level END,
+         best_time_secs = CASE WHEN EXCLUDED.best_score > zuma_scores.best_score
+                               THEN EXCLUDED.best_time_secs ELSE zuma_scores.best_time_secs END,
+         best_score     = GREATEST(zuma_scores.best_score, EXCLUDED.best_score),
+         games_played   = zuma_scores.games_played + 1,
+         updated_at     = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, score, level, timeSecs]
+    );
+    const me = rows[0];
+
+    await pool.query(
+      `UPDATE user_stats_snapshot
+         SET total_score = total_score + $2,
+             classics_played = classics_played + 1,
+             last_win_at = now(),
+             updated_at = now()
+       WHERE user_id = $1`,
+      [req.user.id, score]
+    );
+
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', 'zuma', $2, $3)`,
+        [req.user.id, score, JSON.stringify({ previousBest: prevBest })]
+      );
+    }
+
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM zuma_scores
+        WHERE best_score > $1
+           OR (best_score = $1 AND updated_at < $2)`,
+      [me.best_score, me.updated_at]
+    );
+    res.json({
+      bestScore: me.best_score,
+      rank: Number(rankRows[0].rank),
+      gamesPlayed: me.games_played,
+    });
+  } catch (err) {
+    console.error('[zuma] score failed:', err.message);
+    res.status(500).json({ error: 'Failed to record score' });
+  }
+});
+
+app.get('/api/zuma/leaderboard', async (req, res) => {
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM zuma_scores
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $1`,
+      [ZUMA_LB_LIMIT]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT username, best_score, updated_at FROM zuma_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM zuma_scores
+          WHERE best_score > $1
+             OR (best_score = $1 AND updated_at < $2)`,
+        [row.best_score, row.updated_at]
+      );
+      me = { rank: Number(rankRows[0].rank), username: row.username, bestScore: row.best_score };
+    }
+
+    res.json({ top: top.map(shapeZumaRow), me });
+  } catch (err) {
+    console.error('[zuma] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });

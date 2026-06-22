@@ -65,9 +65,16 @@ purpose.
   `<style>{css}</style>`. Add component styles to `css` and reuse `C`
   tokens (e.g. `${C.accent}`); don't introduce a second stylesheet.
   Fonts are Space Grotesk (body) + JetBrains Mono (`.mono`).
-- **Shared timer:** `useTimer(running)` counts **up** from 0 and
-  returns `{ secs, fmt }`. Pass `!done` so it stops when the round
-  ends.
+- **Shared timer:** `useTimer(running, initialSecs = 0)` counts **up**
+  from `initialSecs` and returns `{ secs, fmt }`. Pass `!done` so it
+  stops when the round ends; pass a saved elapsed value as `initialSecs`
+  to **resume** the timer where a player left off.
+- **Deterministic daily boards:** all daily games derive their board
+  from a **seeded PRNG keyed on the server-anchored UTC day** so every
+  player gets the same puzzle (the precondition for a fair leaderboard).
+  Use `dailyRng(offset, gameId)` (built on `mulberry32` + `utcDayNum`)
+  and thread it through your generator instead of `Math.random()`. Never
+  seed from raw `Date.now()` — always the `offset`-corrected day.
 - **Adding a game** (the extension point): write an
   `XxxGame({ onWin, onStepChange })` component that
   - renders a `.status-bar` of `.pill`s for its live stats,
@@ -91,6 +98,32 @@ purpose.
     extra props — no change needed. Games that need the server-anchored
     UTC day (e.g. a deterministic daily word) also receive `offset`
     (`serverNow − clientNow`, ms).
+  - **Resumability (backward-compatible).** `App` also passes
+    `savedProgress` (the merged in-progress state for today's claimed,
+    unfinished attempt — `null` on a fresh start) and
+    `onSaveProgress(progressObj, steps, secs)`. A resumable game should:
+    on mount, hydrate from `savedProgress` **only when**
+    `savedProgress.dayNum === utcDayNum(offset)` (and seed `useTimer`'s
+    `initialSecs` from `savedProgress.elapsedSecs`); store its
+    *mutable player state* in `progressObj` as `{ dayNum, … }` (the board
+    itself is re-derived from the daily seed, so only moves go here); and
+    call `onSaveProgress` on every meaningful move. Idle timer-advance
+    and tab-close saves are handled for you by the shared `useAutosave`
+    hook — `useAutosave(onSaveProgress, () => ({ progress, steps, secs }),
+    !done)`. Per-game progress shapes today: sudoku `{ dayNum, grid }`,
+    wordhunt `{ dayNum, found: [...words] }`, cryptowordle
+    `{ dayNum, words: [...guessStrings] }`, tilematchingdaily
+    `{ dayNum, tiles: [...], bar: [...ids], moves, boosters }` (the tile
+    snapshot is stored in full because the shuffle booster moves tiles).
+    The lock is **finished-aware**:
+    a row with `finishedAt` set is locked; a claimed-but-unfinished row
+    resumes into the game (lobby card shows "▶ In progress · resume").
+  - **Daily leaderboard.** The win overlay and `LockedScreen` render a
+    `<Leaderboard gameId solved />` that calls
+    `GET /api/daily/:gameId/leaderboard` (today's solvers ranked by
+    fastest `time_secs`, then fewest `steps`), highlighting the current
+    user and pinning their row when outside the top N. New games get this
+    automatically; no game-component work needed.
   - **Also add the new `id` to `GAME_IDS` in `server.js`.** The daily
     routes validate `:gameId` against that set and reject unknown ids
     with `400`, so a game that's in `GAMES` but not in `GAME_IDS`
@@ -111,6 +144,10 @@ describe it as static-only.
   **resets implicitly at midnight UTC**: a new date yields rows that no
   longer match today's lookups — there is no cron/cleanup. `score`,
   `steps`, `time_secs` are nullable (null between start and finish).
+  Two more nullable columns back **resumability**: `progress JSONB`
+  (game-specific in-progress moves) and `elapsed_secs INTEGER`
+  (accumulated active timer). They're written during play and ignored
+  once `finished_at` is set.
 - **Auth-gated API** (all under `/api/`, so the existing deny-by-default
   middleware requires `req.user` — do **not** whitelist these):
   - `GET /api/daily` — today's state for the signed-in user: `user`
@@ -125,6 +162,15 @@ describe it as static-only.
   - `POST /api/daily/:gameId/finish` — records `score/steps/time_secs`
     on today's already-claimed row, and returns the freshly recomputed
     `streak` so the client reconciles its optimistic value.
+  - `POST /api/daily/:gameId/progress` — **autosave**: updates today's
+    claimed, **unfinished** row with `progress/steps/elapsed_secs`. Never
+    creates a row and never touches `finished_at/score`; a finished row
+    is immutable here (`409` "No active attempt to save").
+  - `GET /api/daily/:gameId/leaderboard` — today's solvers for one game
+    (finished with `score > 0`, so Crypto Wordle losses are excluded),
+    ranked `time_secs ASC, steps ASC, finished_at ASC`. Returns
+    `{ entries: top-N, me, total }`; `me` is the current user's row/rank
+    even when outside the top N (`null` if they haven't solved today).
 - **Identity comes from `req.user`** (the iframe JWT), never the client.
   Progress is keyed to the Usernode account and persists across reloads
   and devices. The nav's `AccountChip` reads `user` from `/api/daily`
@@ -141,10 +187,20 @@ describe it as static-only.
   upserts finished `sudoku` attempts for the **10 UTC days before
   today**, giving the viewer a 10-day streak so the multiplier UI is
   demonstrable; today is left open so a tester can trigger a multiplied
-  win. Both are strict no-ops in production.
+  win. `GET /api/daily?demo=leaderboard` upserts ~6 obviously-fake
+  solvers ("Staging demo Ada/Borg/…") per game for today so the per-game
+  leaderboard ranking + tiebreakers are demonstrable.
+  `GET /api/daily?demo=resume` upserts one **claimed, unfinished**
+  `wordhunt` row for the current viewer (partial timer/steps) so the
+  "In progress · resume" card and resume flow are demonstrable. It uses
+  `wordhunt` (not `sudoku`) on purpose: `demo=locked`/`demo=streak`
+  finish the viewer's sudoku row for today, and proposal checks share
+  one staging DB, so a sudoku resume seed would collide and render
+  locked instead. All strict no-ops in production.
 - The nav **`Score`** is rehydrated from today's finished attempts.
-  Cross-day score history and a leaderboard remain **out of scope** (the
-  public table leaves room for them).
+  A per-game **daily leaderboard** now ships (see the API above);
+  cross-day / all-time history remains **out of scope** (the public table
+  leaves room for it).
 
 ## Streak multiplier tiers
 

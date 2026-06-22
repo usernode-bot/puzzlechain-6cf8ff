@@ -926,6 +926,11 @@ async function ensureUser(userId, username, usernode_pubkey) {
 const PUBLIC_API_PATHS = new Set(['/health']);
 const PUBLIC_PREFIXES = ['/explorer-api/'];
 
+// Serve static assets (CSS/JS/images from public/) BEFORE the auth middleware
+// so static files don't get 401'd. The browser won't load React/Babel/vendor
+// files if they require a token.
+app.use(express.static(path.join(__dirname, 'public')));
+
 app.use((req, res, next) => {
   const token = req.query.token || req.headers['x-usernode-token'];
   // Record *why* auth failed (a coarse signal only — never the token itself)
@@ -3090,9 +3095,7 @@ app.post('/api/pvp/match/:matchId/forfeit', async (req, res) => {
   }
 });
 
-// ---- Static + HTML shell -------------------------------------------------
-
-app.use(express.static(path.join(__dirname, 'public')));
+// ---- HTML shell (static assets served earlier, before auth) ----------------
 
 // Unauthenticated HTML shell. Branches on the *cause* of the auth miss so a
 // user staring at "the app won't open" gets a recovery path instead of a dead

@@ -32,7 +32,7 @@
     {
       "key": "APP_PUBKEY",
       "description": "Application public key",
-      "required": true,
+      "required": false,
       "private": false
     },
     {

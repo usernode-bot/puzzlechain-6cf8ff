@@ -10449,6 +10449,244 @@ const GAMES = [
 const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas', 'hashrush']);
 
 /* ============================================================
+   Social: Feed & Posts
+   ============================================================ */
+
+function FeedScreen({ user, setScreen }) {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+
+  useEffect(() => {
+    const loadFeed = async () => {
+      const { ok, body } = await api('/api/posts/feed?limit=20&offset=0');
+      if (ok && body) setPosts(body.posts || []);
+      setLoading(false);
+    };
+    loadFeed();
+    const id = setInterval(loadFeed, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (selectedPostId) {
+    const post = posts.find(p => p.id === selectedPostId);
+    if (post) {
+      return (
+        <PostDetail
+          post={post}
+          onBack={() => setSelectedPostId(null)}
+        />
+      );
+    }
+  }
+
+  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading feed...</div>;
+
+  const gameNameMap = {};
+  GAMES.forEach(g => gameNameMap[g.id] = g);
+
+  return (
+    <div className="lobby" style={{ maxWidth: '600px' }}>
+      {posts.length === 0 ? (
+        <div style={{ textAlign: 'center', color: C.muted, padding: '2rem' }}>
+          <p>No posts yet. Play a game and share your wins!</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {posts.map(p => {
+            const game = gameNameMap[p.gameId];
+            return (
+              <div
+                key={p.id}
+                className="card"
+                style={{ cursor: 'pointer', '--accent': game?.tagColor || C.accent }}
+                onClick={() => setSelectedPostId(p.id)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{
+                    width: '1.8rem', height: '1.8rem', borderRadius: '50%',
+                    background: C.accent, color: '#fff', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: '600'
+                  }}>
+                    {(p.username || 'U')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{p.username}</div>
+                    <div style={{ fontSize: '0.75rem', color: C.muted }}>
+                      {p.createdAt ? new Date(p.createdAt).toLocaleString() : 'now'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>{game?.icon || '🎮'}</span>
+                  <span style={{ fontWeight: '600' }}>{game?.name || p.gameId}</span>
+                </div>
+                <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  {p.score} pts
+                </div>
+                {p.caption && <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>{p.caption}</div>}
+                <div style={{ fontSize: '0.8rem', color: C.muted }}>
+                  💬 {p.commentCount} comment{p.commentCount !== 1 ? 's' : ''}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostDetail({ post, onBack }) {
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPost = async () => {
+      const { ok: userOk, body: userData } = await api('/api/daily');
+      if (userOk) setUser(userData.user);
+
+      const { ok, body } = await api(`/api/posts/${post.id}/comments?limit=50&offset=0`);
+      if (ok && body) setComments(body.comments || []);
+      setLoading(false);
+    };
+    loadPost();
+  }, [post.id]);
+
+  const addComment = async () => {
+    if (!commentText.trim()) return;
+    const { ok, body } = await api(`/api/posts/${post.id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ text: commentText }),
+    });
+    if (ok && body) {
+      setComments(prev => [body, ...prev]);
+      setCommentText('');
+    }
+  };
+
+  const deleteComment = async (commentId) => {
+    const { ok } = await api(`/api/posts/${post.id}/comments/${commentId}`, {
+      method: 'DELETE',
+    });
+    if (ok) {
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    }
+  };
+
+  const gameNameMap = {};
+  GAMES.forEach(g => gameNameMap[g.id] = g);
+  const game = gameNameMap[post.gameId];
+
+  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+
+  return (
+    <div className="game-wrap">
+      <button className="back-btn" onClick={onBack}>← Back</button>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{
+              width: '2rem', height: '2rem', borderRadius: '50%',
+              background: C.accent, color: '#fff', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontWeight: '600'
+            }}>
+              {(post.username || 'U')[0].toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: '600' }}>{post.username}</div>
+              <div style={{ fontSize: '0.8rem', color: C.muted }}>
+                {post.createdAt ? new Date(post.createdAt).toLocaleString() : 'now'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>{game?.icon || '🎮'}</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: '600' }}>{game?.name || post.gameId}</span>
+          </div>
+          <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', fontSize: '1.1rem', marginBottom: '0.75rem' }}>
+            {post.score} pts{post.timeSecs ? ` · ${Math.floor(post.timeSecs / 60)}:${String(post.timeSecs % 60).padStart(2, '0')}` : ''}
+          </div>
+          {post.caption && <div style={{ fontSize: '0.95rem', marginTop: '0.75rem' }}>{post.caption}</div>}
+        </div>
+
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Comments ({comments.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            {comments.map(c => (
+              <div key={c.id} className="card" style={{ padding: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.username}</div>
+                    <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.4rem' }}>
+                      {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'now'}
+                    </div>
+                    <div style={{ fontSize: '0.9rem' }}>{c.text}</div>
+                  </div>
+                  {user && user.id === c.userId && (
+                    <button
+                      onClick={() => deleteComment(c.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: C.rose,
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        marginLeft: '0.5rem',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              placeholder="Add a comment..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value.slice(0, 280))}
+              onKeyDown={(e) => e.key === 'Enter' && addComment()}
+              style={{
+                flex: 1,
+                padding: '0.6rem 0.8rem',
+                background: C.card,
+                border: `1px solid ${C.border}`,
+                borderRadius: '10px',
+                color: C.text,
+                fontFamily: 'inherit',
+                fontSize: '0.9rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={addComment}
+              style={{
+                padding: '0.6rem 1rem',
+                background: C.accent,
+                color: '#fff',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+              }}
+            >
+              Reply
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Root app
    ============================================================ */
 function App() {
@@ -10477,6 +10715,8 @@ function App() {
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
+  // Share modal for posting wins to feed
+  const [shareModal, setShareModal] = useState({ show: false, caption: '' });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -10582,7 +10822,12 @@ function App() {
     const finalScore = Math.round(score * multiplier);
     const bonus = finalScore - score;
     setStreak(effectiveStreak);
-    setWinData({ score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak, share: meta && meta.share });
+    setWinData({
+      score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+      share: meta && meta.share,
+      canPost: true,
+      gameId: gameId,
+    });
 
     const gameId = currentGame.id;
     const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
@@ -10739,7 +10984,7 @@ function App() {
         <div className="lobby">
           <div className="lobby-head">
             <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : 'PvP Arena'}
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : lobbyTab === 'pvp' ? 'PvP Arena' : 'Community Feed'}
             </h1>
             <p>
               {lobbyTab === 'daily'
@@ -10748,7 +10993,9 @@ function App() {
                 ? 'Play anytime — track your best scores.'
                 : lobbyTab === 'idle'
                 ? 'Tap, upgrade, and build your empire. Progress saved automatically.'
-                : 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'}
+                : lobbyTab === 'pvp'
+                ? 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'
+                : 'See what your friends have been playing'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
               <p className="lobby-hint">
@@ -10782,9 +11029,17 @@ function App() {
               onClick={() => setLobbyTab('pvp')}
               style={lobbyTab !== 'pvp' ? { borderColor: C.rose + '60', color: C.rose } : {}}
             >⚔️ PvP Arena</button>
+            {authOk && (
+              <button
+                className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
+                onClick={() => setLobbyTab('feed')}
+              >Feed</button>
+            )}
           </div>
           {lobbyTab === 'pvp' ? (
             <PvpArena user={user} authOk={authOk} />
+          ) : lobbyTab === 'feed' ? (
+            <FeedScreen user={user} setScreen={setScreen} />
           ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
@@ -10924,6 +11179,15 @@ function App() {
               </div>
             </div>
             <ShareButton text={winData.share} />
+            {!winData.isClassic && authOk && (
+              <button
+                className="primary-btn"
+                style={{ marginBottom: '0.6rem', background: C.emerald }}
+                onClick={() => setShareModal({ show: true, caption: '', gameId: winData.gameId, score: winData.finalScore, steps: winData.steps, timeSecs: winData.timeSecs })}
+              >
+                📤 Share to Feed
+              </button>
+            )}
             {winData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
                 Play Again
@@ -10963,6 +11227,67 @@ function App() {
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+          </div>
+        </div>
+      )}
+
+      {shareModal.show && (
+        <div className="win-overlay">
+          <div className="win-card">
+            <h2>Share to Feed</h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <textarea
+                placeholder="Add a caption (optional, max 280 chars)"
+                value={shareModal.caption}
+                onChange={(e) => setShareModal(prev => ({ ...prev, caption: e.target.value.slice(0, 280) }))}
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: '10px',
+                  color: C.text,
+                  fontFamily: 'inherit',
+                  fontSize: '0.9rem',
+                  minHeight: '80px',
+                  resize: 'vertical',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ fontSize: '0.75rem', color: C.muted, marginTop: '0.4rem', textAlign: 'right' }}>
+                {shareModal.caption.length}/280
+              </div>
+            </div>
+            <button
+              className="primary-btn"
+              onClick={async () => {
+                const { ok } = await api('/api/posts', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    gameId: shareModal.gameId,
+                    score: shareModal.score,
+                    steps: shareModal.steps,
+                    timeSecs: shareModal.timeSecs,
+                    caption: shareModal.caption || null,
+                  }),
+                });
+                if (ok) {
+                  setShareModal({ show: false, caption: '' });
+                  // Show brief success message
+                  setTimeout(() => backToLobby(), 1500);
+                }
+              }}
+              style={{ marginBottom: '0.6rem' }}
+            >
+              ✓ Post to Feed
+            </button>
+            <button
+              className="primary-btn"
+              style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+              onClick={() => setShareModal({ show: false, caption: '' })}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

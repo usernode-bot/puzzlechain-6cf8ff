@@ -923,7 +923,7 @@ async function ensureUser(userId, username, usernode_pubkey) {
 // anything not explicitly marked public. The iframe adds `?token=…`
 // on load; the frontend script forwards the token via `x-usernode-token`
 // on subsequent fetches.
-const PUBLIC_API_PATHS = new Set(['/health']);
+const PUBLIC_API_PATHS = new Set(['/health', '/favicon.ico']);
 const PUBLIC_PREFIXES = ['/explorer-api/'];
 
 // Serve static assets (CSS/JS/images from public/) BEFORE the auth middleware

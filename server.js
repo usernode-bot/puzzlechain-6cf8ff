@@ -111,6 +111,9 @@ const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 // resets implicitly: a new UTC date yields a new attempt_date, so
 // yesterday's rows simply stop matching today's lookups.
 async function migrate() {
+  let _step = 'init';
+  try {
+  _step = 'daily_attempts';
   await pool.query(`
     CREATE TABLE IF NOT EXISTS daily_attempts (
       id           SERIAL PRIMARY KEY,
@@ -538,6 +541,7 @@ async function migrate() {
 
   // tilematch_tokens is PUBLIC: off-chain MATCH token balance per user.
   // Server enforces balance >= 0 on every write.
+  _step = 'tilematch_tokens';
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tilematch_tokens (
       user_id    TEXT PRIMARY KEY,
@@ -639,6 +643,7 @@ async function migrate() {
   await pool.query(`ALTER TABLE tilematch_tournaments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
 
   // tilematch_tournament_entries is PUBLIC: one entry per user per tournament.
+  _step = 'tilematch_tournament_entries';
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tilematch_tournament_entries (
       id              TEXT PRIMARY KEY,
@@ -723,6 +728,7 @@ async function migrate() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_session_states_session ON session_states(session_id, sequence)`);
 
   if (IS_STAGING) {
+    _step = 'staging_pvp_seeds';
     // PvP staging seeds: three match states for UI testing.
     await pool.query(`
       INSERT INTO pvp_matches
@@ -1073,6 +1079,7 @@ async function migrate() {
   // Tilematch Puzzle staging seeds: populate leaderboard, wallet, tasks, duels,
   // and daily attempts for the daily leaderboard tab. All idempotent; no-op in prod.
   if (IS_STAGING) {
+    _step = 'staging_tilematch_seeds';
     // Global leaderboard — 5 fake users with spread of highest levels
     const tmScoreSeed = [
       ['tm-demo-1', 'staging-tm-legend',  480, 510, 12400],
@@ -1091,17 +1098,28 @@ async function migrate() {
       );
     }
 
-    // Wallet: give staging-demo-user 500 MATCH tokens + economy balances
+    // Wallet: give staging-demo-user 500 MATCH tokens + economy balances.
+    // DO UPDATE so balances are reset to known values on every staging boot.
     await pool.query(
       `INSERT INTO tilematch_tokens (user_id, username, balance, balance_points, balance_stable, is_vip)
        VALUES ('staging-demo-user', 'staging-demo-user', 500, 1500, 25.00, false)
-       ON CONFLICT (user_id) DO NOTHING`
+       ON CONFLICT (user_id) DO UPDATE SET
+         balance = EXCLUDED.balance,
+         balance_points = EXCLUDED.balance_points,
+         balance_stable = EXCLUDED.balance_stable,
+         is_vip = EXCLUDED.is_vip,
+         updated_at = now()`
     );
     // staging-demo-vip: VIP account for VIP panel demo
     await pool.query(
       `INSERT INTO tilematch_tokens (user_id, username, balance, balance_points, balance_stable, is_vip)
        VALUES ('staging-demo-vip', 'staging-demo-vip', 200, 3000, 50.00, true)
-       ON CONFLICT (user_id) DO NOTHING`
+       ON CONFLICT (user_id) DO UPDATE SET
+         balance = EXCLUDED.balance,
+         balance_points = EXCLUDED.balance_points,
+         balance_stable = EXCLUDED.balance_stable,
+         is_vip = EXCLUDED.is_vip,
+         updated_at = now()`
     );
 
     // Daily tasks for staging-demo-user: one completable, one in-progress, one not started
@@ -1222,6 +1240,7 @@ async function migrate() {
     }
 
     // One PROVEN wallet for the viewer so the "Verified identity" badge renders.
+    _step = 'staging_wallet_ownership_proofs';
     await pool.query(
       `INSERT INTO wallet_ownership_proofs (user_id, usernode_pubkey, wallet_addr, nonce, signature)
        VALUES ('staging-demo-user', 'ut1stagingdemo',
@@ -1229,6 +1248,10 @@ async function migrate() {
                'staging-demo-nonce', '0xstagingdemosignature')
        ON CONFLICT (user_id) DO NOTHING`
     );
+  }
+  console.log('[migrate] complete');
+  } catch (err) {
+    throw Object.assign(err, { migrationStep: _step });
   }
 }
 
@@ -5873,13 +5896,15 @@ async function ensureTournamentsExist() {
   try {
     const today = utcToday(); const weekAnchor = utcWeekAnchor(); const monthAnchor = utcMonthAnchor();
 
-    // Daily tournament: midnight UTC today → tomorrow
+    // Daily tournament: midnight UTC today → tomorrow.
+    // ON CONFLICT (id) DO NOTHING is safe and idempotent: if 'daily-<today>'
+    // already exists (active OR finished) we skip; no PK collision risk.
     const tomorrow = new Date(today); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
     const dailySeed = Math.floor(Math.random() * 2147483647) + 1;
     await pool.query(
       `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
-       SELECT 'daily-' || $1, 'daily', $2, $3, 50, 5000, 10.00, 'active', $4
-       WHERE NOT EXISTS (SELECT 1 FROM tilematch_tournaments WHERE type = 'daily' AND status = 'active' AND start_at::date = $1::date)`,
+       VALUES ('daily-' || $1, 'daily', $2, $3, 50, 5000, 10.00, 'active', $4)
+       ON CONFLICT (id) DO NOTHING`,
       [today, today + 'T00:00:00Z', tomorrow.toISOString(), dailySeed]
     );
 
@@ -5888,8 +5913,8 @@ async function ensureTournamentsExist() {
     const weeklySeed = Math.floor(Math.random() * 2147483647) + 1;
     await pool.query(
       `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
-       SELECT 'weekly-' || $1, 'weekly', $2, $3, 200, 20000, 50.00, 'active', $4
-       WHERE NOT EXISTS (SELECT 1 FROM tilematch_tournaments WHERE type = 'weekly' AND status = 'active' AND start_at::date = $1::date)`,
+       VALUES ('weekly-' || $1, 'weekly', $2, $3, 200, 20000, 50.00, 'active', $4)
+       ON CONFLICT (id) DO NOTHING`,
       [weekAnchor, weekAnchor + 'T00:00:00Z', nextMonday.toISOString(), weeklySeed]
     );
 
@@ -5898,8 +5923,8 @@ async function ensureTournamentsExist() {
     const monthlySeed = Math.floor(Math.random() * 2147483647) + 1;
     await pool.query(
       `INSERT INTO tilematch_tournaments (id, type, start_at, end_at, entry_fee_points, prize_pool_points, prize_pool_stable, status, board_seed)
-       SELECT 'monthly-' || $1, 'monthly', $2, $3, 500, 75000, 200.00, 'active', $4
-       WHERE NOT EXISTS (SELECT 1 FROM tilematch_tournaments WHERE type = 'monthly' AND status = 'active' AND start_at::date = $1::date)`,
+       VALUES ('monthly-' || $1, 'monthly', $2, $3, 500, 75000, 200.00, 'active', $4)
+       ON CONFLICT (id) DO NOTHING`,
       [monthAnchor, monthAnchor + 'T00:00:00Z', nextMonth1.toISOString(), monthlySeed]
     );
 
@@ -5913,6 +5938,6 @@ migrate()
   .then(() => ensureTournamentsExist())
   .then(() => app.listen(port, () => console.log(`Listening on :${port}`)))
   .catch((err) => {
-    console.error('Migration failed:', err);
+    console.error('Migration failed at step [' + (err.migrationStep || 'unknown') + ']:', err.message, err.stack);
     process.exit(1);
   });

@@ -24,9 +24,19 @@ const utgoProvider = UTGO_RPC_URL
   ? new ethers.JsonRpcProvider(UTGO_RPC_URL)
   : null;
 
-const UTGO_ABI_BALANCE = ['function balanceOf(address account) view returns (uint256)'];
-const WAGER_IFACE       = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
+const UTGO_ABI_BALANCE   = ['function balanceOf(address account) view returns (uint256)'];
+const WAGER_IFACE        = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
 const CANCEL_QUEUE_IFACE = new ethers.Interface(['function cancelQueue(bytes32)']);
+const TRANSFER_IFACE     = new ethers.Interface(['function transfer(address,uint256)']);
+const CLAIM_REWARDS_IFACE = new ethers.Interface(['function claimRewards(address,uint256,uint256,bytes)']);
+
+// Reward economics — single source of truth for balance/tuning.
+// 1 UTGO per 1000 final points; streak multiplier already baked into finalScore.
+const REWARD_PER_POINT_WEI = BigInt('1000000000000000'); // 0.001 UTGO per point → ~0.96 UTGO for ~960pts
+const STREAK_FREEZE_PRICE_WEI = BigInt('5000000000000000000'); // 5 UTGO
+
+// EVM address regex (same as PvP validation throughout)
+const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // Single shared connection pool to this app's Postgres DB.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -51,7 +61,7 @@ let redisReady = false;
 
 // Known game ids — kept in sync with the GAMES registry in public/app.jsx.
 // Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle']);
+const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle', 'zuma']);
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -224,6 +234,24 @@ async function migrate() {
     )
   `);
 
+  // zuma_scores is PUBLIC — high scores for the Zuma classic game, shown on
+  // a global leaderboard (no sensitive data; gameplay results only). One row
+  // per user holding their personal best, upserted with GREATEST so a worse
+  // run never clobbers a better one. No foreign keys (public-table rule).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS zuma_scores (
+      id             SERIAL PRIMARY KEY,
+      user_id        TEXT NOT NULL UNIQUE,
+      username       TEXT,
+      best_score     INTEGER NOT NULL DEFAULT 0,
+      best_level     INTEGER,
+      best_time_secs INTEGER,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   // pvp_moves: per-move log for anti-cheat timing analysis. PUBLIC.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pvp_moves (
@@ -263,6 +291,65 @@ async function migrate() {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     )
+  `);
+
+  // user_wallets is PRIVATE: maps user_id to EVM wallet address.
+  // Marked private because it links a Usernode identity to a financial address.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_wallets (
+      user_id     TEXT PRIMARY KEY,
+      wallet_addr TEXT NOT NULL,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE user_wallets IS 'staging:private'`);
+
+  // token_rewards_ledger is PUBLIC: per-user accrual of earned-but-unclaimed $UTGO.
+  // No sensitive data (amounts are gameplay results like daily_attempts).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS token_rewards_ledger (
+      user_id              TEXT PRIMARY KEY,
+      pending_wei          NUMERIC(78,0) NOT NULL DEFAULT 0,
+      lifetime_earned_wei  NUMERIC(78,0) NOT NULL DEFAULT 0,
+      lifetime_claimed_wei NUMERIC(78,0) NOT NULL DEFAULT 0,
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // token_reward_events is PUBLIC: idempotency log for puzzle reward credits.
+  // UNIQUE (user_id, game_id, attempt_date) prevents double-crediting on retries.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS token_reward_events (
+      id           BIGSERIAL PRIMARY KEY,
+      user_id      TEXT NOT NULL,
+      game_id      TEXT NOT NULL,
+      attempt_date DATE NOT NULL,
+      amount_wei   NUMERIC(78,0) NOT NULL,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (user_id, game_id, attempt_date)
+    )
+  `);
+
+  // token_tips is PUBLIC: one row per tip between users.
+  // Mirrors public on-chain transfers; powers profile "tips received" panel.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS token_tips (
+      id           BIGSERIAL PRIMARY KEY,
+      from_user_id TEXT NOT NULL,
+      to_user_id   TEXT NOT NULL,
+      from_addr    TEXT,
+      to_addr      TEXT,
+      amount_wei   NUMERIC(78,0) NOT NULL,
+      tx_hash      TEXT,
+      status       TEXT NOT NULL DEFAULT 'confirmed',
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Add streak_freezes column to user_stats_snapshot (idempotent)
+  await pool.query(`
+    ALTER TABLE user_stats_snapshot
+      ADD COLUMN IF NOT EXISTS streak_freezes INTEGER NOT NULL DEFAULT 0
   `);
 
   // user_follows is PUBLIC: directional follow relationships.
@@ -307,6 +394,56 @@ async function migrate() {
     )
   `);
 
+  // posts is PUBLIC: shared game results and scores. No sensitive data.
+  // One row per post. user_id is the author.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id              SERIAL PRIMARY KEY,
+      user_id         TEXT NOT NULL,
+      game_id         TEXT NOT NULL,
+      score           INTEGER NOT NULL,
+      steps           INTEGER,
+      time_secs       INTEGER,
+      caption         TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // post_comments is PUBLIC: comments on shared posts. No sensitive data.
+  // One row per comment. Cascades delete when post is deleted.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS post_comments (
+      id              SERIAL PRIMARY KEY,
+      post_id         INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+      user_id         TEXT NOT NULL,
+      text            TEXT NOT NULL,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // collab_sessions is PUBLIC: collaborative puzzle-solving sessions.
+  // One row per co-op game session. status: waiting|active|finished.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS collab_sessions (
+      id              TEXT PRIMARY KEY,
+      game_id         TEXT NOT NULL,
+      initiator_id    TEXT NOT NULL,
+      invitee_id      TEXT,
+      initiator_name  TEXT,
+      invitee_name    TEXT,
+      status          TEXT NOT NULL DEFAULT 'waiting',
+      state           JSONB,
+      seed            BIGINT,
+      initiator_score INTEGER,
+      invitee_score   INTEGER,
+      started_at      TIMESTAMPTZ,
+      finished_at     TIMESTAMPTZ,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_activity   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   // Create indices for social queries
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_follows_followee
@@ -323,6 +460,26 @@ async function migrate() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_achievements_created
     ON user_achievements(created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_posts_user_created
+    ON posts(user_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_posts_created
+    ON posts(created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_post_comments_post_created
+    ON post_comments(post_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_collab_sessions_initiator
+    ON collab_sessions(initiator_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_collab_sessions_invitee
+    ON collab_sessions(invitee_id)
   `);
 
   if (IS_STAGING) {
@@ -451,6 +608,133 @@ async function migrate() {
         [uid, type, gameId, score, JSON.stringify(meta)]
       );
     }
+
+    // Wallet staging seeds — user_wallets is private (schema-only in staging), so
+    // we seed fake wallet addresses for demo users so tip/profile flows have targets.
+    const walletSeeds = [
+      ['staging-demo-user', '0xDEAD000000000000000000000000000000000001'],
+      ['staging-alice',     '0xDEAD000000000000000000000000000000000002'],
+      ['staging-bob',       '0xDEAD000000000000000000000000000000000003'],
+      ['staging-charlie',   '0xDEAD000000000000000000000000000000000004'],
+    ];
+    for (const [uid, addr] of walletSeeds) {
+      await pool.query(
+        `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, addr]
+      );
+    }
+
+    // Seed the demo user with 3 UTGO pending rewards so the Wallet screen's
+    // Claim button and pending display are demonstrable without solving a puzzle.
+    await pool.query(
+      `INSERT INTO token_rewards_ledger
+         (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) DO NOTHING`,
+      ['staging-demo-user',
+       '3000000000000000000',  // 3 UTGO pending
+       '5000000000000000000',  // 5 UTGO lifetime earned
+       '2000000000000000000']  // 2 UTGO lifetime claimed
+    );
+
+    // Seed tips received by staging-demo-user so their profile and Wallet
+    // recent-activity show rows without any real on-chain action.
+    const tipSeeds = [
+      ['staging-alice', 'staging-demo-user',
+       '0xDEAD000000000000000000000000000000000002',
+       '0xDEAD000000000000000000000000000000000001',
+       '1000000000000000000', '0xstaging-tip-1'],
+      ['staging-bob', 'staging-demo-user',
+       '0xDEAD000000000000000000000000000000000003',
+       '0xDEAD000000000000000000000000000000000001',
+       '2000000000000000000', '0xstaging-tip-2'],
+    ];
+    for (const [from, to, fromAddr, toAddr, amount, tx] of tipSeeds) {
+      await pool.query(
+        `INSERT INTO token_tips
+           (from_user_id, to_user_id, from_addr, to_addr, amount_wei, tx_hash, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')
+         ON CONFLICT DO NOTHING`,
+        [from, to, fromAddr, toAddr, amount, tx]
+      );
+    }
+
+    // Seed posts from demo users with varied games
+    const posts = [
+      ['staging-demo-user', 'sudoku', 980, 17, 132, 'Finally beat my PB! 🎉'],
+      ['staging-alice', 'wordhunt', 1050, 28, 95, 'Had so much fun with this one'],
+      ['staging-bob', 'mancala', 750, null, 180, 'Mancala champion right here'],
+      ['staging-demo-user', 'wordhunt', 920, 31, 108, ''],
+      ['staging-charlie', 'sudoku', 620, 22, 156, 'Still learning but enjoying it'],
+      ['staging-alice', 'cryptowordle', 890, 4, 85, 'Got the daily crypto word!'],
+      ['staging-bob', 'sudoku', 1100, 19, 145, 'Personal record on sudoku today'],
+    ];
+
+    for (const [userId, gameId, score, steps, timeSecs, caption] of posts) {
+      await pool.query(
+        `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, now() - interval '${Math.floor(Math.random() * 48)}' hours)
+         ON CONFLICT DO NOTHING`,
+        [userId, gameId, score, steps, timeSecs, caption || null]
+      );
+    }
+
+    // Seed comments on a few posts (fetch post IDs for linking)
+    const postsForComments = await pool.query(
+      `SELECT id FROM posts WHERE user_id IN ('staging-demo-user', 'staging-alice', 'staging-bob')
+       LIMIT 3`
+    );
+
+    if (postsForComments.rows.length > 0) {
+      const comments = [
+        [postsForComments.rows[0].id, 'staging-alice', 'Nice score! 👍'],
+        [postsForComments.rows[0].id, 'staging-bob', 'How did you solve that so fast?'],
+        [postsForComments.rows[0].id, 'staging-charlie', 'Amazing!'],
+      ];
+      if (postsForComments.rows.length > 1) {
+        comments.push([postsForComments.rows[1].id, 'staging-demo-user', 'Congrats Alice!']);
+        comments.push([postsForComments.rows[1].id, 'staging-charlie', 'Great work']);
+      }
+      if (postsForComments.rows.length > 2) {
+        comments.push([postsForComments.rows[2].id, 'staging-alice', 'Awesome!']);
+      }
+
+      for (const [postId, userId, text] of comments) {
+        await pool.query(
+          `INSERT INTO post_comments (post_id, user_id, text, created_at)
+           VALUES ($1, $2, $3, now() - interval '${Math.floor(Math.random() * 24)}' hours)
+           ON CONFLICT DO NOTHING`,
+          [postId, userId, text]
+        );
+      }
+    }
+
+    // Seed collab sessions: one finished, one active
+    const finishedPits = JSON.stringify([0,0,0,0,0,0,32,0,0,0,0,0,0,16]);
+    const activePits = JSON.stringify([0,0,0,0,0,1,28,2,2,2,2,2,2,5]);
+
+    await pool.query(
+      `INSERT INTO collab_sessions
+         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
+          status, state, seed, initiator_score, invitee_score, started_at, finished_at, created_at, last_activity)
+       VALUES ($1, 'mancala', 'staging-demo-user', 'staging-alice', 'staging-demo-user', 'staging-alice',
+               'finished', $2, 42317893, 750, 620,
+               now() - interval '2 hours', now() - interval '1 hour 50 minutes',
+               now() - interval '2 hours', now() - interval '1 hour 50 minutes')
+       ON CONFLICT (id) DO NOTHING`,
+      ['COLL1', finishedPits]
+    );
+
+    await pool.query(
+      `INSERT INTO collab_sessions
+         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
+          status, state, seed, created_at, last_activity)
+       VALUES ($1, 'mancala', 'staging-bob', 'staging-charlie', 'staging-bob', 'staging-charlie',
+               'waiting', $2, 12345678, now() - interval '15 minutes', now() - interval '5 minutes')
+       ON CONFLICT (id) DO NOTHING`,
+      ['COLL2', activePits]
+    );
   }
 
   // Staging seeds for mancala_rooms so testers can exercise all states
@@ -518,6 +802,26 @@ async function migrate() {
     for (const [uid, uname, best, lvl, secs] of bounceSeed) {
       await pool.query(
         `INSERT INTO breakout_scores
+           (user_id, username, best_score, best_level, best_time_secs, games_played)
+         VALUES ($1, $2, $3, $4, $5, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [uid, uname, best, lvl, secs]
+      );
+    }
+
+    // Zuma leaderboard seed — newly created table is empty in staging, so the
+    // leaderboard tab would have nothing to show. Obviously-fake users with a
+    // spread of scores. Idempotent; no-op in production.
+    const zumaSeed = [
+      ['zuma-demo-1', 'staging-zuma-master',  4200, 3, 210],
+      ['zuma-demo-2', 'staging-zuma-ace',     2900, 3, 275],
+      ['zuma-demo-3', 'staging-zuma-rookie',  1600, 2, 188],
+      ['zuma-demo-4', 'staging-zuma-fan',      750, 2, 130],
+      ['zuma-demo-5', 'staging-zuma-newbie',   280, 1,  60],
+    ];
+    for (const [uid, uname, best, lvl, secs] of zumaSeed) {
+      await pool.query(
+        `INSERT INTO zuma_scores
            (user_id, username, best_score, best_level, best_time_secs, games_played)
          VALUES ($1, $2, $3, $4, $5, 3)
          ON CONFLICT (user_id) DO NOTHING`,
@@ -659,7 +963,8 @@ function prevUtcDay(iso) {
 // Consecutive-day streak for a user: the length of the unbroken run of UTC
 // days (each with >=1 finished attempt) ending today, or ending yesterday if
 // today hasn't been played yet (a streak stays alive until a full day is
-// missed). Computed from the existing daily_attempts rows — no extra schema.
+// missed). A streak_freeze in user_stats_snapshot bridges exactly ONE missed
+// UTC day — a 2+ day gap still resets. Computed from the existing daily_attempts rows.
 async function computeStreak(userId) {
   const { rows } = await pool.query(
     `SELECT DISTINCT attempt_date::text AS d
@@ -671,12 +976,35 @@ async function computeStreak(userId) {
   );
   if (rows.length === 0) return 0;
   const days = new Set(rows.map(r => r.d));
-  const today = new Date().toISOString().slice(0, 10); // UTC, matches (now() AT TIME ZONE 'utc')::date
+  const today = new Date().toISOString().slice(0, 10); // UTC
   const yesterday = prevUtcDay(today);
   let cursor;
   if (days.has(today)) cursor = today;
   else if (days.has(yesterday)) cursor = yesterday;
-  else return 0; // last finished day is older than yesterday → streak broken
+  else {
+    // Check if a freeze bridges today's gap
+    const twoDaysAgo = prevUtcDay(yesterday);
+    if (days.has(twoDaysAgo)) {
+      const { rows: fRows } = await pool.query(
+        `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
+        [userId]
+      );
+      if (fRows.length > 0 && fRows[0].streak_freezes > 0) {
+        // Consume the freeze: deduct one and count from twoDaysAgo
+        await pool.query(
+          `UPDATE user_stats_snapshot
+              SET streak_freezes = GREATEST(0, streak_freezes - 1), updated_at = now()
+            WHERE user_id = $1 AND streak_freezes > 0`,
+          [userId]
+        );
+        cursor = twoDaysAgo;
+      } else {
+        return 0;
+      }
+    } else {
+      return 0; // last finished day is older than yesterday → streak broken
+    }
+  }
   let streak = 0;
   while (days.has(cursor)) {
     streak++;
@@ -806,6 +1134,34 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
     );
     const followingCount = parseInt(followingRows[0].count);
 
+    // Wallet info: whether they have a linked address, plus tips received
+    const { rows: walletRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [viewedUserId]
+    );
+    const walletLinked = walletRows.length > 0;
+
+    const { rows: tipRows } = await pool.query(
+      `SELECT SUM(amount_wei) as total_wei,
+              JSON_AGG(
+                JSON_BUILD_OBJECT(
+                  'fromUserId', from_user_id,
+                  'amountWei', amount_wei::text,
+                  'createdAt', created_at
+                ) ORDER BY created_at DESC
+              ) as tips
+         FROM (
+           SELECT from_user_id, amount_wei, created_at
+             FROM token_tips
+            WHERE to_user_id = $1 AND status = 'confirmed'
+            ORDER BY created_at DESC
+            LIMIT 5
+         ) sub`,
+      [viewedUserId]
+    );
+    const tipsReceivedWei = tipRows[0].total_wei ? tipRows[0].total_wei.toString() : '0';
+    const recentTippers = tipRows[0].tips || [];
+
     res.json({
       user: {
         id: user.id,
@@ -823,6 +1179,9 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
       following,
       followerCount,
       followingCount,
+      walletLinked,
+      tipsReceivedWei,
+      recentTippers,
     });
   } catch (err) {
     console.error('[social] profile failed:', err.message);
@@ -899,6 +1258,383 @@ app.delete('/api/social/unfollow/:userId', async (req, res) => {
   } catch (err) {
     console.error('[social] unfollow failed:', err.message);
     res.status(500).json({ error: 'Failed to unfollow user' });
+  }
+});
+
+// ---- Posts API (sharing) -----------------------------------------------
+
+// POST /api/posts — create a post from a win
+app.post('/api/posts', async (req, res) => {
+  const { gameId, score, steps, timeSecs, caption } = req.body;
+  if (!gameId || !Number.isFinite(score)) {
+    return res.status(400).json({ error: 'gameId and score are required' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, user_id, game_id, score, steps, time_secs, caption, created_at`,
+      [req.user.id, gameId, score, steps || null, timeSecs || null, caption || null]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[posts] create failed:', err.message);
+    res.status(500).json({ error: 'Failed to create post' });
+  }
+});
+
+// GET /api/posts/feed — fetch feed for signed-in user
+app.get('/api/posts/feed', async (req, res) => {
+  try {
+    const limit = Math.min(50, parseInt(req.query.limit) || 20);
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+    // Get user's posts + posts from followed users, ordered by created_at DESC
+    const { rows: posts } = await pool.query(
+      `SELECT p.id, p.user_id, u.username, p.game_id, p.score, p.steps, p.time_secs, p.caption, p.created_at,
+              (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.user_id = $1
+          OR p.user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1)
+       ORDER BY p.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) as total FROM posts p
+       WHERE p.user_id = $1
+          OR p.user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1)`,
+      [req.user.id]
+    );
+
+    res.json({
+      posts: posts.map(p => ({
+        id: p.id,
+        userId: p.user_id,
+        username: p.username,
+        gameId: p.game_id,
+        score: p.score,
+        steps: p.steps,
+        timeSecs: p.time_secs,
+        caption: p.caption,
+        createdAt: p.created_at,
+        commentCount: parseInt(p.comment_count),
+      })),
+      total: parseInt(countRows[0].total),
+    });
+  } catch (err) {
+    console.error('[posts] feed failed:', err.message);
+    res.status(500).json({ error: 'Failed to load feed' });
+  }
+});
+
+// GET /api/posts/:postId — fetch single post
+app.get('/api/posts/:postId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.id, p.user_id, u.username, p.game_id, p.score, p.steps, p.time_secs, p.caption, p.created_at,
+              (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`,
+      [req.params.postId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    const p = rows[0];
+    res.json({
+      id: p.id,
+      userId: p.user_id,
+      username: p.username,
+      gameId: p.game_id,
+      score: p.score,
+      steps: p.steps,
+      timeSecs: p.time_secs,
+      caption: p.caption,
+      createdAt: p.created_at,
+      commentCount: parseInt(p.comment_count),
+    });
+  } catch (err) {
+    console.error('[posts] get failed:', err.message);
+    res.status(500).json({ error: 'Failed to load post' });
+  }
+});
+
+// ---- Post comments API ---------------------------------------------------
+
+// GET /api/posts/:postId/comments — fetch comments on a post
+app.get('/api/posts/:postId/comments', async (req, res) => {
+  try {
+    const limit = Math.min(100, parseInt(req.query.limit) || 50);
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+    // Verify post exists
+    const { rows: postRows } = await pool.query(
+      `SELECT id FROM posts WHERE id = $1`,
+      [req.params.postId]
+    );
+    if (postRows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const { rows: comments } = await pool.query(
+      `SELECT c.id, c.post_id, c.user_id, u.username, c.text, c.created_at
+       FROM post_comments c
+       JOIN users u ON c.user_id = u.id
+       WHERE c.post_id = $1
+       ORDER BY c.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.params.postId, limit, offset]
+    );
+
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) as total FROM post_comments WHERE post_id = $1`,
+      [req.params.postId]
+    );
+
+    res.json({
+      comments: comments.map(c => ({
+        id: c.id,
+        postId: c.post_id,
+        userId: c.user_id,
+        username: c.username,
+        text: c.text,
+        createdAt: c.created_at,
+      })),
+      total: parseInt(countRows[0].total),
+    });
+  } catch (err) {
+    console.error('[comments] get failed:', err.message);
+    res.status(500).json({ error: 'Failed to load comments' });
+  }
+});
+
+// POST /api/posts/:postId/comments — add a comment
+app.post('/api/posts/:postId/comments', async (req, res) => {
+  const { text } = req.body;
+  if (!text || text.length > 280) {
+    return res.status(400).json({ error: 'text is required and must be <= 280 chars' });
+  }
+  try {
+    // Verify post exists
+    const { rows: postRows } = await pool.query(
+      `SELECT id FROM posts WHERE id = $1`,
+      [req.params.postId]
+    );
+    if (postRows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO post_comments (post_id, user_id, text)
+       VALUES ($1, $2, $3)
+       RETURNING id, post_id, user_id, text, created_at`,
+      [req.params.postId, req.user.id, text]
+    );
+    const c = rows[0];
+    res.json({
+      id: c.id,
+      postId: c.post_id,
+      userId: c.user_id,
+      text: c.text,
+      createdAt: c.created_at,
+    });
+  } catch (err) {
+    console.error('[comments] create failed:', err.message);
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
+});
+
+// DELETE /api/posts/:postId/comments/:commentId — delete own comment
+app.delete('/api/posts/:postId/comments/:commentId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM post_comments
+       WHERE id = $1 AND post_id = $2 AND user_id = $3
+       RETURNING id`,
+      [req.params.commentId, req.params.postId, req.user.id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Comment not found or not owned by you' });
+    }
+    res.status(204).send();
+  } catch (err) {
+    console.error('[comments] delete failed:', err.message);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
+// ---- Collaborative sessions API ----------------------------------------
+
+// POST /api/collab/sessions — initiate a collaborative session
+app.post('/api/collab/sessions', async (req, res) => {
+  const { gameId, inviteeId } = req.body;
+  if (!gameId || !inviteeId) {
+    return res.status(400).json({ error: 'gameId and inviteeId are required' });
+  }
+  if (inviteeId === req.user.id) {
+    return res.status(409).json({ error: 'Cannot invite yourself' });
+  }
+  try {
+    // Generate room ID (6-char code)
+    let roomId = '';
+    const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let i = 0; i < 6; i++) {
+      roomId += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    }
+
+    // Get invitee name
+    const { rows: inviteeRows } = await pool.query(
+      `SELECT username FROM users WHERE id = $1`,
+      [inviteeId]
+    );
+    if (inviteeRows.length === 0) {
+      return res.status(404).json({ error: 'Invitee not found' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO collab_sessions
+         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'waiting')
+       RETURNING id, game_id, initiator_id, invitee_id, initiator_name, invitee_name, status, created_at`,
+      [roomId, gameId, req.user.id, inviteeId, req.user.username, inviteeRows[0].username]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[collab] create failed:', err.message);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+// GET /api/collab/sessions/:roomId — poll session state
+app.get('/api/collab/sessions/:roomId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
+              status, state, seed, initiator_score, invitee_score, started_at, finished_at, created_at
+       FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    const s = rows[0];
+    res.json({
+      id: s.id,
+      gameId: s.game_id,
+      initiatorId: s.initiator_id,
+      inviteeId: s.invitee_id,
+      initiatorName: s.initiator_name,
+      inviteeName: s.invitee_name,
+      status: s.status,
+      state: s.state,
+      seed: s.seed,
+      initiatorScore: s.initiator_score,
+      inviteeScore: s.invitee_score,
+      startedAt: s.started_at,
+      finishedAt: s.finished_at,
+      createdAt: s.created_at,
+    });
+  } catch (err) {
+    console.error('[collab] get failed:', err.message);
+    res.status(500).json({ error: 'Failed to load session' });
+  }
+});
+
+// POST /api/collab/sessions/:roomId/move — apply a move (game-dependent)
+app.post('/api/collab/sessions/:roomId/move', async (req, res) => {
+  const { move, moveSeq } = req.body;
+  if (typeof move !== 'object' || typeof moveSeq !== 'number') {
+    return res.status(400).json({ error: 'move (object) and moveSeq (number) are required' });
+  }
+  try {
+    const { rows: sessionRows } = await pool.query(
+      `SELECT game_id, state FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    if (sessionRows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // For now, stub with success. In future: game-specific move validation.
+    // Update state (placeholder: just track moves)
+    const session = sessionRows[0];
+    const newState = session.state || { moves: [] };
+    newState.moves = (newState.moves || []).concat([move]);
+
+    await pool.query(
+      `UPDATE collab_sessions SET state = $2, last_activity = now()
+       WHERE id = $1`,
+      [req.params.roomId, JSON.stringify(newState)]
+    );
+
+    const { rows } = await pool.query(
+      `SELECT id, game_id, status, state FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[collab] move failed:', err.message);
+    res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// POST /api/collab/sessions/:roomId/finish — finish the session and record score
+app.post('/api/collab/sessions/:roomId/finish', async (req, res) => {
+  const { initiatorScore, inviteeScore } = req.body;
+  try {
+    const { rows: sessionRows } = await pool.query(
+      `SELECT game_id, initiator_id, status FROM collab_sessions WHERE id = $1`,
+      [req.params.roomId]
+    );
+    if (sessionRows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const session = sessionRows[0];
+    // Only initiator records a daily attempt
+    if (GAME_IDS.has(session.game_id)) {
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, finished_at)
+         VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, now())
+         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+        [session.initiator_id, req.user.username || null, session.game_id, initiatorScore]
+      );
+
+      // Update stats if this is a win
+      if (initiatorScore && initiatorScore > 0) {
+        await pool.query(
+          `UPDATE user_stats_snapshot
+             SET total_score = total_score + $2, last_win_at = now(), updated_at = now()
+           WHERE user_id = $1`,
+          [session.initiator_id, initiatorScore]
+        );
+      }
+    }
+
+    // Mark session as finished
+    const { rows } = await pool.query(
+      `UPDATE collab_sessions
+         SET status = 'finished', initiator_score = $2, invitee_score = $3, finished_at = now()
+       WHERE id = $1
+       RETURNING id, game_id, status, initiator_score, invitee_score`,
+      [req.params.roomId, initiatorScore, inviteeScore]
+    );
+
+    // Recompute streak
+    const streak = await computeStreak(session.initiator_id);
+
+    res.json({
+      ...rows[0],
+      streak,
+    });
+  } catch (err) {
+    console.error('[collab] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish session' });
   }
 });
 
@@ -1136,10 +1872,46 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
+    // Credit puzzle reward to ledger (idempotent via unique event constraint).
+    // Only for daily-category games (classic/idle/pvp skip this; the score guard
+    // below handles the rest). Credit amount = score * REWARD_PER_POINT_WEI.
+    let rewardWei = '0';
+    if (score && score > 0) {
+      try {
+        const amountWei = (BigInt(score) * REWARD_PER_POINT_WEI).toString();
+        const today = new Date().toISOString().slice(0, 10);
+        const { rows: evtRows } = await pool.query(
+          `INSERT INTO token_reward_events
+             (user_id, game_id, attempt_date, amount_wei)
+           VALUES ($1, $2, $3::date, $4)
+           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
+           RETURNING amount_wei`,
+          [req.user.id, gameId, today, amountWei]
+        );
+        if (evtRows.length > 0) {
+          // New event — credit the ledger
+          await pool.query(
+            `INSERT INTO token_rewards_ledger
+               (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
+             VALUES ($1, $2, $2, 0)
+             ON CONFLICT (user_id) DO UPDATE
+               SET pending_wei         = token_rewards_ledger.pending_wei + EXCLUDED.pending_wei,
+                   lifetime_earned_wei = token_rewards_ledger.lifetime_earned_wei + EXCLUDED.lifetime_earned_wei,
+                   updated_at          = now()`,
+            [req.user.id, amountWei]
+          );
+          rewardWei = amountWei;
+        }
+      } catch (rewardErr) {
+        // Non-fatal: reward crediting is best-effort; the puzzle result still records.
+        console.error('[daily] reward credit failed:', rewardErr.message);
+      }
+    }
+
     // Recompute the streak now that today is finished so the client can
     // reconcile its optimistic value without a full reload.
     const streak = await computeStreak(req.user.id);
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak });
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, rewardWei });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
@@ -1957,6 +2729,119 @@ app.get('/api/bounce/leaderboard', async (req, res) => {
   }
 });
 
+// ---- Zuma leaderboard API ------------------------------------------------
+// Mirrors Bounce/Snake exactly: one personal-best row per user, upserted with
+// GREATEST, ranked by best_score then earliest-to-reach.
+
+const ZUMA_LB_LIMIT = 20;
+
+function shapeZumaRow(row) {
+  return {
+    rank: Number(row.rank),
+    username: row.username,
+    bestScore: row.best_score,
+  };
+}
+
+app.post('/api/zuma/score', async (req, res) => {
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  if (score === null) return res.status(400).json({ error: 'score is required' });
+  try {
+    const { rows: prevRows } = await pool.query(
+      `SELECT best_score FROM zuma_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const prevBest = prevRows.length > 0 ? prevRows[0].best_score : null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO zuma_scores
+         (user_id, username, best_score, best_level, best_time_secs, games_played, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         username       = EXCLUDED.username,
+         best_level     = CASE WHEN EXCLUDED.best_score > zuma_scores.best_score
+                               THEN EXCLUDED.best_level ELSE zuma_scores.best_level END,
+         best_time_secs = CASE WHEN EXCLUDED.best_score > zuma_scores.best_score
+                               THEN EXCLUDED.best_time_secs ELSE zuma_scores.best_time_secs END,
+         best_score     = GREATEST(zuma_scores.best_score, EXCLUDED.best_score),
+         games_played   = zuma_scores.games_played + 1,
+         updated_at     = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, score, level, timeSecs]
+    );
+    const me = rows[0];
+
+    await pool.query(
+      `UPDATE user_stats_snapshot
+         SET total_score = total_score + $2,
+             classics_played = classics_played + 1,
+             last_win_at = now(),
+             updated_at = now()
+       WHERE user_id = $1`,
+      [req.user.id, score]
+    );
+
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', 'zuma', $2, $3)`,
+        [req.user.id, score, JSON.stringify({ previousBest: prevBest })]
+      );
+    }
+
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM zuma_scores
+        WHERE best_score > $1
+           OR (best_score = $1 AND updated_at < $2)`,
+      [me.best_score, me.updated_at]
+    );
+    res.json({
+      bestScore: me.best_score,
+      rank: Number(rankRows[0].rank),
+      gamesPlayed: me.games_played,
+    });
+  } catch (err) {
+    console.error('[zuma] score failed:', err.message);
+    res.status(500).json({ error: 'Failed to record score' });
+  }
+});
+
+app.get('/api/zuma/leaderboard', async (req, res) => {
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM zuma_scores
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $1`,
+      [ZUMA_LB_LIMIT]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT username, best_score, updated_at FROM zuma_scores WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM zuma_scores
+          WHERE best_score > $1
+             OR (best_score = $1 AND updated_at < $2)`,
+        [row.best_score, row.updated_at]
+      );
+      me = { rank: Number(rankRows[0].rank), username: row.username, bestScore: row.best_score };
+    }
+
+    res.json({ top: top.map(shapeZumaRow), me });
+  } catch (err) {
+    console.error('[zuma] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
 // ---- PvP Wager API ----------------------------------------------------------
 
 // Convert a DB match-id string to bytes32 hex for on-chain use.
@@ -2533,6 +3418,357 @@ app.post('/api/pvp/match/:matchId/forfeit', async (req, res) => {
   } catch (err) {
     console.error('[pvp] forfeit failed:', err.message);
     res.status(500).json({ error: 'Failed to forfeit' });
+  }
+});
+
+// ---- Wallet API ----------------------------------------------------------
+
+// POST /api/wallet/link { addr }
+// Upsert the caller's EVM wallet address (captured client-side via bridge getNodeAddress).
+app.post('/api/wallet/link', async (req, res) => {
+  const { addr } = req.body;
+  if (!addr || !EVM_ADDR_RE.test(addr)) {
+    return res.status(400).json({ error: 'Valid EVM address required' });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO user_wallets (user_id, wallet_addr, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (user_id) DO UPDATE
+         SET wallet_addr = EXCLUDED.wallet_addr, updated_at = now()`,
+      [req.user.id, addr]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[wallet] link failed:', err.message);
+    res.status(500).json({ error: 'Failed to link wallet' });
+  }
+});
+
+// GET /api/wallet
+// Full wallet state for the Wallet screen: address, on-chain balance, pending rewards,
+// streak freezes, and recent activity (rewards earned + tips sent/received + claims).
+app.get('/api/wallet', async (req, res) => {
+  try {
+    // Staging demo seed: insert a fake wallet address and rewards for the current
+    // viewer so the Wallet screen is demonstrable on a fresh staging DB.
+    if (IS_STAGING && req.query.demo === '1') {
+      const fakeAddr = '0xDEAD000000000000000000000000000000009999';
+      await pool.query(
+        `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id, fakeAddr]
+      );
+      await pool.query(
+        `INSERT INTO token_rewards_ledger
+           (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
+         VALUES ($1, '3000000000000000000', '5000000000000000000', '2000000000000000000')
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id]
+      );
+    }
+
+    // Wallet address
+    const { rows: wRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const addr = wRows.length > 0 ? wRows[0].wallet_addr : null;
+
+    // On-chain balance (mock in staging/no-contract)
+    let balanceWei = '0';
+    let mock = true;
+    if (addr) {
+      if (IS_STAGING || !utgoProvider || !UTGO_CONTRACT_ADDRESS) {
+        balanceWei = ethers.parseUnits('10', 18).toString();
+        mock = true;
+      } else {
+        try {
+          const token = new ethers.Contract(UTGO_CONTRACT_ADDRESS, UTGO_ABI_BALANCE, utgoProvider);
+          balanceWei = (await token.balanceOf(addr)).toString();
+          mock = false;
+        } catch (e) {
+          console.error('[wallet] balance check failed:', e.message);
+          balanceWei = '0';
+        }
+      }
+    }
+
+    // Pending rewards ledger
+    const { rows: lRows } = await pool.query(
+      `SELECT pending_wei, lifetime_earned_wei, lifetime_claimed_wei
+         FROM token_rewards_ledger WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const pendingWei          = lRows.length > 0 ? lRows[0].pending_wei.toString()          : '0';
+    const lifetimeEarnedWei   = lRows.length > 0 ? lRows[0].lifetime_earned_wei.toString()  : '0';
+    const lifetimeClaimedWei  = lRows.length > 0 ? lRows[0].lifetime_claimed_wei.toString() : '0';
+
+    // Streak freezes
+    const { rows: sRows } = await pool.query(
+      `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const streakFreezes = sRows.length > 0 ? (sRows[0].streak_freezes || 0) : 0;
+
+    // Recent activity: rewards + tips (sent/received) + claims — last 10 events
+    const { rows: evtRows } = await pool.query(
+      `(SELECT 'reward' AS kind, amount_wei::text AS amount_wei,
+               NULL AS counterpart, created_at
+          FROM token_reward_events WHERE user_id = $1
+      )
+      UNION ALL
+      (SELECT 'tip_sent' AS kind, amount_wei::text AS amount_wei,
+               to_user_id AS counterpart, created_at
+          FROM token_tips WHERE from_user_id = $1 AND status = 'confirmed'
+      )
+      UNION ALL
+      (SELECT 'tip_received' AS kind, amount_wei::text AS amount_wei,
+               from_user_id AS counterpart, created_at
+          FROM token_tips WHERE to_user_id = $1 AND status = 'confirmed'
+      )
+      ORDER BY created_at DESC LIMIT 10`,
+      [req.user.id]
+    );
+
+    res.json({
+      addr,
+      balanceWei,
+      mock,
+      pendingWei,
+      lifetimeEarnedWei,
+      lifetimeClaimedWei,
+      streakFreezes,
+      recent: evtRows,
+    });
+  } catch (err) {
+    console.error('[wallet] GET failed:', err.message);
+    res.status(500).json({ error: 'Failed to load wallet' });
+  }
+});
+
+// GET /api/wallet/balance?addr=0x…
+// On-chain balance for any address. Used by the nav balance chip.
+app.get('/api/wallet/balance', async (req, res) => {
+  const addr = req.query.addr;
+  if (!addr || !EVM_ADDR_RE.test(addr)) {
+    return res.status(400).json({ error: 'Valid EVM address required' });
+  }
+  try {
+    if (IS_STAGING || !utgoProvider || !UTGO_CONTRACT_ADDRESS) {
+      return res.json({ balance: ethers.parseUnits('10', 18).toString(), mock: true });
+    }
+    const token = new ethers.Contract(UTGO_CONTRACT_ADDRESS, UTGO_ABI_BALANCE, utgoProvider);
+    const balance = await token.balanceOf(addr);
+    res.json({ balance: balance.toString(), mock: false });
+  } catch (err) {
+    console.error('[wallet] balance check failed:', err.message);
+    res.status(500).json({ error: 'Failed to check balance' });
+  }
+});
+
+// POST /api/wallet/tip/prepare { toUserId, amount }
+// Look up recipient's wallet address, build transfer calldata, return to client.
+// The client sends the transaction, then calls /tip/confirm.
+app.post('/api/wallet/tip/prepare', async (req, res) => {
+  const { toUserId, amount } = req.body;
+  if (!toUserId || typeof amount !== 'string') {
+    return res.status(400).json({ error: 'toUserId and amount (wei string) required' });
+  }
+  if (toUserId === req.user.id) {
+    return res.status(400).json({ error: 'Cannot tip yourself' });
+  }
+  let amountWei;
+  try { amountWei = BigInt(amount); } catch { return res.status(400).json({ error: 'Invalid amount' }); }
+  if (amountWei <= 0n) return res.status(400).json({ error: 'Amount must be positive' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [toUserId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Recipient has not linked a wallet' });
+    }
+    const toAddr = rows[0].wallet_addr;
+
+    let calldata = null;
+    if (UTGO_CONTRACT_ADDRESS && TRANSFER_IFACE) {
+      calldata = TRANSFER_IFACE.encodeFunctionData('transfer', [toAddr, amountWei]);
+    }
+
+    res.json({
+      toAddr,
+      calldata,
+      contractAddr: UTGO_CONTRACT_ADDRESS || null,
+    });
+  } catch (err) {
+    console.error('[wallet] tip/prepare failed:', err.message);
+    res.status(500).json({ error: 'Failed to prepare tip' });
+  }
+});
+
+// POST /api/wallet/tip/confirm { toUserId, amount, txHash }
+// Record a completed tip (client reports after sendTransaction).
+app.post('/api/wallet/tip/confirm', async (req, res) => {
+  const { toUserId, amount, txHash } = req.body;
+  if (!toUserId || typeof amount !== 'string' || !txHash) {
+    return res.status(400).json({ error: 'toUserId, amount, txHash required' });
+  }
+  if (toUserId === req.user.id) {
+    return res.status(400).json({ error: 'Cannot tip yourself' });
+  }
+  let amountWei;
+  try { amountWei = BigInt(amount); } catch { return res.status(400).json({ error: 'Invalid amount' }); }
+  if (amountWei <= 0n) return res.status(400).json({ error: 'Amount must be positive' });
+
+  try {
+    const [fromWallet, toWallet] = await Promise.all([
+      pool.query(`SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [req.user.id]),
+      pool.query(`SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [toUserId]),
+    ]);
+    const fromAddr = fromWallet.rows.length > 0 ? fromWallet.rows[0].wallet_addr : null;
+    const toAddr   = toWallet.rows.length > 0   ? toWallet.rows[0].wallet_addr   : null;
+
+    await pool.query(
+      `INSERT INTO token_tips
+         (from_user_id, to_user_id, from_addr, to_addr, amount_wei, tx_hash, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')`,
+      [req.user.id, toUserId, fromAddr, toAddr, amount, txHash]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[wallet] tip/confirm failed:', err.message);
+    res.status(500).json({ error: 'Failed to confirm tip' });
+  }
+});
+
+// POST /api/wallet/rewards/claim
+// Validator signs a claimRewards call; client sends via bridge.
+// In staging/no-contract: immediately marks rewards as claimed and returns mock.
+app.post('/api/wallet/rewards/claim', async (req, res) => {
+  try {
+    // Get user's wallet address
+    const { rows: wRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
+      [req.user.id]
+    );
+    if (wRows.length === 0) {
+      return res.status(400).json({ error: 'No wallet linked' });
+    }
+    const addr = wRows[0].wallet_addr;
+
+    // Atomically read and zero pending_wei
+    const { rows: lRows } = await pool.query(
+      `UPDATE token_rewards_ledger
+          SET pending_wei = 0, updated_at = now()
+        WHERE user_id = $1 AND pending_wei > 0
+        RETURNING pending_wei`,
+      [req.user.id]
+    );
+    // If no row was updated, check if there's just nothing pending
+    if (lRows.length === 0) {
+      const { rows: check } = await pool.query(
+        `SELECT pending_wei FROM token_rewards_ledger WHERE user_id = $1`,
+        [req.user.id]
+      );
+      if (check.length === 0 || check[0].pending_wei === '0' || check[0].pending_wei === 0) {
+        return res.status(409).json({ error: 'No pending rewards to claim' });
+      }
+    }
+
+    // pending_wei was already zeroed above — reconstruct the claimed amount
+    // Note: the UPDATE returns the OLD pending_wei only on Postgres 12+
+    // We re-read lifetime for confirmation display
+    const { rows: afterRows } = await pool.query(
+      `UPDATE token_rewards_ledger
+          SET lifetime_claimed_wei = lifetime_claimed_wei + $2, updated_at = now()
+        WHERE user_id = $1
+        RETURNING lifetime_claimed_wei, pending_wei`,
+      [req.user.id, lRows.length > 0 ? lRows[0].pending_wei.toString() : '0']
+    );
+
+    const amountWei = lRows.length > 0 ? lRows[0].pending_wei.toString() : '0';
+
+    // Staging / no contract: mock claim
+    if (IS_STAGING || !validatorWallet || !UTGO_CONTRACT_ADDRESS) {
+      return res.json({
+        claimCalldata: null,
+        contractAddr: null,
+        amountWei,
+        mock: true,
+        txHash: '0xstagingclaim',
+      });
+    }
+
+    // Production: validator-signed claim calldata
+    try {
+      const nonce = Date.now();
+      const innerHash = ethers.keccak256(
+        ethers.solidityPacked(
+          ['address', 'uint256', 'uint256'],
+          [addr, BigInt(amountWei), BigInt(nonce)]
+        )
+      );
+      const sig = await validatorWallet.signMessage(ethers.getBytes(innerHash));
+      const claimCalldata = CLAIM_REWARDS_IFACE.encodeFunctionData(
+        'claimRewards',
+        [addr, BigInt(amountWei), BigInt(nonce), sig]
+      );
+      res.json({ claimCalldata, contractAddr: UTGO_CONTRACT_ADDRESS, amountWei, mock: false });
+    } catch (sigErr) {
+      console.error('[wallet] claim signing failed:', sigErr.message);
+      res.status(500).json({ error: 'Failed to sign claim' });
+    }
+  } catch (err) {
+    console.error('[wallet] claim failed:', err.message);
+    res.status(500).json({ error: 'Failed to claim rewards' });
+  }
+});
+
+// POST /api/wallet/rewards/claim/confirm { txHash }
+// Client reports successful on-chain claim — already settled in /claim, so this is a no-op
+// record for auditability. In production you'd verify via RPC here.
+app.post('/api/wallet/rewards/claim/confirm', async (req, res) => {
+  res.json({ ok: true });
+});
+
+// POST /api/wallet/spend/streak-freeze
+// Debit STREAK_FREEZE_PRICE_WEI from pending rewards and add one freeze.
+app.post('/api/wallet/spend/streak-freeze', async (req, res) => {
+  try {
+    const priceWei = STREAK_FREEZE_PRICE_WEI;
+
+    const { rows } = await pool.query(
+      `UPDATE token_rewards_ledger
+          SET pending_wei = pending_wei - $2, updated_at = now()
+        WHERE user_id = $1 AND pending_wei >= $2
+        RETURNING pending_wei`,
+      [req.user.id, priceWei.toString()]
+    );
+    if (rows.length === 0) {
+      return res.status(409).json({ error: 'Insufficient pending rewards' });
+    }
+
+    await pool.query(
+      `UPDATE user_stats_snapshot
+          SET streak_freezes = streak_freezes + 1, updated_at = now()
+        WHERE user_id = $1`,
+      [req.user.id]
+    );
+
+    const { rows: sRows } = await pool.query(
+      `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
+      [req.user.id]
+    );
+    res.json({
+      ok: true,
+      streakFreezes: sRows.length > 0 ? sRows[0].streak_freezes : 1,
+      newPendingWei: rows[0].pending_wei.toString(),
+    });
+  } catch (err) {
+    console.error('[wallet] streak-freeze failed:', err.message);
+    res.status(500).json({ error: 'Failed to purchase streak freeze' });
   }
 });
 

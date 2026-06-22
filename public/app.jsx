@@ -1803,6 +1803,26 @@ body {
 }
 .bounce-dpad button:active { background: ${C.accent}; border-color: ${C.accent}; }
 
+/* ---- Zuma ---- */
+.zuma-wrap {
+  position: relative;
+  max-width: 300px;
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
+}
+.zuma-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: ${C.bg};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+}
+
 /* ---- Block Blast ---- */
 .bb-board-wrap {
   position: relative;
@@ -3098,6 +3118,135 @@ body {
 .pvp-prize-row .mono { color: ${C.text}; }
 .pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
 .pvp-prize-winner .mono { color: ${C.emerald}; }
+
+/* ---- Wallet screen ---- */
+.wallet-screen {
+  max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem;
+}
+.wallet-screen h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.25rem; }
+.wallet-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.25rem; margin-bottom: 1rem;
+}
+.wallet-card-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: ${C.muted}; margin-bottom: 0.6rem;
+}
+.wallet-addr {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  color: ${C.text}; word-break: break-all; flex: 1;
+}
+.wallet-addr-row {
+  display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
+}
+.wallet-balance-big {
+  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
+  color: ${C.emerald};
+}
+.wallet-balance-sub { font-size: 0.8rem; color: ${C.muted}; margin-top: 0.2rem; }
+.wallet-pending-big {
+  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
+  color: ${C.gold};
+}
+.wallet-mock-badge {
+  display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px;
+  background: ${C.dim}; border: 1px solid ${C.border};
+  font-size: 0.68rem; color: ${C.muted}; margin-bottom: 1rem;
+}
+.wallet-activity-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.45rem 0; border-bottom: 1px solid ${C.border}40;
+  font-size: 0.83rem;
+}
+.wallet-activity-row:last-child { border-bottom: none; }
+.wallet-activity-kind { color: ${C.muted}; }
+.wallet-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.wallet-activity-earned { color: ${C.emerald}; }
+.wallet-activity-tip-recv { color: ${C.gold}; }
+.wallet-activity-tip-sent { color: ${C.rose}; }
+.wallet-no-wallet {
+  text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
+}
+.wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
+.wallet-freeze-info {
+  font-size: 0.8rem; color: ${C.muted}; margin-top: 0.35rem;
+}
+/* ---- Nav wallet chip ---- */
+.nav-wallet-chip {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.7rem;
+  cursor: pointer; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
+  color: ${C.emerald}; transition: border-color 0.15s;
+}
+.nav-wallet-chip:hover { border-color: ${C.emerald}; }
+/* ---- Tip modal ---- */
+.tip-modal-backdrop {
+  position: fixed; inset: 0; background: #00000099; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+}
+.tip-modal {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
+  padding: 1.5rem; width: min(95vw, 380px);
+}
+.tip-modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+.tip-presets { display: flex; gap: 0.5rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
+.tip-preset-btn {
+  padding: 0.35rem 0.8rem; border-radius: 8px; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem; cursor: pointer; transition: border-color 0.12s;
+}
+.tip-preset-btn.active { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
+.tip-input {
+  width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px;
+  border: 1px solid ${C.border}; background: ${C.surface}; color: ${C.text};
+  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
+  margin-bottom: 0.85rem;
+}
+.tip-input:focus { outline: none; border-color: ${C.accent}; }
+/* ---- Win overlay reward line ---- */
+.win-reward-row {
+  display: flex; justify-content: space-between; padding: 0.4rem 0;
+  border-top: 1px solid ${C.border}40; margin-top: 0.4rem;
+}
+.win-reward-row .k { color: ${C.muted}; font-size: 0.88rem; }
+.win-reward-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; }
+
+/* ---- Hash Rush ---- */
+.hr-wrap {
+  position: relative; width: 100%; flex: 1; align-self: stretch; overflow: hidden; min-height: 0;
+}
+.hr-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hr-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0.75rem;
+  background: ${C.bg}; color: ${C.muted}; font-size: 0.9rem; text-align: center; padding: 1.5rem;
+}
+.hr-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid ${C.border}; border-top-color: ${C.accent};
+  animation: pc-spin 0.8s linear infinite;
+}
+.hr-hud {
+  position: absolute; top: 0.75rem; left: 0; right: 0;
+  display: flex; justify-content: center; gap: 0.5rem; padding: 0 0.5rem;
+  pointer-events: none;
+}
+.hr-pill {
+  background: rgba(17,24,39,0.82); border: 1px solid ${C.border}; border-radius: 10px;
+  padding: 0.4rem 0.9rem; text-align: center; min-width: 72px; backdrop-filter: blur(4px);
+}
+.hr-plabel { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.hr-pvalue { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1rem; color: ${C.text}; }
+.hr-lane-btn {
+  position: absolute; bottom: 2.5rem; width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(17,24,39,0.75); border: 1px solid ${C.border}; color: ${C.muted};
+  font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; z-index: 5;
+}
+.hr-lane-left { left: 1rem; }
+.hr-lane-right { right: 1rem; }
+.hr-lane-btn:active { background: ${C.accent}30; border-color: ${C.accent}; color: ${C.accent}; }
 `;
 
 /* ============================================================
@@ -9792,25 +9941,29 @@ function PvpResult({ result, onBack }) {
   );
 }
 
-function PvpArena({ user, authOk }) {
+function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appWalletBalance }) {
   const [phase, setPhase] = useState('lobby'); // lobby | matchmaking | game | result
   const [match, setMatch] = useState(null);
   const [joining, setJoining] = useState(null);
   const [pvpResult, setPvpResult] = useState(null);
-  const [playerAddr, setPlayerAddr] = useState(null);
-  const [balance, setBalance] = useState(null);
+  // Use app-level wallet addr/balance when available; fall back to own fetch
+  const [localAddr, setLocalAddr] = useState(null);
+  const [localBalance, setLocalBalance] = useState(null);
+  const playerAddr = appWalletAddr || localAddr;
+  const balance = appWalletBalance || localBalance;
   const pollRef = useRef(null);
 
   useEffect(() => {
+    if (appWalletAddr) return; // already have it from app level
     if (!window.usernode || !window.usernode.getNodeAddress) return;
     window.usernode.getNodeAddress().then(addr => {
       if (!addr) return;
-      setPlayerAddr(addr);
+      setLocalAddr(addr);
       api(`/api/pvp/balance?addr=${encodeURIComponent(addr)}`)
-        .then(({ ok, body }) => { if (ok && body) setBalance(body.balance); })
+        .then(({ ok, body }) => { if (ok && body) setLocalBalance(body.balance); })
         .catch(() => {});
     }).catch(() => {});
-  }, []);
+  }, [appWalletAddr]);
 
   // Poll for opponent joining while in matchmaking; also refresh cancelQueueCalldata
   useEffect(() => {
@@ -9894,6 +10047,370 @@ function PvpArena({ user, authOk }) {
 const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
 
 /* ============================================================
+   Wallet helpers
+   ============================================================ */
+function fmtUtgo(weiStr) {
+  if (!weiStr || weiStr === '0') return '0.00 UTGO';
+  try {
+    const n = Number(BigInt(weiStr)) / 1e18;
+    return n.toFixed(2) + ' UTGO';
+  } catch { return '0.00 UTGO'; }
+}
+
+function shortAddr(addr) {
+  if (!addr) return '';
+  return addr.slice(0, 6) + '…' + addr.slice(-4);
+}
+
+/* ============================================================
+   TipModal — send $UTGO to another user
+   ============================================================ */
+function TipModal({ toUser, onClose, onSuccess }) {
+  const TIP_PRESETS = ['1', '5', '10'];
+  const [amount, setAmount] = React.useState('1');
+  const [customAmount, setCustomAmount] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const [done, setDone] = React.useState(null);
+
+  const selectedAmount = customAmount || amount;
+
+  const handleSend = async () => {
+    const amountFloat = parseFloat(selectedAmount);
+    if (!amountFloat || amountFloat <= 0) {
+      setErr('Enter a valid amount');
+      return;
+    }
+    const amountWei = BigInt(Math.round(amountFloat * 1e18)).toString();
+    setSending(true);
+    setErr(null);
+    try {
+      // Prepare: get calldata + recipient addr
+      const { ok: prepOk, body: prep } = await api('/api/wallet/tip/prepare', {
+        method: 'POST',
+        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei }),
+      });
+      if (!prepOk) {
+        setErr(prep && prep.error ? prep.error : 'Failed to prepare tip');
+        setSending(false);
+        return;
+      }
+
+      let txHash = '0xmock';
+      const isMock = !window.usernode || !prep.calldata || !prep.contractAddr
+        || (window.usernode.isMockEnabled && await window.usernode.isMockEnabled());
+      if (!isMock && window.usernode && window.usernode.sendTransaction) {
+        const tx = await window.usernode.sendTransaction({
+          to: prep.contractAddr,
+          data: prep.calldata,
+        });
+        txHash = tx && tx.hash ? tx.hash : '0xunknown';
+      }
+
+      // Confirm
+      const { ok: confOk } = await api('/api/wallet/tip/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei, txHash }),
+      });
+      if (!confOk) {
+        setErr('Tip sent but confirmation failed — check your wallet history');
+        setSending(false);
+        return;
+      }
+      setDone({ txHash, amount: fmtUtgo(amountWei), isMock });
+    } catch (e) {
+      setErr(e && e.message ? e.message : 'Transaction failed');
+    }
+    setSending(false);
+  };
+
+  return (
+    <div className="tip-modal-backdrop" onClick={onClose}>
+      <div className="tip-modal" onClick={e => e.stopPropagation()}>
+        <h3>Tip {toUser.username}</h3>
+        {done ? (
+          <div>
+            <div style={{ color: C.emerald, fontWeight: 600, marginBottom: '0.5rem' }}>
+              Sent {done.amount}! {done.isMock && <span style={{ color: C.muted, fontSize: '0.8rem' }}>(demo)</span>}
+            </div>
+            {done.txHash && !done.isMock && (
+              <div style={{ fontSize: '0.72rem', color: C.muted, wordBreak: 'break-all', marginBottom: '0.75rem' }}>
+                Tx: {done.txHash}
+              </div>
+            )}
+            <button className="primary-btn" onClick={() => { onSuccess && onSuccess(); onClose(); }}>Done</button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: '0.82rem', color: C.muted, marginBottom: '0.75rem' }}>
+              Quick amounts (UTGO):
+            </div>
+            <div className="tip-presets">
+              {TIP_PRESETS.map(p => (
+                <button
+                  key={p}
+                  className={'tip-preset-btn' + (amount === p && !customAmount ? ' active' : '')}
+                  onClick={() => { setAmount(p); setCustomAmount(''); }}
+                >{p}</button>
+              ))}
+            </div>
+            <input
+              className="tip-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Custom amount"
+              value={customAmount}
+              onChange={e => { setCustomAmount(e.target.value); setAmount(''); }}
+            />
+            {err && <div style={{ color: C.rose, fontSize: '0.82rem', marginBottom: '0.5rem' }}>{err}</div>}
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="primary-btn" disabled={sending} onClick={handleSend} style={{ flex: 1 }}>
+                {sending ? 'Sending…' : `Send ${selectedAmount || '?'} UTGO`}
+              </button>
+              <button
+                className="primary-btn"
+                style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+                onClick={onClose}
+              >Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   WalletScreen — the full wallet management view
+   ============================================================ */
+function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh }) {
+  const [walletData, setWalletData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [claiming, setClaiming] = React.useState(false);
+  const [claimResult, setClaimResult] = React.useState(null);
+  const [buyingFreeze, setBuyingFreeze] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [freezeMsg, setFreezeMsg] = React.useState(null);
+
+  const loadWallet = async () => {
+    const demo = new URLSearchParams(window.location.search).get('demo');
+    const path = '/api/wallet' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
+    const { ok, body } = await api(path);
+    if (ok && body) setWalletData(body);
+    setLoading(false);
+  };
+
+  React.useEffect(() => { loadWallet(); }, []);
+
+  const handleCopy = async () => {
+    if (!walletData || !walletData.addr) return;
+    try {
+      await navigator.clipboard.writeText(walletData.addr);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    setClaimResult(null);
+    try {
+      const { ok, body } = await api('/api/wallet/rewards/claim', { method: 'POST' });
+      if (!ok) {
+        setClaimResult({ err: (body && body.error) || 'Failed to claim' });
+        setClaiming(false);
+        return;
+      }
+      // Mock or signed claim
+      if (body.mock || !body.claimCalldata) {
+        setClaimResult({ txHash: body.txHash || '0xstagingclaim', mock: true, amount: fmtUtgo(body.amountWei) });
+        await loadWallet();
+        onBalanceRefresh && onBalanceRefresh();
+        setClaiming(false);
+        return;
+      }
+      // Real on-chain claim
+      const tx = await window.usernode.sendTransaction({
+        to: body.contractAddr,
+        data: body.claimCalldata,
+      });
+      const txHash = tx && tx.hash ? tx.hash : '0xunknown';
+      await api('/api/wallet/rewards/claim/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ txHash }),
+      });
+      setClaimResult({ txHash, mock: false, amount: fmtUtgo(body.amountWei) });
+      await loadWallet();
+      onBalanceRefresh && onBalanceRefresh();
+    } catch (e) {
+      setClaimResult({ err: e && e.message ? e.message : 'Transaction failed' });
+    }
+    setClaiming(false);
+  };
+
+  const handleBuyFreeze = async () => {
+    setBuyingFreeze(true);
+    setFreezeMsg(null);
+    const { ok, body } = await api('/api/wallet/spend/streak-freeze', { method: 'POST' });
+    if (ok && body) {
+      setFreezeMsg(`Freeze purchased! You now have ${body.streakFreezes} freeze${body.streakFreezes === 1 ? '' : 's'}.`);
+      await loadWallet();
+    } else {
+      setFreezeMsg((body && body.error) || 'Insufficient pending rewards');
+    }
+    setBuyingFreeze(false);
+  };
+
+  if (!authOk) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <div className="wallet-no-wallet" style={{ marginTop: '2rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔐</div>
+          <div>Sign in to PuzzleChain to access your wallet.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <p style={{ color: C.muted, marginTop: '1rem' }}>Loading wallet…</p>
+      </div>
+    );
+  }
+
+  if (!walletData || !walletData.addr) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <h2>My Wallet</h2>
+        <div className="wallet-no-wallet">
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔗</div>
+          <div>No wallet linked yet.</div>
+          <div style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
+            Open this app inside Usernode with a linked wallet to see your balance.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const d = walletData;
+  const isMock = d.mock || walletMock;
+  const hasPending = d.pendingWei && d.pendingWei !== '0';
+  const FREEZE_PRICE = '5.00 UTGO';
+
+  return (
+    <div className="wallet-screen">
+      <button className="back-btn" onClick={onBack}>← Back</button>
+      <h2>My Wallet</h2>
+
+      {isMock && (
+        <div className="wallet-mock-badge">Demo wallet — balances are simulated</div>
+      )}
+
+      {/* Address */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Linked Address</div>
+        <div className="wallet-addr-row">
+          <span className="wallet-addr mono">{d.addr}</span>
+          <button
+            className="primary-btn"
+            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
+            onClick={handleCopy}
+          >{copied ? 'Copied!' : 'Copy'}</button>
+        </div>
+      </div>
+
+      {/* On-chain balance */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">On-Chain Balance</div>
+        <div className="wallet-balance-big">{fmtUtgo(d.balanceWei)}</div>
+        {isMock && <div className="wallet-balance-sub">(simulated)</div>}
+      </div>
+
+      {/* Pending rewards */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Pending Puzzle Rewards</div>
+        <div className="wallet-pending-big">{fmtUtgo(d.pendingWei)}</div>
+        <div className="wallet-balance-sub">
+          {fmtUtgo(d.lifetimeEarnedWei)} lifetime earned · {fmtUtgo(d.lifetimeClaimedWei)} claimed
+        </div>
+        {claimResult && !claimResult.err && (
+          <div style={{ color: C.emerald, fontSize: '0.83rem', margin: '0.5rem 0' }}>
+            Claimed {claimResult.amount}! {claimResult.mock && '(demo)'}
+            {claimResult.txHash && !claimResult.mock && (
+              <div style={{ fontSize: '0.7rem', color: C.muted, wordBreak: 'break-all' }}>
+                Tx: {claimResult.txHash}
+              </div>
+            )}
+          </div>
+        )}
+        {claimResult && claimResult.err && (
+          <div style={{ color: C.rose, fontSize: '0.82rem', margin: '0.5rem 0' }}>{claimResult.err}</div>
+        )}
+        <div className="wallet-btn-row">
+          <button
+            className="primary-btn"
+            disabled={!hasPending || claiming}
+            onClick={handleClaim}
+            style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
+          >
+            {claiming ? 'Claiming…' : 'Claim to Wallet'}
+          </button>
+        </div>
+      </div>
+
+      {/* Streak freeze */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">Streak Freeze</div>
+        <div style={{ fontSize: '0.88rem', marginBottom: '0.6rem' }}>
+          You have <strong style={{ color: C.gold }}>{d.streakFreezes}</strong> freeze{d.streakFreezes === 1 ? '' : 's'} banked.
+          A freeze protects your streak against one missed day.
+        </div>
+        {freezeMsg && (
+          <div style={{ fontSize: '0.82rem', color: C.emerald, marginBottom: '0.5rem' }}>{freezeMsg}</div>
+        )}
+        <button
+          className="primary-btn"
+          disabled={buyingFreeze || !hasPending}
+          onClick={handleBuyFreeze}
+          style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : { background: C.gold + 'cc' }}
+        >
+          {buyingFreeze ? 'Purchasing…' : `Buy Freeze (${FREEZE_PRICE})`}
+        </button>
+        {!hasPending && <div className="wallet-freeze-info">Earn rewards by solving daily puzzles first.</div>}
+      </div>
+
+      {/* Recent activity */}
+      {d.recent && d.recent.length > 0 && (
+        <div className="wallet-card">
+          <div className="wallet-card-title">Recent Activity</div>
+          {d.recent.map((ev, i) => {
+            const isReward = ev.kind === 'reward';
+            const isTipRecv = ev.kind === 'tip_received';
+            const isTipSent = ev.kind === 'tip_sent';
+            const label = isReward ? '🪙 Puzzle reward' : isTipRecv ? '💰 Tip received' : '→ Tip sent';
+            const amtClass = isReward ? 'wallet-activity-earned' : isTipRecv ? 'wallet-activity-tip-recv' : 'wallet-activity-tip-sent';
+            const prefix = isReward || isTipRecv ? '+' : '-';
+            return (
+              <div className="wallet-activity-row" key={i}>
+                <span className="wallet-activity-kind">{label}</span>
+                <span className={`wallet-activity-amt ${amtClass}`}>{prefix}{fmtUtgo(ev.amount_wei)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Game registry
    (more games slot in here — lobby/lock/win/scoring auto-wire)
    ============================================================ */
@@ -9904,17 +10421,15 @@ const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
 function ProfileScreen({ userId, user: loggedInUser, onBack }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showTip, setShowTip] = useState(false);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      const { ok, body } = await api(`/api/social/profile/${userId}`);
-      if (ok && body) {
-        setProfile(body);
-      }
-      setLoading(false);
-    };
-    loadProfile();
-  }, [userId]);
+  const loadProfile = async () => {
+    const { ok, body } = await api(`/api/social/profile/${userId}`);
+    if (ok && body) setProfile(body);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadProfile(); }, [userId]);
 
   const handleFollow = async () => {
     if (!profile) return;
@@ -9972,18 +10487,37 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             {isOwnProfile && <p style={{ color: C.emerald, fontSize: '0.8rem', margin: '0.5rem 0 0' }}>Your Profile</p>}
           </div>
           {!isOwnProfile && (
-            <button
-              className="primary-btn"
-              style={{
-                background: profile.following ? C.surface : C.accent,
-                border: `1px solid ${profile.following ? C.border : C.accent}`,
-                color: profile.following ? C.text : 'white',
-                padding: '0.5rem 1rem',
-              }}
-              onClick={profile.following ? handleUnfollow : handleFollow}
-            >
-              {profile.following ? 'Unfollow' : 'Follow'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <button
+                className="primary-btn"
+                style={{
+                  background: profile.following ? C.surface : C.accent,
+                  border: `1px solid ${profile.following ? C.border : C.accent}`,
+                  color: profile.following ? C.text : 'white',
+                  padding: '0.5rem 1rem',
+                }}
+                onClick={profile.following ? handleUnfollow : handleFollow}
+              >
+                {profile.following ? 'Unfollow' : 'Follow'}
+              </button>
+              <button
+                className="primary-btn"
+                disabled={!profile.walletLinked}
+                title={!profile.walletLinked ? "This user hasn't set up a wallet yet" : `Tip ${profile.user.username}`}
+                style={{
+                  padding: '0.4rem 0.9rem',
+                  background: profile.walletLinked ? C.gold + 'cc' : C.surface,
+                  border: `1px solid ${profile.walletLinked ? C.gold : C.border}`,
+                  color: profile.walletLinked ? C.bg : C.muted,
+                  cursor: profile.walletLinked ? 'pointer' : 'not-allowed',
+                  fontSize: '0.85rem',
+                  opacity: profile.walletLinked ? 1 : 0.5,
+                }}
+                onClick={() => profile.walletLinked && setShowTip(true)}
+              >
+                🪙 Tip
+              </button>
+            </div>
           )}
         </div>
 
@@ -10016,8 +10550,33 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             <span style={{ color: C.muted }}>Following:</span>{' '}
             <span style={{ fontWeight: 600, color: C.accent }}>{profile.followingCount}</span>
           </p>
+          {profile.tipsReceivedWei && profile.tipsReceivedWei !== '0' && (
+            <p style={{ margin: '0.5rem 0' }}>
+              <span style={{ color: C.muted }}>Tips received:</span>{' '}
+              <span style={{ fontWeight: 600, color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
+                {fmtUtgo(profile.tipsReceivedWei)}
+              </span>
+            </p>
+          )}
+          {profile.recentTippers && profile.recentTippers.length > 0 && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: '0.25rem' }}>Recent tips:</div>
+              {profile.recentTippers.slice(0, 3).map((t, i) => (
+                <div key={i} style={{ fontSize: '0.82rem', color: C.text }}>
+                  {t.fromUserId} → <span style={{ color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>{fmtUtgo(t.amountWei)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+      {showTip && (
+        <TipModal
+          toUser={profile.user}
+          onClose={() => setShowTip(false)}
+          onSuccess={loadProfile}
+        />
+      )}
     </div>
   );
 }
@@ -10104,6 +10663,988 @@ function FriendsListScreen({ onSelectUser, onBack }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ============================================================
+   Zuma — frog shooter (Classic, leaderboard)
+   ============================================================ */
+const ZUMA_W = 300, ZUMA_H = 400;
+const ZUMA_BALL_R = 11;
+const ZUMA_DIAM = ZUMA_BALL_R * 2 + 2;
+const ZUMA_SHOT_SPEED = 300;
+const FROG_X = 150, FROG_Y = 218;
+const ZUMA_COLORS_ALL = ['#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
+
+const ZUMA_PATH_S = [
+  {x:28,y:32},{x:75,y:25},{x:135,y:22},{x:195,y:25},{x:250,y:34},
+  {x:276,y:58},{x:278,y:100},{x:268,y:138},{x:245,y:162},
+  {x:208,y:175},{x:165,y:180},{x:122,y:175},{x:82,y:162},
+  {x:52,y:138},{x:28,y:108},{x:18,y:155},{x:22,y:195},
+  {x:42,y:228},{x:78,y:248},{x:120,y:256},{x:162,y:258},
+  {x:205,y:255},{x:245,y:242},{x:268,y:220},
+  {x:274,y:268},{x:265,y:308},{x:242,y:338},{x:208,y:358},
+  {x:170,y:370},{x:148,y:374},
+];
+
+const ZUMA_PATH_L3 = [
+  {x:28,y:32},{x:75,y:25},{x:135,y:22},{x:195,y:25},{x:250,y:34},
+  {x:276,y:58},{x:278,y:100},{x:268,y:138},{x:245,y:162},
+  {x:208,y:175},{x:165,y:180},{x:122,y:175},{x:82,y:162},
+  {x:52,y:138},{x:28,y:108},{x:18,y:155},{x:22,y:195},
+  {x:42,y:228},{x:78,y:248},{x:120,y:256},{x:162,y:258},
+  {x:205,y:255},{x:245,y:242},{x:268,y:220},
+  {x:255,y:248},{x:225,y:262},{x:188,y:268},{x:150,y:270},
+  {x:112,y:268},{x:78,y:260},{x:52,y:245},{x:32,y:270},
+  {x:26,y:300},{x:32,y:328},{x:52,y:350},{x:88,y:368},
+  {x:125,y:377},{x:148,y:380},
+];
+
+const ZUMA_LEVELS = [
+  { path: ZUMA_PATH_S,  ballCount: 20, speed: 9,  colors: 4 },
+  { path: ZUMA_PATH_S,  ballCount: 26, speed: 15, colors: 4 },
+  { path: ZUMA_PATH_L3, ballCount: 32, speed: 23, colors: 5 },
+];
+
+function zumaComputePathData(waypoints) {
+  const cumDists = [0];
+  for (let i = 1; i < waypoints.length; i++) {
+    const dx = waypoints[i].x - waypoints[i-1].x;
+    const dy = waypoints[i].y - waypoints[i-1].y;
+    cumDists.push(cumDists[i-1] + Math.hypot(dx, dy));
+  }
+  return { waypoints, cumDists, totalLen: cumDists[cumDists.length - 1] };
+}
+
+function zumaPointAtDist(pd, dist) {
+  const { waypoints: wps, cumDists: cd } = pd;
+  if (dist <= 0) return wps[0];
+  const last = cd.length - 1;
+  if (dist >= cd[last]) return wps[last];
+  let lo = 0, hi = last - 1;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (cd[m+1] < dist) lo = m + 1; else hi = m;
+  }
+  const t = (dist - cd[lo]) / (cd[lo+1] - cd[lo]);
+  return { x: wps[lo].x + t*(wps[lo+1].x - wps[lo].x), y: wps[lo].y + t*(wps[lo+1].y - wps[lo].y) };
+}
+
+function zumaBuildChain(count, numColors) {
+  const balls = [];
+  for (let i = 0; i < count; i++) {
+    balls.push({ color: ZUMA_COLORS_ALL[Math.floor(Math.random() * numColors)], dist: -i * ZUMA_DIAM });
+  }
+  return balls;
+}
+
+function zumaRandColor(numColors) {
+  return ZUMA_COLORS_ALL[Math.floor(Math.random() * numColors)];
+}
+
+function zumaCheckMatches(chain, idx) {
+  if (chain.length === 0 || idx < 0 || idx >= chain.length) return 0;
+  const color = chain[idx].color;
+  let lo = idx, hi = idx;
+  while (lo > 0 && chain[lo-1].color === color) lo--;
+  while (hi < chain.length-1 && chain[hi+1].color === color) hi++;
+  const runLen = hi - lo + 1;
+  if (runLen < 3) return 0;
+  chain.splice(lo, runLen);
+  let extra = 0;
+  if (lo > 0 && lo < chain.length) {
+    const needed = chain[lo-1].dist - ZUMA_DIAM;
+    const shift = needed - chain[lo].dist;
+    if (shift > 1) {
+      for (let i = lo; i < chain.length; i++) chain[i].dist += shift;
+      if (chain[lo-1].color === chain[lo].color) extra += zumaCheckMatches(chain, lo);
+    }
+  }
+  return runLen + extra;
+}
+
+function ZumaGame({ onWin, onStepChange, resetKey }) {
+  const { useState, useEffect, useRef } = React;
+  const [activeTab, setActiveTab] = useState('game');
+  const [score, setScore] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [ballsPopped, setBallsPopped] = useState(0);
+  const [started, setStarted] = useState(false);
+  const [done, setDone] = useState(false);
+  const [elapsedSecs, setElapsedSecs] = useState(0);
+  const [lb, setLb] = useState(null);
+  const [lbLoading, setLbLoading] = useState(false);
+  const [lbError, setLbError] = useState(false);
+
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const elapsedRef = useRef(0);
+  const startedRef = useRef(false);
+  const doneRef = useRef(false);
+  const submittedRef = useRef(false);
+  const levelRef = useRef(1);
+  const scoreRef = useRef(0);
+  const bpRef = useRef(0);
+  const chainRef = useRef([]);
+  const shotRef = useRef(null);
+  const frogAngleRef = useRef(-Math.PI / 2);
+  const curColorRef = useRef(ZUMA_COLORS_ALL[0]);
+  const nxtColorRef = useRef(ZUMA_COLORS_ALL[1]);
+  const pathDataRef = useRef(null);
+  const onWinRef = useRef(onWin); onWinRef.current = onWin;
+  const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
+
+  function initLevel(lvlNum) {
+    const lvl = ZUMA_LEVELS[lvlNum - 1];
+    pathDataRef.current = zumaComputePathData(lvl.path);
+    chainRef.current = zumaBuildChain(lvl.ballCount, lvl.colors);
+    curColorRef.current = zumaRandColor(lvl.colors);
+    nxtColorRef.current = zumaRandColor(lvl.colors);
+    shotRef.current = null;
+  }
+
+  function init() {
+    levelRef.current = 1;
+    scoreRef.current = 0;
+    bpRef.current = 0;
+    elapsedRef.current = 0;
+    startedRef.current = false;
+    doneRef.current = false;
+    submittedRef.current = false;
+    initLevel(1);
+    setScore(0); setLevel(1); setBallsPopped(0);
+    setStarted(false); setDone(false); setElapsedSecs(0);
+  }
+
+  useEffect(() => { init(); }, [resetKey]);
+
+  useEffect(() => {
+    if (!started || done) return;
+    const id = setInterval(() => { elapsedRef.current++; setElapsedSecs(elapsedRef.current); }, 1000);
+    return () => clearInterval(id);
+  }, [started, done]);
+
+  const submitScore = async (finalScore, finalLevel) => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    try {
+      await api('/api/zuma/score', {
+        method: 'POST',
+        body: JSON.stringify({ score: finalScore, level: finalLevel, timeSecs: elapsedRef.current }),
+      });
+    } catch (_) {}
+  };
+
+  function triggerEnd(cleared) {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    setDone(true);
+    const s = scoreRef.current;
+    const bp = bpRef.current;
+    const secs = elapsedRef.current;
+    const lv = levelRef.current;
+    submitScore(s, lv);
+    onWinRef.current(s, bp, secs, {
+      winnerLabel: cleared ? 'Cleared! 🎉' : 'Game Over',
+      share: cleared
+        ? '🐸 Zuma — ' + s + ' pts, all 3 levels cleared!'
+        : '🐸 Zuma — ' + s + ' pts, level ' + lv,
+    });
+  }
+
+  const loopRunning = activeTab === 'game' && !done;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(ZUMA_W * dpr);
+    canvas.height = Math.round(ZUMA_H * dpr);
+
+    function drawFrame() {
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.fillStyle = C.bg;
+      ctx.fillRect(0, 0, ZUMA_W, ZUMA_H);
+
+      const pd = pathDataRef.current;
+      if (pd) {
+        // Track outer
+        ctx.beginPath();
+        ctx.moveTo(pd.waypoints[0].x, pd.waypoints[0].y);
+        for (let i = 1; i < pd.waypoints.length; i++) ctx.lineTo(pd.waypoints[i].x, pd.waypoints[i].y);
+        ctx.strokeStyle = '#1e3a5f';
+        ctx.lineWidth = ZUMA_BALL_R * 2 + 6;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.stroke();
+        // Track inner
+        ctx.beginPath();
+        ctx.moveTo(pd.waypoints[0].x, pd.waypoints[0].y);
+        for (let i = 1; i < pd.waypoints.length; i++) ctx.lineTo(pd.waypoints[i].x, pd.waypoints[i].y);
+        ctx.strokeStyle = '#0e1f33';
+        ctx.lineWidth = ZUMA_BALL_R * 2 - 2;
+        ctx.stroke();
+        // Entry marker
+        const entry = pd.waypoints[0];
+        ctx.beginPath(); ctx.arc(entry.x, entry.y, 8, 0, Math.PI*2);
+        ctx.fillStyle = '#334155'; ctx.fill();
+        // Chain balls (back to front — lower dist first)
+        const chain = chainRef.current;
+        for (let i = chain.length - 1; i >= 0; i--) {
+          const ball = chain[i];
+          if (ball.dist < 0 || ball.dist > pd.totalLen) continue;
+          const pt = zumaPointAtDist(pd, ball.dist);
+          ctx.beginPath(); ctx.arc(pt.x, pt.y, ZUMA_BALL_R, 0, Math.PI*2);
+          ctx.fillStyle = ball.color; ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+          ctx.beginPath(); ctx.arc(pt.x-3, pt.y-3, 4, 0, Math.PI*2);
+          ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
+        }
+        // Shot ball
+        const sh = shotRef.current;
+        if (sh) {
+          ctx.beginPath(); ctx.arc(sh.x, sh.y, ZUMA_BALL_R, 0, Math.PI*2);
+          ctx.fillStyle = sh.color; ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+          ctx.beginPath(); ctx.arc(sh.x-3, sh.y-3, 4, 0, Math.PI*2);
+          ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
+        }
+        // Skull at path end
+        const skull = pd.waypoints[pd.waypoints.length - 1];
+        ctx.font = '20px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('💀', skull.x, skull.y);
+      }
+
+      // Frog shadow
+      ctx.beginPath(); ctx.arc(FROG_X+2, FROG_Y+2, 18, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+      // Frog body
+      ctx.beginPath(); ctx.arc(FROG_X, FROG_Y, 18, 0, Math.PI*2);
+      ctx.fillStyle = '#059669'; ctx.fill();
+      ctx.strokeStyle = '#064e3b'; ctx.lineWidth = 2; ctx.stroke();
+      // Eyes
+      const angle = frogAngleRef.current;
+      const ex = Math.cos(angle-0.5)*10+FROG_X, ey = Math.sin(angle-0.5)*10+FROG_Y;
+      const ex2 = Math.cos(angle+0.5)*10+FROG_X, ey2 = Math.sin(angle+0.5)*10+FROG_Y;
+      ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(ex+Math.cos(angle), ey+Math.sin(angle), 2, 0, Math.PI*2); ctx.fillStyle='#111'; ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2, ey2, 3.5, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2+Math.cos(angle), ey2+Math.sin(angle), 2, 0, Math.PI*2); ctx.fillStyle='#111'; ctx.fill();
+      // Ball loaded in frog
+      ctx.beginPath(); ctx.arc(FROG_X, FROG_Y, 8, 0, Math.PI*2);
+      ctx.fillStyle = curColorRef.current; ctx.fill();
+      // Aim pointer
+      ctx.beginPath();
+      ctx.moveTo(FROG_X+Math.cos(angle)*20, FROG_Y+Math.sin(angle)*20);
+      ctx.lineTo(FROG_X+Math.cos(angle)*32, FROG_Y+Math.sin(angle)*32);
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3; ctx.stroke();
+      // Next ball preview
+      const nx = FROG_X+Math.cos(angle+Math.PI)*30, ny = FROG_Y+Math.sin(angle+Math.PI)*30;
+      ctx.beginPath(); ctx.arc(nx, ny, 7, 0, Math.PI*2);
+      ctx.fillStyle = nxtColorRef.current; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.font='8px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.fillText('next', nx, ny);
+
+      // Start overlay
+      if (!startedRef.current && !doneRef.current) {
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, ZUMA_W, ZUMA_H);
+        ctx.font = 'bold 16px "Space Grotesk",system-ui,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#e2e8f0'; ctx.fillText('Tap to shoot!', ZUMA_W/2, ZUMA_H/2);
+        ctx.font = '13px "Space Grotesk",system-ui,sans-serif';
+        ctx.fillStyle = '#64748b'; ctx.fillText('Move pointer to aim', ZUMA_W/2, ZUMA_H/2+24);
+      }
+      ctx.restore();
+    }
+
+    if (!loopRunning) { drawFrame(); return; }
+
+    let alive = true, lastTs = null;
+    const loop = (ts) => {
+      if (!alive) return;
+      rafRef.current = requestAnimationFrame(loop);
+      if (!lastTs) { lastTs = ts; drawFrame(); return; }
+      const dt = Math.min((ts - lastTs) / 1000, 0.05);
+      lastTs = ts;
+
+      const chain = chainRef.current;
+      const pd = pathDataRef.current;
+      const lv = ZUMA_LEVELS[levelRef.current - 1];
+
+      // Advance chain
+      for (let i = 0; i < chain.length; i++) chain[i].dist += lv.speed * dt;
+
+      // Game over: front ball crossed the skull
+      if (chain.length > 0 && chain[0].dist >= pd.totalLen) {
+        triggerEnd(false); drawFrame(); return;
+      }
+
+      // Level cleared: chain empty and no shot in flight
+      if (chain.length === 0 && !shotRef.current) {
+        scoreRef.current += 500 * levelRef.current;
+        setScore(scoreRef.current);
+        if (levelRef.current >= 3) { triggerEnd(true); drawFrame(); return; }
+        levelRef.current++;
+        setLevel(levelRef.current);
+        initLevel(levelRef.current);
+        drawFrame(); return;
+      }
+
+      // Advance shot ball
+      if (shotRef.current) {
+        const sh = shotRef.current;
+        sh.x += sh.vx * dt; sh.y += sh.vy * dt;
+        if (sh.x < -20 || sh.x > ZUMA_W+20 || sh.y < -20 || sh.y > ZUMA_H+20) {
+          shotRef.current = null;
+        } else {
+          for (let i = 0; i < chain.length; i++) {
+            if (chain[i].dist < 0) continue;
+            const pt = zumaPointAtDist(pd, chain[i].dist);
+            const dx = sh.x - pt.x, dy = sh.y - pt.y;
+            if (dx*dx + dy*dy < (ZUMA_BALL_R*2)*(ZUMA_BALL_R*2)) {
+              // Insert behind hit ball; push rear segment back if needed
+              chain.splice(i+1, 0, { color: sh.color, dist: chain[i].dist - ZUMA_DIAM });
+              for (let j = i+2; j < chain.length; j++) {
+                const needed = chain[j-1].dist - ZUMA_DIAM;
+                if (chain[j].dist > needed) chain[j].dist = needed; else break;
+              }
+              shotRef.current = null;
+              const p = zumaCheckMatches(chain, i+1);
+              if (p > 0) {
+                const bonus = p >= 6 ? (p-5)*50 : 0;
+                scoreRef.current += p*10 + bonus;
+                bpRef.current += p;
+                setScore(scoreRef.current);
+                setBallsPopped(bpRef.current);
+                onStepRef.current && onStepRef.current(bpRef.current);
+              }
+              break;
+            }
+          }
+        }
+      }
+      drawFrame();
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => { alive = false; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [loopRunning, resetKey]);
+
+  const getCanvasCoords = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = ZUMA_W / rect.width, sy = ZUMA_H / rect.height;
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (cx - rect.left)*sx, y: (cy - rect.top)*sy };
+  };
+
+  const updateAim = e => {
+    const c = canvasRef.current; if (!c) return;
+    const { x, y } = getCanvasCoords(e, c);
+    frogAngleRef.current = Math.atan2(y - FROG_Y, x - FROG_X);
+  };
+
+  const shoot = () => {
+    if (doneRef.current || shotRef.current) return;
+    if (!startedRef.current) { startedRef.current = true; setStarted(true); }
+    const lv = ZUMA_LEVELS[levelRef.current - 1];
+    const angle = frogAngleRef.current;
+    shotRef.current = {
+      x: FROG_X + Math.cos(angle)*20, y: FROG_Y + Math.sin(angle)*20,
+      vx: Math.cos(angle)*ZUMA_SHOT_SPEED, vy: Math.sin(angle)*ZUMA_SHOT_SPEED,
+      color: curColorRef.current,
+    };
+    curColorRef.current = nxtColorRef.current;
+    nxtColorRef.current = zumaRandColor(lv.colors);
+  };
+
+  const loadLeaderboard = async () => {
+    setLbLoading(true); setLbError(false);
+    const { ok, body } = await api('/api/zuma/leaderboard');
+    if (ok && body) setLb(body); else setLbError(true);
+    setLbLoading(false);
+  };
+
+  const fmtS = s => String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+
+  return (
+    React.createElement('div', null,
+      activeTab === 'game' && React.createElement('div', null,
+        React.createElement('div', { className: 'status-bar' },
+          React.createElement('div', { className: 'pill' },
+            React.createElement('div', { className: 'plabel' }, 'Score'),
+            React.createElement('div', { className: 'pvalue mono' }, score.toLocaleString())
+          ),
+          React.createElement('div', { className: 'pill' },
+            React.createElement('div', { className: 'plabel' }, 'Level'),
+            React.createElement('div', { className: 'pvalue mono' }, level + '/3')
+          ),
+          React.createElement('div', { className: 'pill' },
+            React.createElement('div', { className: 'plabel' }, 'Popped'),
+            React.createElement('div', { className: 'pvalue mono' }, ballsPopped)
+          ),
+          React.createElement('div', { className: 'pill' },
+            React.createElement('div', { className: 'plabel' }, 'Time'),
+            React.createElement('div', { className: 'pvalue mono' }, fmtS(elapsedSecs))
+          )
+        ),
+        React.createElement('div', { className: 'zuma-wrap' },
+          React.createElement('canvas', {
+            ref: canvasRef,
+            className: 'zuma-canvas',
+            onMouseMove: e => updateAim(e),
+            onClick: e => { updateAim(e); shoot(); },
+            onTouchMove: e => { e.preventDefault(); updateAim(e); },
+            onTouchEnd: () => shoot(),
+          })
+        ),
+        React.createElement('div', { className: 'bounce-controls' },
+          React.createElement('button', { onClick: () => init() }, '↺ New Game')
+        )
+      ),
+      activeTab === 'leaderboard' && React.createElement('div', null,
+        lbLoading && React.createElement('div', { className: 'snake-lb-empty' }, 'Loading…'),
+        !lbLoading && lbError && React.createElement('div', { className: 'snake-lb-empty' }, 'Leaderboard unavailable — score saved locally.'),
+        !lbLoading && !lbError && lb && (() => {
+          const top = lb.top || [], me = lb.me || null;
+          const meInTop = me && top.some(r => r.rank === me.rank);
+          if (!top.length) return React.createElement('div', { className: 'snake-lb-empty' }, 'No scores yet — be the first!');
+          return React.createElement('div', { className: 'snake-lb-list' },
+            top.map(r =>
+              React.createElement('div', { key: r.rank, className: 'snake-lb-row' + (me && r.rank === me.rank ? ' snake-lb-me' : '') },
+                React.createElement('span', { className: 'snake-lb-rank' }, '#' + r.rank),
+                React.createElement('span', { className: 'snake-lb-name' }, r.username || 'anon'),
+                React.createElement('span', { className: 'snake-lb-score' }, Number(r.bestScore).toLocaleString())
+              )
+            ),
+            me && !meInTop && React.createElement('div', null,
+              React.createElement('div', { className: 'snake-lb-divider' }, '···'),
+              React.createElement('div', { className: 'snake-lb-row snake-lb-me' },
+                React.createElement('span', { className: 'snake-lb-rank' }, '#' + me.rank),
+                React.createElement('span', { className: 'snake-lb-name' }, me.username || 'You'),
+                React.createElement('span', { className: 'snake-lb-score' }, Number(me.bestScore).toLocaleString())
+              )
+            )
+          );
+        })()
+      ),
+      React.createElement('div', { className: 't2048-bottom-nav' },
+        ['game', 'leaderboard'].map(tab =>
+          React.createElement('button', {
+            key: tab,
+            className: 't2048-tab' + (activeTab === tab ? ' active' : ''),
+            onClick: () => { setActiveTab(tab); if (tab === 'leaderboard') loadLeaderboard(); },
+          }, tab.charAt(0).toUpperCase() + tab.slice(1))
+        )
+      )
+    )
+  );
+}
+
+/* ============================================================
+   Game — Hash Rush (3D endless runner, Three.js, Classic tab)
+   ============================================================ */
+const HR_HISTORY_KEY = 'puzzlechain_hashrush_history';
+const HR_LANE_X      = [-3, 0, 3];
+const HR_CHUNK_LEN   = 40;
+const HR_NUM_CHUNKS  = 4;
+
+function hrMakeGridTex(THREE) {
+  const sz = 256;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = sz;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#04101e';
+  ctx.fillRect(0, 0, sz, sz);
+  ctx.strokeStyle = '#0d3358';
+  ctx.lineWidth = 1;
+  const step = sz / 8;
+  for (let i = 0; i <= 8; i++) {
+    ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, sz); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(sz, i * step); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 4);
+  return tex;
+}
+
+function hrSpawnChunk(THREE, scene, centerZ, isFirst, gridTex) {
+  const allMeshes = [];
+  const obstacles = [];
+  const collectibles = [];
+
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, HR_CHUNK_LEN),
+    new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.85, emissive: new THREE.Color(0x081520), emissiveIntensity: 0.5 })
+  );
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(0, 0, centerZ);
+  scene.add(road);
+  allMeshes.push(road);
+
+  [-1.5, 1.5].forEach(lx => {
+    const d = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.05, HR_CHUNK_LEN),
+      new THREE.MeshBasicMaterial({ color: 0x1e3d6a })
+    );
+    d.position.set(lx, 0.02, centerZ);
+    scene.add(d);
+    allMeshes.push(d);
+  });
+
+  if (!isFirst) {
+    const chunkFarZ  = centerZ - HR_CHUNK_LEN / 2;
+    const occupied   = new Set();
+    const numObs     = Math.random() < 0.45 ? 1 : 2;
+
+    for (let i = 0; i < numObs; i++) {
+      const lane = Math.floor(Math.random() * 3);
+      const zOff = 6 + Math.random() * (HR_CHUNK_LEN - 12);
+      const slot = `o_${lane}_${Math.floor(zOff / 7)}`;
+      if (occupied.has(slot)) continue;
+      occupied.add(slot);
+
+      const type = Math.random() < 0.38 ? 'firewall' : Math.random() < 0.55 ? 'congestion' : 'failedtx';
+      let geo, mat;
+      if (type === 'firewall') {
+        geo = new THREE.BoxGeometry(2.0, 3.0, 0.5);
+        mat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xa01030, emissiveIntensity: 0.35 });
+      } else if (type === 'congestion') {
+        geo = new THREE.BoxGeometry(2.0, 1.2, 1.2);
+        mat = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x7a3508, emissiveIntensity: 0.25 });
+      } else {
+        geo = new THREE.SphereGeometry(0.7, 8, 6);
+        mat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0x880020, emissiveIntensity: 0.5, wireframe: true });
+      }
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(HR_LANE_X[lane], type === 'firewall' ? 1.5 : 0.65, chunkFarZ + zOff);
+      scene.add(mesh);
+      allMeshes.push(mesh);
+      obstacles.push({ mesh, type, alive: true });
+    }
+
+    const numCol = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < numCol; i++) {
+      const lane   = Math.floor(Math.random() * 3);
+      const zOff   = 4 + Math.random() * (HR_CHUNK_LEN - 8);
+      const slot   = `c_${lane}_${Math.floor(zOff / 6)}`;
+      if (occupied.has(slot)) continue;
+      occupied.add(slot);
+
+      const isShard = Math.random() < 0.22;
+      const geo2 = isShard
+        ? new THREE.IcosahedronGeometry(0.6, 0)
+        : new THREE.OctahedronGeometry(0.65, 0);
+      const mat2 = new THREE.MeshStandardMaterial(
+        isShard
+          ? { color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 0.7 }
+          : { color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.5 }
+      );
+      const mesh2 = new THREE.Mesh(geo2, mat2);
+      mesh2.position.set(HR_LANE_X[lane], 1.0, chunkFarZ + zOff);
+      scene.add(mesh2);
+      allMeshes.push(mesh2);
+      collectibles.push({ mesh: mesh2, isShard, alive: true });
+    }
+  }
+
+  return { centerZ, allMeshes, obstacles, collectibles };
+}
+
+function hrDisposeChunk(THREE, scene, chunk) {
+  chunk.allMeshes.forEach(m => {
+    scene.remove(m);
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) {
+      if (m.material.map) m.material.map.dispose();
+      m.material.dispose();
+    }
+  });
+}
+
+function HashRushGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const [loading, setLoading] = useState(true);
+  const [webglErr, setWebglErr] = useState(false);
+  const [score, setScore] = useState(0);
+  const [dist, setDist] = useState(0);
+  const [mult, setMult] = useState(1);
+
+  const mountRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef    = useRef(null);
+  const uiTmrRef  = useRef(null);
+  const roRef     = useRef(null);
+  const gameRef   = useRef(null); // holds live game state object
+  const onWinRef  = useRef(onWin);
+  const onStepRef = useRef(onStepChange);
+  onWinRef.current  = onWin;
+  onStepRef.current = onStepChange;
+
+  const histRef = useRef(cgLoadHistory(HR_HISTORY_KEY));
+
+  const sheet = [
+    cgRulesSection([
+      'Tap left / right side of screen (or ← → arrow keys) to switch lanes.',
+      'Dodge red Firewalls, orange Congestion blocks, and spinning Failed-Tx spheres.',
+      'Collect gold Tokens (+50 pts) and cyan Hash Shards (×2 score rate for 5 s).',
+      'The rig speeds up over time — survive as long as possible!',
+    ]),
+    cgHistorySection(histRef.current, r => (
+      React.createElement(React.Fragment, null,
+        React.createElement('span', null, `${(r.score || 0).toLocaleString()} pts`),
+        React.createElement('span', { className: 'mono' }, `${r.distance || 0}m · ${r.tokens || 0}⛏`)
+      )
+    )),
+    cgStatsSection([
+      { val: histRef.current.length > 0 ? Math.max(...histRef.current.map(r => r.score || 0)).toLocaleString() : 0, lbl: 'Best Score' },
+      { val: histRef.current.length, lbl: 'Total Runs' },
+      { val: histRef.current.reduce((a, r) => a + (r.distance || 0), 0), lbl: 'Total Metres' },
+      { val: histRef.current.reduce((a, r) => a + (r.tokens || 0), 0), lbl: 'Total Tokens' },
+    ]),
+  ];
+
+  // Keyboard input — reads from gameRef.current so always fresh
+  useEffect(() => {
+    const onKey = (e) => {
+      const g = gameRef.current;
+      if (!g || g.done) return;
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        e.preventDefault();
+        if (g.targetLane > 0) { g.targetLane--; cgHaptic(10); }
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        e.preventDefault();
+        if (g.targetLane < 2) { g.targetLane++; cgHaptic(10); }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Main init effect (re-runs on resetKey to restart)
+  useEffect(() => {
+    // Reset display state
+    setScore(0); setDist(0); setMult(1); setLoading(true); setWebglErr(false);
+
+    // Cancel previous loop / timer
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
+    if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
+
+    // Fresh game state (shared by loop + cleanup via closure)
+    let renderer = null, scene = null;
+    const chunks = [];
+    const g = {
+      targetLane: 1, speed: 8,
+      score: 0, dist: 0, tokens: 0, multEnd: 0,
+      done: false, elapsed: 0, lastTs: null,
+    };
+    gameRef.current = g;
+
+    const endRun = () => {
+      if (g.done) return;
+      g.done = true;
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
+      setScore(g.score);
+      setDist(Math.floor(g.dist));
+      cgSaveHistory(HR_HISTORY_KEY, { score: g.score, distance: Math.floor(g.dist), tokens: g.tokens, ts: Date.now() });
+      cgHaptic([20, 40, 20]);
+      onWinRef.current(g.score, g.tokens, Math.floor(g.elapsed), {
+        winnerLabel: 'Run Over',
+        share: `⛏️ Hash Rush — ${g.score.toLocaleString()} pts · ${Math.floor(g.dist)}m · ${g.tokens} tokens`,
+      });
+    };
+
+    const initWithThree = (THREE) => {
+      const canvas = canvasRef.current;
+      const mount  = mountRef.current;
+      if (!canvas || !mount) return;
+
+      // Create renderer (throws if WebGL unavailable)
+      try {
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      } catch (e) {
+        setWebglErr(true); setLoading(false); return;
+      }
+      const W = mount.clientWidth  || window.innerWidth;
+      const H = mount.clientHeight || Math.round(window.innerHeight * 0.65);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(W, H);
+      renderer.setClearColor(0x030609);
+      renderer.shadowMap.enabled = false;
+
+      scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(70, W / H, 0.1, 500);
+      camera.position.set(0, 5, 12);
+      camera.lookAt(0, 0, -20);
+
+      // Lighting
+      scene.add(new THREE.AmbientLight(0x334466, 0.8));
+      const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+      dir.position.set(5, 10, 5);
+      scene.add(dir);
+      const rigLight = new THREE.PointLight(0x3b82f6, 4, 16);
+      rigLight.position.set(0, 2, 0);
+      scene.add(rigLight);
+
+      // Sky dome
+      scene.add(new THREE.Mesh(
+        new THREE.SphereGeometry(220, 16, 8),
+        new THREE.MeshBasicMaterial({ color: 0x020407, side: THREE.BackSide })
+      ));
+
+      // Distant city blocks (decorative)
+      [
+        [-20, -130, 18], [-15, -110, 13], [20, -120, 22],
+        [15, -145, 14],  [-25, -160, 26], [25, -170, 20],
+      ].forEach(([x, z, h]) => {
+        const cm = new THREE.Mesh(
+          new THREE.BoxGeometry(2.5, h, 2.5),
+          new THREE.MeshStandardMaterial({ color: 0x050e1c, emissive: new THREE.Color(0x0c2845), emissiveIntensity: 0.65 })
+        );
+        cm.position.set(x, h / 2, z);
+        scene.add(cm);
+      });
+
+      // Player rig
+      const rig = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 1, 3),
+        new THREE.MeshStandardMaterial({
+          color: 0x3b82f6, emissive: new THREE.Color(0x1a4fc4),
+          emissiveIntensity: 0.5, roughness: 0.3, metalness: 0.7,
+        })
+      );
+      rig.position.set(0, 0.5, 0);
+      scene.add(rig);
+
+      // Grid texture (shared across all chunks this session)
+      const gridTex = hrMakeGridTex(THREE);
+
+      // Initial road chunks: centers at -20, -60, -100, -140
+      for (let i = 0; i < HR_NUM_CHUNKS; i++) {
+        const centerZ = -(i * HR_CHUNK_LEN) - HR_CHUNK_LEN / 2;
+        chunks.push(hrSpawnChunk(THREE, scene, centerZ, i === 0, gridTex));
+      }
+
+      // Resize observer
+      const ro = new ResizeObserver(([entry]) => {
+        const { width, height } = entry.contentRect;
+        if (width < 1 || height < 1 || !renderer) return;
+        renderer.setSize(width, height);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      });
+      ro.observe(mount);
+      roRef.current = ro;
+
+      setLoading(false);
+
+      // Game loop
+      const loop = (ts) => {
+        if (g.done) return;
+        rafRef.current = requestAnimationFrame(loop);
+
+        const dt = g.lastTs ? Math.min((ts - g.lastTs) / 1000, 0.1) : 0.016;
+        g.lastTs = ts;
+        g.elapsed += dt;
+
+        const scroll = g.speed * dt;
+        g.dist += scroll;
+
+        // Move all chunk meshes toward camera (+z)
+        for (let ci = 0; ci < chunks.length; ci++) {
+          const ch = chunks[ci];
+          ch.centerZ += scroll;
+          for (let mi = 0; mi < ch.allMeshes.length; mi++) {
+            ch.allMeshes[mi].position.z += scroll;
+          }
+        }
+
+        // Lerp rig x
+        const targetX = HR_LANE_X[g.targetLane];
+        rig.position.x += (targetX - rig.position.x) * Math.min(dt * 10, 0.9);
+        rigLight.position.x = rig.position.x;
+
+        // Animate collectibles and failed-tx obstacles
+        for (let ci = 0; ci < chunks.length; ci++) {
+          const ch = chunks[ci];
+          for (let oi = 0; oi < ch.obstacles.length; oi++) {
+            const obs = ch.obstacles[oi];
+            if (!obs.alive || obs.type !== 'failedtx') continue;
+            obs.mesh.rotation.x += dt * 2;
+            obs.mesh.rotation.z += dt * 1.5;
+          }
+          for (let ki = 0; ki < ch.collectibles.length; ki++) {
+            const col = ch.collectibles[ki];
+            if (!col.alive) continue;
+            col.mesh.rotation.y += dt * (col.isShard ? 3.5 : 2);
+            col.mesh.rotation.x += dt * 0.8;
+          }
+        }
+
+        // Collision + collection — only within reasonable z range
+        const rx = rig.position.x;
+        outer: for (let ci = 0; ci < chunks.length; ci++) {
+          const ch = chunks[ci];
+          for (let oi = 0; oi < ch.obstacles.length; oi++) {
+            const obs = ch.obstacles[oi];
+            if (!obs.alive) continue;
+            const oz = obs.mesh.position.z;
+            if (oz > 4 || oz < -3) continue; // z cull: only near z=0
+            const ox = obs.mesh.position.x;
+            const dx = Math.abs(rx - ox);
+            const hz = obs.type === 'firewall' ? 1.5 : obs.type === 'congestion' ? 1.8 : 1.4;
+            if (dx < 1.8 && Math.abs(oz) < hz) { endRun(); break outer; }
+          }
+          for (let ki = 0; ki < ch.collectibles.length; ki++) {
+            const col = ch.collectibles[ki];
+            if (!col.alive) continue;
+            const oz = col.mesh.position.z;
+            if (oz > 3 || oz < -3) continue;
+            const dx = Math.abs(rx - col.mesh.position.x);
+            if (dx < 1.6 && Math.abs(oz) < 1.8) {
+              col.alive = false;
+              scene.remove(col.mesh);
+              if (col.isShard) {
+                g.multEnd = performance.now() + 5000;
+              } else {
+                g.tokens++;
+                if (onStepRef.current) onStepRef.current(g.tokens);
+              }
+            }
+          }
+        }
+
+        // Update score
+        const multActive = performance.now() < g.multEnd;
+        g.score = Math.round(g.dist * (multActive ? 2 : 1) * 10) + g.tokens * 50;
+
+        // Increase speed gently
+        g.speed = Math.min(8 + g.dist * 0.016, 32);
+
+        // Retire far chunks (centerZ > 40 means they're well past the camera)
+        for (let ci = chunks.length - 1; ci >= 0; ci--) {
+          if (chunks[ci].centerZ > 40) {
+            hrDisposeChunk(THREE, scene, chunks[ci]);
+            chunks.splice(ci, 1);
+          }
+        }
+        // Spawn replacements
+        while (chunks.length < HR_NUM_CHUNKS) {
+          const minCZ = chunks.length > 0 ? Math.min(...chunks.map(c => c.centerZ)) : -HR_CHUNK_LEN / 2;
+          chunks.push(hrSpawnChunk(THREE, scene, minCZ - HR_CHUNK_LEN, false, gridTex));
+        }
+
+        renderer.render(scene, camera);
+      };
+
+      rafRef.current = requestAnimationFrame(loop);
+
+      // UI update timer — updates React state without spamming RAF
+      uiTmrRef.current = setInterval(() => {
+        if (g.done) return;
+        setScore(g.score);
+        setDist(Math.floor(g.dist));
+        setMult(performance.now() < g.multEnd ? 2 : 1);
+      }, 100);
+    }; // end initWithThree
+
+    // Load Three.js lazily (cached on window.THREE)
+    if (window.THREE) {
+      initWithThree(window.THREE);
+    } else {
+      let s = document.getElementById('three-js-cdn');
+      if (!s) {
+        s = document.createElement('script');
+        s.id = 'three-js-cdn';
+        s.src = 'https://unpkg.com/three@0.161.0/build/three.min.js';
+        s.addEventListener('load', () => initWithThree(window.THREE), { once: true });
+        s.addEventListener('error', () => { setWebglErr(true); setLoading(false); }, { once: true });
+        document.head.appendChild(s);
+      } else {
+        // Script tag exists — might still be loading
+        if (window.THREE) {
+          initWithThree(window.THREE);
+        } else {
+          s.addEventListener('load', () => initWithThree(window.THREE), { once: true });
+        }
+      }
+    }
+
+    return () => {
+      g.done = true;
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
+      if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
+      const THREE = window.THREE;
+      if (THREE && scene) chunks.forEach(ch => hrDisposeChunk(THREE, scene, ch));
+      if (renderer) { renderer.dispose(); renderer = null; }
+    };
+  }, [resetKey]);
+
+  // Touch controls on canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onTouch = (e) => {
+      const g = gameRef.current;
+      if (!g || g.done) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      if (!t) return;
+      const rect = canvas.getBoundingClientRect();
+      if (t.clientX < rect.left + rect.width / 2) {
+        if (g.targetLane > 0) { g.targetLane--; cgHaptic(10); }
+      } else {
+        if (g.targetLane < 2) { g.targetLane++; cgHaptic(10); }
+      }
+    };
+    canvas.addEventListener('touchstart', onTouch, { passive: false });
+    return () => canvas.removeEventListener('touchstart', onTouch);
+  }, []);
+
+  const moveLane = (dir) => {
+    const g = gameRef.current;
+    if (!g || g.done) return;
+    const next = g.targetLane + dir;
+    if (next >= 0 && next <= 2) { g.targetLane = next; cgHaptic(10); }
+  };
+
+  return (
+    React.createElement(ClassicShell, { game, onExit: onBack, sheetSections: sheet },
+      React.createElement('div', { ref: mountRef, className: 'hr-wrap' },
+        React.createElement('canvas', { ref: canvasRef, className: 'hr-canvas' }),
+        loading && !webglErr && React.createElement('div', { className: 'hr-overlay' },
+          React.createElement('div', { className: 'hr-spinner' }),
+          React.createElement('div', null, 'Initializing 3D engine…')
+        ),
+        webglErr && React.createElement('div', { className: 'hr-overlay' },
+          React.createElement('div', { style: { fontSize: '2rem' } }, '⚠️'),
+          React.createElement('div', null, 'WebGL is not available in your browser.')
+        ),
+        !loading && !webglErr && React.createElement(React.Fragment, null,
+          React.createElement('div', { className: 'hr-hud' },
+            React.createElement('div', { className: 'hr-pill' },
+              React.createElement('div', { className: 'hr-plabel' }, 'Score'),
+              React.createElement('div', { className: 'hr-pvalue' }, score.toLocaleString())
+            ),
+            React.createElement('div', { className: 'hr-pill' },
+              React.createElement('div', { className: 'hr-plabel' }, 'Distance'),
+              React.createElement('div', { className: 'hr-pvalue' }, dist + 'm')
+            ),
+            React.createElement('div', { className: 'hr-pill', style: mult > 1 ? { borderColor: C.gold } : {} },
+              React.createElement('div', { className: 'hr-plabel' }, 'Mult'),
+              React.createElement('div', { className: 'hr-pvalue', style: mult > 1 ? { color: C.gold } : {} }, '\xd7' + mult)
+            )
+          ),
+          React.createElement('button', { className: 'hr-lane-btn hr-lane-left', onClick: () => moveLane(-1) }, '◄'),
+          React.createElement('button', { className: 'hr-lane-btn hr-lane-right', onClick: () => moveLane(1) }, '►')
+        )
+      )
+    )
   );
 }
 
@@ -10249,6 +11790,26 @@ const GAMES = [
     component: BounceGame,
   },
   {
+    id: 'zuma',
+    name: 'Zuma',
+    icon: '🐸',
+    category: 'classic',
+    desc: 'Shoot colored balls to match 3 in a row before the chain reaches the skull.',
+    tag: 'Arcade',
+    tagColor: C.emerald,
+    component: ZumaGame,
+  },
+  {
+    id: 'hashrush',
+    name: 'Hash Rush',
+    icon: '⛏️',
+    category: 'classic',
+    desc: 'Dodge blockchain obstacles and collect tokens in a crypto-themed 3D endless runner.',
+    tag: '3D',
+    tagColor: C.accent,
+    component: HashRushGame,
+  },
+  {
     id: 'tilematchingdaily',
     name: 'Daily Tile Match Puzzle',
     icon: '🀄',
@@ -10271,13 +11832,255 @@ const GAMES = [
 ];
 
 // Games that render their own ClassicShell (full-screen, gesture-first).
-const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas']);
+const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'tilematch', 'diamondrush', 'texas', 'hashrush']);
+
+/* ============================================================
+   Social: Feed & Posts
+   ============================================================ */
+
+function FeedScreen({ user, setScreen }) {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+
+  useEffect(() => {
+    const loadFeed = async () => {
+      const { ok, body } = await api('/api/posts/feed?limit=20&offset=0');
+      if (ok && body) setPosts(body.posts || []);
+      setLoading(false);
+    };
+    loadFeed();
+    const id = setInterval(loadFeed, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (selectedPostId) {
+    const post = posts.find(p => p.id === selectedPostId);
+    if (post) {
+      return (
+        <PostDetail
+          post={post}
+          onBack={() => setSelectedPostId(null)}
+        />
+      );
+    }
+  }
+
+  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading feed...</div>;
+
+  const gameNameMap = {};
+  GAMES.forEach(g => gameNameMap[g.id] = g);
+
+  return (
+    <div className="lobby" style={{ maxWidth: '600px' }}>
+      {posts.length === 0 ? (
+        <div style={{ textAlign: 'center', color: C.muted, padding: '2rem' }}>
+          <p>No posts yet. Play a game and share your wins!</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {posts.map(p => {
+            const game = gameNameMap[p.gameId];
+            return (
+              <div
+                key={p.id}
+                className="card"
+                style={{ cursor: 'pointer', '--accent': game?.tagColor || C.accent }}
+                onClick={() => setSelectedPostId(p.id)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{
+                    width: '1.8rem', height: '1.8rem', borderRadius: '50%',
+                    background: C.accent, color: '#fff', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: '600'
+                  }}>
+                    {(p.username || 'U')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{p.username}</div>
+                    <div style={{ fontSize: '0.75rem', color: C.muted }}>
+                      {p.createdAt ? new Date(p.createdAt).toLocaleString() : 'now'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>{game?.icon || '🎮'}</span>
+                  <span style={{ fontWeight: '600' }}>{game?.name || p.gameId}</span>
+                </div>
+                <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  {p.score} pts
+                </div>
+                {p.caption && <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>{p.caption}</div>}
+                <div style={{ fontSize: '0.8rem', color: C.muted }}>
+                  💬 {p.commentCount} comment{p.commentCount !== 1 ? 's' : ''}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostDetail({ post, onBack }) {
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPost = async () => {
+      const { ok: userOk, body: userData } = await api('/api/daily');
+      if (userOk) setUser(userData.user);
+
+      const { ok, body } = await api(`/api/posts/${post.id}/comments?limit=50&offset=0`);
+      if (ok && body) setComments(body.comments || []);
+      setLoading(false);
+    };
+    loadPost();
+  }, [post.id]);
+
+  const addComment = async () => {
+    if (!commentText.trim()) return;
+    const { ok, body } = await api(`/api/posts/${post.id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ text: commentText }),
+    });
+    if (ok && body) {
+      setComments(prev => [body, ...prev]);
+      setCommentText('');
+    }
+  };
+
+  const deleteComment = async (commentId) => {
+    const { ok } = await api(`/api/posts/${post.id}/comments/${commentId}`, {
+      method: 'DELETE',
+    });
+    if (ok) {
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    }
+  };
+
+  const gameNameMap = {};
+  GAMES.forEach(g => gameNameMap[g.id] = g);
+  const game = gameNameMap[post.gameId];
+
+  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+
+  return (
+    <div className="game-wrap">
+      <button className="back-btn" onClick={onBack}>← Back</button>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{
+              width: '2rem', height: '2rem', borderRadius: '50%',
+              background: C.accent, color: '#fff', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontWeight: '600'
+            }}>
+              {(post.username || 'U')[0].toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: '600' }}>{post.username}</div>
+              <div style={{ fontSize: '0.8rem', color: C.muted }}>
+                {post.createdAt ? new Date(post.createdAt).toLocaleString() : 'now'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>{game?.icon || '🎮'}</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: '600' }}>{game?.name || post.gameId}</span>
+          </div>
+          <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', fontSize: '1.1rem', marginBottom: '0.75rem' }}>
+            {post.score} pts{post.timeSecs ? ` · ${Math.floor(post.timeSecs / 60)}:${String(post.timeSecs % 60).padStart(2, '0')}` : ''}
+          </div>
+          {post.caption && <div style={{ fontSize: '0.95rem', marginTop: '0.75rem' }}>{post.caption}</div>}
+        </div>
+
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Comments ({comments.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            {comments.map(c => (
+              <div key={c.id} className="card" style={{ padding: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.username}</div>
+                    <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.4rem' }}>
+                      {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'now'}
+                    </div>
+                    <div style={{ fontSize: '0.9rem' }}>{c.text}</div>
+                  </div>
+                  {user && user.id === c.userId && (
+                    <button
+                      onClick={() => deleteComment(c.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: C.rose,
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        marginLeft: '0.5rem',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              placeholder="Add a comment..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value.slice(0, 280))}
+              onKeyDown={(e) => e.key === 'Enter' && addComment()}
+              style={{
+                flex: 1,
+                padding: '0.6rem 0.8rem',
+                background: C.card,
+                border: `1px solid ${C.border}`,
+                borderRadius: '10px',
+                color: C.text,
+                fontFamily: 'inherit',
+                fontSize: '0.9rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={addComment}
+              style={{
+                padding: '0.6rem 1rem',
+                background: C.accent,
+                color: '#fff',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+              }}
+            >
+              Reply
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ============================================================
    Root app
    ============================================================ */
 function App() {
-  const [screen, setScreen] = useState('lobby'); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends'
+  const [screen, setScreen] = useState(() => {
+    // Support ?screen=wallet deep link for testing
+    const s = new URLSearchParams(window.location.search).get('screen');
+    return s === 'wallet' ? 'wallet' : 'lobby';
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet'
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -10302,6 +12105,12 @@ function App() {
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
+  // Wallet state (app-level so PvP and nav share one source)
+  const [walletAddr, setWalletAddr] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null); // wei string
+  const [walletMock, setWalletMock] = useState(true);
+  // Share modal for posting wins to feed
+  const [shareModal, setShareModal] = useState({ show: false, caption: '' });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -10336,6 +12145,35 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  // Wallet: get EVM address from bridge, link it to the account, fetch balance.
+  // Promoted to app-level so PvP Arena and the nav chip share one source.
+  useEffect(() => {
+    if (!window.usernode || !window.usernode.getNodeAddress) return;
+    window.usernode.getNodeAddress().then(addr => {
+      if (!addr) return;
+      setWalletAddr(addr);
+      // Link address server-side so tipping lookups work
+      api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }).catch(() => {});
+      // Fetch on-chain balance
+      api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`)
+        .then(({ ok, body }) => {
+          if (ok && body) {
+            setWalletBalance(body.balance);
+            setWalletMock(!!body.mock);
+          }
+        }).catch(() => {});
+    }).catch(() => {});
+  }, []);
+
+  // Refresh balance on demand (called after claim/tip)
+  const refreshWalletBalance = () => {
+    if (!walletAddr) return;
+    api(`/api/wallet/balance?addr=${encodeURIComponent(walletAddr)}`)
+      .then(({ ok, body }) => {
+        if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
+      }).catch(() => {});
+  };
 
   // Midnight UTC reached — reload state so everything unlocks.
   const onReset = () => {
@@ -10445,7 +12283,12 @@ function App() {
     const finalScore = Math.round(score * multiplier);
     const bonus = finalScore - score;
     setStreak(effectiveStreak);
-    setWinData({ score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak, share: meta && meta.share });
+    setWinData({
+      score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+      share: meta && meta.share,
+      canPost: true,
+      gameId: gameId,
+    });
 
     const gameId = currentGame.id;
     const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
@@ -10460,6 +12303,10 @@ function App() {
     // Reconcile against the server's authoritative streak (now that today is
     // finished) so a reload and the live nav badge agree.
     if (ok && body && typeof body.streak === 'number') setStreak(body.streak);
+    // Store reward amount from server so win overlay can show it
+    if (ok && body && body.rewardWei) {
+      setWinData(prev => prev ? { ...prev, rewardWei: body.rewardWei } : prev);
+    }
   };
 
   // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
@@ -10563,6 +12410,16 @@ function App() {
               </div>
             </div>
           </div>
+          {authOk && walletBalance && (
+            <button
+              className="nav-wallet-chip"
+              title="Open Wallet"
+              onClick={() => setScreen('wallet')}
+            >
+              🪙 {fmtUtgo(walletBalance)}
+              {walletMock && <span style={{ fontSize: '0.6rem', color: C.muted, marginLeft: '0.2rem' }}>(demo)</span>}
+            </button>
+          )}
           {authOk && (
             <button
               className="primary-btn"
@@ -10598,11 +12455,22 @@ function App() {
         />
       )}
 
+      {screen === 'wallet' && (
+        <WalletScreen
+          user={user}
+          authOk={authOk}
+          walletAddr={walletAddr}
+          walletMock={walletMock}
+          onBack={() => setScreen('lobby')}
+          onBalanceRefresh={refreshWalletBalance}
+        />
+      )}
+
       {screen === 'lobby' && (
         <div className="lobby">
           <div className="lobby-head">
             <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : 'PvP Arena'}
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : lobbyTab === 'pvp' ? 'PvP Arena' : 'Community Feed'}
             </h1>
             <p>
               {lobbyTab === 'daily'
@@ -10611,7 +12479,9 @@ function App() {
                 ? 'Play anytime — track your best scores.'
                 : lobbyTab === 'idle'
                 ? 'Tap, upgrade, and build your empire. Progress saved automatically.'
-                : 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'}
+                : lobbyTab === 'pvp'
+                ? 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'
+                : 'See what your friends have been playing'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
               <p className="lobby-hint">
@@ -10645,9 +12515,17 @@ function App() {
               onClick={() => setLobbyTab('pvp')}
               style={lobbyTab !== 'pvp' ? { borderColor: C.rose + '60', color: C.rose } : {}}
             >⚔️ PvP Arena</button>
+            {authOk && (
+              <button
+                className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
+                onClick={() => setLobbyTab('feed')}
+              >Feed</button>
+            )}
           </div>
           {lobbyTab === 'pvp' ? (
-            <PvpArena user={user} authOk={authOk} />
+            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
+          ) : lobbyTab === 'feed' ? (
+            <FeedScreen user={user} setScreen={setScreen} />
           ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
@@ -10790,9 +12668,24 @@ function App() {
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
+              {winData.rewardWei && winData.rewardWei !== '0' && !winData.isClassic && (
+                <div className="win-reward-row">
+                  <span className="k">🪙 Token reward</span>
+                  <span className="v">+{fmtUtgo(winData.rewardWei)}</span>
+                </div>
+              )}
             </div>
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
+            {!winData.isClassic && authOk && (
+              <button
+                className="primary-btn"
+                style={{ marginBottom: '0.6rem', background: C.emerald }}
+                onClick={() => setShareModal({ show: true, caption: '', gameId: winData.gameId, score: winData.finalScore, steps: winData.steps, timeSecs: winData.timeSecs })}
+              >
+                📤 Share to Feed
+              </button>
+            )}
             {winData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
                 Play Again
@@ -10833,6 +12726,67 @@ function App() {
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+          </div>
+        </div>
+      )}
+
+      {shareModal.show && (
+        <div className="win-overlay">
+          <div className="win-card">
+            <h2>Share to Feed</h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <textarea
+                placeholder="Add a caption (optional, max 280 chars)"
+                value={shareModal.caption}
+                onChange={(e) => setShareModal(prev => ({ ...prev, caption: e.target.value.slice(0, 280) }))}
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: '10px',
+                  color: C.text,
+                  fontFamily: 'inherit',
+                  fontSize: '0.9rem',
+                  minHeight: '80px',
+                  resize: 'vertical',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ fontSize: '0.75rem', color: C.muted, marginTop: '0.4rem', textAlign: 'right' }}>
+                {shareModal.caption.length}/280
+              </div>
+            </div>
+            <button
+              className="primary-btn"
+              onClick={async () => {
+                const { ok } = await api('/api/posts', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    gameId: shareModal.gameId,
+                    score: shareModal.score,
+                    steps: shareModal.steps,
+                    timeSecs: shareModal.timeSecs,
+                    caption: shareModal.caption || null,
+                  }),
+                });
+                if (ok) {
+                  setShareModal({ show: false, caption: '' });
+                  // Show brief success message
+                  setTimeout(() => backToLobby(), 1500);
+                }
+              }}
+              style={{ marginBottom: '0.6rem' }}
+            >
+              ✓ Post to Feed
+            </button>
+            <button
+              className="primary-btn"
+              style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+              onClick={() => setShareModal({ show: false, caption: '' })}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

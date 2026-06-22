@@ -31,6 +31,7 @@
     }
   ],
   "tests": [
+    { "name": "Main screen loads with no console errors", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" },
     { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" },
@@ -46,10 +47,12 @@
     { "name": "Diamond Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Diamond Rush" },
     { "name": "Texas Hold Em card in Classic Games tab", "path": "/?tab=classic", "expectText": "Texas Hold 'Em" },
     { "name": "Bounce card in Classic Games tab", "path": "/?tab=classic", "expectText": "Bounce" },
+    { "name": "Zuma card in Classic Games tab", "path": "/?tab=classic", "expectText": "Zuma" },
     { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" },
     { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
     { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" },
     { "name": "PvP Arena tab renders", "path": "/?tab=pvp", "expectText": "PvP Arena" },
-    { "name": "Wallet screen shows pending rewards", "path": "/?screen=wallet&demo=1", "expectText": "Pending Rewards" }
+    { "name": "Wallet screen shows pending rewards", "path": "/?screen=wallet&demo=1", "expectText": "Pending Rewards" },
+    { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" }
   ]
 }

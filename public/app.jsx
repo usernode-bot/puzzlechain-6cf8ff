@@ -1632,9 +1632,9 @@ body {
 /* ---- Snake ---- */
 .snake-board-wrap {
   position: relative;
-  max-width: 360px;
+  display: inline-block;
   margin: 0 auto;
-  aspect-ratio: 1;
+  width: 100%;
 }
 .snake-grid {
   display: grid;
@@ -1738,6 +1738,22 @@ body {
 .snake-lb-row .snake-lb-score { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; }
 .snake-lb-divider { text-align: center; color: ${C.muted}; padding: 0.4rem 0; font-size: 0.8rem; letter-spacing: 0.2em; }
 .snake-lb-empty { color: ${C.muted}; text-align: center; padding: 2rem 0; font-size: 0.9rem; }
+.snake-pause-overlay {
+  position: absolute;
+  inset: 0;
+  background: ${C.bg}cc;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+}
+.snake-pause-text {
+  font-size: 2rem;
+  font-weight: 700;
+  color: ${C.gold};
+  letter-spacing: 0.1em;
+}
 
 /* ---- Bounce (Breakout) ---- */
 .bounce-board-wrap {
@@ -6851,10 +6867,12 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
   const [done, setDone] = useState(false);
   const [score, setScore] = useState(0);
   const [started, setStarted] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [pausedSecs, setPausedSecs] = useState(0);
   const st = useRef(null);
   const doneRef = useRef(false);
   const boardRef = useRef(null);
-  const secs = useElapsed(resetKey, !done);
+  const secs = useElapsed(resetKey, !done && !paused);
   const secsRef = useRef(0); secsRef.current = secs;
 
   const randFood = (snake) => {
@@ -6868,7 +6886,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
     st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: 200, eaten: 0 };
     doneRef.current = false;
-    setDone(false); setScore(0); setStarted(false); render(n => n + 1);
+    setDone(false); setScore(0); setStarted(false); setPaused(false); setPausedSecs(0); render(n => n + 1);
   };
   useEffect(() => { init(); }, [resetKey]);
 
@@ -6903,7 +6921,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     render(n => n + 1);
   };
   useEffect(() => {
-    if (done || !started) return;
+    if (done || !started || paused) return;
     let raf, last = 0, alive = true;
     const loop = (ts) => {
       if (!alive) return;
@@ -6913,11 +6931,11 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     };
     raf = requestAnimationFrame(loop);
     return () => { alive = false; cancelAnimationFrame(raf); };
-  }, [done, started, resetKey]);
+  }, [done, started, paused, resetKey]);
 
   const turn = (dir) => {
     const s = st.current;
-    if (!s || doneRef.current) return;
+    if (!s || doneRef.current || paused) return;
     const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
     const nd = map[dir]; if (!nd) return;
     if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
@@ -6925,7 +6943,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     if (!started) setStarted(true);
     cgSound('move');
   };
-  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started) setStarted(true); } });
+  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started && !paused) setStarted(true); } });
   useEffect(() => {
     const onKey = (e) => {
       const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
@@ -6961,10 +6979,32 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
-          {cells}
+        <div className="snake-board-wrap">
+          <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
+            {cells}
+          </div>
+          {paused && !done && (
+            <div className="snake-pause-overlay">
+              <div className="snake-pause-text">PAUSED</div>
+            </div>
+          )}
         </div>
         <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
+        <div className="snake-controls">
+          {!started && <button onClick={() => init()}>Restart</button>}
+          {started && !paused && !done && (
+            <>
+              <button onClick={() => { setPaused(true); setPausedSecs(secs); }}>Pause</button>
+              <button onClick={() => init()}>Restart</button>
+            </>
+          )}
+          {paused && !done && (
+            <>
+              <button onClick={() => { setPaused(false); }}>Resume</button>
+              <button onClick={() => init()}>Restart</button>
+            </>
+          )}
+        </div>
       </div>
     </ClassicShell>
   );

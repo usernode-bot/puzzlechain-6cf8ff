@@ -112,6 +112,7 @@ const GAME_REGISTRY = {
   bounce:            { category: 'classic', tier: 'B' },
   zuma:              { category: 'classic', tier: 'B' },
   hashrush:          { category: 'classic', tier: 'A' },
+  match3:            { category: 'classic', tier: 'A' },
   idle:              { category: 'idle',    tier: 'C' },
   // DApp-only pseudo-game for PvP tile-match sessions (not a lobby card).
   tilematch_pvp:     { category: 'pvp',     tier: 'A' },
@@ -126,6 +127,63 @@ const GAME_IDS = new Set(
 
 // Any game id known to the hub (used by DApp session validation).
 const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
+
+// ---- Match-3 puzzle configuration ----------------------------------------
+const MATCH3_PUZZLES = [
+  // Easy (1-10)
+  { id: 1, name: 'Getting Started', target: 800, timeLimit: 120, moveLimit: 30, layers: 2, difficulty: 'Easy' },
+  { id: 2, name: 'Gather Gems', target: 1200, timeLimit: 120, moveLimit: 28, layers: 3, difficulty: 'Easy' },
+  { id: 3, name: 'Color Cascade', target: 1500, timeLimit: 120, moveLimit: 26, layers: 2, difficulty: 'Easy' },
+  { id: 4, name: 'Tile Practice', target: 2000, timeLimit: 120, moveLimit: 35, layers: 3, difficulty: 'Easy' },
+  { id: 5, name: 'Gem Master', target: 2500, timeLimit: 120, moveLimit: 32, layers: 2, difficulty: 'Easy' },
+  { id: 6, name: 'Combo Chain', target: 1800, timeLimit: 120, moveLimit: 40, layers: 2, difficulty: 'Easy' },
+  { id: 7, name: 'Rainbow Tiles', target: 2200, timeLimit: 120, moveLimit: 30, layers: 3, difficulty: 'Easy' },
+  { id: 8, name: 'Momentum', target: 2700, timeLimit: 120, moveLimit: 28, layers: 2, difficulty: 'Easy' },
+  { id: 9, name: 'Precision Match', target: 2000, timeLimit: 120, moveLimit: 25, layers: 3, difficulty: 'Easy' },
+  { id: 10, name: 'Power Play', target: 2800, timeLimit: 120, moveLimit: 32, layers: 3, difficulty: 'Easy' },
+  // Medium (11-30)
+  { id: 11, name: 'Rising Challenge', target: 3000, timeLimit: 110, moveLimit: 28, layers: 3, difficulty: 'Medium' },
+  { id: 12, name: 'Locked Tiles', target: 3200, timeLimit: 110, moveLimit: 26, layers: 4, difficulty: 'Medium' },
+  { id: 13, name: 'Strategic Moves', target: 3500, timeLimit: 110, moveLimit: 30, layers: 3, difficulty: 'Medium' },
+  { id: 14, name: 'Gem Rush', target: 3800, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+  { id: 15, name: 'Pressure Cooker', target: 3200, timeLimit: 100, moveLimit: 24, layers: 3, difficulty: 'Medium' },
+  { id: 16, name: 'Ice Breaker', target: 4000, timeLimit: 110, moveLimit: 32, layers: 4, difficulty: 'Medium' },
+  { id: 17, name: 'Cascade Master', target: 3600, timeLimit: 110, moveLimit: 26, layers: 3, difficulty: 'Medium' },
+  { id: 18, name: 'Deep Focus', target: 4200, timeLimit: 110, moveLimit: 30, layers: 4, difficulty: 'Medium' },
+  { id: 19, name: 'Tile Tactics', target: 3900, timeLimit: 100, moveLimit: 25, layers: 3, difficulty: 'Medium' },
+  { id: 20, name: 'Gem Sculptor', target: 4400, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+  { id: 21, name: 'Locked & Loaded', target: 4100, timeLimit: 110, moveLimit: 30, layers: 4, difficulty: 'Medium' },
+  { id: 22, name: 'Precision Strike', target: 3800, timeLimit: 100, moveLimit: 23, layers: 3, difficulty: 'Medium' },
+  { id: 23, name: 'Color Theory', target: 4300, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+  { id: 24, name: 'Momentum Shift', target: 4600, timeLimit: 110, moveLimit: 32, layers: 4, difficulty: 'Medium' },
+  { id: 25, name: 'Maze Solver', target: 4000, timeLimit: 100, moveLimit: 26, layers: 3, difficulty: 'Medium' },
+  { id: 26, name: 'Time Pressure', target: 3900, timeLimit: 90, moveLimit: 22, layers: 4, difficulty: 'Medium' },
+  { id: 27, name: 'Champion\'s Path', target: 4500, timeLimit: 110, moveLimit: 30, layers: 4, difficulty: 'Medium' },
+  { id: 28, name: 'Final Stand', target: 4800, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+  { id: 29, name: 'Gem Dynasty', target: 4200, timeLimit: 100, moveLimit: 24, layers: 3, difficulty: 'Medium' },
+  { id: 30, name: 'Gateway Challenge', target: 5000, timeLimit: 110, moveLimit: 32, layers: 4, difficulty: 'Medium' },
+  // Hard (31-50)
+  { id: 31, name: 'Expert Territory', target: 5200, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+  { id: 32, name: 'Ice Fortress', target: 5400, timeLimit: 100, moveLimit: 24, layers: 5, difficulty: 'Hard' },
+  { id: 33, name: 'Avalanche', target: 5800, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+  { id: 34, name: 'Locked Labyrinth', target: 5600, timeLimit: 100, moveLimit: 25, layers: 5, difficulty: 'Hard' },
+  { id: 35, name: 'Inferno', target: 6000, timeLimit: 90, moveLimit: 22, layers: 5, difficulty: 'Hard' },
+  { id: 36, name: 'Master Puzzle', target: 5900, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+  { id: 37, name: 'Complexity', target: 6200, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+  { id: 38, name: 'Precision Required', target: 5800, timeLimit: 90, moveLimit: 23, layers: 5, difficulty: 'Hard' },
+  { id: 39, name: 'Final Test', target: 6400, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+  { id: 40, name: 'Legendary Tier', target: 6600, timeLimit: 100, moveLimit: 30, layers: 5, difficulty: 'Hard' },
+  { id: 41, name: 'Peak Performance', target: 6000, timeLimit: 90, moveLimit: 24, layers: 5, difficulty: 'Hard' },
+  { id: 42, name: 'Unrelenting', target: 6300, timeLimit: 100, moveLimit: 27, layers: 5, difficulty: 'Hard' },
+  { id: 43, name: 'Titan\'s Trial', target: 6800, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+  { id: 44, name: 'Endgame', target: 6500, timeLimit: 90, moveLimit: 25, layers: 5, difficulty: 'Hard' },
+  { id: 45, name: 'Perfection Quest', target: 6900, timeLimit: 100, moveLimit: 30, layers: 5, difficulty: 'Hard' },
+  { id: 46, name: 'Unstoppable', target: 6700, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+  { id: 47, name: 'Ultra Challenge', target: 7000, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+  { id: 48, name: 'Reality Bender', target: 6800, timeLimit: 90, moveLimit: 23, layers: 5, difficulty: 'Hard' },
+  { id: 49, name: 'Pandora\'s Box', target: 7100, timeLimit: 100, moveLimit: 30, layers: 5, difficulty: 'Hard' },
+  { id: 50, name: 'Master Challenge', target: 7200, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+];
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -672,9 +730,69 @@ async function migrate() {
   `);
   await pool.query(`COMMENT ON TABLE wallet_ownership_proofs IS 'staging:private'`);
 
+  // match3_progress is PUBLIC — per-user campaign progress.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS match3_progress (
+      id                SERIAL PRIMARY KEY,
+      user_id           TEXT NOT NULL UNIQUE,
+      username          TEXT,
+      highest_puzzle    INTEGER NOT NULL DEFAULT 0,
+      best_score        INTEGER NOT NULL DEFAULT 0,
+      total_puzzles_completed INTEGER NOT NULL DEFAULT 0,
+      last_played_puzzle INTEGER NOT NULL DEFAULT 1,
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // match3_scores is PUBLIC — per-user per-puzzle best scores.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS match3_scores (
+      user_id           TEXT NOT NULL,
+      puzzle_id         INTEGER NOT NULL,
+      best_score        INTEGER NOT NULL,
+      best_time_secs    INTEGER,
+      moves_used        INTEGER,
+      completed_at      TIMESTAMPTZ,
+      PRIMARY KEY (user_id, puzzle_id)
+    )
+  `);
+
+  // match3_session is PUBLIC — in-progress puzzle state for resumability.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS match3_session (
+      user_id           TEXT NOT NULL UNIQUE,
+      current_puzzle    INTEGER NOT NULL,
+      tiles             JSONB NOT NULL,
+      bar               JSONB NOT NULL,
+      score             INTEGER NOT NULL DEFAULT 0,
+      moves             INTEGER NOT NULL DEFAULT 0,
+      elapsed_secs      INTEGER NOT NULL DEFAULT 0,
+      board_seed        INTEGER NOT NULL,
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_game_sessions_user ON game_sessions(user_id, created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_game_sessions_game_status ON game_sessions(game_id, status)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_session_states_session ON session_states(session_id, sequence)`);
+
+  // user_game_state is PUBLIC: generic per-user game-state store (gameplay
+  // progress, no sensitive data). One row per (user_id, game_id); `state` is
+  // an arbitrary game-specific JSON blob. This is the reusable persistence
+  // layer for NEW non-daily games — they read/write it via GET/PUT
+  // /api/state/:gameId instead of needing a bespoke table. Existing bespoke
+  // tables (idle_game_state, diamond_rush_progress, …) stay as-is.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_game_state (
+      user_id    TEXT NOT NULL,
+      username   TEXT,
+      game_id    TEXT NOT NULL,
+      state      JSONB NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
 
   if (IS_STAGING) {
     // PvP staging seeds: three match states for UI testing.
@@ -801,6 +919,45 @@ async function migrate() {
          ON CONFLICT DO NOTHING`,
         [uid, type, gameId, score, JSON.stringify(meta)]
       );
+    }
+
+    // Match-3 campaign progression seed — viewer at puzzle 12 with in-progress session.
+    const demoUserId = 'staging-demo-user';
+    await pool.query(`
+      INSERT INTO match3_progress (user_id, username, highest_puzzle, best_score, total_puzzles_completed, last_played_puzzle)
+      VALUES ($1, 'staging-demo-user', 12, 3500, 12, 13)
+      ON CONFLICT (user_id) DO UPDATE SET highest_puzzle = GREATEST(match3_progress.highest_puzzle, 12)
+    `, [demoUserId]);
+
+    // In-progress session on puzzle 13
+    const boardSeed = 99999;
+    const tiles = JSON.stringify([
+      { id: 1, type: 0, pos: 0, locked: false, inBar: false, removed: false },
+      { id: 2, type: 1, pos: 1, locked: false, inBar: false, removed: false },
+      { id: 3, type: 2, pos: 2, locked: false, inBar: false, removed: false },
+      { id: 4, type: 3, pos: 3, locked: false, inBar: false, removed: false },
+      { id: 5, type: 4, pos: 4, locked: false, inBar: false, removed: false },
+    ]);
+    const bar = JSON.stringify([1, 2, 3]);
+    await pool.query(`
+      INSERT INTO match3_session (user_id, current_puzzle, tiles, bar, score, moves, elapsed_secs, board_seed)
+      VALUES ($1, 13, $2, $3, 1200, 15, 60, $4)
+      ON CONFLICT (user_id) DO UPDATE SET current_puzzle = 13, score = 1200, moves = 15
+    `, [demoUserId, tiles, bar, boardSeed]);
+
+    // Match-3 leaderboard seeds — fake players for global leaderboard display
+    const match3Leaderboard = [
+      { id: 'staging-m3-ada', name: 'Staging demo Ada', highest: 50, best: 9950 },
+      { id: 'staging-m3-borg', name: 'Staging demo Borg', highest: 45, best: 8200 },
+      { id: 'staging-m3-chen', name: 'Staging demo Chen', highest: 38, best: 6100 },
+      { id: 'staging-m3-dot', name: 'Staging demo Dot', highest: 42, best: 7600 },
+    ];
+    for (const p of match3Leaderboard) {
+      await pool.query(`
+        INSERT INTO match3_progress (user_id, username, highest_puzzle, best_score, total_puzzles_completed)
+        VALUES ($1, $2, $3, $4, $3)
+        ON CONFLICT (user_id) DO NOTHING
+      `, [p.id, p.name, p.highest, p.best]);
     }
 
     // Wallet staging seeds — user_wallets is private (schema-only in staging), so
@@ -1176,6 +1333,25 @@ async function migrate() {
                '0xDEAD000000000000000000000000000000009999',
                'staging-demo-nonce', '0xstagingdemosignature')
        ON CONFLICT (user_id) DO NOTHING`
+    );
+
+    // ---- Account screen staging seeds ---------------------------------------
+    // Generic per-user game-state store: one demo row for the viewer so
+    // GET /api/state/:gameId returns a non-empty payload during testing.
+    await pool.query(
+      `INSERT INTO user_game_state (user_id, username, game_id, state)
+       VALUES ('staging-demo-user', 'staging-demo-user', 'minesweeper', $1::jsonb)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [JSON.stringify({ demo: true, level: 3, board: 'expert', note: 'Staging demo saved state' })]
+    );
+    // "Linked but NOT verified" demo identity: staging-alice already has a
+    // user_wallets row (seeded above) and deliberately NO wallet_ownership_proofs
+    // row, so her Account screen shows "Linked", not "Verified ✓". Ensure the
+    // link exists even if the earlier social block ordering changes.
+    await pool.query(
+      `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO NOTHING`,
+      ['staging-alice', '0xDEAD000000000000000000000000000000000002']
     );
   }
 }
@@ -5013,6 +5189,91 @@ async function walletIdentityVerified(userId) {
   return rows.length > 0;
 }
 
+// ---- Account API ----------------------------------------------------------
+
+// GET /api/account — consolidated identity for the Account screen in ONE call:
+// username + pubkey from the JWT (req.user), plus wallet link + verified-proof
+// status from the DB. Kept separate from /api/daily and /api/wallet (which also
+// do streak/balance/rewards work) so the Account screen stays cheap.
+app.get('/api/account', async (req, res) => {
+  try {
+    await ensureUser(req.user.id, req.user.username, req.user.usernode_pubkey);
+    const { rows: wRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [req.user.id]
+    );
+    const walletAddr = wRows.length > 0 ? wRows[0].wallet_addr : null;
+    const { rows: pRows } = await pool.query(
+      `SELECT verified_at FROM wallet_ownership_proofs WHERE user_id = $1`, [req.user.id]
+    );
+    const identityVerified = pRows.length > 0;
+    res.json({
+      username: req.user.username || null,
+      id: req.user.id,
+      usernodePubkey: req.user.usernode_pubkey || null,
+      walletAddr,
+      walletLinked: !!walletAddr,
+      identityVerified,
+      verifiedAt: identityVerified ? pRows[0].verified_at : null,
+    });
+  } catch (err) {
+    console.error('[account] GET failed:', err.message);
+    res.status(500).json({ error: 'Failed to load account' });
+  }
+});
+
+// ---- Generic per-user game-state store ------------------------------------
+// Reusable key-value persistence keyed to (req.user.id, game_id). New non-daily
+// games persist here via GET/PUT /api/state/:gameId. :gameId is validated
+// against ALL_GAME_IDS (any hub game), NOT the daily-only GAME_IDS.
+const MAX_STATE_BYTES = 100 * 1024; // 100 KB cap on a single state payload
+
+app.get('/api/state/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT state, updated_at FROM user_game_state WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]
+    );
+    if (rows.length === 0) return res.json({ state: null });
+    res.json({ state: rows[0].state, updatedAt: rows[0].updated_at });
+  } catch (err) {
+    console.error('[state] GET failed:', err.message);
+    res.status(500).json({ error: 'Failed to load state' });
+  }
+});
+
+app.put('/api/state/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const { state } = req.body || {};
+  // Require a plain JSON object — reject null / arrays / scalars so the row's
+  // shape stays predictable for consumers.
+  if (state === null || typeof state !== 'object' || Array.isArray(state)) {
+    return res.status(400).json({ error: 'state must be a JSON object' });
+  }
+  let serialized;
+  try { serialized = JSON.stringify(state); }
+  catch { return res.status(400).json({ error: 'state not serializable' }); }
+  if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
+    return res.status(400).json({ error: 'state too large (max 100KB)' });
+  }
+  try {
+    // Last-write-wins upsert.
+    await pool.query(
+      `INSERT INTO user_game_state (user_id, username, game_id, state, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, now())
+       ON CONFLICT (user_id, game_id) DO UPDATE
+         SET state = EXCLUDED.state, username = EXCLUDED.username, updated_at = now()`,
+      [req.user.id, req.user.username || null, gameId, serialized]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[state] PUT failed:', err.message);
+    res.status(500).json({ error: 'Failed to save state' });
+  }
+});
+
 function newSessionId() {
   return 'S' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 8).toUpperCase();
 }
@@ -5266,6 +5527,265 @@ app.get('*', (req, res) => {
 </body>`);
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ---- Match-3 Campaign API (/api/match3/*) --------------------------------
+
+app.get('/api/match3/progress', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const { rows: progress } = await pool.query(
+      'SELECT * FROM match3_progress WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    const userProgress = progress[0] || {
+      user_id: req.user.id,
+      username: req.user.username,
+      highest_puzzle: 0,
+      best_score: 0,
+      total_puzzles_completed: 0,
+      last_played_puzzle: 1,
+    };
+
+    // Global leaderboard
+    const { rows: global } = await pool.query(
+      `SELECT user_id, username, highest_puzzle, best_score,
+              ROW_NUMBER() OVER (ORDER BY highest_puzzle DESC, best_score DESC, updated_at ASC) AS rank
+         FROM match3_progress
+        ORDER BY highest_puzzle DESC, best_score DESC, updated_at ASC
+        LIMIT 25`
+    );
+
+    const meRank = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM match3_progress
+        WHERE highest_puzzle > $1 OR (highest_puzzle = $1 AND best_score > $2)
+           OR (highest_puzzle = $1 AND best_score = $2 AND updated_at < $3)`,
+      [userProgress.highest_puzzle, userProgress.best_score, userProgress.updated_at]
+    );
+
+    const leaderboard = {
+      global: global.map(r => ({
+        rank: Number(r.rank),
+        username: r.username || 'anon',
+        highestPuzzle: r.highest_puzzle,
+        bestScore: r.best_score,
+      })),
+      me: {
+        rank: Number(meRank.rows[0]?.rank || 1),
+        username: userProgress.username || req.user.username || 'you',
+        highestPuzzle: userProgress.highest_puzzle,
+        bestScore: userProgress.best_score,
+      },
+    };
+
+    res.json({
+      highestPuzzle: userProgress.highest_puzzle,
+      bestScore: userProgress.best_score,
+      totalCompleted: userProgress.total_puzzles_completed,
+      lastPlayedPuzzle: userProgress.last_played_puzzle,
+      leaderboard,
+    });
+  } catch (err) {
+    console.error('[match3] progress failed:', err.message);
+    res.status(500).json({ error: 'Failed to load progress' });
+  }
+});
+
+app.post('/api/match3/start/:puzzleId', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  const puzzleId = Number(req.params.puzzleId);
+  const puzzle = MATCH3_PUZZLES.find(p => p.id === puzzleId);
+  if (!puzzle) return res.status(400).json({ error: 'Unknown puzzle' });
+
+  try {
+    const { rows: session } = await pool.query(
+      'SELECT * FROM match3_session WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    const boardSeed = puzzleId * 73 + 17; // deterministic seed per puzzle
+    const savedSession = session.length > 0 && session[0].current_puzzle === puzzleId
+      ? {
+          tiles: session[0].tiles,
+          bar: session[0].bar,
+          score: session[0].score,
+          moves: session[0].moves,
+          elapsedSecs: session[0].elapsed_secs,
+        }
+      : null;
+
+    res.json({
+      puzzleId: puzzle.id,
+      name: puzzle.name,
+      targetScore: puzzle.target,
+      timeLimit: puzzle.timeLimit,
+      moveLimit: puzzle.moveLimit,
+      layers: puzzle.layers,
+      difficulty: puzzle.difficulty,
+      boardSeed,
+      savedSession,
+    });
+  } catch (err) {
+    console.error('[match3] start failed:', err.message);
+    res.status(500).json({ error: 'Failed to start puzzle' });
+  }
+});
+
+app.post('/api/match3/finish/:puzzleId', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  const puzzleId = Number(req.params.puzzleId);
+  const { score, timeSecs, moves } = req.body;
+
+  if (!Number.isFinite(score) || !Number.isFinite(timeSecs) || !Number.isFinite(moves)) {
+    return res.status(400).json({ error: 'Invalid score/time/moves' });
+  }
+
+  const puzzle = MATCH3_PUZZLES.find(p => p.id === puzzleId);
+  if (!puzzle) return res.status(400).json({ error: 'Unknown puzzle' });
+
+  try {
+    // Update progress if this is a new completion
+    if (score > 0) {
+      const { rows: existing } = await pool.query(
+        'SELECT highest_puzzle FROM match3_progress WHERE user_id = $1',
+        [req.user.id]
+      );
+
+      const currentHighest = existing.length > 0 ? existing[0].highest_puzzle : 0;
+      const newHighest = Math.max(currentHighest, puzzleId);
+      const nextUnlocked = newHighest === puzzleId ? puzzleId + 1 : newHighest;
+
+      await pool.query(`
+        INSERT INTO match3_progress (user_id, username, highest_puzzle, best_score, total_puzzles_completed, last_played_puzzle, updated_at)
+        VALUES ($1, $2, $3, $4, 1, $5, now())
+        ON CONFLICT (user_id) DO UPDATE SET
+          highest_puzzle = GREATEST(match3_progress.highest_puzzle, $3),
+          best_score = GREATEST(match3_progress.best_score, $4),
+          total_puzzles_completed = total_puzzles_completed + (CASE WHEN EXCLUDED.highest_puzzle < $3 THEN 1 ELSE 0 END),
+          last_played_puzzle = $5,
+          updated_at = now()
+      `, [req.user.id, req.user.username || 'anon', newHighest, score, puzzleId + 1]);
+
+      // Update per-puzzle best score
+      await pool.query(`
+        INSERT INTO match3_scores (user_id, puzzle_id, best_score, best_time_secs, moves_used, completed_at)
+        VALUES ($1, $2, $3, $4, $5, now())
+        ON CONFLICT (user_id, puzzle_id) DO UPDATE SET
+          best_score = GREATEST(match3_scores.best_score, $3),
+          best_time_secs = LEAST(COALESCE(match3_scores.best_time_secs, 9999), $4),
+          moves_used = LEAST(COALESCE(match3_scores.moves_used, 9999), $5),
+          completed_at = now()
+      `, [req.user.id, puzzleId, score, timeSecs, moves]);
+
+      // Clear the session
+      await pool.query('DELETE FROM match3_session WHERE user_id = $1', [req.user.id]);
+
+      res.json({
+        unlocked: nextUnlocked,
+        newHighestPuzzle: newHighest,
+        bestScoreOnThisPuzzle: score,
+      });
+    } else {
+      // Score <= 0, no progression
+      res.status(400).json({ error: 'Score must be > 0 to progress' });
+    }
+  } catch (err) {
+    console.error('[match3] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to save score' });
+  }
+});
+
+app.post('/api/match3/autosave/:puzzleId', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  const puzzleId = Number(req.params.puzzleId);
+  const { tiles, bar, score, moves, elapsedSecs } = req.body;
+
+  if (!tiles || !Array.isArray(bar)) {
+    return res.status(400).json({ error: 'Invalid session state' });
+  }
+
+  try {
+    const boardSeed = puzzleId * 73 + 17;
+    await pool.query(`
+      INSERT INTO match3_session (user_id, current_puzzle, tiles, bar, score, moves, elapsed_secs, board_seed, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+      ON CONFLICT (user_id) DO UPDATE SET
+        current_puzzle = $2,
+        tiles = $3,
+        bar = $4,
+        score = $5,
+        moves = $6,
+        elapsed_secs = $7,
+        updated_at = now()
+    `, [req.user.id, puzzleId, JSON.stringify(tiles), JSON.stringify(bar), score, moves, elapsedSecs, boardSeed]);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[match3] autosave failed:', err.message);
+    res.status(500).json({ error: 'Failed to save progress' });
+  }
+});
+
+app.post('/api/match3/abandon/:puzzleId', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    await pool.query('DELETE FROM match3_session WHERE user_id = $1', [req.user.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[match3] abandon failed:', err.message);
+    res.status(500).json({ error: 'Failed to abandon puzzle' });
+  }
+});
+
+app.get('/api/match3/leaderboard', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const { rows: global } = await pool.query(
+      `SELECT user_id, username, highest_puzzle, best_score,
+              ROW_NUMBER() OVER (ORDER BY highest_puzzle DESC, best_score DESC, updated_at ASC) AS rank
+         FROM match3_progress
+        ORDER BY highest_puzzle DESC, best_score DESC, updated_at ASC
+        LIMIT 25`
+    );
+
+    const meRow = await pool.query(
+      `SELECT * FROM match3_progress WHERE user_id = $1`,
+      [req.user.id]
+    );
+
+    let me = null;
+    if (meRow.rows.length > 0) {
+      const r = meRow.rows[0];
+      const rankRow = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM match3_progress
+          WHERE highest_puzzle > $1 OR (highest_puzzle = $1 AND best_score > $2)
+             OR (highest_puzzle = $1 AND best_score = $2 AND updated_at < $3)`,
+        [r.highest_puzzle, r.best_score, r.updated_at]
+      );
+      me = {
+        rank: Number(rankRow.rows[0].rank),
+        username: r.username || 'you',
+        highestPuzzle: r.highest_puzzle,
+        bestScore: r.best_score,
+      };
+    }
+
+    res.json({
+      global: global.map(r => ({
+        rank: Number(r.rank),
+        username: r.username || 'anon',
+        highestPuzzle: r.highest_puzzle,
+        bestScore: r.best_score,
+      })),
+      me,
+    });
+  } catch (err) {
+    console.error('[match3] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
 });
 
 // Fail fast if the DApp hash/replay contract regresses (cross-runtime

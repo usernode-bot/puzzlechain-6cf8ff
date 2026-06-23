@@ -60,6 +60,7 @@
     { "name": "Snake card in Classic Games tab", "path": "/?tab=classic", "expectText": "Snake" },
     { "name": "Block Blast card in Classic Games tab", "path": "/?tab=classic", "expectText": "Block Blast" },
     { "name": "Tile Match Puzzle card in Classic Games tab", "path": "/?tab=classic", "expectText": "Tile Match Puzzle" },
+    { "name": "Match-3 Puzzle card in Classic Games tab", "path": "/?tab=classic", "expectText": "Match-3 Puzzle" },
     { "name": "Diamond Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Diamond Rush" },
     { "name": "Texas Hold Em card in Classic Games tab", "path": "/?tab=classic", "expectText": "Texas Hold 'Em" },
     { "name": "Bounce card in Classic Games tab", "path": "/?tab=classic", "expectText": "Bounce" },
@@ -76,6 +77,8 @@
     { "name": "DApp session receipt renders", "path": "/?demo=dapp", "expectText": "Session Receipt" },
     { "name": "DApp receipt shows chain hash", "path": "/?demo=dapp", "expectText": "Chain hash" },
     { "name": "Verified leaderboard renders demo rows", "path": "/?demo=dapp", "expectText": "Staging demo Ada" },
-    { "name": "Disputed session shows rejection copy", "path": "/?screen=session&sid=DAPPDEMOBAD", "expectText": "could not be verified" }
+    { "name": "Disputed session shows rejection copy", "path": "/?screen=session&sid=DAPPDEMOBAD", "expectText": "could not be verified" },
+    { "name": "Account screen opens from chip", "path": "/?screen=account", "expectText": "On-chain login" },
+    { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" }
   ]
 }

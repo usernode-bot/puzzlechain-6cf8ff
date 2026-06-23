@@ -3356,6 +3356,13 @@ body {
   color: ${C.emerald}; transition: border-color 0.15s;
 }
 .nav-wallet-chip:hover { border-color: ${C.emerald}; }
+.nav-integration-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.7rem;
+  font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
+  color: ${C.accent};
+}
 /* ---- Tip modal ---- */
 .tip-modal-backdrop {
   position: fixed; inset: 0; background: #00000099; z-index: 50;
@@ -12830,6 +12837,10 @@ function App() {
   const [walletMock, setWalletMock] = useState(true);
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
+  // dApps-integration availability. Disabled (e.g. staging with an empty
+  // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
+  // gracefully alongside the server.
+  const [integration, setIntegration] = useState({ enabled: false, pubkey: null });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -12864,6 +12875,16 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  // dApps-integration status. Degrades gracefully: a failed/absent response
+  // leaves the feature disabled (chip stays hidden) rather than erroring.
+  useEffect(() => {
+    api('/api/integration/status')
+      .then(({ ok, body }) => {
+        if (ok && body) setIntegration({ enabled: !!body.enabled, pubkey: body.pubkey || null });
+      })
+      .catch(() => {});
+  }, []);
 
   // Wallet: read EVM address from the bridge, link it to the account, optionally
   // prove ownership (sign a challenge), and fetch balance. Extracted into one
@@ -13204,6 +13225,14 @@ function App() {
             >
               👥 Friends
             </button>
+          )}
+          {authOk && integration.enabled && (
+            <span
+              className="nav-integration-chip"
+              title={`dApps integration active${integration.pubkey ? ' · ' + integration.pubkey : ''}`}
+            >
+              🔗 dApps
+            </span>
           )}
           <AccountChip
             loading={loading}

@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const ethers = require('ethers');
@@ -27,6 +28,29 @@ const validatorWallet = VALIDATOR_PRIVATE_KEY
 const utgoProvider = UTGO_RPC_URL
   ? new ethers.JsonRpcProvider(UTGO_RPC_URL)
   : null;
+
+// ---- dApps-integration app identity ---------------------------------------
+// APP_PUBKEY / APP_SECRET_KEY identify this app to the dApps-integration
+// surface and sign integration payloads. The feature is OPTIONAL and must
+// degrade gracefully: a blank/missing APP_SECRET_KEY (e.g. a staging preview
+// whose manifest staging_default is "") MUST NOT crash the server on boot.
+// Instead the feature is treated as disabled — signing is skipped and the
+// affected routes report it as unavailable so the UI can hide/disable it.
+const APP_PUBKEY     = (process.env.APP_PUBKEY || '').trim();
+const APP_SECRET_KEY = (process.env.APP_SECRET_KEY || '').trim();
+const APP_INTEGRATION_ENABLED = APP_SECRET_KEY.length > 0;
+
+if (!APP_INTEGRATION_ENABLED) {
+  console.warn('[integration] APP_SECRET_KEY is empty — dApps integration disabled (signing/integration calls skipped).');
+}
+
+// Sign an integration payload with the app secret. Only ever called when
+// APP_INTEGRATION_ENABLED is true; uses an opaque HMAC so any secret format is
+// safe (no key parsing that could throw on a non-hex value).
+function signIntegrationPayload(payload) {
+  const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  return crypto.createHmac('sha256', APP_SECRET_KEY).update(body).digest('hex');
+}
 
 const UTGO_ABI_BALANCE   = ['function balanceOf(address account) view returns (uint256)'];
 const WAGER_IFACE        = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
@@ -4397,6 +4421,43 @@ app.post('/api/wallet/spend/streak-freeze', async (req, res) => {
     console.error('[wallet] streak-freeze failed:', err.message);
     res.status(500).json({ error: 'Failed to purchase streak freeze' });
   }
+});
+
+// ---- dApps integration (app-identity signing) -----------------------------
+// Gated on APP_SECRET_KEY. When the secret is empty/missing (e.g. a staging
+// preview whose staging_default is ""), these routes degrade gracefully: the
+// server still boots, signing is skipped, and the routes report the feature as
+// unavailable so the frontend hides/disables the related UI.
+
+// Current integration availability for the signed-in user. Always 200 so the
+// UI can branch on `enabled` rather than handling an error path.
+app.get('/api/integration/status', (_req, res) => {
+  res.json({
+    enabled: APP_INTEGRATION_ENABLED,
+    pubkey: APP_INTEGRATION_ENABLED ? (APP_PUBKEY || null) : null,
+  });
+});
+
+// Sign an integration payload with the app secret. Returns 503 with a clear
+// message when the feature is disabled so callers never reach a signing path
+// that doesn't exist in this environment.
+app.post('/api/integration/sign', (req, res) => {
+  if (!APP_INTEGRATION_ENABLED) {
+    return res.status(503).json({
+      error: 'integration unavailable in this environment',
+      code: 'integration_disabled',
+      enabled: false,
+    });
+  }
+  const payload = req.body && req.body.payload;
+  if (payload === undefined || payload === null) {
+    return res.status(400).json({ error: 'Missing payload' });
+  }
+  res.json({
+    enabled: true,
+    pubkey: APP_PUBKEY || null,
+    signature: signIntegrationPayload(payload),
+  });
 });
 
 // ---- Static + HTML shell -------------------------------------------------

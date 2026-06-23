@@ -2,41 +2,42 @@
   "name": "PuzzleChain",
   "secrets": [
     {
-      "name": "VALIDATOR_PRIVATE_KEY",
+      "key": "VALIDATOR_PRIVATE_KEY",
       "description": "ECDSA private key for the validator wallet that signs claimWin messages. Staging default is Hardhat account #0.",
       "required": true,
       "private": true,
       "staging_default": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     },
     {
-      "name": "UTGO_CONTRACT_ADDRESS",
+      "key": "UTGO_CONTRACT_ADDRESS",
       "description": "Deployed WagerEscrow contract address on Usernode EVM chain. Staging uses a placeholder (no real contract).",
       "required": false,
       "private": false,
       "staging_default": "0x0000000000000000000000000000000000000001"
     },
     {
-      "name": "TREASURY_WALLET",
+      "key": "TREASURY_WALLET",
       "description": "EVM address receiving the 8% treasury cut of each wager pot.",
       "required": false,
       "private": false,
       "staging_default": "0x0000000000000000000000000000000000000002"
     },
     {
-      "name": "REDIS_URL",
+      "key": "REDIS_URL",
       "description": "Redis connection URL for PvP matchmaking queue and match timers.",
       "required": true,
       "private": false,
       "staging_default": "redis://localhost:6379"
     },
     {
-      "name": "APP_PUBKEY",
+      "key": "APP_PUBKEY",
       "description": "Application public key",
-      "required": false,
-      "private": false
+      "required": true,
+      "private": false,
+      "staging_default": ""
     },
     {
-      "name": "APP_SECRET_KEY",
+      "key": "APP_SECRET_KEY",
       "description": "Application secret key",
       "required": true,
       "private": true,
@@ -70,6 +71,7 @@
     { "name": "PvP Arena tab renders", "path": "/?tab=pvp", "expectText": "PvP Arena" },
     { "name": "Wallet screen shows pending rewards", "path": "/?screen=wallet&demo=1", "expectText": "Pending Rewards" },
     { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" },
+    { "name": "Boots with dApps integration disabled (empty APP_SECRET_KEY)", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Wallet shows Verified identity badge", "path": "/?screen=wallet&demo=1", "expectText": "Verified identity" },
     { "name": "Wallet shows Disconnect control", "path": "/?screen=wallet&demo=1", "expectText": "Disconnect" },
     { "name": "DApp session receipt renders", "path": "/?demo=dapp", "expectText": "Session Receipt" },

@@ -6878,7 +6878,10 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     cgSound('lose'); cgHaptic([20, 40, 20]);
     const sc = st.current.eaten * 10;
     cgSaveHistory(SNAKE_KEY, { score: sc, len: st.current.snake.length, ts: Date.now() });
-    onWin(sc, st.current.eaten, secsRef.current, { winnerLabel: 'Game Over', share: `🐍 Snake — ${sc} pts, length ${st.current.snake.length}` });
+    const hist = cgLoadHistory(SNAKE_KEY);
+    const bestScore = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+    const longestSnake = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
+    onWin(sc, st.current.eaten, secsRef.current, { winnerLabel: 'Game Over', share: `🐍 Snake — ${sc} pts, length ${st.current.snake.length}`, bestScore, longestSnake });
   };
   const step = () => {
     const s = st.current;
@@ -13011,6 +13014,8 @@ function App() {
         cashOut: meta && meta.cashOut,
         winnerLabel: meta && meta.winnerLabel,
         isClassic: true,
+        bestScore: meta && meta.bestScore,
+        longestSnake: meta && meta.longestSnake,
       });
       return;
     }
@@ -13427,6 +13432,18 @@ function App() {
                 <div className="win-reward-row">
                   <span className="k">🪙 Token reward</span>
                   <span className="v">+{fmtUtgo(winData.rewardWei)}</span>
+                </div>
+              )}
+              {winData.isClassic && winData.bestScore !== undefined && (
+                <div className="score-row">
+                  <span className="k">Best score</span>
+                  <span className="v mono">{winData.bestScore}</span>
+                </div>
+              )}
+              {winData.isClassic && winData.longestSnake !== undefined && (
+                <div className="score-row">
+                  <span className="k">Longest</span>
+                  <span className="v mono">{winData.longestSnake} cells</span>
                 </div>
               )}
             </div>

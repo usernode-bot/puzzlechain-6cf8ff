@@ -124,6 +124,50 @@ body {
 .account-chip.off { border-color: ${C.rose}; }
 .account-chip.off .dot { background: ${C.rose}; }
 .account-chip.off .who { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; }
+.account-chip.on { cursor: pointer; font-family: inherit; color: ${C.text}; transition: border-color 0.12s ease; }
+.account-chip.on:hover { border-color: ${C.accent}; }
+.account-chip .avatar { position: relative; }
+.account-chip .avatar-tick {
+  position: absolute; right: -0.2rem; bottom: -0.2rem;
+  width: 0.85rem; height: 0.85rem; border-radius: 50%;
+  background: ${C.emerald}; color: white; font-size: 0.55rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid ${C.bg};
+}
+
+/* ---- Account screen ---- */
+.account-screen { max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem; }
+.account-head { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.25rem; }
+.account-head h2 { font-size: 1.4rem; font-weight: 700; }
+.account-id-row { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1rem; }
+.account-avatar {
+  width: 2.6rem; height: 2.6rem; border-radius: 50%; background: ${C.accent};
+  color: white; font-size: 1.1rem; font-weight: 700; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+}
+.account-uname { font-size: 1.05rem; font-weight: 700; }
+.account-sub { font-size: 0.78rem; color: ${C.emerald}; }
+.account-field { margin-top: 0.5rem; }
+.account-signed-out { color: ${C.muted}; font-size: 0.9rem; line-height: 1.5; }
+.account-status {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem;
+}
+.account-status-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: 0 0 auto; }
+.account-status-verified { color: ${C.emerald}; }
+.account-status-verified .account-status-dot { background: ${C.emerald}; }
+.account-status-linked { color: ${C.gold}; }
+.account-status-linked .account-status-dot { background: ${C.gold}; }
+.account-status-none { color: ${C.muted}; }
+.account-status-none .account-status-dot { background: ${C.muted}; }
+.account-wallet-addr {
+  font-size: 0.85rem; color: ${C.text}; margin-bottom: 0.5rem;
+}
+.account-status-desc { font-size: 0.83rem; color: ${C.muted}; line-height: 1.5; }
+.account-danger { color: ${C.rose}; border-color: ${C.rose}; }
+.account-msg { margin-top: 0.75rem; font-size: 0.83rem; line-height: 1.45; }
+.account-msg.ok { color: ${C.emerald}; }
+.account-msg.err { color: ${C.rose}; }
 
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
@@ -4102,7 +4146,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
    Account indicator — confirms the signed-in Usernode account so the
    player knows their progress is being saved (not just session state).
    ============================================================ */
-function AccountChip({ loading, authOk, user }) {
+function AccountChip({ loading, authOk, user, walletVerified, onOpen }) {
   if (loading) {
     return (
       <div className="account-chip loading" title="Checking your account…">
@@ -4120,12 +4164,163 @@ function AccountChip({ loading, authOk, user }) {
   const name = user.username || 'Linked account';
   const initial = (user.username || '?').charAt(0).toUpperCase();
   return (
-    <div className="account-chip on" title={`Signed in as ${name} — your daily progress is saved to your account.`}>
-      <span className="avatar mono">{initial}</span>
+    <button
+      type="button"
+      className="account-chip on"
+      title={`Signed in as ${name}${walletVerified ? ' · wallet verified' : ''} — tap to open your account.`}
+      onClick={onOpen}
+    >
+      <span className="avatar mono">
+        {initial}
+        {walletVerified && <span className="avatar-tick" title="Wallet verified">✓</span>}
+      </span>
       <span className="who">
         <span className="uname">{name}</span>
-        <span className="status">● Progress saved</span>
+        <span className="status">{walletVerified ? '✓ Verified · saved' : '● Progress saved'}</span>
       </span>
+    </button>
+  );
+}
+
+/* ============================================================
+   Account screen — single place for identity + on-chain login status.
+   Surfaces username, a copyable Usernode pubkey, and a three-state
+   wallet status (Not connected / Linked / Verified ✓), with manual
+   Connect/Verify and Disconnect controls.
+   ============================================================ */
+function truncAddr(a) {
+  if (!a) return '';
+  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+}
+
+function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVerify, onDisconnect }) {
+  const [copied, setCopied] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const [confirmDisc, setConfirmDisc] = React.useState(false);
+  const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
+
+  // status: 'verified' | 'linked' | 'none'
+  const status = walletVerified ? 'verified' : (walletAddr ? 'linked' : 'none');
+
+  const copyPubkey = async () => {
+    if (!user || !user.usernodePubkey) return;
+    try {
+      await navigator.clipboard.writeText(user.usernodePubkey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const handleVerify = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await onVerify();
+      if (res && res.verified) setMsg({ ok: true, text: 'Wallet ownership verified ✓' });
+      else if (res && res.ok) setMsg({ ok: true, text: 'Wallet linked. Ownership proof unavailable (your wallet can’t sign here).' });
+      else setMsg({ ok: false, text: 'No wallet was readable in this environment.' });
+    } catch {
+      setMsg({ ok: false, text: 'Could not connect to your wallet.' });
+    }
+    setBusy(false);
+  };
+
+  const handleDisconnect = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await onDisconnect();
+      setMsg({ ok: true, text: 'Disconnected. Your public link is kept so received tips still resolve.' });
+    } catch {
+      setMsg({ ok: false, text: 'Could not disconnect.' });
+    }
+    setConfirmDisc(false);
+    setBusy(false);
+  };
+
+  const initial = (user && user.username ? user.username : '?').charAt(0).toUpperCase();
+
+  return (
+    <div className="account-screen">
+      <div className="account-head">
+        <button className="back-btn" onClick={onBack}>‹ Back</button>
+        <h2>Account</h2>
+      </div>
+
+      {(!authOk || !user) ? (
+        <div className="wallet-card">
+          <div className="account-signed-out">
+            You’re signed out. Open PuzzleChain inside Usernode so your progress
+            and identity are saved to your account.
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="wallet-card">
+            <div className="account-id-row">
+              <span className="account-avatar mono">{initial}</span>
+              <div>
+                <div className="account-uname">{user.username || 'Linked account'}</div>
+                <div className="account-sub">Signed in · progress saved</div>
+              </div>
+            </div>
+            <div className="account-field">
+              <div className="wallet-card-title">Usernode public key</div>
+              <div className="wallet-addr-row">
+                <span className="wallet-addr">{user.usernodePubkey || '— not linked —'}</span>
+                {user.usernodePubkey && (
+                  <button className="back-btn" onClick={copyPubkey}>{copied ? 'Copied ✓' : 'Copy'}</button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="wallet-card">
+            <div className="wallet-card-title">On-chain login</div>
+            <div className={`account-status account-status-${status}`}>
+              {status === 'verified' && <span className="account-status-dot" />}
+              {status === 'verified' && <span>Verified ✓</span>}
+              {status === 'linked' && <span className="account-status-dot" />}
+              {status === 'linked' && <span>Linked (not verified)</span>}
+              {status === 'none' && <span className="account-status-dot" />}
+              {status === 'none' && <span>Not connected</span>}
+            </div>
+            {walletAddr && (
+              <div className="account-wallet-addr mono" title={walletAddr}>{truncAddr(walletAddr)}</div>
+            )}
+            <div className="account-status-desc">
+              {status === 'verified' && 'You’ve signed an ownership challenge — this wallet is cryptographically yours.'}
+              {status === 'linked' && 'Your wallet address is linked to your account, but ownership hasn’t been proven yet. Verify to confirm it’s really yours.'}
+              {status === 'none' && (bridgeAvailable
+                ? 'No wallet is linked yet. Connect to read your Usernode wallet and link it to your account.'
+                : 'On-chain features are unavailable in this environment (no wallet could be read). Open PuzzleChain inside Usernode.')}
+            </div>
+
+            <div className="wallet-btn-row">
+              <button
+                className="primary-btn"
+                disabled={busy || !bridgeAvailable}
+                onClick={handleVerify}
+              >
+                {busy ? 'Working…' : status === 'verified' ? 'Re-verify wallet' : 'Connect / Verify wallet'}
+              </button>
+              {status === 'verified' && !confirmDisc && (
+                <button className="back-btn" disabled={busy} onClick={() => setConfirmDisc(true)}>Disconnect</button>
+              )}
+              {confirmDisc && (
+                <>
+                  <button className="back-btn account-danger" disabled={busy} onClick={handleDisconnect}>Confirm disconnect</button>
+                  <button className="back-btn" disabled={busy} onClick={() => setConfirmDisc(false)}>Cancel</button>
+                </>
+              )}
+            </div>
+            {msg && (
+              <div className={`account-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -13149,9 +13344,10 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('screen');
     if (s === 'wallet') return 'wallet';
+    if (s === 'account') return 'account';
     if (s === 'session' || params.get('demo') === 'dapp') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   const [receiptSessionId, setReceiptSessionId] = useState(() =>
     new URLSearchParams(window.location.search).get('sid') || null);
@@ -13222,47 +13418,67 @@ function App() {
 
   useEffect(() => { loadDaily(); }, []);
 
-  // Wallet: get EVM address from bridge, link it to the account, fetch balance.
-  // Promoted to app-level so PvP Arena and the nav chip share one source.
-  useEffect(() => {
-    // Session restore: read any existing identity-proof state from the server
-    // first, so the "Verified identity" badge shows even before the bridge
-    // resolves (or when the bridge is unavailable).
-    api('/api/wallet').then(({ ok, body }) => {
-      if (ok && body && body.identityVerified) setWalletVerified(true);
-    }).catch(() => {});
+  // Wallet: read EVM address from the bridge, link it to the account, optionally
+  // prove ownership (sign a challenge), and fetch balance. Extracted into one
+  // callable so BOTH the on-mount effect and the Account screen's "Connect /
+  // Verify" button run the identical flow. Returns { ok, addr, verified } so the
+  // Account screen can show precise feedback; never throws.
+  const connectAndVerifyWallet = React.useCallback(async () => {
+    if (!window.usernode || !window.usernode.getNodeAddress) {
+      return { ok: false, reason: 'unavailable' };
+    }
+    let addr = null;
+    try { addr = await window.usernode.getNodeAddress(); } catch { return { ok: false, reason: 'unavailable' }; }
+    if (!addr) return { ok: false, reason: 'unavailable' };
+    setWalletAddr(addr);
+    // Link address server-side so tipping lookups work (trust-on-report).
+    try { await api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }); } catch {}
 
-    if (!window.usernode || !window.usernode.getNodeAddress) return;
-    window.usernode.getNodeAddress().then(addr => {
-      if (!addr) return;
-      setWalletAddr(addr);
-      // Link address server-side so tipping lookups work
-      api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }).catch(() => {});
-      // Optional cryptographic ownership proof — only if the wallet can sign.
-      if (window.usernode.signMessage) {
-        api('/api/wallet/challenge').then(({ ok, body }) => {
-          if (!ok || !body || !body.message) return;
-          window.usernode.signMessage(body.message).then(sig => {
-            if (!sig) return;
-            api('/api/wallet/prove', {
+    // Optional cryptographic ownership proof — only if the wallet can sign.
+    let verified = false;
+    if (window.usernode.signMessage) {
+      try {
+        const { ok, body } = await api('/api/wallet/challenge');
+        if (ok && body && body.message) {
+          const sig = await window.usernode.signMessage(body.message);
+          if (sig) {
+            const { ok: pOk, body: pBody } = await api('/api/wallet/prove', {
               method: 'POST',
               body: JSON.stringify({ addr, nonce: body.nonce, signature: sig }),
-            }).then(({ ok: pOk, body: pBody }) => {
-              if (pOk && pBody && pBody.verified) setWalletVerified(true);
-            }).catch(() => {});
-          }).catch(() => {});
-        }).catch(() => {});
-      }
-      // Fetch on-chain balance
-      api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`)
-        .then(({ ok, body }) => {
-          if (ok && body) {
-            setWalletBalance(body.balance);
-            setWalletMock(!!body.mock);
+            });
+            if (pOk && pBody && pBody.verified) { verified = true; setWalletVerified(true); }
           }
-        }).catch(() => {});
-    }).catch(() => {});
+        }
+      } catch {}
+    }
+
+    // Fetch on-chain balance.
+    try {
+      const { ok, body } = await api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`);
+      if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
+    } catch {}
+
+    return { ok: true, addr, verified };
   }, []);
+
+  // Disconnect the verified-identity proof (public link is kept so received
+  // tips still resolve). Used by the Account screen.
+  const disconnectWallet = React.useCallback(async () => {
+    await api('/api/wallet/disconnect', { method: 'POST' });
+    setWalletVerified(false);
+  }, []);
+
+  // On mount: restore any existing identity/link state from the server first
+  // (so the verified badge + linked address show even before the bridge
+  // resolves or when it's unavailable), then run the connect/verify flow.
+  useEffect(() => {
+    api('/api/account').then(({ ok, body }) => {
+      if (!ok || !body) return;
+      if (body.identityVerified) setWalletVerified(true);
+      if (body.walletAddr) setWalletAddr(prev => prev || body.walletAddr);
+    }).catch(() => {});
+    connectAndVerifyWallet();
+  }, [connectAndVerifyWallet]);
 
   // Refresh balance on demand (called after claim/tip)
   const refreshWalletBalance = () => {
@@ -13542,7 +13758,13 @@ function App() {
               👥 Friends
             </button>
           )}
-          <AccountChip loading={loading} authOk={authOk} user={user} />
+          <AccountChip
+            loading={loading}
+            authOk={authOk}
+            user={user}
+            walletVerified={walletVerified}
+            onOpen={() => setScreen('account')}
+          />
         </div>
       </nav>
 
@@ -13570,6 +13792,18 @@ function App() {
           onBack={() => setScreen('lobby')}
           onBalanceRefresh={refreshWalletBalance}
           onOpenReceipt={openReceipt}
+        />
+      )}
+
+      {screen === 'account' && (
+        <AccountScreen
+          user={user}
+          authOk={authOk}
+          walletAddr={walletAddr}
+          walletVerified={walletVerified}
+          onBack={() => setScreen('lobby')}
+          onVerify={connectAndVerifyWallet}
+          onDisconnect={disconnectWallet}
         />
       )}
 

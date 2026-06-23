@@ -752,6 +752,24 @@ async function migrate() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_game_sessions_game_status ON game_sessions(game_id, status)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_session_states_session ON session_states(session_id, sequence)`);
 
+  // user_game_state is PUBLIC: generic per-user game-state store (gameplay
+  // progress, no sensitive data). One row per (user_id, game_id); `state` is
+  // an arbitrary game-specific JSON blob. This is the reusable persistence
+  // layer for NEW non-daily games — they read/write it via GET/PUT
+  // /api/state/:gameId instead of needing a bespoke table. Existing bespoke
+  // tables (idle_game_state, diamond_rush_progress, …) stay as-is.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_game_state (
+      user_id    TEXT NOT NULL,
+      username   TEXT,
+      game_id    TEXT NOT NULL,
+      state      JSONB NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+
   if (IS_STAGING) {
     // PvP staging seeds: three match states for UI testing.
     await pool.query(`
@@ -1291,6 +1309,25 @@ async function migrate() {
                '0xDEAD000000000000000000000000000000009999',
                'staging-demo-nonce', '0xstagingdemosignature')
        ON CONFLICT (user_id) DO NOTHING`
+    );
+
+    // ---- Account screen staging seeds ---------------------------------------
+    // Generic per-user game-state store: one demo row for the viewer so
+    // GET /api/state/:gameId returns a non-empty payload during testing.
+    await pool.query(
+      `INSERT INTO user_game_state (user_id, username, game_id, state)
+       VALUES ('staging-demo-user', 'staging-demo-user', 'minesweeper', $1::jsonb)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [JSON.stringify({ demo: true, level: 3, board: 'expert', note: 'Staging demo saved state' })]
+    );
+    // "Linked but NOT verified" demo identity: staging-alice already has a
+    // user_wallets row (seeded above) and deliberately NO wallet_ownership_proofs
+    // row, so her Account screen shows "Linked", not "Verified ✓". Ensure the
+    // link exists even if the earlier social block ordering changes.
+    await pool.query(
+      `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO NOTHING`,
+      ['staging-alice', '0xDEAD000000000000000000000000000000000002']
     );
   }
 }
@@ -5090,6 +5127,91 @@ async function walletIdentityVerified(userId) {
   );
   return rows.length > 0;
 }
+
+// ---- Account API ----------------------------------------------------------
+
+// GET /api/account — consolidated identity for the Account screen in ONE call:
+// username + pubkey from the JWT (req.user), plus wallet link + verified-proof
+// status from the DB. Kept separate from /api/daily and /api/wallet (which also
+// do streak/balance/rewards work) so the Account screen stays cheap.
+app.get('/api/account', async (req, res) => {
+  try {
+    await ensureUser(req.user.id, req.user.username, req.user.usernode_pubkey);
+    const { rows: wRows } = await pool.query(
+      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [req.user.id]
+    );
+    const walletAddr = wRows.length > 0 ? wRows[0].wallet_addr : null;
+    const { rows: pRows } = await pool.query(
+      `SELECT verified_at FROM wallet_ownership_proofs WHERE user_id = $1`, [req.user.id]
+    );
+    const identityVerified = pRows.length > 0;
+    res.json({
+      username: req.user.username || null,
+      id: req.user.id,
+      usernodePubkey: req.user.usernode_pubkey || null,
+      walletAddr,
+      walletLinked: !!walletAddr,
+      identityVerified,
+      verifiedAt: identityVerified ? pRows[0].verified_at : null,
+    });
+  } catch (err) {
+    console.error('[account] GET failed:', err.message);
+    res.status(500).json({ error: 'Failed to load account' });
+  }
+});
+
+// ---- Generic per-user game-state store ------------------------------------
+// Reusable key-value persistence keyed to (req.user.id, game_id). New non-daily
+// games persist here via GET/PUT /api/state/:gameId. :gameId is validated
+// against ALL_GAME_IDS (any hub game), NOT the daily-only GAME_IDS.
+const MAX_STATE_BYTES = 100 * 1024; // 100 KB cap on a single state payload
+
+app.get('/api/state/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT state, updated_at FROM user_game_state WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]
+    );
+    if (rows.length === 0) return res.json({ state: null });
+    res.json({ state: rows[0].state, updatedAt: rows[0].updated_at });
+  } catch (err) {
+    console.error('[state] GET failed:', err.message);
+    res.status(500).json({ error: 'Failed to load state' });
+  }
+});
+
+app.put('/api/state/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const { state } = req.body || {};
+  // Require a plain JSON object — reject null / arrays / scalars so the row's
+  // shape stays predictable for consumers.
+  if (state === null || typeof state !== 'object' || Array.isArray(state)) {
+    return res.status(400).json({ error: 'state must be a JSON object' });
+  }
+  let serialized;
+  try { serialized = JSON.stringify(state); }
+  catch { return res.status(400).json({ error: 'state not serializable' }); }
+  if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
+    return res.status(400).json({ error: 'state too large (max 100KB)' });
+  }
+  try {
+    // Last-write-wins upsert.
+    await pool.query(
+      `INSERT INTO user_game_state (user_id, username, game_id, state, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, now())
+       ON CONFLICT (user_id, game_id) DO UPDATE
+         SET state = EXCLUDED.state, username = EXCLUDED.username, updated_at = now()`,
+      [req.user.id, req.user.username || null, gameId, serialized]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[state] PUT failed:', err.message);
+    res.status(500).json({ error: 'Failed to save state' });
+  }
+});
 
 function newSessionId() {
   return 'S' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 8).toUpperCase();

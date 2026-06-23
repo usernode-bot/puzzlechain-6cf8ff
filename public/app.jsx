@@ -86,6 +86,63 @@ body {
   padding: 0.05rem 0.35rem;
   vertical-align: middle;
 }
+.streak-badge-icon {
+  margin-left: 0.35rem;
+  font-size: 0.95rem;
+  vertical-align: middle;
+  line-height: 1;
+}
+/* Earned-badge collection strip (lobby + profile) */
+.badge-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: ${C.text};
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  white-space: nowrap;
+}
+.badge-chip .badge-chip-icon { font-size: 1rem; line-height: 1; }
+.badge-chip.locked { opacity: 0.35; }
+.badge-chip.active { border-color: ${C.emerald}; color: ${C.emerald}; background: ${C.emerald}14; }
+/* Win-overlay "milestone unlocked" flourish */
+.badge-unlock {
+  margin: 0.4rem 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  text-align: center;
+  background: linear-gradient(135deg, ${C.emerald}22, ${C.gold}22);
+  border: 1px solid ${C.emerald}55;
+  animation: badgePop 0.5s ease;
+}
+.badge-unlock .bu-icon { font-size: 1.8rem; line-height: 1; }
+.badge-unlock .bu-title { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: ${C.muted}; margin-top: 0.25rem; }
+.badge-unlock .bu-name { font-size: 1.05rem; font-weight: 700; color: ${C.emerald}; }
+@keyframes badgePop {
+  0% { transform: scale(0.8); opacity: 0; }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.win-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  color: ${C.muted};
+}
+.win-badge-row .wbr-icon { font-size: 1.1rem; }
 
 /* ---- Account indicator ---- */
 .nav-right { display: flex; align-items: center; gap: 1.25rem; }
@@ -3899,6 +3956,46 @@ function nextTierInfo(streak) {
     .sort((a, b) => a.min - b.min);
   if (above.length === 0) return null;
   return { daysAway: above[0].min - streak, mult: above[0].mult };
+}
+
+/* ============================================================
+   Streak badges — named milestones unlocked at consecutive-day
+   thresholds. The single source of truth for badge copy/icons;
+   the server (STREAK_BADGE_DAYS in server.js) persists the same day
+   thresholds as streak_milestone achievements so earned badges
+   survive a streak reset. Keep the `min` list in sync across both.
+   ============================================================ */
+const STREAK_BADGES = [
+  { min: 3,   id: 'on-fire',     name: 'On Fire',          icon: '🔥' },
+  { min: 7,   id: 'week',        name: 'Week Warrior',     icon: '⚡' },
+  { min: 30,  id: 'monthly',     name: 'Monthly Master',   icon: '🌟' },
+  { min: 50,  id: 'half-cent',   name: 'Half-Century',     icon: '💎' },
+  { min: 100, id: 'centurion',   name: 'Centurion',        icon: '👑' },
+  { min: 180, id: 'half-year',   name: 'Half-Year Hero',   icon: '🛡️' },
+  { min: 365, id: 'year-legend', name: 'Year-Long Legend', icon: '🏆' },
+];
+
+// Look up a badge definition by its day threshold (used to render the
+// permanent earned-badge list the server returns as `badges`).
+function badgeForDays(days) {
+  return STREAK_BADGES.find(b => b.min === days) || null;
+}
+
+// All badges a live streak currently satisfies (streak >= min), low→high.
+function streakBadges(streak) {
+  return STREAK_BADGES.filter(b => streak >= b.min);
+}
+
+// The highest badge a live streak has reached, or null below the first tier.
+function activeBadge(streak) {
+  const earned = streakBadges(streak);
+  return earned.length ? earned[earned.length - 1] : null;
+}
+
+// Does this win's streak land EXACTLY on a badge threshold? (the "just
+// unlocked" celebration fires only on the day the milestone is reached.)
+function justUnlockedBadge(streak) {
+  return STREAK_BADGES.find(b => b.min === streak) || null;
 }
 
 // Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)
@@ -11897,6 +11994,23 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
           </div>
         </div>
 
+        {Array.isArray(profile.badges) && profile.badges.length > 0 && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Streak badges</div>
+            <div className="badge-strip" style={{ marginTop: 0 }}>
+              {profile.badges
+                .map(badgeForDays)
+                .filter(Boolean)
+                .map(b => (
+                  <span key={b.id} className="badge-chip" title={`${b.name} · ${b.min}-day streak`}>
+                    <span className="badge-chip-icon">{b.icon}</span>
+                    {b.name}
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '1rem', fontSize: '0.9rem' }}>
           <p style={{ margin: '0.5rem 0' }}>
             <span style={{ color: C.muted }}>Followers:</span>{' '}
@@ -13371,17 +13485,23 @@ function App() {
     const s = params.get('screen');
     if (s === 'wallet') return 'wallet';
     if (s === 'account') return 'account';
-    if (s === 'session' || params.get('demo') === 'dapp') return 'session';
+    if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
   }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
-  const [receiptSessionId, setReceiptSessionId] = useState(() =>
-    new URLSearchParams(window.location.search).get('sid') || null);
+  // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
+  const [receiptSessionId, setReceiptSessionId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('sid') || (params.get('demo') === 'anchor' ? 'DAPPDEMOSUDOKU' : null);
+  });
   const openReceipt = (sid) => { setReceiptSessionId(sid); setScreen('session'); };
   const [walletVerified, setWalletVerified] = useState(false);
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
+  // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
+  // even after a streak resets, so the lobby can show a collected-badges strip.
+  const [badges, setBadges] = useState([]);
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -13432,6 +13552,7 @@ function App() {
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setBadges(Array.isArray(body.badges) ? body.badges : []);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -13442,6 +13563,7 @@ function App() {
       setAuthOk(false);
       setUser(null);
       setStreak(0);
+      setBadges([]);
     }
     setLoading(false);
   };
@@ -13639,8 +13761,15 @@ function App() {
     const finalScore = Math.round(score * multiplier);
     const bonus = finalScore - score;
     setStreak(effectiveStreak);
+    // A badge unlocked the moment this win's streak lands exactly on a tier.
+    const unlocked = justUnlockedBadge(effectiveStreak);
+    if (unlocked) {
+      setBadges(prev => (prev.includes(unlocked.min) ? prev : [...prev, unlocked.min].sort((a, b) => a - b)));
+    }
     setWinData({
       score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+      activeBadge: activeBadge(effectiveStreak),
+      justBadge: unlocked,
       share: meta && meta.share,
       canPost: true,
       gameId: gameId,
@@ -13770,6 +13899,14 @@ function App() {
               <div className="label">Streak</div>
               <div className="value streak mono">
                 {streak}
+                {authOk && activeBadge(streak) && (
+                  <span
+                    className="streak-badge-icon"
+                    title={`${activeBadge(streak).name} — ${activeBadge(streak).min}-day streak badge`}
+                  >
+                    {activeBadge(streak).icon}
+                  </span>
+                )}
                 {activeMult > 1 && <span className="mult-badge">×{activeMult}</span>}
               </div>
             </div>
@@ -13890,6 +14027,27 @@ function App() {
                   new Date(nextResetUtc).getTime() - (Date.now() + offset))}
               </p>
             )}
+            {lobbyTab === 'daily' && authOk && (() => {
+              // Union of permanent earned badges and any the live streak now
+              // satisfies, so the strip is correct right after a win too.
+              const earned = new Set([...badges, ...streakBadges(streak).map(b => b.min)]);
+              if (earned.size === 0) return null;
+              const live = activeBadge(streak);
+              return (
+                <div className="badge-strip">
+                  {STREAK_BADGES.filter(b => earned.has(b.min)).map(b => (
+                    <span
+                      key={b.id}
+                      className={`badge-chip${live && live.min === b.min ? ' active' : ''}`}
+                      title={`${b.name} · ${b.min}-day streak`}
+                    >
+                      <span className="badge-chip-icon">{b.icon}</span>
+                      {b.name}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           <div className="lobby-tabs">
             <button
@@ -14084,6 +14242,19 @@ function App() {
                 </div>
               )}
             </div>
+            {!winData.isClassic && winData.justBadge && (
+              <div className="badge-unlock">
+                <div className="bu-icon">{winData.justBadge.icon}</div>
+                <div className="bu-title">Milestone reached!</div>
+                <div className="bu-name">{winData.justBadge.name} · {winData.justBadge.min}-day streak</div>
+              </div>
+            )}
+            {!winData.isClassic && !winData.justBadge && winData.activeBadge && (
+              <div className="win-badge-row">
+                <span className="wbr-icon">{winData.activeBadge.icon}</span>
+                <span>{winData.activeBadge.name} badge active</span>
+              </div>
+            )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />

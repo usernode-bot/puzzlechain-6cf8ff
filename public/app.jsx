@@ -129,6 +129,9 @@ body {
   .account-chip .who { display: none; }
   .account-chip { padding: 0.35rem; }
   .nav-right { gap: 0.8rem; }
+  .lobby { padding: 1rem 0.75rem; }
+  .lobby-head h1 { font-size: 1.3rem; }
+  .lobby-head p { font-size: 0.85rem; }
 }
 
 /* ---- Lobby ---- */
@@ -152,8 +155,14 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
+}
+
+@media (max-width: 380px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
@@ -622,7 +631,7 @@ body {
 .cw-key.gray   { background: ${C.dim};     color: ${C.muted}; }
 
 /* ---- Lobby tab switcher ---- */
-.lobby-tabs { display: flex; gap: 0.35rem; margin-bottom: 1.1rem; }
+.lobby-tabs { display: flex; gap: 0.35rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
 .lobby-tab {
   padding: 0.45rem 1.1rem;
   background: ${C.card};
@@ -637,6 +646,10 @@ body {
 }
 .lobby-tab.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
 .lobby-tab:not(.active):hover { border-color: ${C.accent}; }
+
+@media (max-width: 480px) {
+  .lobby-tab { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+}
 
 /* ---- Minesweeper ---- */
 .ms-grid {
@@ -3366,6 +3379,41 @@ body {
 .hr-lane-left { left: 1rem; }
 .hr-lane-right { right: 1rem; }
 .hr-lane-btn:active { background: ${C.accent}30; border-color: ${C.accent}; color: ${C.accent}; }
+
+/* ---- DApp Mode ---- */
+.dapp-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem; width: 100%;
+  justify-content: center; margin: 0.6rem 0; padding: 0.5rem 0.7rem;
+  background: ${C.emerald}1a; border: 1px solid ${C.emerald}66; color: ${C.emerald};
+  border-radius: 0.6rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.dapp-badge.disputed { background: ${C.rose}1a; border-color: ${C.rose}66; color: ${C.rose}; }
+.dapp-badge-arrow { margin-left: auto; opacity: 0.7; }
+.dapp-badge-dot { font-size: 0.9rem; }
+.dapp-verified-pill {
+  font-size: 0.62rem; font-weight: 600; color: ${C.emerald};
+  background: ${C.emerald}1a; border: 1px solid ${C.emerald}55; border-radius: 999px;
+  padding: 0.05rem 0.45rem; margin-left: 0.4rem; vertical-align: middle;
+}
+.dapp-verdict { border-radius: 0.6rem; padding: 0.7rem 0.85rem; font-weight: 600; font-size: 0.88rem; margin-bottom: 0.85rem; }
+.dapp-verdict.ok  { background: ${C.emerald}1a; border: 1px solid ${C.emerald}66; color: ${C.emerald}; }
+.dapp-verdict.bad { background: ${C.rose}1a; border: 1px solid ${C.rose}66; color: ${C.rose}; }
+.dapp-verdict-reason { font-weight: 400; font-size: 0.76rem; color: ${C.muted}; margin-top: 0.35rem; }
+.dapp-kv { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem; padding: 0.2rem 0; color: ${C.text}; }
+.dapp-kv span:first-child { color: ${C.muted}; }
+.dapp-hash { font-size: 0.72rem; color: ${C.text}; word-break: break-all; line-height: 1.45; }
+.dapp-ledger { display: flex; flex-direction: column; gap: 0.25rem; max-height: 9rem; overflow-y: auto; }
+.dapp-ledger-row { display: flex; gap: 0.6rem; font-size: 0.72rem; }
+.dapp-ledger-seq { color: ${C.muted}; min-width: 2.5rem; }
+.dapp-ledger-hash { color: ${C.accent}; }
+.dapp-lrow { width: 100%; background: none; border: none; cursor: pointer; text-align: left; }
+.dapp-identity-badge {
+  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 600;
+  color: ${C.emerald}; background: ${C.emerald}1a; border: 1px solid ${C.emerald}55;
+  border-radius: 999px; padding: 0.15rem 0.55rem; margin-left: 0.5rem;
+}
+.dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
+.dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
 `;
 
 /* ============================================================
@@ -3716,6 +3764,62 @@ async function api(path, opts = {}) {
   let body = null;
   try { body = await res.json(); } catch {}
   return { ok: res.ok, status: res.status, body };
+}
+
+/* ============================================================
+   DApp Mode (Phase 0) — client helpers
+   canonicalize + sha256 mirror lib/dapp.js byte-for-byte so a chain
+   hash the client builds equals the one the server recomputes.
+   ============================================================ */
+function dappCanonicalize(value) {
+  if (value === null || value === undefined) return 'null';
+  const t = typeof value;
+  if (t === 'number') {
+    if (!Number.isFinite(value) || !Number.isInteger(value)) throw new Error('non-integer in hashed state');
+    return String(value);
+  }
+  if (t === 'boolean') return value ? 'true' : 'false';
+  if (t === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(dappCanonicalize).join(',') + ']';
+  if (t === 'object') {
+    const keys = Object.keys(value).sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + dappCanonicalize(value[k])).join(',') + '}';
+  }
+  throw new Error('unhashable');
+}
+async function dappSha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(str)));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Anchor a verified session's final chain hash on-chain via the bridge, then
+// confirm with the server. Best-effort: degrades to a 'mock' anchor when the
+// bridge/wallet is unavailable (staging) and never throws. Returns the updated
+// session shape (with anchorStatus/anchorTxHash) or the original on failure.
+async function dappAnchor(session) {
+  if (!session || session.status !== 'verified' || !session.chainHash) return session;
+  let txHash = null;
+  let mock = true;
+  try {
+    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
+      ? !(await window.usernode.isMockEnabled())
+      : false;
+    if (window.usernode && window.usernode.sendTransaction && window.usernode.getNodeAddress && bridgeMockOff) {
+      const addr = await window.usernode.getNodeAddress();
+      if (addr) {
+        const tx = await window.usernode.sendTransaction({ to: addr, data: '0x' + session.chainHash, value: 0 });
+        txHash = tx && tx.hash ? tx.hash : null;
+        mock = false;
+      }
+    }
+  } catch (e) { /* fall through to mock anchor */ }
+  try {
+    const { ok, body } = await api(`/api/dapp/sessions/${session.sessionId}/anchor/confirm`, {
+      method: 'POST', body: JSON.stringify({ txHash, mock }),
+    });
+    if (ok && body && body.session) return body.session;
+  } catch (e) {}
+  return session;
 }
 
 // HH:MM:SS for a millisecond remainder.
@@ -10348,6 +10452,7 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
         contractAddr: body.contractAddr,
         prize: body.prize,
         telemetrySummary: body.telemetrySummary,
+        dapp: body.dapp,
       });
     }
   };
@@ -10373,6 +10478,7 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
           contractAddr: body.contractAddr,
           prize: body.prize,
           telemetrySummary: body.telemetrySummary,
+          dapp: body.dapp,
         });
       }
     } else {
@@ -10434,12 +10540,21 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
   );
 }
 
-function PvpResult({ result, onBack }) {
+function PvpResult({ result, onBack, onOpenReceipt }) {
   const { isWinner, match, claimCalldata, contractAddr, prize, telemetrySummary } = result || {};
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [claimErr, setClaimErr] = useState(null);
   const [txHash, setTxHash] = useState(null);
+  // DApp Mode: surface + anchor the verified session minted from this match's
+  // telemetry (server already replayed it).
+  const [dappSession, setDappSession] = useState(result && result.dapp);
+  useEffect(() => {
+    if (result && result.dapp) {
+      setDappSession(result.dapp);
+      dappAnchor(result.dapp).then(setDappSession);
+    }
+  }, [result && result.dapp && result.dapp.sessionId]);
 
   const handleClaim = async () => {
     if (!claimCalldata || !contractAddr) return;
@@ -10466,6 +10581,8 @@ function PvpResult({ result, onBack }) {
     <div className="pvp-result">
       <div className="pvp-result-emoji">{isWinner ? '🏆' : '💀'}</div>
       <div className="pvp-result-title">{isWinner ? 'You Won!' : 'You Lost'}</div>
+
+      {dappSession && <VerifiedBadge session={dappSession} onOpenReceipt={onOpenReceipt} />}
 
       {telemetrySummary && (
         <div className="pvp-telem-summary">
@@ -10540,7 +10657,7 @@ function PvpResult({ result, onBack }) {
   );
 }
 
-function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appWalletBalance }) {
+function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appWalletBalance, onOpenReceipt }) {
   const [phase, setPhase] = useState('lobby'); // lobby | matchmaking | game | result
   const [match, setMatch] = useState(null);
   const [joining, setJoining] = useState(null);
@@ -10637,7 +10754,7 @@ function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appW
     return <PvpGameScreen match={match} playerIsP1={playerIsP1} onResult={handleResult} />;
   }
   if (phase === 'result') {
-    return <PvpResult result={pvpResult} onBack={() => { setMatch(null); setPhase('lobby'); }} />;
+    return <PvpResult result={pvpResult} onBack={() => { setMatch(null); setPhase('lobby'); }} onOpenReceipt={onOpenReceipt} />;
   }
   return null;
 }
@@ -10783,7 +10900,7 @@ function TipModal({ toUser, onClose, onSuccess }) {
 /* ============================================================
    WalletScreen — the full wallet management view
    ============================================================ */
-function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh }) {
+function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh, onOpenReceipt }) {
   const [walletData, setWalletData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [claiming, setClaiming] = React.useState(false);
@@ -10861,6 +10978,36 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
     setBuyingFreeze(false);
   };
 
+  // DApp Mode: prove wallet ownership (challenge → signMessage → verify) and
+  // disconnect (clear the proof). Connect itself happens automatically at app
+  // load; this button (re)runs the cryptographic proof on demand.
+  const [proving, setProving] = React.useState(false);
+  const handleProve = async () => {
+    setProving(true);
+    try {
+      const addr = (walletData && walletData.addr) || walletAddr;
+      if (!addr) { setProving(false); return; }
+      if (!window.usernode || !window.usernode.signMessage) {
+        setFreezeMsg('This wallet cannot sign — identity stays linked (unproven).');
+        setProving(false);
+        return;
+      }
+      const { ok, body } = await api('/api/wallet/challenge');
+      if (ok && body && body.message) {
+        const sig = await window.usernode.signMessage(body.message);
+        if (sig) {
+          await api('/api/wallet/prove', { method: 'POST', body: JSON.stringify({ addr, nonce: body.nonce, signature: sig }) });
+          await loadWallet();
+        }
+      }
+    } catch (e) {}
+    setProving(false);
+  };
+  const handleDisconnect = async () => {
+    await api('/api/wallet/disconnect', { method: 'POST' }).catch(() => {});
+    await loadWallet();
+  };
+
   if (!authOk) {
     return (
       <div className="wallet-screen">
@@ -10912,9 +11059,14 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
         <div className="wallet-mock-badge">Demo wallet — balances are simulated</div>
       )}
 
-      {/* Address */}
+      {/* Address + identity */}
       <div className="wallet-card">
-        <div className="wallet-card-title">Linked Address</div>
+        <div className="wallet-card-title">
+          Connected Wallet
+          {d.identityVerified
+            ? <span className="dapp-identity-badge">✓ Verified identity</span>
+            : <span className="dapp-identity-badge unproven">Linked (unproven)</span>}
+        </div>
         <div className="wallet-addr-row">
           <span className="wallet-addr mono">{d.addr}</span>
           <button
@@ -10922,6 +11074,20 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
             style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
             onClick={handleCopy}
           >{copied ? 'Copied!' : 'Copy'}</button>
+        </div>
+        <div className="dapp-wallet-btns">
+          {!d.identityVerified && (
+            <button className="primary-btn" disabled={proving}
+              style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem' }}
+              onClick={handleProve}>
+              {proving ? 'Signing…' : 'Prove ownership'}
+            </button>
+          )}
+          <button className="primary-btn"
+            style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+            onClick={handleDisconnect}>
+            Disconnect
+          </button>
         </div>
       </div>
 
@@ -11003,6 +11169,161 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   DApp Mode — Verified badge, session receipt, verified leaderboard
+   ============================================================ */
+function shortHash(h) {
+  if (!h) return '—';
+  return h.length > 18 ? `${h.slice(0, 10)}…${h.slice(-6)}` : h;
+}
+
+// Compact "Verified" stamp shown on a finished result. Clicking opens the
+// session receipt. `session` is the shape returned by /api/dapp/* endpoints.
+function VerifiedBadge({ session, onOpenReceipt }) {
+  if (!session) return null;
+  const disputed = session.status === 'disputed';
+  const anchored = session.anchorStatus === 'anchored';
+  const mock = session.anchorStatus === 'mock';
+  let label;
+  if (disputed) label = "Couldn't be verified";
+  else if (anchored) label = 'Verified ✓ — anchored on-chain';
+  else if (mock) label = 'Verified ✓ — demo / not anchored';
+  else if (session.anchorStatus === 'pending') label = 'Verified ✓ — anchor pending';
+  else label = 'Verified ✓ — not anchored';
+  return (
+    <button
+      className={`dapp-badge${disputed ? ' disputed' : ''}`}
+      onClick={() => onOpenReceipt && onOpenReceipt(session.sessionId)}
+      title="View session receipt"
+    >
+      <span className="dapp-badge-dot">{disputed ? '⚠' : '🔗'}</span>
+      <span>{label}</span>
+      <span className="dapp-badge-arrow">›</span>
+    </button>
+  );
+}
+
+// Full session receipt / audit view. Reads GET /api/dapp/sessions/:id.
+function SessionReceipt({ sessionId, onBack }) {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const sid = sessionId || new URLSearchParams(window.location.search).get('sid') || 'DAPPDEMOOK';
+
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api(`/api/dapp/sessions/${encodeURIComponent(sid)}`);
+      if (!alive) return;
+      setData(ok && body ? body : { error: true });
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [sid]);
+
+  if (loading) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <p style={{ color: C.muted, marginTop: '1rem' }}>Loading session receipt…</p>
+      </div>
+    );
+  }
+  if (!data || data.error || !data.session) {
+    return (
+      <div className="wallet-screen">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <h2>Session Receipt</h2>
+        <div className="wallet-no-wallet"><div>Session not found.</div></div>
+      </div>
+    );
+  }
+  const s = data.session;
+  const ledger = data.ledger || [];
+  const disputed = s.status === 'disputed';
+  return (
+    <div className="wallet-screen dapp-receipt">
+      <button className="back-btn" onClick={onBack}>← Back</button>
+      <h2>Session Receipt</h2>
+      <div className={`dapp-verdict ${disputed ? 'bad' : 'ok'}`}>
+        {disputed ? 'This result could not be verified' : 'Verified - replayed by the server'}
+        {disputed && s.disputeReason && <div className="dapp-verdict-reason">Reason: {s.disputeReason}</div>}
+      </div>
+
+      <div className="wallet-card">
+        <div className="wallet-card-title">Session</div>
+        <div className="dapp-kv"><span>Game</span><span className="mono">{s.gameId}</span></div>
+        <div className="dapp-kv"><span>Seed</span><span className="mono">{s.seed != null ? s.seed : '—'}</span></div>
+        <div className="dapp-kv"><span>Score · Steps</span><span className="mono">{s.finalScore != null ? s.finalScore : '—'} · {s.finalSteps != null ? s.finalSteps : '—'}</span></div>
+        <div className="dapp-kv"><span>Status</span><span className="mono">{s.status}</span></div>
+      </div>
+
+      <div className="wallet-card">
+        <div className="wallet-card-title">Chain hash</div>
+        <div className="dapp-hash mono">{s.chainHash || '—'}</div>
+        <div className="dapp-kv" style={{ marginTop: '0.5rem' }}>
+          <span>On-chain anchor</span>
+          <span className="mono">
+            {s.anchorStatus === 'anchored' ? 'anchored' : s.anchorStatus === 'mock' ? 'demo (not anchored)' : s.anchorStatus}
+          </span>
+        </div>
+        {s.anchorTxHash && (
+          <div className="dapp-kv"><span>Anchor tx</span><span className="mono">{shortHash(s.anchorTxHash)}</span></div>
+        )}
+      </div>
+
+      {ledger.length > 0 && (
+        <div className="wallet-card">
+          <div className="wallet-card-title">Hash-chain ledger ({ledger.length})</div>
+          <div className="dapp-ledger">
+            {ledger.map(e => (
+              <div className="dapp-ledger-row" key={e.sequence}>
+                <span className="mono dapp-ledger-seq">#{e.sequence}</span>
+                <span className="mono dapp-ledger-hash">{shortHash(e.chainHash)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {s.gameId && <VerifiedLeaderboard gameId={s.gameId} onOpenReceipt={onBack && ((sid2) => { window.location.search = `?screen=session&sid=${sid2}`; })} />}
+    </div>
+  );
+}
+
+// "Verified" leaderboard tab — replay-validated sessions only.
+function VerifiedLeaderboard({ gameId, onOpenReceipt }) {
+  const [state, setState] = React.useState({ loading: true, entries: [] });
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api(`/api/dapp/leaderboard/${gameId}`);
+      if (!alive) return;
+      setState({ loading: false, entries: (ok && body && body.entries) || [] });
+    })();
+    return () => { alive = false; };
+  }, [gameId]);
+  if (state.loading) return <div className="lboard"><div className="lboard-empty">Loading…</div></div>;
+  return (
+    <div className="lboard">
+      <div className="lboard-title">Verified leaderboard <span className="dapp-verified-pill">replay-validated</span></div>
+      {state.entries.length === 0 ? (
+        <div className="lboard-empty">No verified results yet.</div>
+      ) : (
+        <div className="lboard-rows">
+          {state.entries.map(e => (
+            <button key={e.sessionId} className="lrow dapp-lrow" onClick={() => onOpenReceipt && onOpenReceipt(e.sessionId)}>
+              <span className="lrank mono">#{e.rank}</span>
+              <span className="lname">{e.username} {e.anchored && <span title="anchored on-chain">🔗</span>}</span>
+              <span className="ltime mono">{e.score} pts</span>
+              <span className="lsteps mono">{lbFmtTime(e.timeSecs)}</span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -12412,11 +12733,21 @@ const GAMES = [
     id: 'idle',
     name: 'Idle Empire',
     icon: '🐹',
-    category: 'idle',
+    category: 'classic',
     desc: 'Tap, upgrade, and build your hamster empire with prestige rewards.',
     tag: 'Idle',
     tagColor: C.gold,
     component: IdleGame,
+  },
+  {
+    id: 'pvp-arena',
+    name: 'PvP Arena',
+    icon: '⚔️',
+    category: 'classic',
+    desc: 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.',
+    tag: 'Wager',
+    tagColor: C.rose,
+    component: () => null,
   },
 ];
 
@@ -12666,10 +12997,18 @@ function PostDetail({ post, onBack }) {
    ============================================================ */
 function App() {
   const [screen, setScreen] = useState(() => {
-    // Support ?screen=wallet deep link for testing
-    const s = new URLSearchParams(window.location.search).get('screen');
-    return s === 'wallet' ? 'wallet' : 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet'
+    // Support ?screen=wallet / ?screen=session deep links for testing
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get('screen');
+    if (s === 'wallet') return 'wallet';
+    if (s === 'session' || params.get('demo') === 'dapp') return 'session';
+    return 'lobby';
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'session'
+  // DApp session receipt being viewed (session id), and identity-verified flag.
+  const [receiptSessionId, setReceiptSessionId] = useState(() =>
+    new URLSearchParams(window.location.search).get('sid') || null);
+  const openReceipt = (sid) => { setReceiptSessionId(sid); setScreen('session'); };
+  const [walletVerified, setWalletVerified] = useState(false);
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -12738,12 +13077,34 @@ function App() {
   // Wallet: get EVM address from bridge, link it to the account, fetch balance.
   // Promoted to app-level so PvP Arena and the nav chip share one source.
   useEffect(() => {
+    // Session restore: read any existing identity-proof state from the server
+    // first, so the "Verified identity" badge shows even before the bridge
+    // resolves (or when the bridge is unavailable).
+    api('/api/wallet').then(({ ok, body }) => {
+      if (ok && body && body.identityVerified) setWalletVerified(true);
+    }).catch(() => {});
+
     if (!window.usernode || !window.usernode.getNodeAddress) return;
     window.usernode.getNodeAddress().then(addr => {
       if (!addr) return;
       setWalletAddr(addr);
       // Link address server-side so tipping lookups work
       api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }).catch(() => {});
+      // Optional cryptographic ownership proof — only if the wallet can sign.
+      if (window.usernode.signMessage) {
+        api('/api/wallet/challenge').then(({ ok, body }) => {
+          if (!ok || !body || !body.message) return;
+          window.usernode.signMessage(body.message).then(sig => {
+            if (!sig) return;
+            api('/api/wallet/prove', {
+              method: 'POST',
+              body: JSON.stringify({ addr, nonce: body.nonce, signature: sig }),
+            }).then(({ ok: pOk, body: pBody }) => {
+              if (pOk && pBody && pBody.verified) setWalletVerified(true);
+            }).catch(() => {});
+          }).catch(() => {});
+        }).catch(() => {});
+      }
       // Fetch on-chain balance
       api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`)
         .then(({ ok, body }) => {
@@ -12774,8 +13135,8 @@ function App() {
   };
 
   const launchGame = async (game) => {
-    // Classic games and idle games skip the daily system
-    if (game.category === 'classic' || game.category === 'idle') {
+    // Classic games and idle games skip the daily system; PvP Arena is handled specially
+    if (game.category === 'classic' || game.category === 'idle' || game.id === 'pvp-arena') {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -12895,6 +13256,14 @@ function App() {
     // Store reward amount from server so win overlay can show it
     if (ok && body && body.rewardWei) {
       setWinData(prev => prev ? { ...prev, rewardWei: body.rewardWei } : prev);
+    }
+    // DApp Mode: surface the Verified badge for the pilot game, then anchor the
+    // session's chain hash on-chain (best-effort; degrades to a mock anchor).
+    if (ok && body && body.dapp) {
+      setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
+      dappAnchor(body.dapp).then(updated => {
+        setWinData(prev => prev ? { ...prev, dapp: updated } : prev);
+      });
     }
   };
 
@@ -13052,6 +13421,14 @@ function App() {
           walletMock={walletMock}
           onBack={() => setScreen('lobby')}
           onBalanceRefresh={refreshWalletBalance}
+          onOpenReceipt={openReceipt}
+        />
+      )}
+
+      {screen === 'session' && (
+        <SessionReceipt
+          sessionId={receiptSessionId}
+          onBack={() => setScreen('lobby')}
         />
       )}
 
@@ -13059,17 +13436,13 @@ function App() {
         <div className="lobby">
           <div className="lobby-head">
             <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : lobbyTab === 'idle' ? 'Idle Empire' : lobbyTab === 'pvp' ? 'PvP Arena' : 'Community Feed'}
+              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : 'Community Feed'}
             </h1>
             <p>
               {lobbyTab === 'daily'
                 ? 'One attempt each, per day. Resets at midnight UTC.'
                 : lobbyTab === 'classic'
                 ? 'Play anytime — track your best scores.'
-                : lobbyTab === 'idle'
-                ? 'Tap, upgrade, and build your empire. Progress saved automatically.'
-                : lobbyTab === 'pvp'
-                ? 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.'
                 : 'See what your friends have been playing'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
@@ -13095,15 +13468,6 @@ function App() {
               className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
               onClick={() => setLobbyTab('classic')}
             >Classic Games</button>
-            <button
-              className={'lobby-tab' + (lobbyTab === 'idle' ? ' active' : '')}
-              onClick={() => setLobbyTab('idle')}
-            >Idle Empire</button>
-            <button
-              className={'lobby-tab' + (lobbyTab === 'pvp' ? ' active' : '')}
-              onClick={() => setLobbyTab('pvp')}
-              style={lobbyTab !== 'pvp' ? { borderColor: C.rose + '60', color: C.rose } : {}}
-            >⚔️ PvP Arena</button>
             {authOk && (
               <button
                 className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
@@ -13112,7 +13476,7 @@ function App() {
             )}
           </div>
           {lobbyTab === 'pvp' ? (
-            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
+            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />
           ) : lobbyTab === 'feed' ? (
             <FeedScreen user={user} setScreen={setScreen} />
           ) : (
@@ -13127,7 +13491,7 @@ function App() {
                   key={g.id}
                   className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
                   style={{ '--accent': g.tagColor }}
-                  onClick={() => !loading && launchGame(g)}
+                  onClick={() => !loading && (g.id === 'pvp-arena' ? setCurrentGame(g) : launchGame(g))}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
@@ -13176,7 +13540,19 @@ function App() {
         </div>
       )}
 
-      {screen === 'game' && currentGame && !winData && !loseData && (
+      {screen === 'game' && currentGame && !winData && !loseData && currentGame.id === 'pvp-arena' && (
+        <div className="game-wrap">
+          <div className="game-head">
+            <button className="back-btn" onClick={backToLobby}>← Back</button>
+            <div className="game-title">
+              <span>{currentGame.icon}</span> {currentGame.name}
+            </div>
+          </div>
+          <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
+        </div>
+      )}
+
+      {screen === 'game' && currentGame && !winData && !loseData && currentGame.id !== 'pvp-arena' && (
         currentGame.category === 'classic' ? (
           SELF_SHELL_GAMES.has(currentGame.id) ? (
             <GameComponent
@@ -13264,6 +13640,7 @@ function App() {
                 </div>
               )}
             </div>
+            {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             {!winData.isClassic && authOk && (

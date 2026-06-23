@@ -2087,6 +2087,20 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: create a Bounce game attempt with active power-ups
+    // so the power-up UI and mechanics are demonstrable on a fresh staging DB.
+    if (IS_STAGING && req.query.demo === 'powerup') {
+      await pool.query(
+        `INSERT INTO breakout_scores
+           (user_id, username, best_score, best_level, best_time_secs, games_played)
+         VALUES ($1, $2, 1200, 3, 300, 5)
+         ON CONFLICT (user_id) DO UPDATE
+           SET best_score = GREATEST(breakout_scores.best_score, EXCLUDED.best_score),
+               best_level = GREATEST(breakout_scores.best_level, EXCLUDED.best_level)`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+    }
+
     const { rows } = await pool.query(
       `SELECT * FROM daily_attempts
        WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,

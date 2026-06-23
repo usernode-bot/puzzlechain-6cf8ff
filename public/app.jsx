@@ -9545,6 +9545,47 @@ function bounceShareText(score, level, secs) {
   return `I scored ${score.toLocaleString()} on Bounce 🧱 — reached level ${level} · ${m}:${s}`;
 }
 
+/* ============================================================
+   Power-ups system (Bounce & Zuma)
+   ============================================================ */
+const POWERUP_DURATION_MS = 10000;
+const POWERUP_SPAWN_RATE = 0.1;
+const POWERUP_RADIUS = 12;
+const POWERUP_TYPES = {
+  bounce: ['multi-ball', 'larger-paddle', 'slower-ball', 'laser'],
+  zuma: ['multi-shot', 'faster-shot', 'color-switch', 'chain-clear'],
+};
+const POWERUP_ICONS = {
+  'multi-ball': '🔄',
+  'larger-paddle': '⬆️',
+  'slower-ball': '🐢',
+  'laser': '⚡',
+  'multi-shot': '🔄',
+  'faster-shot': '💨',
+  'color-switch': '🎨',
+  'chain-clear': '✂️',
+};
+
+function spawnPowerup(x, y, typeArray) {
+  const type = typeArray[Math.floor(Math.random() * typeArray.length)];
+  return {
+    id: `pu_${Date.now()}_${Math.random()}`,
+    type,
+    x, y,
+    vx: (Math.random() - 0.5) * 1.2,
+    vy: 1.5,
+    radius: POWERUP_RADIUS,
+    spawnedAt: Date.now(),
+    caught: false,
+  };
+}
+
+function updatePowerup(pu, scale) {
+  pu.x += pu.vx * scale;
+  pu.y += pu.vy * scale;
+  pu.vy += 0.1 * scale;
+}
+
 function BounceGame({ onWin, onStepChange, resetKey }) {
   const [score, setScore]   = useState(0);
   const [lives, setLives]   = useState(BOUNCE_LIVES);
@@ -9555,6 +9596,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const [bestScore, setBestScore] = useState(() => bounceLoadBest());
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const [isMock, setIsMock] = useState(false);
+  const [activePowerups, setActivePowerups] = useState([]);
 
   // Leaderboard tab state (mirrors Snake)
   const [lb, setLb]               = useState(null);
@@ -9584,6 +9626,14 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const leftRef     = useRef(false);
   const rightRef    = useRef(false);
 
+  // Power-ups refs
+  const ballsRef    = useRef([{ x: BOUNCE_W / 2, y: BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1, vx: 0, vy: 0 }]);
+  const powerUpsRef = useRef([]);
+  const activePowerupsRef = useRef([]);
+  const basePaddleWRef = useRef(BOUNCE_PADDLE_W);
+  const baseSpeedRef = useRef(bounceSpeedForLevel(1));
+  const laserLoadedRef = useRef(0);
+
   // Latest-closure prop refs so listeners/loop mount once.
   const onWinRef = useRef(onWin);        onWinRef.current = onWin;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
@@ -9607,17 +9657,15 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   }, [timerRunning]);
 
   const resetBallToPaddle = () => {
-    const ball = ballRef.current;
-    ball.x = paddleRef.current;
-    ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
-    ball.vx = 0;
-    ball.vy = 0;
+    ballsRef.current = [{ x: paddleRef.current, y: BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1, vx: 0, vy: 0 }];
   };
 
   const handleNewGame = () => {
     paddleRef.current = BOUNCE_W / 2;
+    basePaddleWRef.current = BOUNCE_PADDLE_W;
     bricksRef.current = bounceBuildBricks(1);
     speedRef.current = bounceSpeedForLevel(1);
+    baseSpeedRef.current = bounceSpeedForLevel(1);
     scoreRef.current = 0;
     livesRef.current = BOUNCE_LIVES;
     levelRef.current = 1;
@@ -9631,9 +9679,12 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     rightRef.current = false;
     accRef.current = 0;
     lastTsRef.current = null;
+    powerUpsRef.current = [];
+    activePowerupsRef.current = [];
+    laserLoadedRef.current = 0;
     resetBallToPaddle();
     setScore(0); setLives(BOUNCE_LIVES); setLevel(1);
-    setStarted(false); setDone(false); setElapsedSecs(0);
+    setStarted(false); setDone(false); setElapsedSecs(0); setActivePowerups([]);
   };
 
   useEffect(() => {
@@ -9701,65 +9752,139 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     resetBallToPaddle();
   };
 
-  // Advance the ball by a fraction of its per-step velocity and resolve every
-  // collision. Returns true when this frame's integration must stop early
-  // (a life was lost or the wall was cleared and rebuilt).
   const stepBall = (scale) => {
-    const ball = ballRef.current;
-    ball.x += ball.vx * scale;
-    ball.y += ball.vy * scale;
-
-    // Side + top walls.
-    if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); }
-    else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); }
-    if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); }
-
-    // Paddle — deflection angle depends on where it struck.
-    const px = paddleRef.current;
-    if (ball.vy > 0 &&
-        ball.y + BOUNCE_BALL_R >= BOUNCE_PADDLE_Y &&
-        ball.y + BOUNCE_BALL_R <= BOUNCE_PADDLE_Y + BOUNCE_PADDLE_H + 8 &&
-        ball.x >= px - BOUNCE_PADDLE_W / 2 - BOUNCE_BALL_R &&
-        ball.x <= px + BOUNCE_PADDLE_W / 2 + BOUNCE_BALL_R) {
-      const hit = bounceClamp((ball.x - px) / (BOUNCE_PADDLE_W / 2), -1, 1);
-      const angle = hit * BOUNCE_MAX_ANGLE;
-      const speed = speedRef.current;
-      ball.vx = speed * Math.sin(angle);
-      ball.vy = -Math.abs(speed * Math.cos(angle));
-      ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
-    }
-
-    // Bricks — reflect on the shallower-overlap axis, one brick per substep.
+    const balls = ballsRef.current;
     const bricks = bricksRef.current;
-    for (let i = 0; i < bricks.length; i++) {
-      const b = bricks[i];
-      if (!b.alive) continue;
-      const ox = Math.min(ball.x + BOUNCE_BALL_R, b.x + b.w) - Math.max(ball.x - BOUNCE_BALL_R, b.x);
-      const oy = Math.min(ball.y + BOUNCE_BALL_R, b.y + b.h) - Math.max(ball.y - BOUNCE_BALL_R, b.y);
-      if (ox > 0 && oy > 0) {
-        b.alive = false;
-        brokenRef.current += 1;
-        scoreRef.current += b.points;
-        setScore(scoreRef.current);
-        onStepRef.current && onStepRef.current(brokenRef.current);
-        if (ox < oy) { ball.vx = -ball.vx; ball.x += (ball.vx > 0 ? 1 : -1) * ox; }
-        else { ball.vy = -ball.vy; ball.y += (ball.vy > 0 ? 1 : -1) * oy; }
-        if (bricks.every(x => !x.alive)) { nextLevel(); return true; }
-        break;
+    const px = paddleRef.current;
+    const paddleW = basePaddleWRef.current * (1 + activePowerupsRef.current.filter(p => p.type === 'larger-paddle').reduce((a, p) => a + 0.5 * p.stacks, 0));
+
+    for (let ballIdx = 0; ballIdx < balls.length; ballIdx++) {
+      const ball = balls[ballIdx];
+      ball.x += ball.vx * scale;
+      ball.y += ball.vy * scale;
+
+      if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); }
+      else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); }
+      if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); }
+
+      if (ball.vy > 0 &&
+          ball.y + BOUNCE_BALL_R >= BOUNCE_PADDLE_Y &&
+          ball.y + BOUNCE_BALL_R <= BOUNCE_PADDLE_Y + BOUNCE_PADDLE_H + 8 &&
+          ball.x >= px - paddleW / 2 - BOUNCE_BALL_R &&
+          ball.x <= px + paddleW / 2 + BOUNCE_BALL_R) {
+        const hit = bounceClamp((ball.x - px) / (paddleW / 2), -1, 1);
+        const angle = hit * BOUNCE_MAX_ANGLE;
+        const speed = speedRef.current;
+        ball.vx = speed * Math.sin(angle);
+        ball.vy = -Math.abs(speed * Math.cos(angle));
+        ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
+      }
+
+      for (let i = 0; i < bricks.length; i++) {
+        const b = bricks[i];
+        if (!b.alive) continue;
+        const ox = Math.min(ball.x + BOUNCE_BALL_R, b.x + b.w) - Math.max(ball.x - BOUNCE_BALL_R, b.x);
+        const oy = Math.min(ball.y + BOUNCE_BALL_R, b.y + b.h) - Math.max(ball.y - BOUNCE_BALL_R, b.y);
+        if (ox > 0 && oy > 0) {
+          if (laserLoadedRef.current > 0) {
+            const col = Math.floor((b.x - BOUNCE_MARGIN) / ((BOUNCE_W - 2 * BOUNCE_MARGIN - (BOUNCE_COLS - 1) * BOUNCE_GAP_X) / BOUNCE_COLS + BOUNCE_GAP_X));
+            for (let j = 0; j < bricks.length; j++) {
+              const br = bricks[j];
+              const brickCol = Math.floor((br.x - BOUNCE_MARGIN) / ((BOUNCE_W - 2 * BOUNCE_MARGIN - (BOUNCE_COLS - 1) * BOUNCE_GAP_X) / BOUNCE_COLS + BOUNCE_GAP_X));
+              if (brickCol === col && br.alive) {
+                br.alive = false;
+                brokenRef.current += 1;
+                scoreRef.current += br.points;
+              }
+            }
+            laserLoadedRef.current -= 1;
+          } else {
+            b.alive = false;
+            brokenRef.current += 1;
+            scoreRef.current += b.points;
+          }
+          setScore(scoreRef.current);
+          onStepRef.current && onStepRef.current(brokenRef.current);
+          if (Math.random() < POWERUP_SPAWN_RATE) {
+            powerUpsRef.current.push(spawnPowerup(b.x + b.w / 2, b.y + b.h / 2, POWERUP_TYPES.bounce));
+          }
+          if (ox < oy) { ball.vx = -ball.vx; ball.x += (ball.vx > 0 ? 1 : -1) * ox; }
+          else { ball.vy = -ball.vy; ball.y += (ball.vy > 0 ? 1 : -1) * oy; }
+          if (bricks.every(x => !x.alive)) { nextLevel(); return true; }
+          break;
+        }
+      }
+
+      if (ball.y - BOUNCE_BALL_R > BOUNCE_H) {
+        balls.splice(ballIdx, 1);
+        ballIdx--;
+        if (balls.length === 0) { loseLife(); return true; }
       }
     }
-
-    // Bottom edge — life lost.
-    if (ball.y - BOUNCE_BALL_R > BOUNCE_H) { loseLife(); return true; }
     return false;
   };
 
   const update = () => {
-    // Paddle steering by key / dpad.
+    const now = Date.now();
+    const paddleW = basePaddleWRef.current * (1 + activePowerupsRef.current.filter(p => p.type === 'larger-paddle').reduce((a, p) => a + 0.5 * p.stacks, 0));
+
     let px = paddleRef.current;
     if (leftRef.current) px -= BOUNCE_PADDLE_KEY_SPEED;
     if (rightRef.current) px += BOUNCE_PADDLE_KEY_SPEED;
-    paddleRef.current = bounceClamp(px, BOUNCE_PADDLE_W / 2, BOUNCE_W - BOUNCE_PADDLE_W / 2);
+    paddleRef.current = bounceClamp(px, paddleW / 2, BOUNCE_W - paddleW / 2);
+
+    // Update power-ups in flight
+    for (let i = powerUpsRef.current.length - 1; i >= 0; i--) {
+      const pu = powerUpsRef.current[i];
+      updatePowerup(pu, 1);
+
+      if (!pu.caught && pu.y + pu.radius >= BOUNCE_PADDLE_Y && pu.x >= paddleRef.current - paddleW / 2 - 20 && pu.x <= paddleRef.current + paddleW / 2 + 20) {
+        pu.caught = true;
+        const existing = activePowerupsRef.current.find(p => p.type === pu.type);
+        if (pu.type === 'multi-ball') {
+          if (ballsRef.current.length > 0) {
+            const firstBall = ballsRef.current[0];
+            const newBall = {
+              x: firstBall.x + 10,
+              y: firstBall.y,
+              vx: firstBall.vx * Math.cos(Math.PI / 6) - firstBall.vy * Math.sin(Math.PI / 6),
+              vy: firstBall.vx * Math.sin(Math.PI / 6) + firstBall.vy * Math.cos(Math.PI / 6),
+            };
+            ballsRef.current.push(newBall);
+          }
+        }
+        if (existing) {
+          existing.stacks += 1;
+          existing.startedAt = now;
+        } else {
+          activePowerupsRef.current.push({ type: pu.type, startedAt: now, stacks: 1 });
+        }
+        setActivePowerups([...activePowerupsRef.current]);
+        powerUpsRef.current.splice(i, 1);
+      } else if (pu.y > BOUNCE_H + 50) {
+        powerUpsRef.current.splice(i, 1);
+      }
+    }
+
+    // Update active power-ups duration
+    for (let i = activePowerupsRef.current.length - 1; i >= 0; i--) {
+      const ap = activePowerupsRef.current[i];
+      if (now - ap.startedAt > POWERUP_DURATION_MS) {
+        if (ap.type === 'multi-shot') { } // handled in zuma
+        activePowerupsRef.current.splice(i, 1);
+      }
+    }
+    if (activePowerupsRef.current.length === 0 && powerUpsRef.current.length === 0) {
+      setActivePowerups([]);
+    }
+
+    // Apply speed multiplier
+    const slowPower = activePowerupsRef.current.find(p => p.type === 'slower-ball');
+    if (slowPower) {
+      speedRef.current = baseSpeedRef.current * Math.pow(0.7, slowPower.stacks);
+    } else {
+      speedRef.current = baseSpeedRef.current;
+    }
 
     if (!launchedRef.current) { resetBallToPaddle(); return; }
     for (let i = 0; i < BOUNCE_SUBSTEPS; i++) {
@@ -9780,14 +9905,40 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
       ctx.fillStyle = b.color;
       ctx.fillRect(b.x, b.y, b.w, b.h);
     }
+
+    // Draw power-ups in flight
+    for (let i = 0; i < powerUpsRef.current.length; i++) {
+      const pu = powerUpsRef.current[i];
+      ctx.save();
+      ctx.translate(pu.x, pu.y);
+      const rotation = ((Date.now() - pu.spawnedAt) / 100) % (Math.PI * 2);
+      ctx.rotate(rotation);
+      ctx.font = '24px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(POWERUP_ICONS[pu.type], 0, 0);
+      ctx.restore();
+
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(pu.x, pu.y + pu.radius + 3, pu.radius * 0.7, pu.radius * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.fillStyle = C.text;
     const px = paddleRef.current;
-    ctx.fillRect(px - BOUNCE_PADDLE_W / 2, BOUNCE_PADDLE_Y, BOUNCE_PADDLE_W, BOUNCE_PADDLE_H);
-    const ball = ballRef.current;
+    const paddleW = basePaddleWRef.current * (1 + activePowerupsRef.current.filter(p => p.type === 'larger-paddle').reduce((a, p) => a + 0.5 * p.stacks, 0));
+    ctx.fillRect(px - paddleW / 2, BOUNCE_PADDLE_Y, paddleW, BOUNCE_PADDLE_H);
+
+    const balls = ballsRef.current;
     ctx.fillStyle = C.gold;
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, BOUNCE_BALL_R, 0, Math.PI * 2);
-    ctx.fill();
+    for (let i = 0; i < balls.length; i++) {
+      const ball = balls[i];
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BOUNCE_BALL_R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     if (startedRef.current && !launchedRef.current && !doneRef.current) {
       ctx.fillStyle = C.text;
       ctx.font = '600 14px "Space Grotesk", system-ui, sans-serif';
@@ -9898,6 +10049,18 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
               <div className="plabel">Time</div>
               <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
             </div>
+            {activePowerups.map((ap, idx) => {
+              const now = Date.now();
+              const elapsed = now - ap.startedAt;
+              const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
+              return (
+                <div key={idx} className="pill" style={{ background: C.emerald + '22', border: `1px solid ${C.emerald}` }}>
+                  <div className="plabel" style={{ fontSize: '0.75rem' }}>
+                    {POWERUP_ICONS[ap.type]} {remaining}s {ap.stacks > 1 ? `×${ap.stacks}` : ''}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="bounce-board-wrap">
@@ -11482,6 +11645,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
   const [elapsedSecs, setElapsedSecs] = useState(0);
+  const [activePowerups, setActivePowerups] = useState([]);
   const [lb, setLb] = useState(null);
   const [lbLoading, setLbLoading] = useState(false);
   const [lbError, setLbError] = useState(false);
@@ -11501,6 +11665,12 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   const curColorRef = useRef(ZUMA_COLORS_ALL[0]);
   const nxtColorRef = useRef(ZUMA_COLORS_ALL[1]);
   const pathDataRef = useRef(null);
+  const powerUpsRef = useRef([]);
+  const activePowerupsRef = useRef([]);
+  const baseShotSpeedRef = useRef(ZUMA_SHOT_SPEED);
+  const shotCountRef = useRef(1);
+  const wildColorLoadedRef = useRef(0);
+  const chainClearLoadedRef = useRef(0);
   const onWinRef = useRef(onWin); onWinRef.current = onWin;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
 
@@ -11521,9 +11691,14 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
     startedRef.current = false;
     doneRef.current = false;
     submittedRef.current = false;
+    powerUpsRef.current = [];
+    activePowerupsRef.current = [];
+    shotCountRef.current = 1;
+    wildColorLoadedRef.current = 0;
+    chainClearLoadedRef.current = 0;
     initLevel(1);
     setScore(0); setLevel(1); setBallsPopped(0);
-    setStarted(false); setDone(false); setElapsedSecs(0);
+    setStarted(false); setDone(false); setElapsedSecs(0); setActivePowerups([]);
   }
 
   useEffect(() => { init(); }, [resetKey]);
@@ -11611,6 +11786,24 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
           ctx.beginPath(); ctx.arc(pt.x-3, pt.y-3, 4, 0, Math.PI*2);
           ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
         }
+        // Power-ups in flight
+        for (let i = 0; i < powerUpsRef.current.length; i++) {
+          const pu = powerUpsRef.current[i];
+          ctx.save();
+          ctx.translate(pu.x, pu.y);
+          const rotation = ((Date.now() - pu.spawnedAt) / 100) % (Math.PI * 2);
+          ctx.rotate(rotation);
+          ctx.font = '20px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(POWERUP_ICONS[pu.type], 0, 0);
+          ctx.restore();
+          ctx.fillStyle = 'rgba(0,0,0,0.2)';
+          ctx.beginPath();
+          ctx.ellipse(pu.x, pu.y + pu.radius + 3, pu.radius * 0.7, pu.radius * 0.3, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
         // Shot ball
         const sh = shotRef.current;
         if (sh) {
@@ -11702,6 +11895,41 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
         drawFrame(); return;
       }
 
+      // Update power-ups and handle frog collision
+      const now = Date.now();
+      for (let i = powerUpsRef.current.length - 1; i >= 0; i--) {
+        const pu = powerUpsRef.current[i];
+        updatePowerup(pu, dt);
+        if (!pu.caught && Math.hypot(pu.x - FROG_X, pu.y - FROG_Y) < POWERUP_RADIUS + 18) {
+          pu.caught = true;
+          const existing = activePowerupsRef.current.find(p => p.type === pu.type);
+          if (existing) {
+            existing.stacks += 1;
+            existing.startedAt = now;
+          } else {
+            activePowerupsRef.current.push({ type: pu.type, startedAt: now, stacks: 1 });
+          }
+          if (pu.type === 'chain-clear') chainClearLoadedRef.current = 1;
+          if (pu.type === 'color-switch') wildColorLoadedRef.current = 1;
+          if (pu.type === 'multi-shot') shotCountRef.current = 2;
+          setActivePowerups([...activePowerupsRef.current]);
+          powerUpsRef.current.splice(i, 1);
+        } else if (pu.y > ZUMA_H + 50) {
+          powerUpsRef.current.splice(i, 1);
+        }
+      }
+      for (let i = activePowerupsRef.current.length - 1; i >= 0; i--) {
+        const ap = activePowerupsRef.current[i];
+        if (now - ap.startedAt > POWERUP_DURATION_MS) {
+          if (ap.type === 'multi-shot') shotCountRef.current = 1;
+          activePowerupsRef.current.splice(i, 1);
+        }
+      }
+
+      // Apply speed modifier
+      const fasterPower = activePowerupsRef.current.find(p => p.type === 'faster-shot');
+      const currentSpeed = fasterPower ? baseShotSpeedRef.current * Math.pow(1.4, fasterPower.stacks) : baseShotSpeedRef.current;
+
       // Advance shot ball
       if (shotRef.current) {
         const sh = shotRef.current;
@@ -11714,22 +11942,30 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
             const pt = zumaPointAtDist(pd, chain[i].dist);
             const dx = sh.x - pt.x, dy = sh.y - pt.y;
             if (dx*dx + dy*dy < (ZUMA_BALL_R*2)*(ZUMA_BALL_R*2)) {
-              // Insert behind hit ball; push rear segment back if needed
-              chain.splice(i+1, 0, { color: sh.color, dist: chain[i].dist - ZUMA_DIAM });
-              for (let j = i+2; j < chain.length; j++) {
-                const needed = chain[j-1].dist - ZUMA_DIAM;
-                if (chain[j].dist > needed) chain[j].dist = needed; else break;
+              if (chainClearLoadedRef.current > 0) {
+                chain.length = 0;
+                chainClearLoadedRef.current = 0;
+              } else {
+                chain.splice(i+1, 0, { color: sh.color, dist: chain[i].dist - ZUMA_DIAM });
+                for (let j = i+2; j < chain.length; j++) {
+                  const needed = chain[j-1].dist - ZUMA_DIAM;
+                  if (chain[j].dist > needed) chain[j].dist = needed; else break;
+                }
+                const p = zumaCheckMatches(chain, i+1);
+                if (p > 0) {
+                  const bonus = p >= 6 ? (p-5)*50 : 0;
+                  scoreRef.current += p*10 + bonus;
+                  bpRef.current += p;
+                  setScore(scoreRef.current);
+                  setBallsPopped(bpRef.current);
+                  onStepRef.current && onStepRef.current(bpRef.current);
+                }
+              }
+              if (Math.random() < POWERUP_SPAWN_RATE) {
+                const pt = zumaPointAtDist(pd, chain[i] ? chain[i].dist : chain[chain.length - 1] ? chain[chain.length - 1].dist : 0);
+                powerUpsRef.current.push(spawnPowerup(pt.x, pt.y, POWERUP_TYPES.zuma));
               }
               shotRef.current = null;
-              const p = zumaCheckMatches(chain, i+1);
-              if (p > 0) {
-                const bonus = p >= 6 ? (p-5)*50 : 0;
-                scoreRef.current += p*10 + bonus;
-                bpRef.current += p;
-                setScore(scoreRef.current);
-                setBallsPopped(bpRef.current);
-                onStepRef.current && onStepRef.current(bpRef.current);
-              }
               break;
             }
           }
@@ -11756,15 +11992,30 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   };
 
   const shoot = () => {
-    if (doneRef.current || shotRef.current) return;
+    if (doneRef.current) return;
     if (!startedRef.current) { startedRef.current = true; setStarted(true); }
     const lv = ZUMA_LEVELS[levelRef.current - 1];
     const angle = frogAngleRef.current;
-    shotRef.current = {
-      x: FROG_X + Math.cos(angle)*20, y: FROG_Y + Math.sin(angle)*20,
-      vx: Math.cos(angle)*ZUMA_SHOT_SPEED, vy: Math.sin(angle)*ZUMA_SHOT_SPEED,
-      color: curColorRef.current,
-    };
+    const fasterPower = activePowerupsRef.current.find(p => p.type === 'faster-shot');
+    const currentSpeed = fasterPower ? ZUMA_SHOT_SPEED * Math.pow(1.4, fasterPower.stacks) : ZUMA_SHOT_SPEED;
+
+    const useWildColor = wildColorLoadedRef.current > 0;
+    const shotColor = useWildColor ? '#ffffff' : curColorRef.current;
+    if (useWildColor) wildColorLoadedRef.current = 0;
+
+    const shotCount = shotCountRef.current;
+    for (let s = 0; s < shotCount; s++) {
+      const angleOffset = shotCount === 1 ? 0 : (s - (shotCount - 1) / 2) * Math.PI / 8;
+      const shootAngle = angle + angleOffset;
+      shotRef.current = {
+        x: FROG_X + Math.cos(shootAngle)*20, y: FROG_Y + Math.sin(shootAngle)*20,
+        vx: Math.cos(shootAngle)*currentSpeed, vy: Math.sin(shootAngle)*currentSpeed,
+        color: shotColor,
+      };
+      if (s < shotCount - 1) {
+        setTimeout(() => {}, 0);
+      }
+    }
     curColorRef.current = nxtColorRef.current;
     nxtColorRef.current = zumaRandColor(lv.colors);
   };
@@ -11797,7 +12048,17 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
           React.createElement('div', { className: 'pill' },
             React.createElement('div', { className: 'plabel' }, 'Time'),
             React.createElement('div', { className: 'pvalue mono' }, fmtS(elapsedSecs))
-          )
+          ),
+          activePowerups.map((ap, idx) => {
+            const now = Date.now();
+            const elapsed = now - ap.startedAt;
+            const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
+            return React.createElement('div', { key: idx, className: 'pill', style: { background: C.emerald + '22', border: `1px solid ${C.emerald}` } },
+              React.createElement('div', { className: 'plabel', style: { fontSize: '0.75rem' } },
+                POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '')
+              )
+            );
+          })
         ),
         React.createElement('div', { className: 'zuma-wrap' },
           React.createElement('canvas', {

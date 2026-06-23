@@ -6819,6 +6819,7 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
    Texas Hold 'Em) — all self-wrap in ClassicShell.
    ============================================================ */
 const SNAKE_KEY = 'puzzlechain_snake_history';
+const SNAKE_DIFFICULTY_KEY = 'puzzlechain_snake_difficulty';
 const BB_KEY    = 'puzzlechain_blockblast_history';
 const DR_KEY    = 'puzzlechain_diamondrush_history';
 const TH_KEY    = 'puzzlechain_texas_history';
@@ -6844,8 +6845,44 @@ function useElapsed(resetKey, running) {
   return secs;
 }
 
-/* ---------------- Snake ---------------- */
-function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+/* ---------------- Snake ---- Difficulty config ---- */
+const SNAKE_SPEED_CONFIG = {
+  easy:   { initial: 250, decrement: 4 },
+  normal: { initial: 200, decrement: 6 },
+  hard:   { initial: 150, decrement: 8 },
+};
+
+/* ---- Snake — Mode Selector ---- */
+function SnakeGameModeSelect({ onSelectDifficulty }) {
+  const [difficulty, setDifficulty] = useState(() => localStorage.getItem(SNAKE_DIFFICULTY_KEY) || 'normal');
+
+  const handleStart = () => {
+    try { localStorage.setItem(SNAKE_DIFFICULTY_KEY, difficulty); } catch {}
+    onSelectDifficulty(difficulty);
+  };
+
+  return (
+    <div className="mnc-mode-select">
+      <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>Choose Difficulty</h3>
+        <p style={{ color: 'var(--cg-muted, #999)', fontSize: '0.9rem', margin: '0 0 1.5rem 0' }}>Affects starting speed and acceleration</p>
+      </div>
+      <div className="mnc-difficulty-row">
+        {['easy', 'normal', 'hard'].map(d => (
+          <button key={d} className={'mnc-difficulty-pill' + (difficulty === d ? ' active' : '')} onClick={() => setDifficulty(d)}>
+            {d.charAt(0).toUpperCase() + d.slice(1)}
+          </button>
+        ))}
+      </div>
+      <button className="mnc-mode-start-btn" onClick={handleStart}>
+        Play
+      </button>
+    </div>
+  );
+}
+
+/* ---- Snake — Gameplay ---- */
+function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty }) {
   const N = 15;
   const [, render] = useState(0);
   const [done, setDone] = useState(false);
@@ -6866,7 +6903,8 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
   const init = () => {
     const m = Math.floor(N / 2);
     const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
-    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: 200, eaten: 0 };
+    const config = SNAKE_SPEED_CONFIG[difficulty || 'normal'];
+    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: config.initial, eaten: 0 };
     doneRef.current = false;
     setDone(false); setScore(0); setStarted(false); render(n => n + 1);
   };
@@ -6895,7 +6933,8 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
       s.eaten++; setScore(s.eaten * 10);
       cgSound('clear', 1 + s.eaten * 0.02); cgHaptic(15);
       s.food = randFood(s.snake);
-      s.speed = Math.max(80, 200 - s.eaten * 6);
+      const config = SNAKE_SPEED_CONFIG[difficulty || 'normal'];
+      s.speed = Math.max(80, config.initial - s.eaten * config.decrement);
       onStepChange && onStepChange(s.eaten);
     } else {
       s.snake.pop();
@@ -6955,7 +6994,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
       { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
       { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
     ]),
-    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!']),
+    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
@@ -6968,6 +7007,31 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
       </div>
     </ClassicShell>
   );
+}
+
+/* ---- Snake — Wrapper (mode selector + gameplay) ---- */
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const [difficulty, setDifficulty] = useState(null);
+  const diffRef = useRef(difficulty);
+  diffRef.current = difficulty;
+
+  useEffect(() => {
+    if (diffRef.current !== null) {
+      setDifficulty(null);
+    }
+  }, [resetKey]);
+
+  if (!difficulty) {
+    return (
+      <ClassicShell game={game} onExit={onBack} sheetSections={[]}>
+        <div className="cg-stage">
+          <SnakeGameModeSelect onSelectDifficulty={(d) => setDifficulty(d)} />
+        </div>
+      </ClassicShell>
+    );
+  }
+
+  return React.createElement(SnakeGameplay, { onWin, onStepChange, resetKey, game, onBack, difficulty });
 }
 
 /* ---------------- Block Blast ---------------- */

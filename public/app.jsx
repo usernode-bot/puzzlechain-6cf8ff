@@ -11668,7 +11668,6 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   const powerUpsRef = useRef([]);
   const activePowerupsRef = useRef([]);
   const baseShotSpeedRef = useRef(ZUMA_SHOT_SPEED);
-  const shotCountRef = useRef(1);
   const wildColorLoadedRef = useRef(0);
   const chainClearLoadedRef = useRef(0);
   const onWinRef = useRef(onWin); onWinRef.current = onWin;
@@ -11693,7 +11692,6 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
     submittedRef.current = false;
     powerUpsRef.current = [];
     activePowerupsRef.current = [];
-    shotCountRef.current = 1;
     wildColorLoadedRef.current = 0;
     chainClearLoadedRef.current = 0;
     initLevel(1);
@@ -11909,9 +11907,8 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
           } else {
             activePowerupsRef.current.push({ type: pu.type, startedAt: now, stacks: 1 });
           }
-          if (pu.type === 'chain-clear') chainClearLoadedRef.current = 1;
-          if (pu.type === 'color-switch') wildColorLoadedRef.current = 1;
-          if (pu.type === 'multi-shot') shotCountRef.current = 2;
+          if (pu.type === 'chain-clear') chainClearLoadedRef.current = existing ? existing.stacks : 1;
+          if (pu.type === 'color-switch') wildColorLoadedRef.current = existing ? existing.stacks : 1;
           setActivePowerups([...activePowerupsRef.current]);
           powerUpsRef.current.splice(i, 1);
         } else if (pu.y > ZUMA_H + 50) {
@@ -11921,14 +11918,19 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
       for (let i = activePowerupsRef.current.length - 1; i >= 0; i--) {
         const ap = activePowerupsRef.current[i];
         if (now - ap.startedAt > POWERUP_DURATION_MS) {
-          if (ap.type === 'multi-shot') shotCountRef.current = 1;
+          if (ap.type === 'chain-clear') chainClearLoadedRef.current = 0;
+          if (ap.type === 'color-switch') wildColorLoadedRef.current = 0;
           activePowerupsRef.current.splice(i, 1);
         }
       }
 
-      // Apply speed modifier
+      // Update baseShotSpeed for faster-shot power-up
       const fasterPower = activePowerupsRef.current.find(p => p.type === 'faster-shot');
-      const currentSpeed = fasterPower ? baseShotSpeedRef.current * Math.pow(1.4, fasterPower.stacks) : baseShotSpeedRef.current;
+      if (fasterPower) {
+        baseShotSpeedRef.current = ZUMA_SHOT_SPEED * Math.pow(1.4, fasterPower.stacks);
+      } else {
+        baseShotSpeedRef.current = ZUMA_SHOT_SPEED;
+      }
 
       // Advance shot ball
       if (shotRef.current) {
@@ -11992,7 +11994,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   };
 
   const shoot = () => {
-    if (doneRef.current) return;
+    if (doneRef.current || shotRef.current) return;
     if (!startedRef.current) { startedRef.current = true; setStarted(true); }
     const lv = ZUMA_LEVELS[levelRef.current - 1];
     const angle = frogAngleRef.current;
@@ -12003,19 +12005,11 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
     const shotColor = useWildColor ? '#ffffff' : curColorRef.current;
     if (useWildColor) wildColorLoadedRef.current = 0;
 
-    const shotCount = shotCountRef.current;
-    for (let s = 0; s < shotCount; s++) {
-      const angleOffset = shotCount === 1 ? 0 : (s - (shotCount - 1) / 2) * Math.PI / 8;
-      const shootAngle = angle + angleOffset;
-      shotRef.current = {
-        x: FROG_X + Math.cos(shootAngle)*20, y: FROG_Y + Math.sin(shootAngle)*20,
-        vx: Math.cos(shootAngle)*currentSpeed, vy: Math.sin(shootAngle)*currentSpeed,
-        color: shotColor,
-      };
-      if (s < shotCount - 1) {
-        setTimeout(() => {}, 0);
-      }
-    }
+    shotRef.current = {
+      x: FROG_X + Math.cos(angle)*20, y: FROG_Y + Math.sin(angle)*20,
+      vx: Math.cos(angle)*currentSpeed, vy: Math.sin(angle)*currentSpeed,
+      color: shotColor,
+    };
     curColorRef.current = nxtColorRef.current;
     nxtColorRef.current = zumaRandColor(lv.colors);
   };

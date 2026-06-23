@@ -128,6 +128,12 @@ const GAME_IDS = new Set(
 // Any game id known to the hub (used by DApp session validation).
 const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
+// Consecutive-day streak milestones that unlock a named badge. Kept in sync
+// with STREAK_BADGES in public/app.jsx (the client owns the icon/name copy;
+// the server only persists the day thresholds as streak_milestone achievements
+// so a player's earned badges survive a later streak reset).
+const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
+
 // ---- Match-3 puzzle configuration ----------------------------------------
 const MATCH3_PUZZLES = [
   // Easy (1-10)
@@ -1341,6 +1347,34 @@ async function migrate() {
        ON CONFLICT (id) DO NOTHING`
     );
 
+    // One VERIFIED + truly ANCHORED 6×6 Mini Sudoku session, so the daily
+    // on-chain receipt for the headline puzzle is demonstrable (anchor_status
+    // 'anchored', not the 'mock' the others use). Reached via ?demo=anchor,
+    // which deep-links the client to this session's receipt by its fixed id.
+    await pool.query(
+      `INSERT INTO game_sessions
+         (id, user_id, username, usernode_pubkey, game_id, seed, status,
+          final_score, final_steps, final_time_secs, final_chain_hash,
+          anchor_status, anchor_tx_hash, finished_at)
+       VALUES ('DAPPDEMOSUDOKU', 'staging-demo-user', 'staging-demo-user', 'ut1stagingdemo',
+               'sudoku', 20240, 'verified', 940, 22, 118,
+               '0xSUDOKUDEMOCHAINHASH00000000000000000000000000000000000000000000',
+               'anchored',
+               '0xSUDOKUDEMOANCHORTX000000000000000000000000000000000000000000000', now())
+       ON CONFLICT (id) DO NOTHING`
+    );
+    await pool.query(
+      `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+       VALUES ('DAPPDEMOSUDOKU', 1, $1, $2, $3, $4, now())
+       ON CONFLICT (session_id, sequence) DO NOTHING`,
+      [
+        JSON.stringify({ snapshot: true, score: 940 }),
+        '0xSUDOKUDEMOSTATEHASH00000000000000000000000000000000000000000000',
+        '0xSUDOKUDEMOGENESIS0000000000000000000000000000000000000000000000',
+        '0xSUDOKUDEMOCHAINHASH00000000000000000000000000000000000000000000',
+      ]
+    );
+
     // A handful of VERIFIED leaderboard sessions — one Tier A game
     // (tilematchingdaily) and one Tier B game (zuma) — so the Verified filter
     // and ranking are visible. "Staging demo …" labelled, obviously fake.
@@ -1594,8 +1628,9 @@ function prevUtcDay(iso) {
 // Consecutive-day streak for a user: the length of the unbroken run of UTC
 // days (each with >=1 finished attempt) ending today, or ending yesterday if
 // today hasn't been played yet (a streak stays alive until a full day is
-// missed). A streak_freeze in user_stats_snapshot bridges exactly ONE missed
-// UTC day — a 2+ day gap still resets. Computed from the existing daily_attempts rows.
+// missed). Strict reset: ANY missed UTC day resets the streak to 0 — the
+// former streak_freeze grace is disabled (column kept dormant). Computed from
+// the existing daily_attempts rows.
 async function computeStreak(userId) {
   const { rows } = await pool.query(
     `SELECT DISTINCT attempt_date::text AS d
@@ -1613,28 +1648,11 @@ async function computeStreak(userId) {
   if (days.has(today)) cursor = today;
   else if (days.has(yesterday)) cursor = yesterday;
   else {
-    // Check if a freeze bridges today's gap
-    const twoDaysAgo = prevUtcDay(yesterday);
-    if (days.has(twoDaysAgo)) {
-      const { rows: fRows } = await pool.query(
-        `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
-        [userId]
-      );
-      if (fRows.length > 0 && fRows[0].streak_freezes > 0) {
-        // Consume the freeze: deduct one and count from twoDaysAgo
-        await pool.query(
-          `UPDATE user_stats_snapshot
-              SET streak_freezes = GREATEST(0, streak_freezes - 1), updated_at = now()
-            WHERE user_id = $1 AND streak_freezes > 0`,
-          [userId]
-        );
-        cursor = twoDaysAgo;
-      } else {
-        return 0;
-      }
-    } else {
-      return 0; // last finished day is older than yesterday → streak broken
-    }
+    // Strict reset: any missed UTC day breaks the streak back to 0. The
+    // streak_freezes grace that once bridged a single missed day is
+    // intentionally disabled (the column is kept dormant for backward
+    // compatibility and possible future re-enablement as "streak insurance").
+    return 0; // last finished day is older than yesterday → streak broken
   }
   let streak = 0;
   while (days.has(cursor)) {
@@ -1642,6 +1660,25 @@ async function computeStreak(userId) {
     cursor = prevUtcDay(cursor);
   }
   return streak;
+}
+
+// The set of streak-milestone day thresholds a user has ever reached, as a
+// sorted ascending int array (e.g. [3, 7, 30]). Read from the permanent
+// user_achievements rows so earned badges persist across a streak reset.
+async function earnedStreakBadges(userId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT (metadata->>'streak')::int AS days
+         FROM user_achievements
+        WHERE user_id = $1 AND type = 'streak_milestone'
+          AND metadata ? 'streak'
+        ORDER BY days ASC`,
+      [userId]
+    );
+    return rows.map(r => r.days).filter(d => Number.isFinite(d));
+  } catch {
+    return [];
+  }
 }
 
 // Shape a DB row for the client.
@@ -1793,15 +1830,22 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
     const tipsReceivedWei = tipRows[0].total_wei ? tipRows[0].total_wei.toString() : '0';
     const recentTippers = tipRows[0].tips || [];
 
+    // Live, authoritative streak (computed from finished daily_attempts) rather
+    // than the stale user_stats_snapshot.current_streak column, plus the set of
+    // permanent streak-milestone badges this player has earned.
+    const liveStreak = await computeStreak(viewedUserId);
+    const badges = await earnedStreakBadges(viewedUserId);
+
     res.json({
       user: {
         id: user.id,
         username: user.username,
         createdAt: user.created_at,
       },
+      badges,
       stats: {
         totalScore: user.total_score || 0,
-        currentStreak: user.current_streak || 0,
+        currentStreak: liveStreak,
         gamesPlayed: user.games_played || 0,
         dailiesCompleted: user.dailies_completed || 0,
         classicsPlayed: user.classics_played || 0,
@@ -2318,6 +2362,38 @@ app.get('/api/daily', async (req, res) => {
       }
     }
 
+    // Staging-only demo seed: give the current viewer a LONG streak plus the
+    // full earned-badge ladder so the streak-badge UI (nav chip, lobby badge
+    // strip incl. "Centurion"/"Year-Long Legend", profile badges) is
+    // demonstrable. Seeds 60 consecutive finished sudoku days before today
+    // (the computeStreak read cap → an active Half-Century badge) and inserts
+    // a permanent streak_milestone achievement for EVERY threshold so the
+    // higher badges render even past the live-streak cap. Today left open so a
+    // tester can still trigger a multiplied win. Idempotent, no-op in prod.
+    if (IS_STAGING && req.query.demo === 'badges') {
+      for (let i = 1; i <= 60; i++) {
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+           VALUES ($1, $2, 'sudoku', ((now() AT TIME ZONE 'utc')::date - $3::int), 900, 18, 110, now())
+           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', i]
+        );
+      }
+      for (const days of STREAK_BADGE_DAYS) {
+        await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+           SELECT $1, 'streak_milestone', NULL, NULL, $2::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements
+               WHERE user_id = $1 AND type = 'streak_milestone'
+                 AND (metadata->>'streak')::int = $3
+            )`,
+          [req.user.id, JSON.stringify({ streak: days }), days]
+        );
+      }
+    }
+
     // Staging-only demo seed: populate today's per-game leaderboards with a
     // handful of obviously-fake solvers so the ranking (fastest time, then
     // fewest steps) is demonstrable on a fresh staging DB. Spread time/steps
@@ -2406,6 +2482,7 @@ app.get('/api/daily', async (req, res) => {
     for (const row of rows) attempts[row.game_id] = shapeAttempt(row);
 
     const streak = await computeStreak(req.user.id);
+    const badges = await earnedStreakBadges(req.user.id);
 
     res.json({
       // Surface the signed-in account so the UI can confirm login +
@@ -2419,6 +2496,10 @@ app.get('/api/daily', async (req, res) => {
       serverNowUtc: new Date().toISOString(),
       nextResetUtc: nextResetUtc(),
       streak,
+      // Permanent streak-milestone badges (day thresholds) this user has ever
+      // earned — kept even after a streak resets, so the lobby/profile can show
+      // a player's collected badges independent of the current streak.
+      badges,
       attempts,
     });
   } catch (err) {
@@ -2557,6 +2638,32 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
     // reconcile its optimistic value without a full reload.
     const streak = await computeStreak(req.user.id);
 
+    // Award streak-milestone badges as permanent achievements when this win
+    // pushes the consecutive-day streak to (or past) a threshold. Idempotent:
+    // each threshold is recorded at most once per user via a NOT EXISTS guard,
+    // so a second daily game the same day (or a re-finish) never duplicates a
+    // badge. Best-effort — a failure here never blocks the puzzle result.
+    if (score && score > 0) {
+      try {
+        for (const days of STREAK_BADGE_DAYS) {
+          if (streak >= days) {
+            await pool.query(
+              `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+               SELECT $1, 'streak_milestone', NULL, NULL, $2::jsonb
+                WHERE NOT EXISTS (
+                  SELECT 1 FROM user_achievements
+                   WHERE user_id = $1 AND type = 'streak_milestone'
+                     AND (metadata->>'streak')::int = $3
+                )`,
+              [req.user.id, JSON.stringify({ streak: days }), days]
+            );
+          }
+        }
+      } catch (badgeErr) {
+        console.warn('[daily] streak badge award failed (non-fatal):', badgeErr.message);
+      }
+    }
+
     // Auto-report the "daily_match_2min" task when tilematchingdaily is finished
     // under 2 minutes with a positive score. Idempotent via GREATEST.
     if (gameId === 'tilematchingdaily' && timeSecs !== null && timeSecs <= 119 && score && score > 0) {
@@ -2574,14 +2681,18 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
-    // ---- DApp Mode: mint a verified session for the pilot game --------------
-    // tilematchingdaily is the Phase 0 pilot. The daily finish endpoint doesn't
-    // carry a per-tap log, so the daily path records a session-level snapshot
-    // (a single-link hash chain bound to identity + the deterministic daily
-    // seed). The PvP path does full per-move replay. Either way the result gets
-    // a Verified badge + an on-chain-anchorable receipt.
+    // ---- DApp Mode: mint a verified session for EVERY daily win ------------
+    // Every category:'daily' completion (the 6×6 Mini Sudoku included) now gets
+    // an on-chain-anchorable receipt — not just the tilematchingdaily pilot.
+    // The daily finish endpoint doesn't carry a per-tap log, so the daily path
+    // records a session-level snapshot (a single-link hash chain bound to
+    // identity + the deterministic daily seed). The PvP path does full per-move
+    // replay. Either way the result gets a Verified badge the client anchors via
+    // the existing dappAnchor flow (wallet sendTransaction → anchor/confirm).
+    // gameId is already validated against GAME_IDS (all category:'daily'), so a
+    // positive score is the only additional gate.
     let dappSession = null;
-    if (gameId === 'tilematchingdaily' && score && score > 0) {
+    if (score && score > 0) {
       try {
         const seed = Math.floor(Date.now() / 86400000); // UTC day number (deterministic per day)
         const sid = newSessionId();

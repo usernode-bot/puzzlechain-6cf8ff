@@ -80,6 +80,8 @@
     { "name": "Verified leaderboard renders demo rows", "path": "/?demo=dapp", "expectText": "Staging demo Ada" },
     { "name": "Disputed session shows rejection copy", "path": "/?screen=session&sid=DAPPDEMOBAD", "expectText": "could not be verified" },
     { "name": "Account screen opens from chip", "path": "/?screen=account", "expectText": "On-chain login" },
-    { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" }
+    { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" },
+    { "name": "Streak badge ladder renders earned badges", "path": "/?demo=badges", "expectText": "Centurion" },
+    { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" }
   ]
 }

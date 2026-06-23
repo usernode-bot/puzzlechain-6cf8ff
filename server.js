@@ -4,11 +4,15 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const ethers = require('ethers');
+const dapp = require('./lib/dapp');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 const IS_STAGING = process.env.USERNODE_ENV === 'staging';
+
+// App identity secrets (APP_PUBKEY, APP_SECRET_KEY) are declared in dapp.json
+// and available via process.env for cryptographic operations when needed.
 
 // ---- PvP wager config -------------------------------------------------------
 
@@ -83,9 +87,45 @@ let redisReady = false;
   }
 })();
 
-// Known game ids — kept in sync with the GAMES registry in public/app.jsx.
-// Used to validate :gameId on the daily-attempt routes.
-const GAME_IDS = new Set(['sudoku', 'wordhunt', 'cryptowordle', 'mancala', 'tilematchingdaily', 'idle', 'zuma']);
+// ---- Authoritative game registry -----------------------------------------
+// Single source of truth for every game in the hub, keyed by id, mirroring the
+// GAMES array in public/app.jsx. `category` is the lobby tab; `tier` is the
+// DApp-Mode validation tier (A=full replay, B=snapshot/heuristic,
+// C=server-authoritative). This reconciles the historical GAMES/GAME_IDS drift:
+// GAME_IDS is now DERIVED from this registry's daily-category games (the set the
+// per-day attempt routes validate against), and DApp validation keys off the
+// registry too.
+const GAME_REGISTRY = {
+  sudoku:            { category: 'daily',   tier: 'A' },
+  wordhunt:          { category: 'daily',   tier: 'A' },
+  cryptowordle:      { category: 'daily',   tier: 'A' },
+  tilematchingdaily: { category: 'daily',   tier: 'A' },
+  minesweeper:       { category: 'classic', tier: 'A' },
+  mancala:           { category: 'classic', tier: 'A' },
+  '2048':            { category: 'classic', tier: 'A' },
+  'knights-tour':    { category: 'classic', tier: 'A' },
+  snake:             { category: 'classic', tier: 'B' },
+  blockblast:        { category: 'classic', tier: 'A' },
+  diamondrush:       { category: 'classic', tier: 'A' },
+  texas:             { category: 'classic', tier: 'C' },
+  tilematching:      { category: 'classic', tier: 'A' },
+  bounce:            { category: 'classic', tier: 'B' },
+  zuma:              { category: 'classic', tier: 'B' },
+  hashrush:          { category: 'classic', tier: 'A' },
+  idle:              { category: 'idle',    tier: 'C' },
+  // DApp-only pseudo-game for PvP tile-match sessions (not a lobby card).
+  tilematch_pvp:     { category: 'pvp',     tier: 'A' },
+};
+
+// Daily-attempt routes validate :gameId against the daily-category games.
+// (Historically this set also carried mancala/idle/zuma by mistake; those are
+// not daily games and were never reachable as daily attempts.)
+const GAME_IDS = new Set(
+  Object.keys(GAME_REGISTRY).filter(id => GAME_REGISTRY[id].category === 'daily')
+);
+
+// Any game id known to the hub (used by DApp session validation).
+const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
 // ---- Schema bootstrap (idempotent, runs on boot) -------------------------
 // daily_attempts is PUBLIC (the platform default): it holds gameplay
@@ -370,12 +410,6 @@ async function migrate() {
     )
   `);
 
-  // Add streak_freezes column to user_stats_snapshot (idempotent)
-  await pool.query(`
-    ALTER TABLE user_stats_snapshot
-      ADD COLUMN IF NOT EXISTS streak_freezes INTEGER NOT NULL DEFAULT 0
-  `);
-
   // user_follows is PUBLIC: directional follow relationships.
   // One row per (follower_id, followee_id) pair.
   await pool.query(`
@@ -402,6 +436,12 @@ async function migrate() {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     )
+  `);
+
+  // Add streak_freezes column to user_stats_snapshot (idempotent)
+  await pool.query(`
+    ALTER TABLE user_stats_snapshot
+      ADD COLUMN IF NOT EXISTS streak_freezes INTEGER NOT NULL DEFAULT 0
   `);
 
   // user_achievements is PUBLIC: recent milestones and notable events.
@@ -571,6 +611,70 @@ async function migrate() {
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+
+  // ---- DApp Mode (Phase 0) tables -----------------------------------------
+  // game_sessions is PUBLIC: one wallet-bound verification session per play.
+  // Holds gameplay results + the session's final chain hash + on-chain anchor
+  // state. Deliberately stores NO wallet address (it carries usernode_pubkey,
+  // which is already public in `users`); the EVM address is looked up from the
+  // private user_wallets table at anchor time, so this public table never links
+  // identity → financial address (public-table-no-FK-to-private rule).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_sessions (
+      id               TEXT PRIMARY KEY,
+      user_id          TEXT NOT NULL,
+      username         TEXT,
+      usernode_pubkey  TEXT,
+      game_id          TEXT NOT NULL,
+      seed             BIGINT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'active',  -- active|verified|disputed|abandoned
+      dispute_reason   TEXT,
+      final_score      INTEGER,
+      final_steps      INTEGER,
+      final_time_secs  INTEGER,
+      final_chain_hash TEXT,
+      anchor_status    TEXT NOT NULL DEFAULT 'none',     -- none|mock|pending|anchored
+      anchor_tx_hash   TEXT,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at      TIMESTAMPTZ
+    )
+  `);
+
+  // session_states is PUBLIC: the append-only hash-chain ledger. One row per
+  // move/snapshot; gameplay data only, no sensitive content.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS session_states (
+      id          BIGSERIAL PRIMARY KEY,
+      session_id  TEXT NOT NULL,
+      sequence    INTEGER NOT NULL,
+      move        JSONB,
+      state_hash  TEXT NOT NULL,
+      prev_hash   TEXT NOT NULL,
+      chain_hash  TEXT NOT NULL,
+      ts_client   TIMESTAMPTZ,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (session_id, sequence)
+    )
+  `);
+
+  // wallet_ownership_proofs is PRIVATE: binds a Usernode identity to a signed
+  // ownership challenge over an EVM address. Auth material → staging:private,
+  // mirroring user_wallets.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS wallet_ownership_proofs (
+      user_id         TEXT PRIMARY KEY,
+      usernode_pubkey TEXT,
+      wallet_addr     TEXT NOT NULL,
+      nonce           TEXT NOT NULL,
+      signature       TEXT NOT NULL,
+      verified_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE wallet_ownership_proofs IS 'staging:private'`);
+
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_game_sessions_user ON game_sessions(user_id, created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_game_sessions_game_status ON game_sessions(game_id, status)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_session_states_session ON session_states(session_id, sequence)`);
 
   if (IS_STAGING) {
     // PvP staging seeds: three match states for UI testing.
@@ -995,6 +1099,84 @@ async function migrate() {
         [uid, uname, today, score, timeSecs]
       );
     }
+
+    // ---- DApp Mode staging seeds -------------------------------------------
+    // One VERIFIED + (mock-)ANCHORED tilematchingdaily session for the viewer,
+    // with a real recomputed hash-chain ledger, so the Verified badge, the
+    // session receipt, and the anchor link are demonstrable on a fresh DB.
+    const okSession = {
+      id: 'DAPPDEMOOK', game_id: 'tilematchingdaily', seed: 12345,
+      usernode_pubkey: 'ut1stagingdemo',
+    };
+    // A short valid run of legal triples (mirrors what the client would send).
+    const okEngine = dapp.getEngine(okSession.game_id);
+    const okInit = okEngine.initialState(okSession.seed);
+    const okTypes = Array.from(okInit.validTypes).slice(0, 3);
+    const okMoves = [];
+    let okTs = Date.now() - 120000;
+    for (const ty of okTypes) for (let k = 0; k < 3; k++) { okMoves.push({ tileType: ty, tsClient: new Date(okTs).toISOString() }); okTs += 900; }
+    const okLedger = dapp.buildLedger(okSession, okMoves);
+    await pool.query(
+      `INSERT INTO game_sessions
+         (id, user_id, username, usernode_pubkey, game_id, seed, status,
+          final_score, final_steps, final_time_secs, final_chain_hash,
+          anchor_status, anchor_tx_hash, finished_at)
+       VALUES ($1, 'staging-demo-user', 'staging-demo-user', $2, $3, $4, 'verified',
+               150, $5, 95, $6, 'mock', '0xSTAGINGDEMOANCHOR0000000000000000000000000000000000000000000000', now())
+       ON CONFLICT (id) DO NOTHING`,
+      [okSession.id, okSession.usernode_pubkey, okSession.game_id, okSession.seed,
+       okLedger.entries.length, okLedger.finalChainHash]
+    );
+    for (const e of okLedger.entries) {
+      await pool.query(
+        `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (session_id, sequence) DO NOTHING`,
+        [okSession.id, e.sequence, JSON.stringify(e.move), e.stateHash, e.prevHash, e.chainHash, e.tsClient]
+      );
+    }
+
+    // One DISPUTED session (anti-cheat rejection) so the "couldn't be verified"
+    // state and the audit trail are demonstrable.
+    await pool.query(
+      `INSERT INTO game_sessions
+         (id, user_id, username, usernode_pubkey, game_id, seed, status, dispute_reason,
+          final_steps, finished_at)
+       VALUES ('DAPPDEMOBAD', 'staging-demo-user', 'staging-demo-user', 'ut1stagingdemo',
+               'tilematchingdaily', 99999, 'disputed', 'anti_cheat:invalid_tile_types:4', 30, now())
+       ON CONFLICT (id) DO NOTHING`
+    );
+
+    // A handful of VERIFIED leaderboard sessions — one Tier A game
+    // (tilematchingdaily) and one Tier B game (zuma) — so the Verified filter
+    // and ranking are visible. "Staging demo …" labelled, obviously fake.
+    const demoBoard = [
+      ['DAPPLBADA',  'Staging demo Ada',  'tilematchingdaily', 11, 980, 62],
+      ['DAPPLBBORG', 'Staging demo Borg', 'tilematchingdaily', 12, 910, 70],
+      ['DAPPLBCY',   'Staging demo Cy',   'zuma',              13, 4200, 140],
+      ['DAPPLBDOT',  'Staging demo Dot',  'zuma',              14, 3800, 165],
+    ];
+    for (const [sid, uname, gameId, seed, score, secs] of demoBoard) {
+      await pool.query(
+        `INSERT INTO game_sessions
+           (id, user_id, username, usernode_pubkey, game_id, seed, status,
+            final_score, final_steps, final_time_secs, final_chain_hash,
+            anchor_status, finished_at)
+         VALUES ($1, $1, $2, 'ut1' || $1, $3, $4, 'verified', $5, 60, $6,
+                 'beef' || $1, 'mock', now())
+         ON CONFLICT (id) DO NOTHING`,
+        [sid, uname, gameId, seed, score, secs]
+      );
+    }
+
+    // One PROVEN wallet for the viewer so the "Verified identity" badge renders.
+    await pool.query(
+      `INSERT INTO wallet_ownership_proofs (user_id, usernode_pubkey, wallet_addr, nonce, signature)
+       VALUES ('staging-demo-user', 'ut1stagingdemo',
+               '0xDEAD000000000000000000000000000000009999',
+               'staging-demo-nonce', '0xstagingdemosignature')
+       ON CONFLICT (user_id) DO NOTHING`
+    );
   }
 }
 
@@ -2106,7 +2288,43 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, rewardWei });
+    // ---- DApp Mode: mint a verified session for the pilot game --------------
+    // tilematchingdaily is the Phase 0 pilot. The daily finish endpoint doesn't
+    // carry a per-tap log, so the daily path records a session-level snapshot
+    // (a single-link hash chain bound to identity + the deterministic daily
+    // seed). The PvP path does full per-move replay. Either way the result gets
+    // a Verified badge + an on-chain-anchorable receipt.
+    let dappSession = null;
+    if (gameId === 'tilematchingdaily' && score && score > 0) {
+      try {
+        const seed = Math.floor(Date.now() / 86400000); // UTC day number (deterministic per day)
+        const sid = newSessionId();
+        await pool.query(
+          `INSERT INTO game_sessions (id, user_id, username, usernode_pubkey, game_id, seed, status)
+           VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
+          [sid, req.user.id, req.user.username || null, req.user.usernode_pubkey || null, gameId, seed]
+        );
+        const genesis = dapp.genesisHash({ gameId, seed, pubkey: req.user.usernode_pubkey, sessionId: sid });
+        const stateHash = dapp.sha256Hex(dapp.canonicalize({ score, steps: steps || 0, terminal: 1 }));
+        const chainHash = dapp.chainStep(genesis, stateHash, 1);
+        await pool.query(
+          `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+           VALUES ($1, 1, $2, $3, $4, $5, now()) ON CONFLICT (session_id, sequence) DO NOTHING`,
+          [sid, JSON.stringify({ snapshot: true, score }), stateHash, genesis, chainHash]
+        );
+        await pool.query(
+          `UPDATE game_sessions SET status='verified', final_score=$2, final_steps=$3,
+                  final_time_secs=$4, final_chain_hash=$5, finished_at=now() WHERE id=$1`,
+          [sid, score, steps, timeSecs, chainHash]
+        );
+        const { rows: sRows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [sid]);
+        dappSession = shapeSession(sRows[0]);
+      } catch (dappErr) {
+        console.error('[daily] dapp session mint failed (non-fatal):', dappErr.message);
+      }
+    }
+
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, rewardWei, dapp: dappSession });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
@@ -3501,8 +3719,53 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
     }
     const mu = updated[0];
 
+    // ---- DApp Mode: mint a verified session from this player's telemetry ----
+    // Reuses the same telemetry + board-seed the anti-cheat above already
+    // validated; builds the hash-chain ledger server-side and persists it so the
+    // PvP result carries a Verified badge + on-chain-anchorable session receipt.
+    let dappSession = null;
+    try {
+      if (mu.board_seed != null) {
+        const sid = newSessionId();
+        await pool.query(
+          `INSERT INTO game_sessions (id, user_id, username, usernode_pubkey, game_id, seed, status)
+           VALUES ($1, $2, $3, $4, 'tilematch_pvp', $5, 'active')`,
+          [sid, req.user.id, req.user.username || null, req.user.usernode_pubkey || null, Number(mu.board_seed)]
+        );
+        const sess = { id: sid, game_id: 'tilematch_pvp', seed: Number(mu.board_seed), usernode_pubkey: req.user.usernode_pubkey };
+        const moves = telemetry
+          .filter(t => Number.isFinite(t.tileType))
+          .map(t => ({ tileType: Math.round(t.tileType), tsClient: t.tsClient ? new Date(t.tsClient).toISOString() : null }));
+        let built = null;
+        try { built = dapp.buildLedger(sess, moves); } catch (e) { built = null; }
+        if (built) {
+          for (const e of built.entries) {
+            await pool.query(
+              `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+               VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (session_id, sequence) DO NOTHING`,
+              [sid, e.sequence, JSON.stringify(e.move), e.stateHash, e.prevHash, e.chainHash, e.tsClient]
+            );
+          }
+          await pool.query(
+            `UPDATE game_sessions SET status='verified', final_score=$2, final_steps=$3,
+                    final_time_secs=$4, final_chain_hash=$5, finished_at=now() WHERE id=$1`,
+            [sid, score, steps, timeSecs, built.finalChainHash]
+          );
+        } else {
+          await pool.query(
+            `UPDATE game_sessions SET status='disputed', dispute_reason='ledger_build_failed', finished_at=now() WHERE id=$1`,
+            [sid]
+          );
+        }
+        const { rows: sRows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [sid]);
+        dappSession = shapeSession(sRows[0]);
+      }
+    } catch (dappErr) {
+      console.error('[pvp] dapp session mint failed (non-fatal):', dappErr.message);
+    }
+
     if (!mu.p1_finished_at || !mu.p2_finished_at) {
-      return res.json({ waiting: true, match: shapePvpMatch(mu, req.user.id) });
+      return res.json({ waiting: true, match: shapePvpMatch(mu, req.user.id), dapp: dappSession });
     }
 
     // Both done — higher score wins; ties go to faster time
@@ -3558,6 +3821,7 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
         timeTaken:    timeSecs,
         tilesCleared: 72 - remainingTiles,
       },
+      dapp: dappSession,
     });
   } catch (err) {
     console.error('[pvp] finish failed:', err.message);
@@ -3661,6 +3925,14 @@ app.get('/api/wallet', async (req, res) => {
          ON CONFLICT (user_id) DO NOTHING`,
         [req.user.id]
       );
+      // DApp Mode: seed a verified ownership proof for the viewer so the
+      // "Verified identity" badge renders on the Wallet screen.
+      await pool.query(
+        `INSERT INTO wallet_ownership_proofs (user_id, usernode_pubkey, wallet_addr, nonce, signature)
+         VALUES ($1, $2, $3, 'staging-demo-nonce', '0xstagingdemosignature')
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id, req.user.usernode_pubkey || 'ut1stagingdemo', fakeAddr]
+      );
     }
 
     // Wallet address
@@ -3706,6 +3978,13 @@ app.get('/api/wallet', async (req, res) => {
     );
     const streakFreezes = sRows.length > 0 ? (sRows[0].streak_freezes || 0) : 0;
 
+    // DApp Mode: is this wallet identity cryptographically proven?
+    const { rows: proofRows } = await pool.query(
+      `SELECT verified_at FROM wallet_ownership_proofs WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const identityVerified = proofRows.length > 0;
+
     // Recent activity: rewards + tips (sent/received) + claims — last 10 events
     const { rows: evtRows } = await pool.query(
       `(SELECT 'reward' AS kind, amount_wei::text AS amount_wei,
@@ -3734,6 +4013,7 @@ app.get('/api/wallet', async (req, res) => {
       lifetimeEarnedWei,
       lifetimeClaimedWei,
       streakFreezes,
+      identityVerified,
       recent: evtRows,
     });
   } catch (err) {
@@ -4655,6 +4935,324 @@ app.post('/api/tilematch/duel/:duelId/forfeit', async (req, res) => {
   }
 });
 
+// ============================================================
+// DApp Mode (Phase 0) — wallet identity + verification framework
+// ============================================================
+
+// GET /api/wallet/challenge — issue a one-time nonce for the client to sign
+// (via the bridge's signMessage, if available) to prove wallet ownership.
+app.get('/api/wallet/challenge', async (req, res) => {
+  const nonce = `puzzlechain-ownership:${req.user.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  res.json({
+    nonce,
+    message: `PuzzleChain wallet ownership proof\nuser: ${req.user.id}\nnonce: ${nonce}`,
+  });
+});
+
+// Canonical message a client signs for an ownership proof.
+function ownershipMessage(userId, nonce) {
+  return `PuzzleChain wallet ownership proof\nuser: ${userId}\nnonce: ${nonce}`;
+}
+
+// POST /api/wallet/prove { addr, nonce, signature }
+// Verify the signature recovers `addr`, then record the proof. Additive to the
+// existing trust-on-report /api/wallet/link (which stays for lookups).
+app.post('/api/wallet/prove', async (req, res) => {
+  const { addr, nonce, signature } = req.body || {};
+  if (!addr || !EVM_ADDR_RE.test(addr)) return res.status(400).json({ error: 'Valid EVM address required' });
+  if (!nonce || !signature) return res.status(400).json({ error: 'nonce and signature required' });
+  try {
+    let recovered = null;
+    try {
+      recovered = ethers.verifyMessage(ownershipMessage(req.user.id, nonce), signature);
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+    if (!recovered || recovered.toLowerCase() !== addr.toLowerCase()) {
+      return res.status(400).json({ error: 'Signature does not match address' });
+    }
+    // Keep the (public) wallet link fresh and record the (private) proof.
+    await pool.query(
+      `INSERT INTO user_wallets (user_id, wallet_addr, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (user_id) DO UPDATE SET wallet_addr = EXCLUDED.wallet_addr, updated_at = now()`,
+      [req.user.id, addr]
+    );
+    await pool.query(
+      `INSERT INTO wallet_ownership_proofs (user_id, usernode_pubkey, wallet_addr, nonce, signature, verified_at)
+       VALUES ($1, $2, $3, $4, $5, now())
+       ON CONFLICT (user_id) DO UPDATE
+         SET usernode_pubkey = EXCLUDED.usernode_pubkey, wallet_addr = EXCLUDED.wallet_addr,
+             nonce = EXCLUDED.nonce, signature = EXCLUDED.signature, verified_at = now()`,
+      [req.user.id, req.user.usernode_pubkey || null, addr, nonce, signature]
+    );
+    res.json({ ok: true, verified: true });
+  } catch (err) {
+    console.error('[wallet] prove failed:', err.message);
+    res.status(500).json({ error: 'Failed to record ownership proof' });
+  }
+});
+
+// POST /api/wallet/disconnect — clear the ownership proof (server-side record of
+// "verified identity"). The public link row is left intact for tip lookups.
+app.post('/api/wallet/disconnect', async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM wallet_ownership_proofs WHERE user_id = $1`, [req.user.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[wallet] disconnect failed:', err.message);
+    res.status(500).json({ error: 'Failed to disconnect' });
+  }
+});
+
+// Helper: does this user have a verified ownership proof?
+async function walletIdentityVerified(userId) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM wallet_ownership_proofs WHERE user_id = $1`, [userId]
+  );
+  return rows.length > 0;
+}
+
+function newSessionId() {
+  return 'S' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function shapeSession(s) {
+  return {
+    sessionId:      s.id,
+    gameId:         s.game_id,
+    seed:           s.seed != null ? Number(s.seed) : null,
+    status:         s.status,
+    disputeReason:  s.dispute_reason || null,
+    finalScore:     s.final_score,
+    finalSteps:     s.final_steps,
+    finalTimeSecs:  s.final_time_secs,
+    chainHash:      s.final_chain_hash,
+    anchorStatus:   s.anchor_status,
+    anchorTxHash:   s.anchor_tx_hash,
+    username:       s.username,
+    usernodePubkey: s.usernode_pubkey,
+    createdAt:      s.created_at,
+    finishedAt:     s.finished_at,
+  };
+}
+
+// POST /api/dapp/sessions/start { gameId, seed? }
+// Claims a new verification session. Returns the genesis hash so the client can
+// build its hash chain against the same binding the server will recompute.
+app.post('/api/dapp/sessions/start', async (req, res) => {
+  const { gameId } = req.body || {};
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  if (!dapp.getEngine(gameId)) return res.status(400).json({ error: 'Game not yet supported by DApp Mode' });
+  let seed = Number.isFinite(req.body.seed) ? Math.round(req.body.seed) : null;
+  if (seed === null) seed = Math.floor(Math.random() * 0x7fffffff);
+  try {
+    const id = newSessionId();
+    await pool.query(
+      `INSERT INTO game_sessions (id, user_id, username, usernode_pubkey, game_id, seed, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
+      [id, req.user.id, req.user.username || null, req.user.usernode_pubkey || null, gameId, seed]
+    );
+    const genesisHash = dapp.genesisHash({ gameId, seed, pubkey: req.user.usernode_pubkey, sessionId: id });
+    res.json({ sessionId: id, seed, genesisHash });
+  } catch (err) {
+    console.error('[dapp] start failed:', err.message);
+    res.status(500).json({ error: 'Failed to start session' });
+  }
+});
+
+// POST /api/dapp/sessions/:id/append { entries:[{sequence,move,stateHash,prevHash,chainHash,tsClient}] }
+// Autosave ledger flush. Append-only; rejects a finished or foreign session
+// (mirrors the daily/progress immutability rule).
+app.post('/api/dapp/sessions/:id/append', async (req, res) => {
+  const { id } = req.params;
+  const entries = Array.isArray(req.body.entries) ? req.body.entries.slice(0, 500) : [];
+  try {
+    const { rows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    const s = rows[0];
+    if (s.user_id !== req.user.id) return res.status(403).json({ error: 'Not your session' });
+    if (s.status !== 'active') return res.status(409).json({ error: 'No active session to append to' });
+    for (const e of entries) {
+      if (!Number.isInteger(e.sequence) || !e.stateHash || !e.prevHash || !e.chainHash) continue;
+      await pool.query(
+        `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (session_id, sequence) DO NOTHING`,
+        [id, e.sequence, e.move != null ? JSON.stringify(e.move) : null,
+         e.stateHash, e.prevHash, e.chainHash, e.tsClient ? new Date(e.tsClient).toISOString() : null]
+      );
+    }
+    res.json({ ok: true, count: entries.length });
+  } catch (err) {
+    console.error('[dapp] append failed:', err.message);
+    res.status(500).json({ error: 'Failed to append' });
+  }
+});
+
+// POST /api/dapp/sessions/:id/finish { entries?, claimedScore, claimedSteps, claimedChainHash, timeSecs }
+// Runs validateSession over the (persisted + newly-supplied) ledger, settles the
+// session status, and returns the canonical chain hash for the client to anchor.
+app.post('/api/dapp/sessions/:id/finish', async (req, res) => {
+  const { id } = req.params;
+  const supplied = Array.isArray(req.body.entries) ? req.body.entries.slice(0, 500) : [];
+  const claimedScore     = Number.isFinite(req.body.claimedScore) ? Math.round(req.body.claimedScore) : null;
+  const claimedSteps     = Number.isFinite(req.body.claimedSteps) ? Math.round(req.body.claimedSteps) : null;
+  const claimedChainHash = typeof req.body.claimedChainHash === 'string' ? req.body.claimedChainHash : null;
+  const timeSecs         = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  try {
+    const { rows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    const s = rows[0];
+    if (s.user_id !== req.user.id) return res.status(403).json({ error: 'Not your session' });
+    if (s.status !== 'active') {
+      return res.json({ session: shapeSession(s), alreadyFinished: true });
+    }
+
+    // Persist any final entries the client flushed with the finish call.
+    for (const e of supplied) {
+      if (!Number.isInteger(e.sequence) || !e.stateHash || !e.prevHash || !e.chainHash) continue;
+      await pool.query(
+        `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (session_id, sequence) DO NOTHING`,
+        [id, e.sequence, e.move != null ? JSON.stringify(e.move) : null,
+         e.stateHash, e.prevHash, e.chainHash, e.tsClient ? new Date(e.tsClient).toISOString() : null]
+      );
+    }
+
+    // Load the full ordered ledger.
+    const { rows: stateRows } = await pool.query(
+      `SELECT sequence, move, state_hash, prev_hash, chain_hash, ts_client
+         FROM session_states WHERE session_id = $1 ORDER BY sequence ASC`,
+      [id]
+    );
+    const entries = stateRows.map(r => ({
+      sequence: r.sequence,
+      move: r.move,
+      stateHash: r.state_hash,
+      prevHash: r.prev_hash,
+      chainHash: r.chain_hash,
+      tsClient: r.ts_client,
+    }));
+
+    const session = { id: s.id, game_id: s.game_id, seed: Number(s.seed), usernode_pubkey: s.usernode_pubkey };
+    const verdict = dapp.validateSession(session, entries, {
+      score: claimedScore, steps: claimedSteps, chainHash: claimedChainHash,
+    });
+
+    if (verdict.status === 'verified') {
+      await pool.query(
+        `UPDATE game_sessions
+            SET status='verified', final_score=$2, final_steps=$3, final_time_secs=$4,
+                final_chain_hash=$5, finished_at=now()
+          WHERE id=$1 AND status='active'`,
+        [id, verdict.score, verdict.steps, timeSecs, verdict.finalChainHash]
+      );
+    } else {
+      await pool.query(
+        `UPDATE game_sessions
+            SET status='disputed', dispute_reason=$2, final_chain_hash=$3, finished_at=now()
+          WHERE id=$1 AND status='active'`,
+        [id, verdict.reason, verdict.finalChainHash]
+      );
+    }
+
+    const { rows: after } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [id]);
+    res.json({
+      status: verdict.status,
+      reason: verdict.reason,
+      chainHash: verdict.finalChainHash,
+      score: verdict.score,
+      steps: verdict.steps,
+      session: shapeSession(after[0]),
+    });
+  } catch (err) {
+    console.error('[dapp] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish session' });
+  }
+});
+
+// POST /api/dapp/sessions/:id/anchor/confirm { txHash, mock? }
+// Records the on-chain anchor tx (or a mock marker when the bridge/wallet is
+// unavailable). Never blocks settlement — best-effort.
+app.post('/api/dapp/sessions/:id/anchor/confirm', async (req, res) => {
+  const { id } = req.params;
+  const txHash = typeof req.body.txHash === 'string' ? req.body.txHash : null;
+  const mock = !!req.body.mock || IS_STAGING || !UTGO_CONTRACT_ADDRESS;
+  try {
+    const { rows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    if (rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Not your session' });
+    if (rows[0].status !== 'verified') return res.status(409).json({ error: 'Only verified sessions can be anchored' });
+    await pool.query(
+      `UPDATE game_sessions SET anchor_status=$2, anchor_tx_hash=$3 WHERE id=$1`,
+      [id, mock ? 'mock' : 'anchored', txHash]
+    );
+    const { rows: after } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [id]);
+    res.json({ ok: true, session: shapeSession(after[0]) });
+  } catch (err) {
+    console.error('[dapp] anchor confirm failed:', err.message);
+    res.status(500).json({ error: 'Failed to record anchor' });
+  }
+});
+
+// GET /api/dapp/sessions/:id — session receipt for the audit view.
+app.get('/api/dapp/sessions/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Session not found' });
+    const { rows: stateRows } = await pool.query(
+      `SELECT sequence, move, state_hash, prev_hash, chain_hash, ts_client
+         FROM session_states WHERE session_id = $1 ORDER BY sequence ASC LIMIT 200`,
+      [id]
+    );
+    res.json({
+      session: shapeSession(rows[0]),
+      ledger: stateRows.map(r => ({
+        sequence: r.sequence, move: r.move,
+        stateHash: r.state_hash, prevHash: r.prev_hash, chainHash: r.chain_hash, tsClient: r.ts_client,
+      })),
+    });
+  } catch (err) {
+    console.error('[dapp] get session failed:', err.message);
+    res.status(500).json({ error: 'Failed to load session' });
+  }
+});
+
+// GET /api/dapp/leaderboard/:gameId — verified-session leaderboard (Phase 0:
+// powers the "Verified" filter; ranked by score desc, then time asc).
+app.get('/api/dapp/leaderboard/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, username, usernode_pubkey, final_score, final_time_secs, final_chain_hash, anchor_status
+         FROM game_sessions
+        WHERE game_id = $1 AND status = 'verified' AND final_score IS NOT NULL
+        ORDER BY final_score DESC, final_time_secs ASC NULLS LAST, finished_at ASC
+        LIMIT 20`,
+      [gameId]
+    );
+    res.json({
+      entries: rows.map((r, i) => ({
+        rank: i + 1,
+        sessionId: r.id,
+        username: r.username,
+        score: r.final_score,
+        timeSecs: r.final_time_secs,
+        chainHash: r.final_chain_hash,
+        anchored: r.anchor_status === 'anchored' || r.anchor_status === 'mock',
+        verified: true,
+      })),
+    });
+  } catch (err) {
+    console.error('[dapp] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
 // landing page so stray visits to the staging URL don't reveal the app.
 app.get('*', (req, res) => {
   if (!req.user) {
@@ -4669,6 +5267,15 @@ app.get('*', (req, res) => {
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Fail fast if the DApp hash/replay contract regresses (cross-runtime
+// determinism is the framework's highest-risk dependency).
+try {
+  dapp.selfTest();
+  console.log('[dapp] verification self-test passed');
+} catch (e) {
+  console.error('[dapp] verification self-test FAILED:', e.message);
+}
 
 migrate()
   .then(() => app.listen(port, () => console.log(`Listening on :${port}`)))

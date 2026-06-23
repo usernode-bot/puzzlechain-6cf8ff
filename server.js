@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const ethers = require('ethers');
@@ -249,6 +250,43 @@ async function migrate() {
       games_played   INTEGER NOT NULL DEFAULT 0,
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // mancala_sessions is PUBLIC — transient game tokens, no sensitive data.
+  // One row per ZK proof session; status: pending|verified|rejected|expired.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mancala_sessions (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL,
+      commitment   TEXT NOT NULL,
+      difficulty   TEXT,
+      status       TEXT NOT NULL DEFAULT 'pending',
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      verified_at  TIMESTAMPTZ
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_mancala_sessions_user
+    ON mancala_sessions(user_id, created_at DESC)
+  `);
+
+  // mancala_scores is PUBLIC — global leaderboard for verified AI-mode wins.
+  // One row per (user_id, difficulty); upserted with GREATEST so worse runs
+  // never overwrite a personal best.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mancala_scores (
+      user_id        TEXT NOT NULL,
+      username       TEXT,
+      difficulty     TEXT NOT NULL,
+      best_score     INTEGER NOT NULL DEFAULT 0,
+      best_margin    INTEGER,
+      best_moves     INTEGER,
+      best_time_secs INTEGER,
+      games_played   INTEGER NOT NULL DEFAULT 0,
+      wins           INTEGER NOT NULL DEFAULT 0,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, difficulty)
     )
   `);
 
@@ -969,6 +1007,65 @@ async function migrate() {
          VALUES ($1, $2, 'tilematchingdaily', $3, $4, 72, $5, now() - interval '1 hour')
          ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
         [uid, uname, today, score, timeSecs]
+      );
+    }
+  }
+
+  // Mancala ZK leaderboard staging seeds: 3 session rows (one per status) and
+  // 15 score rows (5 per difficulty) so the leaderboard tabs render with data.
+  // Idempotent; no-op in production.
+  if (IS_STAGING) {
+    // Sessions — exercise pending / verified / rejected states in the UI
+    await pool.query(`
+      INSERT INTO mancala_sessions
+        (id, user_id, commitment, difficulty, status, created_at, verified_at)
+      VALUES
+        ('MNCSESS1', 'staging-demo-user',
+         'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+         'hard', 'verified',
+         now() - interval '30 minutes', now() - interval '29 minutes'),
+        ('MNCSESS2', 'staging-demo-user',
+         'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3',
+         'medium', 'rejected',
+         now() - interval '1 hour', null),
+        ('MNCSESS3', 'staging-mnc-seeder',
+         'c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+         'easy', 'pending',
+         now() - interval '5 minutes', null)
+      ON CONFLICT (id) DO NOTHING
+    `);
+
+    // Hard-mode leaderboard seed
+    const mncHard = [
+      ['mnc-h1', 'staging-mnc-hard-ace', 'hard', 680, 20, 24, 62],
+      ['mnc-h2', 'staging-mnc-hard-pro', 'hard', 520, 14, 28, 75],
+      ['mnc-h3', 'staging-mnc-hard-mid', 'hard', 410, 10, 32, 88],
+      ['mnc-h4', 'staging-mnc-hard-fan', 'hard', 280,  6, 36, 105],
+      ['mnc-h5', 'staging-mnc-hard-new', 'hard', 170,  3, 41, 115],
+    ];
+    // Medium-mode leaderboard seed
+    const mncMed = [
+      ['mnc-m1', 'staging-mnc-med-ace',  'medium', 750, 22, 22, 58],
+      ['mnc-m2', 'staging-mnc-med-pro',  'medium', 580, 16, 26, 70],
+      ['mnc-m3', 'staging-mnc-med-mid',  'medium', 430, 11, 30, 85],
+      ['mnc-m4', 'staging-mnc-med-fan',  'medium', 310,  7, 34, 98],
+      ['mnc-m5', 'staging-mnc-med-new',  'medium', 200,  4, 39, 110],
+    ];
+    // Easy-mode leaderboard seed (wider margins since AI plays randomly)
+    const mncEasy = [
+      ['mnc-e1', 'staging-mnc-easy-ace', 'easy', 900, 26, 20, 52],
+      ['mnc-e2', 'staging-mnc-easy-pro', 'easy', 710, 19, 23, 65],
+      ['mnc-e3', 'staging-mnc-easy-mid', 'easy', 510, 13, 28, 79],
+      ['mnc-e4', 'staging-mnc-easy-fan', 'easy', 370,  9, 33, 92],
+      ['mnc-e5', 'staging-mnc-easy-new', 'easy', 200,  4, 38, 108],
+    ];
+    for (const [uid, uname, diff, score, margin, moves, secs] of [...mncHard, ...mncMed, ...mncEasy]) {
+      await pool.query(
+        `INSERT INTO mancala_scores
+           (user_id, username, difficulty, best_score, best_margin, best_moves, best_time_secs, games_played, wins)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 5, 3)
+         ON CONFLICT (user_id, difficulty) DO NOTHING`,
+        [uid, uname, diff, score, margin, moves, secs]
       );
     }
   }
@@ -2270,6 +2367,269 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
   } catch (err) {
     console.error('[mancala] move failed:', err.message);
     res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// ---- Mancala ZK leaderboard API ------------------------------------------
+
+const MNC_SESSION_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+function generateMncSessionId() {
+  let id = '';
+  const bytes = crypto.randomBytes(12);
+  for (let i = 0; i < 12; i++) {
+    id += MNC_SESSION_ALPHABET[bytes[i] % MNC_SESSION_ALPHABET.length];
+  }
+  return id;
+}
+
+const VALID_MNC_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+const MNC_LB_LIMIT = 20;
+// Server-side score formula — must mirror the client constant in MancalaAIGame.
+function mncComputeScore(finalPits) {
+  return Math.max((finalPits[6] - finalPits[13]) * 15, 50);
+}
+
+// Register a new ZK session: client commits to game state before playing.
+app.post('/api/mancala/score/start', async (req, res) => {
+  const { commitment, difficulty } = req.body;
+  if (typeof commitment !== 'string' || commitment.length < 10) {
+    return res.status(400).json({ error: 'commitment is required' });
+  }
+  if (!VALID_MNC_DIFFICULTIES.has(difficulty)) {
+    return res.status(400).json({ error: 'difficulty must be easy, medium, or hard' });
+  }
+  try {
+    const sessionId = generateMncSessionId();
+    await pool.query(
+      `INSERT INTO mancala_sessions (id, user_id, commitment, difficulty)
+       VALUES ($1, $2, $3, $4)`,
+      [sessionId, req.user.id, commitment, difficulty]
+    );
+    res.json({ sessionId });
+  } catch (err) {
+    console.error('[mancala-zk] start failed:', err.message);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+// Verify the move log, compute server-side score, upsert personal best.
+// Score formula mirrors client: Math.max((finalPits[6] - finalPits[13]) * 15 - timeSecs, 50)
+app.post('/api/mancala/score/verify', async (req, res) => {
+  const { sessionId, nonce, moveLog, finalPits, timeSecs } = req.body;
+  if (typeof sessionId !== 'string' || typeof nonce !== 'string') {
+    return res.status(400).json({ error: 'sessionId and nonce are required' });
+  }
+  if (!Array.isArray(moveLog) || moveLog.length === 0 || moveLog.length > 200) {
+    return res.status(400).json({ error: 'moveLog must be a non-empty array of ≤200 moves' });
+  }
+  if (!Array.isArray(finalPits) || finalPits.length !== 14) {
+    return res.status(400).json({ error: 'finalPits must be a 14-element array' });
+  }
+  const tSecs = typeof timeSecs === 'number' ? Math.round(timeSecs) : null;
+  if (tSecs === null || tSecs < 0) {
+    return res.status(400).json({ error: 'timeSecs is required' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM mancala_sessions WHERE id = $1`,
+      [sessionId]
+    );
+    if (rows.length === 0) return res.status(404).json({ verified: false, reason: 'session_not_found' });
+    const sess = rows[0];
+    if (sess.user_id !== req.user.id) return res.status(403).json({ verified: false, reason: 'not_your_session' });
+    if (sess.status !== 'pending') return res.status(409).json({ verified: false, reason: 'session_already_used' });
+
+    // Check session age (max 2 hours)
+    const ageMs = Date.now() - new Date(sess.created_at).getTime();
+    if (ageMs > 7200 * 1000) {
+      await pool.query(`UPDATE mancala_sessions SET status = 'expired' WHERE id = $1`, [sessionId]);
+      return res.status(409).json({ verified: false, reason: 'session_expired' });
+    }
+
+    // Verify commitment: SHA-256(nonce + "||" + JSON(initBoard))
+    const initBoard = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
+    const expectedCommitment = crypto.createHash('sha256')
+      .update(nonce + '||' + JSON.stringify(initBoard))
+      .digest('hex');
+    if (expectedCommitment !== sess.commitment) {
+      await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+      return res.json({ verified: false, reason: 'commitment_mismatch' });
+    }
+
+    // Replay the full game from initBoard using the submitted move log.
+    // Each move must be valid for the current player; we track currentPlayer.
+    let pits = initBoard.slice();
+    let currentPlayer = 1;
+    for (let i = 0; i < moveLog.length; i++) {
+      const pitIdx = moveLog[i];
+      if (typeof pitIdx !== 'number' || !Number.isFinite(pitIdx)) {
+        await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+        return res.json({ verified: false, reason: 'invalid_move_type' });
+      }
+      const ownMin = currentPlayer === 1 ? 0 : 7;
+      const ownMax = currentPlayer === 1 ? 5 : 12;
+      if (pitIdx < ownMin || pitIdx > ownMax || pits[pitIdx] === 0) {
+        await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+        return res.json({ verified: false, reason: `illegal_move_at_index_${i}` });
+      }
+      const result = srvMncApplyMove(pits, pitIdx, currentPlayer);
+      pits = result.pits;
+      if (result.gameOver) {
+        // Game should be over — remaining moves in log are unexpected
+        if (i < moveLog.length - 1) {
+          await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+          return res.json({ verified: false, reason: 'moves_after_game_over' });
+        }
+        break;
+      }
+      currentPlayer = result.nextPlayer;
+    }
+
+    // Check final board matches and player won
+    for (let j = 0; j < 14; j++) {
+      if (pits[j] !== finalPits[j]) {
+        await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+        return res.json({ verified: false, reason: 'final_pits_mismatch' });
+      }
+    }
+    if (pits[6] <= pits[13]) {
+      await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+      return res.json({ verified: false, reason: 'player_did_not_win' });
+    }
+
+    // Compute server-side score (mirrors client formula)
+    const margin = pits[6] - pits[13];
+    const score = Math.max(margin * 15 - tSecs, 50);
+    const diff = sess.difficulty;
+    const moves = moveLog.length;
+
+    // Get previous best for achievement check
+    const { rows: prevRows } = await pool.query(
+      `SELECT best_score FROM mancala_scores WHERE user_id = $1 AND difficulty = $2`,
+      [req.user.id, diff]
+    );
+    const prevBest = prevRows.length > 0 ? prevRows[0].best_score : null;
+
+    // Upsert personal best — GREATEST so worse runs never overwrite better ones
+    const { rows: updated } = await pool.query(
+      `INSERT INTO mancala_scores
+         (user_id, username, difficulty, best_score, best_margin, best_moves, best_time_secs,
+          games_played, wins, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, 1, now())
+       ON CONFLICT (user_id, difficulty) DO UPDATE SET
+         username       = EXCLUDED.username,
+         best_margin    = CASE WHEN EXCLUDED.best_score > mancala_scores.best_score
+                               THEN EXCLUDED.best_margin ELSE mancala_scores.best_margin END,
+         best_moves     = CASE WHEN EXCLUDED.best_score > mancala_scores.best_score
+                               THEN EXCLUDED.best_moves  ELSE mancala_scores.best_moves  END,
+         best_time_secs = CASE WHEN EXCLUDED.best_score > mancala_scores.best_score
+                               THEN EXCLUDED.best_time_secs ELSE mancala_scores.best_time_secs END,
+         best_score     = GREATEST(mancala_scores.best_score, EXCLUDED.best_score),
+         games_played   = mancala_scores.games_played + 1,
+         wins           = mancala_scores.wins + 1,
+         updated_at     = now()
+       RETURNING best_score, updated_at`,
+      [req.user.id, req.user.username || null, diff, score, margin, moves, tSecs]
+    );
+    const me = updated[0];
+
+    // Mark session verified
+    await pool.query(
+      `UPDATE mancala_sessions SET status = 'verified', verified_at = now() WHERE id = $1`,
+      [sessionId]
+    );
+
+    // Update user stats snapshot
+    await pool.query(
+      `UPDATE user_stats_snapshot
+         SET total_score = total_score + $2,
+             classics_played = classics_played + 1,
+             last_win_at = now(),
+             updated_at = now()
+       WHERE user_id = $1`,
+      [req.user.id, score]
+    );
+
+    // Achievement for personal best
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', 'mancala', $2, $3)`,
+        [req.user.id, score, JSON.stringify({ previousBest: prevBest, difficulty: diff })]
+      );
+    }
+
+    // Caller's current rank within this difficulty
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM mancala_scores
+        WHERE difficulty = $1
+          AND (best_score > $2 OR (best_score = $2 AND updated_at < $3))`,
+      [diff, me.best_score, me.updated_at]
+    );
+
+    res.json({ verified: true, score, rank: Number(rankRows[0].rank) });
+  } catch (err) {
+    console.error('[mancala-zk] verify failed:', err.message);
+    res.status(500).json({ error: 'Failed to verify session' });
+  }
+});
+
+// Global Mancala leaderboard — top 20 per difficulty + caller's own standing.
+const VALID_MNC_LB_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+app.get('/api/mancala/leaderboard', async (req, res) => {
+  const diff = req.query.difficulty || 'hard';
+  if (!VALID_MNC_LB_DIFFICULTIES.has(diff)) {
+    return res.status(400).json({ error: 'difficulty must be easy, medium, or hard' });
+  }
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score, best_margin, best_time_secs,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM mancala_scores
+        WHERE difficulty = $1
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $2`,
+      [diff, MNC_LB_LIMIT]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT best_score, best_margin, best_time_secs, updated_at
+         FROM mancala_scores
+        WHERE user_id = $1 AND difficulty = $2`,
+      [req.user.id, diff]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM mancala_scores
+          WHERE difficulty = $1
+            AND (best_score > $2 OR (best_score = $2 AND updated_at < $3))`,
+        [diff, row.best_score, row.updated_at]
+      );
+      me = {
+        rank: Number(rankRows[0].rank),
+        username: req.user.username || null,
+        bestScore: row.best_score,
+        bestMargin: row.best_margin,
+        bestTimeSecs: row.best_time_secs,
+      };
+    }
+
+    res.json({
+      top: top.map(r => ({
+        rank: Number(r.rank),
+        username: r.username,
+        bestScore: r.best_score,
+        bestMargin: r.best_margin,
+        bestTimeSecs: r.best_time_secs,
+      })),
+      me,
+    });
+  } catch (err) {
+    console.error('[mancala-zk] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
 

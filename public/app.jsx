@@ -5903,6 +5903,131 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   Mancala ZK helpers (commit-reveal proof, browser-side)
+   ============================================================ */
+async function mncStartSession(difficulty) {
+  try {
+    const nonceBytes = new Uint8Array(16);
+    window.crypto.getRandomValues(nonceBytes);
+    const nonceHex = Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const initBoard = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
+    const msgBuf = new TextEncoder().encode(nonceHex + '||' + JSON.stringify(initBoard));
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', msgBuf);
+    const commitment = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    const { ok, body } = await api('/api/mancala/score/start', {
+      method: 'POST',
+      body: JSON.stringify({ commitment, difficulty }),
+    });
+    if (ok && body && body.sessionId) {
+      return { sessionId: body.sessionId, nonce: nonceHex };
+    }
+    return null;
+  } catch { return null; }
+}
+
+async function mncVerifySession(sessionId, nonce, moveLog, finalPits, timeSecs) {
+  try {
+    const { ok, body } = await api('/api/mancala/score/verify', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, nonce, moveLog, finalPits, timeSecs }),
+    });
+    if (ok && body) return body;
+    return { verified: false, reason: 'network_error' };
+  } catch { return { verified: false, reason: 'network_error' }; }
+}
+
+/* ============================================================
+   Mancala Leaderboard component (used inside AI game tab)
+   ============================================================ */
+function MncLeaderboard() {
+  const [diff, setDiff]       = useState('hard');
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    api('/api/mancala/leaderboard?difficulty=' + diff)
+      .then(({ ok, body }) => {
+        if (ok && body) setData(body);
+        else setError(true);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [diff]);
+
+  const fmtSecs = s => {
+    if (!s && s !== 0) return '—';
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+
+  const tabs = ['easy', 'medium', 'hard'];
+  const meInTop = data && data.me && data.top && data.top.some(r => r.rank === data.me.rank);
+
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+        {tabs.map(t => (
+          <button
+            key={t}
+            className={'mnc-difficulty-pill' + (diff === t ? ' active' : '')}
+            onClick={() => setDiff(t)}
+            style={{ textTransform: 'capitalize' }}
+          >{t}</button>
+        ))}
+      </div>
+      {loading && <div style={{ textAlign: 'center', color: C.muted, padding: '1rem', fontSize: '0.85rem' }}>Loading…</div>}
+      {error && <div style={{ textAlign: 'center', color: C.rose, padding: '1rem', fontSize: '0.85rem' }}>Could not load leaderboard.</div>}
+      {!loading && !error && data && (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem', fontSize: '0.75rem', color: C.muted, padding: '0 0.25rem 0.3rem', borderBottom: `1px solid ${C.border}` }}>
+            <span>#</span><span>Player</span><span>Score</span><span>Time</span>
+          </div>
+          {data.top.length === 0 && (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '1.25rem', fontSize: '0.85rem' }}>No scores yet — be the first!</div>
+          )}
+          {data.top.map((row, i) => {
+            const isMe = data.me && row.rank === data.me.rank;
+            return (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem',
+                padding: '0.4rem 0.25rem', fontSize: '0.82rem',
+                borderBottom: `1px solid ${C.border}22`,
+                background: isMe ? C.accent + '18' : 'transparent',
+                borderRadius: isMe ? '6px' : '0',
+              }}>
+                <span style={{ color: row.rank <= 3 ? C.gold : C.muted, fontWeight: row.rank <= 3 ? 700 : 400 }}>{row.rank}</span>
+                <span style={{ color: isMe ? C.accent : C.text, fontWeight: isMe ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.username || '—'}</span>
+                <span style={{ color: C.gold, fontFamily: 'monospace' }}>{row.bestScore}</span>
+                <span style={{ color: C.muted }}>{fmtSecs(row.bestTimeSecs)}</span>
+              </div>
+            );
+          })}
+          {data.me && !meInTop && (
+            <div>
+              <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.7rem', padding: '0.2rem 0' }}>…</div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem',
+                padding: '0.4rem 0.25rem', fontSize: '0.82rem',
+                background: C.accent + '18', borderRadius: '6px',
+              }}>
+                <span style={{ color: C.accent, fontWeight: 600 }}>{data.me.rank}</span>
+                <span style={{ color: C.accent, fontWeight: 600 }}>{data.me.username || 'You'}</span>
+                <span style={{ color: C.gold, fontFamily: 'monospace' }}>{data.me.bestScore}</span>
+                <span style={{ color: C.muted }}>{fmtSecs(data.me.bestTimeSecs)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Game 5b — Mancala AI variant (human P1 vs AI P2)
    ============================================================ */
 function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
@@ -5917,6 +6042,10 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const [aiThinking, setAiThinking]     = useState(false);
   const [history, setHistory]           = useState(() => mncLoadHistory());
   const [soundOn, setSoundOn]           = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
+  const [activeTab, setActiveTab]       = useState('game');
+  // ZK session state
+  const [verifying, setVerifying]       = useState(false);
+  const [verified, setVerified]         = useState(null); // null | true | false
 
   const animatingRef  = useRef(false);
   const soundOnRef    = useRef(soundOn);
@@ -5924,6 +6053,10 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const applyMoveRef  = useRef(null);
   const pitsRef       = useRef(pits);
   const movesRef      = useRef(moves);
+  // ZK proof refs
+  const sessionIdRef  = useRef(null);
+  const nonceRef      = useRef(null);
+  const moveLogRef    = useRef([]);
   soundOnRef.current  = soundOn;
   pitsRef.current     = pits;
   movesRef.current    = moves;
@@ -5931,6 +6064,17 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
   secsRef.current = secs;
+
+  const startSession = async () => {
+    sessionIdRef.current = null;
+    nonceRef.current = null;
+    moveLogRef.current = [];
+    const result = await mncStartSession(difficulty);
+    if (result) {
+      sessionIdRef.current = result.sessionId;
+      nonceRef.current = result.nonce;
+    }
+  };
 
   useEffect(() => { resetGame(); }, [resetKey]);
 
@@ -5946,7 +6090,12 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     setCaptureFlash(new Set());
     setBannerMsg('');
     setAiThinking(false);
+    setVerifying(false);
+    setVerified(null);
+    startSession();
   };
+
+  useEffect(() => { startSession(); }, []);
 
   const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
     const p = newPits.slice();
@@ -5980,13 +6129,46 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
       };
       mncSaveEntry(entry);
       setHistory(mncLoadHistory());
-      winTimerRef.current = setTimeout(() => {
-        winTimerRef.current = null;
-        setBannerMsg('');
-        const base = Math.max(Math.abs(p[6] - p[13]) * 15 - secsRef.current, 50);
-        const share = `Mancala vs AI (${difficulty}) — 🫘 You ${p[6]} · AI ${p[13]} · ${newMoves} moves · ${secsRef.current}s`;
-        onWin(w === 1 ? base : w === 'draw' ? 50 : 0, newMoves, secsRef.current, { winner: w, share });
-      }, 1500);
+
+      // ZK verify on player win, then fire onWin
+      const finalSecs = secsRef.current;
+      const base = Math.max(Math.abs(p[6] - p[13]) * 15 - finalSecs, 50);
+      const share = `Mancala vs AI (${difficulty}) — 🫘 You ${p[6]} · AI ${p[13]} · ${newMoves} moves · ${finalSecs}s`;
+
+      if (w === 1 && sessionIdRef.current && nonceRef.current) {
+        setVerifying(true);
+        const sid = sessionIdRef.current;
+        const nonce = nonceRef.current;
+        const log = moveLogRef.current.slice();
+        const fp = p.slice();
+        // Race: verify within 3s max, then proceed regardless
+        const verifyTimeout = setTimeout(() => {
+          setVerifying(false);
+          setVerified(false);
+          winTimerRef.current = setTimeout(() => {
+            winTimerRef.current = null;
+            setBannerMsg('');
+            onWin(base, newMoves, finalSecs, { winner: w, share, verified: false });
+          }, 500);
+        }, 3000);
+        mncVerifySession(sid, nonce, log, fp, finalSecs).then(result => {
+          clearTimeout(verifyTimeout);
+          setVerifying(false);
+          const ok = result && result.verified;
+          setVerified(ok);
+          winTimerRef.current = setTimeout(() => {
+            winTimerRef.current = null;
+            setBannerMsg('');
+            onWin(ok ? (result.score || base) : base, newMoves, finalSecs, { winner: w, share, verified: ok });
+          }, 600);
+        });
+      } else {
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          setBannerMsg('');
+          onWin(w === 1 ? base : w === 'draw' ? 50 : 0, newMoves, finalSecs, { winner: w, share, verified: false });
+        }, 1500);
+      }
     } else if (extraTurn) {
       setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
       setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
@@ -6002,6 +6184,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     if (curPits[idx] === 0) return;
     const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(curPits, idx, currentPlayer);
     const newMoves = movesRef.current + 1;
+    moveLogRef.current.push(idx);
     animatingRef.current = true;
     const working = curPits.slice();
     working[idx] = 0;
@@ -6088,6 +6271,12 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
           <div className="plabel">Diff</div>
           <div className="pvalue" style={{ fontSize: '0.8rem', textTransform: 'capitalize' }}>{difficulty}</div>
         </div>
+        <div className="pill">
+          <div className="plabel">ZK</div>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
+          </div>
+        </div>
       </div>
 
       <div style={{
@@ -6138,14 +6327,32 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
         </button>
       </div>
 
-      {aiHistory.length > 0 && (
-        <div className="mnc-stats-grid" style={{ marginTop: '1rem' }}>
+      <div style={{ display: 'flex', gap: '0', marginTop: '1.25rem', borderBottom: `1px solid ${C.border}` }}>
+        {['game', 'leaderboard'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              flex: 1, padding: '0.45rem', fontSize: '0.82rem', fontWeight: activeTab === tab ? 700 : 400,
+              background: 'none', border: 'none', borderBottom: activeTab === tab ? `2px solid ${C.accent}` : '2px solid transparent',
+              color: activeTab === tab ? C.accent : C.muted, cursor: 'pointer', textTransform: 'capitalize',
+            }}
+          >{tab === 'game' ? '📊 Stats' : '🏆 Leaderboard'}</button>
+        ))}
+      </div>
+
+      {activeTab === 'game' && aiHistory.length > 0 && (
+        <div className="mnc-stats-grid" style={{ marginTop: '0.75rem' }}>
           <div className="mnc-stat-card"><div className="mnc-stat-val">{stats.total}</div><div className="mnc-stat-lbl">Games</div></div>
           <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: p1Color }}>{stats.wins}</div><div className="mnc-stat-lbl">Wins</div></div>
           <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: p2Color }}>{stats.losses}</div><div className="mnc-stat-lbl">Losses</div></div>
           <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: C.muted }}>{stats.draws}</div><div className="mnc-stat-lbl">Draws</div></div>
         </div>
       )}
+      {activeTab === 'game' && aiHistory.length === 0 && (
+        <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.82rem', padding: '1rem 0' }}>No games yet — play one!</div>
+      )}
+      {activeTab === 'leaderboard' && <MncLeaderboard />}
     </div>
   );
 }
@@ -6326,7 +6533,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 
   const modes = [
     { id: 'local',  icon: '👥', name: 'Local 2-Player', desc: 'Pass and play on this device' },
-    { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer' },
+    { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer', ranked: true },
     { id: 'online', icon: '🌐', name: 'Online',          desc: 'Play with a friend via room code' },
   ];
 
@@ -6342,8 +6549,11 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
         <button key={m.id} className={'mnc-mode-btn' + (mode === m.id ? ' active' : '')} onClick={() => { setMode(m.id); setJoinError(''); }}>
           <span className="mnc-mode-icon">{m.icon}</span>
           <span className="mnc-mode-text">
-            <span className="mnc-mode-name">{m.name}</span>
-            <span className="mnc-mode-desc">{m.desc}</span>
+            <span className="mnc-mode-name">
+              {m.name}
+              {m.ranked && <span style={{ marginLeft: '0.4rem', fontSize: '0.68rem', background: C.gold + '33', color: C.gold, border: `1px solid ${C.gold}55`, borderRadius: '999px', padding: '0.1rem 0.4rem', verticalAlign: 'middle', fontWeight: 700 }}>🏆 Ranked</span>}
+            </span>
+            <span className="mnc-mode-desc">{m.desc}{m.ranked ? ' — wins post to leaderboard' : ''}</span>
           </span>
         </button>
       ))}

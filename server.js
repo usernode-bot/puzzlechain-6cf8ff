@@ -541,7 +541,7 @@ async function migrate() {
 
   // tilematch_tokens is PUBLIC: off-chain MATCH token balance per user.
   // Server enforces balance >= 0 on every write.
-  _step = 'tilematch_tokens';
+  _step = 'tilematch_tokens_create';
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tilematch_tokens (
       user_id    TEXT PRIMARY KEY,
@@ -551,8 +551,11 @@ async function migrate() {
     )
   `);
 
+  _step = 'tilematch_tokens_alter_balance_points';
   await pool.query(`ALTER TABLE tilematch_tokens ADD COLUMN IF NOT EXISTS balance_points INTEGER NOT NULL DEFAULT 0`);
+  _step = 'tilematch_tokens_alter_balance_stable';
   await pool.query(`ALTER TABLE tilematch_tokens ADD COLUMN IF NOT EXISTS balance_stable NUMERIC(12,2) NOT NULL DEFAULT 0.00`);
+  _step = 'tilematch_tokens_alter_is_vip';
   await pool.query(`ALTER TABLE tilematch_tokens ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false`);
 
   // tilematch_daily_tasks is PUBLIC: per-user per-day task progress.
@@ -596,13 +599,19 @@ async function migrate() {
     )
   `);
 
+  _step = 'tilematch_duels_alter_currency_type';
   await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS currency_type TEXT NOT NULL DEFAULT 'match'`);
+  _step = 'tilematch_duels_alter_stake_points';
   await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS stake_points INTEGER`);
+  _step = 'tilematch_duels_alter_stake_stable';
   await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS stake_stable NUMERIC(12,2)`);
+  _step = 'tilematch_duels_alter_session_id_p1';
   await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS session_id_p1 TEXT`);
+  _step = 'tilematch_duels_alter_session_id_p2';
   await pool.query(`ALTER TABLE tilematch_duels ADD COLUMN IF NOT EXISTS session_id_p2 TEXT`);
 
   // tilematch_game_sessions is PUBLIC: server-side anti-cheat timing for Points/Stable duels and tournaments.
+  _step = 'tilematch_game_sessions_create';
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tilematch_game_sessions (
       id            TEXT PRIMARY KEY,
@@ -624,6 +633,7 @@ async function migrate() {
   `);
 
   // tilematch_tournaments is PUBLIC: daily/weekly/monthly tournament metadata.
+  _step = 'tilematch_tournaments_create';
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tilematch_tournaments (
       id                  TEXT PRIMARY KEY,
@@ -640,10 +650,11 @@ async function migrate() {
       updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  _step = 'tilematch_tournaments_alter_updated_at';
   await pool.query(`ALTER TABLE tilematch_tournaments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
 
   // tilematch_tournament_entries is PUBLIC: one entry per user per tournament.
-  _step = 'tilematch_tournament_entries';
+  _step = 'tilematch_tournament_entries_create';
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tilematch_tournament_entries (
       id              TEXT PRIMARY KEY,
@@ -728,7 +739,7 @@ async function migrate() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_session_states_session ON session_states(session_id, sequence)`);
 
   if (IS_STAGING) {
-    _step = 'staging_pvp_seeds';
+    _step = 'staging_pvp_wait';
     // PvP staging seeds: three match states for UI testing.
     await pool.query(`
       INSERT INTO pvp_matches
@@ -780,6 +791,7 @@ async function migrate() {
 
     // Social staging seeds: create demo users with follow relationships,
     // stats, and achievements. Idempotent, no-op in production.
+    _step = 'staging_social_users';
     const demoUsers = [
       { id: 'staging-demo-user', username: 'staging-demo-user' },
       { id: 'staging-alice', username: 'staging-alice' },
@@ -857,6 +869,7 @@ async function migrate() {
 
     // Wallet staging seeds — user_wallets is private (schema-only in staging), so
     // we seed fake wallet addresses for demo users so tip/profile flows have targets.
+    _step = 'staging_social_wallets';
     const walletSeeds = [
       ['staging-demo-user', '0xDEAD000000000000000000000000000000000001'],
       ['staging-alice',     '0xDEAD000000000000000000000000000000000002'],
@@ -906,6 +919,7 @@ async function migrate() {
       );
     }
 
+    _step = 'staging_social_posts';
     // Seed posts from demo users with varied games
     const posts = [
       ['staging-demo-user', 'sudoku', 980, 17, 132, 'Finally beat my PB! 🎉'],
@@ -986,6 +1000,7 @@ async function migrate() {
   // Staging seeds for mancala_rooms so testers can exercise all states
   // without needing a second device. Strictly a no-op in production.
   if (IS_STAGING) {
+    _step = 'staging_mancala_seeds';
     const initPits = JSON.stringify([4,4,4,4,4,4,0,4,4,4,4,4,4,0]);
     const finishedPits = JSON.stringify([0,0,0,0,0,0,32,0,0,0,0,0,0,16]);
     const midPits = JSON.stringify([0,0,0,0,0,1,28,2,2,2,2,2,2,5]);
@@ -1079,7 +1094,7 @@ async function migrate() {
   // Tilematch Puzzle staging seeds: populate leaderboard, wallet, tasks, duels,
   // and daily attempts for the daily leaderboard tab. All idempotent; no-op in prod.
   if (IS_STAGING) {
-    _step = 'staging_tilematch_seeds';
+    _step = 'staging_tilematch_scores';
     // Global leaderboard — 5 fake users with spread of highest levels
     const tmScoreSeed = [
       ['tm-demo-1', 'staging-tm-legend',  480, 510, 12400],
@@ -1100,6 +1115,7 @@ async function migrate() {
 
     // Wallet: give staging-demo-user 500 MATCH tokens + economy balances.
     // DO UPDATE so balances are reset to known values on every staging boot.
+    _step = 'staging_tilematch_tokens_demo';
     await pool.query(
       `INSERT INTO tilematch_tokens (user_id, username, balance, balance_points, balance_stable, is_vip)
        VALUES ('staging-demo-user', 'staging-demo-user', 500, 1500, 25.00, false)
@@ -1111,6 +1127,7 @@ async function migrate() {
          updated_at = now()`
     );
     // staging-demo-vip: VIP account for VIP panel demo
+    _step = 'staging_tilematch_tokens_vip';
     await pool.query(
       `INSERT INTO tilematch_tokens (user_id, username, balance, balance_points, balance_stable, is_vip)
        VALUES ('staging-demo-vip', 'staging-demo-vip', 200, 3000, 50.00, true)
@@ -1123,6 +1140,7 @@ async function migrate() {
     );
 
     // Daily tasks for staging-demo-user: one completable, one in-progress, one not started
+    _step = 'staging_tilematch_daily_tasks';
     const today = new Date().toISOString().slice(0, 10);
     await pool.query(
       `INSERT INTO tilematch_daily_tasks (user_id, task_date, task_id, progress)
@@ -1134,12 +1152,14 @@ async function migrate() {
     );
 
     // Duels: one waiting, one finished
+    _step = 'staging_tilematch_duel_wait';
     await pool.query(
       `INSERT INTO tilematch_duels
          (id, player1_id, player1_name, stake_tokens, status)
        VALUES ('TMWAIT1', 'staging-demo-user', 'staging-demo-user', 10, 'waiting')
        ON CONFLICT (id) DO NOTHING`
     );
+    _step = 'staging_tilematch_duel_fini';
     await pool.query(
       `INSERT INTO tilematch_duels
          (id, player1_id, player2_id, player1_name, player2_name,
@@ -1155,6 +1175,7 @@ async function migrate() {
     );
 
     // Daily attempts for daily leaderboard tab
+    _step = 'staging_tilematch_daily_attempts';
     const dailySeeds = [
       ['staging-alice',   'staging-alice',   85,  960],
       ['staging-bob',     'staging-bob',    112,  840],
@@ -1174,6 +1195,7 @@ async function migrate() {
     // One VERIFIED + (mock-)ANCHORED tilematchingdaily session for the viewer,
     // with a real recomputed hash-chain ledger, so the Verified badge, the
     // session receipt, and the anchor link are demonstrable on a fresh DB.
+    _step = 'staging_dapp_ok_session';
     const okSession = {
       id: 'DAPPDEMOOK', game_id: 'tilematchingdaily', seed: 12345,
       usernode_pubkey: 'ut1stagingdemo',
@@ -1197,6 +1219,7 @@ async function migrate() {
       [okSession.id, okSession.usernode_pubkey, okSession.game_id, okSession.seed,
        okLedger.entries.length, okLedger.finalChainHash]
     );
+    _step = 'staging_dapp_ok_ledger';
     for (const e of okLedger.entries) {
       await pool.query(
         `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
@@ -1208,6 +1231,7 @@ async function migrate() {
 
     // One DISPUTED session (anti-cheat rejection) so the "couldn't be verified"
     // state and the audit trail are demonstrable.
+    _step = 'staging_dapp_bad_session';
     await pool.query(
       `INSERT INTO game_sessions
          (id, user_id, username, usernode_pubkey, game_id, seed, status, dispute_reason,
@@ -1220,6 +1244,7 @@ async function migrate() {
     // A handful of VERIFIED leaderboard sessions — one Tier A game
     // (tilematchingdaily) and one Tier B game (zuma) — so the Verified filter
     // and ranking are visible. "Staging demo …" labelled, obviously fake.
+    _step = 'staging_dapp_leaderboard';
     const demoBoard = [
       ['DAPPLBADA',  'Staging demo Ada',  'tilematchingdaily', 11, 980, 62],
       ['DAPPLBBORG', 'Staging demo Borg', 'tilematchingdaily', 12, 910, 70],

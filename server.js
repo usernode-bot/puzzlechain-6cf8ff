@@ -5565,10 +5565,10 @@ app.post('/api/tilematch/duel/:duelId/forfeit', async (req, res) => {
     if (opponentId && d.status === 'active') {
       const prize = Math.floor(d.stake_tokens * 2 * 0.9);
       await client.query(
-        `INSERT INTO tilematch_tokens (user_id, balance)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()`,
-        [opponentId, prize]
+        `INSERT INTO tilematch_tokens (user_id, username, balance)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+        [opponentId, req.user.username || null, prize]
       );
     } else if (d.status === 'waiting') {
       // Refund creator if no opponent
@@ -5577,10 +5577,10 @@ app.post('/api/tilematch/duel/:duelId/forfeit', async (req, res) => {
         [duelId]
       );
       await client.query(
-        `INSERT INTO tilematch_tokens (user_id, balance)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()`,
-        [req.user.id, d.stake_tokens]
+        `INSERT INTO tilematch_tokens (user_id, username, balance)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+        [req.user.id, req.user.username || null, d.stake_tokens]
       );
     }
 

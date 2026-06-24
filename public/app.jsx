@@ -8617,7 +8617,7 @@ function TileMatchDailyTasks({ tasks, onClaim }) {
   );
 }
 
-function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
+function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, user }) {
   const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
   const [selectedLevel, setSelectedLevel] = useState(1);
   const [tierPage, setTierPage] = useState(null); // null = overview, 0-9 = tier index
@@ -8915,9 +8915,10 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   // ---- Level selector screen ----
   if (phase === 'select') {
     const menuContent = () => {
-      if (tmMenuTab === 'leaderboard') return <TileMatchLeaderboard />;
+      if (tmMenuTab === 'leaderboard') return <TileMatchLeaderboard user={user} />;
       if (tmMenuTab === 'duel') return (
         <TileMatchDuelArena
+          user={user}
           balance={tmBalance}
           onBalanceChange={(fn) => setTmBalance(b => typeof fn === 'function' ? fn(b || 0) : fn)}
         />
@@ -14167,6 +14168,7 @@ function App() {
                   onStepChange={setStepCount}
                   offset={offset}
                   resetKey={playAgainKey}
+                  user={user}
                 />
               </div>
             </ClassicShell>

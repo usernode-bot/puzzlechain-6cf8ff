@@ -35,6 +35,13 @@ try {
     configFile: false,
     babelrc: false,
     filename: 'app.jsx',
+    // Mirror the browser bootstrap (index.html): compact:true keeps Babel's
+    // code generator off its "auto" path, so it never logs the
+    // "deoptimised the styling ... exceeds the max of 500KB" note for a >500KB
+    // bundle. Keeping these in sync means this check compiles app.jsx exactly
+    // the way the browser does.
+    compact: true,
+    comments: false,
   });
   console.log('[check] public/app.jsx compiles cleanly ✓');
 } catch (e) {

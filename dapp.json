@@ -88,6 +88,7 @@
     { "name": "Today's Champions lists a seeded solver", "path": "/?demo=leaderboard", "expectText": "Staging demo Ada" },
     { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
     { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
-    { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" }
+    { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
+    { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" }
   ]
 }

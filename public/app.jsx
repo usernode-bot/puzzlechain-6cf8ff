@@ -13203,6 +13203,7 @@ const GAMES = [
     component: ZumaGame,
   },
   {
+    id: 'match3',
     name: 'Match-3 Puzzle',
     icon: '🟩',
     category: 'classic',
@@ -13523,10 +13524,10 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
-  // Lobby tab: 'daily', 'classic', 'idle', or 'pvp' — initialized from ?tab= URL param
+  // Lobby tab: 'daily', 'classic', 'idle', 'pvp', or 'feed' — initialized from ?tab= URL param
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : 'daily';
+    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : t === 'feed' ? 'feed' : 'daily';
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
@@ -13758,6 +13759,10 @@ function App() {
         isClassic: true,
         bestScore: meta && meta.bestScore,
         longestSnake: meta && meta.longestSnake,
+        // Carry the game id so the win card's "Share to Feed" button can post
+        // this classic result, mirroring the daily branch below.
+        gameId: currentGame.id,
+        canPost: true,
       });
       return;
     }
@@ -14267,7 +14272,7 @@ function App() {
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
-            {!winData.isClassic && authOk && (
+            {authOk && winData.gameId && (
               <button
                 className="primary-btn"
                 style={{ marginBottom: '0.6rem', background: C.emerald }}

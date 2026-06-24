@@ -1100,6 +1100,12 @@ async function migrate() {
       ['staging-charlie', 'sudoku', 620, 22, 156, 'Still learning but enjoying it'],
       ['staging-alice', 'cryptowordle', 890, 4, 85, 'Got the daily crypto word!'],
       ['staging-bob', 'sudoku', 1100, 19, 145, 'Personal record on sudoku today'],
+      // Classic-game posts so the feed exercises the classic-result share shape
+      // (game name/icon resolution, "pts" rendering) introduced by Share to Feed.
+      ['staging-demo-user', 'snake', 320, 0, 95, 'New Snake high score! 🐍'],
+      ['staging-alice', '2048', 2048, 412, 600, 'Finally hit 2048'],
+      ['staging-bob', 'minesweeper', 540, 41, 70, 'Cashed out before the last mine 💣'],
+      ['staging-charlie', 'blockblast', 880, 0, 210, 'Block Blast streak going strong'],
     ];
 
     for (const [userId, gameId, score, steps, timeSecs, caption] of posts) {

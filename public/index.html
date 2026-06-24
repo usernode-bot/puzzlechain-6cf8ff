@@ -145,7 +145,7 @@
        error card so a non-technical player can retry and report it. -->
   <script>
     (function () {
-      var WATCHDOG_MS = 15000;
+      var WATCHDOG_MS = 30000;
       var watchdog = null;
       var settled = false; // true once we've either mounted or shown an error
 
@@ -243,31 +243,76 @@
         fail('start (taking longer than usual)', new Error('mount watchdog timed out after ' + WATCHDOG_MS + 'ms'));
       }, WATCHDOG_MS);
 
-      fetch('/app.jsx')
-        .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status + ' fetching /app.jsx');
-          return r.text();
-        })
-        .then(function (src) {
-          var compiled;
-          try {
-            compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script' }).code;
-          } catch (e) { fail('compile app.jsx', e); return; }
-          // Wrap execution so a runtime throw during eval is routed to the
-          // error card instead of dying silently with a blank #root.
-          try {
-            var run = new Function(compiled + '\n//# sourceURL=app.compiled.js');
-            run();
-          } catch (e) { fail('run app.jsx', e); return; }
-          // App marks itself mounted; also detect via real #root content.
+      // Component files in dependency order. Each is fetched, Babel-compiled,
+      // and executed (via indirect eval so all top-level declarations land in
+      // the global scope) before the next begins. app.jsx is last.
+      var APP_FILES = [
+        'components/design-system.js',
+        'components/hooks.js',
+        'components/utils.js',
+        'components/streak.js',
+        'components/classic-shell.js',
+        'components/leaderboard.js',
+        'components/locked-screen.js',
+        'components/account-chip.js',
+        'components/account-screen.js',
+        'components/wallet-screen.js',
+        'components/pvp-arena.js',
+        'components/dapp-screen.js',
+        'components/social.js',
+        'components/win-overlay.js',
+        'components/games/sudoku.js',
+        'components/games/word-hunt.js',
+        'components/games/crypto-wordle.js',
+        'components/games/minesweeper.js',
+        'components/games/mancala.js',
+        'components/games/2048.js',
+        'components/games/snake.js',
+        'components/games/block-blast.js',
+        'components/games/diamond-rush.js',
+        'components/games/texas-holdem.js',
+        'components/games/tile-match.js',
+        'components/games/idle.js',
+        'components/games/knights-tour.js',
+        'components/games/bounce.js',
+        'components/games/zuma.js',
+        'components/games/match3.js',
+        'app.jsx',
+      ];
+
+      function loadFiles(files, idx) {
+        if (idx >= files.length) {
           requestAnimationFrame(function () {
             var root = document.getElementById('root');
             var mounted = window.__puzzlechainMounted ||
               (root && root.firstElementChild && root.firstElementChild.id !== 'boot-loader');
             if (mounted) { settled = true; clearWatchdog(); }
           });
-        })
-        .catch(function (e) { fail('fetch app.jsx', e); });
+          return;
+        }
+        var filename = files[idx];
+        fetch('/' + filename)
+          .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status + ' fetching /' + filename);
+            return r.text();
+          })
+          .then(function (src) {
+            var compiled;
+            try {
+              compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script' }).code;
+            } catch (e) { fail('compile ' + filename, e); return; }
+            // window.eval is indirect eval — always runs in global scope so
+            // all top-level declarations (const, let, function) are global and
+            // accessible to every subsequently loaded file and to app.jsx.
+            try {
+              window.eval(compiled + '\n//# sourceURL=/' + filename);
+            } catch (e) { fail('run ' + filename, e); return; }
+            loadFiles(files, idx + 1);
+          })
+          .catch(function (e) { fail('fetch ' + filename, e); });
+      }
+
+      loadFiles(APP_FILES, 0);
     })();
   </script>
 </body>

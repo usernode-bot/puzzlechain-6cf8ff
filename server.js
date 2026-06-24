@@ -21,13 +21,31 @@ const UTGO_CONTRACT_ADDRESS = process.env.UTGO_CONTRACT_ADDRESS;
 const TREASURY_WALLET       = process.env.TREASURY_WALLET;
 const UTGO_RPC_URL          = process.env.UTGO_RPC_URL || '';
 
-const validatorWallet = VALIDATOR_PRIVATE_KEY
-  ? new ethers.Wallet(VALIDATOR_PRIVATE_KEY)
-  : null;
+// Wager-feature identity is OPTIONAL and must degrade gracefully: a malformed
+// VALIDATOR_PRIVATE_KEY or UTGO_RPC_URL must DISABLE the wager feature, never
+// crash boot (mirrors the APP_SECRET_KEY pattern below). ethers' Wallet /
+// JsonRpcProvider constructors throw synchronously on bad input, so a
+// fat-fingered prod secret would otherwise kill the process at module load —
+// before listen() — and surface as a 502. We .trim() the key first so a
+// valid-but-untrimmed secret (e.g. a copy/paste trailing newline) still works
+// rather than disabling the feature.
+let validatorWallet = null;
+if (VALIDATOR_PRIVATE_KEY && VALIDATOR_PRIVATE_KEY.trim()) {
+  try {
+    validatorWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY.trim());
+  } catch (e) {
+    console.warn('[wager] VALIDATOR_PRIVATE_KEY is invalid — wager signing disabled:', e.message);
+  }
+}
 
-const utgoProvider = UTGO_RPC_URL
-  ? new ethers.JsonRpcProvider(UTGO_RPC_URL)
-  : null;
+let utgoProvider = null;
+if (UTGO_RPC_URL) {
+  try {
+    utgoProvider = new ethers.JsonRpcProvider(UTGO_RPC_URL);
+  } catch (e) {
+    console.warn('[wager] UTGO_RPC_URL is invalid — on-chain provider disabled:', e.message);
+  }
+}
 
 // ---- dApps-integration app identity ---------------------------------------
 // APP_PUBKEY / APP_SECRET_KEY identify this app to the dApps-integration
@@ -67,7 +85,26 @@ const STREAK_FREEZE_PRICE_WEI = BigInt('5000000000000000000'); // 5 UTGO
 const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // Single shared connection pool to this app's Postgres DB.
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// connectionTimeoutMillis bounds how long a query waits for a connection so a
+// stalled/unreachable DB fails fast-and-loud (the migrate retry loop logs and
+// retries) instead of hanging boot forever. statement_timeout caps any single
+// query server-side so a wedged statement can't pin a connection indefinitely.
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 10000,
+  statement_timeout: 30000,
+});
+
+// Surface pool-level errors on idle clients instead of letting them bubble up
+// as an uncaught exception that takes the process down.
+pool.on('error', (err) => {
+  console.error('[pg] idle client error:', err.message);
+});
+
+// Flipped true once the boot migration completes. Surfaced on /health for
+// diagnostics; the container stays routable (and /health stays 200) while
+// migrations are still running or retrying.
+let migrationsReady = false;
 
 // Redis client for PvP matchmaking queue (120s TTL keys). Graceful fallback to
 // Postgres-only CAS queue if REDIS_URL is unset or connection fails.
@@ -1942,7 +1979,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// Always 200 so the container stays routable even while migrations are still
+// running or the DB is briefly unreachable; `migrationsReady` is surfaced for
+// diagnostics (true once the boot migration has completed).
+app.get('/health', (_req, res) => res.json({ status: 'ok', migrationsReady }));
 
 // ---- Social API ----------------------------------------------------------
 
@@ -7042,15 +7082,46 @@ async function ensureTournamentsExist() {
   }
 }
 
-migrate()
-  .then(() => {
-    // Ensure tournaments exist, but don't block the server if it fails.
-    ensureTournamentsExist().catch((err) => {
-      console.error('[tilematch] ensureTournamentsExist failed during boot (non-fatal):', err.message);
-    });
-  })
-  .then(() => app.listen(port, () => console.log(`Listening on :${port}`)))
-  .catch((err) => {
-    console.error('Migration failed at step [' + (err.migrationStep || 'unknown') + ']:', err.message, err.stack);
-    process.exit(1);
-  });
+// Global last-resort handlers so a stray rejection/throw during boot or at
+// runtime logs a clear, greppable line before the process exits, instead of
+// dying silently (which looks identical to a hang from the outside).
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] unhandledRejection:', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaughtException:', err && err.stack ? err.stack : err);
+  process.exit(1);
+});
+
+// Boot order: bind the port FIRST so /health responds immediately, THEN run
+// migrations. Decoupling listen() from migrate() means a transient DB issue at
+// boot no longer produces a hard 502 — the container stays up and answers the
+// healthcheck while the DB recovers, and DB-backed routes return their own 500s
+// (caught per-route) until the migration succeeds.
+app.listen(port, () => console.log(`Listening on :${port}`));
+
+// Run the idempotent schema migration, retrying with capped exponential
+// backoff instead of exiting on the first failure. A stalled/unreachable DB
+// (the #1 historical cause of the production 502) now keeps the container up
+// and routable, logging a loud, greppable line per attempt so the failure is
+// diagnosable, until the DB recovers and the migration completes.
+async function runMigrations() {
+  const backoffMs = [1000, 2000, 5000, 10000, 15000, 30000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await migrate();
+      migrationsReady = true;
+      console.log('[migrate] schema ready');
+      ensureTournamentsExist().catch((err) => {
+        console.error('[tilematch] ensureTournamentsExist failed during boot (non-fatal):', err.message);
+      });
+      return;
+    } catch (err) {
+      const wait = backoffMs[Math.min(attempt, backoffMs.length - 1)];
+      console.error(`[migrate] attempt ${attempt + 1} failed — retrying in ${wait}ms:`, err.message);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+}
+
+runMigrations();

@@ -251,7 +251,21 @@
         .then(function (src) {
           var compiled;
           try {
-            compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script' }).code;
+            // `compact` + `filename` explicitly set so Babel's code generator
+            // never falls into its "auto" path: when output exceeds 500KB and
+            // compact is left at the default "auto", @babel/generator logs
+            // `[BABEL] Note: ...deoptimised the styling of undefined...` via
+            // console.error (undefined = the missing filename), which trips the
+            // platform's no-console-errors check on every route. Pinning
+            // compact:true (and naming the file) skips that branch entirely and
+            // yields smaller, faster output. Semantics are unchanged.
+            compiled = Babel.transform(src, {
+              presets: ['react'],
+              sourceType: 'script',
+              compact: true,
+              comments: false,
+              filename: 'app.jsx',
+            }).code;
           } catch (e) { fail('compile app.jsx', e); return; }
           // Wrap execution so a runtime throw during eval is routed to the
           // error card instead of dying silently with a blank #root.

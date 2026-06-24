@@ -251,7 +251,7 @@
         .then(function (src) {
           var compiled;
           try {
-            compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script' }).code;
+            compiled = Babel.transform(src, { presets: ['react'], sourceType: 'script', compact: true }).code;
           } catch (e) { fail('compile app.jsx', e); return; }
           // Wrap execution so a runtime throw during eval is routed to the
           // error card instead of dying silently with a blank #root.

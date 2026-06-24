@@ -1156,7 +1156,7 @@ async function migrate() {
     for (const [userId, gameId, score, steps, timeSecs, caption] of posts) {
       await pool.query(
         `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, now() - interval '${Math.floor(Math.random() * 48)}' hours)
+         VALUES ($1, $2, $3, $4, $5, $6, now() - interval '${Math.floor(Math.random() * 48)} hours')
          ON CONFLICT DO NOTHING`,
         [userId, gameId, score, steps, timeSecs, caption || null]
       );
@@ -1185,7 +1185,7 @@ async function migrate() {
       for (const [postId, userId, text] of comments) {
         await pool.query(
           `INSERT INTO post_comments (post_id, user_id, text, created_at)
-           VALUES ($1, $2, $3, now() - interval '${Math.floor(Math.random() * 24)}' hours)
+           VALUES ($1, $2, $3, now() - interval '${Math.floor(Math.random() * 24)} hours')
            ON CONFLICT DO NOTHING`,
           [postId, userId, text]
         );

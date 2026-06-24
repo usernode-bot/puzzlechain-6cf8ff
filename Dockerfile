@@ -1,8 +1,9 @@
 FROM node:22-alpine
 WORKDIR /app
 COPY package.json ./
-RUN npm install --production
+RUN npm install
 COPY . .
+RUN npm run build
 EXPOSE 3000
 # Probe the port the app actually binds ($PORT), falling back to 3000 — so a
 # platform-injected PORT other than 3000 can't leave a healthy app failing its

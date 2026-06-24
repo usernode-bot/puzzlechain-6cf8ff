@@ -1,3 +1,4 @@
+// PuzzleChain server — rebuild trigger
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');

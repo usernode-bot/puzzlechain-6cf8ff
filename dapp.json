@@ -83,6 +83,7 @@
     { "name": "Account screen opens from chip", "path": "/?screen=account", "expectText": "On-chain login" },
     { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" },
     { "name": "Streak badge ladder renders earned badges", "path": "/?demo=badges", "expectText": "Centurion" },
-    { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" }
+    { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" },
+    { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" }
   ]
 }

@@ -6333,17 +6333,26 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   };
   applyMoveRef.current = applyMove;
 
-  // Trigger AI when it's P2's turn
+  // Trigger AI when it's P2's turn.
+  // Yield a frame so the "AI is thinking…" banner paints first, then run the
+  // (fast) search and apply the move once a short, consistent thinking floor
+  // has elapsed — measure-then-pad. This keeps the bot snappy and avoids a
+  // synchronous board freeze on Hard, without changing move selection.
   useEffect(() => {
     if (player !== 2 || done) return;
     setAiThinking(true);
-    const delay = difficulty === 'easy' ? 500 : difficulty === 'medium' ? 700 : 1100;
-    const t = setTimeout(() => {
-      setAiThinking(false);
+    const FLOOR = difficulty === 'easy' ? 250 : difficulty === 'medium' ? 300 : 350;
+    let raf = null, applyTimer = null;
+    raf = requestAnimationFrame(() => {
+      const startedAt = Date.now();
       const idx = mncAIMove(pitsRef.current, difficulty);
-      if (idx >= 0) applyMoveRef.current(idx, 2);
-    }, delay);
-    return () => clearTimeout(t);
+      const elapsed = Date.now() - startedAt;
+      applyTimer = setTimeout(() => {
+        setAiThinking(false);
+        if (idx >= 0) applyMoveRef.current(idx, 2);
+      }, Math.max(0, FLOOR - elapsed));
+    });
+    return () => { if (raf) cancelAnimationFrame(raf); if (applyTimer) clearTimeout(applyTimer); };
   }, [player, done]);
 
   const handlePitClick = (idx) => {

@@ -26,11 +26,13 @@ const UTGO_RPC_URL          = process.env.UTGO_RPC_URL || '';
 // crash boot (mirrors the APP_SECRET_KEY pattern below). ethers' Wallet /
 // JsonRpcProvider constructors throw synchronously on bad input, so a
 // fat-fingered prod secret would otherwise kill the process at module load —
-// before listen() — and surface as a 502.
+// before listen() — and surface as a 502. We .trim() the key first so a
+// valid-but-untrimmed secret (e.g. a copy/paste trailing newline) still works
+// rather than disabling the feature.
 let validatorWallet = null;
-if (VALIDATOR_PRIVATE_KEY) {
+if (VALIDATOR_PRIVATE_KEY && VALIDATOR_PRIVATE_KEY.trim()) {
   try {
-    validatorWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY);
+    validatorWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY.trim());
   } catch (e) {
     console.warn('[wager] VALIDATOR_PRIVATE_KEY is invalid — wager signing disabled:', e.message);
   }
@@ -84,8 +86,8 @@ const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // Single shared connection pool to this app's Postgres DB.
 // connectionTimeoutMillis bounds how long a query waits for a connection so a
-// stalled/unreachable DB fails fast-and-loud (the migrate() .catch logs and
-// exits) instead of hanging boot forever. statement_timeout caps any single
+// stalled/unreachable DB fails fast-and-loud (the migrate retry loop logs and
+// retries) instead of hanging boot forever. statement_timeout caps any single
 // query server-side so a wedged statement can't pin a connection indefinitely.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -98,6 +100,11 @@ const pool = new Pool({
 pool.on('error', (err) => {
   console.error('[pg] idle client error:', err.message);
 });
+
+// Flipped true once the boot migration completes. Surfaced on /health for
+// diagnostics; the container stays routable (and /health stays 200) while
+// migrations are still running or retrying.
+let migrationsReady = false;
 
 // Redis client for PvP matchmaking queue (120s TTL keys). Graceful fallback to
 // Postgres-only CAS queue if REDIS_URL is unset or connection fails.
@@ -6330,8 +6337,6 @@ process.on('uncaughtException', (err) => {
 // boot no longer produces a hard 502 — the container stays up and answers the
 // healthcheck while the DB recovers, and DB-backed routes return their own 500s
 // (caught per-route) until the migration succeeds.
-let migrationsReady = false;
-
 app.listen(port, () => console.log(`Listening on :${port}`));
 
 // Run the idempotent schema migration, retrying with capped exponential

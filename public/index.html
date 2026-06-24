@@ -250,6 +250,20 @@
         })
         .then(function (src) {
           var compiled;
+          // Belt-and-suspenders against the benign `[BABEL] Note: The code
+          // generator has deoptimised the styling of ... exceeds the max of
+          // 500KB` line. `compact:true` below already keeps @babel/generator
+          // out of its "auto" deopt branch, but should a future Babel
+          // Standalone build still emit it, this swallows ONLY that exact
+          // note for the duration of the transform so it can't trip the
+          // platform's no-console-errors check. All other console.error calls
+          // (real errors) pass straight through to the dev-console forwarder.
+          var prevConsoleError = console.error;
+          console.error = function () {
+            var first = arguments.length ? arguments[0] : '';
+            if (typeof first === 'string' && first.indexOf('[BABEL] Note:') !== -1) return;
+            return prevConsoleError.apply(console, arguments);
+          };
           try {
             // `compact` + `filename` explicitly set so Babel's code generator
             // never falls into its "auto" path: when output exceeds 500KB and
@@ -267,6 +281,7 @@
               filename: 'app.jsx',
             }).code;
           } catch (e) { fail('compile app.jsx', e); return; }
+          finally { console.error = prevConsoleError; }
           // Wrap execution so a runtime throw during eval is routed to the
           // error card instead of dying silently with a blank #root.
           try {

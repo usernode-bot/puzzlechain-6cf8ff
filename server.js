@@ -650,8 +650,6 @@ async function migrate() {
       updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  _step = 'tilematch_tournaments_alter_updated_at';
-  await pool.query(`ALTER TABLE tilematch_tournaments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
 
   // tilematch_tournament_entries is PUBLIC: one entry per user per tournament.
   _step = 'tilematch_tournament_entries_create';
@@ -1094,6 +1092,26 @@ async function migrate() {
   // Tilematch Puzzle staging seeds: populate leaderboard, wallet, tasks, duels,
   // and daily attempts for the daily leaderboard tab. All idempotent; no-op in prod.
   if (IS_STAGING) {
+    // CRITICAL: Seed demo users to users table BEFORE seeding tilematch_tokens,
+    // tilematch_duels, or any other tables that reference user_id.
+    // This ensures no dangling FK/PK issues in staging.
+    const demoUsers = [
+      ['staging-demo-user', 'staging-demo-user'],
+      ['staging-demo-vip', 'staging-demo-vip'],
+      ['staging-alice', 'staging-alice'],
+      ['staging-bob', 'staging-bob'],
+      ['staging-charlie', 'staging-charlie'],
+      ['staging-opponent', 'staging-opponent'],
+    ];
+    for (const [uid, uname] of demoUsers) {
+      await pool.query(
+        `INSERT INTO users (id, username)
+         VALUES ($1, $2)
+         ON CONFLICT (id) DO NOTHING`,
+        [uid, uname]
+      );
+    }
+
     _step = 'staging_tilematch_scores';
     // Global leaderboard — 5 fake users with spread of highest levels
     const tmScoreSeed = [
@@ -5960,7 +5978,12 @@ async function ensureTournamentsExist() {
 }
 
 migrate()
-  .then(() => ensureTournamentsExist())
+  .then(() => {
+    // Ensure tournaments exist, but don't block the server if it fails.
+    ensureTournamentsExist().catch((err) => {
+      console.error('[tilematch] ensureTournamentsExist failed during boot (non-fatal):', err.message);
+    });
+  })
   .then(() => app.listen(port, () => console.log(`Listening on :${port}`)))
   .catch((err) => {
     console.error('Migration failed at step [' + (err.migrationStep || 'unknown') + ']:', err.message, err.stack);

@@ -171,6 +171,55 @@ const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 // so a player's earned badges survive a later streak reset).
 const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
 
+// ---- Achievement badges (non-streak) -------------------------------------
+// Persisted in user_achievements as one row per earned badge `type`, mirroring
+// the streak_milestone pattern. Kept in sync with ACHIEVEMENT_BADGES in
+// public/app.jsx (the client owns the icon/name copy; the server owns the
+// award criteria and persists the earned `type`). All criteria derive from
+// columns already recorded per solve (time_secs, steps, score, game_id,
+// attempt_date), so no new data is needed.
+//   first_solve    — the user's first ever finished daily attempt.
+//   speed_demon    — solved any daily in under 60s.
+//   flawless       — solved sudoku/wordhunt at/under a per-game step threshold.
+//   daily_sweep    — finished ALL daily games within one UTC day.
+//   podium         — held rank #1 on a game's daily leaderboard at finish time.
+//   solve_milestone — lifetime finished+won solves crossed 10/50/100.
+const SPEED_DEMON_MAX_SECS = 60;
+// Per-game "no wasted moves" thresholds. Only the move-counted daily games
+// qualify; games without a meaningful step economy are omitted (no flawless).
+const FLAWLESS_STEP_THRESHOLDS = { sudoku: 18, wordhunt: 8 };
+const SOLVE_MILESTONES = [10, 50, 100];
+
+// The set of non-streak achievement badge `type`s a user has earned, plus the
+// solve-milestone counts they've crossed. Read from the permanent
+// user_achievements rows so earned badges persist forever. Returns
+// { types: [...], milestones: [...] }.
+async function earnedAchievementBadges(userId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT type, metadata
+         FROM user_achievements
+        WHERE user_id = $1
+          AND type IN ('first_solve','speed_demon','flawless','daily_sweep','podium','solve_milestone')`,
+      [userId]
+    );
+    const types = new Set();
+    const milestones = new Set();
+    for (const r of rows) {
+      types.add(r.type);
+      if (r.type === 'solve_milestone' && r.metadata && Number.isFinite(+r.metadata.count)) {
+        milestones.add(+r.metadata.count);
+      }
+    }
+    return {
+      types: Array.from(types),
+      milestones: Array.from(milestones).sort((a, b) => a - b),
+    };
+  } catch {
+    return { types: [], milestones: [] };
+  }
+}
+
 // ---- Match-3 puzzle configuration ----------------------------------------
 const MATCH3_PUZZLES = [
   // Easy (1-10)
@@ -1875,6 +1924,7 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
     // permanent streak-milestone badges this player has earned.
     const liveStreak = await computeStreak(viewedUserId);
     const badges = await earnedStreakBadges(viewedUserId);
+    const achievements = await earnedAchievementBadges(viewedUserId);
 
     res.json({
       user: {
@@ -1883,6 +1933,7 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
         createdAt: user.created_at,
       },
       badges,
+      achievements,
       stats: {
         totalScore: user.total_score || 0,
         currentStreak: liveStreak,
@@ -2432,24 +2483,58 @@ app.get('/api/daily', async (req, res) => {
           [req.user.id, JSON.stringify({ streak: days }), days]
         );
       }
+      // Also seed one of every non-streak achievement badge so the broadened
+      // badge strip renders fully earned for the viewer. Idempotent per type
+      // (and per milestone count). Obviously-fake metadata.
+      const achSeed = [
+        { type: 'first_solve',     meta: {} },
+        { type: 'speed_demon',     meta: { timeSecs: 42 } },
+        { type: 'flawless',        meta: { gameId: 'sudoku', steps: 16 } },
+        { type: 'daily_sweep',     meta: {} },
+        { type: 'podium',          meta: { gameId: 'sudoku' } },
+        { type: 'solve_milestone', meta: { count: 10 } },
+        { type: 'solve_milestone', meta: { count: 50 } },
+        { type: 'solve_milestone', meta: { count: 100 } },
+      ];
+      for (const a of achSeed) {
+        const guard = a.type === 'solve_milestone'
+          ? `AND type = 'solve_milestone' AND (metadata->>'count')::int = $3`
+          : `AND type = $2`;
+        await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+           SELECT $1, $2, NULL, NULL, $4::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements WHERE user_id = $1 ${guard}
+            )`,
+          [req.user.id, a.type, a.type === 'solve_milestone' ? a.meta.count : null, JSON.stringify(a.meta)]
+        );
+      }
     }
 
     // Staging-only demo seed: populate today's per-game leaderboards with a
     // handful of obviously-fake solvers so the ranking (fastest time, then
     // fewest steps) is demonstrable on a fresh staging DB. Spread time/steps
-    // so order and tiebreakers are visible. Idempotent, strict no-op in prod.
+    // so order and tiebreakers are visible. `games` controls HOW MANY of the
+    // daily games each demo user solved today, so the lobby-wide "Today's
+    // Champions" board shows a spread of total-points and games-solved counts
+    // (not every user clearing every game). Idempotent, strict no-op in prod.
     if (IS_STAGING && req.query.demo === 'leaderboard') {
       const lbSeed = [
-        { name: 'Staging demo Ada',  time: 47,  steps: 12 },
-        { name: 'Staging demo Borg', time: 63,  steps: 18 },
-        { name: 'Staging demo Cleo', time: 63,  steps: 21 }, // ties Borg on time → steps break
-        { name: 'Staging demo Dax',  time: 88,  steps: 9 },
-        { name: 'Staging demo Evy',  time: 121, steps: 30 },
-        { name: 'Staging demo Finn', time: 210, steps: 44 },
+        { name: 'Staging demo Ada',  time: 47,  steps: 12, games: 4 }, // swept all → top of champions
+        { name: 'Staging demo Borg', time: 63,  steps: 18, games: 3 },
+        { name: 'Staging demo Cleo', time: 63,  steps: 21, games: 3 }, // ties Borg on time → steps break
+        { name: 'Staging demo Dax',  time: 88,  steps: 9,  games: 2 },
+        { name: 'Staging demo Evy',  time: 121, steps: 30, games: 2 },
+        { name: 'Staging demo Finn', time: 210, steps: 44, games: 1 },
       ];
-      for (const g of GAME_IDS) {
+      const dailyGameList = Array.from(GAME_IDS);
+      for (let gi = 0; gi < dailyGameList.length; gi++) {
+        const g = dailyGameList[gi];
         for (let i = 0; i < lbSeed.length; i++) {
           const r = lbSeed[i];
+          // Only seed this user on the first `games` daily games, so games_solved
+          // varies across the champions board while per-game boards stay full.
+          if (gi >= r.games) continue;
           await pool.query(
             `INSERT INTO daily_attempts
                (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
@@ -2523,6 +2608,7 @@ app.get('/api/daily', async (req, res) => {
 
     const streak = await computeStreak(req.user.id);
     const badges = await earnedStreakBadges(req.user.id);
+    const achievements = await earnedAchievementBadges(req.user.id);
 
     res.json({
       // Surface the signed-in account so the UI can confirm login +
@@ -2540,6 +2626,8 @@ app.get('/api/daily', async (req, res) => {
       // earned — kept even after a streak resets, so the lobby/profile can show
       // a player's collected badges independent of the current streak.
       badges,
+      // Non-streak achievement badges earned (types) + solve-milestone counts.
+      achievements,
       attempts,
     });
   } catch (err) {
@@ -2704,6 +2792,101 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
+    // Award non-streak achievement badges. Each criterion derives from data we
+    // just recorded (time/steps/score/game/day). Every insert is guarded by a
+    // NOT EXISTS so it's awarded at most once per user (per milestone count for
+    // solve_milestone), and RETURNING tells us which ones were NEW this finish
+    // so the client can pop a one-time celebration. Best-effort; never blocks.
+    const newAchievements = [];
+    if (score && score > 0) {
+      try {
+        // Helper: idempotent guarded insert; returns true if newly inserted.
+        const award = async (type, metadata) => {
+          const meta = metadata || {};
+          const metaJson = JSON.stringify(meta);
+          // For solve_milestone we de-dup per count; for the rest, per type.
+          const guard = type === 'solve_milestone'
+            ? `AND type = 'solve_milestone' AND (metadata->>'count')::int = $4`
+            : `AND type = $2`;
+          const { rows: ins } = await pool.query(
+            `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+             SELECT $1, $2, $3, NULL, $5::jsonb
+              WHERE NOT EXISTS (
+                SELECT 1 FROM user_achievements WHERE user_id = $1 ${guard}
+              )
+             RETURNING type`,
+            [req.user.id, type, gameId, type === 'solve_milestone' ? meta.count : null, metaJson]
+          );
+          if (ins.length > 0) newAchievements.push({ type, metadata: meta });
+        };
+
+        // first_solve — the user's first ever WON daily attempt.
+        await award('first_solve', {});
+
+        // speed_demon — solved any daily in under SPEED_DEMON_MAX_SECS.
+        if (timeSecs !== null && timeSecs < SPEED_DEMON_MAX_SECS) {
+          await award('speed_demon', { timeSecs });
+        }
+
+        // flawless — solved a move-counted daily at/under its step threshold.
+        const flawlessMax = FLAWLESS_STEP_THRESHOLDS[gameId];
+        if (flawlessMax != null && steps !== null && steps <= flawlessMax) {
+          await award('flawless', { gameId, steps });
+        }
+
+        // daily_sweep — solved (won) EVERY daily game within today's UTC day.
+        const { rows: sweepRows } = await pool.query(
+          `SELECT COUNT(DISTINCT game_id)::int AS n
+             FROM daily_attempts
+            WHERE user_id = $1
+              AND attempt_date = (now() AT TIME ZONE 'utc')::date
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
+          [req.user.id]
+        );
+        if (sweepRows[0] && sweepRows[0].n >= GAME_IDS.size) {
+          await award('daily_sweep', {});
+        }
+
+        // podium — held rank #1 on THIS game's daily leaderboard at finish time.
+        // Count solvers strictly ahead under the (time, steps, finished_at)
+        // ordering; zero ahead ⇒ currently #1. Rank can change as others finish
+        // later in the day — this is intentional ("held #1 at finish time").
+        if (timeSecs !== null) {
+          const { rows: aheadRows } = await pool.query(
+            `SELECT COUNT(*)::int AS ahead
+               FROM daily_attempts
+              WHERE game_id = $1
+                AND attempt_date = (now() AT TIME ZONE 'utc')::date
+                AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
+                AND user_id <> $2
+                AND (
+                  time_secs < $3
+                  OR (time_secs = $3 AND steps < $4)
+                )`,
+            [gameId, req.user.id, timeSecs, steps]
+          );
+          if (aheadRows[0] && aheadRows[0].ahead === 0) {
+            await award('podium', { gameId });
+          }
+        }
+
+        // solve_milestone — lifetime finished+won solves crossed a threshold.
+        const { rows: cntRows } = await pool.query(
+          `SELECT COUNT(*)::int AS n
+             FROM daily_attempts
+            WHERE user_id = $1 AND finished_at IS NOT NULL
+              AND score IS NOT NULL AND score > 0`,
+          [req.user.id]
+        );
+        const totalSolves = (cntRows[0] && cntRows[0].n) || 0;
+        for (const m of SOLVE_MILESTONES) {
+          if (totalSolves >= m) await award('solve_milestone', { count: m });
+        }
+      } catch (achErr) {
+        console.warn('[daily] achievement award failed (non-fatal):', achErr.message);
+      }
+    }
+
     // Auto-report the "daily_match_2min" task when tilematchingdaily is finished
     // under 2 minutes with a positive score. Idempotent via GREATEST.
     if (gameId === 'tilematchingdaily' && timeSecs !== null && timeSecs <= 119 && score && score > 0) {
@@ -2761,7 +2944,7 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, rewardWei, dapp: dappSession });
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, rewardWei, dapp: dappSession, newAchievements });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
@@ -2838,6 +3021,50 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
     res.json({ entries, me, total });
   } catch (err) {
     console.error('[daily] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// Lobby-wide "Today's Champions" leaderboard — everyone who SOLVED at least one
+// daily puzzle today, aggregated across all daily games. Ranked by total points
+// earned today, then games solved (tiebreak), then earliest first finish.
+// Returns { entries: top-N, me, total, gameCount } mirroring the per-game shape
+// so the client can reuse the same row rendering. Auth-gated under /api/.
+app.get('/api/daily/leaderboard/today', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id,
+              MAX(username) AS username,
+              SUM(score)::int AS total_points,
+              COUNT(DISTINCT game_id)::int AS games_solved,
+              MIN(finished_at) AS first_finish,
+              ROW_NUMBER() OVER (
+                ORDER BY SUM(score) DESC,
+                         COUNT(DISTINCT game_id) DESC,
+                         MIN(finished_at) ASC
+              ) AS rank
+         FROM daily_attempts
+        WHERE attempt_date = (now() AT TIME ZONE 'utc')::date
+          AND finished_at IS NOT NULL
+          AND score IS NOT NULL AND score > 0
+        GROUP BY user_id`,
+      []
+    );
+    const total = rows.length;
+    const shape = (r) => ({
+      rank: Number(r.rank),
+      username: r.username || 'anon',
+      totalPoints: r.total_points,
+      gamesSolved: r.games_solved,
+      userId: r.user_id,
+      isCurrentUser: r.user_id === req.user.id,
+    });
+    const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
+    const mineRow = rows.find((r) => r.user_id === req.user.id);
+    const me = mineRow ? shape(mineRow) : null;
+    res.json({ entries, me, total, gameCount: GAME_IDS.size });
+  } catch (err) {
+    console.error('[daily] today champions failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });

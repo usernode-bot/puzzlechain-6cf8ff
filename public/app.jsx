@@ -95,6 +95,63 @@ body {
   padding: 0.05rem 0.35rem;
   vertical-align: middle;
 }
+.streak-badge-icon {
+  margin-left: 0.35rem;
+  font-size: 0.95rem;
+  vertical-align: middle;
+  line-height: 1;
+}
+/* Earned-badge collection strip (lobby + profile) */
+.badge-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: ${C.text};
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  white-space: nowrap;
+}
+.badge-chip .badge-chip-icon { font-size: 1rem; line-height: 1; }
+.badge-chip.locked { opacity: 0.35; }
+.badge-chip.active { border-color: ${C.emerald}; color: ${C.emerald}; background: ${C.emerald}14; }
+/* Win-overlay "milestone unlocked" flourish */
+.badge-unlock {
+  margin: 0.4rem 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  text-align: center;
+  background: linear-gradient(135deg, ${C.emerald}22, ${C.gold}22);
+  border: 1px solid ${C.emerald}55;
+  animation: badgePop 0.5s ease;
+}
+.badge-unlock .bu-icon { font-size: 1.8rem; line-height: 1; }
+.badge-unlock .bu-title { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: ${C.muted}; margin-top: 0.25rem; }
+.badge-unlock .bu-name { font-size: 1.05rem; font-weight: 700; color: ${C.emerald}; }
+@keyframes badgePop {
+  0% { transform: scale(0.8); opacity: 0; }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.win-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  color: ${C.muted};
+}
+.win-badge-row .wbr-icon { font-size: 1.1rem; }
 
 /* ---- Account indicator ---- */
 .nav-right { display: flex; align-items: center; gap: 1.25rem; }
@@ -133,6 +190,50 @@ body {
 .account-chip.off { border-color: ${C.rose}; }
 .account-chip.off .dot { background: ${C.rose}; }
 .account-chip.off .who { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; }
+.account-chip.on { cursor: pointer; font-family: inherit; color: ${C.text}; transition: border-color 0.12s ease; }
+.account-chip.on:hover { border-color: ${C.accent}; }
+.account-chip .avatar { position: relative; }
+.account-chip .avatar-tick {
+  position: absolute; right: -0.2rem; bottom: -0.2rem;
+  width: 0.85rem; height: 0.85rem; border-radius: 50%;
+  background: ${C.emerald}; color: white; font-size: 0.55rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid ${C.bg};
+}
+
+/* ---- Account screen ---- */
+.account-screen { max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem; }
+.account-head { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.25rem; }
+.account-head h2 { font-size: 1.4rem; font-weight: 700; }
+.account-id-row { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1rem; }
+.account-avatar {
+  width: 2.6rem; height: 2.6rem; border-radius: 50%; background: ${C.accent};
+  color: white; font-size: 1.1rem; font-weight: 700; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+}
+.account-uname { font-size: 1.05rem; font-weight: 700; }
+.account-sub { font-size: 0.78rem; color: ${C.emerald}; }
+.account-field { margin-top: 0.5rem; }
+.account-signed-out { color: ${C.muted}; font-size: 0.9rem; line-height: 1.5; }
+.account-status {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem;
+}
+.account-status-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: 0 0 auto; }
+.account-status-verified { color: ${C.emerald}; }
+.account-status-verified .account-status-dot { background: ${C.emerald}; }
+.account-status-linked { color: ${C.gold}; }
+.account-status-linked .account-status-dot { background: ${C.gold}; }
+.account-status-none { color: ${C.muted}; }
+.account-status-none .account-status-dot { background: ${C.muted}; }
+.account-wallet-addr {
+  font-size: 0.85rem; color: ${C.text}; margin-bottom: 0.5rem;
+}
+.account-status-desc { font-size: 0.83rem; color: ${C.muted}; line-height: 1.5; }
+.account-danger { color: ${C.rose}; border-color: ${C.rose}; }
+.account-msg { margin-top: 0.75rem; font-size: 0.83rem; line-height: 1.45; }
+.account-msg.ok { color: ${C.emerald}; }
+.account-msg.err { color: ${C.rose}; }
 
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
@@ -1641,9 +1742,9 @@ body {
 /* ---- Snake ---- */
 .snake-board-wrap {
   position: relative;
-  max-width: 360px;
+  display: inline-block;
   margin: 0 auto;
-  aspect-ratio: 1;
+  width: 100%;
 }
 .snake-grid {
   display: grid;
@@ -1747,6 +1848,22 @@ body {
 .snake-lb-row .snake-lb-score { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; }
 .snake-lb-divider { text-align: center; color: ${C.muted}; padding: 0.4rem 0; font-size: 0.8rem; letter-spacing: 0.2em; }
 .snake-lb-empty { color: ${C.muted}; text-align: center; padding: 2rem 0; font-size: 0.9rem; }
+.snake-pause-overlay {
+  position: absolute;
+  inset: 0;
+  background: ${C.bg}cc;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+}
+.snake-pause-text {
+  font-size: 2rem;
+  font-weight: 700;
+  color: ${C.gold};
+  letter-spacing: 0.1em;
+}
 
 /* ---- Bounce (Breakout) ---- */
 .bounce-board-wrap {
@@ -3422,6 +3539,13 @@ body {
   color: ${C.emerald}; transition: border-color 0.15s;
 }
 .nav-wallet-chip:hover { border-color: ${C.emerald}; }
+.nav-integration-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.7rem;
+  font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
+  color: ${C.accent};
+}
 /* ---- Tip modal ---- */
 .tip-modal-backdrop {
   position: fixed; inset: 0; background: #00000099; z-index: 50;
@@ -3453,42 +3577,6 @@ body {
 }
 .win-reward-row .k { color: ${C.muted}; font-size: 0.88rem; }
 .win-reward-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; }
-
-/* ---- Hash Rush ---- */
-.hr-wrap {
-  position: relative; width: 100%; flex: 1; align-self: stretch; overflow: hidden; min-height: 0;
-}
-.hr-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.hr-overlay {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 0.75rem;
-  background: ${C.bg}; color: ${C.muted}; font-size: 0.9rem; text-align: center; padding: 1.5rem;
-}
-.hr-spinner {
-  width: 36px; height: 36px; border-radius: 50%;
-  border: 3px solid ${C.border}; border-top-color: ${C.accent};
-  animation: pc-spin 0.8s linear infinite;
-}
-.hr-hud {
-  position: absolute; top: 0.75rem; left: 0; right: 0;
-  display: flex; justify-content: center; gap: 0.5rem; padding: 0 0.5rem;
-  pointer-events: none;
-}
-.hr-pill {
-  background: rgba(17,24,39,0.82); border: 1px solid ${C.border}; border-radius: 10px;
-  padding: 0.4rem 0.9rem; text-align: center; min-width: 72px; backdrop-filter: blur(4px);
-}
-.hr-plabel { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
-.hr-pvalue { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1rem; color: ${C.text}; }
-.hr-lane-btn {
-  position: absolute; bottom: 2.5rem; width: 48px; height: 48px; border-radius: 50%;
-  background: rgba(17,24,39,0.75); border: 1px solid ${C.border}; color: ${C.muted};
-  font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; z-index: 5;
-}
-.hr-lane-left { left: 1rem; }
-.hr-lane-right { right: 1rem; }
-.hr-lane-btn:active { background: ${C.accent}30; border-color: ${C.accent}; color: ${C.accent}; }
 
 /* ---- DApp Mode ---- */
 .dapp-badge {
@@ -3980,6 +4068,46 @@ function nextTierInfo(streak) {
   return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
 
+/* ============================================================
+   Streak badges — named milestones unlocked at consecutive-day
+   thresholds. The single source of truth for badge copy/icons;
+   the server (STREAK_BADGE_DAYS in server.js) persists the same day
+   thresholds as streak_milestone achievements so earned badges
+   survive a streak reset. Keep the `min` list in sync across both.
+   ============================================================ */
+const STREAK_BADGES = [
+  { min: 3,   id: 'on-fire',     name: 'On Fire',          icon: '🔥' },
+  { min: 7,   id: 'week',        name: 'Week Warrior',     icon: '⚡' },
+  { min: 30,  id: 'monthly',     name: 'Monthly Master',   icon: '🌟' },
+  { min: 50,  id: 'half-cent',   name: 'Half-Century',     icon: '💎' },
+  { min: 100, id: 'centurion',   name: 'Centurion',        icon: '👑' },
+  { min: 180, id: 'half-year',   name: 'Half-Year Hero',   icon: '🛡️' },
+  { min: 365, id: 'year-legend', name: 'Year-Long Legend', icon: '🏆' },
+];
+
+// Look up a badge definition by its day threshold (used to render the
+// permanent earned-badge list the server returns as `badges`).
+function badgeForDays(days) {
+  return STREAK_BADGES.find(b => b.min === days) || null;
+}
+
+// All badges a live streak currently satisfies (streak >= min), low→high.
+function streakBadges(streak) {
+  return STREAK_BADGES.filter(b => streak >= b.min);
+}
+
+// The highest badge a live streak has reached, or null below the first tier.
+function activeBadge(streak) {
+  const earned = streakBadges(streak);
+  return earned.length ? earned[earned.length - 1] : null;
+}
+
+// Does this win's streak land EXACTLY on a badge threshold? (the "just
+// unlocked" celebration fires only on the day the milestone is reached.)
+function justUnlockedBadge(streak) {
+  return STREAK_BADGES.find(b => b.min === streak) || null;
+}
+
 // Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)
 // so a wrong device clock can't unlock early. Calls onExpire once at zero.
 function useCountdown(nextResetUtc, offset, onExpire) {
@@ -4212,7 +4340,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
    Account indicator — confirms the signed-in Usernode account so the
    player knows their progress is being saved (not just session state).
    ============================================================ */
-function AccountChip({ loading, authOk, user }) {
+function AccountChip({ loading, authOk, user, walletVerified, onOpen }) {
   if (loading) {
     return (
       <div className="account-chip loading" title="Checking your account…">
@@ -4230,12 +4358,163 @@ function AccountChip({ loading, authOk, user }) {
   const name = user.username || 'Linked account';
   const initial = (user.username || '?').charAt(0).toUpperCase();
   return (
-    <div className="account-chip on" title={`Signed in as ${name} — your daily progress is saved to your account.`}>
-      <span className="avatar mono">{initial}</span>
+    <button
+      type="button"
+      className="account-chip on"
+      title={`Signed in as ${name}${walletVerified ? ' · wallet verified' : ''} — tap to open your account.`}
+      onClick={onOpen}
+    >
+      <span className="avatar mono">
+        {initial}
+        {walletVerified && <span className="avatar-tick" title="Wallet verified">✓</span>}
+      </span>
       <span className="who">
         <span className="uname">{name}</span>
-        <span className="status">● Progress saved</span>
+        <span className="status">{walletVerified ? '✓ Verified · saved' : '● Progress saved'}</span>
       </span>
+    </button>
+  );
+}
+
+/* ============================================================
+   Account screen — single place for identity + on-chain login status.
+   Surfaces username, a copyable Usernode pubkey, and a three-state
+   wallet status (Not connected / Linked / Verified ✓), with manual
+   Connect/Verify and Disconnect controls.
+   ============================================================ */
+function truncAddr(a) {
+  if (!a) return '';
+  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+}
+
+function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVerify, onDisconnect }) {
+  const [copied, setCopied] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const [confirmDisc, setConfirmDisc] = React.useState(false);
+  const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
+
+  // status: 'verified' | 'linked' | 'none'
+  const status = walletVerified ? 'verified' : (walletAddr ? 'linked' : 'none');
+
+  const copyPubkey = async () => {
+    if (!user || !user.usernodePubkey) return;
+    try {
+      await navigator.clipboard.writeText(user.usernodePubkey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const handleVerify = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await onVerify();
+      if (res && res.verified) setMsg({ ok: true, text: 'Wallet ownership verified ✓' });
+      else if (res && res.ok) setMsg({ ok: true, text: 'Wallet linked. Ownership proof unavailable (your wallet can’t sign here).' });
+      else setMsg({ ok: false, text: 'No wallet was readable in this environment.' });
+    } catch {
+      setMsg({ ok: false, text: 'Could not connect to your wallet.' });
+    }
+    setBusy(false);
+  };
+
+  const handleDisconnect = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await onDisconnect();
+      setMsg({ ok: true, text: 'Disconnected. Your public link is kept so received tips still resolve.' });
+    } catch {
+      setMsg({ ok: false, text: 'Could not disconnect.' });
+    }
+    setConfirmDisc(false);
+    setBusy(false);
+  };
+
+  const initial = (user && user.username ? user.username : '?').charAt(0).toUpperCase();
+
+  return (
+    <div className="account-screen">
+      <div className="account-head">
+        <button className="back-btn" onClick={onBack}>‹ Back</button>
+        <h2>Account</h2>
+      </div>
+
+      {(!authOk || !user) ? (
+        <div className="wallet-card">
+          <div className="account-signed-out">
+            You’re signed out. Open PuzzleChain inside Usernode so your progress
+            and identity are saved to your account.
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="wallet-card">
+            <div className="account-id-row">
+              <span className="account-avatar mono">{initial}</span>
+              <div>
+                <div className="account-uname">{user.username || 'Linked account'}</div>
+                <div className="account-sub">Signed in · progress saved</div>
+              </div>
+            </div>
+            <div className="account-field">
+              <div className="wallet-card-title">Usernode public key</div>
+              <div className="wallet-addr-row">
+                <span className="wallet-addr">{user.usernodePubkey || '— not linked —'}</span>
+                {user.usernodePubkey && (
+                  <button className="back-btn" onClick={copyPubkey}>{copied ? 'Copied ✓' : 'Copy'}</button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="wallet-card">
+            <div className="wallet-card-title">On-chain login</div>
+            <div className={`account-status account-status-${status}`}>
+              {status === 'verified' && <span className="account-status-dot" />}
+              {status === 'verified' && <span>Verified ✓</span>}
+              {status === 'linked' && <span className="account-status-dot" />}
+              {status === 'linked' && <span>Linked (not verified)</span>}
+              {status === 'none' && <span className="account-status-dot" />}
+              {status === 'none' && <span>Not connected</span>}
+            </div>
+            {walletAddr && (
+              <div className="account-wallet-addr mono" title={walletAddr}>{truncAddr(walletAddr)}</div>
+            )}
+            <div className="account-status-desc">
+              {status === 'verified' && 'You’ve signed an ownership challenge — this wallet is cryptographically yours.'}
+              {status === 'linked' && 'Your wallet address is linked to your account, but ownership hasn’t been proven yet. Verify to confirm it’s really yours.'}
+              {status === 'none' && (bridgeAvailable
+                ? 'No wallet is linked yet. Connect to read your Usernode wallet and link it to your account.'
+                : 'On-chain features are unavailable in this environment (no wallet could be read). Open PuzzleChain inside Usernode.')}
+            </div>
+
+            <div className="wallet-btn-row">
+              <button
+                className="primary-btn"
+                disabled={busy || !bridgeAvailable}
+                onClick={handleVerify}
+              >
+                {busy ? 'Working…' : status === 'verified' ? 'Re-verify wallet' : 'Connect / Verify wallet'}
+              </button>
+              {status === 'verified' && !confirmDisc && (
+                <button className="back-btn" disabled={busy} onClick={() => setConfirmDisc(true)}>Disconnect</button>
+              )}
+              {confirmDisc && (
+                <>
+                  <button className="back-btn account-danger" disabled={busy} onClick={handleDisconnect}>Confirm disconnect</button>
+                  <button className="back-btn" disabled={busy} onClick={() => setConfirmDisc(false)}>Cancel</button>
+                </>
+              )}
+            </div>
+            {msg && (
+              <div className={`account-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -5847,6 +6126,131 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
 }
 
 /* ============================================================
+   Mancala ZK helpers (commit-reveal proof, browser-side)
+   ============================================================ */
+async function mncStartSession(difficulty) {
+  try {
+    const nonceBytes = new Uint8Array(16);
+    window.crypto.getRandomValues(nonceBytes);
+    const nonceHex = Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const initBoard = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
+    const msgBuf = new TextEncoder().encode(nonceHex + '||' + JSON.stringify(initBoard));
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', msgBuf);
+    const commitment = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    const { ok, body } = await api('/api/mancala/score/start', {
+      method: 'POST',
+      body: JSON.stringify({ commitment, difficulty }),
+    });
+    if (ok && body && body.sessionId) {
+      return { sessionId: body.sessionId, nonce: nonceHex };
+    }
+    return null;
+  } catch { return null; }
+}
+
+async function mncVerifySession(sessionId, nonce, moveLog, finalPits, timeSecs) {
+  try {
+    const { ok, body } = await api('/api/mancala/score/verify', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, nonce, moveLog, finalPits, timeSecs }),
+    });
+    if (ok && body) return body;
+    return { verified: false, reason: 'network_error' };
+  } catch { return { verified: false, reason: 'network_error' }; }
+}
+
+/* ============================================================
+   Mancala Leaderboard component (used inside AI game tab)
+   ============================================================ */
+function MncLeaderboard() {
+  const [diff, setDiff]       = useState('hard');
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    api('/api/mancala/leaderboard?difficulty=' + diff)
+      .then(({ ok, body }) => {
+        if (ok && body) setData(body);
+        else setError(true);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [diff]);
+
+  const fmtSecs = s => {
+    if (!s && s !== 0) return '—';
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+
+  const tabs = ['easy', 'medium', 'hard'];
+  const meInTop = data && data.me && data.top && data.top.some(r => r.rank === data.me.rank);
+
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+        {tabs.map(t => (
+          <button
+            key={t}
+            className={'mnc-difficulty-pill' + (diff === t ? ' active' : '')}
+            onClick={() => setDiff(t)}
+            style={{ textTransform: 'capitalize' }}
+          >{t}</button>
+        ))}
+      </div>
+      {loading && <div style={{ textAlign: 'center', color: C.muted, padding: '1rem', fontSize: '0.85rem' }}>Loading…</div>}
+      {error && <div style={{ textAlign: 'center', color: C.rose, padding: '1rem', fontSize: '0.85rem' }}>Could not load leaderboard.</div>}
+      {!loading && !error && data && (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem', fontSize: '0.75rem', color: C.muted, padding: '0 0.25rem 0.3rem', borderBottom: `1px solid ${C.border}` }}>
+            <span>#</span><span>Player</span><span>Score</span><span>Time</span>
+          </div>
+          {data.top.length === 0 && (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '1.25rem', fontSize: '0.85rem' }}>No scores yet — be the first!</div>
+          )}
+          {data.top.map((row, i) => {
+            const isMe = data.me && row.rank === data.me.rank;
+            return (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem',
+                padding: '0.4rem 0.25rem', fontSize: '0.82rem',
+                borderBottom: `1px solid ${C.border}22`,
+                background: isMe ? C.accent + '18' : 'transparent',
+                borderRadius: isMe ? '6px' : '0',
+              }}>
+                <span style={{ color: row.rank <= 3 ? C.gold : C.muted, fontWeight: row.rank <= 3 ? 700 : 400 }}>{row.rank}</span>
+                <span style={{ color: isMe ? C.accent : C.text, fontWeight: isMe ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.username || '—'}</span>
+                <span style={{ color: C.gold, fontFamily: 'monospace' }}>{row.bestScore}</span>
+                <span style={{ color: C.muted }}>{fmtSecs(row.bestTimeSecs)}</span>
+              </div>
+            );
+          })}
+          {data.me && !meInTop && (
+            <div>
+              <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.7rem', padding: '0.2rem 0' }}>…</div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem',
+                padding: '0.4rem 0.25rem', fontSize: '0.82rem',
+                background: C.accent + '18', borderRadius: '6px',
+              }}>
+                <span style={{ color: C.accent, fontWeight: 600 }}>{data.me.rank}</span>
+                <span style={{ color: C.accent, fontWeight: 600 }}>{data.me.username || 'You'}</span>
+                <span style={{ color: C.gold, fontFamily: 'monospace' }}>{data.me.bestScore}</span>
+                <span style={{ color: C.muted }}>{fmtSecs(data.me.bestTimeSecs)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Game 5b — Mancala AI variant (human P1 vs AI P2)
    ============================================================ */
 function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
@@ -5861,6 +6265,10 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const [aiThinking, setAiThinking]     = useState(false);
   const [history, setHistory]           = useState(() => mncLoadHistory());
   const [soundOn, setSoundOn]           = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
+  const [activeTab, setActiveTab]       = useState('game');
+  // ZK session state
+  const [verifying, setVerifying]       = useState(false);
+  const [verified, setVerified]         = useState(null); // null | true | false
 
   const animatingRef  = useRef(false);
   const soundOnRef    = useRef(soundOn);
@@ -5868,6 +6276,10 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const applyMoveRef  = useRef(null);
   const pitsRef       = useRef(pits);
   const movesRef      = useRef(moves);
+  // ZK proof refs
+  const sessionIdRef  = useRef(null);
+  const nonceRef      = useRef(null);
+  const moveLogRef    = useRef([]);
   soundOnRef.current  = soundOn;
   pitsRef.current     = pits;
   movesRef.current    = moves;
@@ -5875,6 +6287,17 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
   secsRef.current = secs;
+
+  const startSession = async () => {
+    sessionIdRef.current = null;
+    nonceRef.current = null;
+    moveLogRef.current = [];
+    const result = await mncStartSession(difficulty);
+    if (result) {
+      sessionIdRef.current = result.sessionId;
+      nonceRef.current = result.nonce;
+    }
+  };
 
   useEffect(() => { resetGame(); }, [resetKey]);
 
@@ -5890,7 +6313,12 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     setCaptureFlash(new Set());
     setBannerMsg('');
     setAiThinking(false);
+    setVerifying(false);
+    setVerified(null);
+    startSession();
   };
+
+  useEffect(() => { startSession(); }, []);
 
   const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
     const p = newPits.slice();
@@ -5924,13 +6352,46 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
       };
       mncSaveEntry(entry);
       setHistory(mncLoadHistory());
-      winTimerRef.current = setTimeout(() => {
-        winTimerRef.current = null;
-        setBannerMsg('');
-        const base = Math.max(Math.abs(p[6] - p[13]) * 15 - secsRef.current, 50);
-        const share = `Mancala vs AI (${difficulty}) — 🫘 You ${p[6]} · AI ${p[13]} · ${newMoves} moves · ${secsRef.current}s`;
-        onWin(w === 1 ? base : w === 'draw' ? 50 : 0, newMoves, secsRef.current, { winner: w, share });
-      }, 1500);
+
+      // ZK verify on player win, then fire onWin
+      const finalSecs = secsRef.current;
+      const base = Math.max(Math.abs(p[6] - p[13]) * 15 - finalSecs, 50);
+      const share = `Mancala vs AI (${difficulty}) — 🫘 You ${p[6]} · AI ${p[13]} · ${newMoves} moves · ${finalSecs}s`;
+
+      if (w === 1 && sessionIdRef.current && nonceRef.current) {
+        setVerifying(true);
+        const sid = sessionIdRef.current;
+        const nonce = nonceRef.current;
+        const log = moveLogRef.current.slice();
+        const fp = p.slice();
+        // Race: verify within 3s max, then proceed regardless
+        const verifyTimeout = setTimeout(() => {
+          setVerifying(false);
+          setVerified(false);
+          winTimerRef.current = setTimeout(() => {
+            winTimerRef.current = null;
+            setBannerMsg('');
+            onWin(base, newMoves, finalSecs, { winner: w, share, verified: false });
+          }, 500);
+        }, 3000);
+        mncVerifySession(sid, nonce, log, fp, finalSecs).then(result => {
+          clearTimeout(verifyTimeout);
+          setVerifying(false);
+          const ok = result && result.verified;
+          setVerified(ok);
+          winTimerRef.current = setTimeout(() => {
+            winTimerRef.current = null;
+            setBannerMsg('');
+            onWin(ok ? (result.score || base) : base, newMoves, finalSecs, { winner: w, share, verified: ok });
+          }, 600);
+        });
+      } else {
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          setBannerMsg('');
+          onWin(w === 1 ? base : w === 'draw' ? 50 : 0, newMoves, finalSecs, { winner: w, share, verified: false });
+        }, 1500);
+      }
     } else if (extraTurn) {
       setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
       setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
@@ -5946,6 +6407,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     if (curPits[idx] === 0) return;
     const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(curPits, idx, currentPlayer);
     const newMoves = movesRef.current + 1;
+    moveLogRef.current.push(idx);
     animatingRef.current = true;
     const working = curPits.slice();
     working[idx] = 0;
@@ -6032,6 +6494,12 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
           <div className="plabel">Diff</div>
           <div className="pvalue" style={{ fontSize: '0.8rem', textTransform: 'capitalize' }}>{difficulty}</div>
         </div>
+        <div className="pill">
+          <div className="plabel">ZK</div>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
+          </div>
+        </div>
       </div>
 
       <div style={{
@@ -6082,14 +6550,32 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
         </button>
       </div>
 
-      {aiHistory.length > 0 && (
-        <div className="mnc-stats-grid" style={{ marginTop: '1rem' }}>
+      <div style={{ display: 'flex', gap: '0', marginTop: '1.25rem', borderBottom: `1px solid ${C.border}` }}>
+        {['game', 'leaderboard'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              flex: 1, padding: '0.45rem', fontSize: '0.82rem', fontWeight: activeTab === tab ? 700 : 400,
+              background: 'none', border: 'none', borderBottom: activeTab === tab ? `2px solid ${C.accent}` : '2px solid transparent',
+              color: activeTab === tab ? C.accent : C.muted, cursor: 'pointer', textTransform: 'capitalize',
+            }}
+          >{tab === 'game' ? '📊 Stats' : '🏆 Leaderboard'}</button>
+        ))}
+      </div>
+
+      {activeTab === 'game' && aiHistory.length > 0 && (
+        <div className="mnc-stats-grid" style={{ marginTop: '0.75rem' }}>
           <div className="mnc-stat-card"><div className="mnc-stat-val">{stats.total}</div><div className="mnc-stat-lbl">Games</div></div>
           <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: p1Color }}>{stats.wins}</div><div className="mnc-stat-lbl">Wins</div></div>
           <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: p2Color }}>{stats.losses}</div><div className="mnc-stat-lbl">Losses</div></div>
           <div className="mnc-stat-card"><div className="mnc-stat-val" style={{ color: C.muted }}>{stats.draws}</div><div className="mnc-stat-lbl">Draws</div></div>
         </div>
       )}
+      {activeTab === 'game' && aiHistory.length === 0 && (
+        <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.82rem', padding: '1rem 0' }}>No games yet — play one!</div>
+      )}
+      {activeTab === 'leaderboard' && <MncLeaderboard />}
     </div>
   );
 }
@@ -6270,7 +6756,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 
   const modes = [
     { id: 'local',  icon: '👥', name: 'Local 2-Player', desc: 'Pass and play on this device' },
-    { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer' },
+    { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer', ranked: true },
     { id: 'online', icon: '🌐', name: 'Online',          desc: 'Play with a friend via room code' },
   ];
 
@@ -6286,8 +6772,11 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
         <button key={m.id} className={'mnc-mode-btn' + (mode === m.id ? ' active' : '')} onClick={() => { setMode(m.id); setJoinError(''); }}>
           <span className="mnc-mode-icon">{m.icon}</span>
           <span className="mnc-mode-text">
-            <span className="mnc-mode-name">{m.name}</span>
-            <span className="mnc-mode-desc">{m.desc}</span>
+            <span className="mnc-mode-name">
+              {m.name}
+              {m.ranked && <span style={{ marginLeft: '0.4rem', fontSize: '0.68rem', background: C.gold + '33', color: C.gold, border: `1px solid ${C.gold}55`, borderRadius: '999px', padding: '0.1rem 0.4rem', verticalAlign: 'middle', fontWeight: 700 }}>🏆 Ranked</span>}
+            </span>
+            <span className="mnc-mode-desc">{m.desc}{m.ranked ? ' — wins post to leaderboard' : ''}</span>
           </span>
         </button>
       ))}
@@ -6929,6 +7418,7 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
    Texas Hold 'Em) — all self-wrap in ClassicShell.
    ============================================================ */
 const SNAKE_KEY = 'puzzlechain_snake_history';
+const SNAKE_DIFFICULTY_KEY = 'puzzlechain_snake_difficulty';
 const BB_KEY    = 'puzzlechain_blockblast_history';
 const DR_KEY    = 'puzzlechain_diamondrush_history';
 const TH_KEY    = 'puzzlechain_texas_history';
@@ -6954,17 +7444,55 @@ function useElapsed(resetKey, running) {
   return secs;
 }
 
-/* ---------------- Snake ---------------- */
-function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+/* ---------------- Snake ---- Difficulty config ---- */
+const SNAKE_SPEED_CONFIG = {
+  easy:   { initial: 250, decrement: 4 },
+  normal: { initial: 200, decrement: 6 },
+  hard:   { initial: 150, decrement: 8 },
+};
+
+/* ---- Snake — Mode Selector ---- */
+function SnakeGameModeSelect({ onSelectDifficulty }) {
+  const [difficulty, setDifficulty] = useState(() => localStorage.getItem(SNAKE_DIFFICULTY_KEY) || 'normal');
+
+  const handleStart = () => {
+    try { localStorage.setItem(SNAKE_DIFFICULTY_KEY, difficulty); } catch {}
+    onSelectDifficulty(difficulty);
+  };
+
+  return (
+    <div className="mnc-mode-select">
+      <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>Choose Difficulty</h3>
+        <p style={{ color: 'var(--cg-muted, #999)', fontSize: '0.9rem', margin: '0 0 1.5rem 0' }}>Affects starting speed and acceleration</p>
+      </div>
+      <div className="mnc-difficulty-row">
+        {['easy', 'normal', 'hard'].map(d => (
+          <button key={d} className={'mnc-difficulty-pill' + (difficulty === d ? ' active' : '')} onClick={() => setDifficulty(d)}>
+            {d.charAt(0).toUpperCase() + d.slice(1)}
+          </button>
+        ))}
+      </div>
+      <button className="mnc-mode-start-btn" onClick={handleStart}>
+        Play
+      </button>
+    </div>
+  );
+}
+
+/* ---- Snake — Gameplay ---- */
+function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty }) {
   const N = 15;
   const [, render] = useState(0);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState(0);
   const [started, setStarted] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [pausedSecs, setPausedSecs] = useState(0);
   const st = useRef(null);
   const doneRef = useRef(false);
   const boardRef = useRef(null);
-  const secs = useElapsed(resetKey, !done);
+  const secs = useElapsed(resetKey, !done && !paused);
   const secsRef = useRef(0); secsRef.current = secs;
 
   const randFood = (snake) => {
@@ -6976,9 +7504,10 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
   const init = () => {
     const m = Math.floor(N / 2);
     const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
-    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: 200, eaten: 0 };
+    const config = SNAKE_SPEED_CONFIG[difficulty || 'normal'];
+    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: config.initial, eaten: 0 };
     doneRef.current = false;
-    setDone(false); setScore(0); setStarted(false); render(n => n + 1);
+    setDone(false); setScore(0); setStarted(false); setPaused(false); setPausedSecs(0); render(n => n + 1);
   };
   useEffect(() => { init(); }, [resetKey]);
 
@@ -6988,7 +7517,10 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     cgSound('lose'); cgHaptic([20, 40, 20]);
     const sc = st.current.eaten * 10;
     cgSaveHistory(SNAKE_KEY, { score: sc, len: st.current.snake.length, ts: Date.now() });
-    onWin(sc, st.current.eaten, secsRef.current, { winnerLabel: 'Game Over', share: `🐍 Snake — ${sc} pts, length ${st.current.snake.length}` });
+    const hist = cgLoadHistory(SNAKE_KEY);
+    const bestScore = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+    const longestSnake = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
+    onWin(sc, st.current.eaten, secsRef.current, { winnerLabel: 'Game Over', share: `🐍 Snake — ${sc} pts, length ${st.current.snake.length}`, bestScore, longestSnake });
   };
   const step = () => {
     const s = st.current;
@@ -7005,7 +7537,8 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
       s.eaten++; setScore(s.eaten * 10);
       cgSound('clear', 1 + s.eaten * 0.02); cgHaptic(15);
       s.food = randFood(s.snake);
-      s.speed = Math.max(80, 200 - s.eaten * 6);
+      const config = SNAKE_SPEED_CONFIG[difficulty || 'normal'];
+      s.speed = Math.max(80, config.initial - s.eaten * config.decrement);
       onStepChange && onStepChange(s.eaten);
     } else {
       s.snake.pop();
@@ -7013,7 +7546,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     render(n => n + 1);
   };
   useEffect(() => {
-    if (done || !started) return;
+    if (done || !started || paused) return;
     let raf, last = 0, alive = true;
     const loop = (ts) => {
       if (!alive) return;
@@ -7023,11 +7556,11 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     };
     raf = requestAnimationFrame(loop);
     return () => { alive = false; cancelAnimationFrame(raf); };
-  }, [done, started, resetKey]);
+  }, [done, started, paused, resetKey]);
 
   const turn = (dir) => {
     const s = st.current;
-    if (!s || doneRef.current) return;
+    if (!s || doneRef.current || paused) return;
     const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
     const nd = map[dir]; if (!nd) return;
     if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
@@ -7035,7 +7568,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     if (!started) setStarted(true);
     cgSound('move');
   };
-  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started) setStarted(true); } });
+  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started && !paused) setStarted(true); } });
   useEffect(() => {
     const onKey = (e) => {
       const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
@@ -7065,19 +7598,66 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
       { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
       { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
     ]),
-    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!']),
+    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
-          {cells}
+        <div className="snake-board-wrap">
+          <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
+            {cells}
+          </div>
+          {paused && !done && (
+            <div className="snake-pause-overlay">
+              <div className="snake-pause-text">PAUSED</div>
+            </div>
+          )}
         </div>
         <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
+        <div className="snake-controls">
+          {!started && <button onClick={() => init()}>Restart</button>}
+          {started && !paused && !done && (
+            <>
+              <button onClick={() => { setPaused(true); setPausedSecs(secs); }}>Pause</button>
+              <button onClick={() => init()}>Restart</button>
+            </>
+          )}
+          {paused && !done && (
+            <>
+              <button onClick={() => { setPaused(false); }}>Resume</button>
+              <button onClick={() => init()}>Restart</button>
+            </>
+          )}
+        </div>
       </div>
     </ClassicShell>
   );
+}
+
+/* ---- Snake — Wrapper (mode selector + gameplay) ---- */
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+  const [difficulty, setDifficulty] = useState(null);
+  const diffRef = useRef(difficulty);
+  diffRef.current = difficulty;
+
+  useEffect(() => {
+    if (diffRef.current !== null) {
+      setDifficulty(null);
+    }
+  }, [resetKey]);
+
+  if (!difficulty) {
+    return (
+      <ClassicShell game={game} onExit={onBack} sheetSections={[]}>
+        <div className="cg-stage">
+          <SnakeGameModeSelect onSelectDifficulty={(d) => setDifficulty(d)} />
+        </div>
+      </ClassicShell>
+    );
+  }
+
+  return React.createElement(SnakeGameplay, { onWin, onStepChange, resetKey, game, onBack, difficulty });
 }
 
 /* ---------------- Block Blast ---------------- */
@@ -9924,6 +10504,47 @@ function bounceShareText(score, level, secs) {
   return `I scored ${score.toLocaleString()} on Bounce 🧱 — reached level ${level} · ${m}:${s}`;
 }
 
+/* ============================================================
+   Power-ups system (Bounce & Zuma)
+   ============================================================ */
+const POWERUP_DURATION_MS = 10000;
+const POWERUP_SPAWN_RATE = 0.1;
+const POWERUP_RADIUS = 12;
+const POWERUP_TYPES = {
+  bounce: ['multi-ball', 'larger-paddle', 'slower-ball', 'laser'],
+  zuma: ['multi-shot', 'faster-shot', 'color-switch', 'chain-clear'],
+};
+const POWERUP_ICONS = {
+  'multi-ball': '🔄',
+  'larger-paddle': '⬆️',
+  'slower-ball': '🐢',
+  'laser': '⚡',
+  'multi-shot': '🔄',
+  'faster-shot': '💨',
+  'color-switch': '🎨',
+  'chain-clear': '✂️',
+};
+
+function spawnPowerup(x, y, typeArray) {
+  const type = typeArray[Math.floor(Math.random() * typeArray.length)];
+  return {
+    id: `pu_${Date.now()}_${Math.random()}`,
+    type,
+    x, y,
+    vx: (Math.random() - 0.5) * 1.2,
+    vy: 1.5,
+    radius: POWERUP_RADIUS,
+    spawnedAt: Date.now(),
+    caught: false,
+  };
+}
+
+function updatePowerup(pu, scale) {
+  pu.x += pu.vx * scale;
+  pu.y += pu.vy * scale;
+  pu.vy += 0.1 * scale;
+}
+
 function BounceGame({ onWin, onStepChange, resetKey }) {
   const [score, setScore]   = useState(0);
   const [lives, setLives]   = useState(BOUNCE_LIVES);
@@ -9934,6 +10555,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const [bestScore, setBestScore] = useState(() => bounceLoadBest());
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const [isMock, setIsMock] = useState(false);
+  const [activePowerups, setActivePowerups] = useState([]);
 
   // Leaderboard tab state (mirrors Snake)
   const [lb, setLb]               = useState(null);
@@ -9963,6 +10585,14 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const leftRef     = useRef(false);
   const rightRef    = useRef(false);
 
+  // Power-ups refs
+  const ballsRef    = useRef([{ x: BOUNCE_W / 2, y: BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1, vx: 0, vy: 0 }]);
+  const powerUpsRef = useRef([]);
+  const activePowerupsRef = useRef([]);
+  const basePaddleWRef = useRef(BOUNCE_PADDLE_W);
+  const baseSpeedRef = useRef(bounceSpeedForLevel(1));
+  const laserLoadedRef = useRef(0);
+
   // Latest-closure prop refs so listeners/loop mount once.
   const onWinRef = useRef(onWin);        onWinRef.current = onWin;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
@@ -9986,17 +10616,15 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   }, [timerRunning]);
 
   const resetBallToPaddle = () => {
-    const ball = ballRef.current;
-    ball.x = paddleRef.current;
-    ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
-    ball.vx = 0;
-    ball.vy = 0;
+    ballsRef.current = [{ x: paddleRef.current, y: BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1, vx: 0, vy: 0 }];
   };
 
   const handleNewGame = () => {
     paddleRef.current = BOUNCE_W / 2;
+    basePaddleWRef.current = BOUNCE_PADDLE_W;
     bricksRef.current = bounceBuildBricks(1);
     speedRef.current = bounceSpeedForLevel(1);
+    baseSpeedRef.current = bounceSpeedForLevel(1);
     scoreRef.current = 0;
     livesRef.current = BOUNCE_LIVES;
     levelRef.current = 1;
@@ -10010,9 +10638,12 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     rightRef.current = false;
     accRef.current = 0;
     lastTsRef.current = null;
+    powerUpsRef.current = [];
+    activePowerupsRef.current = [];
+    laserLoadedRef.current = 0;
     resetBallToPaddle();
     setScore(0); setLives(BOUNCE_LIVES); setLevel(1);
-    setStarted(false); setDone(false); setElapsedSecs(0);
+    setStarted(false); setDone(false); setElapsedSecs(0); setActivePowerups([]);
   };
 
   useEffect(() => {
@@ -10080,65 +10711,139 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     resetBallToPaddle();
   };
 
-  // Advance the ball by a fraction of its per-step velocity and resolve every
-  // collision. Returns true when this frame's integration must stop early
-  // (a life was lost or the wall was cleared and rebuilt).
   const stepBall = (scale) => {
-    const ball = ballRef.current;
-    ball.x += ball.vx * scale;
-    ball.y += ball.vy * scale;
-
-    // Side + top walls.
-    if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); }
-    else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); }
-    if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); }
-
-    // Paddle — deflection angle depends on where it struck.
-    const px = paddleRef.current;
-    if (ball.vy > 0 &&
-        ball.y + BOUNCE_BALL_R >= BOUNCE_PADDLE_Y &&
-        ball.y + BOUNCE_BALL_R <= BOUNCE_PADDLE_Y + BOUNCE_PADDLE_H + 8 &&
-        ball.x >= px - BOUNCE_PADDLE_W / 2 - BOUNCE_BALL_R &&
-        ball.x <= px + BOUNCE_PADDLE_W / 2 + BOUNCE_BALL_R) {
-      const hit = bounceClamp((ball.x - px) / (BOUNCE_PADDLE_W / 2), -1, 1);
-      const angle = hit * BOUNCE_MAX_ANGLE;
-      const speed = speedRef.current;
-      ball.vx = speed * Math.sin(angle);
-      ball.vy = -Math.abs(speed * Math.cos(angle));
-      ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
-    }
-
-    // Bricks — reflect on the shallower-overlap axis, one brick per substep.
+    const balls = ballsRef.current;
     const bricks = bricksRef.current;
-    for (let i = 0; i < bricks.length; i++) {
-      const b = bricks[i];
-      if (!b.alive) continue;
-      const ox = Math.min(ball.x + BOUNCE_BALL_R, b.x + b.w) - Math.max(ball.x - BOUNCE_BALL_R, b.x);
-      const oy = Math.min(ball.y + BOUNCE_BALL_R, b.y + b.h) - Math.max(ball.y - BOUNCE_BALL_R, b.y);
-      if (ox > 0 && oy > 0) {
-        b.alive = false;
-        brokenRef.current += 1;
-        scoreRef.current += b.points;
-        setScore(scoreRef.current);
-        onStepRef.current && onStepRef.current(brokenRef.current);
-        if (ox < oy) { ball.vx = -ball.vx; ball.x += (ball.vx > 0 ? 1 : -1) * ox; }
-        else { ball.vy = -ball.vy; ball.y += (ball.vy > 0 ? 1 : -1) * oy; }
-        if (bricks.every(x => !x.alive)) { nextLevel(); return true; }
-        break;
+    const px = paddleRef.current;
+    const paddleW = basePaddleWRef.current * (1 + activePowerupsRef.current.filter(p => p.type === 'larger-paddle').reduce((a, p) => a + 0.5 * p.stacks, 0));
+
+    for (let ballIdx = 0; ballIdx < balls.length; ballIdx++) {
+      const ball = balls[ballIdx];
+      ball.x += ball.vx * scale;
+      ball.y += ball.vy * scale;
+
+      if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); }
+      else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); }
+      if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); }
+
+      if (ball.vy > 0 &&
+          ball.y + BOUNCE_BALL_R >= BOUNCE_PADDLE_Y &&
+          ball.y + BOUNCE_BALL_R <= BOUNCE_PADDLE_Y + BOUNCE_PADDLE_H + 8 &&
+          ball.x >= px - paddleW / 2 - BOUNCE_BALL_R &&
+          ball.x <= px + paddleW / 2 + BOUNCE_BALL_R) {
+        const hit = bounceClamp((ball.x - px) / (paddleW / 2), -1, 1);
+        const angle = hit * BOUNCE_MAX_ANGLE;
+        const speed = speedRef.current;
+        ball.vx = speed * Math.sin(angle);
+        ball.vy = -Math.abs(speed * Math.cos(angle));
+        ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
+      }
+
+      for (let i = 0; i < bricks.length; i++) {
+        const b = bricks[i];
+        if (!b.alive) continue;
+        const ox = Math.min(ball.x + BOUNCE_BALL_R, b.x + b.w) - Math.max(ball.x - BOUNCE_BALL_R, b.x);
+        const oy = Math.min(ball.y + BOUNCE_BALL_R, b.y + b.h) - Math.max(ball.y - BOUNCE_BALL_R, b.y);
+        if (ox > 0 && oy > 0) {
+          if (laserLoadedRef.current > 0) {
+            const col = Math.floor((b.x - BOUNCE_MARGIN) / ((BOUNCE_W - 2 * BOUNCE_MARGIN - (BOUNCE_COLS - 1) * BOUNCE_GAP_X) / BOUNCE_COLS + BOUNCE_GAP_X));
+            for (let j = 0; j < bricks.length; j++) {
+              const br = bricks[j];
+              const brickCol = Math.floor((br.x - BOUNCE_MARGIN) / ((BOUNCE_W - 2 * BOUNCE_MARGIN - (BOUNCE_COLS - 1) * BOUNCE_GAP_X) / BOUNCE_COLS + BOUNCE_GAP_X));
+              if (brickCol === col && br.alive) {
+                br.alive = false;
+                brokenRef.current += 1;
+                scoreRef.current += br.points;
+              }
+            }
+            laserLoadedRef.current -= 1;
+          } else {
+            b.alive = false;
+            brokenRef.current += 1;
+            scoreRef.current += b.points;
+          }
+          setScore(scoreRef.current);
+          onStepRef.current && onStepRef.current(brokenRef.current);
+          if (Math.random() < POWERUP_SPAWN_RATE) {
+            powerUpsRef.current.push(spawnPowerup(b.x + b.w / 2, b.y + b.h / 2, POWERUP_TYPES.bounce));
+          }
+          if (ox < oy) { ball.vx = -ball.vx; ball.x += (ball.vx > 0 ? 1 : -1) * ox; }
+          else { ball.vy = -ball.vy; ball.y += (ball.vy > 0 ? 1 : -1) * oy; }
+          if (bricks.every(x => !x.alive)) { nextLevel(); return true; }
+          break;
+        }
+      }
+
+      if (ball.y - BOUNCE_BALL_R > BOUNCE_H) {
+        balls.splice(ballIdx, 1);
+        ballIdx--;
+        if (balls.length === 0) { loseLife(); return true; }
       }
     }
-
-    // Bottom edge — life lost.
-    if (ball.y - BOUNCE_BALL_R > BOUNCE_H) { loseLife(); return true; }
     return false;
   };
 
   const update = () => {
-    // Paddle steering by key / dpad.
+    const now = Date.now();
+    const paddleW = basePaddleWRef.current * (1 + activePowerupsRef.current.filter(p => p.type === 'larger-paddle').reduce((a, p) => a + 0.5 * p.stacks, 0));
+
     let px = paddleRef.current;
     if (leftRef.current) px -= BOUNCE_PADDLE_KEY_SPEED;
     if (rightRef.current) px += BOUNCE_PADDLE_KEY_SPEED;
-    paddleRef.current = bounceClamp(px, BOUNCE_PADDLE_W / 2, BOUNCE_W - BOUNCE_PADDLE_W / 2);
+    paddleRef.current = bounceClamp(px, paddleW / 2, BOUNCE_W - paddleW / 2);
+
+    // Update power-ups in flight
+    for (let i = powerUpsRef.current.length - 1; i >= 0; i--) {
+      const pu = powerUpsRef.current[i];
+      updatePowerup(pu, 1);
+
+      if (!pu.caught && pu.y + pu.radius >= BOUNCE_PADDLE_Y && pu.x >= paddleRef.current - paddleW / 2 - 20 && pu.x <= paddleRef.current + paddleW / 2 + 20) {
+        pu.caught = true;
+        const existing = activePowerupsRef.current.find(p => p.type === pu.type);
+        if (pu.type === 'multi-ball') {
+          if (ballsRef.current.length > 0) {
+            const firstBall = ballsRef.current[0];
+            const newBall = {
+              x: firstBall.x + 10,
+              y: firstBall.y,
+              vx: firstBall.vx * Math.cos(Math.PI / 6) - firstBall.vy * Math.sin(Math.PI / 6),
+              vy: firstBall.vx * Math.sin(Math.PI / 6) + firstBall.vy * Math.cos(Math.PI / 6),
+            };
+            ballsRef.current.push(newBall);
+          }
+        }
+        if (existing) {
+          existing.stacks += 1;
+          existing.startedAt = now;
+        } else {
+          activePowerupsRef.current.push({ type: pu.type, startedAt: now, stacks: 1 });
+        }
+        setActivePowerups([...activePowerupsRef.current]);
+        powerUpsRef.current.splice(i, 1);
+      } else if (pu.y > BOUNCE_H + 50) {
+        powerUpsRef.current.splice(i, 1);
+      }
+    }
+
+    // Update active power-ups duration
+    for (let i = activePowerupsRef.current.length - 1; i >= 0; i--) {
+      const ap = activePowerupsRef.current[i];
+      if (now - ap.startedAt > POWERUP_DURATION_MS) {
+        if (ap.type === 'multi-shot') { } // handled in zuma
+        activePowerupsRef.current.splice(i, 1);
+      }
+    }
+    if (activePowerupsRef.current.length === 0 && powerUpsRef.current.length === 0) {
+      setActivePowerups([]);
+    }
+
+    // Apply speed multiplier
+    const slowPower = activePowerupsRef.current.find(p => p.type === 'slower-ball');
+    if (slowPower) {
+      speedRef.current = baseSpeedRef.current * Math.pow(0.7, slowPower.stacks);
+    } else {
+      speedRef.current = baseSpeedRef.current;
+    }
 
     if (!launchedRef.current) { resetBallToPaddle(); return; }
     for (let i = 0; i < BOUNCE_SUBSTEPS; i++) {
@@ -10159,14 +10864,40 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
       ctx.fillStyle = b.color;
       ctx.fillRect(b.x, b.y, b.w, b.h);
     }
+
+    // Draw power-ups in flight
+    for (let i = 0; i < powerUpsRef.current.length; i++) {
+      const pu = powerUpsRef.current[i];
+      ctx.save();
+      ctx.translate(pu.x, pu.y);
+      const rotation = ((Date.now() - pu.spawnedAt) / 100) % (Math.PI * 2);
+      ctx.rotate(rotation);
+      ctx.font = '24px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(POWERUP_ICONS[pu.type], 0, 0);
+      ctx.restore();
+
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(pu.x, pu.y + pu.radius + 3, pu.radius * 0.7, pu.radius * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.fillStyle = C.text;
     const px = paddleRef.current;
-    ctx.fillRect(px - BOUNCE_PADDLE_W / 2, BOUNCE_PADDLE_Y, BOUNCE_PADDLE_W, BOUNCE_PADDLE_H);
-    const ball = ballRef.current;
+    const paddleW = basePaddleWRef.current * (1 + activePowerupsRef.current.filter(p => p.type === 'larger-paddle').reduce((a, p) => a + 0.5 * p.stacks, 0));
+    ctx.fillRect(px - paddleW / 2, BOUNCE_PADDLE_Y, paddleW, BOUNCE_PADDLE_H);
+
+    const balls = ballsRef.current;
     ctx.fillStyle = C.gold;
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, BOUNCE_BALL_R, 0, Math.PI * 2);
-    ctx.fill();
+    for (let i = 0; i < balls.length; i++) {
+      const ball = balls[i];
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BOUNCE_BALL_R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     if (startedRef.current && !launchedRef.current && !doneRef.current) {
       ctx.fillStyle = C.text;
       ctx.font = '600 14px "Space Grotesk", system-ui, sans-serif';
@@ -10277,6 +11008,18 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
               <div className="plabel">Time</div>
               <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
             </div>
+            {activePowerups.map((ap, idx) => {
+              const now = Date.now();
+              const elapsed = now - ap.startedAt;
+              const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
+              return (
+                <div key={idx} className="pill" style={{ background: C.emerald + '22', border: `1px solid ${C.emerald}` }}>
+                  <div className="plabel" style={{ fontSize: '0.75rem' }}>
+                    {POWERUP_ICONS[ap.type]} {remaining}s {ap.stacks > 1 ? `×${ap.stacks}` : ''}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="bounce-board-wrap">
@@ -11630,6 +12373,23 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
           </div>
         </div>
 
+        {Array.isArray(profile.badges) && profile.badges.length > 0 && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Streak badges</div>
+            <div className="badge-strip" style={{ marginTop: 0 }}>
+              {profile.badges
+                .map(badgeForDays)
+                .filter(Boolean)
+                .map(b => (
+                  <span key={b.id} className="badge-chip" title={`${b.name} · ${b.min}-day streak`}>
+                    <span className="badge-chip-icon">{b.icon}</span>
+                    {b.name}
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '1rem', fontSize: '0.9rem' }}>
           <p style={{ margin: '0.5rem 0' }}>
             <span style={{ color: C.muted }}>Followers:</span>{' '}
@@ -11861,6 +12621,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
   const [elapsedSecs, setElapsedSecs] = useState(0);
+  const [activePowerups, setActivePowerups] = useState([]);
   const [lb, setLb] = useState(null);
   const [lbLoading, setLbLoading] = useState(false);
   const [lbError, setLbError] = useState(false);
@@ -11880,6 +12641,11 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   const curColorRef = useRef(ZUMA_COLORS_ALL[0]);
   const nxtColorRef = useRef(ZUMA_COLORS_ALL[1]);
   const pathDataRef = useRef(null);
+  const powerUpsRef = useRef([]);
+  const activePowerupsRef = useRef([]);
+  const baseShotSpeedRef = useRef(ZUMA_SHOT_SPEED);
+  const wildColorLoadedRef = useRef(0);
+  const chainClearLoadedRef = useRef(0);
   const onWinRef = useRef(onWin); onWinRef.current = onWin;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
 
@@ -11900,9 +12666,13 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
     startedRef.current = false;
     doneRef.current = false;
     submittedRef.current = false;
+    powerUpsRef.current = [];
+    activePowerupsRef.current = [];
+    wildColorLoadedRef.current = 0;
+    chainClearLoadedRef.current = 0;
     initLevel(1);
     setScore(0); setLevel(1); setBallsPopped(0);
-    setStarted(false); setDone(false); setElapsedSecs(0);
+    setStarted(false); setDone(false); setElapsedSecs(0); setActivePowerups([]);
   }
 
   useEffect(() => { init(); }, [resetKey]);
@@ -11990,6 +12760,24 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
           ctx.beginPath(); ctx.arc(pt.x-3, pt.y-3, 4, 0, Math.PI*2);
           ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
         }
+        // Power-ups in flight
+        for (let i = 0; i < powerUpsRef.current.length; i++) {
+          const pu = powerUpsRef.current[i];
+          ctx.save();
+          ctx.translate(pu.x, pu.y);
+          const rotation = ((Date.now() - pu.spawnedAt) / 100) % (Math.PI * 2);
+          ctx.rotate(rotation);
+          ctx.font = '20px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(POWERUP_ICONS[pu.type], 0, 0);
+          ctx.restore();
+          ctx.fillStyle = 'rgba(0,0,0,0.2)';
+          ctx.beginPath();
+          ctx.ellipse(pu.x, pu.y + pu.radius + 3, pu.radius * 0.7, pu.radius * 0.3, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
         // Shot ball
         const sh = shotRef.current;
         if (sh) {
@@ -12081,6 +12869,45 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
         drawFrame(); return;
       }
 
+      // Update power-ups and handle frog collision
+      const now = Date.now();
+      for (let i = powerUpsRef.current.length - 1; i >= 0; i--) {
+        const pu = powerUpsRef.current[i];
+        updatePowerup(pu, dt);
+        if (!pu.caught && Math.hypot(pu.x - FROG_X, pu.y - FROG_Y) < POWERUP_RADIUS + 18) {
+          pu.caught = true;
+          const existing = activePowerupsRef.current.find(p => p.type === pu.type);
+          if (existing) {
+            existing.stacks += 1;
+            existing.startedAt = now;
+          } else {
+            activePowerupsRef.current.push({ type: pu.type, startedAt: now, stacks: 1 });
+          }
+          if (pu.type === 'chain-clear') chainClearLoadedRef.current = existing ? existing.stacks : 1;
+          if (pu.type === 'color-switch') wildColorLoadedRef.current = existing ? existing.stacks : 1;
+          setActivePowerups([...activePowerupsRef.current]);
+          powerUpsRef.current.splice(i, 1);
+        } else if (pu.y > ZUMA_H + 50) {
+          powerUpsRef.current.splice(i, 1);
+        }
+      }
+      for (let i = activePowerupsRef.current.length - 1; i >= 0; i--) {
+        const ap = activePowerupsRef.current[i];
+        if (now - ap.startedAt > POWERUP_DURATION_MS) {
+          if (ap.type === 'chain-clear') chainClearLoadedRef.current = 0;
+          if (ap.type === 'color-switch') wildColorLoadedRef.current = 0;
+          activePowerupsRef.current.splice(i, 1);
+        }
+      }
+
+      // Update baseShotSpeed for faster-shot power-up
+      const fasterPower = activePowerupsRef.current.find(p => p.type === 'faster-shot');
+      if (fasterPower) {
+        baseShotSpeedRef.current = ZUMA_SHOT_SPEED * Math.pow(1.4, fasterPower.stacks);
+      } else {
+        baseShotSpeedRef.current = ZUMA_SHOT_SPEED;
+      }
+
       // Advance shot ball
       if (shotRef.current) {
         const sh = shotRef.current;
@@ -12093,22 +12920,30 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
             const pt = zumaPointAtDist(pd, chain[i].dist);
             const dx = sh.x - pt.x, dy = sh.y - pt.y;
             if (dx*dx + dy*dy < (ZUMA_BALL_R*2)*(ZUMA_BALL_R*2)) {
-              // Insert behind hit ball; push rear segment back if needed
-              chain.splice(i+1, 0, { color: sh.color, dist: chain[i].dist - ZUMA_DIAM });
-              for (let j = i+2; j < chain.length; j++) {
-                const needed = chain[j-1].dist - ZUMA_DIAM;
-                if (chain[j].dist > needed) chain[j].dist = needed; else break;
+              if (chainClearLoadedRef.current > 0) {
+                chain.length = 0;
+                chainClearLoadedRef.current = 0;
+              } else {
+                chain.splice(i+1, 0, { color: sh.color, dist: chain[i].dist - ZUMA_DIAM });
+                for (let j = i+2; j < chain.length; j++) {
+                  const needed = chain[j-1].dist - ZUMA_DIAM;
+                  if (chain[j].dist > needed) chain[j].dist = needed; else break;
+                }
+                const p = zumaCheckMatches(chain, i+1);
+                if (p > 0) {
+                  const bonus = p >= 6 ? (p-5)*50 : 0;
+                  scoreRef.current += p*10 + bonus;
+                  bpRef.current += p;
+                  setScore(scoreRef.current);
+                  setBallsPopped(bpRef.current);
+                  onStepRef.current && onStepRef.current(bpRef.current);
+                }
+              }
+              if (Math.random() < POWERUP_SPAWN_RATE) {
+                const pt = zumaPointAtDist(pd, chain[i] ? chain[i].dist : chain[chain.length - 1] ? chain[chain.length - 1].dist : 0);
+                powerUpsRef.current.push(spawnPowerup(pt.x, pt.y, POWERUP_TYPES.zuma));
               }
               shotRef.current = null;
-              const p = zumaCheckMatches(chain, i+1);
-              if (p > 0) {
-                const bonus = p >= 6 ? (p-5)*50 : 0;
-                scoreRef.current += p*10 + bonus;
-                bpRef.current += p;
-                setScore(scoreRef.current);
-                setBallsPopped(bpRef.current);
-                onStepRef.current && onStepRef.current(bpRef.current);
-              }
               break;
             }
           }
@@ -12139,10 +12974,17 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
     if (!startedRef.current) { startedRef.current = true; setStarted(true); }
     const lv = ZUMA_LEVELS[levelRef.current - 1];
     const angle = frogAngleRef.current;
+    const fasterPower = activePowerupsRef.current.find(p => p.type === 'faster-shot');
+    const currentSpeed = fasterPower ? ZUMA_SHOT_SPEED * Math.pow(1.4, fasterPower.stacks) : ZUMA_SHOT_SPEED;
+
+    const useWildColor = wildColorLoadedRef.current > 0;
+    const shotColor = useWildColor ? '#ffffff' : curColorRef.current;
+    if (useWildColor) wildColorLoadedRef.current = 0;
+
     shotRef.current = {
       x: FROG_X + Math.cos(angle)*20, y: FROG_Y + Math.sin(angle)*20,
-      vx: Math.cos(angle)*ZUMA_SHOT_SPEED, vy: Math.sin(angle)*ZUMA_SHOT_SPEED,
-      color: curColorRef.current,
+      vx: Math.cos(angle)*currentSpeed, vy: Math.sin(angle)*currentSpeed,
+      color: shotColor,
     };
     curColorRef.current = nxtColorRef.current;
     nxtColorRef.current = zumaRandColor(lv.colors);
@@ -12176,7 +13018,17 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
           React.createElement('div', { className: 'pill' },
             React.createElement('div', { className: 'plabel' }, 'Time'),
             React.createElement('div', { className: 'pvalue mono' }, fmtS(elapsedSecs))
-          )
+          ),
+          activePowerups.map((ap, idx) => {
+            const now = Date.now();
+            const elapsed = now - ap.startedAt;
+            const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
+            return React.createElement('div', { key: idx, className: 'pill', style: { background: C.emerald + '22', border: `1px solid ${C.emerald}` } },
+              React.createElement('div', { className: 'plabel', style: { fontSize: '0.75rem' } },
+                POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '')
+              )
+            );
+          })
         ),
         React.createElement('div', { className: 'zuma-wrap' },
           React.createElement('canvas', {
@@ -12231,510 +13083,352 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   );
 }
 
-/* ============================================================
-   Game — Hash Rush (3D endless runner, Three.js, Classic tab)
-   ============================================================ */
-const HR_HISTORY_KEY = 'puzzlechain_hashrush_history';
-const HR_LANE_X      = [-3, 0, 3];
-const HR_CHUNK_LEN   = 40;
-const HR_NUM_CHUNKS  = 4;
-
-function hrMakeGridTex(THREE) {
-  const sz = 256;
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = sz;
-  const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#04101e';
-  ctx.fillRect(0, 0, sz, sz);
-  ctx.strokeStyle = '#0d3358';
-  ctx.lineWidth = 1;
-  const step = sz / 8;
-  for (let i = 0; i <= 8; i++) {
-    ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, sz); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(sz, i * step); ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(cv);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(4, 4);
-  return tex;
-}
-
-function hrSpawnChunk(THREE, scene, centerZ, isFirst, gridTex) {
-  const allMeshes = [];
-  const obstacles = [];
-  const collectibles = [];
-
-  const road = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, HR_CHUNK_LEN),
-    new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.85, emissive: new THREE.Color(0x081520), emissiveIntensity: 0.5 })
-  );
-  road.rotation.x = -Math.PI / 2;
-  road.position.set(0, 0, centerZ);
-  scene.add(road);
-  allMeshes.push(road);
-
-  [-1.5, 1.5].forEach(lx => {
-    const d = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 0.05, HR_CHUNK_LEN),
-      new THREE.MeshBasicMaterial({ color: 0x1e3d6a })
-    );
-    d.position.set(lx, 0.02, centerZ);
-    scene.add(d);
-    allMeshes.push(d);
-  });
-
-  if (!isFirst) {
-    const chunkFarZ  = centerZ - HR_CHUNK_LEN / 2;
-    const occupied   = new Set();
-    const numObs     = Math.random() < 0.45 ? 1 : 2;
-
-    for (let i = 0; i < numObs; i++) {
-      const lane = Math.floor(Math.random() * 3);
-      const zOff = 6 + Math.random() * (HR_CHUNK_LEN - 12);
-      const slot = `o_${lane}_${Math.floor(zOff / 7)}`;
-      if (occupied.has(slot)) continue;
-      occupied.add(slot);
-
-      const type = Math.random() < 0.38 ? 'firewall' : Math.random() < 0.55 ? 'congestion' : 'failedtx';
-      let geo, mat;
-      if (type === 'firewall') {
-        geo = new THREE.BoxGeometry(2.0, 3.0, 0.5);
-        mat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xa01030, emissiveIntensity: 0.35 });
-      } else if (type === 'congestion') {
-        geo = new THREE.BoxGeometry(2.0, 1.2, 1.2);
-        mat = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x7a3508, emissiveIntensity: 0.25 });
-      } else {
-        geo = new THREE.SphereGeometry(0.7, 8, 6);
-        mat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0x880020, emissiveIntensity: 0.5, wireframe: true });
-      }
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(HR_LANE_X[lane], type === 'firewall' ? 1.5 : 0.65, chunkFarZ + zOff);
-      scene.add(mesh);
-      allMeshes.push(mesh);
-      obstacles.push({ mesh, type, alive: true });
-    }
-
-    const numCol = Math.floor(Math.random() * 3) + 1;
-    for (let i = 0; i < numCol; i++) {
-      const lane   = Math.floor(Math.random() * 3);
-      const zOff   = 4 + Math.random() * (HR_CHUNK_LEN - 8);
-      const slot   = `c_${lane}_${Math.floor(zOff / 6)}`;
-      if (occupied.has(slot)) continue;
-      occupied.add(slot);
-
-      const isShard = Math.random() < 0.22;
-      const geo2 = isShard
-        ? new THREE.IcosahedronGeometry(0.6, 0)
-        : new THREE.OctahedronGeometry(0.65, 0);
-      const mat2 = new THREE.MeshStandardMaterial(
-        isShard
-          ? { color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 0.7 }
-          : { color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.5 }
-      );
-      const mesh2 = new THREE.Mesh(geo2, mat2);
-      mesh2.position.set(HR_LANE_X[lane], 1.0, chunkFarZ + zOff);
-      scene.add(mesh2);
-      allMeshes.push(mesh2);
-      collectibles.push({ mesh: mesh2, isShard, alive: true });
-    }
-  }
-
-  return { centerZ, allMeshes, obstacles, collectibles };
-}
-
-function hrDisposeChunk(THREE, scene, chunk) {
-  chunk.allMeshes.forEach(m => {
-    scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (m.material.map) m.material.map.dispose();
-      m.material.dispose();
-    }
-  });
-}
-
-function HashRushGame({ onWin, onStepChange, resetKey, game, onBack }) {
-  const [loading, setLoading] = useState(true);
-  const [webglErr, setWebglErr] = useState(false);
+// ---- Match-3 Campaign Game ----
+function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, resetKey }) {
+  const [phase, setPhase] = useState('campaign'); // 'campaign' | 'playing' | 'won' | 'lost'
+  const [selectedPuzzle, setSelectedPuzzle] = useState(1);
+  const [puzzleConfig, setPuzzleConfig] = useState(null);
+  const [tiles, setTiles] = useState([]);
+  const [bar, setBar] = useState([]);
   const [score, setScore] = useState(0);
-  const [dist, setDist] = useState(0);
-  const [mult, setMult] = useState(1);
+  const [moves, setMoves] = useState(0);
+  const [done, setDone] = useState(false);
+  const [userProgress, setUserProgress] = useState(null);
+  const [boardSeed, setBoardSeed] = useState(0);
 
-  const mountRef  = useRef(null);
-  const canvasRef = useRef(null);
-  const rafRef    = useRef(null);
-  const uiTmrRef  = useRef(null);
-  const roRef     = useRef(null);
-  const gameRef   = useRef(null); // holds live game state object
-  const onWinRef  = useRef(onWin);
-  const onStepRef = useRef(onStepChange);
-  onWinRef.current  = onWin;
-  onStepRef.current = onStepChange;
+  const secs = useElapsed(resetKey, !done && phase === 'playing');
+  const secsRef = useRef(0);
+  secsRef.current = secs;
 
-  const histRef = useRef(cgLoadHistory(HR_HISTORY_KEY));
-
-  const sheet = [
-    cgRulesSection([
-      'Tap left / right side of screen (or ← → arrow keys) to switch lanes.',
-      'Dodge red Firewalls, orange Congestion blocks, and spinning Failed-Tx spheres.',
-      'Collect gold Tokens (+50 pts) and cyan Hash Shards (×2 score rate for 5 s).',
-      'The rig speeds up over time — survive as long as possible!',
-    ]),
-    cgHistorySection(histRef.current, r => (
-      React.createElement(React.Fragment, null,
-        React.createElement('span', null, `${(r.score || 0).toLocaleString()} pts`),
-        React.createElement('span', { className: 'mono' }, `${r.distance || 0}m · ${r.tokens || 0}⛏`)
-      )
-    )),
-    cgStatsSection([
-      { val: histRef.current.length > 0 ? Math.max(...histRef.current.map(r => r.score || 0)).toLocaleString() : 0, lbl: 'Best Score' },
-      { val: histRef.current.length, lbl: 'Total Runs' },
-      { val: histRef.current.reduce((a, r) => a + (r.distance || 0), 0), lbl: 'Total Metres' },
-      { val: histRef.current.reduce((a, r) => a + (r.tokens || 0), 0), lbl: 'Total Tokens' },
-    ]),
+  // Match-3 puzzle definitions (same as server)
+  const MATCH3_PUZZLES = [
+    { id: 1, name: 'Getting Started', target: 800, timeLimit: 120, moveLimit: 30, layers: 2, difficulty: 'Easy' },
+    { id: 2, name: 'Gather Gems', target: 1200, timeLimit: 120, moveLimit: 28, layers: 3, difficulty: 'Easy' },
+    { id: 3, name: 'Color Cascade', target: 1500, timeLimit: 120, moveLimit: 26, layers: 2, difficulty: 'Easy' },
+    { id: 4, name: 'Tile Practice', target: 2000, timeLimit: 120, moveLimit: 35, layers: 3, difficulty: 'Easy' },
+    { id: 5, name: 'Gem Master', target: 2500, timeLimit: 120, moveLimit: 32, layers: 2, difficulty: 'Easy' },
+    { id: 6, name: 'Combo Chain', target: 1800, timeLimit: 120, moveLimit: 40, layers: 2, difficulty: 'Easy' },
+    { id: 7, name: 'Rainbow Tiles', target: 2200, timeLimit: 120, moveLimit: 30, layers: 3, difficulty: 'Easy' },
+    { id: 8, name: 'Momentum', target: 2700, timeLimit: 120, moveLimit: 28, layers: 2, difficulty: 'Easy' },
+    { id: 9, name: 'Precision Match', target: 2000, timeLimit: 120, moveLimit: 25, layers: 3, difficulty: 'Easy' },
+    { id: 10, name: 'Power Play', target: 2800, timeLimit: 120, moveLimit: 32, layers: 3, difficulty: 'Easy' },
+    { id: 11, name: 'Rising Challenge', target: 3000, timeLimit: 110, moveLimit: 28, layers: 3, difficulty: 'Medium' },
+    { id: 12, name: 'Locked Tiles', target: 3200, timeLimit: 110, moveLimit: 26, layers: 4, difficulty: 'Medium' },
+    { id: 13, name: 'Strategic Moves', target: 3500, timeLimit: 110, moveLimit: 30, layers: 3, difficulty: 'Medium' },
+    { id: 14, name: 'Gem Rush', target: 3800, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+    { id: 15, name: 'Pressure Cooker', target: 3200, timeLimit: 100, moveLimit: 24, layers: 3, difficulty: 'Medium' },
+    { id: 16, name: 'Ice Breaker', target: 4000, timeLimit: 110, moveLimit: 32, layers: 4, difficulty: 'Medium' },
+    { id: 17, name: 'Cascade Master', target: 3600, timeLimit: 110, moveLimit: 26, layers: 3, difficulty: 'Medium' },
+    { id: 18, name: 'Deep Focus', target: 4200, timeLimit: 110, moveLimit: 30, layers: 4, difficulty: 'Medium' },
+    { id: 19, name: 'Tile Tactics', target: 3900, timeLimit: 100, moveLimit: 25, layers: 3, difficulty: 'Medium' },
+    { id: 20, name: 'Gem Sculptor', target: 4400, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+    { id: 21, name: 'Locked & Loaded', target: 4100, timeLimit: 110, moveLimit: 30, layers: 4, difficulty: 'Medium' },
+    { id: 22, name: 'Precision Strike', target: 3800, timeLimit: 100, moveLimit: 23, layers: 3, difficulty: 'Medium' },
+    { id: 23, name: 'Color Theory', target: 4300, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+    { id: 24, name: 'Momentum Shift', target: 4600, timeLimit: 110, moveLimit: 32, layers: 4, difficulty: 'Medium' },
+    { id: 25, name: 'Maze Solver', target: 4000, timeLimit: 100, moveLimit: 26, layers: 3, difficulty: 'Medium' },
+    { id: 26, name: 'Time Pressure', target: 3900, timeLimit: 90, moveLimit: 22, layers: 4, difficulty: 'Medium' },
+    { id: 27, name: 'Champion\'s Path', target: 4500, timeLimit: 110, moveLimit: 30, layers: 4, difficulty: 'Medium' },
+    { id: 28, name: 'Final Stand', target: 4800, timeLimit: 110, moveLimit: 28, layers: 4, difficulty: 'Medium' },
+    { id: 29, name: 'Gem Dynasty', target: 4200, timeLimit: 100, moveLimit: 24, layers: 3, difficulty: 'Medium' },
+    { id: 30, name: 'Gateway Challenge', target: 5000, timeLimit: 110, moveLimit: 32, layers: 4, difficulty: 'Medium' },
+    { id: 31, name: 'Expert Territory', target: 5200, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+    { id: 32, name: 'Ice Fortress', target: 5400, timeLimit: 100, moveLimit: 24, layers: 5, difficulty: 'Hard' },
+    { id: 33, name: 'Avalanche', target: 5800, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+    { id: 34, name: 'Locked Labyrinth', target: 5600, timeLimit: 100, moveLimit: 25, layers: 5, difficulty: 'Hard' },
+    { id: 35, name: 'Inferno', target: 6000, timeLimit: 90, moveLimit: 22, layers: 5, difficulty: 'Hard' },
+    { id: 36, name: 'Master Puzzle', target: 5900, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+    { id: 37, name: 'Complexity', target: 6200, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+    { id: 38, name: 'Precision Required', target: 5800, timeLimit: 90, moveLimit: 23, layers: 5, difficulty: 'Hard' },
+    { id: 39, name: 'Final Test', target: 6400, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+    { id: 40, name: 'Legendary Tier', target: 6600, timeLimit: 100, moveLimit: 30, layers: 5, difficulty: 'Hard' },
+    { id: 41, name: 'Peak Performance', target: 6000, timeLimit: 90, moveLimit: 24, layers: 5, difficulty: 'Hard' },
+    { id: 42, name: 'Unrelenting', target: 6300, timeLimit: 100, moveLimit: 27, layers: 5, difficulty: 'Hard' },
+    { id: 43, name: 'Titan\'s Trial', target: 6800, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+    { id: 44, name: 'Endgame', target: 6500, timeLimit: 90, moveLimit: 25, layers: 5, difficulty: 'Hard' },
+    { id: 45, name: 'Perfection Quest', target: 6900, timeLimit: 100, moveLimit: 30, layers: 5, difficulty: 'Hard' },
+    { id: 46, name: 'Unstoppable', target: 6700, timeLimit: 100, moveLimit: 26, layers: 5, difficulty: 'Hard' },
+    { id: 47, name: 'Ultra Challenge', target: 7000, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
+    { id: 48, name: 'Reality Bender', target: 6800, timeLimit: 90, moveLimit: 23, layers: 5, difficulty: 'Hard' },
+    { id: 49, name: 'Pandora\'s Box', target: 7100, timeLimit: 100, moveLimit: 30, layers: 5, difficulty: 'Hard' },
+    { id: 50, name: 'Master Challenge', target: 7200, timeLimit: 100, moveLimit: 28, layers: 5, difficulty: 'Hard' },
   ];
 
-  // Keyboard input — reads from gameRef.current so always fresh
+  // Load user progress
   useEffect(() => {
-    const onKey = (e) => {
-      const g = gameRef.current;
-      if (!g || g.done) return;
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
-        e.preventDefault();
-        if (g.targetLane > 0) { g.targetLane--; cgHaptic(10); }
-      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
-        e.preventDefault();
-        if (g.targetLane < 2) { g.targetLane++; cgHaptic(10); }
+    (async () => {
+      const { ok, body } = await api('/api/match3/progress');
+      if (ok && body) {
+        setUserProgress(body);
+        setSelectedPuzzle(body.lastPlayedPuzzle || 1);
       }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    })();
   }, []);
 
-  // Main init effect (re-runs on resetKey to restart)
-  useEffect(() => {
-    // Reset display state
-    setScore(0); setDist(0); setMult(1); setLoading(true); setWebglErr(false);
+  // Start a puzzle
+  const startPuzzle = async (puzzleId) => {
+    const { ok, body } = await api(`/api/match3/start/${puzzleId}`);
+    if (ok && body) {
+      setPuzzleConfig(body);
+      setBoardSeed(body.boardSeed);
+      setSelectedPuzzle(puzzleId);
 
-    // Cancel previous loop / timer
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
-    if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
-
-    // Fresh game state (shared by loop + cleanup via closure)
-    let renderer = null, scene = null;
-    const chunks = [];
-    const g = {
-      targetLane: 1, speed: 8,
-      score: 0, dist: 0, tokens: 0, multEnd: 0,
-      done: false, elapsed: 0, lastTs: null,
-    };
-    gameRef.current = g;
-
-    const endRun = () => {
-      if (g.done) return;
-      g.done = true;
-      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-      if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
-      setScore(g.score);
-      setDist(Math.floor(g.dist));
-      cgSaveHistory(HR_HISTORY_KEY, { score: g.score, distance: Math.floor(g.dist), tokens: g.tokens, ts: Date.now() });
-      cgHaptic([20, 40, 20]);
-      onWinRef.current(g.score, g.tokens, Math.floor(g.elapsed), {
-        winnerLabel: 'Run Over',
-        share: `⛏️ Hash Rush — ${g.score.toLocaleString()} pts · ${Math.floor(g.dist)}m · ${g.tokens} tokens`,
-      });
-    };
-
-    const initWithThree = (THREE) => {
-      const canvas = canvasRef.current;
-      const mount  = mountRef.current;
-      if (!canvas || !mount) return;
-
-      // Create renderer (throws if WebGL unavailable)
-      try {
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-      } catch (e) {
-        setWebglErr(true); setLoading(false); return;
-      }
-      const W = mount.clientWidth  || window.innerWidth;
-      const H = mount.clientHeight || Math.round(window.innerHeight * 0.65);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.setSize(W, H);
-      renderer.setClearColor(0x030609);
-      renderer.shadowMap.enabled = false;
-
-      scene = new THREE.Scene();
-
-      const camera = new THREE.PerspectiveCamera(70, W / H, 0.1, 500);
-      camera.position.set(0, 5, 12);
-      camera.lookAt(0, 0, -20);
-
-      // Lighting
-      scene.add(new THREE.AmbientLight(0x334466, 0.8));
-      const dir = new THREE.DirectionalLight(0xffffff, 0.6);
-      dir.position.set(5, 10, 5);
-      scene.add(dir);
-      const rigLight = new THREE.PointLight(0x3b82f6, 4, 16);
-      rigLight.position.set(0, 2, 0);
-      scene.add(rigLight);
-
-      // Sky dome
-      scene.add(new THREE.Mesh(
-        new THREE.SphereGeometry(220, 16, 8),
-        new THREE.MeshBasicMaterial({ color: 0x020407, side: THREE.BackSide })
-      ));
-
-      // Distant city blocks (decorative)
-      [
-        [-20, -130, 18], [-15, -110, 13], [20, -120, 22],
-        [15, -145, 14],  [-25, -160, 26], [25, -170, 20],
-      ].forEach(([x, z, h]) => {
-        const cm = new THREE.Mesh(
-          new THREE.BoxGeometry(2.5, h, 2.5),
-          new THREE.MeshStandardMaterial({ color: 0x050e1c, emissive: new THREE.Color(0x0c2845), emissiveIntensity: 0.65 })
-        );
-        cm.position.set(x, h / 2, z);
-        scene.add(cm);
-      });
-
-      // Player rig
-      const rig = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 1, 3),
-        new THREE.MeshStandardMaterial({
-          color: 0x3b82f6, emissive: new THREE.Color(0x1a4fc4),
-          emissiveIntensity: 0.5, roughness: 0.3, metalness: 0.7,
-        })
-      );
-      rig.position.set(0, 0.5, 0);
-      scene.add(rig);
-
-      // Grid texture (shared across all chunks this session)
-      const gridTex = hrMakeGridTex(THREE);
-
-      // Initial road chunks: centers at -20, -60, -100, -140
-      for (let i = 0; i < HR_NUM_CHUNKS; i++) {
-        const centerZ = -(i * HR_CHUNK_LEN) - HR_CHUNK_LEN / 2;
-        chunks.push(hrSpawnChunk(THREE, scene, centerZ, i === 0, gridTex));
-      }
-
-      // Resize observer
-      const ro = new ResizeObserver(([entry]) => {
-        const { width, height } = entry.contentRect;
-        if (width < 1 || height < 1 || !renderer) return;
-        renderer.setSize(width, height);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-      });
-      ro.observe(mount);
-      roRef.current = ro;
-
-      setLoading(false);
-
-      // Game loop
-      const loop = (ts) => {
-        if (g.done) return;
-        rafRef.current = requestAnimationFrame(loop);
-
-        const dt = g.lastTs ? Math.min((ts - g.lastTs) / 1000, 0.1) : 0.016;
-        g.lastTs = ts;
-        g.elapsed += dt;
-
-        const scroll = g.speed * dt;
-        g.dist += scroll;
-
-        // Move all chunk meshes toward camera (+z)
-        for (let ci = 0; ci < chunks.length; ci++) {
-          const ch = chunks[ci];
-          ch.centerZ += scroll;
-          for (let mi = 0; mi < ch.allMeshes.length; mi++) {
-            ch.allMeshes[mi].position.z += scroll;
-          }
-        }
-
-        // Lerp rig x
-        const targetX = HR_LANE_X[g.targetLane];
-        rig.position.x += (targetX - rig.position.x) * Math.min(dt * 10, 0.9);
-        rigLight.position.x = rig.position.x;
-
-        // Animate collectibles and failed-tx obstacles
-        for (let ci = 0; ci < chunks.length; ci++) {
-          const ch = chunks[ci];
-          for (let oi = 0; oi < ch.obstacles.length; oi++) {
-            const obs = ch.obstacles[oi];
-            if (!obs.alive || obs.type !== 'failedtx') continue;
-            obs.mesh.rotation.x += dt * 2;
-            obs.mesh.rotation.z += dt * 1.5;
-          }
-          for (let ki = 0; ki < ch.collectibles.length; ki++) {
-            const col = ch.collectibles[ki];
-            if (!col.alive) continue;
-            col.mesh.rotation.y += dt * (col.isShard ? 3.5 : 2);
-            col.mesh.rotation.x += dt * 0.8;
-          }
-        }
-
-        // Collision + collection — only within reasonable z range
-        const rx = rig.position.x;
-        outer: for (let ci = 0; ci < chunks.length; ci++) {
-          const ch = chunks[ci];
-          for (let oi = 0; oi < ch.obstacles.length; oi++) {
-            const obs = ch.obstacles[oi];
-            if (!obs.alive) continue;
-            const oz = obs.mesh.position.z;
-            if (oz > 4 || oz < -3) continue; // z cull: only near z=0
-            const ox = obs.mesh.position.x;
-            const dx = Math.abs(rx - ox);
-            const hz = obs.type === 'firewall' ? 1.5 : obs.type === 'congestion' ? 1.8 : 1.4;
-            if (dx < 1.8 && Math.abs(oz) < hz) { endRun(); break outer; }
-          }
-          for (let ki = 0; ki < ch.collectibles.length; ki++) {
-            const col = ch.collectibles[ki];
-            if (!col.alive) continue;
-            const oz = col.mesh.position.z;
-            if (oz > 3 || oz < -3) continue;
-            const dx = Math.abs(rx - col.mesh.position.x);
-            if (dx < 1.6 && Math.abs(oz) < 1.8) {
-              col.alive = false;
-              scene.remove(col.mesh);
-              if (col.isShard) {
-                g.multEnd = performance.now() + 5000;
-              } else {
-                g.tokens++;
-                if (onStepRef.current) onStepRef.current(g.tokens);
-              }
-            }
-          }
-        }
-
-        // Update score
-        const multActive = performance.now() < g.multEnd;
-        g.score = Math.round(g.dist * (multActive ? 2 : 1) * 10) + g.tokens * 50;
-
-        // Increase speed gently
-        g.speed = Math.min(8 + g.dist * 0.016, 32);
-
-        // Retire far chunks (centerZ > 40 means they're well past the camera)
-        for (let ci = chunks.length - 1; ci >= 0; ci--) {
-          if (chunks[ci].centerZ > 40) {
-            hrDisposeChunk(THREE, scene, chunks[ci]);
-            chunks.splice(ci, 1);
-          }
-        }
-        // Spawn replacements
-        while (chunks.length < HR_NUM_CHUNKS) {
-          const minCZ = chunks.length > 0 ? Math.min(...chunks.map(c => c.centerZ)) : -HR_CHUNK_LEN / 2;
-          chunks.push(hrSpawnChunk(THREE, scene, minCZ - HR_CHUNK_LEN, false, gridTex));
-        }
-
-        renderer.render(scene, camera);
-      };
-
-      rafRef.current = requestAnimationFrame(loop);
-
-      // UI update timer — updates React state without spamming RAF
-      uiTmrRef.current = setInterval(() => {
-        if (g.done) return;
-        setScore(g.score);
-        setDist(Math.floor(g.dist));
-        setMult(performance.now() < g.multEnd ? 2 : 1);
-      }, 100);
-    }; // end initWithThree
-
-    // Load Three.js lazily (cached on window.THREE)
-    if (window.THREE) {
-      initWithThree(window.THREE);
-    } else {
-      let s = document.getElementById('three-js-cdn');
-      if (!s) {
-        s = document.createElement('script');
-        s.id = 'three-js-cdn';
-        s.src = 'https://unpkg.com/three@0.161.0/build/three.min.js';
-        s.addEventListener('load', () => initWithThree(window.THREE), { once: true });
-        s.addEventListener('error', () => { setWebglErr(true); setLoading(false); }, { once: true });
-        document.head.appendChild(s);
+      if (body.savedSession) {
+        setTiles(body.savedSession.tiles || []);
+        setBar(body.savedSession.bar || []);
+        setScore(body.savedSession.score || 0);
+        setMoves(body.savedSession.moves || 0);
       } else {
-        // Script tag exists — might still be loading
-        if (window.THREE) {
-          initWithThree(window.THREE);
-        } else {
-          s.addEventListener('load', () => initWithThree(window.THREE), { once: true });
+        // Generate fresh board (simple: 5 random tiles per layer)
+        const config = body;
+        const newTiles = [];
+        let id = 1;
+        for (let i = 0; i < config.layers * 5; i++) {
+          newTiles.push({
+            id: id++,
+            type: i % 5,
+            pos: i,
+            locked: false,
+            inBar: false,
+            removed: false,
+          });
+        }
+        setTiles(newTiles);
+        setBar([]);
+        setScore(0);
+        setMoves(0);
+      }
+
+      setDone(false);
+      setPhase('playing');
+    }
+  };
+
+  // Handle tile click
+  const selectTile = (tileId) => {
+    if (phase !== 'playing' || done) return;
+    if (bar.length >= 7) {
+      onLose(moves, secsRef.current, { share: `Match-3 • Puzzle ${selectedPuzzle} • ${moves} moves` });
+      setDone(true);
+      setPhase('lost');
+      return;
+    }
+
+    const newBar = [...bar, tileId];
+    const newMoves = moves + 1;
+
+    // Check for match-3
+    let matched = false;
+    if (newBar.length >= 3) {
+      for (let i = 0; i <= newBar.length - 3; i++) {
+        const t1 = tiles.find(t => t.id === newBar[i]);
+        const t2 = tiles.find(t => t.id === newBar[i + 1]);
+        const t3 = tiles.find(t => t.id === newBar[i + 2]);
+        if (t1 && t2 && t3 && t1.type === t2.type && t2.type === t3.type) {
+          matched = true;
+          // Remove matched tiles
+          const toRemove = new Set([newBar[i], newBar[i + 1], newBar[i + 2]]);
+          setTiles(tiles.map(t => toRemove.has(t.id) ? { ...t, removed: true } : t));
+          setBar(newBar.filter(id => !toRemove.has(id)));
+          const newScore = score + 300;
+          setScore(newScore);
+          setMoves(newMoves);
+          onStepChange && onStepChange(newMoves);
+
+          if (newScore >= puzzleConfig.target) {
+            onWin(newScore, newMoves, secsRef.current, { share: `Match-3 • Puzzle ${selectedPuzzle}: ${newScore}pts` });
+            setDone(true);
+            setPhase('won');
+            api(`/api/match3/finish/${selectedPuzzle}`, {
+              method: 'POST',
+              body: JSON.stringify({ score: newScore, timeSecs: secsRef.current, moves: newMoves })
+            }).then(({ ok }) => {
+              if (ok) {
+                api('/api/match3/abandon/' + selectedPuzzle, { method: 'POST' });
+              }
+            });
+          }
+          return;
         }
       }
     }
 
-    return () => {
-      g.done = true;
-      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-      if (uiTmrRef.current) { clearInterval(uiTmrRef.current); uiTmrRef.current = null; }
-      if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
-      const THREE = window.THREE;
-      if (THREE && scene) chunks.forEach(ch => hrDisposeChunk(THREE, scene, ch));
-      if (renderer) { renderer.dispose(); renderer = null; }
-    };
-  }, [resetKey]);
-
-  // Touch controls on canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const onTouch = (e) => {
-      const g = gameRef.current;
-      if (!g || g.done) return;
-      e.preventDefault();
-      const t = e.touches[0];
-      if (!t) return;
-      const rect = canvas.getBoundingClientRect();
-      if (t.clientX < rect.left + rect.width / 2) {
-        if (g.targetLane > 0) { g.targetLane--; cgHaptic(10); }
-      } else {
-        if (g.targetLane < 2) { g.targetLane++; cgHaptic(10); }
-      }
-    };
-    canvas.addEventListener('touchstart', onTouch, { passive: false });
-    return () => canvas.removeEventListener('touchstart', onTouch);
-  }, []);
-
-  const moveLane = (dir) => {
-    const g = gameRef.current;
-    if (!g || g.done) return;
-    const next = g.targetLane + dir;
-    if (next >= 0 && next <= 2) { g.targetLane = next; cgHaptic(10); }
+    if (!matched) {
+      setBar(newBar);
+      setMoves(newMoves);
+      onStepChange && onStepChange(newMoves);
+    }
   };
 
-  return (
-    React.createElement(ClassicShell, { game, onExit: onBack, sheetSections: sheet },
-      React.createElement('div', { ref: mountRef, className: 'hr-wrap' },
-        React.createElement('canvas', { ref: canvasRef, className: 'hr-canvas' }),
-        loading && !webglErr && React.createElement('div', { className: 'hr-overlay' },
-          React.createElement('div', { className: 'hr-spinner' }),
-          React.createElement('div', null, 'Initializing 3D engine…')
-        ),
-        webglErr && React.createElement('div', { className: 'hr-overlay' },
-          React.createElement('div', { style: { fontSize: '2rem' } }, '⚠️'),
-          React.createElement('div', null, 'WebGL is not available in your browser.')
-        ),
-        !loading && !webglErr && React.createElement(React.Fragment, null,
-          React.createElement('div', { className: 'hr-hud' },
-            React.createElement('div', { className: 'hr-pill' },
-              React.createElement('div', { className: 'hr-plabel' }, 'Score'),
-              React.createElement('div', { className: 'hr-pvalue' }, score.toLocaleString())
-            ),
-            React.createElement('div', { className: 'hr-pill' },
-              React.createElement('div', { className: 'hr-plabel' }, 'Distance'),
-              React.createElement('div', { className: 'hr-pvalue' }, dist + 'm')
-            ),
-            React.createElement('div', { className: 'hr-pill', style: mult > 1 ? { borderColor: C.gold } : {} },
-              React.createElement('div', { className: 'hr-plabel' }, 'Mult'),
-              React.createElement('div', { className: 'hr-pvalue', style: mult > 1 ? { color: C.gold } : {} }, '\xd7' + mult)
-            )
-          ),
-          React.createElement('button', { className: 'hr-lane-btn hr-lane-left', onClick: () => moveLane(-1) }, '◄'),
-          React.createElement('button', { className: 'hr-lane-btn hr-lane-right', onClick: () => moveLane(1) }, '►')
-        )
-      )
-    )
+  // Autosave
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      puzzleId: selectedPuzzle,
+      tiles,
+      bar,
+      score,
+      moves,
+    }),
+    !done && phase === 'playing'
   );
+
+  if (phase === 'campaign' && userProgress) {
+    // Campaign selection screen
+    const easyPuzzles = MATCH3_PUZZLES.slice(0, 10);
+    const mediumPuzzles = MATCH3_PUZZLES.slice(10, 30);
+    const hardPuzzles = MATCH3_PUZZLES.slice(30, 50);
+
+    return React.createElement(
+      'div',
+      { style: { padding: '1.5rem', maxWidth: '900px', margin: '0 auto' } },
+      React.createElement('h2', { style: { marginBottom: '1.5rem', color: C.text } }, '🟩 Match-3 Campaign'),
+      React.createElement('div', { style: { marginBottom: '2rem', padding: '1rem', background: C.card, borderRadius: '0.5rem', border: `1px solid ${C.border}` } },
+        React.createElement('div', { style: { display: 'flex', gap: '2rem', marginBottom: '1rem' } },
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: '0.75rem', textTransform: 'uppercase', color: C.muted, marginBottom: '0.25rem' } }, 'Highest Puzzle'),
+            React.createElement('div', { style: { fontSize: '1.75rem', fontWeight: 700, color: C.gold } }, `${userProgress.highestPuzzle}/50`)
+          ),
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: '0.75rem', textTransform: 'uppercase', color: C.muted, marginBottom: '0.25rem' } }, 'Best Score'),
+            React.createElement('div', { style: { fontSize: '1.5rem', fontWeight: 600, color: C.emerald } }, userProgress.bestScore.toLocaleString())
+          ),
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: '0.75rem', textTransform: 'uppercase', color: C.muted, marginBottom: '0.25rem' } }, 'Completed'),
+            React.createElement('div', { style: { fontSize: '1.5rem', fontWeight: 600, color: C.accent } }, userProgress.totalCompleted)
+          )
+        ),
+        userProgress.highestPuzzle > 0 && React.createElement(
+          'button',
+          {
+            onClick: () => startPuzzle(Math.min(userProgress.lastPlayedPuzzle, 50)),
+            style: {
+              padding: '0.5rem 1rem',
+              background: C.accent,
+              color: C.bg,
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }
+          },
+          '▶ Resume Puzzle ' + Math.min(userProgress.lastPlayedPuzzle, 50)
+        )
+      ),
+      ['Easy (1-10)', 'Medium (11-30)', 'Hard (31-50)'].map((tier, tierIdx) => {
+        const puzzles = tierIdx === 0 ? easyPuzzles : tierIdx === 1 ? mediumPuzzles : hardPuzzles;
+        const tierColor = tierIdx === 0 ? C.emerald : tierIdx === 1 ? C.gold : C.rose;
+        return React.createElement(
+          'div',
+          { key: tier, style: { marginBottom: '2rem' } },
+          React.createElement('h3', { style: { color: tierColor, marginBottom: '1rem', fontSize: '1.1rem' } }, tier),
+          React.createElement(
+            'div',
+            { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.75rem' } },
+            puzzles.map(p => {
+              const isSolved = p.id <= userProgress.highestPuzzle;
+              return React.createElement(
+                'button',
+                {
+                  key: p.id,
+                  onClick: () => isSolved && startPuzzle(p.id),
+                  disabled: !isSolved,
+                  style: {
+                    padding: '1rem',
+                    background: isSolved ? C.card : C.surface,
+                    color: isSolved ? C.text : C.muted,
+                    border: `1px solid ${isSolved ? C.accent : C.border}`,
+                    borderRadius: '0.375rem',
+                    cursor: isSolved ? 'pointer' : 'not-allowed',
+                    opacity: isSolved ? 1 : 0.5,
+                    transition: 'all 0.2s',
+                  },
+                  onMouseEnter: (e) => { if (isSolved) e.target.style.background = C.border; },
+                  onMouseLeave: (e) => { e.target.style.background = C.card; }
+                },
+                React.createElement('div', { style: { fontWeight: 700 } }, isSolved ? '✓' : p.id),
+                React.createElement('div', { style: { fontSize: '0.75rem', marginTop: '0.25rem' } }, p.name)
+              );
+            })
+          )
+        );
+      })
+    );
+  }
+
+  if (phase === 'playing' && puzzleConfig) {
+    return React.createElement(
+      'div',
+      { style: { padding: '1rem', background: C.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column' } },
+      React.createElement(
+        'div',
+        { className: 'status-bar', style: { marginBottom: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'space-between' } },
+        React.createElement('div', { className: 'pill', style: { background: C.card, padding: '0.5rem 1rem', borderRadius: '999px' } },
+          React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted } }, 'Score'),
+          React.createElement('span', { style: { marginLeft: '0.5rem', fontWeight: 700 } }, `${score} / ${puzzleConfig.targetScore}`)
+        ),
+        React.createElement('div', { className: 'pill', style: { background: C.card, padding: '0.5rem 1rem', borderRadius: '999px' } },
+          React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted } }, 'Moves'),
+          React.createElement('span', { style: { marginLeft: '0.5rem', fontWeight: 700 } }, `${moves} / ${puzzleConfig.moveLimit}`)
+        ),
+        React.createElement('div', { className: 'pill', style: { background: C.card, padding: '0.5rem 1rem', borderRadius: '999px' } },
+          React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted } }, 'Time'),
+          React.createElement('span', { style: { marginLeft: '0.5rem', fontWeight: 700 } }, `${secs}s`)
+        )
+      ),
+      React.createElement(
+        'div',
+        { style: { flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' } },
+        tiles.map(t => {
+          const colors = [C.rose, C.amber, C.emerald, C.accent, C.violet];
+          return React.createElement(
+            'button',
+            {
+              key: t.id,
+              onClick: () => selectTile(t.id),
+              disabled: t.removed || done,
+              style: {
+                padding: '2rem',
+                background: t.removed ? C.surface : colors[t.type % 5],
+                border: 'none',
+                borderRadius: '0.375rem',
+                cursor: t.removed ? 'default' : 'pointer',
+                opacity: t.removed ? 0.2 : 1,
+                fontSize: '2rem',
+                transition: 'all 0.2s',
+              }
+            },
+            t.removed ? '✓' : '●'
+          );
+        })
+      ),
+      React.createElement(
+        'div',
+        { style: { marginTop: '1.5rem', padding: '1rem', background: C.card, borderRadius: '0.5rem', minHeight: '60px', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' } },
+        React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted, marginRight: '0.5rem' } }, 'Bar:'),
+        bar.length > 0 ? bar.map(id => {
+          const t = tiles.find(tile => tile.id === id);
+          const colors = [C.rose, C.amber, C.emerald, C.accent, C.violet];
+          return React.createElement('div', {
+            key: id,
+            style: {
+              width: '40px',
+              height: '40px',
+              background: colors[t.type % 5],
+              borderRadius: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              color: C.bg,
+            }
+          }, t.type);
+        }) : React.createElement('span', { style: { color: C.muted } }, '(empty)')
+      )
+    );
+  }
+
+  return React.createElement('div', { style: { padding: '1rem', color: C.text } }, 'Loading...');
 }
 
 const GAMES = [
@@ -12879,14 +13573,13 @@ const GAMES = [
     component: ZumaGame,
   },
   {
-    id: 'hashrush',
-    name: 'Hash Rush',
-    icon: '⛏️',
+    name: 'Match-3 Puzzle',
+    icon: '🟩',
     category: 'classic',
-    desc: 'Dodge blockchain obstacles and collect tokens in a crypto-themed 3D endless runner.',
-    tag: '3D',
-    tagColor: C.accent,
-    component: HashRushGame,
+    desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
+    tag: 'Campaign',
+    tagColor: '#f59e0b',
+    component: Match3Game,
   },
   {
     id: 'tilematchingdaily',
@@ -12921,7 +13614,7 @@ const GAMES = [
 ];
 
 // Games that render their own ClassicShell (full-screen, gesture-first).
-const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'diamondrush', 'texas', 'hashrush']);
+const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'diamondrush', 'texas']);
 
 /* ============================================================
    Social: Feed & Posts
@@ -13170,18 +13863,25 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('screen');
     if (s === 'wallet') return 'wallet';
-    if (s === 'session' || params.get('demo') === 'dapp') return 'session';
+    if (s === 'account') return 'account';
+    if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     if (params.get('demo') === 'arena') return 'arena-demo';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'session' | 'arena-demo'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session' | 'arena-demo'
   // DApp session receipt being viewed (session id), and identity-verified flag.
-  const [receiptSessionId, setReceiptSessionId] = useState(() =>
-    new URLSearchParams(window.location.search).get('sid') || null);
+  // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
+  const [receiptSessionId, setReceiptSessionId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('sid') || (params.get('demo') === 'anchor' ? 'DAPPDEMOSUDOKU' : null);
+  });
   const openReceipt = (sid) => { setReceiptSessionId(sid); setScreen('session'); };
   const [walletVerified, setWalletVerified] = useState(false);
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
+  // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
+  // even after a streak resets, so the lobby can show a collected-badges strip.
+  const [badges, setBadges] = useState([]);
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -13209,6 +13909,10 @@ function App() {
   const [walletMock, setWalletMock] = useState(true);
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
+  // dApps-integration availability. Disabled (e.g. staging with an empty
+  // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
+  // gracefully alongside the server.
+  const [integration, setIntegration] = useState({ enabled: false, pubkey: null });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -13228,6 +13932,7 @@ function App() {
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setBadges(Array.isArray(body.badges) ? body.badges : []);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -13238,53 +13943,84 @@ function App() {
       setAuthOk(false);
       setUser(null);
       setStreak(0);
+      setBadges([]);
     }
     setLoading(false);
   };
 
   useEffect(() => { loadDaily(); }, []);
 
-  // Wallet: get EVM address from bridge, link it to the account, fetch balance.
-  // Promoted to app-level so PvP Arena and the nav chip share one source.
+  // dApps-integration status. Degrades gracefully: a failed/absent response
+  // leaves the feature disabled (chip stays hidden) rather than erroring.
   useEffect(() => {
-    // Session restore: read any existing identity-proof state from the server
-    // first, so the "Verified identity" badge shows even before the bridge
-    // resolves (or when the bridge is unavailable).
-    api('/api/wallet').then(({ ok, body }) => {
-      if (ok && body && body.identityVerified) setWalletVerified(true);
-    }).catch(() => {});
+    api('/api/integration/status')
+      .then(({ ok, body }) => {
+        if (ok && body) setIntegration({ enabled: !!body.enabled, pubkey: body.pubkey || null });
+      })
+      .catch(() => {});
+  }, []);
 
-    if (!window.usernode || !window.usernode.getNodeAddress) return;
-    window.usernode.getNodeAddress().then(addr => {
-      if (!addr) return;
-      setWalletAddr(addr);
-      // Link address server-side so tipping lookups work
-      api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }).catch(() => {});
-      // Optional cryptographic ownership proof — only if the wallet can sign.
-      if (window.usernode.signMessage) {
-        api('/api/wallet/challenge').then(({ ok, body }) => {
-          if (!ok || !body || !body.message) return;
-          window.usernode.signMessage(body.message).then(sig => {
-            if (!sig) return;
-            api('/api/wallet/prove', {
+  // Wallet: read EVM address from the bridge, link it to the account, optionally
+  // prove ownership (sign a challenge), and fetch balance. Extracted into one
+  // callable so BOTH the on-mount effect and the Account screen's "Connect /
+  // Verify" button run the identical flow. Returns { ok, addr, verified } so the
+  // Account screen can show precise feedback; never throws.
+  const connectAndVerifyWallet = React.useCallback(async () => {
+    if (!window.usernode || !window.usernode.getNodeAddress) {
+      return { ok: false, reason: 'unavailable' };
+    }
+    let addr = null;
+    try { addr = await window.usernode.getNodeAddress(); } catch { return { ok: false, reason: 'unavailable' }; }
+    if (!addr) return { ok: false, reason: 'unavailable' };
+    setWalletAddr(addr);
+    // Link address server-side so tipping lookups work (trust-on-report).
+    try { await api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }); } catch {}
+
+    // Optional cryptographic ownership proof — only if the wallet can sign.
+    let verified = false;
+    if (window.usernode.signMessage) {
+      try {
+        const { ok, body } = await api('/api/wallet/challenge');
+        if (ok && body && body.message) {
+          const sig = await window.usernode.signMessage(body.message);
+          if (sig) {
+            const { ok: pOk, body: pBody } = await api('/api/wallet/prove', {
               method: 'POST',
               body: JSON.stringify({ addr, nonce: body.nonce, signature: sig }),
-            }).then(({ ok: pOk, body: pBody }) => {
-              if (pOk && pBody && pBody.verified) setWalletVerified(true);
-            }).catch(() => {});
-          }).catch(() => {});
-        }).catch(() => {});
-      }
-      // Fetch on-chain balance
-      api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`)
-        .then(({ ok, body }) => {
-          if (ok && body) {
-            setWalletBalance(body.balance);
-            setWalletMock(!!body.mock);
+            });
+            if (pOk && pBody && pBody.verified) { verified = true; setWalletVerified(true); }
           }
-        }).catch(() => {});
-    }).catch(() => {});
+        }
+      } catch {}
+    }
+
+    // Fetch on-chain balance.
+    try {
+      const { ok, body } = await api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`);
+      if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
+    } catch {}
+
+    return { ok: true, addr, verified };
   }, []);
+
+  // Disconnect the verified-identity proof (public link is kept so received
+  // tips still resolve). Used by the Account screen.
+  const disconnectWallet = React.useCallback(async () => {
+    await api('/api/wallet/disconnect', { method: 'POST' });
+    setWalletVerified(false);
+  }, []);
+
+  // On mount: restore any existing identity/link state from the server first
+  // (so the verified badge + linked address show even before the bridge
+  // resolves or when it's unavailable), then run the connect/verify flow.
+  useEffect(() => {
+    api('/api/account').then(({ ok, body }) => {
+      if (!ok || !body) return;
+      if (body.identityVerified) setWalletVerified(true);
+      if (body.walletAddr) setWalletAddr(prev => prev || body.walletAddr);
+    }).catch(() => {});
+    connectAndVerifyWallet();
+  }, [connectAndVerifyWallet]);
 
   // Refresh balance on demand (called after claim/tip)
   const refreshWalletBalance = () => {
@@ -13391,6 +14127,8 @@ function App() {
         cashOut: meta && meta.cashOut,
         winnerLabel: meta && meta.winnerLabel,
         isClassic: true,
+        bestScore: meta && meta.bestScore,
+        longestSnake: meta && meta.longestSnake,
       });
       return;
     }
@@ -13403,8 +14141,15 @@ function App() {
     const finalScore = Math.round(score * multiplier);
     const bonus = finalScore - score;
     setStreak(effectiveStreak);
+    // A badge unlocked the moment this win's streak lands exactly on a tier.
+    const unlocked = justUnlockedBadge(effectiveStreak);
+    if (unlocked) {
+      setBadges(prev => (prev.includes(unlocked.min) ? prev : [...prev, unlocked.min].sort((a, b) => a - b)));
+    }
     setWinData({
       score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+      activeBadge: activeBadge(effectiveStreak),
+      justBadge: unlocked,
       share: meta && meta.share,
       canPost: true,
       gameId: gameId,
@@ -13534,6 +14279,14 @@ function App() {
               <div className="label">Streak</div>
               <div className="value streak mono">
                 {streak}
+                {authOk && activeBadge(streak) && (
+                  <span
+                    className="streak-badge-icon"
+                    title={`${activeBadge(streak).name} — ${activeBadge(streak).min}-day streak badge`}
+                  >
+                    {activeBadge(streak).icon}
+                  </span>
+                )}
                 {activeMult > 1 && <span className="mult-badge">×{activeMult}</span>}
               </div>
             </div>
@@ -13564,7 +14317,21 @@ function App() {
               👥 Friends
             </button>
           )}
-          <AccountChip loading={loading} authOk={authOk} user={user} />
+          {authOk && integration.enabled && (
+            <span
+              className="nav-integration-chip"
+              title={`dApps integration active${integration.pubkey ? ' · ' + integration.pubkey : ''}`}
+            >
+              🔗 dApps
+            </span>
+          )}
+          <AccountChip
+            loading={loading}
+            authOk={authOk}
+            user={user}
+            walletVerified={walletVerified}
+            onOpen={() => setScreen('account')}
+          />
         </div>
       </nav>
 
@@ -13592,6 +14359,18 @@ function App() {
           onBack={() => setScreen('lobby')}
           onBalanceRefresh={refreshWalletBalance}
           onOpenReceipt={openReceipt}
+        />
+      )}
+
+      {screen === 'account' && (
+        <AccountScreen
+          user={user}
+          authOk={authOk}
+          walletAddr={walletAddr}
+          walletVerified={walletVerified}
+          onBack={() => setScreen('lobby')}
+          onVerify={connectAndVerifyWallet}
+          onDisconnect={disconnectWallet}
         />
       )}
 
@@ -13649,6 +14428,27 @@ function App() {
                   new Date(nextResetUtc).getTime() - (Date.now() + offset))}
               </p>
             )}
+            {lobbyTab === 'daily' && authOk && (() => {
+              // Union of permanent earned badges and any the live streak now
+              // satisfies, so the strip is correct right after a win too.
+              const earned = new Set([...badges, ...streakBadges(streak).map(b => b.min)]);
+              if (earned.size === 0) return null;
+              const live = activeBadge(streak);
+              return (
+                <div className="badge-strip">
+                  {STREAK_BADGES.filter(b => earned.has(b.min)).map(b => (
+                    <span
+                      key={b.id}
+                      className={`badge-chip${live && live.min === b.min ? ' active' : ''}`}
+                      title={`${b.name} · ${b.min}-day streak`}
+                    >
+                      <span className="badge-chip-icon">{b.icon}</span>
+                      {b.name}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           <div className="lobby-tabs">
             <button
@@ -13830,7 +14630,32 @@ function App() {
                   <span className="v">+{fmtUtgo(winData.rewardWei)}</span>
                 </div>
               )}
+              {winData.isClassic && winData.bestScore !== undefined && (
+                <div className="score-row">
+                  <span className="k">Best score</span>
+                  <span className="v mono">{winData.bestScore}</span>
+                </div>
+              )}
+              {winData.isClassic && winData.longestSnake !== undefined && (
+                <div className="score-row">
+                  <span className="k">Longest</span>
+                  <span className="v mono">{winData.longestSnake} cells</span>
+                </div>
+              )}
             </div>
+            {!winData.isClassic && winData.justBadge && (
+              <div className="badge-unlock">
+                <div className="bu-icon">{winData.justBadge.icon}</div>
+                <div className="bu-title">Milestone reached!</div>
+                <div className="bu-name">{winData.justBadge.name} · {winData.justBadge.min}-day streak</div>
+              </div>
+            )}
+            {!winData.isClassic && !winData.justBadge && winData.activeBadge && (
+              <div className="win-badge-row">
+                <span className="wbr-icon">{winData.activeBadge.icon}</span>
+                <span>{winData.activeBadge.name} badge active</span>
+              </div>
+            )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />

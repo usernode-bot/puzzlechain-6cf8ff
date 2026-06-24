@@ -84,6 +84,11 @@
     { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" },
     { "name": "Streak badge ladder renders earned badges", "path": "/?demo=badges", "expectText": "Centurion" },
     { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" },
+    { "name": "Today's Champions board renders in daily lobby", "path": "/?demo=leaderboard", "expectText": "Today's Champions" },
+    { "name": "Today's Champions lists a seeded solver", "path": "/?demo=leaderboard", "expectText": "Staging demo Ada" },
+    { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
+    { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
+    { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
     { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" }
   ]
 }

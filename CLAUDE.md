@@ -80,11 +80,36 @@ purpose.
   - renders a `.status-bar` of `.pill`s for its live stats,
   - calls `onStepChange(n)` as the player makes moves,
   - calls `onWin(score, steps, secs)` **exactly once** when solved;
-  then add its CSS to `css` and append
-  `{ id, name, icon, desc, tag, tagColor, component }` to the `GAMES`
-  array. The root `App` auto-wires the lobby card, the daily one-play
-  lock, the streak **multiplier** (see "Streak multiplier tiers" below),
-  and the win overlay — the game component never touches that machinery.
+  then add its CSS to `css` and append a **fully-declarative** entry
+  `{ id, name, icon, category, shell, daily?, desc, tag, tagColor,
+  component }` to the `GAMES` array. The root `App` reads those flags
+  to auto-wire the lobby card, the daily one-play lock, the streak
+  **multiplier** (see "Streak multiplier tiers" below), and the win
+  overlay — the game component never touches that machinery.
+  - **`id` is mandatory** and must match the server's `GAME_REGISTRY`
+    key (it keys the lobby card, `attempts[id]`, posts, leaderboards,
+    and the daily routes). A missing `id` silently breaks those lookups.
+  - **`category`** is the lobby tab (`'daily'` or `'classic'`).
+  - **`shell`** declares how `App` renders the game body (a single
+    `switch` in `renderGameBody`, no per-id special-casing):
+    - `'daily'` — back-header `game-wrap`; the component also receives
+      `savedProgress` / `onSaveProgress` for resumability. Use for daily
+      puzzles (and any plain back-header game).
+    - `'classic'` — wrapped in `ClassicShell` + `.cg-stage.cg-scroll`
+      (the standard in-frame classic layout).
+    - `'self'` — the component renders its **own** `ClassicShell`
+      (full-screen, gesture-first; it gets `game` + `onBack` too).
+    - `'custom'` — `App` renders a bespoke screen instead of
+      `component` (today only PvP Arena); clicking the card sets
+      `currentGame` directly rather than going through `launchGame`.
+  - **`daily: true`** marks the four daily games and is the **single
+    gate** for the per-day start/lock/finish/streak/resume machinery —
+    `launchGame`, `handleWin`, and `handleLose` all branch on
+    `!game.daily`. Omit it (falsy) for classic/idle/PvP games.
+  - The client `GAMES` array and the server `GAME_REGISTRY`
+    (`server.js`) are two separate objects (one needs React
+    components, the other DApp tiers) that must be kept **in sync** by
+    `id` and `category`, exactly as `GAMES`↔`GAME_IDS` were before.
   - **Optional win/loss extras (backward-compatible).** `onWin` accepts
     an optional 4th `meta` arg — `onWin(score, steps, secs, { share })` —
     and `App` stashes `meta.share` so the win overlay can show a **Share**

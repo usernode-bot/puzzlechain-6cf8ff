@@ -703,16 +703,42 @@ body {
 .word-theme b { color: ${C.text}; }
 
 /* ---- Crypto Wordle ---- */
+.cw-clue {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 460px;
+  margin: 0 auto 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-left: 3px solid ${C.emerald};
+  border-radius: 10px;
+}
+.cw-clue-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: ${C.emerald};
+  font-weight: 700;
+}
+.cw-clue-text { flex: 1 1 auto; font-size: 0.9rem; color: ${C.text}; }
+.cw-clue-len {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: ${C.muted};
+  white-space: nowrap;
+}
 .cw-board {
   display: grid;
-  grid-template-rows: repeat(6, 1fr);
   gap: 0.4rem;
   max-width: 330px;
   margin: 0 auto;
 }
 .cw-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
   gap: 0.4rem;
 }
 .cw-row.shake { animation: cw-shake 0.4s ease; }
@@ -4955,21 +4981,67 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 }
 
 /* ============================================================
-   Game 3 — Crypto Wordle (daily 5-letter Web3 term)
+   Game 3 — Crypto Wordle (daily variable-length finance/crypto word)
    ============================================================ */
-const CW_LEN = 5;
-const CW_MAX = 6;
+// The daily word now varies in length (3–8 letters). The board sizes its
+// columns to the word and allows wordLen + 1 guesses (see cwMaxGuesses).
+const CW_MIN_LEN = 3;
+const CW_MAX_LEN = 8;
 
-// Curated, well-known 5-letter Web3 / crypto terms. The daily answer is
-// chosen deterministically from this list, so everyone gets the same word
-// on the same UTC day (shareable, comparable). No dictionary validates the
-// guesses — any 5 letters are accepted — but the answer is always from here.
-const CW_ANSWERS = [
-  'TOKEN', 'BLOCK', 'CHAIN', 'MINER', 'NONCE', 'STAKE', 'VAULT', 'TRADE',
-  'WHALE', 'PROOF', 'AUDIT', 'ETHER', 'YIELD', 'LAYER', 'NODES', 'MOONS',
-  'DEGEN', 'ALPHA', 'FLOOR', 'MINTS', 'ASSET', 'BYTES', 'PEERS', 'SHARD',
-  'BASED', 'VYPER', 'BLOBS', 'WAGMI', 'PUMPS', 'DUMPS',
+// Curated finance / crypto terms of VARYING length (3–8 letters), each with a
+// short themed clue the player reads while solving. The daily answer is chosen
+// deterministically from this list, so everyone gets the same word + length +
+// clue on the same UTC day (shareable, comparable). No dictionary validates the
+// guesses — any letters of the right length are accepted — but the answer is
+// always from here. Every `word` must be UPPERCASE A–Z and 3–8 letters.
+const CW_WORDS = [
+  { word: 'FEE',      clue: 'What you pay to get a transaction processed' },
+  { word: 'BID',      clue: 'The price a buyer offers in an order book' },
+  { word: 'APY',      clue: 'Yearly compounded return on a staking deposit' },
+  { word: 'BULL',     clue: 'An investor betting prices will rise' },
+  { word: 'BEAR',     clue: 'An investor betting prices will fall' },
+  { word: 'COIN',     clue: "A blockchain's own native digital currency" },
+  { word: 'FIAT',     clue: 'Government-issued money like dollars or euros' },
+  { word: 'HODL',     clue: 'Crypto slang for holding through the swings' },
+  { word: 'MINT',     clue: 'To create a brand-new token or NFT' },
+  { word: 'PUMP',     clue: 'A sharp, sudden rise in a coin’s price' },
+  { word: 'TOKEN',    clue: 'A tradable unit of value issued on a chain' },
+  { word: 'BLOCK',    clue: 'A bundle of transactions added to the chain' },
+  { word: 'CHAIN',    clue: 'The shared ledger of linked blocks' },
+  { word: 'STAKE',    clue: 'Lock up coins to secure a network and earn rewards' },
+  { word: 'VAULT',    clue: 'A smart contract that safeguards deposited assets' },
+  { word: 'WHALE',    clue: 'A holder big enough to move the market' },
+  { word: 'YIELD',    clue: 'The income your crypto earns over time' },
+  { word: 'AUDIT',    clue: 'A security review of a smart contract' },
+  { word: 'ASSET',    clue: 'Anything of value you can hold or trade' },
+  { word: 'NONCE',    clue: 'The number a miner tweaks to find a valid hash' },
+  { word: 'WALLET',   clue: 'App that holds your keys and coins' },
+  { word: 'LEDGER',   clue: 'The record of every transaction ever made' },
+  { word: 'MINING',   clue: 'Spending compute to add blocks and earn rewards' },
+  { word: 'ORACLE',   clue: 'A feed that brings off-chain data on-chain' },
+  { word: 'BRIDGE',   clue: 'Moves assets between two different blockchains' },
+  { word: 'TETHER',   clue: 'Nickname for the best-known dollar stablecoin' },
+  { word: 'CRYPTO',   clue: 'Short name for digital currencies as a whole' },
+  { word: 'BROKER',   clue: 'A middleman who places trades for you' },
+  { word: 'WALLETS',  clue: 'Where holders keep their keys and coins (plural)' },
+  { word: 'NETWORK',  clue: 'The connected nodes that run a blockchain' },
+  { word: 'TRADING',  clue: 'Buying and selling to profit from price moves' },
+  { word: 'STAKING',  clue: 'Earning rewards by locking up your coins' },
+  { word: 'DEPOSIT',  clue: 'Funds you put into an account or protocol' },
+  { word: 'AIRDROP',  clue: 'Free tokens dropped to a community of wallets' },
+  { word: 'LENDING',  clue: 'Supplying assets so others can borrow for interest' },
+  { word: 'EXCHANGE', clue: 'A marketplace for swapping one coin for another' },
+  { word: 'SOLVENCY', clue: 'Having enough assets to cover what you owe' },
+  { word: 'TREASURY', clue: 'The shared pool of funds a protocol controls' },
+  { word: 'VALIDATE', clue: 'To confirm transactions are legitimate' },
+  { word: 'DIVIDEND', clue: 'A share of profits paid out to holders' },
+  { word: 'CURRENCY', clue: 'Money in a particular form, digital or fiat' },
+  { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement' },
 ];
+
+// Guesses allowed for a given word length: one more than the length, so a
+// 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
+const cwMaxGuesses = (wordLen) => wordLen + 1;
 
 const CW_EMOJI = { green: '🟩', yellow: '🟨', gray: '⬛' };
 const CW_KEYS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
@@ -4987,13 +5059,14 @@ function cwDayNum(offset) {
 // first, consuming a tally of the answer's letters; then yellows only while
 // an unconsumed copy of the letter remains, else gray.
 function cwScoreGuess(guess, answer) {
-  const res = Array(CW_LEN).fill('gray');
+  const len = answer.length;
+  const res = Array(len).fill('gray');
   const counts = {};
-  for (let i = 0; i < CW_LEN; i++) counts[answer[i]] = (counts[answer[i]] || 0) + 1;
-  for (let i = 0; i < CW_LEN; i++) {
+  for (let i = 0; i < len; i++) counts[answer[i]] = (counts[answer[i]] || 0) + 1;
+  for (let i = 0; i < len; i++) {
     if (guess[i] === answer[i]) { res[i] = 'green'; counts[guess[i]]--; }
   }
-  for (let i = 0; i < CW_LEN; i++) {
+  for (let i = 0; i < len; i++) {
     if (res[i] === 'green') continue;
     if (counts[guess[i]] > 0) { res[i] = 'yellow'; counts[guess[i]]--; }
   }
@@ -5002,9 +5075,15 @@ function cwScoreGuess(guess, answer) {
 
 function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
-  const answer = useRef(
-    CW_ANSWERS[((dayNum % CW_ANSWERS.length) + CW_ANSWERS.length) % CW_ANSWERS.length]
+  // The day's entry carries both the answer and its themed clue; its length
+  // sizes the board and sets the guess count.
+  const entry = useRef(
+    CW_WORDS[((dayNum % CW_WORDS.length) + CW_WORDS.length) % CW_WORDS.length]
   ).current;
+  const answer = entry.word;
+  const clue = entry.clue;
+  const wordLen = answer.length;
+  const maxGuesses = cwMaxGuesses(wordLen);
 
   // Hydrate from a resumed attempt: recompute each guess's colors from the
   // saved guess words (the answer is deterministic for the day).
@@ -5012,8 +5091,8 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     ? savedProgress
     : null;
   const initGuesses = () => (resumed ? resumed.words : [])
-    .filter(w => typeof w === 'string' && w.length === CW_LEN)
-    .slice(0, CW_MAX)
+    .filter(w => typeof w === 'string' && w.length === wordLen)
+    .slice(0, maxGuesses)
     .map(w => ({ word: w, result: cwScoreGuess(w, answer) }));
 
   const [guesses, setGuesses] = useState(initGuesses); // [{ word, result: ['green'|'yellow'|'gray', …] }]
@@ -5040,19 +5119,19 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const keyState = {};
   const rank = { gray: 0, yellow: 1, green: 2 };
   for (const g of guesses) {
-    for (let i = 0; i < CW_LEN; i++) {
+    for (let i = 0; i < wordLen; i++) {
       const ch = g.word[i], c = g.result[i];
       if (!(ch in keyState) || rank[c] > rank[keyState[ch]]) keyState[ch] = c;
     }
   }
 
   const buildShare = (rows, solved) =>
-    `Crypto Wordle #${dayNum} ${solved ? rows.length : 'X'}/${CW_MAX}\n` +
+    `Crypto Wordle #${dayNum} (${wordLen}) ${solved ? rows.length : 'X'}/${maxGuesses}\n` +
     rows.map(r => r.result.map(c => CW_EMOJI[c]).join('')).join('\n');
 
   const submit = () => {
     if (done) return;
-    if (cur.length !== CW_LEN) {
+    if (cur.length !== wordLen) {
       setShake(true);
       setTimeout(() => setShake(false), 400);
       return;
@@ -5068,15 +5147,15 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
 
     if (cur === answer) {
       setDone(true);
-      const score = Math.max((7 - rows.length) * 180 - secs * 2, 100);
+      const score = Math.max((maxGuesses + 1 - rows.length) * 180 - secs * 2, 100);
       onWin(score, rows.length, secs, { share: buildShare(rows, true) });
-    } else if (rows.length >= CW_MAX) {
+    } else if (rows.length >= maxGuesses) {
       setDone(true);
       onLose(rows.length, secs, { share: buildShare(rows, false), answer });
     }
   };
 
-  const typeLetter = (ch) => { if (!done && cur.length < CW_LEN) setCur(cur + ch); };
+  const typeLetter = (ch) => { if (!done && cur.length < wordLen) setCur(cur + ch); };
   const backspace = () => { if (!done) setCur(cur.slice(0, -1)); };
 
   // Physical keyboard. The window listener is registered once; it dispatches
@@ -5094,7 +5173,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const rowsLeft = Math.max(CW_MAX - guesses.length, 0);
+  const rowsLeft = Math.max(maxGuesses - guesses.length, 0);
+  // Size the board to the day's word: ~52px per column, capped so an 8-wide
+  // row still fits comfortably and a 3-wide row isn't oversized.
+  const boardWidth = Math.min(wordLen * 52, 440);
 
   return (
     <div>
@@ -5105,7 +5187,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
         </div>
         <div className="pill">
           <div className="plabel">Guesses</div>
-          <div className="pvalue">{Math.min(guesses.length, CW_MAX)}/{CW_MAX}</div>
+          <div className="pvalue">{Math.min(guesses.length, maxGuesses)}/{maxGuesses}</div>
         </div>
         <div className="pill">
           <div className="plabel">Left</div>
@@ -5113,14 +5195,27 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
         </div>
       </div>
 
-      <div className="cw-board">
-        {Array.from({ length: CW_MAX }).map((_, r) => {
+      <div className="cw-clue">
+        <span className="cw-clue-label">Clue</span>
+        <span className="cw-clue-text">{clue}</span>
+        <span className="cw-clue-len">{wordLen} letters</span>
+      </div>
+
+      <div
+        className="cw-board"
+        style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
+      >
+        {Array.from({ length: maxGuesses }).map((_, r) => {
           const g = guesses[r];
           const isCurrent = !g && r === guesses.length && !done;
           const letters = g ? g.word : (isCurrent ? cur : '');
           return (
-            <div key={r} className={`cw-row${isCurrent && shake ? ' shake' : ''}`}>
-              {Array.from({ length: CW_LEN }).map((__, c) => {
+            <div
+              key={r}
+              className={`cw-row${isCurrent && shake ? ' shake' : ''}`}
+              style={{ gridTemplateColumns: `repeat(${wordLen}, 1fr)` }}
+            >
+              {Array.from({ length: wordLen }).map((__, c) => {
                 const ch = letters[c] || '';
                 const cls = ['cw-tile'];
                 if (g) cls.push(g.result[c]);
@@ -13269,7 +13364,7 @@ const GAMES = [
     name: 'Crypto Wordle',
     icon: '🟩',
     category: 'daily',
-    desc: 'Guess the daily 5-letter Web3 term in 6 tries.',
+    desc: 'Guess the daily crypto word — length and clue change every day.',
     tag: 'Web3',
     tagColor: C.emerald,
     component: CryptoWordleGame,

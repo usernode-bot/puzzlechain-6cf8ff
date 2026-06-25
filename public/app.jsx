@@ -143,6 +143,46 @@ body {
   color: ${C.muted};
 }
 .win-badge-row .wbr-icon { font-size: 1.1rem; }
+.badge-chip .badge-chip-name { line-height: 1; }
+/* Badge collection wrapper (lobby + profile) */
+.badge-strip-wrap { margin-top: 1rem; }
+.badge-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${C.muted};
+}
+.badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Today's Champions leaderboard tweaks (reuses .lboard) */
+.lboard.champions { margin-top: 0; }
+.lboard .lrow.clickable { cursor: pointer; }
+.lboard .lrow.clickable:hover { background: ${C.border}; }
+/* Win-overlay "couldn't sync" note + retry */
+.win-sync-note {
+  margin: 0.4rem 0 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  text-align: center;
+  color: ${C.gold};
+  background: ${C.gold}14;
+  border: 1px solid ${C.gold}55;
+}
+.win-sync-note button {
+  margin-top: 0.4rem;
+  font: inherit;
+  font-weight: 700;
+  color: ${C.text};
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
 
 /* ---- Account indicator ---- */
 .nav-right { display: flex; align-items: center; gap: 1.25rem; }
@@ -4018,6 +4058,53 @@ function justUnlockedBadge(streak) {
   return STREAK_BADGES.find(b => b.min === streak) || null;
 }
 
+/* ============================================================
+   Achievement badges — non-streak milestones the server awards
+   in /api/daily/:gameId/finish and persists in user_achievements.
+   This is the client's source of truth for badge copy/icons; the
+   server (ACHIEVEMENT_BADGE_TYPES + criteria in server.js) owns when
+   each is awarded. Keep `type` values in sync across both files.
+   `solve_milestone` is parameterized by a `count` (10/50/100).
+   ============================================================ */
+const ACHIEVEMENT_BADGES = [
+  { type: 'first_solve', name: 'First Solve',   icon: '🎉', desc: 'Solved your first daily puzzle' },
+  { type: 'speed_demon', name: 'Speed Demon',   icon: '⚡', desc: 'Solved a daily in under 60s' },
+  { type: 'flawless',    name: 'Flawless',      icon: '✨', desc: 'Solved with no wasted moves' },
+  { type: 'daily_sweep', name: 'Daily Sweep',   icon: '🧹', desc: 'Solved every daily puzzle in one day' },
+  { type: 'podium',      name: 'Podium Finish', icon: '🥇', desc: 'Finished #1 on a daily leaderboard' },
+];
+// Lifetime solve-count milestones (a single `solve_milestone` type, many counts).
+const SOLVE_MILESTONE_BADGES = [
+  { count: 10,  name: 'Solver',      icon: '🔟', desc: 'Solved 10 daily puzzles' },
+  { count: 50,  name: 'Dedicated',   icon: '🏅', desc: 'Solved 50 daily puzzles' },
+  { count: 100, name: 'Centenarian', icon: '💯', desc: 'Solved 100 daily puzzles' },
+];
+
+// Resolve a freshly-awarded achievement (from finish's newAchievements) to its
+// badge definition for the "just unlocked" overlay pop.
+function achievementBadgeFor(ach) {
+  if (!ach || !ach.type) return null;
+  if (ach.type === 'solve_milestone') {
+    const c = ach.metadata && ach.metadata.count;
+    return SOLVE_MILESTONE_BADGES.find(b => b.count === c) || null;
+  }
+  return ACHIEVEMENT_BADGES.find(b => b.type === ach.type) || null;
+}
+
+// Merge newly-awarded achievements into the { types, milestones } client state.
+function mergeAchievements(prev, newAch) {
+  const types = new Set((prev && prev.types) || []);
+  const milestones = new Set((prev && prev.milestones) || []);
+  for (const a of newAch || []) {
+    if (!a || !a.type) continue;
+    types.add(a.type);
+    if (a.type === 'solve_milestone' && a.metadata && Number.isFinite(+a.metadata.count)) {
+      milestones.add(+a.metadata.count);
+    }
+  }
+  return { types: Array.from(types), milestones: Array.from(milestones).sort((a, b) => a - b) };
+}
+
 // Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)
 // so a wrong device clock can't unlock early. Calls onExpire once at zero.
 function useCountdown(nextResetUtc, offset, onExpire) {
@@ -4490,6 +4577,111 @@ function Leaderboard({ gameId, solved }) {
       {solved === false && (
         <div className="lboard-note">You didn't solve today's puzzle — no ranking this round.</div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Today's Champions — lobby-wide leaderboard aggregating EVERYONE who
+   solved at least one daily puzzle today, ranked by total points then
+   games solved. Reuses the per-game leaderboard styles. Tapping a row
+   opens that player's profile via onSelectUser.
+   ============================================================ */
+function TodayChampions({ onSelectUser }) {
+  const [state, setState] = useState({ loading: true });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api('/api/daily/leaderboard/today');
+      if (!alive) return;
+      if (ok && body) setState({ loading: false, ...body });
+      else setState({ loading: false, entries: [], me: null, total: 0, error: true });
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (state.loading) {
+    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><div className="lboard-empty">Loading…</div></div>;
+  }
+
+  const entries = state.entries || [];
+  const me = state.me || null;
+  const meVisible = me && entries.some(e => e.isCurrentUser);
+  const gameCount = state.gameCount || 0;
+  const row = (e, pinned) => (
+    <div
+      key={pinned ? 'me-pinned' : e.rank}
+      className={`lrow${e.isCurrentUser ? ' me' : ''}${pinned ? ' pinned' : ''}${onSelectUser ? ' clickable' : ''}`}
+      onClick={onSelectUser && e.userId ? () => onSelectUser(e.userId) : undefined}
+    >
+      <span className="lrank mono">#{e.rank}</span>
+      <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+      <span className="ltime mono">{e.totalPoints} pts</span>
+      <span className="lsteps mono">{e.gamesSolved}{gameCount ? ` / ${gameCount}` : ''}</span>
+    </div>
+  );
+
+  return (
+    <div className="lboard champions">
+      <div className="lboard-title">
+        Today's Champions
+        {state.total > 0 && <span className="lboard-count">{state.total} playing</span>}
+      </div>
+      {entries.length === 0 ? (
+        <div className="lboard-empty">No one has solved today's puzzles yet — be the first!</div>
+      ) : (
+        <div className="lboard-rows">
+          {entries.map(e => row(e, false))}
+          {me && !meVisible && row(me, true)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Badge strip — the player's collected badges (streak milestones +
+   non-streak achievements). Earned badges render solid; not-yet-earned
+   render dimmed so there's a visible collection to complete. Shared by
+   the lobby and the profile screen.
+   ============================================================ */
+function BadgeStrip({ badges, achievements }) {
+  const earnedDays = new Set(badges || []);
+  const ach = achievements || { types: [], milestones: [] };
+  const earnedTypes = new Set(ach.types || []);
+  const earnedMilestones = new Set(ach.milestones || []);
+
+  const chips = [];
+  for (const b of STREAK_BADGES) {
+    chips.push({ key: `s${b.min}`, icon: b.icon, name: b.name, sub: `${b.min}-day streak`, earned: earnedDays.has(b.min) });
+  }
+  for (const b of ACHIEVEMENT_BADGES) {
+    chips.push({ key: `a${b.type}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedTypes.has(b.type) });
+  }
+  for (const b of SOLVE_MILESTONE_BADGES) {
+    chips.push({ key: `m${b.count}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedMilestones.has(b.count) });
+  }
+  const earnedCount = chips.filter(c => c.earned).length;
+
+  return (
+    <div className="badge-strip-wrap">
+      <div className="badge-strip-head">
+        <span>Badges</span>
+        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
+      </div>
+      <div className="badge-strip">
+        {chips.map(c => (
+          <div
+            key={c.key}
+            className={`badge-chip${c.earned ? ' active' : ' locked'}`}
+            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
+          >
+            <span className="badge-chip-icon">{c.icon}</span>
+            <span className="badge-chip-name">{c.name}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -11986,22 +12178,12 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
           </div>
         </div>
 
-        {Array.isArray(profile.badges) && profile.badges.length > 0 && (
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Streak badges</div>
-            <div className="badge-strip" style={{ marginTop: 0 }}>
-              {profile.badges
-                .map(badgeForDays)
-                .filter(Boolean)
-                .map(b => (
-                  <span key={b.id} className="badge-chip" title={`${b.name} · ${b.min}-day streak`}>
-                    <span className="badge-chip-icon">{b.icon}</span>
-                    {b.name}
-                  </span>
-                ))}
-            </div>
-          </div>
-        )}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <BadgeStrip
+            badges={Array.isArray(profile.badges) ? profile.badges : []}
+            achievements={profile.achievements || { types: [], milestones: [] }}
+          />
+        </div>
 
         <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '1rem', fontSize: '0.9rem' }}>
           <p style={{ margin: '0.5rem 0' }}>
@@ -13186,6 +13368,7 @@ const GAMES = [
     component: ZumaGame,
   },
   {
+    id: 'match3',
     name: 'Match-3 Puzzle',
     icon: '🟩',
     category: 'classic',
@@ -13494,6 +13677,8 @@ function App() {
   // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
   // even after a streak resets, so the lobby can show a collected-badges strip.
   const [badges, setBadges] = useState([]);
+  // Non-streak achievement badges earned: { types: [...], milestones: [...] }.
+  const [achievements, setAchievements] = useState({ types: [], milestones: [] });
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -13506,10 +13691,10 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
-  // Lobby tab: 'daily', 'classic', 'idle', or 'pvp' — initialized from ?tab= URL param
+  // Lobby tab: 'daily', 'classic', 'idle', 'pvp', or 'feed' — initialized from ?tab= URL param
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : 'daily';
+    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : t === 'feed' ? 'feed' : 'daily';
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
@@ -13545,6 +13730,9 @@ function App() {
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
+      setAchievements(body.achievements && Array.isArray(body.achievements.types)
+        ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
+        : { types: [], milestones: [] });
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -13556,6 +13744,7 @@ function App() {
       setUser(null);
       setStreak(0);
       setBadges([]);
+      setAchievements({ types: [], milestones: [] });
     }
     setLoading(false);
   };
@@ -13723,108 +13912,178 @@ function App() {
     });
   };
 
-  const handleWin = async (score, steps, timeSecs, meta) => {
-    // Classic games skip server, streak, and totalScore nav update
-    if (currentGame && currentGame.category === 'classic') {
-      const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
-      setWinData({
-        score,
-        bonus: 0,
-        finalScore: score,
-        steps,
-        timeSecs,
-        multiplier: cashoutMultiplier,
-        effectiveStreak: 0,
-        share: meta && meta.share,
-        cashOut: meta && meta.cashOut,
-        winnerLabel: meta && meta.winnerLabel,
-        isClassic: true,
-        bestScore: meta && meta.bestScore,
-        longestSnake: meta && meta.longestSnake,
+  // POST the finished daily result to the server and reconcile client state.
+  // Pulled out of handleWin so the win overlay's "couldn't sync — retrying"
+  // button can re-run exactly the same submission. Returns true on success.
+  // Best-effort: a network throw is treated as a failed sync (syncError), never
+  // an uncaught rejection that would break the overlay.
+  const submitDailyFinish = async (gameId, finalScore, steps, timeSecs) => {
+    let ok = false, body = null;
+    try {
+      const res = await api(`/api/daily/${gameId}/finish`, {
+        method: 'POST',
+        body: JSON.stringify({ score: finalScore, steps, timeSecs }),
       });
-      return;
+      ok = res.ok; body = res.body;
+    } catch (e) {
+      console.error('[daily] finish submit threw:', e && e.message);
+      ok = false;
     }
-    // The streak this win lands in: the first finished game of the day extends
-    // the consecutive-day streak by 1; a second game the same day reuses the
-    // same day count (the multiplier is per-day, not per-game).
-    const playedToday = Object.values(attempts).some(a => a && a.score != null);
-    const effectiveStreak = playedToday ? streak : streak + 1;
-    const multiplier = streakMultiplier(effectiveStreak);
-    const finalScore = Math.round(score * multiplier);
-    const bonus = finalScore - score;
-    setStreak(effectiveStreak);
-    // A badge unlocked the moment this win's streak lands exactly on a tier.
-    const unlocked = justUnlockedBadge(effectiveStreak);
-    if (unlocked) {
-      setBadges(prev => (prev.includes(unlocked.min) ? prev : [...prev, unlocked.min].sort((a, b) => a - b)));
-    }
-    setWinData({
-      score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
-      activeBadge: activeBadge(effectiveStreak),
-      justBadge: unlocked,
-      share: meta && meta.share,
-      canPost: true,
-      gameId: gameId,
-    });
-
-    const gameId = currentGame.id;
-    const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
-      method: 'POST',
-      body: JSON.stringify({ score: finalScore, steps, timeSecs }),
-    });
+    // Local mirror so the lobby card locks even if the server didn't confirm.
     const stored = ok && body && body.attempt
       ? body.attempt
-      : { score: finalScore, steps, timeSecs, finishedAt: new Date().toISOString() };
+      : { gameId, score: finalScore, steps, timeSecs, finishedAt: new Date().toISOString() };
     setAttempts(prev => ({ ...prev, [gameId]: stored }));
-    setTotalScore(t => t + finalScore);
-    // Reconcile against the server's authoritative streak (now that today is
-    // finished) so a reload and the live nav badge agree.
-    if (ok && body && typeof body.streak === 'number') setStreak(body.streak);
-    // Store reward amount from server so win overlay can show it
-    if (ok && body && body.rewardWei) {
-      setWinData(prev => prev ? { ...prev, rewardWei: body.rewardWei } : prev);
+    if (ok) {
+      // Reconcile against the server's authoritative streak + reward + new
+      // achievement badges, and clear any prior sync-error flag.
+      if (body && typeof body.streak === 'number') setStreak(body.streak);
+      const newAch = (body && Array.isArray(body.newAchievements)) ? body.newAchievements : [];
+      if (newAch.length) {
+        setAchievements(prev => mergeAchievements(prev, newAch));
+      }
+      setWinData(prev => prev ? {
+        ...prev,
+        syncError: false,
+        rewardWei: body && body.rewardWei,
+        newAchievements: newAch,
+        justAchievement: newAch.length ? achievementBadgeFor(newAch[0]) : prev.justAchievement,
+      } : prev);
+      // DApp Mode: surface the Verified badge, then anchor on-chain (best-effort).
+      if (body && body.dapp) {
+        setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
+        dappAnchor(body.dapp).then(updated => {
+          setWinData(prev => prev ? { ...prev, dapp: updated } : prev);
+        }).catch(() => {});
+      }
+    } else {
+      setWinData(prev => prev ? { ...prev, syncError: true } : prev);
     }
-    // DApp Mode: surface the Verified badge for the pilot game, then anchor the
-    // session's chain hash on-chain (best-effort; degrades to a mock anchor).
-    if (ok && body && body.dapp) {
-      setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
-      dappAnchor(body.dapp).then(updated => {
-        setWinData(prev => prev ? { ...prev, dapp: updated } : prev);
+    return ok;
+  };
+
+  const handleWin = async (score, steps, timeSecs, meta) => {
+    try {
+      // Classic games skip server, streak, and totalScore nav update
+      if (currentGame && currentGame.category === 'classic') {
+        const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
+        setWinData({
+          score,
+          bonus: 0,
+          finalScore: score,
+          steps,
+          timeSecs,
+          multiplier: cashoutMultiplier,
+          effectiveStreak: 0,
+          share: meta && meta.share,
+          cashOut: meta && meta.cashOut,
+          winnerLabel: meta && meta.winnerLabel,
+          isClassic: true,
+          bestScore: meta && meta.bestScore,
+          longestSnake: meta && meta.longestSnake,
+          // Carry the game id so the win card's "Share to Feed" button can post
+          // this classic result, mirroring the daily branch below.
+          gameId: currentGame.id,
+          canPost: true,
+        });
+        return;
+      }
+      // Declare gameId FIRST — referencing it before this line is a temporal
+      // dead zone ReferenceError that previously killed the entire win flow
+      // (no overlay, no finish call). Keep this above setWinData.
+      const gameId = currentGame.id;
+      // The streak this win lands in: the first finished game of the day extends
+      // the consecutive-day streak by 1; a second game the same day reuses the
+      // same day count (the multiplier is per-day, not per-game).
+      const playedToday = Object.values(attempts).some(a => a && a.score != null);
+      const effectiveStreak = playedToday ? streak : streak + 1;
+      const multiplier = streakMultiplier(effectiveStreak);
+      const finalScore = Math.round(score * multiplier);
+      const bonus = finalScore - score;
+      setStreak(effectiveStreak);
+      // A badge unlocked the moment this win's streak lands exactly on a tier.
+      const unlocked = justUnlockedBadge(effectiveStreak);
+      if (unlocked) {
+        setBadges(prev => (prev.includes(unlocked.min) ? prev : [...prev, unlocked.min].sort((a, b) => a - b)));
+      }
+      // Show the celebration overlay immediately — independent of the network
+      // call below, so the player always gets a clear "Solved!" confirmation.
+      setWinData({
+        score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+        activeBadge: activeBadge(effectiveStreak),
+        justBadge: unlocked,
+        share: meta && meta.share,
+        canPost: true,
+        gameId,
+        syncError: false,
+        newAchievements: [],
+      });
+      setTotalScore(t => t + finalScore);
+      // Submit to the server (records result, streak, reward, badges, receipt).
+      await submitDailyFinish(gameId, finalScore, steps, timeSecs);
+    } catch (e) {
+      // Never let a handler error swallow the win silently again. Surface a
+      // minimal overlay so the player sees their solve was registered.
+      console.error('[daily] handleWin failed:', e && e.message);
+      setWinData(prev => prev || {
+        score, finalScore: score, bonus: 0, steps, timeSecs,
+        multiplier: 1, effectiveStreak: 0, share: meta && meta.share, syncError: true,
       });
     }
+  };
+
+  // Retry the finish submission for the current win (used by the overlay's
+  // "couldn't sync — retrying" button).
+  const retryDailyFinish = () => {
+    if (!winData || winData.isClassic) return;
+    const gameId = winData.gameId || (currentGame && currentGame.id);
+    if (!gameId) return;
+    setWinData(prev => prev ? { ...prev, syncError: false, syncing: true } : prev);
+    submitDailyFinish(gameId, winData.finalScore, winData.steps, winData.timeSecs)
+      .finally(() => setWinData(prev => prev ? { ...prev, syncing: false } : prev));
   };
 
   // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
   // finished row with score 0 so the day stays locked, but does NOT touch the
   // streak. Existing win-only games never call this.
   const handleLose = async (steps, timeSecs, meta) => {
-    // Classic games skip server entirely
-    if (currentGame && currentGame.category === 'classic') {
+    try {
+      // Classic games skip server entirely
+      if (currentGame && currentGame.category === 'classic') {
+        setLoseData({
+          steps,
+          timeSecs,
+          share: meta && meta.share,
+          answer: meta && meta.answer,
+          isClassic: true,
+        });
+        return;
+      }
+      const gameId = currentGame.id;
       setLoseData({
         steps,
         timeSecs,
         share: meta && meta.share,
         answer: meta && meta.answer,
-        isClassic: true,
       });
-      return;
-    }
-    setLoseData({
-      steps,
-      timeSecs,
-      share: meta && meta.share,
-      answer: meta && meta.answer,
-    });
 
-    const gameId = currentGame.id;
-    const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
-      method: 'POST',
-      body: JSON.stringify({ score: 0, steps, timeSecs }),
-    });
-    const stored = ok && body && body.attempt
-      ? body.attempt
-      : { score: 0, steps, timeSecs, finishedAt: new Date().toISOString() };
-    setAttempts(prev => ({ ...prev, [gameId]: stored }));
+      let ok = false, body = null;
+      try {
+        const res = await api(`/api/daily/${gameId}/finish`, {
+          method: 'POST',
+          body: JSON.stringify({ score: 0, steps, timeSecs }),
+        });
+        ok = res.ok; body = res.body;
+      } catch (e) {
+        console.error('[daily] lose submit threw:', e && e.message);
+      }
+      const stored = ok && body && body.attempt
+        ? body.attempt
+        : { gameId, score: 0, steps, timeSecs, finishedAt: new Date().toISOString() };
+      setAttempts(prev => ({ ...prev, [gameId]: stored }));
+    } catch (e) {
+      console.error('[daily] handleLose failed:', e && e.message);
+    }
   };
 
   const backToLobby = (tab) => {
@@ -14020,25 +14279,10 @@ function App() {
               </p>
             )}
             {lobbyTab === 'daily' && authOk && (() => {
-              // Union of permanent earned badges and any the live streak now
-              // satisfies, so the strip is correct right after a win too.
-              const earned = new Set([...badges, ...streakBadges(streak).map(b => b.min)]);
-              if (earned.size === 0) return null;
-              const live = activeBadge(streak);
-              return (
-                <div className="badge-strip">
-                  {STREAK_BADGES.filter(b => earned.has(b.min)).map(b => (
-                    <span
-                      key={b.id}
-                      className={`badge-chip${live && live.min === b.min ? ' active' : ''}`}
-                      title={`${b.name} · ${b.min}-day streak`}
-                    >
-                      <span className="badge-chip-icon">{b.icon}</span>
-                      {b.name}
-                    </span>
-                  ))}
-                </div>
-              );
+              // Union of permanent earned streak badges and any the live streak
+              // now satisfies, so the strip is correct right after a win too.
+              const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
+              return <BadgeStrip badges={earnedDays} achievements={achievements} />;
             })()}
           </div>
           <div className="lobby-tabs">
@@ -14099,6 +14343,11 @@ function App() {
               );
             })}
           </div>
+          )}
+          {lobbyTab === 'daily' && authOk && (
+            <TodayChampions
+              onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+            />
           )}
         </div>
       )}
@@ -14247,10 +14496,26 @@ function App() {
                 <span>{winData.activeBadge.name} badge active</span>
               </div>
             )}
+            {!winData.isClassic && winData.justAchievement && (
+              <div className="badge-unlock">
+                <div className="bu-icon">{winData.justAchievement.icon}</div>
+                <div className="bu-title">Badge unlocked!</div>
+                <div className="bu-name">{winData.justAchievement.name}</div>
+              </div>
+            )}
+            {!winData.isClassic && winData.syncError && (
+              <div className="win-sync-note">
+                Couldn't sync your result — your puzzle is still locked for today.
+                <br />
+                <button onClick={retryDailyFinish} disabled={winData.syncing}>
+                  {winData.syncing ? 'Retrying…' : 'Retry sync'}
+                </button>
+              </div>
+            )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
-            {!winData.isClassic && authOk && (
+            {authOk && winData.gameId && (
               <button
                 className="primary-btn"
                 style={{ marginBottom: '0.6rem', background: C.emerald }}

@@ -138,31 +138,31 @@
        warning while keeping the same global-scope React classic-script runtime. -->
   <script>
     (function () {
-      if (typeof React === ‘undefined’ || typeof ReactDOM === ‘undefined’) {
-        document.getElementById(‘root’).innerHTML =
-          ‘<div class="pc-boot-error"><div class="card"><div class="glyph">⬢</div>’ +
-          ‘<h1>PuzzleChain couldn\’t start</h1>’ +
-          ‘<p>React failed to load. Check your connection and reload.</p>’ +
-          ‘<div class="btns"><button type="button" class="primary" onclick="location.reload()">Reload</button></div>’ +
-          ‘</div></div>’;
+      if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+        document.getElementById('root').innerHTML =
+          '<div class="pc-boot-error"><div class="card"><div class="glyph">⬢</div>' +
+          '<h1>PuzzleChain couldn\'t start</h1>' +
+          '<p>React failed to load. Check your connection and reload.</p>' +
+          '<div class="btns"><button type="button" class="primary" onclick="location.reload()">Reload</button></div>' +
+          '</div></div>';
         return;
       }
-      // Watchdog: surface an error card if the app hasn’t mounted within 15 s.
+      // Watchdog: surface an error card if the app hasn't mounted within 15 s.
       window.__pcWatchdog = setTimeout(function () {
-        var root = document.getElementById(‘root’);
+        var root = document.getElementById('root');
         var mounted = window.__puzzlechainMounted ||
-          (root && root.firstElementChild && root.firstElementChild.id !== ‘boot-loader’);
+          (root && root.firstElementChild && root.firstElementChild.id !== 'boot-loader');
         if (!mounted) {
           root.innerHTML =
-            ‘<div class="pc-boot-error"><div class="card"><div class="glyph">⬢</div>’ +
-            ‘<h1>PuzzleChain couldn\’t start</h1>’ +
-            ‘<p>This is taking longer than usual — check your connection and reload.</p>’ +
-            ‘<div class="btns"><button type="button" class="primary" onclick="location.reload()">Reload</button></div>’ +
-            ‘</div></div>’;
+            '<div class="pc-boot-error"><div class="card"><div class="glyph">⬢</div>' +
+            '<h1>PuzzleChain couldn\'t start</h1>' +
+            '<p>This is taking longer than usual — check your connection and reload.</p>' +
+            '<div class="btns"><button type="button" class="primary" onclick="location.reload()">Reload</button></div>' +
+            '</div></div>';
         }
       }, 15000);
     })();
   </script>
-  <script src="/app.js" onerror="clearTimeout(window.__pcWatchdog);document.getElementById(‘root’).innerHTML=’<div class=pc-boot-error><div class=card><div class=glyph>⬢</div><h1>PuzzleChain couldn\’t start</h1><p>Failed to load app. Try reloading.</p><div class=btns><button class=primary onclick=location.reload()>Reload</button></div></div></div>’"></script>
+  <script src="/app.js" onerror="clearTimeout(window.__pcWatchdog);document.getElementById('root').innerHTML='<div class=pc-boot-error><div class=card><div class=glyph>⬢</div><h1>PuzzleChain couldn\'t start</h1><p>Failed to load app. Try reloading.</p><div class=btns><button class=primary onclick=location.reload()>Reload</button></div></div></div>'"></script>
 </body>
 </html>

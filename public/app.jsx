@@ -6358,6 +6358,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const applyMoveRef  = useRef(null);
   const pitsRef       = useRef(pits);
   const movesRef      = useRef(moves);
+  const playerRef     = useRef(player);
+  const doneRef       = useRef(done);
+  // AI turn-loop timers (thinking delay + last-resort watchdog)
+  const aiTimerRef    = useRef(null);
+  const aiWatchdogRef = useRef(null);
   // ZK proof refs
   const sessionIdRef  = useRef(null);
   const nonceRef      = useRef(null);
@@ -6365,6 +6370,8 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   soundOnRef.current  = soundOn;
   pitsRef.current     = pits;
   movesRef.current    = moves;
+  playerRef.current   = player;
+  doneRef.current     = done;
 
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
@@ -6385,6 +6392,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   const resetGame = () => {
     animatingRef.current = false;
+    cancelAiTimers();
     if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
     setPits(mncInitBoard());
     setPlayer(1);
@@ -6415,9 +6423,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     setMoves(newMoves);
     onStepChange(newMoves);
     if (isGameOver) {
+      cancelAiTimers();
       const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
       setWinner(w);
       setDone(true);
+      doneRef.current = true;
       setAiThinking(false);
       const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
       setBannerMsg(wLabel);
@@ -6477,7 +6487,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     } else if (extraTurn) {
       setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
       setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
+      // The AI keeps the turn on an extra turn; the [player, done] effect
+      // won't re-fire (player is unchanged), so re-arm the AI loop directly.
+      if (currentPlayer === 2) scheduleAiMove();
     } else {
+      if (currentPlayer === 2) cancelAiTimers();
       setPlayer(currentPlayer === 1 ? 2 : 1);
       setBannerMsg('');
     }
@@ -6525,27 +6539,86 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   };
   applyMoveRef.current = applyMove;
 
-  // Trigger AI when it's P2's turn.
-  // Yield a frame so the "AI is thinking…" banner paints first, then run the
-  // (fast) search and apply the move once a short, consistent thinking floor
-  // has elapsed — measure-then-pad. This keeps the bot snappy and avoids a
-  // synchronous board freeze on Hard, without changing move selection.
-  useEffect(() => {
-    if (player !== 2 || done) return;
+  // --- AI turn loop -------------------------------------------------------
+  // Cancel any pending AI thinking timer + watchdog.
+  const cancelAiTimers = () => {
+    if (aiTimerRef.current)    { clearTimeout(aiTimerRef.current);    aiTimerRef.current = null; }
+    if (aiWatchdogRef.current) { clearTimeout(aiWatchdogRef.current); aiWatchdogRef.current = null; }
+  };
+
+  // Settle every remaining stone into its owner's store and end the game.
+  // Used when the AI has no legal move, or as the watchdog's last resort so
+  // the board can never stay frozen on "AI is thinking…".
+  const forceEndGame = () => {
+    cancelAiTimers();
+    if (doneRef.current) return;
+    const p = pitsRef.current.slice();
+    for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+    for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    animatingRef.current = false;
+    setAiThinking(false);
+    // p has both sides empty, so finishMove detects game-over and runs the
+    // full winner / history / ZK / onWin flow exactly as a normal end would.
+    finishMove(p, 2, false, -1, movesRef.current);
+  };
+
+  // Last-resort safety net: if the AI ever fails to produce a move within a
+  // generous window, force the game to a result rather than hang forever.
+  const armWatchdog = () => {
+    if (aiWatchdogRef.current) { clearTimeout(aiWatchdogRef.current); aiWatchdogRef.current = null; }
+    aiWatchdogRef.current = setTimeout(() => {
+      aiWatchdogRef.current = null;
+      if (doneRef.current || playerRef.current !== 2) return;
+      // A real move may still be animating — give it more time, don't cut in.
+      if (animatingRef.current) { armWatchdog(); return; }
+      forceEndGame();
+    }, 12000);
+  };
+
+  // Compute and play the AI's move. Defends against a thrown engine, a missing
+  // legal move, and a still-running animation (retry instead of dropping it).
+  const performAiMove = () => {
+    aiTimerRef.current = null;
+    if (doneRef.current || playerRef.current !== 2) { setAiThinking(false); return; }
+    if (animatingRef.current) {
+      // Previous animation hasn't settled yet — retry shortly so the busy
+      // guard in applyMove never silently swallows the AI's move.
+      aiTimerRef.current = setTimeout(performAiMove, 120);
+      return;
+    }
+    let idx = -1;
+    try {
+      idx = mncAIMove(pitsRef.current, difficulty);
+    } catch (e) {
+      const legal = mncGetValidMoves(pitsRef.current, 2);
+      idx = legal.length ? legal[Math.floor(Math.random() * legal.length)] : -1;
+    }
+    if (idx < 0) { setAiThinking(false); forceEndGame(); return; }
+    setAiThinking(false);
+    applyMoveRef.current(idx, 2);
+  };
+
+  // Arm a single AI step (thinking delay + watchdog). Cancels any prior timer
+  // first, so chained extra turns never stack up.
+  const scheduleAiMove = () => {
+    if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
+    if (doneRef.current || playerRef.current !== 2) return;
     setAiThinking(true);
-    const FLOOR = difficulty === 'easy' ? 250 : difficulty === 'medium' ? 300 : 350;
-    let raf = null, applyTimer = null;
-    raf = requestAnimationFrame(() => {
-      const startedAt = Date.now();
-      const idx = mncAIMove(pitsRef.current, difficulty);
-      const elapsed = Date.now() - startedAt;
-      applyTimer = setTimeout(() => {
-        setAiThinking(false);
-        if (idx >= 0) applyMoveRef.current(idx, 2);
-      }, Math.max(0, FLOOR - elapsed));
-    });
-    return () => { if (raf) cancelAnimationFrame(raf); if (applyTimer) clearTimeout(applyTimer); };
+    armWatchdog();
+    const delay = difficulty === 'easy' ? 500 : difficulty === 'medium' ? 700 : 1100;
+    aiTimerRef.current = setTimeout(performAiMove, delay);
+  };
+
+  // Kick off the AI loop whenever it becomes P2's turn. Chained extra turns
+  // are re-armed from finishMove (player is unchanged, so this won't re-fire).
+  useEffect(() => {
+    if (player !== 2 || done) { cancelAiTimers(); return; }
+    scheduleAiMove();
+    return () => cancelAiTimers();
   }, [player, done]);
+
+  // Cancel all AI timers on unmount.
+  useEffect(() => () => cancelAiTimers(), []);
 
   const handlePitClick = (idx) => {
     if (player !== 1 || done || animatingRef.current) return;

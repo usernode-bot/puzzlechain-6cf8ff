@@ -1277,6 +1277,27 @@ body {
 }
 .mnc-difficulty-pill:hover { border-color: ${C.gold}; color: ${C.text}; }
 .mnc-difficulty-pill.active { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}14; font-weight: 600; }
+.mnc-daily-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; flex-wrap: wrap;
+  max-width: 480px; margin: 0 auto 0.6rem;
+}
+.mnc-daily-title { font-weight: 700; font-size: 0.95rem; color: ${C.text}; }
+.mnc-daily-pills { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.mnc-record-pill {
+  font-size: 0.74rem; font-weight: 700;
+  background: ${C.gold}14; color: ${C.gold};
+  border: 1px solid ${C.gold}55;
+  border-radius: 999px; padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
+.mnc-streak-chip {
+  font-size: 0.74rem; font-weight: 700;
+  background: ${C.rose}1f; color: ${C.rose};
+  border: 1px solid ${C.rose}55;
+  border-radius: 999px; padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
 .mnc-mode-start-btn {
   width: 100%;
   padding: 0.65rem;
@@ -3846,6 +3867,23 @@ function dailyRng(offset, gameId) {
   return mulberry32((utcDayNum(offset) + hashStr(gameId)) >>> 0);
 }
 
+// Mancala Daily Challenge opening board, derived from the server-anchored UTC
+// day. Deals 24 stones into one side via the daily seed, then mirrors them
+// rotationally (pit i ↔ opposite 12-i) so both players start from an identical,
+// fair position; stores (6, 13) stay empty. MUST match srvMncDailyBoard in
+// server.js byte-for-byte or verification fails.
+function mncDailyBoard(offset) {
+  const rng = dailyRng(offset, 'mancaladaily');
+  const side = [0, 0, 0, 0, 0, 0];
+  for (let s = 0; s < 24; s++) side[Math.floor(rng() * 6)]++;
+  const board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < 6; i++) {
+    board[i] = side[i];
+    board[12 - i] = side[i];
+  }
+  return board;
+}
+
 // Periodically persist a game's in-progress state so a resumed attempt picks up
 // the exact board, step count, and accumulated timer. `getState()` returns
 // `{ progress, steps, secs }`; it's read through a ref so the interval and the
@@ -6241,6 +6279,39 @@ async function mncVerifySession(sessionId, nonce, moveLog, finalPits, timeSecs) 
   } catch { return { verified: false, reason: 'network_error' }; }
 }
 
+// Daily Challenge: claim today's attempt and mint a session whose commitment
+// covers the day's deterministic board. Returns { sessionId, nonce, attempt, ... }
+// or { locked, ... } / null. Mirrors mncStartSession but for the daily board.
+async function mncDailyStart(offset) {
+  try {
+    const board = mncDailyBoard(offset);
+    const nonceBytes = new Uint8Array(16);
+    window.crypto.getRandomValues(nonceBytes);
+    const nonceHex = Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const msgBuf = new TextEncoder().encode(nonceHex + '||' + JSON.stringify(board));
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', msgBuf);
+    const commitment = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    const { ok, status, body } = await api('/api/mancala/daily/start', {
+      method: 'POST',
+      body: JSON.stringify({ commitment }),
+    });
+    if (status === 409) return { locked: true, body };
+    if (ok && body && body.sessionId) return { sessionId: body.sessionId, nonce: nonceHex, body };
+    return null;
+  } catch { return null; }
+}
+
+async function mncDailyFinish(sessionId, nonce, moveLog, finalPits, timeSecs) {
+  try {
+    const { ok, body } = await api('/api/mancala/daily/finish', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, nonce, moveLog, finalPits, timeSecs }),
+    });
+    if (ok && body) return body;
+    return { verified: false, reason: 'network_error' };
+  } catch { return { verified: false, reason: 'network_error' }; }
+}
+
 /* ============================================================
    Mancala Leaderboard component (used inside AI game tab)
    ============================================================ */
@@ -6328,6 +6399,492 @@ function MncLeaderboard() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Mancala Daily Challenge — leaderboard (Today / All-Time tabs)
+   ============================================================ */
+function MncDailyLeaderboard({ refreshKey }) {
+  const [scope, setScope]     = useState('today');
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(false);
+    api('/api/mancala/daily/leaderboard?scope=' + scope)
+      .then(({ ok, body }) => {
+        if (!alive) return;
+        if (ok && body) setData(body);
+        else setError(true);
+      })
+      .catch(() => { if (alive) setError(true); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [scope, refreshKey]);
+
+  const fmtSecs = s => {
+    if (s == null) return '—';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+  const meInTop = data && data.me && data.entries && data.entries.some(r => r.rank === data.me.rank);
+  const cols = scope === 'today' ? '2rem 1fr auto auto' : '2rem 1fr auto auto';
+
+  const Row = ({ r, me }) => (
+    <div style={{
+      display: 'grid', gridTemplateColumns: cols, gap: '0 0.5rem',
+      padding: '0.4rem 0.25rem', fontSize: '0.82rem',
+      borderBottom: `1px solid ${C.border}22`,
+      background: me ? C.accent + '18' : 'transparent',
+      borderRadius: me ? '6px' : '0',
+    }}>
+      <span style={{ color: r.rank <= 3 ? C.gold : C.muted, fontWeight: r.rank <= 3 ? 700 : 400 }}>{r.rank}</span>
+      <span style={{ color: me ? C.accent : C.text, fontWeight: me ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.username || '—'}</span>
+      <span style={{ color: C.gold, fontFamily: 'monospace' }}>{r.score}</span>
+      <span style={{ color: C.muted }}>
+        {scope === 'today' ? fmtSecs(r.timeSecs) : `🔥 ${r.daysHeldRecord != null ? r.daysHeldRecord : 0}`}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+        {[['today', 'Today'], ['alltime', 'All-Time']].map(([id, label]) => (
+          <button key={id} className={'mnc-difficulty-pill' + (scope === id ? ' active' : '')} onClick={() => setScope(id)}>{label}</button>
+        ))}
+      </div>
+      {loading && <div style={{ textAlign: 'center', color: C.muted, padding: '1rem', fontSize: '0.85rem' }}>Loading…</div>}
+      {error && <div style={{ textAlign: 'center', color: C.rose, padding: '1rem', fontSize: '0.85rem' }}>Could not load leaderboard.</div>}
+      {!loading && !error && data && (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '0 0.5rem', fontSize: '0.75rem', color: C.muted, padding: '0 0.25rem 0.3rem', borderBottom: `1px solid ${C.border}` }}>
+            <span>#</span><span>Player</span><span>Score</span><span>{scope === 'today' ? 'Time' : 'Record'}</span>
+          </div>
+          {data.entries.length === 0 && (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '1.25rem', fontSize: '0.85rem' }}>No scores yet — be the first!</div>
+          )}
+          {data.entries.map((r, i) => <Row key={i} r={r} me={r.isCurrentUser} />)}
+          {data.me && !meInTop && (
+            <div>
+              <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.7rem', padding: '0.2rem 0' }}>…</div>
+              <Row r={data.me} me={true} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Game 5e — Mancala Daily Challenge (one seeded puzzle/day vs Hard AI)
+   ============================================================ */
+function MancalaDailyGame({ onWin, onStepChange, offset }) {
+  // Phase: 'loading' | 'locked' | 'play' | 'error'
+  const [phase, setPhase]               = useState('loading');
+  const [pits, setPits]                 = useState(() => mncDailyBoard(offset));
+  const [player, setPlayer]             = useState(1);
+  const [done, setDone]                 = useState(false);
+  const [winner, setWinner]             = useState(null);
+  const [moves, setMoves]               = useState(0);
+  const [flashPits, setFlashPits]       = useState(() => new Set());
+  const [captureFlash, setCaptureFlash] = useState(() => new Set());
+  const [bannerMsg, setBannerMsg]       = useState('');
+  const [aiThinking, setAiThinking]     = useState(false);
+  const [soundOn, setSoundOn]           = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
+  const [activeTab, setActiveTab]       = useState('game');
+  const [globalRecord, setGlobalRecord] = useState(null);
+  const [streak, setStreak]             = useState(0);
+  const [nextReset, setNextReset]       = useState(null);
+  const [lockedAttempt, setLockedAttempt] = useState(null);
+  const [verifying, setVerifying]       = useState(false);
+  const [verified, setVerified]         = useState(null);
+  const [becameRecord, setBecameRecord] = useState(false);
+  const [lbKey, setLbKey]               = useState(0);
+  const [resumeSecs, setResumeSecs]     = useState(0);
+
+  const animatingRef = useRef(false);
+  const soundOnRef   = useRef(soundOn);
+  const winTimerRef  = useRef(null);
+  const applyMoveRef = useRef(null);
+  const pitsRef      = useRef(pits);
+  const movesRef     = useRef(moves);
+  const sessionIdRef = useRef(null);
+  const nonceRef     = useRef(null);
+  const moveLogRef   = useRef([]);
+  const startedRef   = useRef(false);
+  soundOnRef.current = soundOn;
+  pitsRef.current    = pits;
+  movesRef.current   = moves;
+
+  const { secs, fmt } = useTimer(phase === 'play' && !done, resumeSecs);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+
+  const countdown = useCountdown(nextReset, offset, null);
+
+  // Hydrate state on mount: derive board, learn record/streak/lock, and (if
+  // playable) claim today's attempt + mint the ZK session.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const demo = new URLSearchParams(window.location.search).get('demo');
+      const { ok, body } = await api('/api/mancala/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : ''));
+      if (!alive) return;
+      if (!ok || !body) { setPhase('error'); return; }
+      setPits(body.board || mncDailyBoard(offset));
+      setGlobalRecord(body.globalRecord != null ? body.globalRecord : null);
+      setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setNextReset(body.nextResetUtc || null);
+      const at = body.attempt;
+      if (at && at.finishedAt) {
+        setLockedAttempt(at);
+        setPhase('locked');
+        return;
+      }
+      // Fresh or resumable — claim/mint a session.
+      const started = await mncDailyStart(offset);
+      if (!alive) return;
+      if (started && started.locked) {
+        setLockedAttempt(started.body && started.body.attempt);
+        if (started.body && started.body.nextResetUtc) setNextReset(started.body.nextResetUtc);
+        setPhase('locked');
+        return;
+      }
+      if (!started || !started.sessionId) { setPhase('error'); return; }
+      sessionIdRef.current = started.sessionId;
+      nonceRef.current = started.nonce;
+      moveLogRef.current = [];
+      if (started.body) {
+        if (started.body.board) setPits(started.body.board);
+        if (started.body.globalRecord != null) setGlobalRecord(started.body.globalRecord);
+        if (started.body.nextResetUtc) setNextReset(started.body.nextResetUtc);
+        const sa = started.body.attempt;
+        // Resume an unfinished attempt: restore move count + elapsed timer. The
+        // board itself is re-derived from the day seed, so only the count is
+        // needed to keep the step display honest (moves replay isn't restored —
+        // a same-day return continues from the live board the server tracks via
+        // the new session; we keep it simple and resume the clock + counter).
+        if (sa && sa.elapsedSecs) setResumeSecs(sa.elapsedSecs);
+        if (sa && typeof sa.moves === 'number') { setMoves(sa.moves); onStepChange(sa.moves); }
+      }
+      startedRef.current = true;
+      setPhase('play');
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Autosave elapsed time + move count for resume (board re-derives from seed).
+  useAutosave(
+    (progress, steps, s) => {
+      if (phase !== 'play' || done) return;
+      api('/api/mancala/daily/progress', {
+        method: 'POST', keepalive: true,
+        body: JSON.stringify({ progress, moves: steps, elapsedSecs: s }),
+      }).catch(() => {});
+    },
+    () => ({ progress: { dayNum: utcDayNum(offset), moves: movesRef.current }, steps: movesRef.current, secs: secsRef.current }),
+    phase === 'play' && !done
+  );
+
+  const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
+    const p = newPits.slice();
+    const p1Empty = p.slice(0, 6).every(v => v === 0);
+    const p2Empty = p.slice(7, 13).every(v => v === 0);
+    const isGameOver = p1Empty || p2Empty;
+    if (isGameOver) {
+      for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+      for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    }
+    setPits(p);
+    setMoves(newMoves);
+    onStepChange(newMoves);
+    if (isGameOver) {
+      const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
+      setWinner(w);
+      setDone(true);
+      setAiThinking(false);
+      const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
+      setBannerMsg(wLabel);
+
+      const finalSecs = secsRef.current;
+      const date = new Date(Date.now() + offset).toISOString().slice(0, 10);
+      const recLine = w === 1 ? '' : '';
+      const share = `Mancala Daily ${date} — 🫘 You ${p[6]} · AI ${p[13]} · ${finalSecs}s${recLine}`;
+      const base = Math.max((p[6] - p[13]) * 15 - finalSecs, 0);
+
+      setVerifying(true);
+      const sid = sessionIdRef.current;
+      const nonce = nonceRef.current;
+      const log = moveLogRef.current.slice();
+      const fp = p.slice();
+      const proceed = (serverScore, ver, became) => {
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          setBannerMsg('');
+          const label = w === 'draw' ? "Draw 🤝"
+            : w === 2 ? 'AI wins 🤖'
+            : became ? '🏆 New daily record!' : 'You win! 🎉';
+          onWin(w === 1 ? serverScore : 0, newMoves, finalSecs, {
+            winner: w, share, verified: ver, daily: true,
+            becameRecord: became, streak, winnerLabel: label,
+          });
+        }, 700);
+      };
+
+      if (sid && nonce) {
+        mncDailyFinish(sid, nonce, log, fp, finalSecs).then(result => {
+          setVerifying(false);
+          const ok = result && result.verified;
+          setVerified(ok);
+          if (ok) {
+            if (result.globalRecord != null) setGlobalRecord(result.globalRecord);
+            if (typeof result.streak === 'number') setStreak(result.streak);
+            setBecameRecord(!!result.becameRecord);
+            setLbKey(k => k + 1);
+            proceed(typeof result.score === 'number' ? result.score : (w === 1 ? base : 0), true, !!result.becameRecord);
+          } else {
+            proceed(w === 1 ? base : 0, false, false);
+          }
+        });
+      } else {
+        setVerifying(false);
+        proceed(w === 1 ? base : 0, false, false);
+      }
+    } else if (extraTurn) {
+      setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
+      setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
+    } else {
+      setPlayer(currentPlayer === 1 ? 2 : 1);
+      setBannerMsg('');
+    }
+  };
+
+  const applyMove = (idx, currentPlayer) => {
+    if (animatingRef.current) return;
+    const curPits = pitsRef.current;
+    if (curPits[idx] === 0) return;
+    const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(curPits, idx, currentPlayer);
+    const newMoves = movesRef.current + 1;
+    moveLogRef.current.push(idx);
+    animatingRef.current = true;
+    const working = curPits.slice();
+    working[idx] = 0;
+    setPits(working.slice());
+    setFlashPits(new Set());
+    let step = 0;
+    const animate = () => {
+      if (!animatingRef.current) { setFlashPits(new Set()); return; }
+      if (step >= sequence.length) {
+        setFlashPits(new Set());
+        if (captureFrom >= 0) {
+          setCaptureFlash(new Set([captureFrom]));
+          setTimeout(() => {
+            if (!animatingRef.current) return;
+            setCaptureFlash(new Set());
+            animatingRef.current = false;
+            finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+          }, 350);
+        } else {
+          animatingRef.current = false;
+          finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+        }
+        return;
+      }
+      working[sequence[step]]++;
+      setPits(working.slice());
+      setFlashPits(new Set([sequence[step]]));
+      if (soundOnRef.current) mncPlayClick();
+      step++;
+      setTimeout(animate, 80);
+    };
+    setTimeout(animate, 0);
+  };
+  applyMoveRef.current = applyMove;
+
+  // AI plays P2 at Hard difficulty (deterministic — matches server verification).
+  useEffect(() => {
+    if (phase !== 'play' || player !== 2 || done) return;
+    setAiThinking(true);
+    const FLOOR = 350;
+    let raf = null, applyTimer = null;
+    raf = requestAnimationFrame(() => {
+      const startedAt = Date.now();
+      const idx = mncAIMove(pitsRef.current, 'hard');
+      const elapsed = Date.now() - startedAt;
+      applyTimer = setTimeout(() => {
+        setAiThinking(false);
+        if (idx >= 0) applyMoveRef.current(idx, 2);
+      }, Math.max(0, FLOOR - elapsed));
+    });
+    return () => { if (raf) cancelAnimationFrame(raf); if (applyTimer) clearTimeout(applyTimer); };
+  }, [player, done, phase]);
+
+  useEffect(() => () => { if (winTimerRef.current) clearTimeout(winTimerRef.current); }, []);
+
+  if (phase === 'loading') {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} />
+        <div style={{ color: C.muted, fontSize: '0.85rem' }}>Loading today's challenge…</div>
+      </div>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem', color: C.rose, fontSize: '0.9rem' }}>
+        Couldn't load the Daily Challenge. Make sure you're signed in, then try again.
+      </div>
+    );
+  }
+
+  if (phase === 'locked') {
+    const at = lockedAttempt || {};
+    const solved = at.score != null && at.score > 0;
+    const fmtTime = s => s == null ? '—' : `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    return (
+      <div className="locked-card">
+        <div className="lock-icon">🔒</div>
+        <h2>You've played today</h2>
+        <div className="sub">Mancala Daily Challenge — one attempt per day</div>
+        <div className="mnc-daily-pills" style={{ justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <span className="mnc-record-pill">🏆 Record: {globalRecord != null ? globalRecord : '—'}</span>
+          {streak > 0 && <span className="mnc-streak-chip">🔥 {streak} day{streak === 1 ? '' : 's'}</span>}
+        </div>
+        <div className="countdown-block">
+          <div className="clabel">Next puzzle in</div>
+          <div className="ctime mono">{countdown}</div>
+        </div>
+        {at.score != null && (
+          <div className="locked-result">
+            <div className="score-row"><span className="k">Your score</span><span className="v">{solved ? '+' + at.score : '0'}</span></div>
+            {at.timeSecs != null && <div className="score-row"><span className="k">Time</span><span className="v">{fmtTime(at.timeSecs)}</span></div>}
+            {at.moves != null && <div className="score-row"><span className="k">Moves</span><span className="v">{at.moves}</span></div>}
+          </div>
+        )}
+        <MncDailyLeaderboard refreshKey={lbKey} />
+      </div>
+    );
+  }
+
+  // ----- play phase -----
+  const p2Display = [12, 11, 10, 9, 8, 7];
+  const p1Display = [0, 1, 2, 3, 4, 5];
+  const p1Color = C.accent, p2Color = C.rose;
+  const activeColor = player === 1 ? p1Color : p2Color;
+  const leadingRecord = globalRecord != null && pits[6] > globalRecord;
+
+  const handlePitClick = (idx) => {
+    if (player !== 1 || done || animatingRef.current) return;
+    if (idx < 0 || idx > 5 || pits[idx] === 0) return;
+    applyMove(idx, 1);
+  };
+  const pitClass = (idx) => {
+    const isP1Pit = idx <= 5;
+    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
+    const cls = ['mnc-pit'];
+    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
+    if (flashPits.has(idx)) cls.push('mnc-flash');
+    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
+    return cls.join(' ');
+  };
+
+  return (
+    <div>
+      <div className="mnc-daily-header">
+        <div className="mnc-daily-title">🗓️ Daily Challenge</div>
+        <div className="mnc-daily-pills">
+          <span className="mnc-record-pill" style={leadingRecord ? { borderColor: C.gold, color: C.gold } : null}>
+            {globalRecord != null ? `🏆 Record: ${globalRecord}` : '🏆 Be the first!'}
+          </span>
+          {streak > 0 && <span className="mnc-streak-chip">🔥 {streak} day{streak === 1 ? '' : 's'}</span>}
+        </div>
+      </div>
+
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
+        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: p1Color }}>{pits[6]}</div></div>
+        <div className="pill">
+          <div className="plabel">ZK</div>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
+        color: done ? C.muted : activeColor,
+        background: (done ? C.dim : activeColor) + '22',
+        border: `1px solid ${(done ? C.dim : activeColor)}44`,
+        borderRadius: '999px', padding: '0.32rem 0.8rem',
+        maxWidth: 480, margin: '0 auto 0.65rem',
+      }}>
+        {done
+          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits'}
+      </div>
+
+      <div className="mnc-board">
+        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
+          <div className="mnc-store-label">AI</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p2Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
+          <div className="mnc-store-label">You</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p1Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
+            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+      </div>
+
+      {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
+      {becameRecord && <div className="mnc-banner" style={{ color: C.gold }}>🏆 New daily record!</div>}
+
+      <div className="mnc-controls">
+        <button onClick={() => { const next = !soundOn; setSoundOn(next); soundOnRef.current = next; try { localStorage.setItem(MNC_SOUND_KEY, next ? '1' : '0'); } catch {} }}>
+          {soundOn ? '🔊' : '🔇'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0', marginTop: '1.25rem', borderBottom: `1px solid ${C.border}` }}>
+        {['game', 'leaderboard'].map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{
+              flex: 1, padding: '0.45rem', fontSize: '0.82rem', fontWeight: activeTab === tab ? 700 : 400,
+              background: 'none', border: 'none', borderBottom: activeTab === tab ? `2px solid ${C.accent}` : '2px solid transparent',
+              color: activeTab === tab ? C.accent : C.muted, cursor: 'pointer',
+            }}>{tab === 'game' ? '🎯 Challenge' : '🏆 Leaderboard'}</button>
+        ))}
+      </div>
+      {activeTab === 'game' && (
+        <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.82rem', padding: '0.9rem 0.5rem', lineHeight: 1.5 }}>
+          One puzzle a day — the same board for every player. Win against the Hard AI to score; a bigger,
+          faster win scores higher. Beat the global record to extend your 🔥 streak.
+        </div>
+      )}
+      {activeTab === 'leaderboard' && <MncDailyLeaderboard refreshKey={lbKey} />}
     </div>
   );
 }
@@ -6808,7 +7365,7 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
 /* ============================================================
    Game 5d — Mancala Mode Selector
    ============================================================ */
-function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
+function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline, onSelectDaily }) {
   const [mode, setMode]             = useState(null);
   const [difficulty, setDifficulty] = useState(() => localStorage.getItem(MNC_AI_DIFF_KEY) || 'medium');
   const [onlineAction, setOnlineAction] = useState(null);
@@ -6818,6 +7375,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 
   const handleStart = async () => {
     if (!mode) return;
+    if (mode === 'daily') { onSelectDaily(); return; }
     if (mode === 'local') { onSelectLocal(); return; }
     if (mode === 'ai') {
       try { localStorage.setItem(MNC_AI_DIFF_KEY, difficulty); } catch {}
@@ -6846,6 +7404,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
   };
 
   const modes = [
+    { id: 'daily',  icon: '🗓️', name: 'Daily Challenge', desc: 'One puzzle a day. Beat the global record.', ranked: true },
     { id: 'local',  icon: '👥', name: 'Local 2-Player', desc: 'Pass and play on this device' },
     { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer', ranked: true },
     { id: 'online', icon: '🌐', name: 'Online',          desc: 'Play with a friend via room code' },
@@ -6921,15 +7480,16 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 /* ============================================================
    Game 5 — Mancala wrapper (delegates to mode sub-components)
    ============================================================ */
-function MancalaGame({ onWin, onStepChange, resetKey }) {
-  const [mode, setMode]               = useState(null);
+function MancalaGame({ onWin, onStepChange, resetKey, offset }) {
+  const [mode, setMode]               = useState(() =>
+    new URLSearchParams(window.location.search).get('mmode') === 'daily' ? 'daily' : null);
   const [difficulty, setDifficulty]   = useState(null);
   const [roomId, setRoomId]           = useState(null);
   const [myPlayerNum, setMyPlayerNum] = useState(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
-  // When "Play Again" fires, keep mode for local/ai but reset online (needs new room).
+  // When "Play Again" fires, keep mode for local/ai/daily but reset online (needs new room).
   useEffect(() => {
     if (modeRef.current === 'online') {
       setMode(null);
@@ -6941,6 +7501,7 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
   if (!mode) {
     return (
       <MancalaModeSelect
+        onSelectDaily={() => setMode('daily')}
         onSelectLocal={() => setMode('local')}
         onSelectAI={(diff) => { setDifficulty(diff); setMode('ai'); }}
         onSelectOnline={(playerNum, rId) => { setMyPlayerNum(playerNum); setRoomId(rId); setMode('online'); }}
@@ -6948,6 +7509,7 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
     );
   }
 
+  if (mode === 'daily')  return React.createElement(MancalaDailyGame, { onWin, onStepChange, offset });
   if (mode === 'local') return React.createElement(MancalaLocalGame, { onWin, onStepChange, resetKey });
   if (mode === 'ai')    return React.createElement(MancalaAIGame,    { onWin, onStepChange, resetKey, difficulty });
   if (mode === 'online') return React.createElement(MancalaOnlineGame, { onWin, onStepChange, roomId, myPlayerNum });
@@ -13902,6 +14464,18 @@ function App() {
       setScreen(body && body.attempt && !body.attempt.finishedAt ? 'game' : 'locked');
     }
   };
+
+  // Deep-link: ?game=<id> auto-opens that game once loaded. Combined with
+  // ?mmode=daily it jumps straight into Mancala's Daily Challenge — used by the
+  // Daily Challenge proposal tests and shareable links. Runs once after hydrate.
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (loading || deepLinkedRef.current) return;
+    const gid = new URLSearchParams(window.location.search).get('game');
+    if (!gid) return;
+    const g = GAMES.find(x => x.id === gid);
+    if (g) { deepLinkedRef.current = true; launchGame(g); }
+  }, [loading]);
 
   // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
   // a game component can hydrate from a single savedProgress object.

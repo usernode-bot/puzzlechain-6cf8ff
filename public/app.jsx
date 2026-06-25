@@ -3542,6 +3542,88 @@ body {
 }
 .dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
 .dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+
+/* ---- Chutes & Ladders ---- */
+.cnl-banner {
+  text-align: center; font-size: 0.82rem; font-weight: 600;
+  border-radius: 999px; padding: 0.32rem 0.8rem;
+  max-width: 480px; margin: 0 auto 0.65rem; display: block;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.cnl-board-wrap {
+  position: relative; max-width: 480px; margin: 0 auto;
+  aspect-ratio: 1; width: 100%;
+}
+.cnl-board {
+  position: absolute; inset: 0;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  gap: 2px;
+  background: ${C.border};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 2px;
+  overflow: hidden;
+}
+.cnl-cell {
+  position: relative;
+  display: flex; align-items: flex-start; justify-content: flex-start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: ${C.muted};
+  background: ${C.card};
+  padding: 1px 2px;
+  user-select: none;
+}
+.cnl-cell.alt { background: ${C.surface}; }
+.cnl-cell.cnl-goal { background: ${C.gold}22; color: ${C.gold}; }
+.cnl-cell-mark {
+  position: absolute; bottom: 0; right: 1px;
+  font-size: 0.72rem; line-height: 1;
+}
+.cnl-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 2;
+}
+.cnl-pawn {
+  position: absolute; z-index: 3;
+  width: 7%; height: 7%;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  transform: translate(-50%, -50%);
+  transition: left 0.13s ease, top 0.13s ease;
+}
+.cnl-die {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  margin: 0.9rem auto 0.2rem; max-width: 480px;
+}
+.cnl-die-face {
+  width: 3.4rem; height: 3.4rem; border-radius: 14px;
+  background: ${C.card}; border: 2px solid ${C.border};
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700;
+  font-size: 1.7rem; color: ${C.text};
+  transition: transform 0.1s ease, border-color 0.2s;
+}
+.cnl-die-face.rolling { animation: cnl-shake 0.5s ease; }
+@keyframes cnl-shake {
+  0%, 100% { transform: rotate(0) scale(1); }
+  25% { transform: rotate(-12deg) scale(1.08); }
+  50% { transform: rotate(10deg) scale(1.05); }
+  75% { transform: rotate(-6deg) scale(1.08); }
+}
+.cnl-roll-btn {
+  width: 100%; max-width: 480px; margin: 0 auto;
+  display: block; border: none; cursor: pointer;
+  border-radius: 12px; padding: 0.8rem 1rem;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1rem;
+  color: #fff; transition: opacity 0.15s, transform 0.1s;
+}
+.cnl-roll-btn:active { transform: scale(0.98); }
+.cnl-roll-btn:disabled { opacity: 0.45; cursor: default; }
 `;
 
 /* ============================================================
@@ -13243,6 +13325,285 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
   return React.createElement('div', { style: { padding: '1rem', color: C.text } }, 'Loading...');
 }
 
+/* ============================================================
+   Chutes & Ladders — 2-player local (pass-and-play) classic game
+   ============================================================ */
+// Standard Milton-Bradley layout. Ladders climb (bottom -> top),
+// chutes slide (top -> bottom). One flat map keyed by landing square.
+const CNL_LADDERS = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+const CNL_CHUTES  = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+const CNL_JUMPS   = Object.assign({}, CNL_LADDERS, CNL_CHUTES);
+
+// Map a square number (1..100) to {row, col} on the boustrophedon board.
+// row 0 is the BOTTOM row (squares 1..10), row 9 is the TOP (91..100).
+// Even rows (0-indexed from bottom) run left->right; odd rows right->left.
+function cnlRowCol(n) {
+  const idx = n - 1;            // 0-based
+  const row = Math.floor(idx / 10);
+  const within = idx % 10;
+  const col = (row % 2 === 0) ? within : (9 - within);
+  return { row, col };
+}
+
+// Center of a square as a percentage of the board box (for SVG + pawns).
+// Visual row 0 sits at the BOTTOM, so flip for top-origin coordinates.
+function cnlCenterPct(n) {
+  if (n <= 0) return { x: 50, y: 104 }; // off-board: just below the board
+  const { row, col } = cnlRowCol(n);
+  const visualRow = 9 - row;
+  return { x: (col + 0.5) * 10, y: (visualRow + 0.5) * 10 };
+}
+
+function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
+  const [p1Pos, setP1Pos]   = useState(0);
+  const [p2Pos, setP2Pos]   = useState(0);
+  const [player, setPlayer] = useState(1);
+  const [die, setDie]       = useState(null);
+  const [rolls, setRolls]   = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const [rolling, setRolling]     = useState(false);
+  const [done, setDone]     = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [banner, setBanner] = useState('');
+
+  const animatingRef = useRef(false);
+  const winTimerRef  = useRef(null);
+  const timersRef    = useRef([]);
+
+  const { secs, fmt } = useTimer(!done);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+  const rollsRef = useRef(0);
+  rollsRef.current = rolls;
+
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
+  };
+
+  const resetGame = () => {
+    animatingRef.current = false;
+    clearTimers();
+    setP1Pos(0); setP2Pos(0);
+    setPlayer(1); setDie(null); setRolls(0);
+    setAnimating(false); setRolling(false);
+    setDone(false); setWinner(null); setBanner('');
+  };
+
+  useEffect(() => { resetGame(); }, [resetKey]);
+  useEffect(() => () => clearTimers(), []);
+
+  const p1Color = C.accent;
+  const p2Color = C.rose;
+  const activeColor = done ? C.muted : (player === 1 ? p1Color : p2Color);
+
+  const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
+
+  const finishTurn = (who, landed) => {
+    const jump = CNL_JUMPS[landed];
+    const settle = () => {
+      // Win check: must land exactly on 100 (no chute sits on 100).
+      if (landed === 100) {
+        setDone(true);
+        setWinner(who);
+        const label = `Player ${who} wins! 🎉`;
+        setBanner(label);
+        const finalRolls = rollsRef.current;
+        const finalSecs = secsRef.current;
+        const score = Math.max(50, 300 - finalRolls * 5);
+        const share = `🪜 Chutes & Ladders — Player ${who} won in ${finalRolls} rolls!`;
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          onWin(score, finalRolls, finalSecs, { winner: who, winnerLabel: label, share });
+        }, 1300);
+        return;
+      }
+      // Pass turn to the other player.
+      animatingRef.current = false;
+      setAnimating(false);
+      setPlayer(who === 1 ? 2 : 1);
+    };
+
+    if (jump !== undefined) {
+      // Brief pause so players see the landing, then climb/slide.
+      const isLadder = CNL_LADDERS[landed] !== undefined;
+      setBanner(isLadder ? 'Ladder up! 🪜' : 'Down the chute! 🛝');
+      const t = setTimeout(() => {
+        setPos(who, jump);
+        const t2 = setTimeout(() => { setBanner(''); settle(); }, 320);
+        timersRef.current.push(t2);
+      }, 380);
+      timersRef.current.push(t);
+    } else {
+      settle();
+    }
+  };
+
+  const roll = () => {
+    if (animatingRef.current || done || rolling) return;
+    const who = player;
+    const value = Math.floor(Math.random() * 6) + 1;
+    const from = who === 1 ? p1Pos : p2Pos;
+    const newRolls = rolls + 1;
+
+    setRolling(true);
+    setDie(value);
+    setBanner('');
+    setRolls(newRolls);
+    rollsRef.current = newRolls;
+    onStepChange(newRolls);
+
+    const rollT = setTimeout(() => {
+      setRolling(false);
+
+      // Overshoot 100 => stay put, pass turn.
+      if (from + value > 100) {
+        setBanner('Overshoot — stay put');
+        const passT = setTimeout(() => {
+          setBanner('');
+          setPlayer(who === 1 ? 2 : 1);
+        }, 700);
+        timersRef.current.push(passT);
+        return;
+      }
+
+      // Hop square-by-square to the landing square.
+      animatingRef.current = true;
+      setAnimating(true);
+      const target = from + value;
+      let cur = from;
+      const hop = () => {
+        if (!animatingRef.current) return;
+        if (cur >= target) { finishTurn(who, target); return; }
+        cur++;
+        setPos(who, cur);
+        const t = setTimeout(hop, 130);
+        timersRef.current.push(t);
+      };
+      const t0 = setTimeout(hop, 130);
+      timersRef.current.push(t0);
+    }, 480);
+    timersRef.current.push(rollT);
+  };
+
+  // Build the 10x10 cells (top row first for natural DOM order).
+  const cells = [];
+  for (let visualRow = 0; visualRow < 10; visualRow++) {
+    for (let col = 0; col < 10; col++) {
+      const row = 9 - visualRow;              // bottom-origin board row
+      const within = (row % 2 === 0) ? col : (9 - col);
+      const n = row * 10 + within + 1;
+      const mark = CNL_LADDERS[n] !== undefined ? '🪜'
+        : CNL_CHUTES[n] !== undefined ? '🛝' : null;
+      cells.push(
+        <div
+          key={n}
+          className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
+        >
+          <span>{n}</span>
+          {mark && <span className="cnl-cell-mark">{mark}</span>}
+        </div>
+      );
+    }
+  }
+
+  // SVG connector lines for every ladder/chute.
+  const lines = Object.keys(CNL_JUMPS).map(k => {
+    const from = parseInt(k, 10);
+    const to = CNL_JUMPS[from];
+    const a = cnlCenterPct(from);
+    const b = cnlCenterPct(to);
+    const isLadder = CNL_LADDERS[from] !== undefined;
+    return (
+      <line
+        key={k}
+        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+        stroke={isLadder ? C.emerald : C.rose}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        opacity="0.6"
+      />
+    );
+  });
+
+  const p1c = cnlCenterPct(p1Pos);
+  const p2c = cnlCenterPct(p2Pos);
+  // Nudge pawns apart when sharing a square (incl. both off-board) so both stay visible.
+  const sameCell = p1Pos === p2Pos;
+  const p1x = sameCell ? p1c.x - 2.4 : p1c.x;
+  const p2x = sameCell ? p2c.x + 2.4 : p2c.x;
+
+  const bannerActive = !!banner;
+  const bannerColor = done ? C.muted : activeColor;
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Time</div>
+          <div className="pvalue time">{fmt}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Turn</div>
+          <div className="pvalue" style={{ color: activeColor, fontSize: '0.95rem' }}>
+            {done ? `P${winner}` : `P${player}`}
+          </div>
+        </div>
+        <div className="pill">
+          <div className="plabel">P1</div>
+          <div className="pvalue" style={{ color: p1Color, fontSize: '0.95rem' }}>{p1Pos}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">P2</div>
+          <div className="pvalue" style={{ color: p2Color, fontSize: '0.95rem' }}>{p2Pos}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Rolls</div>
+          <div className="pvalue">{rolls}</div>
+        </div>
+      </div>
+
+      <div
+        className="cnl-banner"
+        style={{
+          color: bannerColor,
+          background: (bannerActive ? bannerColor : activeColor) + '22',
+          border: `1px solid ${(bannerActive ? bannerColor : activeColor)}44`,
+        }}
+      >
+        {done
+          ? `Game over — Player ${winner} wins! 🎉`
+          : (banner || `Player ${player}'s turn`)}
+      </div>
+
+      <div className="cnl-board-wrap">
+        <div className="cnl-board">{cells}</div>
+        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {lines}
+        </svg>
+        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn" />
+        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn" />
+      </div>
+
+      <div className="cnl-die">
+        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: activeColor + '88' }}>
+          {die == null ? '·' : die}
+        </div>
+      </div>
+
+      <button
+        className="cnl-roll-btn"
+        style={{ background: activeColor }}
+        onClick={roll}
+        disabled={done || animating || rolling}
+      >
+        {done ? 'Game over' : `Roll for Player ${player}`}
+      </button>
+    </div>
+  );
+}
+
 const GAMES = [
   {
     id: 'sudoku',
@@ -13293,6 +13654,16 @@ const GAMES = [
     tag: 'Strategy',
     tagColor: C.gold,
     component: MancalaGame,
+  },
+  {
+    id: 'chutes-ladders',
+    name: 'Chutes & Ladders',
+    icon: '🪜',
+    category: 'classic',
+    desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
+    tag: 'Board',
+    tagColor: C.emerald,
+    component: ChutesLaddersGame,
   },
   {
     id: '2048',

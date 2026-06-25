@@ -139,6 +139,7 @@ const GAME_REGISTRY = {
   tilematchingdaily: { category: 'daily',   tier: 'A' },
   minesweeper:       { category: 'classic', tier: 'A' },
   mancala:           { category: 'classic', tier: 'A' },
+  'chutes-ladders':  { category: 'classic', tier: 'A' },
   '2048':            { category: 'classic', tier: 'A' },
   'knights-tour':    { category: 'classic', tier: 'A' },
   snake:             { category: 'classic', tier: 'B' },

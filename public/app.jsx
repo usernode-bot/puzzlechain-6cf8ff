@@ -266,6 +266,28 @@ body {
 .account-msg.ok { color: ${C.emerald}; }
 .account-msg.err { color: ${C.rose}; }
 
+/* Account "Connections" section — Friends + dApps relocated here on mobile. */
+.account-connection-row {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+  background: ${C.dim}; border: 1px solid ${C.border};
+  border-radius: 10px; padding: 0.7rem 0.9rem;
+  font-size: 0.9rem; font-weight: 600; color: ${C.text};
+  cursor: pointer; text-align: left; transition: border-color 0.15s;
+}
+.account-connection-row:hover { border-color: ${C.accent}; }
+.account-connection-row .chev { margin-left: auto; color: ${C.muted}; }
+.account-dapps-row { margin-top: 1rem; }
+.account-dapps-pubkey {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  color: ${C.text}; word-break: break-all; flex: 1;
+}
+
+/* The Connections section is only shown at narrow widths — above 560px the
+   Friends button and dApps chip live in the top bar instead. */
+@media (min-width: 561px) {
+  .account-connections { display: none; }
+}
+
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
   .account-chip { padding: 0.35rem; }
@@ -273,6 +295,11 @@ body {
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
+  /* Friends + dApps move into the Account screen's Connections section.
+     Scoped under .nav-right so they outrank the base chip rule defined
+     later in this stylesheet regardless of source order. */
+  .nav-right .nav-friends-btn { display: none; }
+  .nav-right .nav-integration-chip { display: none; }
 }
 
 /* ---- Lobby ---- */
@@ -4364,11 +4391,14 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVerify, onDisconnect }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect }) {
   const [copied, setCopied] = React.useState(false);
+  const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [confirmDisc, setConfirmDisc] = React.useState(false);
+  const dappEnabled = !!(integration && integration.enabled);
+  const dappPubkey = integration && integration.pubkey;
   const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
 
   // status: 'verified' | 'linked' | 'none'
@@ -4380,6 +4410,15 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVer
       await navigator.clipboard.writeText(user.usernodePubkey);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const copyDappPubkey = async () => {
+    if (!dappPubkey) return;
+    try {
+      await navigator.clipboard.writeText(dappPubkey);
+      setDappCopied(true);
+      setTimeout(() => setDappCopied(false), 1500);
     } catch {}
   };
 
@@ -4488,6 +4527,39 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVer
             </div>
             {msg && (
               <div className={`account-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>
+            )}
+          </div>
+
+          {/* Connections — Friends + dApps, shown here only on narrow viewports
+              (hidden ≥561px via CSS, where they live in the top bar instead). */}
+          <div className="wallet-card account-connections">
+            <div className="wallet-card-title">Connections</div>
+            <button
+              type="button"
+              className="account-connection-row"
+              onClick={onOpenFriends}
+            >
+              👥 Friends
+              <span className="chev">›</span>
+            </button>
+            {dappEnabled && (
+              <div className="account-dapps-row">
+                <div className="wallet-card-title">dApps integration</div>
+                <div className="account-status account-status-verified">
+                  <span className="account-status-dot" />
+                  <span>Active</span>
+                </div>
+                {dappPubkey && (
+                  <div className="wallet-addr-row">
+                    <span className="account-dapps-pubkey" title={dappPubkey}>
+                      🔗 {truncAddr(dappPubkey)}
+                    </span>
+                    <button className="back-btn" onClick={copyDappPubkey}>
+                      {dappCopied ? 'Copied ✓' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </>
@@ -14191,7 +14263,7 @@ function App() {
           )}
           {authOk && (
             <button
-              className="primary-btn"
+              className="primary-btn nav-friends-btn"
               style={{
                 background: 'transparent',
                 border: `1px solid ${C.border}`,
@@ -14256,6 +14328,8 @@ function App() {
           authOk={authOk}
           walletAddr={walletAddr}
           walletVerified={walletVerified}
+          integration={integration}
+          onOpenFriends={() => setScreen('friends')}
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
           onDisconnect={disconnectWallet}

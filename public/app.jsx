@@ -4,18 +4,18 @@ const { useState, useEffect, useRef } = React;
    Design system — color palette
    ============================================================ */
 const C = {
-  bg:      '#0A0E1A',
-  surface: '#111827',
-  card:    '#1a2235',
-  border:  '#1e3a5f',
-  accent:  '#3b82f6',
-  gold:    '#f59e0b',
-  emerald: '#10b981',
-  violet:  '#8b5cf6',
-  rose:    '#f43f5e',
-  text:    '#e2e8f0',
-  muted:   '#64748b',
-  dim:     '#334155',
+  bg:      '#0A0D14',
+  surface: '#12161F',
+  card:    '#181D29',
+  border:  '#2A3342',
+  accent:  '#6366F1',
+  gold:    '#FBBF24',
+  emerald: '#34D399',
+  violet:  '#A78BFA',
+  rose:    '#FB7185',
+  text:    '#ECEFF6',
+  muted:   '#8B95A8',
+  dim:     '#39424F',
 };
 
 /* ============================================================
@@ -515,7 +515,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.primary-btn:hover { background: #2f6fe0; }
+.primary-btn:hover { background: #4F52D9; }
 
 /* ---- Locked screen ---- */
 .locked-card {
@@ -2284,7 +2284,7 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.tm-play-btn:hover { background: #2f6fe0; }
+.tm-play-btn:hover { background: #4F52D9; }
 .tm-level-won {
   background: ${C.card};
   border: 1px solid ${C.emerald}55;
@@ -2882,7 +2882,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.idle-card-btn:hover { background: #2f6fe0; }
+.idle-card-btn:hover { background: #4F52D9; }
 .idle-card-btn:disabled { background: ${C.muted}; cursor: not-allowed; }
 
 .idle-coin-popup {
@@ -2946,7 +2946,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.prestige-confirm:hover { background: #2f6fe0; }
+.prestige-confirm:hover { background: #4F52D9; }
 .prestige-cancel {
   flex: 1;
   padding: 0.8rem;
@@ -3352,7 +3352,7 @@ body {
   padding: 0.45rem 0.85rem; font-family: inherit; font-size: 0.83rem;
   font-weight: 600; cursor: pointer; transition: background 0.12s;
 }
-.tm-duel-find-btn:hover:not(:disabled) { background: #2f6fe0; }
+.tm-duel-find-btn:hover:not(:disabled) { background: #4F52D9; }
 .tm-duel-find-btn:disabled { opacity: 0.35; cursor: not-allowed; background: ${C.muted}; }
 .tm-duel-matchmaking {
   text-align: center; padding: 2rem 1rem;
@@ -6660,7 +6660,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
         </div>
         <div className="pill">
           <div className="plabel">ZK</div>
-          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? C.emerald : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
             {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
           </div>
         </div>
@@ -13434,7 +13434,7 @@ const GAMES = [
     category: 'classic',
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
-    tagColor: '#6366f1',
+    tagColor: C.accent,
     component: TileMatchingGame,
   },
   {
@@ -13464,7 +13464,7 @@ const GAMES = [
     category: 'classic',
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
-    tagColor: '#f59e0b',
+    tagColor: C.gold,
     component: Match3Game,
   },
   {
@@ -13474,7 +13474,7 @@ const GAMES = [
     category: 'daily',
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',
     tag: 'Puzzle',
-    tagColor: '#6366f1',
+    tagColor: C.accent,
     component: TileMatchingDailyGame,
   },
   {

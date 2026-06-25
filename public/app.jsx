@@ -14013,8 +14013,8 @@ function App() {
 
   const handleWin = async (score, steps, timeSecs, meta) => {
     try {
-      // Classic games skip server, streak, and totalScore nav update
-      if (currentGame && currentGame.category === 'classic') {
+      // Non-daily games skip the server, streak, and totalScore nav update.
+      if (currentGame && !currentGame.daily) {
         const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
         setWinData({
           score,
@@ -14097,8 +14097,8 @@ function App() {
   // streak. Existing win-only games never call this.
   const handleLose = async (steps, timeSecs, meta) => {
     try {
-      // Classic games skip server entirely
-      if (currentGame && currentGame.category === 'classic') {
+      // Non-daily games skip the server entirely.
+      if (currentGame && !currentGame.daily) {
         setLoseData({
           steps,
           timeSecs,

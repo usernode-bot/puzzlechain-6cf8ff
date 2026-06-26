@@ -730,16 +730,103 @@ body {
 .word-theme b { color: ${C.text}; }
 
 /* ---- Crypto Wordle ---- */
+.cw-tracker {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  max-width: 460px;
+  margin: 0 auto 0.8rem;
+}
+.cw-tracker .cw-dot {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: ${C.muted};
+  font-family: 'JetBrains Mono', monospace;
+}
+.cw-tracker .cw-dot.solved { color: ${C.emerald}; }
+.cw-tracker .cw-dot.missed { color: ${C.rose}; }
+.cw-tracker .cw-dot.active { color: ${C.accent}; }
+.cw-alldone {
+  text-align: center;
+  max-width: 460px;
+  margin: 1rem auto 0;
+  font-weight: 600;
+  color: ${C.emerald};
+}
+.cw-clue {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 460px;
+  margin: 0 auto 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-left: 3px solid ${C.emerald};
+  border-radius: 10px;
+}
+.cw-clue-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: ${C.emerald};
+  font-weight: 700;
+}
+.cw-clue-text { flex: 1 1 auto; font-size: 0.9rem; color: ${C.text}; }
+.cw-clue-len {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: ${C.muted};
+  white-space: nowrap;
+}
+.cw-clue-extra {
+  margin-top: -0.4rem;
+  border-left-color: ${C.gold};
+}
+.cw-clue-extra .cw-clue-label { color: ${C.gold}; }
+.cw-hint-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  max-width: 460px;
+  margin: 0 auto 0.9rem;
+}
+.cw-hint-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  background: ${C.gold};
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  transition: filter 0.1s ease, opacity 0.1s ease;
+}
+.cw-hint-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.cw-hint-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.cw-hint-balance {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  color: ${C.muted};
+}
+.cw-hint-msg {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: ${C.rose};
+}
 .cw-board {
   display: grid;
-  grid-template-rows: repeat(6, 1fr);
   gap: 0.4rem;
   max-width: 330px;
   margin: 0 auto;
 }
 .cw-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
   gap: 0.4rem;
 }
 .cw-row.shake { animation: cw-shake 0.4s ease; }
@@ -3517,6 +3604,13 @@ body {
   color: ${C.emerald}; transition: border-color 0.15s;
 }
 .nav-wallet-chip:hover { border-color: ${C.emerald}; }
+.nav-match-chip {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.7rem;
+  font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
+  color: ${C.gold}; white-space: nowrap;
+}
 .nav-integration-chip {
   display: inline-flex; align-items: center; gap: 0.3rem;
   background: ${C.card}; border: 1px solid ${C.border};
@@ -5147,21 +5241,77 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 }
 
 /* ============================================================
-   Game 3 — Crypto Wordle (daily 5-letter Web3 term)
+   Game 3 — Crypto Wordle (daily variable-length finance/crypto word)
    ============================================================ */
-const CW_LEN = 5;
-const CW_MAX = 6;
+// The daily word now varies in length (3–8 letters). The board sizes its
+// columns to the word and allows wordLen + 1 guesses (see cwMaxGuesses).
+const CW_MIN_LEN = 3;
+const CW_MAX_LEN = 8;
 
-// Curated, well-known 5-letter Web3 / crypto terms. The daily answer is
-// chosen deterministically from this list, so everyone gets the same word
-// on the same UTC day (shareable, comparable). No dictionary validates the
-// guesses — any 5 letters are accepted — but the answer is always from here.
-const CW_ANSWERS = [
-  'TOKEN', 'BLOCK', 'CHAIN', 'MINER', 'NONCE', 'STAKE', 'VAULT', 'TRADE',
-  'WHALE', 'PROOF', 'AUDIT', 'ETHER', 'YIELD', 'LAYER', 'NODES', 'MOONS',
-  'DEGEN', 'ALPHA', 'FLOOR', 'MINTS', 'ASSET', 'BYTES', 'PEERS', 'SHARD',
-  'BASED', 'VYPER', 'BLOBS', 'WAGMI', 'PUMPS', 'DUMPS',
+// Curated finance / crypto terms of VARYING length (3–8 letters), each with a
+// short themed clue the player reads while solving. The daily answer is chosen
+// deterministically from this list, so everyone gets the same word + length +
+// clue on the same UTC day (shareable, comparable). No dictionary validates the
+// guesses — any letters of the right length are accepted — but the answer is
+// always from here. Every `word` must be UPPERCASE A–Z and 3–8 letters.
+// Each entry: `clue` is the always-visible main clue; `hints` is an ordered
+// list of EXTRA clues (default 2) that unlock progressively — one per wrong
+// guess, or early via the paid Hint button. Keep hints incremental and
+// spoiler-light (never spell the word).
+const CW_WORDS = [
+  { word: 'FEE',      clue: 'What you pay to get a transaction processed',        hints: ['Charged every time you move funds on-chain', 'Spikes when the network is congested'] },
+  { word: 'BID',      clue: 'The price a buyer offers in an order book',          hints: ["The opposite of an 'ask'", 'Sits on the buy side of the book'] },
+  { word: 'APY',      clue: 'Yearly compounded return on a staking deposit',      hints: ['A percentage yield farmers watch', "Three-letter acronym ending in 'yield'"] },
+  { word: 'BULL',     clue: 'An investor betting prices will rise',               hints: ['This market only goes up, they say', 'The opposite of a bear'] },
+  { word: 'BEAR',     clue: 'An investor betting prices will fall',               hints: ['Prices keep sliding in this market', 'The opposite of a bull'] },
+  { word: 'COIN',     clue: "A blockchain's own native digital currency",         hints: ['Bitcoin is the original one', 'Not a token — it has its own chain'] },
+  { word: 'FIAT',     clue: 'Government-issued money like dollars or euros',      hints: ['Backed by a state, not a blockchain', 'The dollar and euro are examples'] },
+  { word: 'HODL',     clue: 'Crypto slang for holding through the swings',        hints: ["Born from a typo of 'hold'", 'A meme for diamond hands'] },
+  { word: 'MINT',     clue: 'To create a brand-new token or NFT',                 hints: ['Happens when an NFT is first created', 'Adds fresh supply to existence'] },
+  { word: 'PUMP',     clue: 'A sharp, sudden rise in a coin’s price',             hints: ['Often followed by a dump', 'A rapid green candle'] },
+  { word: 'TOKEN',    clue: 'A tradable unit of value issued on a chain',         hints: ['Issued on top of an existing chain', 'ERC-20 is a standard for these'] },
+  { word: 'BLOCK',    clue: 'A bundle of transactions added to the chain',        hints: ['Miners race to add the next one', 'Links to the one before it'] },
+  { word: 'CHAIN',    clue: 'The shared ledger of linked blocks',                 hints: ['A linked sequence of blocks', "The 'chain' in blockchain"] },
+  { word: 'STAKE',    clue: 'Lock up coins to secure a network and earn rewards', hints: ['You give this up temporarily to earn passive rewards', 'Proof-of-_____ networks rely on it'] },
+  { word: 'VAULT',    clue: 'A smart contract that safeguards deposited assets',  hints: ['Where a DeFi protocol stores deposits', 'A digital strongbox'] },
+  { word: 'WHALE',    clue: 'A holder big enough to move the market',             hints: ['A sea creature that moves markets', 'Holds enough to cause a splash'] },
+  { word: 'YIELD',    clue: 'The income your crypto earns over time',             hints: ['What farmers chase in DeFi', 'Your return, expressed as a rate'] },
+  { word: 'AUDIT',    clue: 'A security review of a smart contract',             hints: ['Done before a protocol launches', 'Hunts for code vulnerabilities'] },
+  { word: 'ASSET',    clue: 'Anything of value you can hold or trade',            hints: ['On the plus side of a balance sheet', 'Crypto, stocks, and gold all count'] },
+  { word: 'NONCE',    clue: 'The number a miner tweaks to find a valid hash',     hints: ['A miner increments it endlessly', 'Used once, then discarded'] },
+  { word: 'WALLET',   clue: 'App that holds your keys and coins',                 hints: ['Holds your private keys', 'Can be hot software or a cold device'] },
+  { word: 'LEDGER',   clue: 'The record of every transaction ever made',         hints: ['An immutable transaction record', 'Also a famous hardware brand'] },
+  { word: 'MINING',   clue: 'Spending compute to add blocks and earn rewards',    hints: ['How proof-of-work secures a chain', 'Rewards whoever solves the puzzle'] },
+  { word: 'ORACLE',   clue: 'A feed that brings off-chain data on-chain',         hints: ['Feeds real-world prices on-chain', 'Chainlink is the best-known one'] },
+  { word: 'BRIDGE',   clue: 'Moves assets between two different blockchains',     hints: ['Connects two separate chains', 'A frequent hacking target'] },
+  { word: 'TETHER',   clue: 'Nickname for the best-known dollar stablecoin',      hints: ['Its ticker is USDT', 'A coin pegged to the dollar'] },
+  { word: 'CRYPTO',   clue: 'Short name for digital currencies as a whole',       hints: ["Short for a kind of currency", "The whole industry's nickname"] },
+  { word: 'BROKER',   clue: 'A middleman who places trades for you',              hints: ['Places trades on your behalf', 'Earns a commission per trade'] },
+  { word: 'WALLETS',  clue: 'Where holders keep their keys and coins (plural)',   hints: ['Plural of where you keep keys', 'You might own several of these'] },
+  { word: 'NETWORK',  clue: 'The connected nodes that run a blockchain',          hints: ['Nodes connected together', 'Ethereum is one of these'] },
+  { word: 'TRADING',  clue: 'Buying and selling to profit from price moves',      hints: ['Buying low and selling high', 'What day-_____ describes'] },
+  { word: 'STAKING',  clue: 'Earning rewards by locking up your coins',           hints: ['Locking coins to earn rewards', 'Powers proof-of-stake'] },
+  { word: 'DEPOSIT',  clue: 'Funds you put into an account or protocol',          hints: ['Money you put in', 'The opposite of a withdrawal'] },
+  { word: 'AIRDROP',  clue: 'Free tokens dropped to a community of wallets',      hints: ['Free tokens sent to wallets', 'Often rewards early users'] },
+  { word: 'LENDING',  clue: 'Supplying assets so others can borrow for interest', hints: ['Earn interest by supplying assets', 'Aave and Compound enable it'] },
+  { word: 'EXCHANGE', clue: 'A marketplace for swapping one coin for another',    hints: ['Where you swap one coin for another', 'Can be centralized or decentralized'] },
+  { word: 'SOLVENCY', clue: 'Having enough assets to cover what you owe',         hints: ['Enough assets to cover liabilities', 'The opposite of bankruptcy'] },
+  { word: 'TREASURY', clue: 'The shared pool of funds a protocol controls',       hints: ["A DAO's shared war chest", "Holds a protocol's reserves"] },
+  { word: 'VALIDATE', clue: 'To confirm transactions are legitimate',             hints: ['Confirm a transaction is legit', 'Validators do this'] },
+  { word: 'DIVIDEND', clue: 'A share of profits paid out to holders',             hints: ['A payout to shareholders', 'Profit shared with holders'] },
+  { word: 'CURRENCY', clue: 'Money in a particular form, digital or fiat',        hints: ['A medium of exchange', 'Dollars and bitcoin both qualify'] },
+  { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement',       hints: ['Self-executing code on a chain', 'Smart ones run on Ethereum'] },
 ];
+
+// Hint pricing — single tuning knob. Cost of the Nth hint purchased today
+// (0-indexed) is CW_HINT_BASE_COST * 2**N → 1, 2, 4, 8, … in MATCH tokens.
+// The server is authoritative; this client copy is for display only.
+const CW_HINT_BASE_COST = 1;
+const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
+
+// Guesses allowed for a given word length: one more than the length, so a
+// 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
+const cwMaxGuesses = (wordLen) => wordLen + 1;
 
 const CW_EMOJI = { green: '🟩', yellow: '🟨', gray: '⬛' };
 const CW_KEYS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
@@ -5179,100 +5329,238 @@ function cwDayNum(offset) {
 // first, consuming a tally of the answer's letters; then yellows only while
 // an unconsumed copy of the letter remains, else gray.
 function cwScoreGuess(guess, answer) {
-  const res = Array(CW_LEN).fill('gray');
+  const len = answer.length;
+  const res = Array(len).fill('gray');
   const counts = {};
-  for (let i = 0; i < CW_LEN; i++) counts[answer[i]] = (counts[answer[i]] || 0) + 1;
-  for (let i = 0; i < CW_LEN; i++) {
+  for (let i = 0; i < len; i++) counts[answer[i]] = (counts[answer[i]] || 0) + 1;
+  for (let i = 0; i < len; i++) {
     if (guess[i] === answer[i]) { res[i] = 'green'; counts[guess[i]]--; }
   }
-  for (let i = 0; i < CW_LEN; i++) {
+  for (let i = 0; i < len; i++) {
     if (res[i] === 'green') continue;
     if (counts[guess[i]] > 0) { res[i] = 'yellow'; counts[guess[i]]--; }
   }
   return res;
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
-  const dayNum = useRef(cwDayNum(offset)).current;
-  const answer = useRef(
-    CW_ANSWERS[((dayNum % CW_ANSWERS.length) + CW_ANSWERS.length) % CW_ANSWERS.length]
-  ).current;
+// Multi-word daily puzzle: each UTC day is a deterministic stack of 4–7
+// independent words drawn from CW_WORDS via the shared seeded PRNG, so every
+// player faces the identical set. Tunable knobs.
+const CW_MIN_ROWS = 4;
+const CW_MAX_ROWS = 7;
 
-  // Hydrate from a resumed attempt: recompute each guess's colors from the
-  // saved guess words (the answer is deterministic for the day).
-  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.words)
+// Points banked for solving one word in `attemptsUsed` tries. Fewer attempts and
+// longer words score more. Missed words score 0. Single formula, easy to retune.
+const cwRoundPoints = (wordLen, attemptsUsed) =>
+  Math.max((cwMaxGuesses(wordLen) + 1 - attemptsUsed) * 60, 60) + wordLen * 10;
+
+// The day's ordered list of word entries ({ word, clue, hints }). Deterministic
+// from the server-anchored UTC day, so it's identical for everyone (fair board).
+function cwDailyRounds(offset) {
+  const rng = dailyRng(offset, 'cryptowordle');
+  const R = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
+  const picked = [];
+  const used = new Set();
+  let guard = 0;
+  while (picked.length < R && guard < 1000) {
+    guard++;
+    const idx = Math.floor(rng() * CW_WORDS.length);
+    if (used.has(idx)) continue;
+    used.add(idx);
+    picked.push(CW_WORDS[idx]);
+  }
+  return picked;
+}
+
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+  const dayNum = useRef(cwDayNum(offset)).current;
+  // The day's stack of independent word rounds (stable for the render lifetime).
+  const roundsDef = useRef(cwDailyRounds(offset)).current;
+
+  // Resume only today's saved progress (multi-round shape). Board is re-derived
+  // from the seed; we persist only the mutable per-round guess words + hint use.
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.rounds)
     ? savedProgress
     : null;
-  const initGuesses = () => (resumed ? resumed.words : [])
-    .filter(w => typeof w === 'string' && w.length === CW_LEN)
-    .slice(0, CW_MAX)
-    .map(w => ({ word: w, result: cwScoreGuess(w, answer) }));
+  const initRoundGuesses = () => roundsDef.map((rd, i) => {
+    const words = resumed && Array.isArray(resumed.rounds[i]) ? resumed.rounds[i] : [];
+    return words
+      .filter(w => typeof w === 'string' && w.length === rd.word.length)
+      .slice(0, cwMaxGuesses(rd.word.length))
+      .map(w => ({ word: w, result: cwScoreGuess(w, rd.word) }));
+  });
+  const initHintsByRound = () => roundsDef.map((_, i) =>
+    resumed && Array.isArray(resumed.hintsByRound) && Number.isFinite(resumed.hintsByRound[i])
+      ? resumed.hintsByRound[i] : 0
+  );
 
-  const [guesses, setGuesses] = useState(initGuesses); // [{ word, result: ['green'|'yellow'|'gray', …] }]
-  const [cur, setCur] = useState('');          // in-progress letters for the active row
+  // roundGuesses[i] = [{ word, result }]; hintsByRound[i] = paid hints applied to round i.
+  const [roundGuesses, setRoundGuesses] = useState(initRoundGuesses);
+  const [hintsByRound, setHintsByRound] = useState(initHintsByRound);
+  const [cur, setCur] = useState('');
   const [shake, setShake] = useState(false);
   const [done, setDone] = useState(false);
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
 
-  // Idle/leave autosave; per-guess saves happen in submit().
+  // Derive per-round status (solved / missed / active) from the submitted guesses.
+  const resolveRounds = (guessArrays) => roundsDef.map((rd, i) => {
+    const gs = guessArrays[i] || [];
+    const maxG = cwMaxGuesses(rd.word.length);
+    const solved = gs.length > 0 && gs[gs.length - 1].word === rd.word;
+    const missed = !solved && gs.length >= maxG;
+    return { def: rd, guesses: gs, maxG, solved, missed, resolved: solved || missed };
+  });
+  const roundState = resolveRounds(roundGuesses);
+  const activeIdx = roundState.findIndex(r => !r.resolved);
+  const allResolved = activeIdx === -1;
+  const active = activeIdx >= 0 ? roundState[activeIdx] : null;
+
+  const solvedCount = roundState.filter(r => r.solved).length;
+  const totalScore = roundState.reduce(
+    (a, r) => a + (r.solved ? cwRoundPoints(r.def.word.length, r.guesses.length) : 0), 0
+  );
+  const totalSteps = roundGuesses.reduce((a, g) => a + (g ? g.length : 0), 0);
+
+  const buildProgress = (guessArrays, hbr) => ({
+    dayNum,
+    rounds: guessArrays.map(gs => (gs || []).map(g => g.word)),
+    hintsByRound: hbr,
+  });
+
+  // Idle/leave autosave; per-guess + per-purchase saves happen inline.
   const stateRef = useRef({});
-  stateRef.current = { guesses, secs };
+  stateRef.current = { roundGuesses, hintsByRound, secs };
   useAutosave(
     onSaveProgress,
     () => ({
-      progress: { dayNum, words: stateRef.current.guesses.map(g => g.word) },
-      steps: stateRef.current.guesses.length,
+      progress: buildProgress(stateRef.current.roundGuesses, stateRef.current.hintsByRound),
+      steps: stateRef.current.roundGuesses.reduce((a, g) => a + (g ? g.length : 0), 0),
       secs: stateRef.current.secs,
     }),
     !done
   );
 
-  // Best color seen per letter, for the on-screen keyboard tinting.
+  // Paid-hint state. hintsPurchased is the server-authoritative DAILY count that
+  // drives the doubling cost ramp; the MATCH balance is the global nav balance
+  // passed in via props. Both are read on mount and reconciled from purchases.
+  const [hintsPurchased, setHintsPurchased] = useState(0);
+  const [buying, setBuying] = useState(false);
+  const [hintMsg, setHintMsg] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api('/api/cryptowordle/hint');
+      if (!alive || !ok || !body) return;
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Per-round clue reveal: wrong guesses in THIS round + hints applied to it,
+  // capped at the round's available clues. Cost ramp is global across rounds.
+  const activeHints = active ? (active.def.hints || []) : [];
+  const activeWrong = active ? active.guesses.filter(g => g.word !== active.def.word).length : 0;
+  const activeHintsApplied = active ? (hintsByRound[activeIdx] || 0) : 0;
+  const revealedExtra = active ? Math.min(activeWrong + activeHintsApplied, activeHints.length) : 0;
+  const cluesLeft = activeHints.length - revealedExtra;
+  const nextCost = cwHintCost(hintsPurchased);
+  const canAffordHint = matchBalance != null && matchBalance >= nextCost;
+  // Daily cap sent to the server: total clues purchasable across all rounds.
+  const dailyClueTotal = roundsDef.reduce((a, rd) => a + (rd.hints ? rd.hints.length : 0), 0);
+
+  const buyHint = async () => {
+    if (buying || done || !active || cluesLeft <= 0) return;
+    setBuying(true);
+    setHintMsg('');
+    const { ok, status, body } = await api('/api/cryptowordle/hint', {
+      method: 'POST',
+      body: JSON.stringify({ maxHints: dailyClueTotal }),
+    });
+    setBuying(false);
+    if (ok && body) {
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+      // Apply the revealed clue to the active round and persist immediately so a
+      // reload can't lose a paid reveal while the server counter already advanced.
+      const nextHbr = hintsByRound.map((n, i) => (i === activeIdx ? (n || 0) + 1 : n));
+      setHintsByRound(nextHbr);
+      onSaveProgress && onSaveProgress(buildProgress(roundGuesses, nextHbr), totalSteps, secs);
+      return;
+    }
+    if (status === 409 && body && body.code === 'insufficient_funds') {
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+      setHintMsg('Not enough MATCH');
+    } else if (status === 409 && body && body.code === 'no_more_hints') {
+      setHintMsg('No more clues');
+    } else {
+      setHintMsg('Could not buy hint');
+    }
+  };
+
+  // Spoiler-free multi-word share: one line per word (✅/❌ + blank squares).
+  const buildShare = (rs) => {
+    const lines = [`Crypto Wordle #${dayNum} — ${rs.filter(r => r.solved).length}/${rs.length} · ${totalScore} pts`];
+    rs.forEach(r => {
+      lines.push((r.solved ? '✅ ' : '❌ ') + (r.solved ? '🟩' : '⬛').repeat(r.def.word.length));
+    });
+    return lines.join('\n');
+  };
+
+  const finishIfDone = (nextRoundState) => {
+    if (nextRoundState.some(r => !r.resolved)) return false;
+    setDone(true);
+    const share = buildShare(nextRoundState);
+    const solved = nextRoundState.filter(r => r.solved).length;
+    const total = nextRoundState.length;
+    const pts = nextRoundState.reduce(
+      (a, r) => a + (r.solved ? cwRoundPoints(r.def.word.length, r.guesses.length) : 0), 0
+    );
+    const meta = { share, hintsUsed: hintsPurchased, wordsSolved: solved, wordsTotal: total };
+    if (pts > 0) onWin(pts, totalSteps + 1, secs, meta);
+    else onLose(totalSteps + 1, secs, meta);
+    return true;
+  };
+
+  // Best color per letter for the active round's keyboard tinting.
   const keyState = {};
   const rank = { gray: 0, yellow: 1, green: 2 };
-  for (const g of guesses) {
-    for (let i = 0; i < CW_LEN; i++) {
-      const ch = g.word[i], c = g.result[i];
-      if (!(ch in keyState) || rank[c] > rank[keyState[ch]]) keyState[ch] = c;
+  if (active) {
+    for (const g of active.guesses) {
+      for (let i = 0; i < active.def.word.length; i++) {
+        const ch = g.word[i], c = g.result[i];
+        if (!(ch in keyState) || rank[c] > rank[keyState[ch]]) keyState[ch] = c;
+      }
     }
   }
 
-  const buildShare = (rows, solved) =>
-    `Crypto Wordle #${dayNum} ${solved ? rows.length : 'X'}/${CW_MAX}\n` +
-    rows.map(r => r.result.map(c => CW_EMOJI[c]).join('')).join('\n');
-
   const submit = () => {
-    if (done) return;
-    if (cur.length !== CW_LEN) {
+    if (done || !active) return;
+    const answer = active.def.word;
+    const wordLen = answer.length;
+    if (cur.length !== wordLen) {
       setShake(true);
       setTimeout(() => setShake(false), 400);
       return;
     }
     const result = cwScoreGuess(cur, answer);
-    const rows = [...guesses, { word: cur, result }];
-    setGuesses(rows);
+    const newRoundGuesses = roundGuesses.map((g, i) =>
+      i === activeIdx ? [...(g || []), { word: cur, result }] : g
+    );
+    setRoundGuesses(newRoundGuesses);
     setCur('');
-    onStepChange(rows.length);
-
-    // persist this guess immediately (before any terminal finish)
-    onSaveProgress && onSaveProgress({ dayNum, words: rows.map(g => g.word) }, rows.length, secs);
-
-    if (cur === answer) {
-      setDone(true);
-      const score = Math.max((7 - rows.length) * 180 - secs * 2, 100);
-      onWin(score, rows.length, secs, { share: buildShare(rows, true) });
-    } else if (rows.length >= CW_MAX) {
-      setDone(true);
-      onLose(rows.length, secs, { share: buildShare(rows, false), answer });
-    }
+    const steps = newRoundGuesses.reduce((a, g) => a + (g ? g.length : 0), 0);
+    onStepChange(steps);
+    onSaveProgress && onSaveProgress(buildProgress(newRoundGuesses, hintsByRound), steps, secs);
+    finishIfDone(resolveRounds(newRoundGuesses));
   };
 
-  const typeLetter = (ch) => { if (!done && cur.length < CW_LEN) setCur(cur + ch); };
+  const typeLetter = (ch) => { if (!done && active && cur.length < active.def.word.length) setCur(cur + ch); };
   const backspace = () => { if (!done) setCur(cur.slice(0, -1)); };
 
-  // Physical keyboard. The window listener is registered once; it dispatches
-  // through a ref so each keypress runs the latest closure (fresh cur/secs).
+  // Physical keyboard, dispatched through a ref so each keypress runs the latest closure.
   const apiRef = useRef({});
   apiRef.current = { submit, typeLetter, backspace };
   useEffect(() => {
@@ -5286,7 +5574,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const rowsLeft = Math.max(CW_MAX - guesses.length, 0);
+  const wordLen = active ? active.def.word.length : 5;
+  const maxGuesses = active ? active.maxG : 6;
+  const rowsLeft = active ? Math.max(maxGuesses - active.guesses.length, 0) : 0;
+  const boardWidth = Math.min(wordLen * 52, 440);
 
   return (
     <div>
@@ -5296,51 +5587,119 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           <div className="pvalue time">{fmt}</div>
         </div>
         <div className="pill">
-          <div className="plabel">Guesses</div>
-          <div className="pvalue">{Math.min(guesses.length, CW_MAX)}/{CW_MAX}</div>
+          <div className="plabel">Word</div>
+          <div className="pvalue">{Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/{roundsDef.length}</div>
         </div>
         <div className="pill">
-          <div className="plabel">Left</div>
-          <div className="pvalue">{rowsLeft}</div>
+          <div className="plabel">Solved</div>
+          <div className="pvalue">{solvedCount}/{roundsDef.length}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Points</div>
+          <div className="pvalue">{totalScore}</div>
         </div>
       </div>
 
-      <div className="cw-board">
-        {Array.from({ length: CW_MAX }).map((_, r) => {
-          const g = guesses[r];
-          const isCurrent = !g && r === guesses.length && !done;
-          const letters = g ? g.word : (isCurrent ? cur : '');
+      <div className="cw-tracker">
+        {roundState.map((r, i) => {
+          let cls = 'cw-dot';
+          if (r.solved) cls += ' solved';
+          else if (r.missed) cls += ' missed';
+          else if (i === activeIdx) cls += ' active';
           return (
-            <div key={r} className={`cw-row${isCurrent && shake ? ' shake' : ''}`}>
-              {Array.from({ length: CW_LEN }).map((__, c) => {
-                const ch = letters[c] || '';
-                const cls = ['cw-tile'];
-                if (g) cls.push(g.result[c]);
-                else if (ch) cls.push('filled');
-                return <div key={c} className={cls.join(' ')}>{ch}</div>;
-              })}
-            </div>
+            <span
+              key={i}
+              className={cls}
+              title={r.resolved ? `Word ${i + 1}: ${r.def.word}` : `Word ${i + 1}`}
+            >
+              {r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○'}
+            </span>
           );
         })}
       </div>
 
-      <div className="cw-kbd">
-        {CW_KEYS.map((row, ri) => (
-          <div key={ri} className="cw-kbd-row">
-            {ri === 2 && <button className="cw-key wide" onClick={submit}>Enter</button>}
-            {row.split('').map(ch => (
-              <button
-                key={ch}
-                className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
-                onClick={() => typeLetter(ch)}
-              >
-                {ch}
-              </button>
-            ))}
-            {ri === 2 && <button className="cw-key wide" onClick={backspace}>⌫</button>}
+      {active && (
+        <>
+          <div className="cw-clue">
+            <span className="cw-clue-label">Clue</span>
+            <span className="cw-clue-text">{active.def.clue}</span>
+            <span className="cw-clue-len">{wordLen} letters</span>
           </div>
-        ))}
-      </div>
+
+          {activeHints.slice(0, revealedExtra).map((h, i) => (
+            <div key={i} className="cw-clue cw-clue-extra">
+              <span className="cw-clue-label">Hint {i + 1}</span>
+              <span className="cw-clue-text">{h}</span>
+            </div>
+          ))}
+
+          {activeHints.length > 0 && (
+            <div className="cw-hint-bar">
+              <button
+                className="cw-hint-btn"
+                onClick={buyHint}
+                disabled={buying || cluesLeft <= 0 || !canAffordHint}
+              >
+                {cluesLeft <= 0
+                  ? '💡 No more clues'
+                  : <>💡 Hint · {nextCost} 🪙</>}
+              </button>
+              <span className="cw-hint-balance">
+                Balance: {matchBalance == null ? '…' : matchBalance} 🪙 MATCH
+              </span>
+              {hintMsg && <span className="cw-hint-msg">{hintMsg}</span>}
+            </div>
+          )}
+
+          <div
+            className="cw-board"
+            style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
+          >
+            {Array.from({ length: maxGuesses }).map((_, r) => {
+              const g = active.guesses[r];
+              const isCurrent = !g && r === active.guesses.length && !done;
+              const letters = g ? g.word : (isCurrent ? cur : '');
+              return (
+                <div
+                  key={r}
+                  className={`cw-row${isCurrent && shake ? ' shake' : ''}`}
+                  style={{ gridTemplateColumns: `repeat(${wordLen}, 1fr)` }}
+                >
+                  {Array.from({ length: wordLen }).map((__, c) => {
+                    const ch = letters[c] || '';
+                    const cls = ['cw-tile'];
+                    if (g) cls.push(g.result[c]);
+                    else if (ch) cls.push('filled');
+                    return <div key={c} className={cls.join(' ')}>{ch}</div>;
+                  })}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="cw-kbd">
+            {CW_KEYS.map((row, ri) => (
+              <div key={ri} className="cw-kbd-row">
+                {ri === 2 && <button className="cw-key wide" onClick={submit}>Enter</button>}
+                {row.split('').map(ch => (
+                  <button
+                    key={ch}
+                    className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
+                    onClick={() => typeLetter(ch)}
+                  >
+                    {ch}
+                  </button>
+                ))}
+                {ri === 2 && <button className="cw-key wide" onClick={backspace}>⌫</button>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {allResolved && (
+        <div className="cw-alldone">Puzzle complete — {solvedCount}/{roundsDef.length} words · {totalScore} pts</div>
+      )}
     </div>
   );
 }
@@ -14337,7 +14696,7 @@ const GAMES = [
     name: 'Crypto Wordle',
     icon: '🟩',
     category: 'daily',
-    desc: 'Guess the daily 5-letter Web3 term in 6 tries.',
+    desc: 'Solve a daily stack of crypto words — clues unlock as you go, or buy a hint.',
     tag: 'Web3',
     tagColor: C.emerald,
     component: CryptoWordleGame,
@@ -14799,6 +15158,8 @@ function App() {
   const [walletAddr, setWalletAddr] = useState(null);
   const [walletBalance, setWalletBalance] = useState(null); // wei string
   const [walletMock, setWalletMock] = useState(true);
+  // Global off-chain MATCH token balance, shown in the nav and spent on hints.
+  const [matchBalance, setMatchBalance] = useState(null); // integer, null = loading
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
   // dApps-integration availability. Disabled (e.g. staging with an empty
@@ -14845,6 +15206,14 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  // Global MATCH token balance for the nav chip + hint spending. Re-fetchable so
+  // the chip refreshes when returning to the lobby after a Tile Match earn/spend.
+  const loadMatchBalance = React.useCallback(async () => {
+    const { ok, body } = await api('/api/tilematch/wallet');
+    if (ok && body && Number.isFinite(body.balance)) setMatchBalance(body.balance);
+  }, []);
+  useEffect(() => { loadMatchBalance(); }, [loadMatchBalance]);
 
   // dApps-integration status. Degrades gracefully: a failed/absent response
   // leaves the feature disabled (chip stays hidden) rather than erroring.
@@ -15120,6 +15489,9 @@ function App() {
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
         share: meta && meta.share,
+        hintsUsed: meta && meta.hintsUsed,
+        wordsSolved: meta && meta.wordsSolved,
+        wordsTotal: meta && meta.wordsTotal,
         canPost: true,
         gameId,
         syncError: false,
@@ -15172,6 +15544,9 @@ function App() {
         timeSecs,
         share: meta && meta.share,
         answer: meta && meta.answer,
+        hintsUsed: meta && meta.hintsUsed,
+        wordsSolved: meta && meta.wordsSolved,
+        wordsTotal: meta && meta.wordsTotal,
       });
 
       let ok = false, body = null;
@@ -15269,6 +15644,11 @@ function App() {
               </div>
             </div>
           </div>
+          {authOk && (
+            <span className="nav-match-chip" title="MATCH tokens — earned in games, spent on hints">
+              🪙 {matchBalance == null ? '…' : matchBalance} MATCH
+            </span>
+          )}
           {authOk && walletBalance && (
             <button
               className="nav-wallet-chip"
@@ -15536,6 +15916,8 @@ function App() {
               offset={offset}
               savedProgress={progressFor(attempts[currentGame.id])}
               onSaveProgress={handleSaveProgress}
+              matchBalance={matchBalance}
+              onMatchBalanceChange={setMatchBalance}
               resetKey={playAgainKey}
             />
           </div>
@@ -15565,10 +15947,22 @@ function App() {
                   <span className="v mono">+{winData.bonus}</span>
                 </div>
               )}
+              {Number.isFinite(winData.wordsTotal) && (
+                <div className="score-row">
+                  <span className="k">Words solved</span>
+                  <span className="v mono">{winData.wordsSolved} / {winData.wordsTotal}</span>
+                </div>
+              )}
               <div className="score-row">
                 <span className="k">Steps · Time</span>
                 <span className="v mono">{winData.steps} · {fmtTime(winData.timeSecs)}</span>
               </div>
+              {winData.hintsUsed > 0 && (
+                <div className="score-row">
+                  <span className="k">💡 Hints used</span>
+                  <span className="v mono">{winData.hintsUsed}</span>
+                </div>
+              )}
               <div className="score-row total">
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
@@ -15656,10 +16050,22 @@ function App() {
                   <span className="v mono">{loseData.answer}</span>
                 </div>
               )}
+              {Number.isFinite(loseData.wordsTotal) && (
+                <div className="score-row">
+                  <span className="k">Words solved</span>
+                  <span className="v mono">{loseData.wordsSolved} / {loseData.wordsTotal}</span>
+                </div>
+              )}
               <div className="score-row">
                 <span className="k">{loseData.isClassic ? 'Steps' : 'Guesses'} · Time</span>
                 <span className="v mono">{loseData.steps} · {fmtTime(loseData.timeSecs)}</span>
               </div>
+              {loseData.hintsUsed > 0 && (
+                <div className="score-row">
+                  <span className="k">💡 Hints used</span>
+                  <span className="v mono">{loseData.hintsUsed}</span>
+                </div>
+              )}
               <div className="score-row total">
                 <span className="k">Earned</span>
                 <span className="v mono">+0</span>

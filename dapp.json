@@ -92,6 +92,7 @@
     { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
     { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
     { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
+    { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },
     { "name": "Mancala mode picker offers Daily Challenge", "path": "/?game=mancala", "expectText": "Daily Challenge" },
     { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" }
   ]

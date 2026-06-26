@@ -112,7 +112,9 @@ purpose.
     hook — `useAutosave(onSaveProgress, () => ({ progress, steps, secs }),
     !done)`. Per-game progress shapes today: sudoku `{ dayNum, grid }`,
     wordhunt `{ dayNum, found: [...words] }`, cryptowordle
-    `{ dayNum, words: [...guessStrings] }`, tilematchingdaily
+    `{ dayNum, rounds: [[...guessStrings], ...], hintsByRound: [...ints] }`
+    (multi-word: one guess-list + applied-hint count per daily word round),
+    tilematchingdaily
     `{ dayNum, tiles: [...], bar: [...ids], moves, boosters }` (the tile
     snapshot is stored in full because the shuffle booster moves tiles).
     The lock is **finished-aware**:

@@ -731,6 +731,43 @@ body {
   color: ${C.muted};
   white-space: nowrap;
 }
+.cw-clue-extra {
+  margin-top: -0.4rem;
+  border-left-color: ${C.gold};
+}
+.cw-clue-extra .cw-clue-label { color: ${C.gold}; }
+.cw-hint-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  max-width: 460px;
+  margin: 0 auto 0.9rem;
+}
+.cw-hint-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  background: ${C.gold};
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  transition: filter 0.1s ease, opacity 0.1s ease;
+}
+.cw-hint-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.cw-hint-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.cw-hint-balance {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  color: ${C.muted};
+}
+.cw-hint-msg {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: ${C.rose};
+}
 .cw-board {
   display: grid;
   gap: 0.4rem;
@@ -4994,50 +5031,60 @@ const CW_MAX_LEN = 8;
 // clue on the same UTC day (shareable, comparable). No dictionary validates the
 // guesses — any letters of the right length are accepted — but the answer is
 // always from here. Every `word` must be UPPERCASE A–Z and 3–8 letters.
+// Each entry: `clue` is the always-visible main clue; `hints` is an ordered
+// list of EXTRA clues (default 2) that unlock progressively — one per wrong
+// guess, or early via the paid Hint button. Keep hints incremental and
+// spoiler-light (never spell the word).
 const CW_WORDS = [
-  { word: 'FEE',      clue: 'What you pay to get a transaction processed' },
-  { word: 'BID',      clue: 'The price a buyer offers in an order book' },
-  { word: 'APY',      clue: 'Yearly compounded return on a staking deposit' },
-  { word: 'BULL',     clue: 'An investor betting prices will rise' },
-  { word: 'BEAR',     clue: 'An investor betting prices will fall' },
-  { word: 'COIN',     clue: "A blockchain's own native digital currency" },
-  { word: 'FIAT',     clue: 'Government-issued money like dollars or euros' },
-  { word: 'HODL',     clue: 'Crypto slang for holding through the swings' },
-  { word: 'MINT',     clue: 'To create a brand-new token or NFT' },
-  { word: 'PUMP',     clue: 'A sharp, sudden rise in a coin’s price' },
-  { word: 'TOKEN',    clue: 'A tradable unit of value issued on a chain' },
-  { word: 'BLOCK',    clue: 'A bundle of transactions added to the chain' },
-  { word: 'CHAIN',    clue: 'The shared ledger of linked blocks' },
-  { word: 'STAKE',    clue: 'Lock up coins to secure a network and earn rewards' },
-  { word: 'VAULT',    clue: 'A smart contract that safeguards deposited assets' },
-  { word: 'WHALE',    clue: 'A holder big enough to move the market' },
-  { word: 'YIELD',    clue: 'The income your crypto earns over time' },
-  { word: 'AUDIT',    clue: 'A security review of a smart contract' },
-  { word: 'ASSET',    clue: 'Anything of value you can hold or trade' },
-  { word: 'NONCE',    clue: 'The number a miner tweaks to find a valid hash' },
-  { word: 'WALLET',   clue: 'App that holds your keys and coins' },
-  { word: 'LEDGER',   clue: 'The record of every transaction ever made' },
-  { word: 'MINING',   clue: 'Spending compute to add blocks and earn rewards' },
-  { word: 'ORACLE',   clue: 'A feed that brings off-chain data on-chain' },
-  { word: 'BRIDGE',   clue: 'Moves assets between two different blockchains' },
-  { word: 'TETHER',   clue: 'Nickname for the best-known dollar stablecoin' },
-  { word: 'CRYPTO',   clue: 'Short name for digital currencies as a whole' },
-  { word: 'BROKER',   clue: 'A middleman who places trades for you' },
-  { word: 'WALLETS',  clue: 'Where holders keep their keys and coins (plural)' },
-  { word: 'NETWORK',  clue: 'The connected nodes that run a blockchain' },
-  { word: 'TRADING',  clue: 'Buying and selling to profit from price moves' },
-  { word: 'STAKING',  clue: 'Earning rewards by locking up your coins' },
-  { word: 'DEPOSIT',  clue: 'Funds you put into an account or protocol' },
-  { word: 'AIRDROP',  clue: 'Free tokens dropped to a community of wallets' },
-  { word: 'LENDING',  clue: 'Supplying assets so others can borrow for interest' },
-  { word: 'EXCHANGE', clue: 'A marketplace for swapping one coin for another' },
-  { word: 'SOLVENCY', clue: 'Having enough assets to cover what you owe' },
-  { word: 'TREASURY', clue: 'The shared pool of funds a protocol controls' },
-  { word: 'VALIDATE', clue: 'To confirm transactions are legitimate' },
-  { word: 'DIVIDEND', clue: 'A share of profits paid out to holders' },
-  { word: 'CURRENCY', clue: 'Money in a particular form, digital or fiat' },
-  { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement' },
+  { word: 'FEE',      clue: 'What you pay to get a transaction processed',        hints: ['Charged every time you move funds on-chain', 'Spikes when the network is congested'] },
+  { word: 'BID',      clue: 'The price a buyer offers in an order book',          hints: ["The opposite of an 'ask'", 'Sits on the buy side of the book'] },
+  { word: 'APY',      clue: 'Yearly compounded return on a staking deposit',      hints: ['A percentage yield farmers watch', "Three-letter acronym ending in 'yield'"] },
+  { word: 'BULL',     clue: 'An investor betting prices will rise',               hints: ['This market only goes up, they say', 'The opposite of a bear'] },
+  { word: 'BEAR',     clue: 'An investor betting prices will fall',               hints: ['Prices keep sliding in this market', 'The opposite of a bull'] },
+  { word: 'COIN',     clue: "A blockchain's own native digital currency",         hints: ['Bitcoin is the original one', 'Not a token — it has its own chain'] },
+  { word: 'FIAT',     clue: 'Government-issued money like dollars or euros',      hints: ['Backed by a state, not a blockchain', 'The dollar and euro are examples'] },
+  { word: 'HODL',     clue: 'Crypto slang for holding through the swings',        hints: ["Born from a typo of 'hold'", 'A meme for diamond hands'] },
+  { word: 'MINT',     clue: 'To create a brand-new token or NFT',                 hints: ['Happens when an NFT is first created', 'Adds fresh supply to existence'] },
+  { word: 'PUMP',     clue: 'A sharp, sudden rise in a coin’s price',             hints: ['Often followed by a dump', 'A rapid green candle'] },
+  { word: 'TOKEN',    clue: 'A tradable unit of value issued on a chain',         hints: ['Issued on top of an existing chain', 'ERC-20 is a standard for these'] },
+  { word: 'BLOCK',    clue: 'A bundle of transactions added to the chain',        hints: ['Miners race to add the next one', 'Links to the one before it'] },
+  { word: 'CHAIN',    clue: 'The shared ledger of linked blocks',                 hints: ['A linked sequence of blocks', "The 'chain' in blockchain"] },
+  { word: 'STAKE',    clue: 'Lock up coins to secure a network and earn rewards', hints: ['You give this up temporarily to earn passive rewards', 'Proof-of-_____ networks rely on it'] },
+  { word: 'VAULT',    clue: 'A smart contract that safeguards deposited assets',  hints: ['Where a DeFi protocol stores deposits', 'A digital strongbox'] },
+  { word: 'WHALE',    clue: 'A holder big enough to move the market',             hints: ['A sea creature that moves markets', 'Holds enough to cause a splash'] },
+  { word: 'YIELD',    clue: 'The income your crypto earns over time',             hints: ['What farmers chase in DeFi', 'Your return, expressed as a rate'] },
+  { word: 'AUDIT',    clue: 'A security review of a smart contract',             hints: ['Done before a protocol launches', 'Hunts for code vulnerabilities'] },
+  { word: 'ASSET',    clue: 'Anything of value you can hold or trade',            hints: ['On the plus side of a balance sheet', 'Crypto, stocks, and gold all count'] },
+  { word: 'NONCE',    clue: 'The number a miner tweaks to find a valid hash',     hints: ['A miner increments it endlessly', 'Used once, then discarded'] },
+  { word: 'WALLET',   clue: 'App that holds your keys and coins',                 hints: ['Holds your private keys', 'Can be hot software or a cold device'] },
+  { word: 'LEDGER',   clue: 'The record of every transaction ever made',         hints: ['An immutable transaction record', 'Also a famous hardware brand'] },
+  { word: 'MINING',   clue: 'Spending compute to add blocks and earn rewards',    hints: ['How proof-of-work secures a chain', 'Rewards whoever solves the puzzle'] },
+  { word: 'ORACLE',   clue: 'A feed that brings off-chain data on-chain',         hints: ['Feeds real-world prices on-chain', 'Chainlink is the best-known one'] },
+  { word: 'BRIDGE',   clue: 'Moves assets between two different blockchains',     hints: ['Connects two separate chains', 'A frequent hacking target'] },
+  { word: 'TETHER',   clue: 'Nickname for the best-known dollar stablecoin',      hints: ['Its ticker is USDT', 'A coin pegged to the dollar'] },
+  { word: 'CRYPTO',   clue: 'Short name for digital currencies as a whole',       hints: ["Short for a kind of currency", "The whole industry's nickname"] },
+  { word: 'BROKER',   clue: 'A middleman who places trades for you',              hints: ['Places trades on your behalf', 'Earns a commission per trade'] },
+  { word: 'WALLETS',  clue: 'Where holders keep their keys and coins (plural)',   hints: ['Plural of where you keep keys', 'You might own several of these'] },
+  { word: 'NETWORK',  clue: 'The connected nodes that run a blockchain',          hints: ['Nodes connected together', 'Ethereum is one of these'] },
+  { word: 'TRADING',  clue: 'Buying and selling to profit from price moves',      hints: ['Buying low and selling high', 'What day-_____ describes'] },
+  { word: 'STAKING',  clue: 'Earning rewards by locking up your coins',           hints: ['Locking coins to earn rewards', 'Powers proof-of-stake'] },
+  { word: 'DEPOSIT',  clue: 'Funds you put into an account or protocol',          hints: ['Money you put in', 'The opposite of a withdrawal'] },
+  { word: 'AIRDROP',  clue: 'Free tokens dropped to a community of wallets',      hints: ['Free tokens sent to wallets', 'Often rewards early users'] },
+  { word: 'LENDING',  clue: 'Supplying assets so others can borrow for interest', hints: ['Earn interest by supplying assets', 'Aave and Compound enable it'] },
+  { word: 'EXCHANGE', clue: 'A marketplace for swapping one coin for another',    hints: ['Where you swap one coin for another', 'Can be centralized or decentralized'] },
+  { word: 'SOLVENCY', clue: 'Having enough assets to cover what you owe',         hints: ['Enough assets to cover liabilities', 'The opposite of bankruptcy'] },
+  { word: 'TREASURY', clue: 'The shared pool of funds a protocol controls',       hints: ["A DAO's shared war chest", "Holds a protocol's reserves"] },
+  { word: 'VALIDATE', clue: 'To confirm transactions are legitimate',             hints: ['Confirm a transaction is legit', 'Validators do this'] },
+  { word: 'DIVIDEND', clue: 'A share of profits paid out to holders',             hints: ['A payout to shareholders', 'Profit shared with holders'] },
+  { word: 'CURRENCY', clue: 'Money in a particular form, digital or fiat',        hints: ['A medium of exchange', 'Dollars and bitcoin both qualify'] },
+  { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement',       hints: ['Self-executing code on a chain', 'Smart ones run on Ethereum'] },
 ];
+
+// Hint pricing — single tuning knob. Cost of the Nth hint purchased today
+// (0-indexed) is CW_HINT_BASE_COST * 2**N → 1, 2, 4, 8, … in MATCH tokens.
+// The server is authoritative; this client copy is for display only.
+const CW_HINT_BASE_COST = 1;
+const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
 
 // Guesses allowed for a given word length: one more than the length, so a
 // 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
@@ -5082,6 +5129,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   ).current;
   const answer = entry.word;
   const clue = entry.clue;
+  const hints = entry.hints || [];
   const wordLen = answer.length;
   const maxGuesses = cwMaxGuesses(wordLen);
 
@@ -5114,6 +5162,58 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     }),
     !done
   );
+
+  // Paid-hint state. The purchased count + MATCH balance are server-authoritative
+  // (fetched on mount, reconciled from each purchase) so the cost ramp survives a
+  // reload and can't be dodged client-side. nextCost is recomputed locally for
+  // display from the same doubling formula the server enforces.
+  const [hintsPurchased, setHintsPurchased] = useState(0);
+  const [matchBalance, setMatchBalance] = useState(null); // null = unknown/loading
+  const [buying, setBuying] = useState(false);
+  const [hintMsg, setHintMsg] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api('/api/cryptowordle/hint');
+      if (!alive || !ok || !body) return;
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance)) setMatchBalance(body.balance);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Wrong-guess rows reveal extra clues for free; purchased hints pull the next
+  // clue forward. Both advance the same pointer, capped at the available clues.
+  const wrongGuesses = guesses.filter(g => g.word !== answer).length;
+  const revealedExtra = Math.min(wrongGuesses + hintsPurchased, hints.length);
+  const nextCost = cwHintCost(hintsPurchased);
+  const cluesLeft = hints.length - revealedExtra;
+  const canAffordHint = matchBalance != null && matchBalance >= nextCost;
+
+  const buyHint = async () => {
+    if (buying || done || cluesLeft <= 0) return;
+    setBuying(true);
+    setHintMsg('');
+    const { ok, status, body } = await api('/api/cryptowordle/hint', {
+      method: 'POST',
+      body: JSON.stringify({ maxHints: hints.length }),
+    });
+    setBuying(false);
+    if (ok && body) {
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance)) setMatchBalance(body.balance);
+      return;
+    }
+    if (status === 409 && body && body.code === 'insufficient_funds') {
+      if (Number.isFinite(body.balance)) setMatchBalance(body.balance);
+      setHintMsg('Not enough MATCH');
+    } else if (status === 409 && body && body.code === 'no_more_hints') {
+      setHintMsg('No more clues');
+    } else {
+      setHintMsg('Could not buy hint');
+    }
+  };
 
   // Best color seen per letter, for the on-screen keyboard tinting.
   const keyState = {};
@@ -5148,10 +5248,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     if (cur === answer) {
       setDone(true);
       const score = Math.max((maxGuesses + 1 - rows.length) * 180 - secs * 2, 100);
-      onWin(score, rows.length, secs, { share: buildShare(rows, true) });
+      onWin(score, rows.length, secs, { share: buildShare(rows, true), hintsUsed: hintsPurchased });
     } else if (rows.length >= maxGuesses) {
       setDone(true);
-      onLose(rows.length, secs, { share: buildShare(rows, false), answer });
+      onLose(rows.length, secs, { share: buildShare(rows, false), answer, hintsUsed: hintsPurchased });
     }
   };
 
@@ -5200,6 +5300,31 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
         <span className="cw-clue-text">{clue}</span>
         <span className="cw-clue-len">{wordLen} letters</span>
       </div>
+
+      {hints.slice(0, revealedExtra).map((h, i) => (
+        <div key={i} className="cw-clue cw-clue-extra">
+          <span className="cw-clue-label">Hint {i + 1}</span>
+          <span className="cw-clue-text">{h}</span>
+        </div>
+      ))}
+
+      {hints.length > 0 && !done && (
+        <div className="cw-hint-bar">
+          <button
+            className="cw-hint-btn"
+            onClick={buyHint}
+            disabled={buying || cluesLeft <= 0 || !canAffordHint}
+          >
+            {cluesLeft <= 0
+              ? '💡 No more clues'
+              : <>💡 Hint · {nextCost} 🪙</>}
+          </button>
+          <span className="cw-hint-balance">
+            Balance: {matchBalance == null ? '…' : matchBalance} 🪙 MATCH
+          </span>
+          {hintMsg && <span className="cw-hint-msg">{hintMsg}</span>}
+        </div>
+      )}
 
       <div
         className="cw-board"
@@ -13364,7 +13489,7 @@ const GAMES = [
     name: 'Crypto Wordle',
     icon: '🟩',
     category: 'daily',
-    desc: 'Guess the daily crypto word — length and clue change every day.',
+    desc: 'Guess the daily crypto word — clues unlock as you go, or buy a hint.',
     tag: 'Web3',
     tagColor: C.emerald,
     component: CryptoWordleGame,
@@ -14125,6 +14250,7 @@ function App() {
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
         share: meta && meta.share,
+        hintsUsed: meta && meta.hintsUsed,
         canPost: true,
         gameId,
         syncError: false,
@@ -14177,6 +14303,7 @@ function App() {
         timeSecs,
         share: meta && meta.share,
         answer: meta && meta.answer,
+        hintsUsed: meta && meta.hintsUsed,
       });
 
       let ok = false, body = null;
@@ -14572,6 +14699,12 @@ function App() {
                 <span className="k">Steps · Time</span>
                 <span className="v mono">{winData.steps} · {fmtTime(winData.timeSecs)}</span>
               </div>
+              {winData.hintsUsed > 0 && (
+                <div className="score-row">
+                  <span className="k">💡 Hints used</span>
+                  <span className="v mono">{winData.hintsUsed}</span>
+                </div>
+              )}
               <div className="score-row total">
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
@@ -14663,6 +14796,12 @@ function App() {
                 <span className="k">{loseData.isClassic ? 'Steps' : 'Guesses'} · Time</span>
                 <span className="v mono">{loseData.steps} · {fmtTime(loseData.timeSecs)}</span>
               </div>
+              {loseData.hintsUsed > 0 && (
+                <div className="score-row">
+                  <span className="k">💡 Hints used</span>
+                  <span className="v mono">{loseData.hintsUsed}</span>
+                </div>
+              )}
               <div className="score-row total">
                 <span className="k">Earned</span>
                 <span className="v mono">+0</span>

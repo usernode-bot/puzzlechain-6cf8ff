@@ -81,6 +81,12 @@ const CLAIM_REWARDS_IFACE = new ethers.Interface(['function claimRewards(address
 const REWARD_PER_POINT_WEI = BigInt('1000000000000000'); // 0.001 UTGO per point → ~0.96 UTGO for ~960pts
 const STREAK_FREEZE_PRICE_WEI = BigInt('5000000000000000000'); // 5 UTGO
 
+// Crypto Wordle paid hints — cost of the Nth hint bought today (0-indexed) is
+// CW_HINT_BASE_COST * 2**N in MATCH tokens → 1, 2, 4, 8, … Resets per UTC day.
+// Server-authoritative; the client mirrors this only for display.
+const CW_HINT_BASE_COST = 1;
+const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
+
 // EVM address regex (same as PvP validation throughout)
 const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -768,6 +774,21 @@ async function migrate() {
       progress   INTEGER NOT NULL DEFAULT 0,
       claimed_at TIMESTAMPTZ,
       PRIMARY KEY (user_id, task_date, task_id)
+    )
+  `);
+
+  // cryptowordle_hints is PUBLIC: per-user, per-UTC-day count of paid hints
+  // bought in Crypto Wordle. Drives the doubling cost ramp (1,2,4,8…) which
+  // resets implicitly at midnight UTC (a new hint_date yields no row → count 0).
+  // No sensitive data — just a gameplay counter, same class as daily_attempts.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cryptowordle_hints (
+      user_id         TEXT NOT NULL,
+      username        TEXT,
+      hint_date       DATE NOT NULL,
+      hints_purchased INTEGER NOT NULL DEFAULT 0,
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, hint_date)
     )
   `);
 
@@ -2587,6 +2608,51 @@ app.get('/api/daily', async (req, res) => {
           // current daily seed; this just marks a claimed, in-progress row.
           JSON.stringify({ resumeDemo: true }),
         ]
+      );
+    }
+
+    // Staging-only demo seed: set up the Crypto Wordle paid-hint flow for the
+    // viewer — top up MATCH so hints are affordable, drop them into a claimed,
+    // unfinished cryptowordle attempt (lobby shows "In progress · resume"), and
+    // pre-buy 2 hints so the next cost shows 4 and persistence is demonstrable.
+    // Forces the row unfinished so it survives a prior demo=locked on the shared
+    // staging DB. Idempotent, strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'hints') {
+      await pool.query(
+        `INSERT INTO tilematch_tokens (user_id, username, balance)
+         VALUES ($1, $2, 100)
+         ON CONFLICT (user_id) DO UPDATE
+           SET balance = GREATEST(tilematch_tokens.balance, 100),
+               updated_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'cryptowordle', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL,
+               score = NULL,
+               time_secs = NULL,
+               steps = EXCLUDED.steps,
+               elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          0,
+          0,
+          // dayNum omitted so the client treats the board as today's daily seed;
+          // this just marks a claimed, in-progress row to resume into.
+          JSON.stringify({ hintsDemo: true }),
+        ]
+      );
+      await pool.query(
+        `INSERT INTO cryptowordle_hints (user_id, username, hint_date, hints_purchased)
+         VALUES ($1, $2, (now() AT TIME ZONE 'utc')::date, 2)
+         ON CONFLICT (user_id, hint_date) DO UPDATE
+           SET hints_purchased = 2, updated_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user']
       );
     }
 
@@ -5177,6 +5243,116 @@ app.post('/api/wallet/spend/streak-freeze', async (req, res) => {
   } catch (err) {
     console.error('[wallet] streak-freeze failed:', err.message);
     res.status(500).json({ error: 'Failed to purchase streak freeze' });
+  }
+});
+
+// ---- Crypto Wordle paid hints --------------------------------------------
+// Per-UTC-day hint purchase counter with a doubling MATCH-token cost. The
+// count is server-authoritative (survives reload, can't be reset client-side)
+// and resets implicitly each UTC day. Hints never affect score/leaderboard.
+
+// GET /api/cryptowordle/hint — today's { hintsPurchased, nextCost, balance }.
+app.get('/api/cryptowordle/hint', async (req, res) => {
+  try {
+    // Lazy-init the MATCH wallet so a brand-new user reads a real 0 balance.
+    await pool.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows: hRows } = await pool.query(
+      `SELECT hints_purchased FROM cryptowordle_hints
+        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date`,
+      [req.user.id]
+    );
+    const { rows: bRows } = await pool.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const hintsPurchased = hRows.length ? hRows[0].hints_purchased : 0;
+    res.json({
+      hintsPurchased,
+      nextCost: cwHintCost(hintsPurchased),
+      balance: bRows.length ? bRows[0].balance : 0,
+    });
+  } catch (err) {
+    console.error('[cryptowordle] hint read failed:', err.message);
+    res.status(500).json({ error: 'Failed to load hint state' });
+  }
+});
+
+// POST /api/cryptowordle/hint — buy the next hint. Atomically bumps today's
+// counter and debits the doubling MATCH cost, mirroring the duel-join spend
+// pattern (SERIALIZABLE + FOR UPDATE). Body may carry { maxHints } (the day's
+// available clue count) so the server refuses to charge past the last clue.
+app.post('/api/cryptowordle/hint', async (req, res) => {
+  const maxHints = Number.isFinite(req.body.maxHints) ? Math.max(0, Math.round(req.body.maxHints)) : null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+
+    // Today's hint counter, locked. Upsert-then-lock so the row always exists.
+    await client.query(
+      `INSERT INTO cryptowordle_hints (user_id, username, hint_date, hints_purchased)
+       VALUES ($1, $2, (now() AT TIME ZONE 'utc')::date, 0)
+       ON CONFLICT (user_id, hint_date) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows: hRows } = await client.query(
+      `SELECT hints_purchased FROM cryptowordle_hints
+        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date
+        FOR UPDATE`,
+      [req.user.id]
+    );
+    const purchased = hRows.length ? hRows[0].hints_purchased : 0;
+
+    // No clues left to reveal (client-known cap) → don't charge.
+    if (maxHints != null && purchased >= maxHints) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ code: 'no_more_hints', error: 'No more clues' });
+    }
+
+    const cost = cwHintCost(purchased);
+
+    // Check + deduct MATCH balance, locked.
+    const { rows: balRows } = await client.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1 FOR UPDATE`,
+      [req.user.id]
+    );
+    const balance = balRows.length ? balRows[0].balance : 0;
+    if (balance < cost) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ code: 'insufficient_funds', error: 'Insufficient tokens', balance });
+    }
+    await client.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0)
+       ON CONFLICT (user_id) DO UPDATE SET
+         balance    = tilematch_tokens.balance - $3,
+         updated_at = now()`,
+      [req.user.id, req.user.username || null, cost]
+    );
+    await client.query(
+      `UPDATE cryptowordle_hints
+          SET hints_purchased = hints_purchased + 1, updated_at = now()
+        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date`,
+      [req.user.id]
+    );
+
+    await client.query('COMMIT');
+    const hintsPurchased = purchased + 1;
+    res.json({
+      hintsPurchased,
+      nextCost: cwHintCost(hintsPurchased),
+      balance: balance - cost,
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error('[cryptowordle] hint buy failed:', err.message);
+    res.status(500).json({ error: 'Failed to buy hint' });
+  } finally {
+    client.release();
   }
 });
 

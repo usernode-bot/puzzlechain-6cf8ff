@@ -3750,22 +3750,28 @@ body {
   font-size: 1.7rem; color: ${C.text};
   transition: transform 0.1s ease, border-color 0.2s;
 }
-.cnl-die-face.rolling { animation: cnl-shake 0.5s ease; }
-@keyframes cnl-shake {
-  0%, 100% { transform: rotate(0) scale(1); }
-  25% { transform: rotate(-12deg) scale(1.08); }
-  50% { transform: rotate(10deg) scale(1.05); }
-  75% { transform: rotate(-6deg) scale(1.08); }
+/* Tumbling spin: ~3 full turns that decelerate and settle on the result. */
+.cnl-die-face.rolling { animation: cnl-spin 0.72s cubic-bezier(0.22, 0.61, 0.36, 1); }
+@keyframes cnl-spin {
+  0%   { transform: rotate(0deg) scale(1); }
+  20%  { transform: rotate(230deg) scale(1.14); }
+  45%  { transform: rotate(560deg) scale(1.1); }
+  72%  { transform: rotate(880deg) scale(1.12); }
+  100% { transform: rotate(1080deg) scale(1); }
+}
+.cnl-roll-buttons {
+  display: flex; gap: 0.5rem;
+  max-width: 480px; margin: 0 auto;
 }
 .cnl-roll-btn {
-  width: 100%; max-width: 480px; margin: 0 auto;
-  display: block; border: none; cursor: pointer;
-  border-radius: 12px; padding: 0.8rem 1rem;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1rem;
+  flex: 1; min-width: 0;
+  border: none; cursor: pointer;
+  border-radius: 12px; padding: 0.8rem 0.6rem;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.95rem;
   color: #fff; transition: opacity 0.15s, transform 0.1s;
 }
-.cnl-roll-btn:active { transform: scale(0.98); }
-.cnl-roll-btn:disabled { opacity: 0.45; cursor: default; }
+.cnl-roll-btn:active:not(:disabled) { transform: scale(0.98); }
+.cnl-roll-btn:disabled { opacity: 0.4; cursor: default; }
 `;
 
 /* ============================================================
@@ -14506,8 +14512,10 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
     }
   };
 
-  const roll = () => {
+  const roll = (clickedWho) => {
     if (animatingRef.current || done || rolling) return;
+    // Buttons pass which player tapped; ignore a tap that isn't the active player.
+    if (clickedWho !== undefined && clickedWho !== player) return;
     const who = player;
     const value = Math.floor(Math.random() * 6) + 1;
     const from = who === 1 ? p1Pos : p2Pos;
@@ -14549,7 +14557,7 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
       };
       const t0 = setTimeout(hop, 130);
       timersRef.current.push(t0);
-    }, 480);
+    }, 720);
     timersRef.current.push(rollT);
   };
 
@@ -14658,14 +14666,24 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
         </div>
       </div>
 
-      <button
-        className="cnl-roll-btn"
-        style={{ background: activeColor }}
-        onClick={roll}
-        disabled={done || animating || rolling}
-      >
-        {done ? 'Game over' : `Roll for Player ${player}`}
-      </button>
+      <div className="cnl-roll-buttons">
+        <button
+          className="cnl-roll-btn"
+          style={{ background: p1Color }}
+          onClick={() => roll(1)}
+          disabled={done || animating || rolling || player !== 1}
+        >
+          Player 1 - Roll
+        </button>
+        <button
+          className="cnl-roll-btn"
+          style={{ background: p2Color }}
+          onClick={() => roll(2)}
+          disabled={done || animating || rolling || player !== 2}
+        >
+          Player 2 - Roll
+        </button>
+      </div>
     </div>
   );
 }

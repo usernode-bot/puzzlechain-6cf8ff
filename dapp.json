@@ -3,8 +3,8 @@
   "secrets": [
     {
       "key": "VALIDATOR_PRIVATE_KEY",
-      "description": "ECDSA private key for the validator wallet that signs claimWin messages. Staging default is Hardhat account #0.",
-      "required": true,
+      "description": "Optional ECDSA private key for the validator wallet that signs claimWin messages. If unset or malformed, wager-signing cleanly disables itself and the rest of the app runs normally — it never blocks the deploy or crashes boot. Staging default is Hardhat account #0.",
+      "required": false,
       "private": true,
       "staging_default": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     },
@@ -57,6 +57,7 @@
     { "name": "Power-up demo seeds successfully", "path": "/?demo=powerup", "expectText": "PuzzleChain" },
     { "name": "Minesweeper card in Classic Games tab", "path": "/?tab=classic", "expectText": "Minesweeper" },
     { "name": "Mancala card in Classic Games tab", "path": "/?tab=classic", "expectText": "Mancala" },
+    { "name": "Chutes & Ladders card in Classic Games tab", "path": "/?tab=classic", "expectText": "Chutes & Ladders" },
     { "name": "2048 card in Classic Games tab", "path": "/?tab=classic", "expectText": "2048" },
     { "name": "Snake card in Classic Games tab", "path": "/?tab=classic", "expectText": "Snake" },
     { "name": "Block Blast card in Classic Games tab", "path": "/?tab=classic", "expectText": "Block Blast" },
@@ -73,6 +74,7 @@
     { "name": "Wallet screen shows pending rewards", "path": "/?screen=wallet&demo=1", "expectText": "Pending Rewards" },
     { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" },
     { "name": "Boots with dApps integration disabled (empty APP_SECRET_KEY)", "path": "/", "expectText": "PuzzleChain" },
+    { "name": "Boots and serves / even if VALIDATOR_PRIVATE_KEY is invalid (wager signing disabled, port still binds)", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Wallet shows Verified identity badge", "path": "/?screen=wallet&demo=1", "expectText": "Verified identity" },
     { "name": "Wallet shows Disconnect control", "path": "/?screen=wallet&demo=1", "expectText": "Disconnect" },
     { "name": "DApp session receipt renders", "path": "/?demo=dapp", "expectText": "Session Receipt" },
@@ -82,6 +84,14 @@
     { "name": "Account screen opens from chip", "path": "/?screen=account", "expectText": "On-chain login" },
     { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" },
     { "name": "Streak badge ladder renders earned badges", "path": "/?demo=badges", "expectText": "Centurion" },
-    { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" }
+    { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" },
+    { "name": "Today's Champions board renders in daily lobby", "path": "/?demo=leaderboard", "expectText": "Today's Champions" },
+    { "name": "Today's Champions lists a seeded solver", "path": "/?demo=leaderboard", "expectText": "Staging demo Ada" },
+    { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
+    { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
+    { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
+    { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
+    { "name": "Mancala mode picker offers Daily Challenge", "path": "/?game=mancala", "expectText": "Daily Challenge" },
+    { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" }
   ]
 }

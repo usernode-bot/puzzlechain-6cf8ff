@@ -4,18 +4,18 @@ const { useState, useEffect, useRef } = React;
    Design system — color palette
    ============================================================ */
 const C = {
-  bg:      '#0A0E1A',
-  surface: '#111827',
-  card:    '#1a2235',
-  border:  '#1e3a5f',
-  accent:  '#3b82f6',
-  gold:    '#f59e0b',
-  emerald: '#10b981',
-  violet:  '#8b5cf6',
-  rose:    '#f43f5e',
-  text:    '#e2e8f0',
-  muted:   '#64748b',
-  dim:     '#334155',
+  bg:      '#0A0D14',
+  surface: '#12161F',
+  card:    '#181D29',
+  border:  '#2A3342',
+  accent:  '#6366F1',
+  gold:    '#FBBF24',
+  emerald: '#34D399',
+  violet:  '#A78BFA',
+  rose:    '#FB7185',
+  text:    '#ECEFF6',
+  muted:   '#8B95A8',
+  dim:     '#39424F',
 };
 
 /* ============================================================
@@ -143,6 +143,46 @@ body {
   color: ${C.muted};
 }
 .win-badge-row .wbr-icon { font-size: 1.1rem; }
+.badge-chip .badge-chip-name { line-height: 1; }
+/* Badge collection wrapper (lobby + profile) */
+.badge-strip-wrap { margin-top: 1rem; }
+.badge-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${C.muted};
+}
+.badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Today's Champions leaderboard tweaks (reuses .lboard) */
+.lboard.champions { margin-top: 0; }
+.lboard .lrow.clickable { cursor: pointer; }
+.lboard .lrow.clickable:hover { background: ${C.border}; }
+/* Win-overlay "couldn't sync" note + retry */
+.win-sync-note {
+  margin: 0.4rem 0 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  text-align: center;
+  color: ${C.gold};
+  background: ${C.gold}14;
+  border: 1px solid ${C.gold}55;
+}
+.win-sync-note button {
+  margin-top: 0.4rem;
+  font: inherit;
+  font-weight: 700;
+  color: ${C.text};
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
 
 /* ---- Account indicator ---- */
 .nav-right { display: flex; align-items: center; gap: 1.25rem; }
@@ -226,6 +266,28 @@ body {
 .account-msg.ok { color: ${C.emerald}; }
 .account-msg.err { color: ${C.rose}; }
 
+/* Account "Connections" section — Friends + dApps relocated here on mobile. */
+.account-connection-row {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+  background: ${C.dim}; border: 1px solid ${C.border};
+  border-radius: 10px; padding: 0.7rem 0.9rem;
+  font-size: 0.9rem; font-weight: 600; color: ${C.text};
+  cursor: pointer; text-align: left; transition: border-color 0.15s;
+}
+.account-connection-row:hover { border-color: ${C.accent}; }
+.account-connection-row .chev { margin-left: auto; color: ${C.muted}; }
+.account-dapps-row { margin-top: 1rem; }
+.account-dapps-pubkey {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  color: ${C.text}; word-break: break-all; flex: 1;
+}
+
+/* The Connections section is only shown at narrow widths — above 560px the
+   Friends button and dApps chip live in the top bar instead. */
+@media (min-width: 561px) {
+  .account-connections { display: none; }
+}
+
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
   .account-chip { padding: 0.35rem; }
@@ -233,6 +295,11 @@ body {
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
+  /* Friends + dApps move into the Account screen's Connections section.
+     Scoped under .nav-right so they outrank the base chip rule defined
+     later in this stylesheet regardless of source order. */
+  .nav-right .nav-friends-btn { display: none; }
+  .nav-right .nav-integration-chip { display: none; }
 }
 
 /* ---- Lobby ---- */
@@ -475,7 +542,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.primary-btn:hover { background: #2f6fe0; }
+.primary-btn:hover { background: #4F52D9; }
 
 /* ---- Locked screen ---- */
 .locked-card {
@@ -1264,6 +1331,27 @@ body {
 }
 .mnc-difficulty-pill:hover { border-color: ${C.gold}; color: ${C.text}; }
 .mnc-difficulty-pill.active { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}14; font-weight: 600; }
+.mnc-daily-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; flex-wrap: wrap;
+  max-width: 480px; margin: 0 auto 0.6rem;
+}
+.mnc-daily-title { font-weight: 700; font-size: 0.95rem; color: ${C.text}; }
+.mnc-daily-pills { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.mnc-record-pill {
+  font-size: 0.74rem; font-weight: 700;
+  background: ${C.gold}14; color: ${C.gold};
+  border: 1px solid ${C.gold}55;
+  border-radius: 999px; padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
+.mnc-streak-chip {
+  font-size: 0.74rem; font-weight: 700;
+  background: ${C.rose}1f; color: ${C.rose};
+  border: 1px solid ${C.rose}55;
+  border-radius: 999px; padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
 .mnc-mode-start-btn {
   width: 100%;
   padding: 0.65rem;
@@ -2271,7 +2359,7 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.tm-play-btn:hover { background: #2f6fe0; }
+.tm-play-btn:hover { background: #4F52D9; }
 .tm-level-won {
   background: ${C.card};
   border: 1px solid ${C.emerald}55;
@@ -2869,7 +2957,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.idle-card-btn:hover { background: #2f6fe0; }
+.idle-card-btn:hover { background: #4F52D9; }
 .idle-card-btn:disabled { background: ${C.muted}; cursor: not-allowed; }
 
 .idle-coin-popup {
@@ -2933,7 +3021,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.prestige-confirm:hover { background: #2f6fe0; }
+.prestige-confirm:hover { background: #4F52D9; }
 .prestige-cancel {
   flex: 1;
   padding: 0.8rem;
@@ -3339,7 +3427,7 @@ body {
   padding: 0.45rem 0.85rem; font-family: inherit; font-size: 0.83rem;
   font-weight: 600; cursor: pointer; transition: background 0.12s;
 }
-.tm-duel-find-btn:hover:not(:disabled) { background: #2f6fe0; }
+.tm-duel-find-btn:hover:not(:disabled) { background: #4F52D9; }
 .tm-duel-find-btn:disabled { opacity: 0.35; cursor: not-allowed; background: ${C.muted}; }
 .tm-duel-matchmaking {
   text-align: center; padding: 2rem 1rem;
@@ -3529,6 +3617,88 @@ body {
 }
 .dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
 .dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+
+/* ---- Chutes & Ladders ---- */
+.cnl-banner {
+  text-align: center; font-size: 0.82rem; font-weight: 600;
+  border-radius: 999px; padding: 0.32rem 0.8rem;
+  max-width: 480px; margin: 0 auto 0.65rem; display: block;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.cnl-board-wrap {
+  position: relative; max-width: 480px; margin: 0 auto;
+  aspect-ratio: 1; width: 100%;
+}
+.cnl-board {
+  position: absolute; inset: 0;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  gap: 2px;
+  background: ${C.border};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 2px;
+  overflow: hidden;
+}
+.cnl-cell {
+  position: relative;
+  display: flex; align-items: flex-start; justify-content: flex-start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: ${C.muted};
+  background: ${C.card};
+  padding: 1px 2px;
+  user-select: none;
+}
+.cnl-cell.alt { background: ${C.surface}; }
+.cnl-cell.cnl-goal { background: ${C.gold}22; color: ${C.gold}; }
+.cnl-cell-mark {
+  position: absolute; bottom: 0; right: 1px;
+  font-size: 0.72rem; line-height: 1;
+}
+.cnl-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 2;
+}
+.cnl-pawn {
+  position: absolute; z-index: 3;
+  width: 7%; height: 7%;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  transform: translate(-50%, -50%);
+  transition: left 0.13s ease, top 0.13s ease;
+}
+.cnl-die {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  margin: 0.9rem auto 0.2rem; max-width: 480px;
+}
+.cnl-die-face {
+  width: 3.4rem; height: 3.4rem; border-radius: 14px;
+  background: ${C.card}; border: 2px solid ${C.border};
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700;
+  font-size: 1.7rem; color: ${C.text};
+  transition: transform 0.1s ease, border-color 0.2s;
+}
+.cnl-die-face.rolling { animation: cnl-shake 0.5s ease; }
+@keyframes cnl-shake {
+  0%, 100% { transform: rotate(0) scale(1); }
+  25% { transform: rotate(-12deg) scale(1.08); }
+  50% { transform: rotate(10deg) scale(1.05); }
+  75% { transform: rotate(-6deg) scale(1.08); }
+}
+.cnl-roll-btn {
+  width: 100%; max-width: 480px; margin: 0 auto;
+  display: block; border: none; cursor: pointer;
+  border-radius: 12px; padding: 0.8rem 1rem;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1rem;
+  color: #fff; transition: opacity 0.15s, transform 0.1s;
+}
+.cnl-roll-btn:active { transform: scale(0.98); }
+.cnl-roll-btn:disabled { opacity: 0.45; cursor: default; }
 `;
 
 /* ============================================================
@@ -3833,6 +4003,23 @@ function dailyRng(offset, gameId) {
   return mulberry32((utcDayNum(offset) + hashStr(gameId)) >>> 0);
 }
 
+// Mancala Daily Challenge opening board, derived from the server-anchored UTC
+// day. Deals 24 stones into one side via the daily seed, then mirrors them
+// rotationally (pit i ↔ opposite 12-i) so both players start from an identical,
+// fair position; stores (6, 13) stay empty. MUST match srvMncDailyBoard in
+// server.js byte-for-byte or verification fails.
+function mncDailyBoard(offset) {
+  const rng = dailyRng(offset, 'mancaladaily');
+  const side = [0, 0, 0, 0, 0, 0];
+  for (let s = 0; s < 24; s++) side[Math.floor(rng() * 6)]++;
+  const board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < 6; i++) {
+    board[i] = side[i];
+    board[12 - i] = side[i];
+  }
+  return board;
+}
+
 // Periodically persist a game's in-progress state so a resumed attempt picks up
 // the exact board, step count, and accumulated timer. `getState()` returns
 // `{ progress, steps, secs }`; it's read through a ref so the interval and the
@@ -4023,6 +4210,53 @@ function activeBadge(streak) {
 // unlocked" celebration fires only on the day the milestone is reached.)
 function justUnlockedBadge(streak) {
   return STREAK_BADGES.find(b => b.min === streak) || null;
+}
+
+/* ============================================================
+   Achievement badges — non-streak milestones the server awards
+   in /api/daily/:gameId/finish and persists in user_achievements.
+   This is the client's source of truth for badge copy/icons; the
+   server (ACHIEVEMENT_BADGE_TYPES + criteria in server.js) owns when
+   each is awarded. Keep `type` values in sync across both files.
+   `solve_milestone` is parameterized by a `count` (10/50/100).
+   ============================================================ */
+const ACHIEVEMENT_BADGES = [
+  { type: 'first_solve', name: 'First Solve',   icon: '🎉', desc: 'Solved your first daily puzzle' },
+  { type: 'speed_demon', name: 'Speed Demon',   icon: '⚡', desc: 'Solved a daily in under 60s' },
+  { type: 'flawless',    name: 'Flawless',      icon: '✨', desc: 'Solved with no wasted moves' },
+  { type: 'daily_sweep', name: 'Daily Sweep',   icon: '🧹', desc: 'Solved every daily puzzle in one day' },
+  { type: 'podium',      name: 'Podium Finish', icon: '🥇', desc: 'Finished #1 on a daily leaderboard' },
+];
+// Lifetime solve-count milestones (a single `solve_milestone` type, many counts).
+const SOLVE_MILESTONE_BADGES = [
+  { count: 10,  name: 'Solver',      icon: '🔟', desc: 'Solved 10 daily puzzles' },
+  { count: 50,  name: 'Dedicated',   icon: '🏅', desc: 'Solved 50 daily puzzles' },
+  { count: 100, name: 'Centenarian', icon: '💯', desc: 'Solved 100 daily puzzles' },
+];
+
+// Resolve a freshly-awarded achievement (from finish's newAchievements) to its
+// badge definition for the "just unlocked" overlay pop.
+function achievementBadgeFor(ach) {
+  if (!ach || !ach.type) return null;
+  if (ach.type === 'solve_milestone') {
+    const c = ach.metadata && ach.metadata.count;
+    return SOLVE_MILESTONE_BADGES.find(b => b.count === c) || null;
+  }
+  return ACHIEVEMENT_BADGES.find(b => b.type === ach.type) || null;
+}
+
+// Merge newly-awarded achievements into the { types, milestones } client state.
+function mergeAchievements(prev, newAch) {
+  const types = new Set((prev && prev.types) || []);
+  const milestones = new Set((prev && prev.milestones) || []);
+  for (const a of newAch || []) {
+    if (!a || !a.type) continue;
+    types.add(a.type);
+    if (a.type === 'solve_milestone' && a.metadata && Number.isFinite(+a.metadata.count)) {
+      milestones.add(+a.metadata.count);
+    }
+  }
+  return { types: Array.from(types), milestones: Array.from(milestones).sort((a, b) => a - b) };
 }
 
 // Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)
@@ -4304,11 +4538,14 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVerify, onDisconnect }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect }) {
   const [copied, setCopied] = React.useState(false);
+  const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [confirmDisc, setConfirmDisc] = React.useState(false);
+  const dappEnabled = !!(integration && integration.enabled);
+  const dappPubkey = integration && integration.pubkey;
   const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
 
   // status: 'verified' | 'linked' | 'none'
@@ -4320,6 +4557,15 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVer
       await navigator.clipboard.writeText(user.usernodePubkey);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const copyDappPubkey = async () => {
+    if (!dappPubkey) return;
+    try {
+      await navigator.clipboard.writeText(dappPubkey);
+      setDappCopied(true);
+      setTimeout(() => setDappCopied(false), 1500);
     } catch {}
   };
 
@@ -4430,6 +4676,39 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVer
               <div className={`account-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>
             )}
           </div>
+
+          {/* Connections — Friends + dApps, shown here only on narrow viewports
+              (hidden ≥561px via CSS, where they live in the top bar instead). */}
+          <div className="wallet-card account-connections">
+            <div className="wallet-card-title">Connections</div>
+            <button
+              type="button"
+              className="account-connection-row"
+              onClick={onOpenFriends}
+            >
+              👥 Friends
+              <span className="chev">›</span>
+            </button>
+            {dappEnabled && (
+              <div className="account-dapps-row">
+                <div className="wallet-card-title">dApps integration</div>
+                <div className="account-status account-status-verified">
+                  <span className="account-status-dot" />
+                  <span>Active</span>
+                </div>
+                {dappPubkey && (
+                  <div className="wallet-addr-row">
+                    <span className="account-dapps-pubkey" title={dappPubkey}>
+                      🔗 {truncAddr(dappPubkey)}
+                    </span>
+                    <button className="back-btn" onClick={copyDappPubkey}>
+                      {dappCopied ? 'Copied ✓' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -4497,6 +4776,111 @@ function Leaderboard({ gameId, solved }) {
       {solved === false && (
         <div className="lboard-note">You didn't solve today's puzzle — no ranking this round.</div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Today's Champions — lobby-wide leaderboard aggregating EVERYONE who
+   solved at least one daily puzzle today, ranked by total points then
+   games solved. Reuses the per-game leaderboard styles. Tapping a row
+   opens that player's profile via onSelectUser.
+   ============================================================ */
+function TodayChampions({ onSelectUser }) {
+  const [state, setState] = useState({ loading: true });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api('/api/daily/leaderboard/today');
+      if (!alive) return;
+      if (ok && body) setState({ loading: false, ...body });
+      else setState({ loading: false, entries: [], me: null, total: 0, error: true });
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (state.loading) {
+    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><div className="lboard-empty">Loading…</div></div>;
+  }
+
+  const entries = state.entries || [];
+  const me = state.me || null;
+  const meVisible = me && entries.some(e => e.isCurrentUser);
+  const gameCount = state.gameCount || 0;
+  const row = (e, pinned) => (
+    <div
+      key={pinned ? 'me-pinned' : e.rank}
+      className={`lrow${e.isCurrentUser ? ' me' : ''}${pinned ? ' pinned' : ''}${onSelectUser ? ' clickable' : ''}`}
+      onClick={onSelectUser && e.userId ? () => onSelectUser(e.userId) : undefined}
+    >
+      <span className="lrank mono">#{e.rank}</span>
+      <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+      <span className="ltime mono">{e.totalPoints} pts</span>
+      <span className="lsteps mono">{e.gamesSolved}{gameCount ? ` / ${gameCount}` : ''}</span>
+    </div>
+  );
+
+  return (
+    <div className="lboard champions">
+      <div className="lboard-title">
+        Today's Champions
+        {state.total > 0 && <span className="lboard-count">{state.total} playing</span>}
+      </div>
+      {entries.length === 0 ? (
+        <div className="lboard-empty">No one has solved today's puzzles yet — be the first!</div>
+      ) : (
+        <div className="lboard-rows">
+          {entries.map(e => row(e, false))}
+          {me && !meVisible && row(me, true)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Badge strip — the player's collected badges (streak milestones +
+   non-streak achievements). Earned badges render solid; not-yet-earned
+   render dimmed so there's a visible collection to complete. Shared by
+   the lobby and the profile screen.
+   ============================================================ */
+function BadgeStrip({ badges, achievements }) {
+  const earnedDays = new Set(badges || []);
+  const ach = achievements || { types: [], milestones: [] };
+  const earnedTypes = new Set(ach.types || []);
+  const earnedMilestones = new Set(ach.milestones || []);
+
+  const chips = [];
+  for (const b of STREAK_BADGES) {
+    chips.push({ key: `s${b.min}`, icon: b.icon, name: b.name, sub: `${b.min}-day streak`, earned: earnedDays.has(b.min) });
+  }
+  for (const b of ACHIEVEMENT_BADGES) {
+    chips.push({ key: `a${b.type}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedTypes.has(b.type) });
+  }
+  for (const b of SOLVE_MILESTONE_BADGES) {
+    chips.push({ key: `m${b.count}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedMilestones.has(b.count) });
+  }
+  const earnedCount = chips.filter(c => c.earned).length;
+
+  return (
+    <div className="badge-strip-wrap">
+      <div className="badge-strip-head">
+        <span>Badges</span>
+        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
+      </div>
+      <div className="badge-strip">
+        {chips.map(c => (
+          <div
+            key={c.key}
+            className={`badge-chip${c.earned ? ' active' : ' locked'}`}
+            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
+          >
+            <span className="badge-chip-icon">{c.icon}</span>
+            <span className="badge-chip-name">{c.name}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -6106,6 +6490,39 @@ async function mncVerifySession(sessionId, nonce, moveLog, finalPits, timeSecs) 
   } catch { return { verified: false, reason: 'network_error' }; }
 }
 
+// Daily Challenge: claim today's attempt and mint a session whose commitment
+// covers the day's deterministic board. Returns { sessionId, nonce, attempt, ... }
+// or { locked, ... } / null. Mirrors mncStartSession but for the daily board.
+async function mncDailyStart(offset) {
+  try {
+    const board = mncDailyBoard(offset);
+    const nonceBytes = new Uint8Array(16);
+    window.crypto.getRandomValues(nonceBytes);
+    const nonceHex = Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const msgBuf = new TextEncoder().encode(nonceHex + '||' + JSON.stringify(board));
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', msgBuf);
+    const commitment = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    const { ok, status, body } = await api('/api/mancala/daily/start', {
+      method: 'POST',
+      body: JSON.stringify({ commitment }),
+    });
+    if (status === 409) return { locked: true, body };
+    if (ok && body && body.sessionId) return { sessionId: body.sessionId, nonce: nonceHex, body };
+    return null;
+  } catch { return null; }
+}
+
+async function mncDailyFinish(sessionId, nonce, moveLog, finalPits, timeSecs) {
+  try {
+    const { ok, body } = await api('/api/mancala/daily/finish', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, nonce, moveLog, finalPits, timeSecs }),
+    });
+    if (ok && body) return body;
+    return { verified: false, reason: 'network_error' };
+  } catch { return { verified: false, reason: 'network_error' }; }
+}
+
 /* ============================================================
    Mancala Leaderboard component (used inside AI game tab)
    ============================================================ */
@@ -6198,6 +6615,492 @@ function MncLeaderboard() {
 }
 
 /* ============================================================
+   Mancala Daily Challenge — leaderboard (Today / All-Time tabs)
+   ============================================================ */
+function MncDailyLeaderboard({ refreshKey }) {
+  const [scope, setScope]     = useState('today');
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(false);
+    api('/api/mancala/daily/leaderboard?scope=' + scope)
+      .then(({ ok, body }) => {
+        if (!alive) return;
+        if (ok && body) setData(body);
+        else setError(true);
+      })
+      .catch(() => { if (alive) setError(true); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [scope, refreshKey]);
+
+  const fmtSecs = s => {
+    if (s == null) return '—';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+  const meInTop = data && data.me && data.entries && data.entries.some(r => r.rank === data.me.rank);
+  const cols = scope === 'today' ? '2rem 1fr auto auto' : '2rem 1fr auto auto';
+
+  const Row = ({ r, me }) => (
+    <div style={{
+      display: 'grid', gridTemplateColumns: cols, gap: '0 0.5rem',
+      padding: '0.4rem 0.25rem', fontSize: '0.82rem',
+      borderBottom: `1px solid ${C.border}22`,
+      background: me ? C.accent + '18' : 'transparent',
+      borderRadius: me ? '6px' : '0',
+    }}>
+      <span style={{ color: r.rank <= 3 ? C.gold : C.muted, fontWeight: r.rank <= 3 ? 700 : 400 }}>{r.rank}</span>
+      <span style={{ color: me ? C.accent : C.text, fontWeight: me ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.username || '—'}</span>
+      <span style={{ color: C.gold, fontFamily: 'monospace' }}>{r.score}</span>
+      <span style={{ color: C.muted }}>
+        {scope === 'today' ? fmtSecs(r.timeSecs) : `🔥 ${r.daysHeldRecord != null ? r.daysHeldRecord : 0}`}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+        {[['today', 'Today'], ['alltime', 'All-Time']].map(([id, label]) => (
+          <button key={id} className={'mnc-difficulty-pill' + (scope === id ? ' active' : '')} onClick={() => setScope(id)}>{label}</button>
+        ))}
+      </div>
+      {loading && <div style={{ textAlign: 'center', color: C.muted, padding: '1rem', fontSize: '0.85rem' }}>Loading…</div>}
+      {error && <div style={{ textAlign: 'center', color: C.rose, padding: '1rem', fontSize: '0.85rem' }}>Could not load leaderboard.</div>}
+      {!loading && !error && data && (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '0 0.5rem', fontSize: '0.75rem', color: C.muted, padding: '0 0.25rem 0.3rem', borderBottom: `1px solid ${C.border}` }}>
+            <span>#</span><span>Player</span><span>Score</span><span>{scope === 'today' ? 'Time' : 'Record'}</span>
+          </div>
+          {data.entries.length === 0 && (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '1.25rem', fontSize: '0.85rem' }}>No scores yet — be the first!</div>
+          )}
+          {data.entries.map((r, i) => <Row key={i} r={r} me={r.isCurrentUser} />)}
+          {data.me && !meInTop && (
+            <div>
+              <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.7rem', padding: '0.2rem 0' }}>…</div>
+              <Row r={data.me} me={true} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Game 5e — Mancala Daily Challenge (one seeded puzzle/day vs Hard AI)
+   ============================================================ */
+function MancalaDailyGame({ onWin, onStepChange, offset }) {
+  // Phase: 'loading' | 'locked' | 'play' | 'error'
+  const [phase, setPhase]               = useState('loading');
+  const [pits, setPits]                 = useState(() => mncDailyBoard(offset));
+  const [player, setPlayer]             = useState(1);
+  const [done, setDone]                 = useState(false);
+  const [winner, setWinner]             = useState(null);
+  const [moves, setMoves]               = useState(0);
+  const [flashPits, setFlashPits]       = useState(() => new Set());
+  const [captureFlash, setCaptureFlash] = useState(() => new Set());
+  const [bannerMsg, setBannerMsg]       = useState('');
+  const [aiThinking, setAiThinking]     = useState(false);
+  const [soundOn, setSoundOn]           = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
+  const [activeTab, setActiveTab]       = useState('game');
+  const [globalRecord, setGlobalRecord] = useState(null);
+  const [streak, setStreak]             = useState(0);
+  const [nextReset, setNextReset]       = useState(null);
+  const [lockedAttempt, setLockedAttempt] = useState(null);
+  const [verifying, setVerifying]       = useState(false);
+  const [verified, setVerified]         = useState(null);
+  const [becameRecord, setBecameRecord] = useState(false);
+  const [lbKey, setLbKey]               = useState(0);
+  const [resumeSecs, setResumeSecs]     = useState(0);
+
+  const animatingRef = useRef(false);
+  const soundOnRef   = useRef(soundOn);
+  const winTimerRef  = useRef(null);
+  const applyMoveRef = useRef(null);
+  const pitsRef      = useRef(pits);
+  const movesRef     = useRef(moves);
+  const sessionIdRef = useRef(null);
+  const nonceRef     = useRef(null);
+  const moveLogRef   = useRef([]);
+  const startedRef   = useRef(false);
+  soundOnRef.current = soundOn;
+  pitsRef.current    = pits;
+  movesRef.current   = moves;
+
+  const { secs, fmt } = useTimer(phase === 'play' && !done, resumeSecs);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+
+  const countdown = useCountdown(nextReset, offset, null);
+
+  // Hydrate state on mount: derive board, learn record/streak/lock, and (if
+  // playable) claim today's attempt + mint the ZK session.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const demo = new URLSearchParams(window.location.search).get('demo');
+      const { ok, body } = await api('/api/mancala/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : ''));
+      if (!alive) return;
+      if (!ok || !body) { setPhase('error'); return; }
+      setPits(body.board || mncDailyBoard(offset));
+      setGlobalRecord(body.globalRecord != null ? body.globalRecord : null);
+      setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setNextReset(body.nextResetUtc || null);
+      const at = body.attempt;
+      if (at && at.finishedAt) {
+        setLockedAttempt(at);
+        setPhase('locked');
+        return;
+      }
+      // Fresh or resumable — claim/mint a session.
+      const started = await mncDailyStart(offset);
+      if (!alive) return;
+      if (started && started.locked) {
+        setLockedAttempt(started.body && started.body.attempt);
+        if (started.body && started.body.nextResetUtc) setNextReset(started.body.nextResetUtc);
+        setPhase('locked');
+        return;
+      }
+      if (!started || !started.sessionId) { setPhase('error'); return; }
+      sessionIdRef.current = started.sessionId;
+      nonceRef.current = started.nonce;
+      moveLogRef.current = [];
+      if (started.body) {
+        if (started.body.board) setPits(started.body.board);
+        if (started.body.globalRecord != null) setGlobalRecord(started.body.globalRecord);
+        if (started.body.nextResetUtc) setNextReset(started.body.nextResetUtc);
+        const sa = started.body.attempt;
+        // Resume an unfinished attempt: restore move count + elapsed timer. The
+        // board itself is re-derived from the day seed, so only the count is
+        // needed to keep the step display honest (moves replay isn't restored —
+        // a same-day return continues from the live board the server tracks via
+        // the new session; we keep it simple and resume the clock + counter).
+        if (sa && sa.elapsedSecs) setResumeSecs(sa.elapsedSecs);
+        if (sa && typeof sa.moves === 'number') { setMoves(sa.moves); onStepChange(sa.moves); }
+      }
+      startedRef.current = true;
+      setPhase('play');
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Autosave elapsed time + move count for resume (board re-derives from seed).
+  useAutosave(
+    (progress, steps, s) => {
+      if (phase !== 'play' || done) return;
+      api('/api/mancala/daily/progress', {
+        method: 'POST', keepalive: true,
+        body: JSON.stringify({ progress, moves: steps, elapsedSecs: s }),
+      }).catch(() => {});
+    },
+    () => ({ progress: { dayNum: utcDayNum(offset), moves: movesRef.current }, steps: movesRef.current, secs: secsRef.current }),
+    phase === 'play' && !done
+  );
+
+  const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
+    const p = newPits.slice();
+    const p1Empty = p.slice(0, 6).every(v => v === 0);
+    const p2Empty = p.slice(7, 13).every(v => v === 0);
+    const isGameOver = p1Empty || p2Empty;
+    if (isGameOver) {
+      for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+      for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    }
+    setPits(p);
+    setMoves(newMoves);
+    onStepChange(newMoves);
+    if (isGameOver) {
+      const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
+      setWinner(w);
+      setDone(true);
+      setAiThinking(false);
+      const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
+      setBannerMsg(wLabel);
+
+      const finalSecs = secsRef.current;
+      const date = new Date(Date.now() + offset).toISOString().slice(0, 10);
+      const recLine = w === 1 ? '' : '';
+      const share = `Mancala Daily ${date} — 🫘 You ${p[6]} · AI ${p[13]} · ${finalSecs}s${recLine}`;
+      const base = Math.max((p[6] - p[13]) * 15 - finalSecs, 0);
+
+      setVerifying(true);
+      const sid = sessionIdRef.current;
+      const nonce = nonceRef.current;
+      const log = moveLogRef.current.slice();
+      const fp = p.slice();
+      const proceed = (serverScore, ver, became) => {
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          setBannerMsg('');
+          const label = w === 'draw' ? "Draw 🤝"
+            : w === 2 ? 'AI wins 🤖'
+            : became ? '🏆 New daily record!' : 'You win! 🎉';
+          onWin(w === 1 ? serverScore : 0, newMoves, finalSecs, {
+            winner: w, share, verified: ver, daily: true,
+            becameRecord: became, streak, winnerLabel: label,
+          });
+        }, 700);
+      };
+
+      if (sid && nonce) {
+        mncDailyFinish(sid, nonce, log, fp, finalSecs).then(result => {
+          setVerifying(false);
+          const ok = result && result.verified;
+          setVerified(ok);
+          if (ok) {
+            if (result.globalRecord != null) setGlobalRecord(result.globalRecord);
+            if (typeof result.streak === 'number') setStreak(result.streak);
+            setBecameRecord(!!result.becameRecord);
+            setLbKey(k => k + 1);
+            proceed(typeof result.score === 'number' ? result.score : (w === 1 ? base : 0), true, !!result.becameRecord);
+          } else {
+            proceed(w === 1 ? base : 0, false, false);
+          }
+        });
+      } else {
+        setVerifying(false);
+        proceed(w === 1 ? base : 0, false, false);
+      }
+    } else if (extraTurn) {
+      setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
+      setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
+    } else {
+      setPlayer(currentPlayer === 1 ? 2 : 1);
+      setBannerMsg('');
+    }
+  };
+
+  const applyMove = (idx, currentPlayer) => {
+    if (animatingRef.current) return;
+    const curPits = pitsRef.current;
+    if (curPits[idx] === 0) return;
+    const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(curPits, idx, currentPlayer);
+    const newMoves = movesRef.current + 1;
+    moveLogRef.current.push(idx);
+    animatingRef.current = true;
+    const working = curPits.slice();
+    working[idx] = 0;
+    setPits(working.slice());
+    setFlashPits(new Set());
+    let step = 0;
+    const animate = () => {
+      if (!animatingRef.current) { setFlashPits(new Set()); return; }
+      if (step >= sequence.length) {
+        setFlashPits(new Set());
+        if (captureFrom >= 0) {
+          setCaptureFlash(new Set([captureFrom]));
+          setTimeout(() => {
+            if (!animatingRef.current) return;
+            setCaptureFlash(new Set());
+            animatingRef.current = false;
+            finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+          }, 350);
+        } else {
+          animatingRef.current = false;
+          finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+        }
+        return;
+      }
+      working[sequence[step]]++;
+      setPits(working.slice());
+      setFlashPits(new Set([sequence[step]]));
+      if (soundOnRef.current) mncPlayClick();
+      step++;
+      setTimeout(animate, 80);
+    };
+    setTimeout(animate, 0);
+  };
+  applyMoveRef.current = applyMove;
+
+  // AI plays P2 at Hard difficulty (deterministic — matches server verification).
+  useEffect(() => {
+    if (phase !== 'play' || player !== 2 || done) return;
+    setAiThinking(true);
+    const FLOOR = 350;
+    let raf = null, applyTimer = null;
+    raf = requestAnimationFrame(() => {
+      const startedAt = Date.now();
+      const idx = mncAIMove(pitsRef.current, 'hard');
+      const elapsed = Date.now() - startedAt;
+      applyTimer = setTimeout(() => {
+        setAiThinking(false);
+        if (idx >= 0) applyMoveRef.current(idx, 2);
+      }, Math.max(0, FLOOR - elapsed));
+    });
+    return () => { if (raf) cancelAnimationFrame(raf); if (applyTimer) clearTimeout(applyTimer); };
+  }, [player, done, phase]);
+
+  useEffect(() => () => { if (winTimerRef.current) clearTimeout(winTimerRef.current); }, []);
+
+  if (phase === 'loading') {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} />
+        <div style={{ color: C.muted, fontSize: '0.85rem' }}>Loading today's challenge…</div>
+      </div>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem', color: C.rose, fontSize: '0.9rem' }}>
+        Couldn't load the Daily Challenge. Make sure you're signed in, then try again.
+      </div>
+    );
+  }
+
+  if (phase === 'locked') {
+    const at = lockedAttempt || {};
+    const solved = at.score != null && at.score > 0;
+    const fmtTime = s => s == null ? '—' : `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    return (
+      <div className="locked-card">
+        <div className="lock-icon">🔒</div>
+        <h2>You've played today</h2>
+        <div className="sub">Mancala Daily Challenge — one attempt per day</div>
+        <div className="mnc-daily-pills" style={{ justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <span className="mnc-record-pill">🏆 Record: {globalRecord != null ? globalRecord : '—'}</span>
+          {streak > 0 && <span className="mnc-streak-chip">🔥 {streak} day{streak === 1 ? '' : 's'}</span>}
+        </div>
+        <div className="countdown-block">
+          <div className="clabel">Next puzzle in</div>
+          <div className="ctime mono">{countdown}</div>
+        </div>
+        {at.score != null && (
+          <div className="locked-result">
+            <div className="score-row"><span className="k">Your score</span><span className="v">{solved ? '+' + at.score : '0'}</span></div>
+            {at.timeSecs != null && <div className="score-row"><span className="k">Time</span><span className="v">{fmtTime(at.timeSecs)}</span></div>}
+            {at.moves != null && <div className="score-row"><span className="k">Moves</span><span className="v">{at.moves}</span></div>}
+          </div>
+        )}
+        <MncDailyLeaderboard refreshKey={lbKey} />
+      </div>
+    );
+  }
+
+  // ----- play phase -----
+  const p2Display = [12, 11, 10, 9, 8, 7];
+  const p1Display = [0, 1, 2, 3, 4, 5];
+  const p1Color = C.accent, p2Color = C.rose;
+  const activeColor = player === 1 ? p1Color : p2Color;
+  const leadingRecord = globalRecord != null && pits[6] > globalRecord;
+
+  const handlePitClick = (idx) => {
+    if (player !== 1 || done || animatingRef.current) return;
+    if (idx < 0 || idx > 5 || pits[idx] === 0) return;
+    applyMove(idx, 1);
+  };
+  const pitClass = (idx) => {
+    const isP1Pit = idx <= 5;
+    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
+    const cls = ['mnc-pit'];
+    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
+    if (flashPits.has(idx)) cls.push('mnc-flash');
+    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
+    return cls.join(' ');
+  };
+
+  return (
+    <div>
+      <div className="mnc-daily-header">
+        <div className="mnc-daily-title">🗓️ Daily Challenge</div>
+        <div className="mnc-daily-pills">
+          <span className="mnc-record-pill" style={leadingRecord ? { borderColor: C.gold, color: C.gold } : null}>
+            {globalRecord != null ? `🏆 Record: ${globalRecord}` : '🏆 Be the first!'}
+          </span>
+          {streak > 0 && <span className="mnc-streak-chip">🔥 {streak} day{streak === 1 ? '' : 's'}</span>}
+        </div>
+      </div>
+
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
+        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: p1Color }}>{pits[6]}</div></div>
+        <div className="pill">
+          <div className="plabel">ZK</div>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
+        color: done ? C.muted : activeColor,
+        background: (done ? C.dim : activeColor) + '22',
+        border: `1px solid ${(done ? C.dim : activeColor)}44`,
+        borderRadius: '999px', padding: '0.32rem 0.8rem',
+        maxWidth: 480, margin: '0 auto 0.65rem',
+      }}>
+        {done
+          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits'}
+      </div>
+
+      <div className="mnc-board">
+        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
+          <div className="mnc-store-label">AI</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p2Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
+          <div className="mnc-store-label">You</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p1Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
+            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+      </div>
+
+      {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
+      {becameRecord && <div className="mnc-banner" style={{ color: C.gold }}>🏆 New daily record!</div>}
+
+      <div className="mnc-controls">
+        <button onClick={() => { const next = !soundOn; setSoundOn(next); soundOnRef.current = next; try { localStorage.setItem(MNC_SOUND_KEY, next ? '1' : '0'); } catch {} }}>
+          {soundOn ? '🔊' : '🔇'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0', marginTop: '1.25rem', borderBottom: `1px solid ${C.border}` }}>
+        {['game', 'leaderboard'].map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{
+              flex: 1, padding: '0.45rem', fontSize: '0.82rem', fontWeight: activeTab === tab ? 700 : 400,
+              background: 'none', border: 'none', borderBottom: activeTab === tab ? `2px solid ${C.accent}` : '2px solid transparent',
+              color: activeTab === tab ? C.accent : C.muted, cursor: 'pointer',
+            }}>{tab === 'game' ? '🎯 Challenge' : '🏆 Leaderboard'}</button>
+        ))}
+      </div>
+      {activeTab === 'game' && (
+        <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.82rem', padding: '0.9rem 0.5rem', lineHeight: 1.5 }}>
+          One puzzle a day — the same board for every player. Win against the Hard AI to score; a bigger,
+          faster win scores higher. Beat the global record to extend your 🔥 streak.
+        </div>
+      )}
+      {activeTab === 'leaderboard' && <MncDailyLeaderboard refreshKey={lbKey} />}
+    </div>
+  );
+}
+
+/* ============================================================
    Game 5b — Mancala AI variant (human P1 vs AI P2)
    ============================================================ */
 function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
@@ -6223,6 +7126,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const applyMoveRef  = useRef(null);
   const pitsRef       = useRef(pits);
   const movesRef      = useRef(moves);
+  const playerRef     = useRef(player);
+  const doneRef       = useRef(done);
+  // AI turn-loop timers (thinking delay + last-resort watchdog)
+  const aiTimerRef    = useRef(null);
+  const aiWatchdogRef = useRef(null);
   // ZK proof refs
   const sessionIdRef  = useRef(null);
   const nonceRef      = useRef(null);
@@ -6230,6 +7138,8 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   soundOnRef.current  = soundOn;
   pitsRef.current     = pits;
   movesRef.current    = moves;
+  playerRef.current   = player;
+  doneRef.current     = done;
 
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
@@ -6250,6 +7160,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   const resetGame = () => {
     animatingRef.current = false;
+    cancelAiTimers();
     if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
     setPits(mncInitBoard());
     setPlayer(1);
@@ -6280,9 +7191,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     setMoves(newMoves);
     onStepChange(newMoves);
     if (isGameOver) {
+      cancelAiTimers();
       const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
       setWinner(w);
       setDone(true);
+      doneRef.current = true;
       setAiThinking(false);
       const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
       setBannerMsg(wLabel);
@@ -6342,7 +7255,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     } else if (extraTurn) {
       setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
       setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
+      // The AI keeps the turn on an extra turn; the [player, done] effect
+      // won't re-fire (player is unchanged), so re-arm the AI loop directly.
+      if (currentPlayer === 2) scheduleAiMove();
     } else {
+      if (currentPlayer === 2) cancelAiTimers();
       setPlayer(currentPlayer === 1 ? 2 : 1);
       setBannerMsg('');
     }
@@ -6390,18 +7307,86 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   };
   applyMoveRef.current = applyMove;
 
-  // Trigger AI when it's P2's turn
-  useEffect(() => {
-    if (player !== 2 || done) return;
+  // --- AI turn loop -------------------------------------------------------
+  // Cancel any pending AI thinking timer + watchdog.
+  const cancelAiTimers = () => {
+    if (aiTimerRef.current)    { clearTimeout(aiTimerRef.current);    aiTimerRef.current = null; }
+    if (aiWatchdogRef.current) { clearTimeout(aiWatchdogRef.current); aiWatchdogRef.current = null; }
+  };
+
+  // Settle every remaining stone into its owner's store and end the game.
+  // Used when the AI has no legal move, or as the watchdog's last resort so
+  // the board can never stay frozen on "AI is thinking…".
+  const forceEndGame = () => {
+    cancelAiTimers();
+    if (doneRef.current) return;
+    const p = pitsRef.current.slice();
+    for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+    for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    animatingRef.current = false;
+    setAiThinking(false);
+    // p has both sides empty, so finishMove detects game-over and runs the
+    // full winner / history / ZK / onWin flow exactly as a normal end would.
+    finishMove(p, 2, false, -1, movesRef.current);
+  };
+
+  // Last-resort safety net: if the AI ever fails to produce a move within a
+  // generous window, force the game to a result rather than hang forever.
+  const armWatchdog = () => {
+    if (aiWatchdogRef.current) { clearTimeout(aiWatchdogRef.current); aiWatchdogRef.current = null; }
+    aiWatchdogRef.current = setTimeout(() => {
+      aiWatchdogRef.current = null;
+      if (doneRef.current || playerRef.current !== 2) return;
+      // A real move may still be animating — give it more time, don't cut in.
+      if (animatingRef.current) { armWatchdog(); return; }
+      forceEndGame();
+    }, 12000);
+  };
+
+  // Compute and play the AI's move. Defends against a thrown engine, a missing
+  // legal move, and a still-running animation (retry instead of dropping it).
+  const performAiMove = () => {
+    aiTimerRef.current = null;
+    if (doneRef.current || playerRef.current !== 2) { setAiThinking(false); return; }
+    if (animatingRef.current) {
+      // Previous animation hasn't settled yet — retry shortly so the busy
+      // guard in applyMove never silently swallows the AI's move.
+      aiTimerRef.current = setTimeout(performAiMove, 120);
+      return;
+    }
+    let idx = -1;
+    try {
+      idx = mncAIMove(pitsRef.current, difficulty);
+    } catch (e) {
+      const legal = mncGetValidMoves(pitsRef.current, 2);
+      idx = legal.length ? legal[Math.floor(Math.random() * legal.length)] : -1;
+    }
+    if (idx < 0) { setAiThinking(false); forceEndGame(); return; }
+    setAiThinking(false);
+    applyMoveRef.current(idx, 2);
+  };
+
+  // Arm a single AI step (thinking delay + watchdog). Cancels any prior timer
+  // first, so chained extra turns never stack up.
+  const scheduleAiMove = () => {
+    if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
+    if (doneRef.current || playerRef.current !== 2) return;
     setAiThinking(true);
+    armWatchdog();
     const delay = difficulty === 'easy' ? 500 : difficulty === 'medium' ? 700 : 1100;
-    const t = setTimeout(() => {
-      setAiThinking(false);
-      const idx = mncAIMove(pitsRef.current, difficulty);
-      if (idx >= 0) applyMoveRef.current(idx, 2);
-    }, delay);
-    return () => clearTimeout(t);
+    aiTimerRef.current = setTimeout(performAiMove, delay);
+  };
+
+  // Kick off the AI loop whenever it becomes P2's turn. Chained extra turns
+  // are re-armed from finishMove (player is unchanged, so this won't re-fire).
+  useEffect(() => {
+    if (player !== 2 || done) { cancelAiTimers(); return; }
+    scheduleAiMove();
+    return () => cancelAiTimers();
   }, [player, done]);
+
+  // Cancel all AI timers on unmount.
+  useEffect(() => () => cancelAiTimers(), []);
 
   const handlePitClick = (idx) => {
     if (player !== 1 || done || animatingRef.current) return;
@@ -6443,7 +7428,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
         </div>
         <div className="pill">
           <div className="plabel">ZK</div>
-          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? C.emerald : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
             {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
           </div>
         </div>
@@ -6664,7 +7649,7 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
 /* ============================================================
    Game 5d — Mancala Mode Selector
    ============================================================ */
-function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
+function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline, onSelectDaily }) {
   const [mode, setMode]             = useState(null);
   const [difficulty, setDifficulty] = useState(() => localStorage.getItem(MNC_AI_DIFF_KEY) || 'medium');
   const [onlineAction, setOnlineAction] = useState(null);
@@ -6674,6 +7659,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 
   const handleStart = async () => {
     if (!mode) return;
+    if (mode === 'daily') { onSelectDaily(); return; }
     if (mode === 'local') { onSelectLocal(); return; }
     if (mode === 'ai') {
       try { localStorage.setItem(MNC_AI_DIFF_KEY, difficulty); } catch {}
@@ -6702,6 +7688,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
   };
 
   const modes = [
+    { id: 'daily',  icon: '🗓️', name: 'Daily Challenge', desc: 'One puzzle a day. Beat the global record.', ranked: true },
     { id: 'local',  icon: '👥', name: 'Local 2-Player', desc: 'Pass and play on this device' },
     { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer', ranked: true },
     { id: 'online', icon: '🌐', name: 'Online',          desc: 'Play with a friend via room code' },
@@ -6777,15 +7764,16 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 /* ============================================================
    Game 5 — Mancala wrapper (delegates to mode sub-components)
    ============================================================ */
-function MancalaGame({ onWin, onStepChange, resetKey }) {
-  const [mode, setMode]               = useState(null);
+function MancalaGame({ onWin, onStepChange, resetKey, offset }) {
+  const [mode, setMode]               = useState(() =>
+    new URLSearchParams(window.location.search).get('mmode') === 'daily' ? 'daily' : null);
   const [difficulty, setDifficulty]   = useState(null);
   const [roomId, setRoomId]           = useState(null);
   const [myPlayerNum, setMyPlayerNum] = useState(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
-  // When "Play Again" fires, keep mode for local/ai but reset online (needs new room).
+  // When "Play Again" fires, keep mode for local/ai/daily but reset online (needs new room).
   useEffect(() => {
     if (modeRef.current === 'online') {
       setMode(null);
@@ -6797,6 +7785,7 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
   if (!mode) {
     return (
       <MancalaModeSelect
+        onSelectDaily={() => setMode('daily')}
         onSelectLocal={() => setMode('local')}
         onSelectAI={(diff) => { setDifficulty(diff); setMode('ai'); }}
         onSelectOnline={(playerNum, rId) => { setMyPlayerNum(playerNum); setRoomId(rId); setMode('online'); }}
@@ -6804,6 +7793,7 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
     );
   }
 
+  if (mode === 'daily')  return React.createElement(MancalaDailyGame, { onWin, onStepChange, offset });
   if (mode === 'local') return React.createElement(MancalaLocalGame, { onWin, onStepChange, resetKey });
   if (mode === 'ai')    return React.createElement(MancalaAIGame,    { onWin, onStepChange, resetKey, difficulty });
   if (mode === 'online') return React.createElement(MancalaOnlineGame, { onWin, onStepChange, roomId, myPlayerNum });
@@ -12051,22 +13041,12 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
           </div>
         </div>
 
-        {Array.isArray(profile.badges) && profile.badges.length > 0 && (
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Streak badges</div>
-            <div className="badge-strip" style={{ marginTop: 0 }}>
-              {profile.badges
-                .map(badgeForDays)
-                .filter(Boolean)
-                .map(b => (
-                  <span key={b.id} className="badge-chip" title={`${b.name} · ${b.min}-day streak`}>
-                    <span className="badge-chip-icon">{b.icon}</span>
-                    {b.name}
-                  </span>
-                ))}
-            </div>
-          </div>
-        )}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <BadgeStrip
+            badges={Array.isArray(profile.badges) ? profile.badges : []}
+            achievements={profile.achievements || { types: [], milestones: [] }}
+          />
+        </div>
 
         <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '1rem', fontSize: '0.9rem' }}>
           <p style={{ margin: '0.5rem 0' }}>
@@ -13109,6 +14089,285 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
   return React.createElement('div', { style: { padding: '1rem', color: C.text } }, 'Loading...');
 }
 
+/* ============================================================
+   Chutes & Ladders — 2-player local (pass-and-play) classic game
+   ============================================================ */
+// Standard Milton-Bradley layout. Ladders climb (bottom -> top),
+// chutes slide (top -> bottom). One flat map keyed by landing square.
+const CNL_LADDERS = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+const CNL_CHUTES  = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+const CNL_JUMPS   = Object.assign({}, CNL_LADDERS, CNL_CHUTES);
+
+// Map a square number (1..100) to {row, col} on the boustrophedon board.
+// row 0 is the BOTTOM row (squares 1..10), row 9 is the TOP (91..100).
+// Even rows (0-indexed from bottom) run left->right; odd rows right->left.
+function cnlRowCol(n) {
+  const idx = n - 1;            // 0-based
+  const row = Math.floor(idx / 10);
+  const within = idx % 10;
+  const col = (row % 2 === 0) ? within : (9 - within);
+  return { row, col };
+}
+
+// Center of a square as a percentage of the board box (for SVG + pawns).
+// Visual row 0 sits at the BOTTOM, so flip for top-origin coordinates.
+function cnlCenterPct(n) {
+  if (n <= 0) return { x: 50, y: 104 }; // off-board: just below the board
+  const { row, col } = cnlRowCol(n);
+  const visualRow = 9 - row;
+  return { x: (col + 0.5) * 10, y: (visualRow + 0.5) * 10 };
+}
+
+function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
+  const [p1Pos, setP1Pos]   = useState(0);
+  const [p2Pos, setP2Pos]   = useState(0);
+  const [player, setPlayer] = useState(1);
+  const [die, setDie]       = useState(null);
+  const [rolls, setRolls]   = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const [rolling, setRolling]     = useState(false);
+  const [done, setDone]     = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [banner, setBanner] = useState('');
+
+  const animatingRef = useRef(false);
+  const winTimerRef  = useRef(null);
+  const timersRef    = useRef([]);
+
+  const { secs, fmt } = useTimer(!done);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+  const rollsRef = useRef(0);
+  rollsRef.current = rolls;
+
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
+  };
+
+  const resetGame = () => {
+    animatingRef.current = false;
+    clearTimers();
+    setP1Pos(0); setP2Pos(0);
+    setPlayer(1); setDie(null); setRolls(0);
+    setAnimating(false); setRolling(false);
+    setDone(false); setWinner(null); setBanner('');
+  };
+
+  useEffect(() => { resetGame(); }, [resetKey]);
+  useEffect(() => () => clearTimers(), []);
+
+  const p1Color = C.accent;
+  const p2Color = C.rose;
+  const activeColor = done ? C.muted : (player === 1 ? p1Color : p2Color);
+
+  const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
+
+  const finishTurn = (who, landed) => {
+    const jump = CNL_JUMPS[landed];
+    const settle = () => {
+      // Win check: must land exactly on 100 (no chute sits on 100).
+      if (landed === 100) {
+        setDone(true);
+        setWinner(who);
+        const label = `Player ${who} wins! 🎉`;
+        setBanner(label);
+        const finalRolls = rollsRef.current;
+        const finalSecs = secsRef.current;
+        const score = Math.max(50, 300 - finalRolls * 5);
+        const share = `🪜 Chutes & Ladders — Player ${who} won in ${finalRolls} rolls!`;
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          onWin(score, finalRolls, finalSecs, { winner: who, winnerLabel: label, share });
+        }, 1300);
+        return;
+      }
+      // Pass turn to the other player.
+      animatingRef.current = false;
+      setAnimating(false);
+      setPlayer(who === 1 ? 2 : 1);
+    };
+
+    if (jump !== undefined) {
+      // Brief pause so players see the landing, then climb/slide.
+      const isLadder = CNL_LADDERS[landed] !== undefined;
+      setBanner(isLadder ? 'Ladder up! 🪜' : 'Down the chute! 🛝');
+      const t = setTimeout(() => {
+        setPos(who, jump);
+        const t2 = setTimeout(() => { setBanner(''); settle(); }, 320);
+        timersRef.current.push(t2);
+      }, 380);
+      timersRef.current.push(t);
+    } else {
+      settle();
+    }
+  };
+
+  const roll = () => {
+    if (animatingRef.current || done || rolling) return;
+    const who = player;
+    const value = Math.floor(Math.random() * 6) + 1;
+    const from = who === 1 ? p1Pos : p2Pos;
+    const newRolls = rolls + 1;
+
+    setRolling(true);
+    setDie(value);
+    setBanner('');
+    setRolls(newRolls);
+    rollsRef.current = newRolls;
+    onStepChange(newRolls);
+
+    const rollT = setTimeout(() => {
+      setRolling(false);
+
+      // Overshoot 100 => stay put, pass turn.
+      if (from + value > 100) {
+        setBanner('Overshoot — stay put');
+        const passT = setTimeout(() => {
+          setBanner('');
+          setPlayer(who === 1 ? 2 : 1);
+        }, 700);
+        timersRef.current.push(passT);
+        return;
+      }
+
+      // Hop square-by-square to the landing square.
+      animatingRef.current = true;
+      setAnimating(true);
+      const target = from + value;
+      let cur = from;
+      const hop = () => {
+        if (!animatingRef.current) return;
+        if (cur >= target) { finishTurn(who, target); return; }
+        cur++;
+        setPos(who, cur);
+        const t = setTimeout(hop, 130);
+        timersRef.current.push(t);
+      };
+      const t0 = setTimeout(hop, 130);
+      timersRef.current.push(t0);
+    }, 480);
+    timersRef.current.push(rollT);
+  };
+
+  // Build the 10x10 cells (top row first for natural DOM order).
+  const cells = [];
+  for (let visualRow = 0; visualRow < 10; visualRow++) {
+    for (let col = 0; col < 10; col++) {
+      const row = 9 - visualRow;              // bottom-origin board row
+      const within = (row % 2 === 0) ? col : (9 - col);
+      const n = row * 10 + within + 1;
+      const mark = CNL_LADDERS[n] !== undefined ? '🪜'
+        : CNL_CHUTES[n] !== undefined ? '🛝' : null;
+      cells.push(
+        <div
+          key={n}
+          className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
+        >
+          <span>{n}</span>
+          {mark && <span className="cnl-cell-mark">{mark}</span>}
+        </div>
+      );
+    }
+  }
+
+  // SVG connector lines for every ladder/chute.
+  const lines = Object.keys(CNL_JUMPS).map(k => {
+    const from = parseInt(k, 10);
+    const to = CNL_JUMPS[from];
+    const a = cnlCenterPct(from);
+    const b = cnlCenterPct(to);
+    const isLadder = CNL_LADDERS[from] !== undefined;
+    return (
+      <line
+        key={k}
+        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+        stroke={isLadder ? C.emerald : C.rose}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        opacity="0.6"
+      />
+    );
+  });
+
+  const p1c = cnlCenterPct(p1Pos);
+  const p2c = cnlCenterPct(p2Pos);
+  // Nudge pawns apart when sharing a square (incl. both off-board) so both stay visible.
+  const sameCell = p1Pos === p2Pos;
+  const p1x = sameCell ? p1c.x - 2.4 : p1c.x;
+  const p2x = sameCell ? p2c.x + 2.4 : p2c.x;
+
+  const bannerActive = !!banner;
+  const bannerColor = done ? C.muted : activeColor;
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Time</div>
+          <div className="pvalue time">{fmt}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Turn</div>
+          <div className="pvalue" style={{ color: activeColor, fontSize: '0.95rem' }}>
+            {done ? `P${winner}` : `P${player}`}
+          </div>
+        </div>
+        <div className="pill">
+          <div className="plabel">P1</div>
+          <div className="pvalue" style={{ color: p1Color, fontSize: '0.95rem' }}>{p1Pos}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">P2</div>
+          <div className="pvalue" style={{ color: p2Color, fontSize: '0.95rem' }}>{p2Pos}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Rolls</div>
+          <div className="pvalue">{rolls}</div>
+        </div>
+      </div>
+
+      <div
+        className="cnl-banner"
+        style={{
+          color: bannerColor,
+          background: (bannerActive ? bannerColor : activeColor) + '22',
+          border: `1px solid ${(bannerActive ? bannerColor : activeColor)}44`,
+        }}
+      >
+        {done
+          ? `Game over — Player ${winner} wins! 🎉`
+          : (banner || `Player ${player}'s turn`)}
+      </div>
+
+      <div className="cnl-board-wrap">
+        <div className="cnl-board">{cells}</div>
+        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {lines}
+        </svg>
+        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn" />
+        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn" />
+      </div>
+
+      <div className="cnl-die">
+        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: activeColor + '88' }}>
+          {die == null ? '·' : die}
+        </div>
+      </div>
+
+      <button
+        className="cnl-roll-btn"
+        style={{ background: activeColor }}
+        onClick={roll}
+        disabled={done || animating || rolling}
+      >
+        {done ? 'Game over' : `Roll for Player ${player}`}
+      </button>
+    </div>
+  );
+}
+
 const GAMES = [
   {
     id: 'sudoku',
@@ -13159,6 +14418,16 @@ const GAMES = [
     tag: 'Strategy',
     tagColor: C.gold,
     component: MancalaGame,
+  },
+  {
+    id: 'chutes-ladders',
+    name: 'Chutes & Ladders',
+    icon: '🪜',
+    category: 'classic',
+    desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
+    tag: 'Board',
+    tagColor: C.emerald,
+    component: ChutesLaddersGame,
   },
   {
     id: '2048',
@@ -13227,7 +14496,7 @@ const GAMES = [
     category: 'classic',
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
-    tagColor: '#6366f1',
+    tagColor: C.accent,
     component: TileMatchingGame,
   },
   {
@@ -13251,12 +14520,13 @@ const GAMES = [
     component: ZumaGame,
   },
   {
+    id: 'match3',
     name: 'Match-3 Puzzle',
     icon: '🟩',
     category: 'classic',
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
-    tagColor: '#f59e0b',
+    tagColor: C.gold,
     component: Match3Game,
   },
   {
@@ -13266,7 +14536,7 @@ const GAMES = [
     category: 'daily',
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',
     tag: 'Puzzle',
-    tagColor: '#6366f1',
+    tagColor: C.accent,
     component: TileMatchingDailyGame,
   },
   {
@@ -13559,6 +14829,8 @@ function App() {
   // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
   // even after a streak resets, so the lobby can show a collected-badges strip.
   const [badges, setBadges] = useState([]);
+  // Non-streak achievement badges earned: { types: [...], milestones: [...] }.
+  const [achievements, setAchievements] = useState({ types: [], milestones: [] });
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -13571,10 +14843,10 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
-  // Lobby tab: 'daily', 'classic', 'idle', or 'pvp' — initialized from ?tab= URL param
+  // Lobby tab: 'daily', 'classic', 'idle', 'pvp', or 'feed' — initialized from ?tab= URL param
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : 'daily';
+    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : t === 'feed' ? 'feed' : 'daily';
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
@@ -13610,6 +14882,9 @@ function App() {
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
+      setAchievements(body.achievements && Array.isArray(body.achievements.types)
+        ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
+        : { types: [], milestones: [] });
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -13621,6 +14896,7 @@ function App() {
       setUser(null);
       setStreak(0);
       setBadges([]);
+      setAchievements({ types: [], milestones: [] });
     }
     setLoading(false);
   };
@@ -13762,6 +15038,18 @@ function App() {
     }
   };
 
+  // Deep-link: ?game=<id> auto-opens that game once loaded. Combined with
+  // ?mmode=daily it jumps straight into Mancala's Daily Challenge — used by the
+  // Daily Challenge proposal tests and shareable links. Runs once after hydrate.
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (loading || deepLinkedRef.current) return;
+    const gid = new URLSearchParams(window.location.search).get('game');
+    if (!gid) return;
+    const g = GAMES.find(x => x.id === gid);
+    if (g) { deepLinkedRef.current = true; launchGame(g); }
+  }, [loading]);
+
   // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
   // a game component can hydrate from a single savedProgress object.
   const progressFor = (attempt) => {
@@ -13788,108 +15076,178 @@ function App() {
     });
   };
 
-  const handleWin = async (score, steps, timeSecs, meta) => {
-    // Classic games skip server, streak, and totalScore nav update
-    if (currentGame && currentGame.category === 'classic') {
-      const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
-      setWinData({
-        score,
-        bonus: 0,
-        finalScore: score,
-        steps,
-        timeSecs,
-        multiplier: cashoutMultiplier,
-        effectiveStreak: 0,
-        share: meta && meta.share,
-        cashOut: meta && meta.cashOut,
-        winnerLabel: meta && meta.winnerLabel,
-        isClassic: true,
-        bestScore: meta && meta.bestScore,
-        longestSnake: meta && meta.longestSnake,
+  // POST the finished daily result to the server and reconcile client state.
+  // Pulled out of handleWin so the win overlay's "couldn't sync — retrying"
+  // button can re-run exactly the same submission. Returns true on success.
+  // Best-effort: a network throw is treated as a failed sync (syncError), never
+  // an uncaught rejection that would break the overlay.
+  const submitDailyFinish = async (gameId, finalScore, steps, timeSecs) => {
+    let ok = false, body = null;
+    try {
+      const res = await api(`/api/daily/${gameId}/finish`, {
+        method: 'POST',
+        body: JSON.stringify({ score: finalScore, steps, timeSecs }),
       });
-      return;
+      ok = res.ok; body = res.body;
+    } catch (e) {
+      console.error('[daily] finish submit threw:', e && e.message);
+      ok = false;
     }
-    // The streak this win lands in: the first finished game of the day extends
-    // the consecutive-day streak by 1; a second game the same day reuses the
-    // same day count (the multiplier is per-day, not per-game).
-    const playedToday = Object.values(attempts).some(a => a && a.score != null);
-    const effectiveStreak = playedToday ? streak : streak + 1;
-    const multiplier = streakMultiplier(effectiveStreak);
-    const finalScore = Math.round(score * multiplier);
-    const bonus = finalScore - score;
-    setStreak(effectiveStreak);
-    // A badge unlocked the moment this win's streak lands exactly on a tier.
-    const unlocked = justUnlockedBadge(effectiveStreak);
-    if (unlocked) {
-      setBadges(prev => (prev.includes(unlocked.min) ? prev : [...prev, unlocked.min].sort((a, b) => a - b)));
-    }
-    setWinData({
-      score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
-      activeBadge: activeBadge(effectiveStreak),
-      justBadge: unlocked,
-      share: meta && meta.share,
-      canPost: true,
-      gameId: gameId,
-    });
-
-    const gameId = currentGame.id;
-    const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
-      method: 'POST',
-      body: JSON.stringify({ score: finalScore, steps, timeSecs }),
-    });
+    // Local mirror so the lobby card locks even if the server didn't confirm.
     const stored = ok && body && body.attempt
       ? body.attempt
-      : { score: finalScore, steps, timeSecs, finishedAt: new Date().toISOString() };
+      : { gameId, score: finalScore, steps, timeSecs, finishedAt: new Date().toISOString() };
     setAttempts(prev => ({ ...prev, [gameId]: stored }));
-    setTotalScore(t => t + finalScore);
-    // Reconcile against the server's authoritative streak (now that today is
-    // finished) so a reload and the live nav badge agree.
-    if (ok && body && typeof body.streak === 'number') setStreak(body.streak);
-    // Store reward amount from server so win overlay can show it
-    if (ok && body && body.rewardWei) {
-      setWinData(prev => prev ? { ...prev, rewardWei: body.rewardWei } : prev);
+    if (ok) {
+      // Reconcile against the server's authoritative streak + reward + new
+      // achievement badges, and clear any prior sync-error flag.
+      if (body && typeof body.streak === 'number') setStreak(body.streak);
+      const newAch = (body && Array.isArray(body.newAchievements)) ? body.newAchievements : [];
+      if (newAch.length) {
+        setAchievements(prev => mergeAchievements(prev, newAch));
+      }
+      setWinData(prev => prev ? {
+        ...prev,
+        syncError: false,
+        rewardWei: body && body.rewardWei,
+        newAchievements: newAch,
+        justAchievement: newAch.length ? achievementBadgeFor(newAch[0]) : prev.justAchievement,
+      } : prev);
+      // DApp Mode: surface the Verified badge, then anchor on-chain (best-effort).
+      if (body && body.dapp) {
+        setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
+        dappAnchor(body.dapp).then(updated => {
+          setWinData(prev => prev ? { ...prev, dapp: updated } : prev);
+        }).catch(() => {});
+      }
+    } else {
+      setWinData(prev => prev ? { ...prev, syncError: true } : prev);
     }
-    // DApp Mode: surface the Verified badge for the pilot game, then anchor the
-    // session's chain hash on-chain (best-effort; degrades to a mock anchor).
-    if (ok && body && body.dapp) {
-      setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
-      dappAnchor(body.dapp).then(updated => {
-        setWinData(prev => prev ? { ...prev, dapp: updated } : prev);
+    return ok;
+  };
+
+  const handleWin = async (score, steps, timeSecs, meta) => {
+    try {
+      // Classic games skip server, streak, and totalScore nav update
+      if (currentGame && currentGame.category === 'classic') {
+        const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
+        setWinData({
+          score,
+          bonus: 0,
+          finalScore: score,
+          steps,
+          timeSecs,
+          multiplier: cashoutMultiplier,
+          effectiveStreak: 0,
+          share: meta && meta.share,
+          cashOut: meta && meta.cashOut,
+          winnerLabel: meta && meta.winnerLabel,
+          isClassic: true,
+          bestScore: meta && meta.bestScore,
+          longestSnake: meta && meta.longestSnake,
+          // Carry the game id so the win card's "Share to Feed" button can post
+          // this classic result, mirroring the daily branch below.
+          gameId: currentGame.id,
+          canPost: true,
+        });
+        return;
+      }
+      // Declare gameId FIRST — referencing it before this line is a temporal
+      // dead zone ReferenceError that previously killed the entire win flow
+      // (no overlay, no finish call). Keep this above setWinData.
+      const gameId = currentGame.id;
+      // The streak this win lands in: the first finished game of the day extends
+      // the consecutive-day streak by 1; a second game the same day reuses the
+      // same day count (the multiplier is per-day, not per-game).
+      const playedToday = Object.values(attempts).some(a => a && a.score != null);
+      const effectiveStreak = playedToday ? streak : streak + 1;
+      const multiplier = streakMultiplier(effectiveStreak);
+      const finalScore = Math.round(score * multiplier);
+      const bonus = finalScore - score;
+      setStreak(effectiveStreak);
+      // A badge unlocked the moment this win's streak lands exactly on a tier.
+      const unlocked = justUnlockedBadge(effectiveStreak);
+      if (unlocked) {
+        setBadges(prev => (prev.includes(unlocked.min) ? prev : [...prev, unlocked.min].sort((a, b) => a - b)));
+      }
+      // Show the celebration overlay immediately — independent of the network
+      // call below, so the player always gets a clear "Solved!" confirmation.
+      setWinData({
+        score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+        activeBadge: activeBadge(effectiveStreak),
+        justBadge: unlocked,
+        share: meta && meta.share,
+        canPost: true,
+        gameId,
+        syncError: false,
+        newAchievements: [],
+      });
+      setTotalScore(t => t + finalScore);
+      // Submit to the server (records result, streak, reward, badges, receipt).
+      await submitDailyFinish(gameId, finalScore, steps, timeSecs);
+    } catch (e) {
+      // Never let a handler error swallow the win silently again. Surface a
+      // minimal overlay so the player sees their solve was registered.
+      console.error('[daily] handleWin failed:', e && e.message);
+      setWinData(prev => prev || {
+        score, finalScore: score, bonus: 0, steps, timeSecs,
+        multiplier: 1, effectiveStreak: 0, share: meta && meta.share, syncError: true,
       });
     }
+  };
+
+  // Retry the finish submission for the current win (used by the overlay's
+  // "couldn't sync — retrying" button).
+  const retryDailyFinish = () => {
+    if (!winData || winData.isClassic) return;
+    const gameId = winData.gameId || (currentGame && currentGame.id);
+    if (!gameId) return;
+    setWinData(prev => prev ? { ...prev, syncError: false, syncing: true } : prev);
+    submitDailyFinish(gameId, winData.finalScore, winData.steps, winData.timeSecs)
+      .finally(() => setWinData(prev => prev ? { ...prev, syncing: false } : prev));
   };
 
   // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
   // finished row with score 0 so the day stays locked, but does NOT touch the
   // streak. Existing win-only games never call this.
   const handleLose = async (steps, timeSecs, meta) => {
-    // Classic games skip server entirely
-    if (currentGame && currentGame.category === 'classic') {
+    try {
+      // Classic games skip server entirely
+      if (currentGame && currentGame.category === 'classic') {
+        setLoseData({
+          steps,
+          timeSecs,
+          share: meta && meta.share,
+          answer: meta && meta.answer,
+          isClassic: true,
+        });
+        return;
+      }
+      const gameId = currentGame.id;
       setLoseData({
         steps,
         timeSecs,
         share: meta && meta.share,
         answer: meta && meta.answer,
-        isClassic: true,
       });
-      return;
-    }
-    setLoseData({
-      steps,
-      timeSecs,
-      share: meta && meta.share,
-      answer: meta && meta.answer,
-    });
 
-    const gameId = currentGame.id;
-    const { ok, body } = await api(`/api/daily/${gameId}/finish`, {
-      method: 'POST',
-      body: JSON.stringify({ score: 0, steps, timeSecs }),
-    });
-    const stored = ok && body && body.attempt
-      ? body.attempt
-      : { score: 0, steps, timeSecs, finishedAt: new Date().toISOString() };
-    setAttempts(prev => ({ ...prev, [gameId]: stored }));
+      let ok = false, body = null;
+      try {
+        const res = await api(`/api/daily/${gameId}/finish`, {
+          method: 'POST',
+          body: JSON.stringify({ score: 0, steps, timeSecs }),
+        });
+        ok = res.ok; body = res.body;
+      } catch (e) {
+        console.error('[daily] lose submit threw:', e && e.message);
+      }
+      const stored = ok && body && body.attempt
+        ? body.attempt
+        : { gameId, score: 0, steps, timeSecs, finishedAt: new Date().toISOString() };
+      setAttempts(prev => ({ ...prev, [gameId]: stored }));
+    } catch (e) {
+      console.error('[daily] handleLose failed:', e && e.message);
+    }
   };
 
   const backToLobby = (tab) => {
@@ -13980,7 +15338,7 @@ function App() {
           )}
           {authOk && (
             <button
-              className="primary-btn"
+              className="primary-btn nav-friends-btn"
               style={{
                 background: 'transparent',
                 border: `1px solid ${C.border}`,
@@ -14045,6 +15403,8 @@ function App() {
           authOk={authOk}
           walletAddr={walletAddr}
           walletVerified={walletVerified}
+          integration={integration}
+          onOpenFriends={() => setScreen('friends')}
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
           onDisconnect={disconnectWallet}
@@ -14085,25 +15445,10 @@ function App() {
               </p>
             )}
             {lobbyTab === 'daily' && authOk && (() => {
-              // Union of permanent earned badges and any the live streak now
-              // satisfies, so the strip is correct right after a win too.
-              const earned = new Set([...badges, ...streakBadges(streak).map(b => b.min)]);
-              if (earned.size === 0) return null;
-              const live = activeBadge(streak);
-              return (
-                <div className="badge-strip">
-                  {STREAK_BADGES.filter(b => earned.has(b.min)).map(b => (
-                    <span
-                      key={b.id}
-                      className={`badge-chip${live && live.min === b.min ? ' active' : ''}`}
-                      title={`${b.name} · ${b.min}-day streak`}
-                    >
-                      <span className="badge-chip-icon">{b.icon}</span>
-                      {b.name}
-                    </span>
-                  ))}
-                </div>
-              );
+              // Union of permanent earned streak badges and any the live streak
+              // now satisfies, so the strip is correct right after a win too.
+              const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
+              return <BadgeStrip badges={earnedDays} achievements={achievements} />;
             })()}
           </div>
           <div className="lobby-tabs">
@@ -14164,6 +15509,11 @@ function App() {
               );
             })}
           </div>
+          )}
+          {lobbyTab === 'daily' && authOk && (
+            <TodayChampions
+              onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+            />
           )}
         </div>
       )}
@@ -14312,10 +15662,26 @@ function App() {
                 <span>{winData.activeBadge.name} badge active</span>
               </div>
             )}
+            {!winData.isClassic && winData.justAchievement && (
+              <div className="badge-unlock">
+                <div className="bu-icon">{winData.justAchievement.icon}</div>
+                <div className="bu-title">Badge unlocked!</div>
+                <div className="bu-name">{winData.justAchievement.name}</div>
+              </div>
+            )}
+            {!winData.isClassic && winData.syncError && (
+              <div className="win-sync-note">
+                Couldn't sync your result — your puzzle is still locked for today.
+                <br />
+                <button onClick={retryDailyFinish} disabled={winData.syncing}>
+                  {winData.syncing ? 'Retrying…' : 'Retry sync'}
+                </button>
+              </div>
+            )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
-            {!winData.isClassic && authOk && (
+            {authOk && winData.gameId && (
               <button
                 className="primary-btn"
                 style={{ marginBottom: '0.6rem', background: C.emerald }}

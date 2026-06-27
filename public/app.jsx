@@ -4148,6 +4148,26 @@ function useAutosave(onSaveProgress, getState, active) {
 }
 
 /* ============================================================
+   Shared localStorage "recent results" history
+   ============================================================ */
+// Newest-first list of finished-game summaries, persisted per game under its
+// own storage key with a hard length cap. Several classic games (minesweeper,
+// mancala, 2048, knight's tour) each used to carry an identical copy of this
+// load/unshift/cap/save pair — collapsed here into one shared implementation
+// they delegate to (the per-game wrappers keep their names + keys, so behavior
+// is byte-identical: same key, same MAX cap, newest-first, errors swallowed).
+function loadHistory(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); }
+  catch { return []; }
+}
+function saveHistory(key, entry, max) {
+  const h = loadHistory(key);
+  h.unshift(entry);
+  if (h.length > max) h.length = max;
+  try { localStorage.setItem(key, JSON.stringify(h)); } catch {}
+}
+
+/* ============================================================
    Platform API helpers — forward the iframe JWT
    ============================================================ */
 // The shell injects ?token=… on the initial iframe load; capture it once
@@ -5745,16 +5765,8 @@ const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10, MS_SAFE = MS_ROWS * MS_COLS - MS_
 const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
 const MS_HISTORY_MAX = 50;
 
-function msLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(MS_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-function msSaveEntry(entry) {
-  const h = msLoadHistory();
-  h.unshift(entry);
-  if (h.length > MS_HISTORY_MAX) h.length = MS_HISTORY_MAX;
-  try { localStorage.setItem(MS_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
+function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
 
 function generateMines(firstR, firstC) {
   const protected_ = new Set();
@@ -6191,17 +6203,8 @@ function MncPitStones({ count, pitSeed, entering, capturing, isStore }) {
 const MNC_HISTORY_MAX = 50;
 const MNC_SOUND_KEY = 'puzzlechain_mancala_sound';
 
-function mncLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(MNC_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-
-function mncSaveEntry(entry) {
-  const h = mncLoadHistory();
-  h.unshift(entry);
-  if (h.length > MNC_HISTORY_MAX) h.length = MNC_HISTORY_MAX;
-  try { localStorage.setItem(MNC_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function mncLoadHistory() { return loadHistory(MNC_HISTORY_KEY); }
+function mncSaveEntry(entry) { saveHistory(MNC_HISTORY_KEY, entry, MNC_HISTORY_MAX); }
 
 function mncInitBoard() {
   return [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
@@ -8315,16 +8318,8 @@ function t2048_stripAnim(grid) {
   ));
 }
 
-function t2048LoadHistory() {
-  try { return JSON.parse(localStorage.getItem(T2048_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-function t2048SaveEntry(entry) {
-  const h = t2048LoadHistory();
-  h.unshift(entry);
-  if (h.length > T2048_HISTORY_MAX) h.length = T2048_HISTORY_MAX;
-  try { localStorage.setItem(T2048_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function t2048LoadHistory() { return loadHistory(T2048_HISTORY_KEY); }
+function t2048SaveEntry(entry) { saveHistory(T2048_HISTORY_KEY, entry, T2048_HISTORY_MAX); }
 function t2048LoadSavedBoard() {
   try {
     const raw = localStorage.getItem(T2048_BOARD_KEY);
@@ -9611,14 +9606,10 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
    ============================================================ */
 
 // Seeded PRNG (mulberry32) — deterministic layouts per level number.
-function mulberry32(seed) {
-  return function() {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
+// mulberry32 is defined once in the shared SDK section above; the Tile Match
+// generator (tmGenerateLevel) uses that single definition. The duplicate copy
+// that previously lived here produced an identical PRNG sequence and has been
+// removed.
 
 const TM_TILE_TYPES = [
   { icon: '🌸', color: '#f43f5e' },
@@ -11148,16 +11139,8 @@ const KT_HISTORY_KEY = 'puzzlechain_knights_history';
 const KT_HISTORY_MAX = 50;
 const KT_MOVES = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 
-function ktLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(KT_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-function ktSaveEntry(entry) {
-  const h = ktLoadHistory();
-  h.unshift(entry);
-  if (h.length > KT_HISTORY_MAX) h.length = KT_HISTORY_MAX;
-  try { localStorage.setItem(KT_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function ktLoadHistory() { return loadHistory(KT_HISTORY_KEY); }
+function ktSaveEntry(entry) { saveHistory(KT_HISTORY_KEY, entry, KT_HISTORY_MAX); }
 function ktValidMoves(pos, visited) {
   if (pos === null) return [];
   const r = Math.floor(pos / 8), c = pos % 8;

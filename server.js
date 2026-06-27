@@ -81,6 +81,12 @@ const CLAIM_REWARDS_IFACE = new ethers.Interface(['function claimRewards(address
 const REWARD_PER_POINT_WEI = BigInt('1000000000000000'); // 0.001 UTGO per point → ~0.96 UTGO for ~960pts
 const STREAK_FREEZE_PRICE_WEI = BigInt('5000000000000000000'); // 5 UTGO
 
+// Crypto Wordle paid hints — cost of the Nth hint bought today (0-indexed) is
+// CW_HINT_BASE_COST * 2**N in MATCH tokens → 1, 2, 4, 8, … Resets per UTC day.
+// Server-authoritative; the client mirrors this only for display.
+const CW_HINT_BASE_COST = 1;
+const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
+
 // EVM address regex (same as PvP validation throughout)
 const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -139,6 +145,7 @@ const GAME_REGISTRY = {
   tilematchingdaily: { category: 'daily',   tier: 'A' },
   minesweeper:       { category: 'classic', tier: 'A' },
   mancala:           { category: 'classic', tier: 'A' },
+  'chutes-ladders':  { category: 'classic', tier: 'A' },
   '2048':            { category: 'classic', tier: 'A' },
   'knights-tour':    { category: 'classic', tier: 'A' },
   snake:             { category: 'classic', tier: 'B' },
@@ -503,6 +510,38 @@ async function migrate() {
     )
   `);
 
+  // mancala_daily is PUBLIC — the global Daily Challenge leaderboard. One row
+  // per (user_id, puzzle_date); the UTC day resets implicitly at midnight (a
+  // new puzzle_date no longer matches today's lookups — no cron). score/margin/
+  // moves/time_secs are null between consume-on-start and a verified finish.
+  // progress/elapsed_secs back resume; session_id links the latest ZK session.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mancala_daily (
+      user_id      TEXT NOT NULL,
+      username     TEXT,
+      puzzle_date  DATE NOT NULL,
+      score        INTEGER,
+      margin       INTEGER,
+      moves        INTEGER,
+      time_secs    INTEGER,
+      won          BOOLEAN,
+      session_id   TEXT,
+      progress     JSONB,
+      elapsed_secs INTEGER,
+      started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at  TIMESTAMPTZ,
+      PRIMARY KEY (user_id, puzzle_date)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_mancala_daily_board
+    ON mancala_daily(puzzle_date, score DESC)
+  `);
+  // The Daily Challenge reuses mancala_sessions for the commit-reveal token;
+  // puzzle_date binds a session to the day whose board it committed to, so a
+  // finish just after midnight still verifies against the start day's board.
+  await pool.query(`ALTER TABLE mancala_sessions ADD COLUMN IF NOT EXISTS puzzle_date DATE`);
+
   // pvp_moves: per-move log for anti-cheat timing analysis. PUBLIC.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pvp_moves (
@@ -768,6 +807,21 @@ async function migrate() {
       progress   INTEGER NOT NULL DEFAULT 0,
       claimed_at TIMESTAMPTZ,
       PRIMARY KEY (user_id, task_date, task_id)
+    )
+  `);
+
+  // cryptowordle_hints is PUBLIC: per-user, per-UTC-day count of paid hints
+  // bought in Crypto Wordle. Drives the doubling cost ramp (1,2,4,8…) which
+  // resets implicitly at midnight UTC (a new hint_date yields no row → count 0).
+  // No sensitive data — just a gameplay counter, same class as daily_attempts.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cryptowordle_hints (
+      user_id         TEXT NOT NULL,
+      username        TEXT,
+      hint_date       DATE NOT NULL,
+      hints_purchased INTEGER NOT NULL DEFAULT 0,
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, hint_date)
     )
   `);
 
@@ -1575,6 +1629,41 @@ async function migrate() {
         [uid, uname, diff, score, margin, moves, secs]
       );
     }
+
+    // Mancala Daily Challenge seeds — populate the Today + All-Time leaderboards
+    // on a fresh staging DB. Six obviously-fake solvers; "Staging demo Ada" is
+    // the record-holder on TODAY and on each of the previous 5 days (so the
+    // All-Time tab shows a 6-day "days held record" and a real streak). The
+    // viewer's own row is left UNSET so a tester can take the attempt and try to
+    // beat today's record. Idempotent; strict no-op in production.
+    const mncDailyUsers = [
+      ['staging-mnc-ada',  'Staging demo Ada',  320],
+      ['staging-mnc-borg', 'Staging demo Borg', 265],
+      ['staging-mnc-cyd',  'Staging demo Cyd',  210],
+      ['staging-mnc-dot',  'Staging demo Dot',  170],
+      ['staging-mnc-eve',  'Staging demo Eve',  120],
+      ['staging-mnc-fin',  'Staging demo Fin',   80],
+    ];
+    const mncToday = new Date().toISOString().slice(0, 10);
+    for (let back = 0; back <= 5; back++) {
+      const d = new Date(mncToday + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() - back);
+      const dateStr = d.toISOString().slice(0, 10);
+      for (let i = 0; i < mncDailyUsers.length; i++) {
+        const [uid, uname, baseScore] = mncDailyUsers[i];
+        // Ada stays top every day; others drift a little per day so ranks vary.
+        const score = i === 0 ? baseScore : Math.max(40, baseScore - back * 5 - i * 3);
+        const secs = 50 + i * 12 + back * 2;
+        const margin = Math.max(1, Math.round(score / 15));
+        await pool.query(
+          `INSERT INTO mancala_daily
+             (user_id, username, puzzle_date, score, margin, moves, time_secs, won, finished_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, true, now() - ($8 || ' days')::interval)
+           ON CONFLICT (user_id, puzzle_date) DO NOTHING`,
+          [uid, uname, dateStr, score, margin, 28 + i, secs, String(back)]
+        );
+      }
+    }
   }
 }
 
@@ -1686,6 +1775,108 @@ function srvMncApplyMove(pits, pitIdx, player) {
   return { pits: p, extraTurn, gameOver: false, winner: null, nextPlayer: extraTurn ? player : (player === 1 ? 2 : 1) };
 }
 
+/* ============================================================
+   Mancala Daily Challenge — deterministic board + AI engine
+   These MUST stay byte-identical to the client helpers in app.jsx
+   (mulberry32 / hashStr / mncDailyBoard / mncMinimax / mncAIMove) or
+   verification fails. Pure integer math, no randomness.
+   ============================================================ */
+function mncMulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function mncHashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+// UTC day-number for a YYYY-MM-DD string (matches client utcDayNum semantics).
+function mncDayNumFromDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
+}
+function mncTodayUtc() {
+  return new Date().toISOString().slice(0, 10);
+}
+// Deal 24 stones into one side of 6 pits using the day's seeded RNG, then place
+// them rotationally-symmetrically (pit i ↔ opposite 12-i) so both players start
+// from an identical, perfectly fair position. Stores (6, 13) stay empty.
+function srvMncDailyBoard(dayNum) {
+  const rng = mncMulberry32((dayNum + mncHashStr('mancaladaily')) >>> 0);
+  const side = [0, 0, 0, 0, 0, 0];
+  for (let s = 0; s < 24; s++) side[Math.floor(rng() * 6)]++;
+  const board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < 6; i++) {
+    board[i] = side[i];          // P1 pits 0..5
+    board[12 - i] = side[i];     // P2 pits 12..7 (rotational mirror)
+  }
+  return board;
+}
+
+function srvMncGetValidMoves(pits, player) {
+  const min = player === 1 ? 0 : 7;
+  const max = player === 1 ? 5 : 12;
+  const moves = [];
+  for (let i = min; i <= max; i++) if (pits[i] > 0) moves.push(i);
+  return moves;
+}
+function srvMncEval(pits) { return pits[6] - pits[13]; }
+function srvMncMinimax(pits, player, depth, alpha, beta) {
+  const p1Empty = pits.slice(0, 6).every(v => v === 0);
+  const p2Empty = pits.slice(7, 13).every(v => v === 0);
+  if (p1Empty || p2Empty) {
+    const p = pits.slice();
+    for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+    for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    return srvMncEval(p);
+  }
+  if (depth === 0) return srvMncEval(pits);
+  const moves = srvMncGetValidMoves(pits, player);
+  if (moves.length === 0) return srvMncEval(pits);
+  if (player === 1) {
+    let best = -Infinity;
+    for (const idx of moves) {
+      const { pits: np, extraTurn } = srvMncDistribute(pits, idx, 1);
+      const score = srvMncMinimax(np, extraTurn ? 1 : 2, depth - 1, alpha, beta);
+      if (score > best) best = score;
+      alpha = Math.max(alpha, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const idx of moves) {
+      const { pits: np, extraTurn } = srvMncDistribute(pits, idx, 2);
+      const score = srvMncMinimax(np, extraTurn ? 2 : 1, depth - 1, alpha, beta);
+      if (score < best) best = score;
+      beta = Math.min(beta, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+}
+// Hard-difficulty AI move for P2 (deterministic; first-best-wins tie-break,
+// matching the client). The Daily Challenge always uses 'hard'.
+function srvMncAIMove(pits) {
+  const moves = srvMncGetValidMoves(pits, 2);
+  if (moves.length === 0) return -1;
+  let bestIdx = moves[0], bestScore = Infinity;
+  for (const idx of moves) {
+    const { pits: np, extraTurn } = srvMncDistribute(pits, idx, 2);
+    const s = srvMncMinimax(np, extraTurn ? 2 : 1, 6, -Infinity, Infinity);
+    if (s < bestScore) { bestScore = s; bestIdx = idx; }
+  }
+  return bestIdx;
+}
+
 function shapeRoom(r) {
   return {
     roomId:        r.id,
@@ -1714,6 +1905,13 @@ function nextResetUtc(from = new Date()) {
 function prevUtcDay(iso) {
   const d = new Date(iso + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// N UTC days before a given ISO date string.
+function prevUtcDayN(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - n);
   return d.toISOString().slice(0, 10);
 }
 
@@ -1746,6 +1944,44 @@ async function computeStreak(userId) {
     // compatibility and possible future re-enablement as "streak insurance").
     return 0; // last finished day is older than yesterday → streak broken
   }
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak++;
+    cursor = prevUtcDay(cursor);
+  }
+  return streak;
+}
+
+// Mancala Daily Challenge record-streak: consecutive UTC days (ending today, or
+// yesterday if today isn't won yet) on which this user HELD THE RECORD — their
+// best score for that day equals that day's global maximum (ties count). A day
+// they were beaten, skipped, or didn't win breaks it. Read-derived, no cron.
+async function computeMancalaRecordStreak(userId) {
+  const { rows } = await pool.query(
+    `WITH day_max AS (
+       SELECT puzzle_date, MAX(score) AS m
+         FROM mancala_daily
+        WHERE score IS NOT NULL AND score > 0
+        GROUP BY puzzle_date
+     )
+     SELECT md.puzzle_date::text AS d
+       FROM mancala_daily md
+       JOIN day_max dm ON dm.puzzle_date = md.puzzle_date
+      WHERE md.user_id = $1
+        AND md.score IS NOT NULL AND md.score > 0
+        AND md.score = dm.m
+      ORDER BY d DESC
+      LIMIT 120`,
+    [userId]
+  );
+  if (rows.length === 0) return 0;
+  const days = new Set(rows.map(r => r.d));
+  const today = mncTodayUtc();
+  const yesterday = prevUtcDay(today);
+  let cursor;
+  if (days.has(today)) cursor = today;
+  else if (days.has(yesterday)) cursor = yesterday;
+  else return 0;
   let streak = 0;
   while (days.has(cursor)) {
     streak++;
@@ -2587,6 +2823,51 @@ app.get('/api/daily', async (req, res) => {
           // current daily seed; this just marks a claimed, in-progress row.
           JSON.stringify({ resumeDemo: true }),
         ]
+      );
+    }
+
+    // Staging-only demo seed: set up the Crypto Wordle paid-hint flow for the
+    // viewer — top up MATCH so hints are affordable, drop them into a claimed,
+    // unfinished cryptowordle attempt (lobby shows "In progress · resume"), and
+    // pre-buy 2 hints so the next cost shows 4 and persistence is demonstrable.
+    // Forces the row unfinished so it survives a prior demo=locked on the shared
+    // staging DB. Idempotent, strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'hints') {
+      await pool.query(
+        `INSERT INTO tilematch_tokens (user_id, username, balance)
+         VALUES ($1, $2, 100)
+         ON CONFLICT (user_id) DO UPDATE
+           SET balance = GREATEST(tilematch_tokens.balance, 100),
+               updated_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'cryptowordle', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL,
+               score = NULL,
+               time_secs = NULL,
+               steps = EXCLUDED.steps,
+               elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          0,
+          0,
+          // dayNum omitted so the client treats the board as today's daily seed;
+          // this just marks a claimed, in-progress row to resume into.
+          JSON.stringify({ hintsDemo: true }),
+        ]
+      );
+      await pool.query(
+        `INSERT INTO cryptowordle_hints (user_id, username, hint_date, hints_purchased)
+         VALUES ($1, $2, (now() AT TIME ZONE 'utc')::date, 2)
+         ON CONFLICT (user_id, hint_date) DO UPDATE
+           SET hints_purchased = 2, updated_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user']
       );
     }
 
@@ -3444,6 +3725,418 @@ app.get('/api/mancala/leaderboard', async (req, res) => {
     });
   } catch (err) {
     console.error('[mancala-zk] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ---- Mancala Daily Challenge API -----------------------------------------
+
+// Daily score formula — win margin rewarded, faster finish scores higher. Floor
+// 0 (not 50) so losses/draws stay off the leaderboard, which filters score > 0.
+function mncDailyScore(finalPits, timeSecs) {
+  if (finalPits[6] <= finalPits[13]) return 0; // only a win scores
+  return Math.max((finalPits[6] - finalPits[13]) * 15 - timeSecs, 0);
+}
+
+function shapeDailyAttempt(row) {
+  if (!row) return null;
+  return {
+    puzzleDate:  row.puzzle_date,
+    score:       row.score,
+    margin:      row.margin,
+    moves:       row.moves,
+    timeSecs:    row.time_secs,
+    won:         row.won,
+    progress:    row.progress || null,
+    elapsedSecs: row.elapsed_secs != null ? row.elapsed_secs : null,
+    startedAt:   row.started_at,
+    finishedAt:  row.finished_at,
+  };
+}
+
+async function mncGlobalRecord(dateStr) {
+  const { rows } = await pool.query(
+    `SELECT MAX(score) AS m FROM mancala_daily
+      WHERE puzzle_date = $1 AND score IS NOT NULL AND score > 0`,
+    [dateStr]
+  );
+  return rows[0] && rows[0].m != null ? Number(rows[0].m) : null;
+}
+
+// GET /api/mancala/daily — today's state: board, global record, streak, attempt.
+app.get('/api/mancala/daily', async (req, res) => {
+  try {
+    // Staging-only demo seed: give the viewer a 3-day record streak (today open)
+    // so the 🔥 chip is demonstrable. Idempotent; strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'mancaladaily') {
+      const today = mncTodayUtc();
+      for (let back = 3; back >= 1; back--) {
+        const d = prevUtcDayN(today, back);
+        await pool.query(
+          `INSERT INTO mancala_daily
+             (user_id, username, puzzle_date, score, margin, moves, time_secs, won, finished_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, true, now() - ($8 || ' days')::interval)
+           ON CONFLICT (user_id, puzzle_date) DO NOTHING`,
+          [req.user.id, req.user.username || 'You', d, 500 - back * 10, 24, 30, 40 + back, String(back)]
+        );
+      }
+    }
+
+    const now = new Date();
+    const today = mncTodayUtc();
+    const dayNum = mncDayNumFromDate(today);
+    const board = srvMncDailyBoard(dayNum);
+    const globalRecord = await mncGlobalRecord(today);
+    const streak = await computeMancalaRecordStreak(req.user.id);
+    const { rows } = await pool.query(
+      `SELECT * FROM mancala_daily WHERE user_id = $1 AND puzzle_date = $2`,
+      [req.user.id, today]
+    );
+    res.json({
+      serverNowUtc: now.toISOString(),
+      nextResetUtc: nextResetUtc(now),
+      board,
+      globalRecord,
+      streak,
+      attempt: shapeDailyAttempt(rows[0]),
+    });
+  } catch (err) {
+    console.error('[mancala-daily] state failed:', err.message);
+    res.status(500).json({ error: 'Failed to load daily state' });
+  }
+});
+
+// POST /api/mancala/daily/start — consume-on-start + mint a commit-reveal
+// session bound to today's board. Resumes an unfinished row; 409 once finished.
+app.post('/api/mancala/daily/start', async (req, res) => {
+  const { commitment } = req.body || {};
+  if (typeof commitment !== 'string' || commitment.length < 10) {
+    return res.status(400).json({ error: 'commitment is required' });
+  }
+  try {
+    const now = new Date();
+    const today = mncTodayUtc();
+    // Claim the day's single row (no-op if it already exists).
+    const { rows: inserted } = await pool.query(
+      `INSERT INTO mancala_daily (user_id, username, puzzle_date)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, puzzle_date) DO NOTHING
+       RETURNING *`,
+      [req.user.id, req.user.username || null, today]
+    );
+    let attempt = inserted[0];
+    if (!attempt) {
+      const { rows: existing } = await pool.query(
+        `SELECT * FROM mancala_daily WHERE user_id = $1 AND puzzle_date = $2`,
+        [req.user.id, today]
+      );
+      attempt = existing[0];
+      if (attempt && attempt.finished_at) {
+        return res.status(409).json({
+          error: 'locked',
+          attempt: shapeDailyAttempt(attempt),
+          nextResetUtc: nextResetUtc(now),
+          globalRecord: await mncGlobalRecord(today),
+        });
+      }
+    }
+    // Mint a fresh session bound to today (board re-derived server-side on finish).
+    const sessionId = generateMncSessionId();
+    await pool.query(
+      `INSERT INTO mancala_sessions (id, user_id, commitment, difficulty, puzzle_date)
+       VALUES ($1, $2, $3, 'daily', $4)`,
+      [sessionId, req.user.id, commitment, today]
+    );
+    await pool.query(
+      `UPDATE mancala_daily SET session_id = $3 WHERE user_id = $1 AND puzzle_date = $2`,
+      [req.user.id, today, sessionId]
+    );
+    res.json({
+      sessionId,
+      attempt: shapeDailyAttempt(attempt),
+      nextResetUtc: nextResetUtc(now),
+      board: srvMncDailyBoard(mncDayNumFromDate(today)),
+      globalRecord: await mncGlobalRecord(today),
+    });
+  } catch (err) {
+    console.error('[mancala-daily] start failed:', err.message);
+    res.status(500).json({ error: 'Failed to start daily' });
+  }
+});
+
+// POST /api/mancala/daily/progress — autosave moves/elapsed on the unfinished row.
+app.post('/api/mancala/daily/progress', async (req, res) => {
+  const { progress, moves, elapsedSecs } = req.body || {};
+  try {
+    const today = mncTodayUtc();
+    const { rows } = await pool.query(
+      `UPDATE mancala_daily
+          SET progress = $3, moves = $4, elapsed_secs = $5
+        WHERE user_id = $1 AND puzzle_date = $2 AND finished_at IS NULL
+        RETURNING *`,
+      [req.user.id, today,
+       progress != null ? JSON.stringify(progress) : null,
+       typeof moves === 'number' ? moves : null,
+       typeof elapsedSecs === 'number' ? Math.round(elapsedSecs) : null]
+    );
+    if (rows.length === 0) return res.status(409).json({ error: 'No active attempt to save' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[mancala-daily] progress failed:', err.message);
+    res.status(500).json({ error: 'Failed to save progress' });
+  }
+});
+
+// POST /api/mancala/daily/finish — verify the move log against today's board AND
+// the deterministic Hard AI, compute the authoritative score, record the result.
+app.post('/api/mancala/daily/finish', async (req, res) => {
+  const { sessionId, nonce, moveLog, finalPits, timeSecs } = req.body || {};
+  if (typeof sessionId !== 'string' || typeof nonce !== 'string') {
+    return res.status(400).json({ error: 'sessionId and nonce are required' });
+  }
+  if (!Array.isArray(moveLog) || moveLog.length === 0 || moveLog.length > 400) {
+    return res.status(400).json({ error: 'moveLog must be a non-empty array of ≤400 moves' });
+  }
+  if (!Array.isArray(finalPits) || finalPits.length !== 14) {
+    return res.status(400).json({ error: 'finalPits must be a 14-element array' });
+  }
+  const tSecs = typeof timeSecs === 'number' ? Math.round(timeSecs) : null;
+  if (tSecs === null || tSecs < 0) return res.status(400).json({ error: 'timeSecs is required' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT *, puzzle_date::text AS puzzle_date_text FROM mancala_sessions WHERE id = $1`,
+      [sessionId]
+    );
+    if (rows.length === 0) return res.status(404).json({ verified: false, reason: 'session_not_found' });
+    const sess = rows[0];
+    if (sess.user_id !== req.user.id) return res.status(403).json({ verified: false, reason: 'not_your_session' });
+    if (sess.status !== 'pending') return res.status(409).json({ verified: false, reason: 'session_already_used' });
+    if (sess.difficulty !== 'daily' || !sess.puzzle_date) {
+      return res.status(400).json({ verified: false, reason: 'not_a_daily_session' });
+    }
+    const ageMs = Date.now() - new Date(sess.created_at).getTime();
+    if (ageMs > 7200 * 1000) {
+      await pool.query(`UPDATE mancala_sessions SET status = 'expired' WHERE id = $1`, [sessionId]);
+      return res.status(409).json({ verified: false, reason: 'session_expired' });
+    }
+
+    // The board is the one committed to at start — derived from the session's
+    // puzzle_date (read as text to avoid any DATE→local-TZ shift) so a finish
+    // just after midnight still validates against the start day's board.
+    const puzzleDate = (sess.puzzle_date_text || '').slice(0, 10);
+    const initBoard = srvMncDailyBoard(mncDayNumFromDate(puzzleDate));
+
+    const expectedCommitment = crypto.createHash('sha256')
+      .update(nonce + '||' + JSON.stringify(initBoard))
+      .digest('hex');
+    if (expectedCommitment !== sess.commitment) {
+      await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+      return res.json({ verified: false, reason: 'commitment_mismatch' });
+    }
+
+    // Replay the full game. Player 1 = human; Player 2 = deterministic Hard AI —
+    // every AI move in the log must equal the engine's choice for that position.
+    let pits = initBoard.slice();
+    let currentPlayer = 1;
+    for (let i = 0; i < moveLog.length; i++) {
+      const pitIdx = moveLog[i];
+      if (typeof pitIdx !== 'number' || !Number.isFinite(pitIdx)) {
+        await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+        return res.json({ verified: false, reason: 'invalid_move_type' });
+      }
+      if (currentPlayer === 2) {
+        const expected = srvMncAIMove(pits);
+        if (pitIdx !== expected) {
+          await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+          return res.json({ verified: false, reason: `ai_move_mismatch_at_index_${i}` });
+        }
+      }
+      const ownMin = currentPlayer === 1 ? 0 : 7;
+      const ownMax = currentPlayer === 1 ? 5 : 12;
+      if (pitIdx < ownMin || pitIdx > ownMax || pits[pitIdx] === 0) {
+        await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+        return res.json({ verified: false, reason: `illegal_move_at_index_${i}` });
+      }
+      const result = srvMncApplyMove(pits, pitIdx, currentPlayer);
+      pits = result.pits;
+      if (result.gameOver) {
+        if (i < moveLog.length - 1) {
+          await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+          return res.json({ verified: false, reason: 'moves_after_game_over' });
+        }
+        break;
+      }
+      currentPlayer = result.nextPlayer;
+    }
+    for (let j = 0; j < 14; j++) {
+      if (pits[j] !== finalPits[j]) {
+        await pool.query(`UPDATE mancala_sessions SET status = 'rejected' WHERE id = $1`, [sessionId]);
+        return res.json({ verified: false, reason: 'final_pits_mismatch' });
+      }
+    }
+
+    const margin = pits[6] - pits[13];
+    const won = pits[6] > pits[13];
+    const score = mncDailyScore(pits, tSecs);
+    const moves = moveLog.length;
+
+    const prevRecord = await mncGlobalRecord(puzzleDate);
+
+    // Record on the day's claimed row. GREATEST so a worse retry can't lower a
+    // better stored result; only a strictly better score updates the details.
+    await pool.query(
+      `INSERT INTO mancala_daily
+         (user_id, username, puzzle_date, score, margin, moves, time_secs, won, finished_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+       ON CONFLICT (user_id, puzzle_date) DO UPDATE SET
+         username    = EXCLUDED.username,
+         margin      = CASE WHEN EXCLUDED.score > COALESCE(mancala_daily.score, -1)
+                            THEN EXCLUDED.margin ELSE mancala_daily.margin END,
+         moves       = CASE WHEN EXCLUDED.score > COALESCE(mancala_daily.score, -1)
+                            THEN EXCLUDED.moves ELSE mancala_daily.moves END,
+         time_secs   = CASE WHEN EXCLUDED.score > COALESCE(mancala_daily.score, -1)
+                            THEN EXCLUDED.time_secs ELSE mancala_daily.time_secs END,
+         won         = COALESCE(mancala_daily.won, false) OR EXCLUDED.won,
+         score       = GREATEST(COALESCE(mancala_daily.score, 0), EXCLUDED.score),
+         finished_at = COALESCE(mancala_daily.finished_at, EXCLUDED.finished_at)`,
+      [req.user.id, req.user.username || null, puzzleDate, score, margin, moves, tSecs, won]
+    );
+
+    await pool.query(
+      `UPDATE mancala_sessions SET status = 'verified', verified_at = now() WHERE id = $1`,
+      [sessionId]
+    );
+
+    // Best-effort total-score snapshot bump (matches the AI-mode pattern).
+    if (score > 0) {
+      await pool.query(
+        `UPDATE user_stats_snapshot
+            SET total_score = total_score + $2, last_win_at = now(), updated_at = now()
+          WHERE user_id = $1`,
+        [req.user.id, score]
+      ).catch(() => {});
+    }
+
+    const newRecord = await mncGlobalRecord(puzzleDate);
+    const streak = await computeMancalaRecordStreak(req.user.id);
+    const { rows: meRows } = await pool.query(
+      `SELECT * FROM mancala_daily WHERE user_id = $1 AND puzzle_date = $2`,
+      [req.user.id, puzzleDate]
+    );
+
+    res.json({
+      verified: true,
+      score,
+      won,
+      streak,
+      globalRecord: newRecord,
+      becameRecord: won && score > 0 && (prevRecord == null || score > prevRecord),
+      attempt: shapeDailyAttempt(meRows[0]),
+    });
+  } catch (err) {
+    console.error('[mancala-daily] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to record daily result' });
+  }
+});
+
+// GET /api/mancala/daily/leaderboard?scope=today|alltime
+app.get('/api/mancala/daily/leaderboard', async (req, res) => {
+  const scope = req.query.scope === 'alltime' ? 'alltime' : 'today';
+  try {
+    if (scope === 'today') {
+      const today = mncTodayUtc();
+      const { rows: top } = await pool.query(
+        `SELECT user_id, username, score, time_secs, moves, margin,
+                ROW_NUMBER() OVER (ORDER BY score DESC, time_secs ASC, finished_at ASC) AS rank
+           FROM mancala_daily
+          WHERE puzzle_date = $1 AND score IS NOT NULL AND score > 0 AND finished_at IS NOT NULL
+          ORDER BY score DESC, time_secs ASC, finished_at ASC
+          LIMIT $2`,
+        [today, MNC_LB_LIMIT]
+      );
+      const shape = r => ({
+        rank: Number(r.rank), userId: r.user_id, username: r.username,
+        score: r.score, timeSecs: r.time_secs, moves: r.moves,
+        daysHeldRecord: null, isCurrentUser: r.user_id === req.user.id,
+      });
+      const entries = top.map(shape);
+      let me = entries.find(e => e.isCurrentUser) || null;
+      if (!me) {
+        const { rows: mine } = await pool.query(
+          `SELECT user_id, username, score, time_secs, moves,
+                  (SELECT COUNT(*) FROM mancala_daily x
+                    WHERE x.puzzle_date = $1 AND x.score IS NOT NULL AND x.score > 0
+                      AND (x.score > md.score
+                           OR (x.score = md.score AND x.time_secs < md.time_secs))) + 1 AS rank
+             FROM mancala_daily md
+            WHERE md.user_id = $2 AND md.puzzle_date = $1 AND md.score IS NOT NULL AND md.score > 0`,
+          [today, req.user.id]
+        );
+        if (mine.length) me = { ...shape(mine[0]), isCurrentUser: true };
+      }
+      const { rows: cnt } = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM mancala_daily
+          WHERE puzzle_date = $1 AND score IS NOT NULL AND score > 0`,
+        [today]
+      );
+      return res.json({ scope, entries, me, total: cnt[0].n });
+    }
+
+    // All-time: rank by total of daily-best scores; show days held as record.
+    const { rows: agg } = await pool.query(
+      `WITH day_max AS (
+         SELECT puzzle_date, MAX(score) AS m FROM mancala_daily
+          WHERE score IS NOT NULL AND score > 0 GROUP BY puzzle_date
+       ), per AS (
+         SELECT md.user_id, MAX(md.username) AS username,
+                SUM(md.score)::int AS total_score,
+                COUNT(*) FILTER (WHERE md.score = dm.m)::int AS days_held
+           FROM mancala_daily md
+           JOIN day_max dm ON dm.puzzle_date = md.puzzle_date
+          WHERE md.score IS NOT NULL AND md.score > 0
+          GROUP BY md.user_id
+       )
+       SELECT *, ROW_NUMBER() OVER (ORDER BY total_score DESC, days_held DESC) AS rank
+         FROM per ORDER BY total_score DESC, days_held DESC LIMIT $1`,
+      [MNC_LB_LIMIT]
+    );
+    const shape = r => ({
+      rank: Number(r.rank), userId: r.user_id, username: r.username,
+      score: r.total_score, daysHeldRecord: r.days_held,
+      isCurrentUser: r.user_id === req.user.id,
+    });
+    const entries = agg.map(shape);
+    let me = entries.find(e => e.isCurrentUser) || null;
+    if (!me) {
+      const { rows: mine } = await pool.query(
+        `WITH day_max AS (
+           SELECT puzzle_date, MAX(score) AS m FROM mancala_daily
+            WHERE score IS NOT NULL AND score > 0 GROUP BY puzzle_date
+         ), per AS (
+           SELECT md.user_id, MAX(md.username) AS username,
+                  SUM(md.score)::int AS total_score,
+                  COUNT(*) FILTER (WHERE md.score = dm.m)::int AS days_held
+             FROM mancala_daily md
+             JOIN day_max dm ON dm.puzzle_date = md.puzzle_date
+            WHERE md.score IS NOT NULL AND md.score > 0
+            GROUP BY md.user_id
+         ), ranked AS (
+           SELECT *, ROW_NUMBER() OVER (ORDER BY total_score DESC, days_held DESC) AS rank
+             FROM per
+         )
+         SELECT * FROM ranked WHERE user_id = $1`,
+        [req.user.id]
+      );
+      if (mine.length) me = { ...shape(mine[0]), isCurrentUser: true };
+    }
+    const { rows: cnt } = await pool.query(
+      `SELECT COUNT(DISTINCT user_id)::int AS n FROM mancala_daily
+        WHERE score IS NOT NULL AND score > 0`
+    );
+    res.json({ scope, entries, me, total: cnt[0].n });
+  } catch (err) {
+    console.error('[mancala-daily] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
@@ -5177,6 +5870,116 @@ app.post('/api/wallet/spend/streak-freeze', async (req, res) => {
   } catch (err) {
     console.error('[wallet] streak-freeze failed:', err.message);
     res.status(500).json({ error: 'Failed to purchase streak freeze' });
+  }
+});
+
+// ---- Crypto Wordle paid hints --------------------------------------------
+// Per-UTC-day hint purchase counter with a doubling MATCH-token cost. The
+// count is server-authoritative (survives reload, can't be reset client-side)
+// and resets implicitly each UTC day. Hints never affect score/leaderboard.
+
+// GET /api/cryptowordle/hint — today's { hintsPurchased, nextCost, balance }.
+app.get('/api/cryptowordle/hint', async (req, res) => {
+  try {
+    // Lazy-init the MATCH wallet so a brand-new user reads a real 0 balance.
+    await pool.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows: hRows } = await pool.query(
+      `SELECT hints_purchased FROM cryptowordle_hints
+        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date`,
+      [req.user.id]
+    );
+    const { rows: bRows } = await pool.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const hintsPurchased = hRows.length ? hRows[0].hints_purchased : 0;
+    res.json({
+      hintsPurchased,
+      nextCost: cwHintCost(hintsPurchased),
+      balance: bRows.length ? bRows[0].balance : 0,
+    });
+  } catch (err) {
+    console.error('[cryptowordle] hint read failed:', err.message);
+    res.status(500).json({ error: 'Failed to load hint state' });
+  }
+});
+
+// POST /api/cryptowordle/hint — buy the next hint. Atomically bumps today's
+// counter and debits the doubling MATCH cost, mirroring the duel-join spend
+// pattern (SERIALIZABLE + FOR UPDATE). Body may carry { maxHints } (the day's
+// available clue count) so the server refuses to charge past the last clue.
+app.post('/api/cryptowordle/hint', async (req, res) => {
+  const maxHints = Number.isFinite(req.body.maxHints) ? Math.max(0, Math.round(req.body.maxHints)) : null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+
+    // Today's hint counter, locked. Upsert-then-lock so the row always exists.
+    await client.query(
+      `INSERT INTO cryptowordle_hints (user_id, username, hint_date, hints_purchased)
+       VALUES ($1, $2, (now() AT TIME ZONE 'utc')::date, 0)
+       ON CONFLICT (user_id, hint_date) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows: hRows } = await client.query(
+      `SELECT hints_purchased FROM cryptowordle_hints
+        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date
+        FOR UPDATE`,
+      [req.user.id]
+    );
+    const purchased = hRows.length ? hRows[0].hints_purchased : 0;
+
+    // No clues left to reveal (client-known cap) → don't charge.
+    if (maxHints != null && purchased >= maxHints) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ code: 'no_more_hints', error: 'No more clues' });
+    }
+
+    const cost = cwHintCost(purchased);
+
+    // Check + deduct MATCH balance, locked.
+    const { rows: balRows } = await client.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1 FOR UPDATE`,
+      [req.user.id]
+    );
+    const balance = balRows.length ? balRows[0].balance : 0;
+    if (balance < cost) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ code: 'insufficient_funds', error: 'Insufficient tokens', balance });
+    }
+    await client.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0)
+       ON CONFLICT (user_id) DO UPDATE SET
+         balance    = tilematch_tokens.balance - $3,
+         updated_at = now()`,
+      [req.user.id, req.user.username || null, cost]
+    );
+    await client.query(
+      `UPDATE cryptowordle_hints
+          SET hints_purchased = hints_purchased + 1, updated_at = now()
+        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date`,
+      [req.user.id]
+    );
+
+    await client.query('COMMIT');
+    const hintsPurchased = purchased + 1;
+    res.json({
+      hintsPurchased,
+      nextCost: cwHintCost(hintsPurchased),
+      balance: balance - cost,
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error('[cryptowordle] hint buy failed:', err.message);
+    res.status(500).json({ error: 'Failed to buy hint' });
+  } finally {
+    client.release();
   }
 });
 

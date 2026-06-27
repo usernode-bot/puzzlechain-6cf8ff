@@ -980,33 +980,60 @@ body {
   margin-top: 0.2rem;
   text-align: center;
 }
-.ms-usernode-banner {
-  display: inline-block;
-  padding: 0.35rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid ${C.border};
-  font-size: 0.75rem;
+.ms-settings-section { margin-bottom: 1.25rem; }
+.ms-settings-section h4 {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: ${C.muted};
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
-.ms-game-header {
+.ms-settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-.ms-theme-btn {
+  padding: 0.6rem 0.75rem;
   background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  margin-bottom: 0.4rem;
+}
+.ms-settings-row .ms-settings-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.ms-theme-toggle {
+  background: ${C.surface};
   border: 1px solid ${C.border};
   color: ${C.text};
   border-radius: 8px;
-  padding: 0.3rem 0.6rem;
+  padding: 0.25rem 0.75rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-family: inherit;
+  font-weight: 600;
   transition: border-color 0.12s;
 }
-.ms-theme-btn:hover { border-color: ${C.accent}; }
+.ms-theme-toggle:hover { border-color: ${C.accent}; }
+.ms-wallet-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: right;
+}
+.ms-wallet-status .ms-ws-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: ${C.emerald};
+}
+.ms-wallet-status .ms-ws-label.mock { color: ${C.gold}; }
+.ms-wallet-status .ms-ws-label.unavail { color: ${C.muted}; }
+.ms-wallet-status .ms-ws-addr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: ${C.muted};
+}
 .ms-action-row {
   display: flex;
   gap: 0.6rem;
@@ -5796,6 +5823,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [gameOverMine, setGameOverMine] = useState(null);
   const [steps, setSteps] = useState(0);
   const [isMock, setIsMock] = useState(false);
+  const [walletAddr, setWalletAddr] = useState(null);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
   const flagTimerRef = useRef(null);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
@@ -5812,10 +5840,13 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     setActiveTab('game');
   }, [resetKey]);
 
-  // Bridge: detect mock mode
+  // Bridge: detect mock mode and fetch wallet address
   useEffect(() => {
     if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
       window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
+    }
+    if (window.usernode && typeof window.usernode.getNodeAddress === 'function') {
+      window.usernode.getNodeAddress().then(addr => { if (addr) setWalletAddr(addr); }).catch(() => {});
     }
   }, []);
 
@@ -5912,20 +5943,10 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
   const minesLeft = MS_MINES - flagged.size;
 
-  const bannerText = isMock
-    ? '🔧 Developer Mode — mock wallet active'
-    : (window.usernode ? '🔗 Usernode connected' : null);
-
   const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
 
   return (
     <div>
-      <div className="ms-game-header">
-        {bannerText && <span className="ms-usernode-banner">{bannerText}</span>}
-        <button className="ms-theme-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-          {theme === 'dark' ? '☀' : '🌙'}
-        </button>
-      </div>
 
       {activeTab === 'game' && (
         <div>
@@ -6044,8 +6065,44 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
+      {activeTab === 'settings' && (
+        <div style={{ padding: '0.5rem 0' }}>
+          <div className="ms-settings-section">
+            <h4>Appearance</h4>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Theme</span>
+              <button className="ms-theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+                {theme === 'dark' ? '🌙 Dark' : '☀ Light'}
+              </button>
+            </div>
+          </div>
+          <div className="ms-settings-section">
+            <h4>Usernode Wallet</h4>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Connection</span>
+              {isMock ? (
+                <div className="ms-wallet-status">
+                  <span className="ms-ws-label mock">🔧 Dev mode</span>
+                  <span className="ms-ws-addr">mock wallet active</span>
+                </div>
+              ) : window.usernode ? (
+                <div className="ms-wallet-status">
+                  <span className="ms-ws-label">🔗 Connected</span>
+                  {walletAddr && <span className="ms-ws-addr">{truncAddr(walletAddr)}</span>}
+                </div>
+              ) : (
+                <div className="ms-wallet-status">
+                  <span className="ms-ws-label unavail">Not available</span>
+                  <span className="ms-ws-addr">open in Usernode</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="ms-bottom-nav">
-        {['game', 'history', 'leaderboard'].map(tab => (
+        {['game', 'history', 'leaderboard', 'settings'].map(tab => (
           <button
             key={tab}
             className={'ms-tab' + (activeTab === tab ? ' active' : '')}

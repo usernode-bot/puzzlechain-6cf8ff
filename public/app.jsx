@@ -157,6 +157,25 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+@media (max-width: 640px) {
+  .badge-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+  .badge-chip {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 12px;
+    padding: 0.65rem 0.3rem;
+    gap: 0.25rem;
+    white-space: normal;
+  }
+  .badge-chip .badge-chip-icon { font-size: 1.8rem; }
+  .badge-chip .badge-chip-name { font-size: 0.62rem; line-height: 1.2; }
+}
 /* Today's Champions leaderboard tweaks (reuses .lboard) */
 .lboard.champions { margin-top: 0; }
 .lboard .lrow.clickable { cursor: pointer; }

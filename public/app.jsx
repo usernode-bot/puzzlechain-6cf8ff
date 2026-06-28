@@ -2901,6 +2901,24 @@ body {
 }
 .dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
 .dr-gem.clearing { opacity: 0; transform: scale(0.4); }
+.dr-gem.bomb {
+  background: rgba(255, 193, 7, 0.15);
+  box-shadow: 0 0 12px rgba(255, 193, 7, 0.4);
+  animation: dr-glow-bomb 1.5s ease-in-out infinite;
+}
+.dr-gem.lightning {
+  background: rgba(100, 200, 255, 0.15);
+  box-shadow: 0 0 12px rgba(100, 200, 255, 0.6);
+  animation: dr-glow-lightning 1.2s ease-in-out infinite;
+}
+.dr-gem.rainbow {
+  background: linear-gradient(45deg, rgba(255, 0, 127, 0.15), rgba(0, 200, 255, 0.15));
+  box-shadow: 0 0 15px rgba(200, 100, 255, 0.5);
+  animation: dr-glow-rainbow 1.8s ease-in-out infinite;
+}
+@keyframes dr-glow-bomb { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
+@keyframes dr-glow-lightning { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
+@keyframes dr-glow-rainbow { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(60deg); } }
 
 /* ---- Texas Hold 'Em ---- */
 .th-felt {
@@ -9180,7 +9198,7 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
 }
 
 /* ---------------- Diamond Rush ---------------- */
-const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵'];
+const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵', '💣', '⚡', '🌈'];
 function drMake() {
   const g = new Array(64);
   for (let i = 0; i < 64; i++) {
@@ -9196,26 +9214,94 @@ function drMake() {
 }
 function drFindMatches(g) {
   const m = new Set();
+  let sourceColor = null;
   for (let r = 0; r < 8; r++) for (let c = 0; c < 6; c++) {
     const i = r * 8 + c, v = g[i];
-    if (v != null && g[i + 1] === v && g[i + 2] === v) { m.add(i); m.add(i + 1); m.add(i + 2); }
+    if (v != null && v < 6 && g[i + 1] === v && g[i + 2] === v) {
+      m.add(i); m.add(i + 1); m.add(i + 2);
+      if (sourceColor === null) sourceColor = v;
+    }
   }
   for (let c = 0; c < 8; c++) for (let r = 0; r < 6; r++) {
     const i = r * 8 + c, v = g[i];
-    if (v != null && g[i + 8] === v && g[i + 16] === v) { m.add(i); m.add(i + 8); m.add(i + 16); }
+    if (v != null && v < 6 && g[i + 8] === v && g[i + 16] === v) {
+      m.add(i); m.add(i + 8); m.add(i + 16);
+      if (sourceColor === null) sourceColor = v;
+    }
   }
-  return m;
+  return { matches: m, sourceColor };
+}
+function drCreateSpecialGem(g, matchSet, sourceColor, rainbowMeta) {
+  const count = matchSet.size;
+  if (count < 3) return null;
+  let gemType = null;
+  if (count >= 7) gemType = 8; // Rainbow
+  else if (count >= 5) gemType = 7; // Lightning
+  else if (count >= 3) gemType = 6; // Bomb
+  if (gemType === null) return null;
+  const positions = Array.from(matchSet).map(i => ({ r: Math.floor(i / 8), c: i % 8 }));
+  const centerR = Math.round(positions.reduce((s, p) => s + p.r, 0) / positions.length);
+  const centerC = Math.round(positions.reduce((s, p) => s + p.c, 0) / positions.length);
+  const centerIndex = centerR * 8 + centerC;
+  g[centerIndex] = gemType;
+  if (gemType === 8) rainbowMeta.set(centerIndex, sourceColor);
+  return centerIndex;
+}
+function drResolveSpecialEffects(g, specialIndex, rainbowMeta, toClear, processed = new Set()) {
+  if (processed.has(specialIndex)) return toClear;
+  processed.add(specialIndex);
+  const gemType = g[specialIndex];
+  const r = Math.floor(specialIndex / 8), c = specialIndex % 8;
+  if (gemType === 6) { // Bomb 3×3
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+          toClear.add(nr * 8 + nc);
+        }
+      }
+    }
+  } else if (gemType === 7) { // Lightning row+col
+    for (let col = 0; col < 8; col++) toClear.add(r * 8 + col);
+    for (let row = 0; row < 8; row++) toClear.add(row * 8 + c);
+  } else if (gemType === 8) { // Rainbow color match
+    const sourceColor = rainbowMeta.get(specialIndex);
+    for (let i = 0; i < 64; i++) {
+      if (g[i] === sourceColor) toClear.add(i);
+    }
+  }
+  const newSpecials = new Set();
+  for (let i of toClear) {
+    if ((g[i] === 6 || g[i] === 7 || g[i] === 8) && !processed.has(i)) {
+      newSpecials.add(i);
+    }
+  }
+  for (let special of newSpecials) {
+    toClear = drResolveSpecialEffects(g, special, rainbowMeta, toClear, processed);
+  }
+  return toClear;
 }
 function drResolve(grid) {
   let g = grid.slice();
+  let rainbowMeta = new Map();
   let total = 0, cascades = 0, maxClear = 0;
   while (true) {
-    const m = drFindMatches(g);
+    const matchResult = drFindMatches(g);
+    const m = matchResult.matches;
+    const sourceColor = matchResult.sourceColor;
     if (!m.size) break;
+    const specialGemIndex = drCreateSpecialGem(g, m, sourceColor, rainbowMeta);
+    let toClear = new Set(m);
+    if (specialGemIndex !== null) {
+      toClear = drResolveSpecialEffects(g, specialGemIndex, rainbowMeta, toClear, new Set());
+    }
     cascades++;
-    maxClear = Math.max(maxClear, m.size);
-    total += m.size * 10 * cascades;
-    m.forEach(i => { g[i] = null; });
+    maxClear = Math.max(maxClear, toClear.size);
+    total += toClear.size * 10 * cascades;
+    toClear.forEach(i => {
+      g[i] = null;
+      rainbowMeta.delete(i);
+    });
     for (let c = 0; c < 8; c++) {
       const col = [];
       for (let r = 7; r >= 0; r--) { const v = g[r * 8 + c]; if (v != null) col.push(v); }
@@ -9302,20 +9388,24 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
       { val: bigC, lbl: 'Best cascade' }, { val: score, lbl: 'This round' },
     ]),
-    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.']),
+    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).']),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="dr-grid">
-          {grid.map((v, i) => (
-            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '')}
-              onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
-              onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
-              {DR_GEMS[v]}
-            </div>
-          ))}
+          {grid.map((v, i) => {
+            const isSpecial = v >= 6 ? ['bomb', 'lightning', 'rainbow'][v - 6] : null;
+            return (
+              <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '') + (isSpecial ? ' ' + isSpecial : '')}
+                data-special={isSpecial}
+                onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
+                onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
+                {DR_GEMS[v]}
+              </div>
+            );
+          })}
         </div>
       </div>
     </ClassicShell>

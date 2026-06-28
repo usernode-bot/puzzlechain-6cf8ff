@@ -2782,6 +2782,49 @@ body {
 }
 .cg-sheet-action:hover { border-color: ${C.accent}; }
 
+/* Game Menu (Menu tab) */
+.cg-menu-section { display: flex; flex-direction: column; gap: 0.4rem; }
+.cg-menu-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.cg-mode-pill {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 600;
+  background: ${C.accent}22;
+  color: ${C.accent};
+  border: 1px solid ${C.accent}55;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  white-space: nowrap;
+}
+.cg-resume-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: var(--cg-board);
+  max-width: 94vw;
+  background: ${C.gold}14;
+  border: 1px solid ${C.gold}55;
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.82rem;
+  color: ${C.text};
+}
+.cg-resume-actions { display: flex; gap: 0.4rem; flex: 0 0 auto; }
+.cg-resume-actions button {
+  background: ${C.gold};
+  color: #1a1205;
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cg-resume-actions button.ghost { background: transparent; color: ${C.muted}; border: 1px solid ${C.border}; }
+
 /* Keep existing classic boards fitting inside the shell stage */
 .cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
 .cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
@@ -3980,11 +4023,246 @@ function CgSettings({ tick }) {
   );
 }
 
+/* ============================================================
+   Classic Games — Game Menu (New Game / Save / Post to Feed)
+   ============================================================ */
+// Module-level bridge so the in-shell Game Menu can read the active
+// Versus-Bot game's current state for "Save Game" without threading a
+// callback through every mode sub-component. The active bot game sets
+// `getSnapshot` on mount and clears it on unmount.
+const ClassicBridge = { getSnapshot: null };
+
+// A Versus-Bot game registers its live-state snapshot provider here so the
+// Game Menu's Save button can persist it. `active` should be true only while
+// the game is in a saveable bot session.
+function useClassicSaveSource(active, snapshotFn) {
+  const ref = useRef(snapshotFn);
+  ref.current = snapshotFn;
+  useEffect(() => {
+    if (!active) return;
+    ClassicBridge.getSnapshot = () => (ref.current ? ref.current() : null);
+    return () => { ClassicBridge.getSnapshot = null; };
+  }, [active]);
+}
+
+// Save / load a Versus-Bot game's in-progress state via the generic
+// user_game_state store (GET/PUT /api/state/:gameId).
+function useClassicSave(gameId) {
+  const [saving, setSaving] = useState(false);
+  const saveState = async (stateObj) => {
+    setSaving(true);
+    const { ok } = await api(`/api/state/${gameId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...stateObj } }),
+    });
+    setSaving(false);
+    return ok;
+  };
+  const loadState = async () => {
+    const { ok, body } = await api(`/api/state/${gameId}`);
+    if (ok && body && body.state && body.state.mode === 'bot') return body.state;
+    return null;
+  };
+  const clearState = async () => {
+    await api(`/api/state/${gameId}`, { method: 'PUT', body: JSON.stringify({ state: {} }) }).catch(() => {});
+  };
+  return { saveState, loadState, clearState, saving };
+}
+
+// Polling hook for the generic classic_rooms online multiplayer (mirrors
+// useMancalaRoom). `applyMove` posts a server-authoritative move (e.g. a
+// Chutes & Ladders roll) and reconciles against the returned room.
+function useClassicRoom(gameId, roomId) {
+  const [room, setRoom] = useState(null);
+  const [pollingError, setPollingError] = useState(null);
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const consecutiveErrors = useRef(0);
+  const intervalRef = useRef(null);
+
+  const fetchRoom = async () => {
+    if (!roomId) return;
+    try {
+      const { ok, status, body } = await api(`/api/classic/${gameId}/rooms/${roomId}`);
+      if (ok && body) {
+        setRoom(body);
+        setPollingError(null);
+        consecutiveErrors.current = 0;
+        setOpponentDisconnected(false);
+      } else if (status === 404) {
+        setPollingError('room_not_found');
+        consecutiveErrors.current++;
+      } else {
+        consecutiveErrors.current++;
+        if (consecutiveErrors.current >= 3) { setOpponentDisconnected(true); setPollingError('connection_error'); }
+      }
+    } catch {
+      consecutiveErrors.current++;
+      if (consecutiveErrors.current >= 3) { setOpponentDisconnected(true); setPollingError('connection_error'); }
+    }
+  };
+
+  useEffect(() => {
+    if (!roomId) { setRoom(null); setPollingError(null); return; }
+    consecutiveErrors.current = 0;
+    fetchRoom();
+    intervalRef.current = setInterval(fetchRoom, 1500);
+    return () => clearInterval(intervalRef.current);
+  }, [gameId, roomId]);
+
+  const submitMove = async (payload) => {
+    if (!room || room.status !== 'active') return;
+    const moveSeq = room.moveSeq + 1;
+    try {
+      const { ok, body } = await api(`/api/classic/${gameId}/rooms/${roomId}/move`, {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, moveSeq }),
+      });
+      if (ok && body) setRoom(body);
+      else fetchRoom();
+    } catch { fetchRoom(); }
+  };
+
+  return { room, pollingError, opponentDisconnected, submitMove };
+}
+
+// Per-mode display metadata for the inline mode picker.
+const CLASSIC_MODE_META = {
+  bot:    { icon: '🤖', name: 'Versus Bot',        desc: 'Play against the computer' },
+  '2p':   { icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
+  online: { icon: '🌐', name: 'Online Multiplayer', desc: 'Play a friend via room code' },
+};
+
+// Inline mode picker shown by the Game Menu's "New Game" for games that route
+// their modes through the menu (e.g. Chutes & Ladders). Calls onPlay(mode, opts).
+function ClassicModePicker({ game, onPlay }) {
+  const [mode, setMode] = useState(null);
+  const [onlineAction, setOnlineAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const handlePlay = async () => {
+    if (!mode) return;
+    if (mode !== 'online') { onPlay(mode, {}); return; }
+    if (onlineAction === 'create') {
+      setBusy(true);
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id });
+      else setError('Could not create room. Try again.');
+    } else if (onlineAction === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api(`/api/classic/${game.id}/rooms/${code}/join`, { method: 'POST' });
+      setBusy(false);
+      if (ok) onPlay('online', { roomAction: 'join', roomId: code });
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  const canStart = mode && (mode !== 'online' || onlineAction === 'create' || (onlineAction === 'join' && joinCode.trim().length >= 4));
+
+  return (
+    <div className="mnc-mode-select" style={{ padding: 0 }}>
+      {(game.modes || []).map(m => (
+        <button key={m} className={'mnc-mode-btn' + (mode === m ? ' active' : '')} onClick={() => { setMode(m); setError(''); }}>
+          <span className="mnc-mode-icon">{CLASSIC_MODE_META[m].icon}</span>
+          <span className="mnc-mode-text">
+            <span className="mnc-mode-name">{CLASSIC_MODE_META[m].name}</span>
+            <span className="mnc-mode-desc">{CLASSIC_MODE_META[m].desc}</span>
+          </span>
+        </button>
+      ))}
+      {mode === 'online' && (
+        <div className="mnc-online-actions">
+          <div className="mnc-mode-sub">
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')} onClick={() => { setOnlineAction('create'); setError(''); }}>Create Room</button>
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')} onClick={() => { setOnlineAction('join'); setError(''); }}>Join Room</button>
+          </div>
+          {onlineAction === 'join' && (
+            <div className="mnc-join-form">
+              <input className="mnc-join-input" placeholder="Room code (e.g. AB3K7P)" value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
+            </div>
+          )}
+        </div>
+      )}
+      {error && <div className="mnc-join-error">{error}</div>}
+      {mode && <button className="mnc-mode-start-btn" onClick={handlePlay} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
+    </div>
+  );
+}
+
+// The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
+// only), and Post to Feed (after a result).
+function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onPostToFeed, onClose }) {
+  const [picking, setPicking] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const modes = game.modes || [];
+  const usePicker = !!game.menuModePicker && modes.length > 0;
+  // Default new-game mode for games without an inline picker.
+  const defaultMode = modes.length === 1 ? modes[0] : null;
+
+  const doSave = async () => {
+    const ok = await onSaveGame();
+    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); }
+  };
+
+  return (
+    <div className="cg-menu-section">
+      <div className="cg-menu-label">New game</div>
+      {usePicker ? (
+        picking
+          ? <ClassicModePicker game={game} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
+          : <button className="cg-sheet-action" onClick={() => setPicking(true)}>↺ New Game</button>
+      ) : (
+        <button className="cg-sheet-action" onClick={() => { onNewGameMode(defaultMode, {}); onClose && onClose(); }}>↺ New Game</button>
+      )}
+
+      {game.supportsSave && gameMode === 'bot' && (
+        <>
+          <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Versus Bot</div>
+          <button className="cg-sheet-action" onClick={doSave}>{saved ? 'Saved ✓' : '💾 Save Game'}</button>
+        </>
+      )}
+
+      {lastResult && (
+        <>
+          <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Share</div>
+          <button className="cg-sheet-action" style={{ borderColor: C.emerald, color: C.emerald }}
+            onClick={() => { onPostToFeed(lastResult); onClose && onClose(); }}>📤 Post to Feed</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// A small in-stage banner offering to resume a saved Versus-Bot game.
+function ClassicResumeBanner({ onResume, onDismiss }) {
+  return (
+    <div className="cg-resume-banner">
+      <span>💾 You have a saved game.</span>
+      <div className="cg-resume-actions">
+        <button onClick={onResume}>Resume</button>
+        <button className="ghost" onClick={onDismiss}>New</button>
+      </div>
+    </div>
+  );
+}
+
 // game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
-function ClassicShell({ game, onExit, onNewGame, sheetSections, children }) {
+// menuConfig (optional): wires the first "Menu" tab — New Game / Save / Post to Feed.
+function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [, force] = useState(0);
   const sections = [
+    ...(menuConfig ? [{
+      id: 'menu', label: 'Menu',
+      render: () => <ClassicGameMenuSection {...menuConfig} onClose={() => setSheetOpen(false)} />,
+    }] : []),
     ...(sheetSections || []),
     { id: 'settings', label: 'Settings', render: () => <CgSettings /> },
   ];
@@ -3992,12 +4270,19 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children }) {
   const open = (id) => { setActive(id || sections[0].id); setSheetOpen(true); cgSound('click'); };
   const toggleSound = () => { cgSetPref('sound', !cgPrefs.sound); force(n => n + 1); if (cgPrefs.sound) cgSound('click'); };
   const cur = sections.find(s => s.id === active) || sections[0];
+  // Games whose New Game lives in the menu hide the topbar quick-reset ↺.
+  const hideQuickReset = menuConfig && (game.modes || []).length > 0;
+  const modePill = menuConfig && menuConfig.gameMode && CLASSIC_MODE_META[menuConfig.gameMode];
   return (
     <div className="cg-shell">
       <div className="cg-topbar">
         <button className="cg-btn" onClick={onExit} title="Back to lobby" aria-label="Back">←</button>
-        <div className="cg-title"><span>{game.icon}</span> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{game.name}</span></div>
-        {onNewGame && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
+        <div className="cg-title">
+          <span>{game.icon}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{game.name}</span>
+          {modePill && <span className="cg-mode-pill">{modePill.icon} {menuConfig.gameMode === '2p' ? '2P' : menuConfig.gameMode === 'online' ? 'Online' : 'Bot'}</span>}
+        </div>
+        {onNewGame && !hideQuickReset && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
         <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
         <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
       </div>
@@ -7532,6 +7817,29 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const secsRef = useRef(0);
   secsRef.current = secs;
 
+  // Game Menu Save/Resume for the Versus-Bot (AI) Mancala game.
+  const { loadState, clearState } = useClassicSave('mancala');
+  const [resumeOffer, setResumeOffer] = useState(null);
+  const resumeCheckedRef = useRef(false);
+  useClassicSaveSource(!done, () => ({
+    difficulty, pits: pitsRef.current, currentPlayer: playerRef.current,
+    moves: movesRef.current, secs: secsRef.current,
+  }));
+  useEffect(() => {
+    if (resumeCheckedRef.current) return;
+    resumeCheckedRef.current = true;
+    loadState().then(s => { if (s && Array.isArray(s.pits)) setResumeOffer(s); });
+  }, []);
+  const applyResume = () => {
+    const s = resumeOffer; if (!s) return;
+    setPits(s.pits); pitsRef.current = s.pits;
+    setPlayer(s.currentPlayer || 1); playerRef.current = s.currentPlayer || 1;
+    setMoves(s.moves || 0); movesRef.current = s.moves || 0;
+    setDone(false); doneRef.current = false;
+    setResumeOffer(null);
+  };
+  const dismissResume = () => { setResumeOffer(null); clearState(); };
+
   const startSession = async () => {
     sessionIdRef.current = null;
     nonceRef.current = null;
@@ -7584,6 +7892,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
       setDone(true);
       doneRef.current = true;
       setAiThinking(false);
+      clearState(); // a finished bot game has no save to resume
       const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
       setBannerMsg(wLabel);
       const entry = {
@@ -7806,6 +8115,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   return (
     <div>
+      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
@@ -8151,7 +8461,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline, onSelect
 /* ============================================================
    Game 5 — Mancala wrapper (delegates to mode sub-components)
    ============================================================ */
-function MancalaGame({ onWin, onStepChange, resetKey, offset }) {
+function MancalaGame({ onWin, onStepChange, resetKey, gameMode, onModeChange, offset }) {
   const [mode, setMode]               = useState(() =>
     new URLSearchParams(window.location.search).get('mmode') === 'daily' ? 'daily' : null);
   const [difficulty, setDifficulty]   = useState(null);
@@ -8160,14 +8470,22 @@ function MancalaGame({ onWin, onStepChange, resetKey, offset }) {
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
-  // When "Play Again" fires, keep mode for local/ai/daily but reset online (needs new room).
+  // On "Play Again" / Game-Menu New Game (resetKey change), return to the mode
+  // selector. Skip the initial mount so a ?mmode=daily deep-link survives.
+  const firstReset = useRef(true);
   useEffect(() => {
-    if (modeRef.current === 'online') {
-      setMode(null);
-      setRoomId(null);
-      setMyPlayerNum(null);
-    }
+    if (firstReset.current) { firstReset.current = false; return; }
+    setMode(null);
+    setRoomId(null);
+    setMyPlayerNum(null);
   }, [resetKey]);
+
+  // Report the active mode upward so the top-bar pill + Save toggle reflect it.
+  // 'ai' → 'bot' (saveable), 'local' → '2p', daily/null are non-mode states.
+  useEffect(() => {
+    if (!onModeChange) return;
+    onModeChange(mode === 'ai' ? 'bot' : mode === 'local' ? '2p' : mode === 'online' ? 'online' : null);
+  }, [mode]);
 
   if (!mode) {
     return (
@@ -8797,7 +9115,7 @@ function SnakeGameModeSelect({ onSelectDifficulty }) {
 }
 
 /* ---- Snake — Gameplay ---- */
-function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty }) {
+function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty, menuConfig }) {
   const N = 15;
   const [, render] = useState(0);
   const [done, setDone] = useState(false);
@@ -8917,7 +9235,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
     cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="snake-board-wrap">
@@ -8952,7 +9270,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
 }
 
 /* ---- Snake — Wrapper (mode selector + gameplay) ---- */
-function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
   const [difficulty, setDifficulty] = useState(null);
   const diffRef = useRef(difficulty);
   diffRef.current = difficulty;
@@ -8965,7 +9283,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
 
   if (!difficulty) {
     return (
-      <ClassicShell game={game} onExit={onBack} sheetSections={[]}>
+      <ClassicShell game={game} onExit={onBack} sheetSections={[]} menuConfig={menuConfig}>
         <div className="cg-stage">
           <SnakeGameModeSelect onSelectDifficulty={(d) => setDifficulty(d)} />
         </div>
@@ -8973,7 +9291,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     );
   }
 
-  return React.createElement(SnakeGameplay, { onWin, onStepChange, resetKey, game, onBack, difficulty });
+  return React.createElement(SnakeGameplay, { onWin, onStepChange, resetKey, game, onBack, difficulty, menuConfig });
 }
 
 /* ---------------- Block Blast ---------------- */
@@ -9005,7 +9323,7 @@ function bbCanPlaceAny(grid, tray) {
   }
   return false;
 }
-function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
   const [tray, setTray] = useState(() => [bbRandPiece(), bbRandPiece(), bbRandPiece()]);
   const [score, setScore] = useState(0);
@@ -9126,7 +9444,7 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
     cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
   ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="bb-grid" ref={gridRef}>
@@ -9227,7 +9545,7 @@ function drResolve(grid) {
   }
   return { grid: g, total, cascades, maxClear };
 }
-function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig }) {
   const TARGET = 800, START_MOVES = 18;
   const [grid, setGrid] = useState(() => drMake());
   const [sel, setSel] = useState(-1);
@@ -9305,7 +9623,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.']),
   ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="dr-grid">
@@ -9387,7 +9705,7 @@ function thHandStrength(hole, board) {
   if (Math.abs(a.r - b.r) === 1) s += 0.05;
   return Math.min(0.95, s);
 }
-function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
   const START = 200, BB = 10;
   const [state, setState] = useState(null);
   const [betOpen, setBetOpen] = useState(false);
@@ -9399,6 +9717,31 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
   const [done, setDone] = useState(false);
   const secs = useElapsed(resetKey, !done);
   secsRef.current = secs;
+
+  // Texas is always a Versus-Bot game — report it so the menu shows Save.
+  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
+
+  // Game Menu Save/Resume.
+  const { loadState, clearState } = useClassicSave('texas');
+  const [resumeOffer, setResumeOffer] = useState(null);
+  const resumeCheckedRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useClassicSaveSource(!done && !!state, () => ({
+    th: stateRef.current, hands: handsRef.current, bigPot: bigPotRef.current,
+  }));
+  useEffect(() => {
+    if (resumeCheckedRef.current) return;
+    resumeCheckedRef.current = true;
+    loadState().then(s => { if (s && s.th) setResumeOffer(s); });
+  }, []);
+  const applyResume = () => {
+    const s = resumeOffer; if (!s) return;
+    handsRef.current = s.hands || 0; bigPotRef.current = s.bigPot || 0;
+    setState(s.th); setDone(false); doneRef.current = false;
+    setResumeOffer(null);
+  };
+  const dismissResume = () => { setResumeOffer(null); clearState(); };
 
   const newHand = (pc, ac, dealerIsPlayer) => {
     const deck = thDeck();
@@ -9532,6 +9875,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     onStepChange && onStepChange(handsRef.current);
     if (s.pc <= 0 || s.ac <= 0) {
       doneRef.current = true; setDone(true);
+      clearState(); // match over — no save to resume
       const youWin = s.pc > 0;
       cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
       cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
@@ -9564,13 +9908,14 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     cgRulesSection(['Heads-up Texas Hold \'Em vs the computer.', 'Tap Check / Call / Fold to act.', 'Tap Bet/Raise to size a wager.', 'Win all the opponent\'s chips to take the match.']),
   ];
 
-  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet}><div className="cg-stage" /></ClassicShell>;
+  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet} menuConfig={menuConfig}><div className="cg-stage" /></ClassicShell>;
   const s = state;
   const toCall = Math.max(0, s.aiBet - s.playerBet);
   const canAct = s.phase === 'betting' && s.toAct === 'player' && !done;
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
+        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
         <div className="th-felt">
           <div className="th-seat">
             <div className="who">Opponent</div>
@@ -14485,7 +14830,9 @@ function cnlCenterPct(n) {
   return { x: (col + 0.5) * 10, y: (visualRow + 0.5) * 10 };
 }
 
-function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
+// Local Chutes & Ladders board: hotseat 2-player, or vs Bot (P2 auto-rolls).
+// `initialState` (a saved bot snapshot) offers an in-stage Resume banner.
+function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialState, onClearSave }) {
   const [p1Pos, setP1Pos]   = useState(0);
   const [p2Pos, setP2Pos]   = useState(0);
   const [player, setPlayer] = useState(1);
@@ -14496,6 +14843,8 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
   const [done, setDone]     = useState(false);
   const [winner, setWinner] = useState(null);
   const [banner, setBanner] = useState('');
+  // Resume offer for a saved bot game; null once dismissed/applied.
+  const [resumeOffer, setResumeOffer] = useState(initialState || null);
 
   const animatingRef = useRef(false);
   const winTimerRef  = useRef(null);
@@ -14506,6 +14855,22 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
   secsRef.current = secs;
   const rollsRef = useRef(0);
   rollsRef.current = rolls;
+
+  const pLabel = (who) => vsBot ? (who === 1 ? 'You' : 'Bot') : `Player ${who}`;
+
+  // Expose a save snapshot to the Game Menu while this is an active bot game.
+  useClassicSaveSource(vsBot && !done, () => ({
+    p1Pos, p2Pos, currentPlayer: player, rolls, secs: secsRef.current,
+  }));
+
+  const applyResume = () => {
+    const s = resumeOffer; if (!s) return;
+    setP1Pos(s.p1Pos || 0); setP2Pos(s.p2Pos || 0);
+    setPlayer(s.currentPlayer || 1); setRolls(s.rolls || 0);
+    rollsRef.current = s.rolls || 0;
+    setResumeOffer(null);
+  };
+  const dismissResume = () => { setResumeOffer(null); if (onClearSave) onClearSave(); };
 
   const clearTimers = () => {
     timersRef.current.forEach(clearTimeout);
@@ -14538,12 +14903,13 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
       if (landed === 100) {
         setDone(true);
         setWinner(who);
-        const label = `Player ${who} wins! 🎉`;
+        if (onClearSave) onClearSave();
+        const label = `${pLabel(who)} win${vsBot && who === 1 ? '' : (vsBot ? 's' : 's')}! 🎉`;
         setBanner(label);
         const finalRolls = rollsRef.current;
         const finalSecs = secsRef.current;
         const score = Math.max(50, 300 - finalRolls * 5);
-        const share = `🪜 Chutes & Ladders — Player ${who} won in ${finalRolls} rolls!`;
+        const share = `🪜 Chutes & Ladders — ${pLabel(who)} won in ${finalRolls} rolls!`;
         winTimerRef.current = setTimeout(() => {
           winTimerRef.current = null;
           onWin(score, finalRolls, finalSecs, { winner: who, winnerLabel: label, share });
@@ -14620,6 +14986,14 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
     timersRef.current.push(rollT);
   };
 
+  // Bot auto-rolls for Player 2 in Versus-Bot mode.
+  useEffect(() => {
+    if (!vsBot || done || resumeOffer) return;
+    if (player !== 2 || animating || rolling) return;
+    const t = setTimeout(() => roll(2), 650);
+    return () => clearTimeout(t);
+  }, [vsBot, player, animating, rolling, done, resumeOffer]);
+
   // Build the 10x10 cells (top row first for natural DOM order).
   const cells = [];
   for (let visualRow = 0; visualRow < 10; visualRow++) {
@@ -14672,6 +15046,9 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
 
   return (
     <div>
+      {resumeOffer && (
+        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
+      )}
       <div className="status-bar">
         <div className="pill">
           <div className="plabel">Time</div>
@@ -14680,15 +15057,15 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
         <div className="pill">
           <div className="plabel">Turn</div>
           <div className="pvalue" style={{ color: activeColor, fontSize: '0.95rem' }}>
-            {done ? `P${winner}` : `P${player}`}
+            {done ? pLabel(winner) : pLabel(player)}
           </div>
         </div>
         <div className="pill">
-          <div className="plabel">P1</div>
+          <div className="plabel">{pLabel(1)}</div>
           <div className="pvalue" style={{ color: p1Color, fontSize: '0.95rem' }}>{p1Pos}</div>
         </div>
         <div className="pill">
-          <div className="plabel">P2</div>
+          <div className="plabel">{pLabel(2)}</div>
           <div className="pvalue" style={{ color: p2Color, fontSize: '0.95rem' }}>{p2Pos}</div>
         </div>
         <div className="pill">
@@ -14706,8 +15083,8 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
         }}
       >
         {done
-          ? `Game over — Player ${winner} wins! 🎉`
-          : (banner || `Player ${player}'s turn`)}
+          ? `Game over — ${pLabel(winner)} win${vsBot && winner === 1 ? '' : 's'}! 🎉`
+          : (banner || `${pLabel(player)}'s turn`)}
       </div>
 
       <div className="cnl-board-wrap">
@@ -14730,20 +15107,255 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey }) {
           className="cnl-roll-btn"
           style={{ background: p1Color }}
           onClick={() => roll(1)}
-          disabled={done || animating || rolling || player !== 1}
+          disabled={done || animating || rolling || player !== 1 || !!resumeOffer}
         >
-          Player 1 - Roll
+          {vsBot ? 'Your' : 'Player 1 -'} Roll
         </button>
-        <button
-          className="cnl-roll-btn"
-          style={{ background: p2Color }}
-          onClick={() => roll(2)}
-          disabled={done || animating || rolling || player !== 2}
-        >
-          Player 2 - Roll
+        {vsBot ? (
+          <button className="cnl-roll-btn" style={{ background: p2Color, opacity: 0.85 }} disabled>
+            {player === 2 && !done ? 'Bot rolling…' : 'Bot'}
+          </button>
+        ) : (
+          <button
+            className="cnl-roll-btn"
+            style={{ background: p2Color }}
+            onClick={() => roll(2)}
+            disabled={done || animating || rolling || player !== 2}
+          >
+            Player 2 - Roll
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// In-stage mode selector for Chutes & Ladders (shown on first launch from the
+// lobby; the Game Menu's New Game also routes here via the mode picker).
+function ChutesLaddersModeSelect({ game, onPick }) {
+  const [mode, setMode] = useState(null);
+  const [onlineAction, setOnlineAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const modes = [
+    { id: '2p',     icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
+    { id: 'bot',    icon: '🤖', name: 'Versus Bot',        desc: 'The computer rolls for Player 2' },
+    { id: 'online', icon: '🌐', name: 'Online Multiplayer', desc: 'Play a friend via room code' },
+  ];
+
+  const handleStart = async () => {
+    if (!mode) return;
+    if (mode !== 'online') { onPick(mode, {}); return; }
+    if (onlineAction === 'create') {
+      setBusy(true);
+      const { ok, body } = await api('/api/classic/chutes-ladders/rooms', { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onPick('online', { roomAction: 'create', roomId: body.id });
+      else setError('Could not create room. Try again.');
+    } else if (onlineAction === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api('/api/classic/chutes-ladders/rooms/' + code + '/join', { method: 'POST' });
+      setBusy(false);
+      if (ok) onPick('online', { roomAction: 'join', roomId: code });
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  const canStart = mode && (mode !== 'online' || onlineAction === 'create' || (onlineAction === 'join' && joinCode.trim().length >= 4));
+
+  return (
+    <div className="mnc-mode-select">
+      {modes.map(m => (
+        <button key={m.id} className={'mnc-mode-btn' + (mode === m.id ? ' active' : '')} onClick={() => { setMode(m.id); setError(''); }}>
+          <span className="mnc-mode-icon">{m.icon}</span>
+          <span className="mnc-mode-text">
+            <span className="mnc-mode-name">{m.name}</span>
+            <span className="mnc-mode-desc">{m.desc}</span>
+          </span>
+        </button>
+      ))}
+      {mode === 'online' && (
+        <div className="mnc-online-actions">
+          <div className="mnc-mode-sub">
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')} onClick={() => { setOnlineAction('create'); setError(''); }}>Create Room</button>
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')} onClick={() => { setOnlineAction('join'); setError(''); }}>Join Room</button>
+          </div>
+          {onlineAction === 'join' && (
+            <div className="mnc-join-form">
+              <input className="mnc-join-input" placeholder="Room code (e.g. AB3K7P)" value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
+            </div>
+          )}
+        </div>
+      )}
+      {error && <div className="mnc-join-error">{error}</div>}
+      {mode && <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
+    </div>
+  );
+}
+
+// Online Chutes & Ladders over classic_rooms. Server owns the dice; the client
+// just sends a "roll" and renders the polled room state.
+function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
+  const { room, pollingError, opponentDisconnected, submitMove } = useClassicRoom('chutes-ladders', roomId);
+  const winCalledRef = useRef(false);
+  const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
+  const secsRef = useRef(0); secsRef.current = secs;
+  const movesRef = useRef(0);
+
+  useEffect(() => {
+    if (!room || room.status !== 'finished' || winCalledRef.current) return;
+    winCalledRef.current = true;
+    const youWin = room.winner === String(myPlayerNum);
+    const rolls = (room.state && room.state.rolls) || 0;
+    const score = youWin ? Math.max(50, 300 - rolls * 5) : 0;
+    const share = `🪜 Chutes & Ladders Online — ${youWin ? 'I won' : 'good game'} in ${rolls} rolls!`;
+    onWin(score, movesRef.current, secsRef.current, { winnerLabel: youWin ? 'You win! 🎉' : 'Opponent wins', share });
+  }, [room && room.status]);
+
+  if (!room && !pollingError) {
+    return <div style={{ textAlign: 'center', padding: '2rem' }}><div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} /><div style={{ color: C.muted, fontSize: '0.85rem' }}>Connecting…</div></div>;
+  }
+  if (pollingError === 'room_not_found') {
+    return <div style={{ textAlign: 'center', padding: '1.5rem', color: C.rose }}>Room not found.</div>;
+  }
+
+  const status = room ? room.status : 'waiting';
+  if (status === 'waiting') {
+    return (
+      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+        <div style={{ color: C.muted, marginBottom: '0.6rem', fontSize: '0.85rem' }}>Waiting for opponent to join…</div>
+        <div className="mnc-room-code">{roomId}</div>
+        <div style={{ color: C.muted, fontSize: '0.78rem', marginTop: '0.4rem' }}>Share this room code</div>
+        <div className="mnc-spinner" style={{ margin: '1rem auto 0' }} />
+      </div>
+    );
+  }
+
+  const st = room.state || {};
+  const cur = st.currentPlayer || 1;
+  const isMyTurn = status === 'active' && cur === myPlayerNum;
+  const p1Color = C.accent, p2Color = C.rose;
+  const myColor = myPlayerNum === 1 ? p1Color : p2Color;
+
+  const doRoll = () => {
+    if (!isMyTurn) return;
+    movesRef.current += 1; onStepChange && onStepChange(movesRef.current);
+    submitMove({ type: 'roll' });
+  };
+
+  // Reuse the static board renderer by mapping positions onto pawns.
+  const cells = [];
+  for (let visualRow = 0; visualRow < 10; visualRow++) {
+    for (let col = 0; col < 10; col++) {
+      const row = 9 - visualRow;
+      const within = (row % 2 === 0) ? col : (9 - col);
+      const n = row * 10 + within + 1;
+      const mark = CNL_LADDERS[n] !== undefined ? '🪜' : CNL_CHUTES[n] !== undefined ? '🛝' : null;
+      cells.push(<div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}><span>{n}</span>{mark && <span className="cnl-cell-mark">{mark}</span>}</div>);
+    }
+  }
+  const lines = Object.keys(CNL_JUMPS).map(k => {
+    const from = parseInt(k, 10), to = CNL_JUMPS[from];
+    const a = cnlCenterPct(from), b = cnlCenterPct(to);
+    const isLadder = CNL_LADDERS[from] !== undefined;
+    return <line key={k} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={isLadder ? C.emerald : C.rose} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />;
+  });
+  const p1c = cnlCenterPct(st.p1Pos || 0), p2c = cnlCenterPct(st.p2Pos || 0);
+  const same = (st.p1Pos || 0) === (st.p2Pos || 0);
+  const p1x = same ? p1c.x - 2.4 : p1c.x, p2x = same ? p2c.x + 2.4 : p2c.x;
+
+  const turnLabel = status === 'finished'
+    ? (room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
+    : isMyTurn ? 'Your turn' : "Opponent's turn";
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
+        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.95rem' }}>{myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0)}</div></div>
+        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
+      </div>
+      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <div className="cnl-board-wrap">
+        <div className="cnl-board">{cells}</div>
+        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">{lines}</svg>
+        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} />
+        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} />
+      </div>
+      <div className="cnl-die">
+        <div className="cnl-die-face" style={{ borderColor: myColor + '88' }}>{st.die == null ? '·' : st.die}</div>
+      </div>
+      <div className="cnl-roll-buttons">
+        <button className="cnl-roll-btn" style={{ background: myColor }} onClick={doRoll} disabled={!isMyTurn}>
+          {status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…'}
         </button>
       </div>
     </div>
+  );
+}
+
+// Chutes & Ladders wrapper — picks a mode (2P / Versus Bot / Online) and
+// delegates. Honors the Game Menu's gameMode/gameModeOpts props.
+function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
+  const [mode, setMode] = useState(gameMode || null);
+  const [roomId, setRoomId] = useState((gameModeOpts && gameModeOpts.roomId) || null);
+  const [myPlayerNum, setMyPlayerNum] = useState(gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1);
+  const [resumeState, setResumeState] = useState(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
+  const { loadState, clearState } = useClassicSave('chutes-ladders');
+
+  // Sync mode from the Game Menu's New Game selection.
+  useEffect(() => {
+    setMode(gameMode || null);
+    if (gameModeOpts && gameModeOpts.roomId) {
+      setRoomId(gameModeOpts.roomId);
+      setMyPlayerNum(gameModeOpts.roomAction === 'join' ? 2 : 1);
+    }
+  }, [gameMode, gameModeOpts, resetKey]);
+
+  // Report active mode upward for the top-bar pill + Save visibility.
+  useEffect(() => { onModeChange && onModeChange(mode); }, [mode]);
+
+  // Check for a saved bot game when entering bot mode.
+  useEffect(() => {
+    let cancelled = false;
+    if (mode === 'bot' && !resumeChecked) {
+      loadState().then(s => { if (!cancelled) { setResumeState(s); setResumeChecked(true); } });
+    } else if (mode !== 'bot') {
+      setResumeChecked(false); setResumeState(null);
+    }
+    return () => { cancelled = true; };
+  }, [mode]);
+
+  if (!mode) {
+    return <ChutesLaddersModeSelect game={{ id: 'chutes-ladders' }} onPick={(m, opts) => {
+      if (m === 'online') { setRoomId(opts.roomId); setMyPlayerNum(opts.roomAction === 'join' ? 2 : 1); }
+      setMode(m);
+    }} />;
+  }
+  if (mode === 'online') {
+    return <ChutesLaddersOnlineGame onWin={onWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
+  }
+  if (mode === 'bot' && !resumeChecked) {
+    return <div style={{ textAlign: 'center', padding: '2rem', color: C.muted }}>Loading…</div>;
+  }
+  return (
+    <ChutesLaddersLocalGame
+      onWin={onWin}
+      onStepChange={onStepChange}
+      resetKey={resetKey}
+      vsBot={mode === 'bot'}
+      initialState={mode === 'bot' ? resumeState : null}
+      onClearSave={mode === 'bot' ? clearState : null}
+    />
   );
 }
 
@@ -14797,6 +15409,8 @@ const GAMES = [
     tag: 'Strategy',
     tagColor: C.gold,
     component: MancalaGame,
+    modes: ['bot', '2p', 'online'],
+    supportsSave: true,
   },
   {
     id: 'chutes-ladders',
@@ -14807,6 +15421,9 @@ const GAMES = [
     tag: 'Board',
     tagColor: C.emerald,
     component: ChutesLaddersGame,
+    modes: ['bot', '2p', 'online'],
+    supportsSave: true,
+    menuModePicker: true,
   },
   {
     id: '2048',
@@ -14867,6 +15484,8 @@ const GAMES = [
     tag: 'Cards',
     tagColor: C.gold,
     component: TexasHoldemGame,
+    modes: ['bot'],
+    supportsSave: true,
   },
   {
     id: 'tilematching',
@@ -15229,6 +15848,13 @@ function App() {
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
+  // Classic Games — Game Menu state. `classicGameMode` is the active mode of
+  // the current classic game ('bot' | '2p' | 'online' | null); `classicLastResult`
+  // is the most recent finished classic result so the menu's Post to Feed works
+  // even after Play Again.
+  const [classicGameMode, setClassicGameMode] = useState(null);
+  const [classicGameModeOpts, setClassicGameModeOpts] = useState(null);
+  const [classicLastResult, setClassicLastResult] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
   // Wallet state (app-level so PvP and nav share one source)
@@ -15539,6 +16165,9 @@ function App() {
           gameId: currentGame.id,
           canPost: true,
         });
+        // Remember this result so the Game Menu's Post to Feed stays reachable
+        // after Play Again.
+        setClassicLastResult({ gameId: currentGame.id, score, steps, timeSecs });
         return;
       }
       // Declare gameId FIRST — referencing it before this line is a temporal
@@ -15613,6 +16242,8 @@ function App() {
           answer: meta && meta.answer,
           isClassic: true,
         });
+        // A loss can still be posted ("Game Over" result). score 0.
+        setClassicLastResult({ gameId: currentGame.id, score: 0, steps, timeSecs });
         return;
       }
       const gameId = currentGame.id;
@@ -15650,6 +16281,9 @@ function App() {
     setCurrentGame(null);
     setWinData(null);
     setLoseData(null);
+    setClassicGameMode(null);
+    setClassicGameModeOpts(null);
+    setClassicLastResult(null);
     if (tab) setLobbyTab(tab);
   };
 
@@ -15658,7 +16292,43 @@ function App() {
     setLoseData(null);
     setStepCount(0);
     setPlayAgainKey(k => k + 1);
+    // Keep classicLastResult so the Game Menu's Post to Feed stays reachable.
   };
+
+  // Game Menu "New Game": optionally re-mount the current classic game in a
+  // chosen mode (Versus Bot / 2 Players / Online), clearing the prior result.
+  const handleNewGameMode = (mode, opts) => {
+    setClassicGameMode(mode || null);
+    setClassicGameModeOpts(opts || null);
+    setClassicLastResult(null);
+    setWinData(null);
+    setLoseData(null);
+    setStepCount(0);
+    setPlayAgainKey(k => k + 1);
+  };
+
+  // Game Menu "Save Game": persist the active Versus-Bot game's snapshot via
+  // the generic user_game_state store. Returns true on success.
+  const handleSaveGame = async () => {
+    if (!currentGame) return false;
+    const snap = ClassicBridge.getSnapshot ? ClassicBridge.getSnapshot() : null;
+    if (!snap) return false;
+    const { ok } = await api(`/api/state/${currentGame.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...snap } }),
+    }).catch(() => ({ ok: false }));
+    return !!ok;
+  };
+
+  // Build the menu config passed into ClassicShell for classic games.
+  const classicMenuConfig = (currentGame && currentGame.category === 'classic') ? {
+    game: currentGame,
+    gameMode: classicGameMode,
+    lastResult: classicLastResult,
+    onNewGameMode: handleNewGameMode,
+    onSaveGame: handleSaveGame,
+    onPostToFeed: (r) => setShareModal({ show: true, caption: '', gameId: r.gameId, score: r.score, steps: r.steps, timeSecs: r.timeSecs }),
+  } : null;
 
   // Copy-to-clipboard Share button for the win/loss overlays. Flips its label
   // to "Copied!" briefly; degrades to a no-op where clipboard is unavailable.
@@ -15960,12 +16630,17 @@ function App() {
               onStepChange={setStepCount}
               offset={offset}
               resetKey={playAgainKey}
+              menuConfig={classicMenuConfig}
+              gameMode={classicGameMode}
+              gameModeOpts={classicGameModeOpts}
+              onModeChange={setClassicGameMode}
             />
           ) : (
             <ClassicShell
               game={currentGame}
               onExit={() => backToLobby('classic')}
               onNewGame={() => setPlayAgainKey(k => k + 1)}
+              menuConfig={classicMenuConfig}
             >
               <div className="cg-stage cg-scroll">
                 <GameComponent
@@ -15974,6 +16649,9 @@ function App() {
                   onStepChange={setStepCount}
                   offset={offset}
                   resetKey={playAgainKey}
+                  gameMode={classicGameMode}
+                  gameModeOpts={classicGameModeOpts}
+                  onModeChange={setClassicGameMode}
                 />
               </div>
             </ClassicShell>

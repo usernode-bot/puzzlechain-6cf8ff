@@ -6,7 +6,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "node scripts/check-jsx.js"
+    "build": "esbuild public/app.jsx --bundle=false --outfile=public/app.js",
+    "check": "node scripts/check-jsx.js",
+    "test:mnc": "node scripts/mancala-daily-selftest.js"
   },
   "dependencies": {
     "ethers": "^6.13.0",
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
-    "@babel/preset-react": "^7.24.0"
+    "@babel/preset-react": "^7.24.0",
+    "esbuild": "^0.23.1"
   }
 }

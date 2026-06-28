@@ -3,8 +3,8 @@
   "secrets": [
     {
       "key": "VALIDATOR_PRIVATE_KEY",
-      "description": "ECDSA private key for the validator wallet that signs claimWin messages. Staging default is Hardhat account #0.",
-      "required": true,
+      "description": "Optional ECDSA private key for the validator wallet that signs claimWin messages. If unset or malformed, wager-signing cleanly disables itself and the rest of the app runs normally — it never blocks the deploy or crashes boot. Staging default is Hardhat account #0.",
+      "required": false,
       "private": true,
       "staging_default": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     },
@@ -24,21 +24,21 @@
     },
     {
       "key": "REDIS_URL",
-      "description": "Redis connection URL for PvP matchmaking queue and match timers.",
-      "required": true,
+      "description": "Optional Redis connection URL used only as a fast path for the PvP matchmaking queue and match timers. The app fully degrades to its built-in Postgres CAS queue when unset, so this is not required to deploy.",
+      "required": false,
       "private": false,
       "staging_default": "redis://localhost:6379"
     },
     {
       "key": "APP_PUBKEY",
-      "description": "Application public key",
+      "description": "Public app-identity key that identifies PuzzleChain to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
       "required": true,
       "private": false,
-      "staging_default": ""
+      "staging_default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     },
     {
       "key": "APP_SECRET_KEY",
-      "description": "Application secret key",
+      "description": "Secret app-identity key used to HMAC-sign payloads PuzzleChain sends to the Usernode dApps-integration surface; an empty value disables the integration gracefully. Treated as an opaque HMAC key (any format works). Set the production value in Settings → Secrets. Staging uses a dummy (Hardhat account #1 key).",
       "required": true,
       "private": true,
       "staging_default": "0x2a871d0798f97d308287f1bd8254e4e96cecc5f0cfa1d93fcff5fb3f87f81947"
@@ -57,7 +57,9 @@
     { "name": "Power-up demo seeds successfully", "path": "/?demo=powerup", "expectText": "PuzzleChain" },
     { "name": "Minesweeper card in Classic Games tab", "path": "/?tab=classic", "expectText": "Minesweeper" },
     { "name": "Mancala card in Classic Games tab", "path": "/?tab=classic", "expectText": "Mancala" },
+    { "name": "Chutes & Ladders card in Classic Games tab", "path": "/?tab=classic", "expectText": "Chutes & Ladders" },
     { "name": "2048 card in Classic Games tab", "path": "/?tab=classic", "expectText": "2048" },
+    { "name": "Knight's Tour card in Classic Games tab", "path": "/?tab=classic", "expectText": "Knight's Tour" },
     { "name": "Snake card in Classic Games tab", "path": "/?tab=classic", "expectText": "Snake" },
     { "name": "Block Blast card in Classic Games tab", "path": "/?tab=classic", "expectText": "Block Blast" },
     { "name": "Tile Match Puzzle card in Classic Games tab", "path": "/?tab=classic", "expectText": "Tile Match Puzzle" },
@@ -73,6 +75,7 @@
     { "name": "Wallet screen shows pending rewards", "path": "/?screen=wallet&demo=1", "expectText": "Pending Rewards" },
     { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" },
     { "name": "Boots with dApps integration disabled (empty APP_SECRET_KEY)", "path": "/", "expectText": "PuzzleChain" },
+    { "name": "Boots and serves / even if VALIDATOR_PRIVATE_KEY is invalid (wager signing disabled, port still binds)", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Wallet shows Verified identity badge", "path": "/?screen=wallet&demo=1", "expectText": "Verified identity" },
     { "name": "Wallet shows Disconnect control", "path": "/?screen=wallet&demo=1", "expectText": "Disconnect" },
     { "name": "DApp session receipt renders", "path": "/?demo=dapp", "expectText": "Session Receipt" },
@@ -80,6 +83,18 @@
     { "name": "Verified leaderboard renders demo rows", "path": "/?demo=dapp", "expectText": "Staging demo Ada" },
     { "name": "Disputed session shows rejection copy", "path": "/?screen=session&sid=DAPPDEMOBAD", "expectText": "could not be verified" },
     { "name": "Account screen opens from chip", "path": "/?screen=account", "expectText": "On-chain login" },
-    { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" }
+    { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" },
+    { "name": "Streak badge ladder renders earned badges", "path": "/?demo=badges", "expectText": "Centurion" },
+    { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" },
+    { "name": "Today's Champions board renders in daily lobby", "path": "/?demo=leaderboard", "expectText": "Today's Champions" },
+    { "name": "Today's Champions lists a seeded solver", "path": "/?demo=leaderboard", "expectText": "Staging demo Ada" },
+    { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
+    { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
+    { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
+    { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
+    { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
+    { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },
+    { "name": "Mancala mode picker offers Daily Challenge", "path": "/?game=mancala", "expectText": "Daily Challenge" },
+    { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" }
   ]
 }

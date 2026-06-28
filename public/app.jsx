@@ -1074,6 +1074,24 @@ body {
   transition: border-color 0.12s;
 }
 .ms-action-row .ms-newgame-btn:hover { border-color: ${C.accent}; }
+.ms-action-row .ms-music-btn {
+  flex: 0 0 auto;
+  width: 3rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 12px;
+  padding: 0.8rem 0.5rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, opacity 0.12s;
+}
+.ms-action-row .ms-music-btn:hover:not(:disabled) { border-color: ${C.accent}; }
+.ms-action-row .ms-music-btn.paused { color: ${C.gold}; border-color: ${C.gold}66; }
+.ms-action-row .ms-music-btn.off { opacity: 0.5; cursor: default; }
+.ms-action-row .ms-music-btn:disabled { cursor: default; }
 .ms-bottom-nav {
   display: flex;
   border-top: 1px solid ${C.border};
@@ -3889,6 +3907,117 @@ function cgHaptic(ms) {
   try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
 }
 
+/* ============================================================
+   Background-music manager — fetch / decode / loop an audio asset
+   ------------------------------------------------------------
+   Unlike the short synthesized cgSound cues, looping background music needs a
+   real asset. We fetch the file once, decode it into an AudioBuffer with the
+   Web Audio API, and play it on a looping BufferSource routed through a shared
+   gain node (BG_MUSIC_GAIN keeps it at a moderate background level so it never
+   drowns out the cgSound effects). decodeAudioData decodes from the raw bytes
+   regardless of file extension / Content-Type, so the asset's container is not
+   constrained by its `.mp3` name. All state is module-level so a single track
+   plays at a time; calling start again with the same url reuses the decoded
+   buffer instead of re-fetching.
+   ============================================================ */
+const BG_MUSIC_GAIN = 0.4;
+let _bgAudioCtx = null;
+let _bgMusicGainNode = null;
+let _bgMusicSource = null;
+let _bgMusicBuffer = null;
+let _bgMusicUrl = null;
+let _bgMusicLoading = false;
+// True once the caller has asked to stop/pause — guards the async decode from
+// auto-starting playback after a stop that raced the fetch.
+let _bgMusicStopped = true;
+
+function bgAudioContext() {
+  if (_bgAudioCtx) return _bgAudioCtx;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) _bgAudioCtx = new AC();
+  } catch {}
+  return _bgAudioCtx;
+}
+
+// (Re)create and start the looping source from the already-decoded buffer.
+function _bgStartSource() {
+  const ctx = bgAudioContext();
+  if (!ctx || !_bgMusicBuffer) return;
+  // Tear down any prior source first (start() can only be called once per node).
+  if (_bgMusicSource) {
+    try { _bgMusicSource.onended = null; _bgMusicSource.stop(); } catch {}
+    _bgMusicSource = null;
+  }
+  if (!_bgMusicGainNode) {
+    _bgMusicGainNode = ctx.createGain();
+    _bgMusicGainNode.gain.value = BG_MUSIC_GAIN;
+    _bgMusicGainNode.connect(ctx.destination);
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = _bgMusicBuffer;
+  src.loop = true;
+  src.connect(_bgMusicGainNode);
+  try { src.start(0); } catch {}
+  _bgMusicSource = src;
+}
+
+// Start (or resume) looping the track at `url`. Must be called from a user
+// gesture the first time so the AudioContext is allowed to produce sound.
+function startBackgroundMusic(url) {
+  const ctx = bgAudioContext();
+  if (!ctx) return;
+  _bgMusicStopped = false;
+  try { if (ctx.state === 'suspended') ctx.resume(); } catch {}
+  // Already decoded this track → just (re)start playback synchronously.
+  if (_bgMusicBuffer && _bgMusicUrl === url) {
+    if (!_bgMusicSource) _bgStartSource();
+    return;
+  }
+  if (_bgMusicLoading && _bgMusicUrl === url) return; // fetch already in flight
+  _bgMusicLoading = true;
+  _bgMusicUrl = url;
+  _bgMusicBuffer = null;
+  fetch(url)
+    .then(r => r.arrayBuffer())
+    .then(buf => new Promise((resolve, reject) => {
+      // decodeAudioData has both promise and legacy-callback forms — support both.
+      let p;
+      try { p = ctx.decodeAudioData(buf, resolve, reject); } catch (e) { reject(e); return; }
+      if (p && typeof p.then === 'function') p.then(resolve, reject);
+    }))
+    .then(decoded => {
+      _bgMusicLoading = false;
+      _bgMusicBuffer = decoded;
+      // Only begin if no stop/pause arrived while we were decoding.
+      if (!_bgMusicStopped) _bgStartSource();
+    })
+    .catch(() => { _bgMusicLoading = false; });
+}
+
+// Stop playback (used as pause too — resume restarts the loop from its start).
+function stopBackgroundMusic() {
+  _bgMusicStopped = true;
+  if (_bgMusicSource) {
+    try { _bgMusicSource.onended = null; _bgMusicSource.stop(); } catch {}
+    _bgMusicSource = null;
+  }
+}
+
+// Resume after a stop/pause. Reuses the decoded buffer when present; otherwise
+// re-fetches the last url.
+function resumeBackgroundMusic() {
+  const ctx = bgAudioContext();
+  if (!ctx) return;
+  _bgMusicStopped = false;
+  try { if (ctx.state === 'suspended') ctx.resume(); } catch {}
+  if (_bgMusicBuffer) {
+    if (!_bgMusicSource) _bgStartSource();
+  } else if (_bgMusicUrl) {
+    startBackgroundMusic(_bgMusicUrl);
+  }
+}
+
 // Discrete-gesture hook: tap / swipe / long-press / double-tap on an element.
 function useGestures(ref, handlers) {
   const h = useRef(handlers);
@@ -5783,6 +5912,8 @@ const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10, MS_SAFE = MS_ROWS * MS_COLS - MS_
 
 const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
 const MS_HISTORY_MAX = 50;
+// Looping background-music asset (served by express.static from public/audio).
+const MS_MUSIC_URL = '/audio/minesweeper-bg.mp3';
 
 function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
 function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
@@ -5856,6 +5987,11 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [isMock, setIsMock] = useState(false);
   const [walletAddr, setWalletAddr] = useState(null);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
+  // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
+  // both SFX and music); `musicPaused` is the player's in-game music pause that
+  // leaves SFX untouched.
+  const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
+  const [musicPaused, setMusicPaused] = useState(false);
   const flagTimerRef = useRef(null);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
 
@@ -5869,7 +6005,29 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     setGameOverMine(null);
     setSteps(0);
     setActiveTab('game');
+    setMusicPaused(false);
   }, [resetKey]);
+
+  // Background music: plays while a game is live (board generated on first
+  // reveal), sound is enabled, and the player hasn't paused it. Starting only
+  // after the first reveal means it's triggered by a user gesture, satisfying
+  // browser autoplay policy. Any change to these conditions re-evaluates.
+  useEffect(() => {
+    const shouldPlay = mineSet !== null && !done && soundOn && !musicPaused;
+    if (shouldPlay) startBackgroundMusic(MS_MUSIC_URL);
+    else stopBackgroundMusic();
+  }, [mineSet, done, soundOn, musicPaused]);
+
+  // Always silence the track when leaving the game (unmount → back to lobby).
+  useEffect(() => () => stopBackgroundMusic(), []);
+
+  // Toggle the shared sound master switch (persists to localStorage via cgPrefs)
+  // and mirror it into local state so the component re-renders.
+  const toggleSound = () => {
+    const next = !cgPrefs.sound;
+    cgSetPref('sound', next);
+    setSoundOn(next);
+  };
 
   // Bridge: detect mock mode and fetch wallet address
   useEffect(() => {
@@ -5906,6 +6064,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (mines.has(idx)) {
       setGameOverMine(idx);
       setDone(true);
+      cgSound('lose'); cgHaptic([20, 40, 20]);
       const baseScore = 0;
       const entry = {
         id: String(Date.now()),
@@ -5926,6 +6085,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (newSafeRevealed >= MS_SAFE) {
       // Full board clear
       setDone(true);
+      cgSound('win'); cgHaptic([15, 30, 15]);
       const baseScore = Math.max(newSafeRevealed * 30 - secs * 2, 100) + 200;
       const dateStr = new Date().toISOString().slice(0, 10);
       const entry = {
@@ -5943,6 +6103,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const handleCashOut = () => {
     if (!cashOutActive || !mineSet) return;
     setDone(true);
+    cgSound('win'); cgHaptic([15, 30, 15]);
     const baseScore = Math.max(safeRevealed * 30 - secs * 2, 100);
     const finalScore = Math.round(baseScore * cashoutMultiplier);
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -6050,9 +6211,19 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               </button>
               {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
+            <button
+              className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
+              onClick={() => setMusicPaused(p => !p)}
+              disabled={!soundOn}
+              title={!soundOn ? 'Sound is off (Settings)' : musicPaused ? 'Resume music' : 'Pause music'}
+              aria-label={!soundOn ? 'Sound off' : musicPaused ? 'Resume music' : 'Pause music'}
+            >
+              {!soundOn ? '🔇' : musicPaused ? '▶' : '⏸'}
+            </button>
             <button className="ms-newgame-btn" onClick={() => {
               setMineSet(null); setAdjacency(null); setRevealed(new Set());
               setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+              setMusicPaused(false);
             }}>↺ New</button>
           </div>
         </div>
@@ -6098,6 +6269,26 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
       {activeTab === 'settings' && (
         <div style={{ padding: '0.5rem 0' }}>
+          <div className="ms-settings-section">
+            <h4>Audio</h4>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Sound &amp; music</span>
+              <button className="ms-theme-toggle" onClick={toggleSound}>
+                {soundOn ? '🔊 On' : '🔇 Off'}
+              </button>
+            </div>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Background music</span>
+              <button
+                className="ms-theme-toggle"
+                onClick={() => setMusicPaused(p => !p)}
+                disabled={!soundOn}
+                style={!soundOn ? { opacity: 0.5, cursor: 'default' } : undefined}
+              >
+                {!soundOn ? '🔇 Off' : musicPaused ? '▶ Paused' : '⏸ Playing'}
+              </button>
+            </div>
+          </div>
           <div className="ms-settings-section">
             <h4>Appearance</h4>
             <div className="ms-settings-row">

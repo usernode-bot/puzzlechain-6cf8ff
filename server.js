@@ -2929,6 +2929,34 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: create a Diamond Rush attempt with power-up gems
+    // on the board so the power-up earning and usage UI is demonstrable.
+    // Claimed but unfinished, with a board containing power-up gems at specific positions.
+    if (IS_STAGING && req.query.demo === 'powerups') {
+      const demoBoard = new Array(64).fill(null);
+      for (let i = 0; i < 64; i++) demoBoard[i] = Math.floor(Math.random() * 6);
+      demoBoard[10] = 6; demoBoard[25] = 7; demoBoard[40] = 8;
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'diamondrush', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL,
+               score = NULL,
+               time_secs = NULL,
+               steps = EXCLUDED.steps,
+               elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          3,
+          45,
+          JSON.stringify({ grid: demoBoard, powerUps: { hint: 1, shuffle: 1, extraTime: 0 } }),
+        ]
+      );
+    }
+
     const { rows } = await pool.query(
       `SELECT * FROM daily_attempts
        WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,

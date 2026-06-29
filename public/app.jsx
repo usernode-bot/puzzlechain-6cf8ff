@@ -1074,6 +1074,24 @@ body {
   transition: border-color 0.12s;
 }
 .ms-action-row .ms-newgame-btn:hover { border-color: ${C.accent}; }
+.ms-action-row .ms-music-btn {
+  flex: 0 0 auto;
+  width: 3rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 12px;
+  padding: 0.8rem 0.5rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, opacity 0.12s;
+}
+.ms-action-row .ms-music-btn:hover:not(:disabled) { border-color: ${C.accent}; }
+.ms-action-row .ms-music-btn.paused { color: ${C.gold}; border-color: ${C.gold}66; }
+.ms-action-row .ms-music-btn.off { opacity: 0.5; cursor: default; }
+.ms-action-row .ms-music-btn:disabled { cursor: default; }
 .ms-bottom-nav {
   display: flex;
   border-top: 1px solid ${C.border};
@@ -2940,10 +2958,56 @@ body {
   cursor: pointer;
   user-select: none;
   aspect-ratio: 1;
-  transition: transform 0.12s ease, opacity 0.12s ease;
+  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
 }
 .dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
 .dr-gem.clearing { opacity: 0; transform: scale(0.4); }
+.dr-gem.hint-target { outline: 3px solid ${C.gold}; animation: hintPulse 0.6s ease-in-out; }
+@keyframes hintPulse { 0%, 100% { box-shadow: 0 0 8px ${C.gold}; } 50% { box-shadow: 0 0 16px ${C.gold}; } }
+.dr-powerups-bar {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  width: var(--cg-board);
+  max-width: 94vw;
+  margin-top: 0.8rem;
+}
+.dr-powerup-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  flex: 1;
+  max-width: 90px;
+}
+.dr-powerup-btn.owned:not(:disabled) { border-color: ${C.accent}; background: ${C.accent}14; }
+.dr-powerup-btn.owned:not(:disabled):hover { border-color: ${C.gold}; background: ${C.gold}22; }
+.dr-powerup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.dr-powerup-btn .icon { font-size: 1.4rem; line-height: 1; }
+.dr-powerup-btn .count { font-size: 0.65rem; color: ${C.muted}; }
+.dr-time-boost {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: ${C.gold};
+  animation: timeBounce 1s ease-out;
+  pointer-events: none;
+  z-index: 50;
+}
+@keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
 /* ---- Texas Hold 'Em ---- */
 .th-felt {
@@ -3774,6 +3838,45 @@ body {
 .dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
 .dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
 
+/* ---- Badges section ---- */
+.badges-section { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid ${C.border}; }
+.badges-toggle {
+  all: unset;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin-bottom: 0.6rem;
+  display: block;
+  cursor: default;
+}
+.badges-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.badges-grid .badge-chip { transition: opacity 0.15s ease; }
+.badges-grid .badge-chip.dim { opacity: 0.38; }
+.badges-grid .badge-chip:not(.dim) {
+  border-color: ${C.gold}55;
+  background: ${C.gold}0d;
+}
+@media (max-width: 560px) {
+  .badges-toggle {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.4rem 0;
+    margin-bottom: 0;
+  }
+  .badges-toggle:hover { color: ${C.text}; }
+  .badges-toggle-arrow { font-size: 0.7rem; transition: transform 0.15s ease; }
+  .badges-grid { display: none; }
+  .badges-grid.open { display: flex; margin-top: 0.6rem; }
+}
 /* ---- Chutes & Ladders ---- */
 .cnl-banner {
   text-align: center; font-size: 0.82rem; font-weight: 600;
@@ -3930,6 +4033,117 @@ function cgSound(name, pitch) {
 function cgHaptic(ms) {
   if (!cgPrefs.haptics) return;
   try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
+}
+
+/* ============================================================
+   Background-music manager — fetch / decode / loop an audio asset
+   ------------------------------------------------------------
+   Unlike the short synthesized cgSound cues, looping background music needs a
+   real asset. We fetch the file once, decode it into an AudioBuffer with the
+   Web Audio API, and play it on a looping BufferSource routed through a shared
+   gain node (BG_MUSIC_GAIN keeps it at a moderate background level so it never
+   drowns out the cgSound effects). decodeAudioData decodes from the raw bytes
+   regardless of file extension / Content-Type, so the asset's container is not
+   constrained by its `.mp3` name. All state is module-level so a single track
+   plays at a time; calling start again with the same url reuses the decoded
+   buffer instead of re-fetching.
+   ============================================================ */
+const BG_MUSIC_GAIN = 0.4;
+let _bgAudioCtx = null;
+let _bgMusicGainNode = null;
+let _bgMusicSource = null;
+let _bgMusicBuffer = null;
+let _bgMusicUrl = null;
+let _bgMusicLoading = false;
+// True once the caller has asked to stop/pause — guards the async decode from
+// auto-starting playback after a stop that raced the fetch.
+let _bgMusicStopped = true;
+
+function bgAudioContext() {
+  if (_bgAudioCtx) return _bgAudioCtx;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) _bgAudioCtx = new AC();
+  } catch {}
+  return _bgAudioCtx;
+}
+
+// (Re)create and start the looping source from the already-decoded buffer.
+function _bgStartSource() {
+  const ctx = bgAudioContext();
+  if (!ctx || !_bgMusicBuffer) return;
+  // Tear down any prior source first (start() can only be called once per node).
+  if (_bgMusicSource) {
+    try { _bgMusicSource.onended = null; _bgMusicSource.stop(); } catch {}
+    _bgMusicSource = null;
+  }
+  if (!_bgMusicGainNode) {
+    _bgMusicGainNode = ctx.createGain();
+    _bgMusicGainNode.gain.value = BG_MUSIC_GAIN;
+    _bgMusicGainNode.connect(ctx.destination);
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = _bgMusicBuffer;
+  src.loop = true;
+  src.connect(_bgMusicGainNode);
+  try { src.start(0); } catch {}
+  _bgMusicSource = src;
+}
+
+// Start (or resume) looping the track at `url`. Must be called from a user
+// gesture the first time so the AudioContext is allowed to produce sound.
+function startBackgroundMusic(url) {
+  const ctx = bgAudioContext();
+  if (!ctx) return;
+  _bgMusicStopped = false;
+  try { if (ctx.state === 'suspended') ctx.resume(); } catch {}
+  // Already decoded this track → just (re)start playback synchronously.
+  if (_bgMusicBuffer && _bgMusicUrl === url) {
+    if (!_bgMusicSource) _bgStartSource();
+    return;
+  }
+  if (_bgMusicLoading && _bgMusicUrl === url) return; // fetch already in flight
+  _bgMusicLoading = true;
+  _bgMusicUrl = url;
+  _bgMusicBuffer = null;
+  fetch(url)
+    .then(r => r.arrayBuffer())
+    .then(buf => new Promise((resolve, reject) => {
+      // decodeAudioData has both promise and legacy-callback forms — support both.
+      let p;
+      try { p = ctx.decodeAudioData(buf, resolve, reject); } catch (e) { reject(e); return; }
+      if (p && typeof p.then === 'function') p.then(resolve, reject);
+    }))
+    .then(decoded => {
+      _bgMusicLoading = false;
+      _bgMusicBuffer = decoded;
+      // Only begin if no stop/pause arrived while we were decoding.
+      if (!_bgMusicStopped) _bgStartSource();
+    })
+    .catch(() => { _bgMusicLoading = false; });
+}
+
+// Stop playback (used as pause too — resume restarts the loop from its start).
+function stopBackgroundMusic() {
+  _bgMusicStopped = true;
+  if (_bgMusicSource) {
+    try { _bgMusicSource.onended = null; _bgMusicSource.stop(); } catch {}
+    _bgMusicSource = null;
+  }
+}
+
+// Resume after a stop/pause. Reuses the decoded buffer when present; otherwise
+// re-fetches the last url.
+function resumeBackgroundMusic() {
+  const ctx = bgAudioContext();
+  if (!ctx) return;
+  _bgMusicStopped = false;
+  try { if (ctx.state === 'suspended') ctx.resume(); } catch {}
+  if (_bgMusicBuffer) {
+    if (!_bgMusicSource) _bgStartSource();
+  } else if (_bgMusicUrl) {
+    startBackgroundMusic(_bgMusicUrl);
+  }
 }
 
 // Discrete-gesture hook: tap / swipe / long-press / double-tap on an element.
@@ -4595,6 +4809,54 @@ function nextTierInfo(streak) {
   if (above.length === 0) return null;
   return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
+
+const BADGE_DEFS = [
+  {
+    id: 'first-light',
+    icon: '🕯️',
+    label: 'First Light',
+    desc: 'Solve any daily puzzle',
+    check: (streak, attempts) =>
+      Object.values(attempts).some(a => a.finishedAt && a.score > 0),
+  },
+  {
+    id: 'all-in',
+    icon: '🎯',
+    label: 'All In',
+    desc: 'Complete all 4 daily games in one day',
+    check: (streak, attempts) =>
+      GAMES.filter(g => g.category === 'daily')
+           .every(g => attempts[g.id] && attempts[g.id].finishedAt && attempts[g.id].score > 0),
+  },
+  {
+    id: 'flame-keeper',
+    icon: '🔥',
+    label: 'Flame Keeper',
+    desc: '3-day streak',
+    check: (streak) => streak >= 3,
+  },
+  {
+    id: 'weekly-warrior',
+    icon: '📅',
+    label: 'Weekly Warrior',
+    desc: '7-day streak',
+    check: (streak) => streak >= 7,
+  },
+  {
+    id: 'multiplied',
+    icon: '💫',
+    label: 'Multiplied',
+    desc: '10-day streak (×1.5 points)',
+    check: (streak) => streak >= 10,
+  },
+  {
+    id: 'streak-titan',
+    icon: '⚡',
+    label: 'Streak Titan',
+    desc: '30-day streak',
+    check: (streak) => streak >= 30,
+  },
+];
 
 /* ============================================================
    Streak badges — named milestones unlocked at consecutive-day
@@ -6068,6 +6330,8 @@ const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10, MS_SAFE = MS_ROWS * MS_COLS - MS_
 
 const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
 const MS_HISTORY_MAX = 50;
+// Looping background-music asset (served by express.static from public/audio).
+const MS_MUSIC_URL = '/audio/minesweeper-bg.mp3';
 
 function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
 function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
@@ -6141,6 +6405,11 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [isMock, setIsMock] = useState(false);
   const [walletAddr, setWalletAddr] = useState(null);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
+  // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
+  // both SFX and music); `musicPaused` is the player's in-game music pause that
+  // leaves SFX untouched.
+  const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
+  const [musicPaused, setMusicPaused] = useState(false);
   const flagTimerRef = useRef(null);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
 
@@ -6154,7 +6423,29 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     setGameOverMine(null);
     setSteps(0);
     setActiveTab('game');
+    setMusicPaused(false);
   }, [resetKey]);
+
+  // Background music: plays while a game is live (board generated on first
+  // reveal), sound is enabled, and the player hasn't paused it. Starting only
+  // after the first reveal means it's triggered by a user gesture, satisfying
+  // browser autoplay policy. Any change to these conditions re-evaluates.
+  useEffect(() => {
+    const shouldPlay = mineSet !== null && !done && soundOn && !musicPaused;
+    if (shouldPlay) startBackgroundMusic(MS_MUSIC_URL);
+    else stopBackgroundMusic();
+  }, [mineSet, done, soundOn, musicPaused]);
+
+  // Always silence the track when leaving the game (unmount → back to lobby).
+  useEffect(() => () => stopBackgroundMusic(), []);
+
+  // Toggle the shared sound master switch (persists to localStorage via cgPrefs)
+  // and mirror it into local state so the component re-renders.
+  const toggleSound = () => {
+    const next = !cgPrefs.sound;
+    cgSetPref('sound', next);
+    setSoundOn(next);
+  };
 
   // Bridge: detect mock mode and fetch wallet address
   useEffect(() => {
@@ -6191,6 +6482,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (mines.has(idx)) {
       setGameOverMine(idx);
       setDone(true);
+      cgSound('lose'); cgHaptic([20, 40, 20]);
       const baseScore = 0;
       const entry = {
         id: String(Date.now()),
@@ -6211,6 +6503,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (newSafeRevealed >= MS_SAFE) {
       // Full board clear
       setDone(true);
+      cgSound('win'); cgHaptic([15, 30, 15]);
       const baseScore = Math.max(newSafeRevealed * 30 - secs * 2, 100) + 200;
       const dateStr = new Date().toISOString().slice(0, 10);
       const entry = {
@@ -6228,6 +6521,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const handleCashOut = () => {
     if (!cashOutActive || !mineSet) return;
     setDone(true);
+    cgSound('win'); cgHaptic([15, 30, 15]);
     const baseScore = Math.max(safeRevealed * 30 - secs * 2, 100);
     const finalScore = Math.round(baseScore * cashoutMultiplier);
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -6335,9 +6629,19 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               </button>
               {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
+            <button
+              className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
+              onClick={() => setMusicPaused(p => !p)}
+              disabled={!soundOn}
+              title={!soundOn ? 'Sound is off (Settings)' : musicPaused ? 'Resume music' : 'Pause music'}
+              aria-label={!soundOn ? 'Sound off' : musicPaused ? 'Resume music' : 'Pause music'}
+            >
+              {!soundOn ? '🔇' : musicPaused ? '▶' : '⏸'}
+            </button>
             <button className="ms-newgame-btn" onClick={() => {
               setMineSet(null); setAdjacency(null); setRevealed(new Set());
               setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+              setMusicPaused(false);
             }}>↺ New</button>
           </div>
         </div>
@@ -6383,6 +6687,26 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
       {activeTab === 'settings' && (
         <div style={{ padding: '0.5rem 0' }}>
+          <div className="ms-settings-section">
+            <h4>Audio</h4>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Sound &amp; music</span>
+              <button className="ms-theme-toggle" onClick={toggleSound}>
+                {soundOn ? '🔊 On' : '🔇 Off'}
+              </button>
+            </div>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Background music</span>
+              <button
+                className="ms-theme-toggle"
+                onClick={() => setMusicPaused(p => !p)}
+                disabled={!soundOn}
+                style={!soundOn ? { opacity: 0.5, cursor: 'default' } : undefined}
+              >
+                {!soundOn ? '🔇 Off' : musicPaused ? '▶ Paused' : '⏸ Playing'}
+              </button>
+            </div>
+          </div>
           <div className="ms-settings-section">
             <h4>Appearance</h4>
             <div className="ms-settings-row">
@@ -9498,12 +9822,28 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
 }
 
 /* ---------------- Diamond Rush ---------------- */
-const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵'];
-function drMake() {
+const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵', '💡', '🔀', '⏱️'];
+const DR_POWER_UP_ICONS = { hint: '💡', shuffle: '🔀', extraTime: '⏱️' };
+const DR_POWER_UP_TYPES = { 6: 'hint', 7: 'shuffle', 8: 'extraTime' };
+const DR_POWER_UP_REWARDS = {
+  win: [
+    { cascades: 3, reward: 'shuffle' },
+    { moves: 15, reward: 'hint' },
+    { always: true, reward: 'extraTime' },
+  ],
+};
+
+function drMake(powerUpSeed = false) {
   const g = new Array(64);
   for (let i = 0; i < 64; i++) {
     let v;
-    do { v = Math.floor(Math.random() * 6); }
+    do {
+      if (powerUpSeed && Math.random() < 0.08) {
+        v = 6 + Math.floor(Math.random() * 3);
+      } else {
+        v = Math.floor(Math.random() * 6);
+      }
+    }
     while (
       (i % 8 >= 2 && g[i - 1] === v && g[i - 2] === v) ||
       (i >= 16 && g[i - 8] === v && g[i - 16] === v)
@@ -9512,7 +9852,7 @@ function drMake() {
   }
   return g;
 }
-function drFindMatches(g) {
+function drFindMatches(g, onPowerUpEarned) {
   const m = new Set();
   for (let r = 0; r < 8; r++) for (let c = 0; c < 6; c++) {
     const i = r * 8 + c, v = g[i];
@@ -9521,6 +9861,15 @@ function drFindMatches(g) {
   for (let c = 0; c < 8; c++) for (let r = 0; r < 6; r++) {
     const i = r * 8 + c, v = g[i];
     if (v != null && g[i + 8] === v && g[i + 16] === v) { m.add(i); m.add(i + 8); m.add(i + 16); }
+  }
+  if (onPowerUpEarned) {
+    m.forEach(i => {
+      const gemType = g[i];
+      if (gemType >= 6 && gemType <= 8) {
+        const powerUpType = DR_POWER_UP_TYPES[gemType];
+        onPowerUpEarned(powerUpType);
+      }
+    });
   }
   return m;
 }
@@ -9545,31 +9894,71 @@ function drResolve(grid) {
   }
   return { grid: g, total, cascades, maxClear };
 }
-function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig }) {
+
+function findHighestScoringSwap(grid) {
+  let best = { a: -1, b: -1, score: 0 };
+  for (let i = 0; i < 64; i++) {
+    const r = Math.floor(i / 8), c = i % 8;
+    const neighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
+    for (const [nr, nc] of neighbors) {
+      if (nr < 0 || nr >= 8 || nc < 0 || nc >= 8) continue;
+      const j = nr * 8 + nc;
+      if (j <= i) continue;
+      const g = grid.slice();
+      [g[i], g[j]] = [g[j], g[i]];
+      const m = drFindMatches(g);
+      const score = m.size * 10;
+      if (score > best.score) best = { a: i, b: j, score };
+    }
+  }
+  return best;
+}
+function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, savedProgress, onSaveProgress }) {
   const TARGET = 800, START_MOVES = 18;
   const [grid, setGrid] = useState(() => drMake());
   const [sel, setSel] = useState(-1);
   const [moves, setMoves] = useState(START_MOVES);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
+  const [powerUps, setPowerUps] = useState(() => (savedProgress?.powerUps || { hint: 0, shuffle: 0, extraTime: 0 }));
+  const [hintIndices, setHintIndices] = useState([]);
+  const [timeBoost, setTimeBoost] = useState(false);
   const doneRef = useRef(false);
   const bestCascadeRef = useRef(0);
   const touch = useRef(null);
-  const secs = useElapsed(resetKey, !done);
+  const timeAddedRef = useRef(0);
+  const secs = useElapsed(resetKey, !done) + timeAddedRef.current;
   const secsRef = useRef(0); secsRef.current = secs;
 
   const init = () => {
     setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0);
     setDone(false); doneRef.current = false; bestCascadeRef.current = 0;
+    setHintIndices([]);
+    timeAddedRef.current = 0;
   };
   useEffect(() => { init(); }, [resetKey]);
+
+  const grantPowerUp = (type) => {
+    setPowerUps(prev => ({ ...prev, [type]: prev[type] + 1 }));
+  };
+
+  const onPowerUpEarned = (type) => {
+    grantPowerUp(type);
+  };
 
   const finish = (sc, win, mv) => {
     doneRef.current = true; setDone(true);
     cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
     cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, ts: Date.now() });
-    if (win) onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
-    else onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+    if (win) {
+      if (bestCascadeRef.current >= 3) grantPowerUp('shuffle');
+      if (mv >= 15) grantPowerUp('hint');
+      grantPowerUp('extraTime');
+      onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
+    } else {
+      grantPowerUp('extraTime');
+      onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+    }
   };
   const adjacent = (a, b) => {
     const ar = Math.floor(a / 8), ac = a % 8, br = Math.floor(b / 8), bc = b % 8;
@@ -9579,7 +9968,8 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     if (done || a === b || !adjacent(a, b)) { setSel(-1); return; }
     const g = grid.slice();
     [g[a], g[b]] = [g[b], g[a]];
-    if (!drFindMatches(g).size) { cgSound('move'); setSel(-1); return; } // no match, revert
+    if (!drFindMatches(g).size) { cgSound('move'); setSel(-1); return; }
+    drFindMatches(g, onPowerUpEarned);
     const res = drResolve(g);
     bestCascadeRef.current = Math.max(bestCascadeRef.current, res.cascades);
     cgSound('clear', 1 + res.cascades * 0.12); cgHaptic(20);
@@ -9610,6 +10000,33 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     else if (sel === start.i) { setSel(-1); }
     else trySwap(sel, start.i);
   };
+  const usePowerUp = (type) => {
+    if (done || powerUps[type] <= 0) return;
+    if (type === 'hint') {
+      const best = findHighestScoringSwap(grid);
+      if (best.a !== -1) {
+        setHintIndices([best.a, best.b]);
+        setTimeout(() => setHintIndices([]), 2000);
+      }
+    } else if (type === 'shuffle') {
+      const g = grid.slice();
+      const nonNull = [];
+      for (let i = 0; i < 64; i++) if (g[i] != null && g[i] < 6) nonNull.push(i);
+      for (let i = nonNull.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [g[nonNull[i]], g[nonNull[j]]] = [g[nonNull[j]], g[nonNull[i]]];
+      }
+      setGrid(g);
+      cgSound('click'); cgHaptic(30);
+    } else if (type === 'extraTime') {
+      timeAddedRef.current += 30;
+      setTimeBoost(true);
+      setTimeout(() => setTimeBoost(false), 1000);
+      cgSound('click'); cgHaptic(15);
+    }
+    setPowerUps(prev => ({ ...prev, [type]: prev[type] - 1 }));
+  };
+
   const hist = cgLoadHistory(DR_KEY);
   const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
   const wins = hist.filter(r => r.win).length;
@@ -9620,21 +10037,36 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
       { val: bigC, lbl: 'Best cascade' }, { val: score, lbl: 'This round' },
     ]),
-    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.']),
+    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="dr-powerups-bar">
+          {['hint', 'shuffle', 'extraTime'].map(type => (
+            <button
+              key={type}
+              className={`dr-powerup-btn ${powerUps[type] > 0 ? 'owned' : 'empty'}`}
+              onClick={() => usePowerUp(type)}
+              disabled={powerUps[type] === 0 || done}
+              title={`${type.charAt(0).toUpperCase() + type.slice(1)} (${powerUps[type]} owned)`}
+            >
+              <span className="icon">{DR_POWER_UP_ICONS[type]}</span>
+              <span className="count">{powerUps[type]}</span>
+            </button>
+          ))}
+        </div>
         <div className="dr-grid">
           {grid.map((v, i) => (
-            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '')}
+            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '') + (hintIndices.includes(i) ? ' hint-target' : '')}
               onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
               onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
               {DR_GEMS[v]}
             </div>
           ))}
         </div>
+        {timeBoost && <div className="dr-time-boost">+30 sec</div>}
       </div>
     </ClassicShell>
   );
@@ -15803,6 +16235,26 @@ function PostDetail({ post, onBack }) {
 /* ============================================================
    Root app
    ============================================================ */
+function BadgesSection({ streak, attempts, open, onToggle }) {
+  const badges = BADGE_DEFS.map(b => ({ ...b, earned: b.check(streak, attempts) }));
+  return (
+    <div className="badges-section">
+      <button className="badges-toggle" onClick={onToggle}>
+        Badges
+        <span className="badges-toggle-arrow">{open ? '▾' : '▸'}</span>
+      </button>
+      <div className={'badges-grid' + (open ? ' open' : '')}>
+        {badges.map(b => (
+          <div key={b.id} className={'badge-chip' + (b.earned ? '' : ' dim')} title={b.desc}>
+            <span>{b.icon}</span>
+            <span>{b.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=wallet / ?screen=session deep links for testing
@@ -15865,6 +16317,8 @@ function App() {
   const [matchBalance, setMatchBalance] = useState(null); // integer, null = loading
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
+  // Badges section toggle (mobile: collapsed by default)
+  const [badgesOpen, setBadgesOpen] = useState(false);
   // dApps-integration availability. Disabled (e.g. staging with an empty
   // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
   // gracefully alongside the server.
@@ -16579,6 +17033,14 @@ function App() {
               );
             })}
           </div>
+          )}
+          {authOk && (
+            <BadgesSection
+              streak={streak}
+              attempts={attempts}
+              open={badgesOpen}
+              onToggle={() => setBadgesOpen(b => !b)}
+            />
           )}
           {lobbyTab === 'daily' && authOk && (
             <TodayChampions

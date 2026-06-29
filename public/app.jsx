@@ -9850,7 +9850,12 @@ const DR_POWER_UP_REWARDS = {
     { always: true, reward: 'extraTime' },
   ],
 };
-
+function comboMultiplier(combo) {
+  if (combo <= 1) return 1.0;
+  if (combo <= 3) return 1.2;
+  if (combo <= 5) return 1.5;
+  return 2.0;
+}
 function drMake(powerUpSeed = false) {
   const g = new Array(64);
   for (let i = 0; i < 64; i++) {
@@ -10005,20 +10010,22 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   const [sel, setSel] = useState(-1);
   const [moves, setMoves] = useState(START_MOVES);
   const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
   const [done, setDone] = useState(false);
   const [powerUps, setPowerUps] = useState(() => (savedProgress?.powerUps || { hint: 0, shuffle: 0, extraTime: 0 }));
   const [hintIndices, setHintIndices] = useState([]);
   const [timeBoost, setTimeBoost] = useState(false);
   const doneRef = useRef(false);
   const bestCascadeRef = useRef(0);
+  const bestComboRef = useRef(0);
   const touch = useRef(null);
   const timeAddedRef = useRef(0);
   const secs = useElapsed(resetKey, !done) + timeAddedRef.current;
   const secsRef = useRef(0); secsRef.current = secs;
 
   const init = () => {
-    setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0);
-    setDone(false); doneRef.current = false; bestCascadeRef.current = 0;
+    setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0); setCombo(0);
+    setDone(false); doneRef.current = false; bestCascadeRef.current = 0; bestComboRef.current = 0;
     setHintIndices([]);
     timeAddedRef.current = 0;
   };
@@ -10035,7 +10042,8 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   const finish = (sc, win, mv) => {
     doneRef.current = true; setDone(true);
     cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
-    cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, ts: Date.now() });
+    cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, bestCombo: bestComboRef.current, ts: Date.now() });
+    setCombo(0);
     if (win) {
       if (bestCascadeRef.current >= 3) grantPowerUp('shuffle');
       if (mv >= 15) grantPowerUp('hint');
@@ -10054,14 +10062,19 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     if (done || a === b || !adjacent(a, b)) { setSel(-1); return; }
     const g = grid.slice();
     [g[a], g[b]] = [g[b], g[a]];
-    if (!drFindMatches(g).matches.size) { cgSound('move'); setSel(-1); return; }
+    if (!drFindMatches(g).matches.size) { cgSound('move'); setCombo(0); setSel(-1); return; }
     drFindMatches(g, onPowerUpEarned);
+    const newCombo = combo + 1;
+    const multiplier = comboMultiplier(newCombo);
     const res = drResolve(g);
     bestCascadeRef.current = Math.max(bestCascadeRef.current, res.cascades);
     cgSound('clear', 1 + res.cascades * 0.12); cgHaptic(20);
-    const ns = score + res.total;
+    const baseScore = res.total;
+    const multipliedScore = Math.round(baseScore * multiplier);
+    const ns = score + multipliedScore;
     const nm = moves - 1;
-    setGrid(res.grid); setScore(ns); setMoves(nm); setSel(-1);
+    setGrid(res.grid); setScore(ns); setCombo(newCombo); setMoves(nm); setSel(-1);
+    if (newCombo > bestComboRef.current) bestComboRef.current = newCombo;
     onStepChange && onStepChange(START_MOVES - nm);
     if (ns >= TARGET) { setTimeout(() => finish(ns, true, nm), 150); }
     else if (nm <= 0) { setTimeout(() => finish(ns, false, nm), 150); }
@@ -10117,18 +10130,19 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
   const wins = hist.filter(r => r.win).length;
   const bigC = hist.reduce((m, r) => Math.max(m, r.cascade || 0), 0);
+  const bestCombo = hist.reduce((m, r) => Math.max(m, r.bestCombo || 0), 0);
   const sheet = [
-    cgHistorySection(hist, r => <><span>{r.win ? '✅' : '❌'} {r.score} pts</span><span className="mono">x{r.cascade}</span></>),
+    cgHistorySection(hist, r => <><span>{r.win ? '✅' : '❌'} {r.score} pts</span><span className="mono">x{r.cascade}</span><span className="mono">c{r.bestCombo || 0}</span></>),
     cgStatsSection([
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
-      { val: bigC, lbl: 'Best cascade' }, { val: score, lbl: 'This round' },
+      { val: bigC, lbl: 'Best cascade' }, { val: bestCombo, lbl: 'Best combo' },
     ]),
-    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
+    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
-        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
+        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="dr-powerups-bar">
           {['hint', 'shuffle', 'extraTime'].map(type => (
             <button

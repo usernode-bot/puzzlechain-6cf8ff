@@ -2897,10 +2897,56 @@ body {
   cursor: pointer;
   user-select: none;
   aspect-ratio: 1;
-  transition: transform 0.12s ease, opacity 0.12s ease;
+  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
 }
 .dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
 .dr-gem.clearing { opacity: 0; transform: scale(0.4); }
+.dr-gem.hint-target { outline: 3px solid ${C.gold}; animation: hintPulse 0.6s ease-in-out; }
+@keyframes hintPulse { 0%, 100% { box-shadow: 0 0 8px ${C.gold}; } 50% { box-shadow: 0 0 16px ${C.gold}; } }
+.dr-powerups-bar {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  width: var(--cg-board);
+  max-width: 94vw;
+  margin-top: 0.8rem;
+}
+.dr-powerup-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  flex: 1;
+  max-width: 90px;
+}
+.dr-powerup-btn.owned:not(:disabled) { border-color: ${C.accent}; background: ${C.accent}14; }
+.dr-powerup-btn.owned:not(:disabled):hover { border-color: ${C.gold}; background: ${C.gold}22; }
+.dr-powerup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.dr-powerup-btn .icon { font-size: 1.4rem; line-height: 1; }
+.dr-powerup-btn .count { font-size: 0.65rem; color: ${C.muted}; }
+.dr-time-boost {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: ${C.gold};
+  animation: timeBounce 1s ease-out;
+  pointer-events: none;
+  z-index: 50;
+}
+@keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
 /* ---- Texas Hold 'Em ---- */
 .th-felt {
@@ -9180,12 +9226,28 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
 }
 
 /* ---------------- Diamond Rush ---------------- */
-const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵'];
-function drMake() {
+const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵', '💡', '🔀', '⏱️'];
+const DR_POWER_UP_ICONS = { hint: '💡', shuffle: '🔀', extraTime: '⏱️' };
+const DR_POWER_UP_TYPES = { 6: 'hint', 7: 'shuffle', 8: 'extraTime' };
+const DR_POWER_UP_REWARDS = {
+  win: [
+    { cascades: 3, reward: 'shuffle' },
+    { moves: 15, reward: 'hint' },
+    { always: true, reward: 'extraTime' },
+  ],
+};
+
+function drMake(powerUpSeed = false) {
   const g = new Array(64);
   for (let i = 0; i < 64; i++) {
     let v;
-    do { v = Math.floor(Math.random() * 6); }
+    do {
+      if (powerUpSeed && Math.random() < 0.08) {
+        v = 6 + Math.floor(Math.random() * 3);
+      } else {
+        v = Math.floor(Math.random() * 6);
+      }
+    }
     while (
       (i % 8 >= 2 && g[i - 1] === v && g[i - 2] === v) ||
       (i >= 16 && g[i - 8] === v && g[i - 16] === v)
@@ -9194,7 +9256,7 @@ function drMake() {
   }
   return g;
 }
-function drFindMatches(g) {
+function drFindMatches(g, onPowerUpEarned) {
   const m = new Set();
   for (let r = 0; r < 8; r++) for (let c = 0; c < 6; c++) {
     const i = r * 8 + c, v = g[i];
@@ -9203,6 +9265,15 @@ function drFindMatches(g) {
   for (let c = 0; c < 8; c++) for (let r = 0; r < 6; r++) {
     const i = r * 8 + c, v = g[i];
     if (v != null && g[i + 8] === v && g[i + 16] === v) { m.add(i); m.add(i + 8); m.add(i + 16); }
+  }
+  if (onPowerUpEarned) {
+    m.forEach(i => {
+      const gemType = g[i];
+      if (gemType >= 6 && gemType <= 8) {
+        const powerUpType = DR_POWER_UP_TYPES[gemType];
+        onPowerUpEarned(powerUpType);
+      }
+    });
   }
   return m;
 }
@@ -9227,31 +9298,71 @@ function drResolve(grid) {
   }
   return { grid: g, total, cascades, maxClear };
 }
-function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+
+function findHighestScoringSwap(grid) {
+  let best = { a: -1, b: -1, score: 0 };
+  for (let i = 0; i < 64; i++) {
+    const r = Math.floor(i / 8), c = i % 8;
+    const neighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
+    for (const [nr, nc] of neighbors) {
+      if (nr < 0 || nr >= 8 || nc < 0 || nc >= 8) continue;
+      const j = nr * 8 + nc;
+      if (j <= i) continue;
+      const g = grid.slice();
+      [g[i], g[j]] = [g[j], g[i]];
+      const m = drFindMatches(g);
+      const score = m.size * 10;
+      if (score > best.score) best = { a: i, b: j, score };
+    }
+  }
+  return best;
+}
+function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, savedProgress, onSaveProgress }) {
   const TARGET = 800, START_MOVES = 18;
   const [grid, setGrid] = useState(() => drMake());
   const [sel, setSel] = useState(-1);
   const [moves, setMoves] = useState(START_MOVES);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
+  const [powerUps, setPowerUps] = useState(() => (savedProgress?.powerUps || { hint: 0, shuffle: 0, extraTime: 0 }));
+  const [hintIndices, setHintIndices] = useState([]);
+  const [timeBoost, setTimeBoost] = useState(false);
   const doneRef = useRef(false);
   const bestCascadeRef = useRef(0);
   const touch = useRef(null);
-  const secs = useElapsed(resetKey, !done);
+  const timeAddedRef = useRef(0);
+  const secs = useElapsed(resetKey, !done) + timeAddedRef.current;
   const secsRef = useRef(0); secsRef.current = secs;
 
   const init = () => {
     setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0);
     setDone(false); doneRef.current = false; bestCascadeRef.current = 0;
+    setHintIndices([]);
+    timeAddedRef.current = 0;
   };
   useEffect(() => { init(); }, [resetKey]);
+
+  const grantPowerUp = (type) => {
+    setPowerUps(prev => ({ ...prev, [type]: prev[type] + 1 }));
+  };
+
+  const onPowerUpEarned = (type) => {
+    grantPowerUp(type);
+  };
 
   const finish = (sc, win, mv) => {
     doneRef.current = true; setDone(true);
     cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
     cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, ts: Date.now() });
-    if (win) onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
-    else onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+    if (win) {
+      if (bestCascadeRef.current >= 3) grantPowerUp('shuffle');
+      if (mv >= 15) grantPowerUp('hint');
+      grantPowerUp('extraTime');
+      onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
+    } else {
+      grantPowerUp('extraTime');
+      onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+    }
   };
   const adjacent = (a, b) => {
     const ar = Math.floor(a / 8), ac = a % 8, br = Math.floor(b / 8), bc = b % 8;
@@ -9261,7 +9372,8 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     if (done || a === b || !adjacent(a, b)) { setSel(-1); return; }
     const g = grid.slice();
     [g[a], g[b]] = [g[b], g[a]];
-    if (!drFindMatches(g).size) { cgSound('move'); setSel(-1); return; } // no match, revert
+    if (!drFindMatches(g).size) { cgSound('move'); setSel(-1); return; }
+    drFindMatches(g, onPowerUpEarned);
     const res = drResolve(g);
     bestCascadeRef.current = Math.max(bestCascadeRef.current, res.cascades);
     cgSound('clear', 1 + res.cascades * 0.12); cgHaptic(20);
@@ -9292,6 +9404,33 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     else if (sel === start.i) { setSel(-1); }
     else trySwap(sel, start.i);
   };
+  const usePowerUp = (type) => {
+    if (done || powerUps[type] <= 0) return;
+    if (type === 'hint') {
+      const best = findHighestScoringSwap(grid);
+      if (best.a !== -1) {
+        setHintIndices([best.a, best.b]);
+        setTimeout(() => setHintIndices([]), 2000);
+      }
+    } else if (type === 'shuffle') {
+      const g = grid.slice();
+      const nonNull = [];
+      for (let i = 0; i < 64; i++) if (g[i] != null && g[i] < 6) nonNull.push(i);
+      for (let i = nonNull.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [g[nonNull[i]], g[nonNull[j]]] = [g[nonNull[j]], g[nonNull[i]]];
+      }
+      setGrid(g);
+      cgSound('click'); cgHaptic(30);
+    } else if (type === 'extraTime') {
+      timeAddedRef.current += 30;
+      setTimeBoost(true);
+      setTimeout(() => setTimeBoost(false), 1000);
+      cgSound('click'); cgHaptic(15);
+    }
+    setPowerUps(prev => ({ ...prev, [type]: prev[type] - 1 }));
+  };
+
   const hist = cgLoadHistory(DR_KEY);
   const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
   const wins = hist.filter(r => r.win).length;
@@ -9302,21 +9441,36 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
       { val: bigC, lbl: 'Best cascade' }, { val: score, lbl: 'This round' },
     ]),
-    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.']),
+    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="dr-powerups-bar">
+          {['hint', 'shuffle', 'extraTime'].map(type => (
+            <button
+              key={type}
+              className={`dr-powerup-btn ${powerUps[type] > 0 ? 'owned' : 'empty'}`}
+              onClick={() => usePowerUp(type)}
+              disabled={powerUps[type] === 0 || done}
+              title={`${type.charAt(0).toUpperCase() + type.slice(1)} (${powerUps[type]} owned)`}
+            >
+              <span className="icon">{DR_POWER_UP_ICONS[type]}</span>
+              <span className="count">{powerUps[type]}</span>
+            </button>
+          ))}
+        </div>
         <div className="dr-grid">
           {grid.map((v, i) => (
-            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '')}
+            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '') + (hintIndices.includes(i) ? ' hint-target' : '')}
               onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
               onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
               {DR_GEMS[v]}
             </div>
           ))}
         </div>
+        {timeBoost && <div className="dr-time-boost">+30 sec</div>}
       </div>
     </ClassicShell>
   );

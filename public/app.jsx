@@ -2842,6 +2842,18 @@ body {
   cursor: pointer;
 }
 .cg-resume-actions button.ghost { background: transparent; color: ${C.muted}; border: 1px solid ${C.border}; }
+.cg-onchain-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: ${C.accent};
+  text-decoration: none;
+  opacity: 0.85;
+}
+.cg-onchain-badge:hover { opacity: 1; text-decoration: underline; }
 
 /* Keep existing classic boards fitting inside the shell stage */
 .cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
@@ -4292,7 +4304,9 @@ function useClassicSave(gameId) {
   };
   const loadState = async () => {
     const { ok, body } = await api(`/api/state/${gameId}`);
-    if (ok && body && body.state && body.state.mode === 'bot') return body.state;
+    if (ok && body && body.state && body.state.mode === 'bot') {
+      return { ...body.state, __anchorTxHash: body.anchorTxHash || null };
+    }
     return null;
   };
   const clearState = async () => {
@@ -4432,16 +4446,29 @@ function ClassicModePicker({ game, onPlay }) {
 // only), and Post to Feed (after a result).
 function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onPostToFeed, onClose }) {
   const [picking, setPicking] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain' | 'onchain'
   const modes = game.modes || [];
   const usePicker = !!game.menuModePicker && modes.length > 0;
   // Default new-game mode for games without an inline picker.
   const defaultMode = modes.length === 1 ? modes[0] : null;
 
   const doSave = async () => {
-    const ok = await onSaveGame();
-    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); }
+    if (saveStatus === 'saving') return;
+    setSaveStatus('saving');
+    const result = await onSaveGame();
+    if (result && result.ok) {
+      const next = result.anchored ? 'onchain' : 'plain';
+      setSaveStatus(next);
+      setTimeout(() => setSaveStatus(null), 1500);
+    } else {
+      setSaveStatus(null);
+    }
   };
+
+  const saveLabel = saveStatus === 'saving' ? 'Saving…'
+    : saveStatus === 'onchain' ? 'Saved on-chain ✓'
+    : saveStatus === 'plain' ? 'Saved ✓'
+    : '💾 Save Game';
 
   return (
     <div className="cg-menu-section">
@@ -4457,7 +4484,7 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
       {game.supportsSave && gameMode === 'bot' && (
         <>
           <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Versus Bot</div>
-          <button className="cg-sheet-action" onClick={doSave}>{saved ? 'Saved ✓' : '💾 Save Game'}</button>
+          <button className="cg-sheet-action" onClick={doSave} disabled={saveStatus === 'saving'}>{saveLabel}</button>
         </>
       )}
 
@@ -4473,10 +4500,21 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
 }
 
 // A small in-stage banner offering to resume a saved Versus-Bot game.
-function ClassicResumeBanner({ onResume, onDismiss }) {
+// anchorTxHash — when present, shows an ⛓ On-chain badge linking to the explorer.
+function ClassicResumeBanner({ onResume, onDismiss, anchorTxHash }) {
   return (
     <div className="cg-resume-banner">
-      <span>💾 You have a saved game.</span>
+      <span>
+        💾 You have a saved game.
+        {anchorTxHash && (
+          <a
+            href={`https://social-vibecoding.usernodelabs.org/explorer/tx/${anchorTxHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cg-onchain-badge"
+          >⛓ On-chain</a>
+        )}
+      </span>
       <div className="cg-resume-actions">
         <button onClick={onResume}>Resume</button>
         <button className="ghost" onClick={onDismiss}>New</button>
@@ -8487,7 +8525,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   return (
     <div>
-      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
+      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
@@ -10481,7 +10519,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
-        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
+        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
         <div className="th-felt">
           <div className="th-seat">
             <div className="who">Opponent</div>
@@ -15557,7 +15595,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   return (
     <div>
       {resumeOffer && (
-        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
+        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />
       )}
       <div className="status-bar">
         <div className="pill">
@@ -16884,16 +16922,46 @@ function App() {
   };
 
   // Game Menu "Save Game": persist the active Versus-Bot game's snapshot via
-  // the generic user_game_state store. Returns true on success.
+  // the generic user_game_state store, then attempt an on-chain hash anchor.
+  // Returns { ok, anchored } — the on-chain step is fire-and-continue; a tx
+  // failure still returns ok:true as long as the server save succeeded.
   const handleSaveGame = async () => {
-    if (!currentGame) return false;
+    if (!currentGame) return { ok: false, anchored: false };
     const snap = ClassicBridge.getSnapshot ? ClassicBridge.getSnapshot() : null;
-    if (!snap) return false;
-    const { ok } = await api(`/api/state/${currentGame.id}`, {
+    if (!snap) return { ok: false, anchored: false };
+    const { ok, body } = await api(`/api/state/${currentGame.id}`, {
       method: 'PUT',
       body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...snap } }),
-    }).catch(() => ({ ok: false }));
-    return !!ok;
+    }).catch(() => ({ ok: false, body: null }));
+    if (!ok) return { ok: false, anchored: false };
+
+    // Attempt on-chain anchor: send 0-value tx with the save hash as calldata,
+    // mirroring the dappAnchor pattern. Silently skipped in mock/no-wallet mode.
+    let anchored = false;
+    try {
+      const saveHash = body && body.saveHash;
+      const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
+        ? !(await window.usernode.isMockEnabled())
+        : false;
+      if (saveHash && window.usernode && window.usernode.sendTransaction && bridgeMockOff) {
+        const userAddr = window.usernode.getNodeAddress
+          ? await window.usernode.getNodeAddress()
+          : null;
+        if (userAddr) {
+          const tx = await window.usernode.sendTransaction({ to: userAddr, data: '0x' + saveHash, value: 0 });
+          const txHash = tx && tx.hash ? tx.hash : null;
+          if (txHash) {
+            await api(`/api/state/${currentGame.id}/anchor/confirm`, {
+              method: 'POST',
+              body: JSON.stringify({ txHash }),
+            }).catch(() => {});
+            anchored = true;
+          }
+        }
+      }
+    } catch (_e) { /* on-chain step is optional — save already succeeded */ }
+
+    return { ok: true, anchored };
   };
 
   // Build the menu config passed into ClassicShell for classic games.

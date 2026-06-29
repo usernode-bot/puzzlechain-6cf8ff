@@ -3795,6 +3795,45 @@ body {
 .dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
 .dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
 
+/* ---- Badges section ---- */
+.badges-section { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid ${C.border}; }
+.badges-toggle {
+  all: unset;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin-bottom: 0.6rem;
+  display: block;
+  cursor: default;
+}
+.badges-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.badges-grid .badge-chip { transition: opacity 0.15s ease; }
+.badges-grid .badge-chip.dim { opacity: 0.38; }
+.badges-grid .badge-chip:not(.dim) {
+  border-color: ${C.gold}55;
+  background: ${C.gold}0d;
+}
+@media (max-width: 560px) {
+  .badges-toggle {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.4rem 0;
+    margin-bottom: 0;
+  }
+  .badges-toggle:hover { color: ${C.text}; }
+  .badges-toggle-arrow { font-size: 0.7rem; transition: transform 0.15s ease; }
+  .badges-grid { display: none; }
+  .badges-grid.open { display: flex; margin-top: 0.6rem; }
+}
 /* ---- Chutes & Ladders ---- */
 .cnl-banner {
   text-align: center; font-size: 0.82rem; font-weight: 600;
@@ -4485,6 +4524,54 @@ function nextTierInfo(streak) {
   if (above.length === 0) return null;
   return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
+
+const BADGE_DEFS = [
+  {
+    id: 'first-light',
+    icon: '🕯️',
+    label: 'First Light',
+    desc: 'Solve any daily puzzle',
+    check: (streak, attempts) =>
+      Object.values(attempts).some(a => a.finishedAt && a.score > 0),
+  },
+  {
+    id: 'all-in',
+    icon: '🎯',
+    label: 'All In',
+    desc: 'Complete all 4 daily games in one day',
+    check: (streak, attempts) =>
+      GAMES.filter(g => g.category === 'daily')
+           .every(g => attempts[g.id] && attempts[g.id].finishedAt && attempts[g.id].score > 0),
+  },
+  {
+    id: 'flame-keeper',
+    icon: '🔥',
+    label: 'Flame Keeper',
+    desc: '3-day streak',
+    check: (streak) => streak >= 3,
+  },
+  {
+    id: 'weekly-warrior',
+    icon: '📅',
+    label: 'Weekly Warrior',
+    desc: '7-day streak',
+    check: (streak) => streak >= 7,
+  },
+  {
+    id: 'multiplied',
+    icon: '💫',
+    label: 'Multiplied',
+    desc: '10-day streak (×1.5 points)',
+    check: (streak) => streak >= 10,
+  },
+  {
+    id: 'streak-titan',
+    icon: '⚡',
+    label: 'Streak Titan',
+    desc: '30-day streak',
+    check: (streak) => streak >= 30,
+  },
+];
 
 /* ============================================================
    Streak badges — named milestones unlocked at consecutive-day
@@ -15529,6 +15616,26 @@ function PostDetail({ post, onBack }) {
 /* ============================================================
    Root app
    ============================================================ */
+function BadgesSection({ streak, attempts, open, onToggle }) {
+  const badges = BADGE_DEFS.map(b => ({ ...b, earned: b.check(streak, attempts) }));
+  return (
+    <div className="badges-section">
+      <button className="badges-toggle" onClick={onToggle}>
+        Badges
+        <span className="badges-toggle-arrow">{open ? '▾' : '▸'}</span>
+      </button>
+      <div className={'badges-grid' + (open ? ' open' : '')}>
+        {badges.map(b => (
+          <div key={b.id} className={'badge-chip' + (b.earned ? '' : ' dim')} title={b.desc}>
+            <span>{b.icon}</span>
+            <span>{b.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=wallet / ?screen=session deep links for testing
@@ -15584,6 +15691,8 @@ function App() {
   const [matchBalance, setMatchBalance] = useState(null); // integer, null = loading
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
+  // Badges section toggle (mobile: collapsed by default)
+  const [badgesOpen, setBadgesOpen] = useState(false);
   // dApps-integration availability. Disabled (e.g. staging with an empty
   // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
   // gracefully alongside the server.
@@ -16254,6 +16363,14 @@ function App() {
               );
             })}
           </div>
+          )}
+          {authOk && (
+            <BadgesSection
+              streak={streak}
+              attempts={attempts}
+              open={badgesOpen}
+              onToggle={() => setBadgesOpen(b => !b)}
+            />
           )}
           {lobbyTab === 'daily' && authOk && (
             <TodayChampions

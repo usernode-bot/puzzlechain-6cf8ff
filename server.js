@@ -977,6 +977,28 @@ async function migrate() {
     )
   `);
 
+  // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
+  // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
+  // `state` JSONB is game-specific and `game_id` is validated against
+  // ALL_GAME_IDS. No sensitive data (gameplay results only). Any user can join
+  // a waiting room by code, so no inviteeId is required (unlike collab_sessions).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS classic_rooms (
+      id             TEXT PRIMARY KEY,
+      game_id        TEXT NOT NULL,
+      player1_id     TEXT NOT NULL,
+      player2_id     TEXT,
+      player1_name   TEXT,
+      player2_name   TEXT,
+      state          JSONB NOT NULL DEFAULT '{}',
+      move_seq       INTEGER NOT NULL DEFAULT 0,
+      status         TEXT NOT NULL DEFAULT 'waiting',
+      winner         TEXT,
+      last_move_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
   if (IS_STAGING) {
     // PvP staging seeds: three match states for UI testing.
     await pool.query(`
@@ -1305,6 +1327,28 @@ async function migrate() {
                $1, 'active', 1)
        ON CONFLICT (id) DO NOTHING`,
       [midPits]
+    );
+
+    // Game Menu staging seeds (this change). Both are no-ops in production.
+    // 1) A saved Versus-Bot Mancala game so the "Resume Saved" prompt is
+    //    demonstrable without playing an AI game to completion.
+    await pool.query(
+      `INSERT INTO user_game_state (user_id, username, game_id, state)
+       VALUES ('staging-demo-user', 'staging-demo-user', 'mancala', $1::jsonb)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [JSON.stringify({
+        mode: 'bot', difficulty: 'medium',
+        pits: [3, 4, 2, 5, 1, 4, 6, 3, 4, 3, 5, 2, 4, 5],
+        currentPlayer: 1, moves: 8, secs: 64,
+      })]
+    );
+    // 2) A waiting Chutes & Ladders online room so a tester can demo "Join Room"
+    //    with code CLTST.
+    await pool.query(
+      `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state, status)
+       VALUES ('CLTST', 'chutes-ladders', 'staging-demo-user', 'staging-p1', $1::jsonb, 'waiting')
+       ON CONFLICT (id) DO NOTHING`,
+      [JSON.stringify({ p1Pos: 0, p2Pos: 0, currentPlayer: 1, die: null, rolls: 0 })]
     );
 
     // Snake leaderboard seed — newly created table is empty in staging, so the
@@ -2885,6 +2929,34 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: create a Diamond Rush attempt with power-up gems
+    // on the board so the power-up earning and usage UI is demonstrable.
+    // Claimed but unfinished, with a board containing power-up gems at specific positions.
+    if (IS_STAGING && req.query.demo === 'powerups') {
+      const demoBoard = new Array(64).fill(null);
+      for (let i = 0; i < 64; i++) demoBoard[i] = Math.floor(Math.random() * 6);
+      demoBoard[10] = 6; demoBoard[25] = 7; demoBoard[40] = 8;
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'diamondrush', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL,
+               score = NULL,
+               time_secs = NULL,
+               steps = EXCLUDED.steps,
+               elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          3,
+          45,
+          JSON.stringify({ grid: demoBoard, powerUps: { hint: 1, shuffle: 1, extraTime: 0 } }),
+        ]
+      );
+    }
+
     const { rows } = await pool.query(
       `SELECT * FROM daily_attempts
        WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
@@ -3463,6 +3535,177 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
   } catch (err) {
     console.error('[mancala] move failed:', err.message);
     res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// ---- Classic Games generic online rooms (classic_rooms) ------------------
+// Open room-code multiplayer used by the Game Menu's "Online Multiplayer".
+// Currently wired for Chutes & Ladders; the table/state is generic so other
+// classic games can slot in later. Any authenticated user can join by code.
+
+// Chutes & Ladders board map (mirrors CNL_LADDERS/CNL_CHUTES in public/app.jsx).
+const CNL_LADDERS_SRV = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+const CNL_CHUTES_SRV  = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+const CNL_JUMPS_SRV   = Object.assign({}, CNL_LADDERS_SRV, CNL_CHUTES_SRV);
+
+function shapeClassicRoom(r) {
+  return {
+    id: r.id,
+    gameId: r.game_id,
+    player1Id: r.player1_id,
+    player2Id: r.player2_id,
+    player1Name: r.player1_name,
+    player2Name: r.player2_name,
+    state: r.state || {},
+    moveSeq: r.move_seq,
+    status: r.status,
+    winner: r.winner,
+  };
+}
+
+// Apply a single Chutes & Ladders roll for `player` (1|2) to the room state.
+// Returns the next state plus terminal info. Server owns the dice (anti-cheat).
+function cnlApplyRoll(state, player) {
+  const die = crypto.randomInt(1, 7); // 1..6
+  const fromKey = player === 1 ? 'p1Pos' : 'p2Pos';
+  const from = state[fromKey] || 0;
+  const next = { ...state, die, rolls: (state.rolls || 0) + 1, lastJump: null };
+  let landed = from;
+  if (from + die <= 100) {
+    landed = from + die;
+    if (CNL_JUMPS_SRV[landed] !== undefined) {
+      next.lastJump = { from: landed, to: CNL_JUMPS_SRV[landed] };
+      landed = CNL_JUMPS_SRV[landed];
+    }
+  }
+  next[fromKey] = landed;
+  const gameOver = landed === 100;
+  next.currentPlayer = gameOver ? player : (player === 1 ? 2 : 1);
+  return { state: next, gameOver, winner: gameOver ? String(player) : null };
+}
+
+// Create an open room. Body: nothing needed; gameId is the path param.
+app.post('/api/classic/:gameId/rooms', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const initState = gameId === 'chutes-ladders'
+    ? { p1Pos: 0, p2Pos: 0, currentPlayer: 1, die: null, rolls: 0 }
+    : {};
+  let roomId = generateRoomId();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state)
+         VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING *`,
+        [roomId, gameId, req.user.id, req.user.username || null, JSON.stringify(initState)]
+      );
+      return res.json(shapeClassicRoom(rows[0]));
+    } catch (err) {
+      if (err.code === '23505') { roomId = generateRoomId(); continue; }
+      console.error('[classic] create room failed:', err.message);
+      return res.status(500).json({ error: 'Failed to create room' });
+    }
+  }
+  res.status(500).json({ error: 'Failed to generate unique room ID' });
+});
+
+// Join an existing waiting room as player 2.
+app.post('/api/classic/:gameId/rooms/:roomId/join', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE classic_rooms
+         SET player2_id = $1, player2_name = $2, status = 'active', last_move_at = now()
+       WHERE id = $3 AND game_id = $4 AND status = 'waiting' AND player2_id IS NULL
+         AND player1_id != $1
+       RETURNING *`,
+      [req.user.id, req.user.username || null, roomId, gameId]
+    );
+    if (rows.length === 0) {
+      const existing = await pool.query('SELECT id, status, player1_id FROM classic_rooms WHERE id = $1', [roomId]);
+      if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+      if (existing.rows[0].player1_id === req.user.id) {
+        return res.status(409).json({ error: 'You created this room — share the code with a friend' });
+      }
+      return res.status(409).json({ error: 'Room is already full or finished' });
+    }
+    res.json(shapeClassicRoom(rows[0]));
+  } catch (err) {
+    console.error('[classic] join room failed:', err.message);
+    res.status(500).json({ error: 'Failed to join room' });
+  }
+});
+
+// Poll room state.
+app.get('/api/classic/:gameId/rooms/:roomId', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    res.json(shapeClassicRoom(rows[0]));
+  } catch (err) {
+    console.error('[classic] get room failed:', err.message);
+    res.status(500).json({ error: 'Failed to get room' });
+  }
+});
+
+// Apply a move. For Chutes & Ladders the only move is { type: 'roll' }; the
+// server rolls the die so neither client can cheat. move_seq guards duplicates.
+app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  const { moveSeq } = req.body || {};
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  if (gameId !== 'chutes-ladders') return res.status(400).json({ error: 'Online moves not supported for this game' });
+  if (typeof moveSeq !== 'number') return res.status(400).json({ error: 'moveSeq is required' });
+  try {
+    const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    const r = rows[0];
+    if (r.status !== 'active') return res.status(409).json({ error: 'Game is not active' });
+    if (r.move_seq !== moveSeq - 1) return res.status(409).json({ error: 'Stale move_seq', serverMoveSeq: r.move_seq });
+
+    const player = (r.state && r.state.currentPlayer) || 1;
+    if (player === 1 && req.user.id !== r.player1_id) return res.status(403).json({ error: 'Not your turn' });
+    if (player === 2 && req.user.id !== r.player2_id) return res.status(403).json({ error: 'Not your turn' });
+
+    const { state: newState, gameOver, winner } = cnlApplyRoll(r.state || {}, player);
+    const newStatus = gameOver ? 'finished' : 'active';
+
+    const { rows: updated } = await pool.query(
+      `UPDATE classic_rooms
+         SET state = $1::jsonb, status = $2, winner = $3, move_seq = $4, last_move_at = now()
+       WHERE id = $5 AND move_seq = $6
+       RETURNING *`,
+      [JSON.stringify(newState), newStatus, winner, moveSeq, roomId, moveSeq - 1]
+    );
+    if (updated.length === 0) return res.status(409).json({ error: 'Concurrent update conflict' });
+    res.json(shapeClassicRoom(updated[0]));
+  } catch (err) {
+    console.error('[classic] move failed:', err.message);
+    res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// Mark a room finished early (forfeit / opponent left). Idempotent.
+app.post('/api/classic/:gameId/rooms/:roomId/finish', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  const { winner } = req.body || {};
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE classic_rooms
+         SET status = 'finished', winner = COALESCE(winner, $3), last_move_at = now()
+       WHERE id = $1 AND game_id = $2
+       RETURNING *`,
+      [roomId, gameId, winner != null ? String(winner) : null]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    res.json(shapeClassicRoom(rows[0]));
+  } catch (err) {
+    console.error('[classic] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish room' });
   }
 });
 

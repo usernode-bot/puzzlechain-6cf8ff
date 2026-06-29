@@ -57,7 +57,9 @@
     { "name": "Power-up demo seeds successfully", "path": "/?demo=powerup", "expectText": "PuzzleChain" },
     { "name": "Minesweeper card in Classic Games tab", "path": "/?tab=classic", "expectText": "Minesweeper" },
     { "name": "Mancala card in Classic Games tab", "path": "/?tab=classic", "expectText": "Mancala" },
+    { "name": "Chutes & Ladders card in Classic Games tab", "path": "/?tab=classic", "expectText": "Chutes & Ladders" },
     { "name": "2048 card in Classic Games tab", "path": "/?tab=classic", "expectText": "2048" },
+    { "name": "Knight's Tour card in Classic Games tab", "path": "/?tab=classic", "expectText": "Knight's Tour" },
     { "name": "Snake card in Classic Games tab", "path": "/?tab=classic", "expectText": "Snake" },
     { "name": "Block Blast card in Classic Games tab", "path": "/?tab=classic", "expectText": "Block Blast" },
     { "name": "Tile Match Puzzle card in Classic Games tab", "path": "/?tab=classic", "expectText": "Tile Match Puzzle" },
@@ -89,6 +91,13 @@
     { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
     { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
     { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
-    { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" }
+    { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
+    { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
+    { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },
+    { "name": "Mancala mode picker offers Daily Challenge", "path": "/?game=mancala", "expectText": "Daily Challenge" },
+    { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" },
+    { "name": "Chutes & Ladders mode select offers Versus Bot", "path": "/?game=chutes-ladders", "expectText": "Versus Bot" },
+    { "name": "Chutes & Ladders mode select offers Online Multiplayer", "path": "/?game=chutes-ladders", "expectText": "Online Multiplayer" },
+    { "name": "Minesweeper game screen renders (audio controls load cleanly)", "path": "/?game=minesweeper", "expectText": "Safe Revealed" }
   ]
 }

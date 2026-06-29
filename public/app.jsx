@@ -4,18 +4,18 @@ const { useState, useEffect, useRef } = React;
    Design system — color palette
    ============================================================ */
 const C = {
-  bg:      '#0A0E1A',
-  surface: '#111827',
-  card:    '#1a2235',
-  border:  '#1e3a5f',
-  accent:  '#3b82f6',
-  gold:    '#f59e0b',
-  emerald: '#10b981',
-  violet:  '#8b5cf6',
-  rose:    '#f43f5e',
-  text:    '#e2e8f0',
-  muted:   '#64748b',
-  dim:     '#334155',
+  bg:      '#0A0D14',
+  surface: '#12161F',
+  card:    '#181D29',
+  border:  '#2A3342',
+  accent:  '#6366F1',
+  gold:    '#FBBF24',
+  emerald: '#34D399',
+  violet:  '#A78BFA',
+  rose:    '#FB7185',
+  text:    '#ECEFF6',
+  muted:   '#8B95A8',
+  dim:     '#39424F',
 };
 
 /* ============================================================
@@ -157,6 +157,25 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+@media (max-width: 640px) {
+  .badge-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+  .badge-chip {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 12px;
+    padding: 0.65rem 0.3rem;
+    gap: 0.25rem;
+    white-space: normal;
+  }
+  .badge-chip .badge-chip-icon { font-size: 1.8rem; }
+  .badge-chip .badge-chip-name { font-size: 0.62rem; line-height: 1.2; }
+}
 /* Today's Champions leaderboard tweaks (reuses .lboard) */
 .lboard.champions { margin-top: 0; }
 .lboard .lrow.clickable { cursor: pointer; }
@@ -266,6 +285,28 @@ body {
 .account-msg.ok { color: ${C.emerald}; }
 .account-msg.err { color: ${C.rose}; }
 
+/* Account "Connections" section — Friends + dApps relocated here on mobile. */
+.account-connection-row {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+  background: ${C.dim}; border: 1px solid ${C.border};
+  border-radius: 10px; padding: 0.7rem 0.9rem;
+  font-size: 0.9rem; font-weight: 600; color: ${C.text};
+  cursor: pointer; text-align: left; transition: border-color 0.15s;
+}
+.account-connection-row:hover { border-color: ${C.accent}; }
+.account-connection-row .chev { margin-left: auto; color: ${C.muted}; }
+.account-dapps-row { margin-top: 1rem; }
+.account-dapps-pubkey {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  color: ${C.text}; word-break: break-all; flex: 1;
+}
+
+/* The Connections section is only shown at narrow widths — above 560px the
+   Friends button and dApps chip live in the top bar instead. */
+@media (min-width: 561px) {
+  .account-connections { display: none; }
+}
+
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
   .account-chip { padding: 0.35rem; }
@@ -273,6 +314,11 @@ body {
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
+  /* Friends + dApps move into the Account screen's Connections section.
+     Scoped under .nav-right so they outrank the base chip rule defined
+     later in this stylesheet regardless of source order. */
+  .nav-right .nav-friends-btn { display: none; }
+  .nav-right .nav-integration-chip { display: none; }
 }
 
 /* ---- Lobby ---- */
@@ -515,7 +561,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.primary-btn:hover { background: #2f6fe0; }
+.primary-btn:hover { background: #4F52D9; }
 
 /* ---- Locked screen ---- */
 .locked-card {
@@ -703,16 +749,103 @@ body {
 .word-theme b { color: ${C.text}; }
 
 /* ---- Crypto Wordle ---- */
+.cw-tracker {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  max-width: 460px;
+  margin: 0 auto 0.8rem;
+}
+.cw-tracker .cw-dot {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: ${C.muted};
+  font-family: 'JetBrains Mono', monospace;
+}
+.cw-tracker .cw-dot.solved { color: ${C.emerald}; }
+.cw-tracker .cw-dot.missed { color: ${C.rose}; }
+.cw-tracker .cw-dot.active { color: ${C.accent}; }
+.cw-alldone {
+  text-align: center;
+  max-width: 460px;
+  margin: 1rem auto 0;
+  font-weight: 600;
+  color: ${C.emerald};
+}
+.cw-clue {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 460px;
+  margin: 0 auto 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-left: 3px solid ${C.emerald};
+  border-radius: 10px;
+}
+.cw-clue-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: ${C.emerald};
+  font-weight: 700;
+}
+.cw-clue-text { flex: 1 1 auto; font-size: 0.9rem; color: ${C.text}; }
+.cw-clue-len {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: ${C.muted};
+  white-space: nowrap;
+}
+.cw-clue-extra {
+  margin-top: -0.4rem;
+  border-left-color: ${C.gold};
+}
+.cw-clue-extra .cw-clue-label { color: ${C.gold}; }
+.cw-hint-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  max-width: 460px;
+  margin: 0 auto 0.9rem;
+}
+.cw-hint-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  background: ${C.gold};
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  transition: filter 0.1s ease, opacity 0.1s ease;
+}
+.cw-hint-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.cw-hint-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.cw-hint-balance {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  color: ${C.muted};
+}
+.cw-hint-msg {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: ${C.rose};
+}
 .cw-board {
   display: grid;
-  grid-template-rows: repeat(6, 1fr);
   gap: 0.4rem;
   max-width: 330px;
   margin: 0 auto;
 }
 .cw-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
   gap: 0.4rem;
 }
 .cw-row.shake { animation: cw-shake 0.4s ease; }
@@ -866,33 +999,60 @@ body {
   margin-top: 0.2rem;
   text-align: center;
 }
-.ms-usernode-banner {
-  display: inline-block;
-  padding: 0.35rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid ${C.border};
-  font-size: 0.75rem;
+.ms-settings-section { margin-bottom: 1.25rem; }
+.ms-settings-section h4 {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: ${C.muted};
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
-.ms-game-header {
+.ms-settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-.ms-theme-btn {
+  padding: 0.6rem 0.75rem;
   background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  margin-bottom: 0.4rem;
+}
+.ms-settings-row .ms-settings-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.ms-theme-toggle {
+  background: ${C.surface};
   border: 1px solid ${C.border};
   color: ${C.text};
   border-radius: 8px;
-  padding: 0.3rem 0.6rem;
+  padding: 0.25rem 0.75rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-family: inherit;
+  font-weight: 600;
   transition: border-color 0.12s;
 }
-.ms-theme-btn:hover { border-color: ${C.accent}; }
+.ms-theme-toggle:hover { border-color: ${C.accent}; }
+.ms-wallet-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: right;
+}
+.ms-wallet-status .ms-ws-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: ${C.emerald};
+}
+.ms-wallet-status .ms-ws-label.mock { color: ${C.gold}; }
+.ms-wallet-status .ms-ws-label.unavail { color: ${C.muted}; }
+.ms-wallet-status .ms-ws-addr {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: ${C.muted};
+}
 .ms-action-row {
   display: flex;
   gap: 0.6rem;
@@ -914,6 +1074,24 @@ body {
   transition: border-color 0.12s;
 }
 .ms-action-row .ms-newgame-btn:hover { border-color: ${C.accent}; }
+.ms-action-row .ms-music-btn {
+  flex: 0 0 auto;
+  width: 3rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 12px;
+  padding: 0.8rem 0.5rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, opacity 0.12s;
+}
+.ms-action-row .ms-music-btn:hover:not(:disabled) { border-color: ${C.accent}; }
+.ms-action-row .ms-music-btn.paused { color: ${C.gold}; border-color: ${C.gold}66; }
+.ms-action-row .ms-music-btn.off { opacity: 0.5; cursor: default; }
+.ms-action-row .ms-music-btn:disabled { cursor: default; }
 .ms-bottom-nav {
   display: flex;
   border-top: 1px solid ${C.border};
@@ -1277,6 +1455,27 @@ body {
 }
 .mnc-difficulty-pill:hover { border-color: ${C.gold}; color: ${C.text}; }
 .mnc-difficulty-pill.active { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}14; font-weight: 600; }
+.mnc-daily-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; flex-wrap: wrap;
+  max-width: 480px; margin: 0 auto 0.6rem;
+}
+.mnc-daily-title { font-weight: 700; font-size: 0.95rem; color: ${C.text}; }
+.mnc-daily-pills { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.mnc-record-pill {
+  font-size: 0.74rem; font-weight: 700;
+  background: ${C.gold}14; color: ${C.gold};
+  border: 1px solid ${C.gold}55;
+  border-radius: 999px; padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
+.mnc-streak-chip {
+  font-size: 0.74rem; font-weight: 700;
+  background: ${C.rose}1f; color: ${C.rose};
+  border: 1px solid ${C.rose}55;
+  border-radius: 999px; padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
 .mnc-mode-start-btn {
   width: 100%;
   padding: 0.65rem;
@@ -2284,7 +2483,7 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.tm-play-btn:hover { background: #2f6fe0; }
+.tm-play-btn:hover { background: #4F52D9; }
 .tm-level-won {
   background: ${C.card};
   border: 1px solid ${C.emerald}55;
@@ -2601,6 +2800,49 @@ body {
 }
 .cg-sheet-action:hover { border-color: ${C.accent}; }
 
+/* Game Menu (Menu tab) */
+.cg-menu-section { display: flex; flex-direction: column; gap: 0.4rem; }
+.cg-menu-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
+.cg-mode-pill {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 600;
+  background: ${C.accent}22;
+  color: ${C.accent};
+  border: 1px solid ${C.accent}55;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  white-space: nowrap;
+}
+.cg-resume-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: var(--cg-board);
+  max-width: 94vw;
+  background: ${C.gold}14;
+  border: 1px solid ${C.gold}55;
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.82rem;
+  color: ${C.text};
+}
+.cg-resume-actions { display: flex; gap: 0.4rem; flex: 0 0 auto; }
+.cg-resume-actions button {
+  background: ${C.gold};
+  color: #1a1205;
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cg-resume-actions button.ghost { background: transparent; color: ${C.muted}; border: 1px solid ${C.border}; }
+
 /* Keep existing classic boards fitting inside the shell stage */
 .cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
 .cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
@@ -2716,10 +2958,74 @@ body {
   cursor: pointer;
   user-select: none;
   aspect-ratio: 1;
-  transition: transform 0.12s ease, opacity 0.12s ease;
+  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
 }
 .dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
 .dr-gem.clearing { opacity: 0; transform: scale(0.4); }
+.dr-gem.bomb {
+  background: rgba(255, 193, 7, 0.15);
+  box-shadow: 0 0 12px rgba(255, 193, 7, 0.4);
+  animation: dr-glow-bomb 1.5s ease-in-out infinite;
+}
+.dr-gem.lightning {
+  background: rgba(100, 200, 255, 0.15);
+  box-shadow: 0 0 12px rgba(100, 200, 255, 0.6);
+  animation: dr-glow-lightning 1.2s ease-in-out infinite;
+}
+.dr-gem.rainbow {
+  background: linear-gradient(45deg, rgba(255, 0, 127, 0.15), rgba(0, 200, 255, 0.15));
+  box-shadow: 0 0 15px rgba(200, 100, 255, 0.5);
+  animation: dr-glow-rainbow 1.8s ease-in-out infinite;
+}
+@keyframes dr-glow-bomb { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
+@keyframes dr-glow-lightning { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
+@keyframes dr-glow-rainbow { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(60deg); } }
+.dr-gem.hint-target { outline: 3px solid ${C.gold}; animation: hintPulse 0.6s ease-in-out; }
+@keyframes hintPulse { 0%, 100% { box-shadow: 0 0 8px ${C.gold}; } 50% { box-shadow: 0 0 16px ${C.gold}; } }
+.dr-powerups-bar {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  width: var(--cg-board);
+  max-width: 94vw;
+  margin-top: 0.8rem;
+}
+.dr-powerup-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  flex: 1;
+  max-width: 90px;
+}
+.dr-powerup-btn.owned:not(:disabled) { border-color: ${C.accent}; background: ${C.accent}14; }
+.dr-powerup-btn.owned:not(:disabled):hover { border-color: ${C.gold}; background: ${C.gold}22; }
+.dr-powerup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.dr-powerup-btn .icon { font-size: 1.4rem; line-height: 1; }
+.dr-powerup-btn .count { font-size: 0.65rem; color: ${C.muted}; }
+.dr-time-boost {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: ${C.gold};
+  animation: timeBounce 1s ease-out;
+  pointer-events: none;
+  z-index: 50;
+}
+@keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
 /* ---- Texas Hold 'Em ---- */
 .th-felt {
@@ -2882,7 +3188,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.idle-card-btn:hover { background: #2f6fe0; }
+.idle-card-btn:hover { background: #4F52D9; }
 .idle-card-btn:disabled { background: ${C.muted}; cursor: not-allowed; }
 
 .idle-coin-popup {
@@ -2946,7 +3252,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.prestige-confirm:hover { background: #2f6fe0; }
+.prestige-confirm:hover { background: #4F52D9; }
 .prestige-cancel {
   flex: 1;
   padding: 0.8rem;
@@ -3352,7 +3658,7 @@ body {
   padding: 0.45rem 0.85rem; font-family: inherit; font-size: 0.83rem;
   font-weight: 600; cursor: pointer; transition: background 0.12s;
 }
-.tm-duel-find-btn:hover:not(:disabled) { background: #2f6fe0; }
+.tm-duel-find-btn:hover:not(:disabled) { background: #4F52D9; }
 .tm-duel-find-btn:disabled { opacity: 0.35; cursor: not-allowed; background: ${C.muted}; }
 .tm-duel-matchmaking {
   text-align: center; padding: 2rem 1rem;
@@ -3469,6 +3775,13 @@ body {
   color: ${C.emerald}; transition: border-color 0.15s;
 }
 .nav-wallet-chip:hover { border-color: ${C.emerald}; }
+.nav-match-chip {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 999px; padding: 0.3rem 0.7rem;
+  font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
+  color: ${C.gold}; white-space: nowrap;
+}
 .nav-integration-chip {
   display: inline-flex; align-items: center; gap: 0.3rem;
   background: ${C.card}; border: 1px solid ${C.border};
@@ -3542,6 +3855,133 @@ body {
 }
 .dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
 .dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+
+/* ---- Badges section ---- */
+.badges-section { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid ${C.border}; }
+.badges-toggle {
+  all: unset;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${C.muted};
+  margin-bottom: 0.6rem;
+  display: block;
+  cursor: default;
+}
+.badges-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.badges-grid .badge-chip { transition: opacity 0.15s ease; }
+.badges-grid .badge-chip.dim { opacity: 0.38; }
+.badges-grid .badge-chip:not(.dim) {
+  border-color: ${C.gold}55;
+  background: ${C.gold}0d;
+}
+@media (max-width: 560px) {
+  .badges-toggle {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.4rem 0;
+    margin-bottom: 0;
+  }
+  .badges-toggle:hover { color: ${C.text}; }
+  .badges-toggle-arrow { font-size: 0.7rem; transition: transform 0.15s ease; }
+  .badges-grid { display: none; }
+  .badges-grid.open { display: flex; margin-top: 0.6rem; }
+}
+/* ---- Chutes & Ladders ---- */
+.cnl-banner {
+  text-align: center; font-size: 0.82rem; font-weight: 600;
+  border-radius: 999px; padding: 0.32rem 0.8rem;
+  max-width: 480px; margin: 0 auto 0.65rem; display: block;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.cnl-board-wrap {
+  position: relative; max-width: 480px; margin: 0 auto;
+  aspect-ratio: 1; width: 100%;
+}
+.cnl-board {
+  position: absolute; inset: 0;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  gap: 2px;
+  background: ${C.border};
+  border: 2px solid ${C.border};
+  border-radius: 12px;
+  padding: 2px;
+  overflow: hidden;
+}
+.cnl-cell {
+  position: relative;
+  display: flex; align-items: flex-start; justify-content: flex-start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: ${C.muted};
+  background: ${C.card};
+  padding: 1px 2px;
+  user-select: none;
+}
+.cnl-cell.alt { background: ${C.surface}; }
+.cnl-cell.cnl-goal { background: ${C.gold}22; color: ${C.gold}; }
+.cnl-cell-mark {
+  position: absolute; bottom: 0; right: 1px;
+  font-size: 0.72rem; line-height: 1;
+}
+.cnl-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 2;
+}
+.cnl-pawn {
+  position: absolute; z-index: 3;
+  width: 7%; height: 7%;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  transform: translate(-50%, -50%);
+  transition: left 0.13s ease, top 0.13s ease;
+}
+.cnl-die {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  margin: 0.9rem auto 0.2rem; max-width: 480px;
+}
+.cnl-die-face {
+  width: 3.4rem; height: 3.4rem; border-radius: 14px;
+  background: ${C.card}; border: 2px solid ${C.border};
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700;
+  font-size: 1.7rem; color: ${C.text};
+  transition: transform 0.1s ease, border-color 0.2s;
+}
+/* Tumbling spin: ~3 full turns that decelerate and settle on the result. */
+.cnl-die-face.rolling { animation: cnl-spin 0.72s cubic-bezier(0.22, 0.61, 0.36, 1); }
+@keyframes cnl-spin {
+  0%   { transform: rotate(0deg) scale(1); }
+  20%  { transform: rotate(230deg) scale(1.14); }
+  45%  { transform: rotate(560deg) scale(1.1); }
+  72%  { transform: rotate(880deg) scale(1.12); }
+  100% { transform: rotate(1080deg) scale(1); }
+}
+.cnl-roll-buttons {
+  display: flex; gap: 0.5rem;
+  max-width: 480px; margin: 0 auto;
+}
+.cnl-roll-btn {
+  flex: 1; min-width: 0;
+  border: none; cursor: pointer;
+  border-radius: 12px; padding: 0.8rem 0.6rem;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.95rem;
+  color: #fff; transition: opacity 0.15s, transform 0.1s;
+}
+.cnl-roll-btn:active:not(:disabled) { transform: scale(0.98); }
+.cnl-roll-btn:disabled { opacity: 0.4; cursor: default; }
 `;
 
 /* ============================================================
@@ -3611,6 +4051,117 @@ function cgSound(name, pitch) {
 function cgHaptic(ms) {
   if (!cgPrefs.haptics) return;
   try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
+}
+
+/* ============================================================
+   Background-music manager — fetch / decode / loop an audio asset
+   ------------------------------------------------------------
+   Unlike the short synthesized cgSound cues, looping background music needs a
+   real asset. We fetch the file once, decode it into an AudioBuffer with the
+   Web Audio API, and play it on a looping BufferSource routed through a shared
+   gain node (BG_MUSIC_GAIN keeps it at a moderate background level so it never
+   drowns out the cgSound effects). decodeAudioData decodes from the raw bytes
+   regardless of file extension / Content-Type, so the asset's container is not
+   constrained by its `.mp3` name. All state is module-level so a single track
+   plays at a time; calling start again with the same url reuses the decoded
+   buffer instead of re-fetching.
+   ============================================================ */
+const BG_MUSIC_GAIN = 0.4;
+let _bgAudioCtx = null;
+let _bgMusicGainNode = null;
+let _bgMusicSource = null;
+let _bgMusicBuffer = null;
+let _bgMusicUrl = null;
+let _bgMusicLoading = false;
+// True once the caller has asked to stop/pause — guards the async decode from
+// auto-starting playback after a stop that raced the fetch.
+let _bgMusicStopped = true;
+
+function bgAudioContext() {
+  if (_bgAudioCtx) return _bgAudioCtx;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) _bgAudioCtx = new AC();
+  } catch {}
+  return _bgAudioCtx;
+}
+
+// (Re)create and start the looping source from the already-decoded buffer.
+function _bgStartSource() {
+  const ctx = bgAudioContext();
+  if (!ctx || !_bgMusicBuffer) return;
+  // Tear down any prior source first (start() can only be called once per node).
+  if (_bgMusicSource) {
+    try { _bgMusicSource.onended = null; _bgMusicSource.stop(); } catch {}
+    _bgMusicSource = null;
+  }
+  if (!_bgMusicGainNode) {
+    _bgMusicGainNode = ctx.createGain();
+    _bgMusicGainNode.gain.value = BG_MUSIC_GAIN;
+    _bgMusicGainNode.connect(ctx.destination);
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = _bgMusicBuffer;
+  src.loop = true;
+  src.connect(_bgMusicGainNode);
+  try { src.start(0); } catch {}
+  _bgMusicSource = src;
+}
+
+// Start (or resume) looping the track at `url`. Must be called from a user
+// gesture the first time so the AudioContext is allowed to produce sound.
+function startBackgroundMusic(url) {
+  const ctx = bgAudioContext();
+  if (!ctx) return;
+  _bgMusicStopped = false;
+  try { if (ctx.state === 'suspended') ctx.resume(); } catch {}
+  // Already decoded this track → just (re)start playback synchronously.
+  if (_bgMusicBuffer && _bgMusicUrl === url) {
+    if (!_bgMusicSource) _bgStartSource();
+    return;
+  }
+  if (_bgMusicLoading && _bgMusicUrl === url) return; // fetch already in flight
+  _bgMusicLoading = true;
+  _bgMusicUrl = url;
+  _bgMusicBuffer = null;
+  fetch(url)
+    .then(r => r.arrayBuffer())
+    .then(buf => new Promise((resolve, reject) => {
+      // decodeAudioData has both promise and legacy-callback forms — support both.
+      let p;
+      try { p = ctx.decodeAudioData(buf, resolve, reject); } catch (e) { reject(e); return; }
+      if (p && typeof p.then === 'function') p.then(resolve, reject);
+    }))
+    .then(decoded => {
+      _bgMusicLoading = false;
+      _bgMusicBuffer = decoded;
+      // Only begin if no stop/pause arrived while we were decoding.
+      if (!_bgMusicStopped) _bgStartSource();
+    })
+    .catch(() => { _bgMusicLoading = false; });
+}
+
+// Stop playback (used as pause too — resume restarts the loop from its start).
+function stopBackgroundMusic() {
+  _bgMusicStopped = true;
+  if (_bgMusicSource) {
+    try { _bgMusicSource.onended = null; _bgMusicSource.stop(); } catch {}
+    _bgMusicSource = null;
+  }
+}
+
+// Resume after a stop/pause. Reuses the decoded buffer when present; otherwise
+// re-fetches the last url.
+function resumeBackgroundMusic() {
+  const ctx = bgAudioContext();
+  if (!ctx) return;
+  _bgMusicStopped = false;
+  try { if (ctx.state === 'suspended') ctx.resume(); } catch {}
+  if (_bgMusicBuffer) {
+    if (!_bgMusicSource) _bgStartSource();
+  } else if (_bgMusicUrl) {
+    startBackgroundMusic(_bgMusicUrl);
+  }
 }
 
 // Discrete-gesture hook: tap / swipe / long-press / double-tap on an element.
@@ -3704,11 +4255,246 @@ function CgSettings({ tick }) {
   );
 }
 
+/* ============================================================
+   Classic Games — Game Menu (New Game / Save / Post to Feed)
+   ============================================================ */
+// Module-level bridge so the in-shell Game Menu can read the active
+// Versus-Bot game's current state for "Save Game" without threading a
+// callback through every mode sub-component. The active bot game sets
+// `getSnapshot` on mount and clears it on unmount.
+const ClassicBridge = { getSnapshot: null };
+
+// A Versus-Bot game registers its live-state snapshot provider here so the
+// Game Menu's Save button can persist it. `active` should be true only while
+// the game is in a saveable bot session.
+function useClassicSaveSource(active, snapshotFn) {
+  const ref = useRef(snapshotFn);
+  ref.current = snapshotFn;
+  useEffect(() => {
+    if (!active) return;
+    ClassicBridge.getSnapshot = () => (ref.current ? ref.current() : null);
+    return () => { ClassicBridge.getSnapshot = null; };
+  }, [active]);
+}
+
+// Save / load a Versus-Bot game's in-progress state via the generic
+// user_game_state store (GET/PUT /api/state/:gameId).
+function useClassicSave(gameId) {
+  const [saving, setSaving] = useState(false);
+  const saveState = async (stateObj) => {
+    setSaving(true);
+    const { ok } = await api(`/api/state/${gameId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...stateObj } }),
+    });
+    setSaving(false);
+    return ok;
+  };
+  const loadState = async () => {
+    const { ok, body } = await api(`/api/state/${gameId}`);
+    if (ok && body && body.state && body.state.mode === 'bot') return body.state;
+    return null;
+  };
+  const clearState = async () => {
+    await api(`/api/state/${gameId}`, { method: 'PUT', body: JSON.stringify({ state: {} }) }).catch(() => {});
+  };
+  return { saveState, loadState, clearState, saving };
+}
+
+// Polling hook for the generic classic_rooms online multiplayer (mirrors
+// useMancalaRoom). `applyMove` posts a server-authoritative move (e.g. a
+// Chutes & Ladders roll) and reconciles against the returned room.
+function useClassicRoom(gameId, roomId) {
+  const [room, setRoom] = useState(null);
+  const [pollingError, setPollingError] = useState(null);
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const consecutiveErrors = useRef(0);
+  const intervalRef = useRef(null);
+
+  const fetchRoom = async () => {
+    if (!roomId) return;
+    try {
+      const { ok, status, body } = await api(`/api/classic/${gameId}/rooms/${roomId}`);
+      if (ok && body) {
+        setRoom(body);
+        setPollingError(null);
+        consecutiveErrors.current = 0;
+        setOpponentDisconnected(false);
+      } else if (status === 404) {
+        setPollingError('room_not_found');
+        consecutiveErrors.current++;
+      } else {
+        consecutiveErrors.current++;
+        if (consecutiveErrors.current >= 3) { setOpponentDisconnected(true); setPollingError('connection_error'); }
+      }
+    } catch {
+      consecutiveErrors.current++;
+      if (consecutiveErrors.current >= 3) { setOpponentDisconnected(true); setPollingError('connection_error'); }
+    }
+  };
+
+  useEffect(() => {
+    if (!roomId) { setRoom(null); setPollingError(null); return; }
+    consecutiveErrors.current = 0;
+    fetchRoom();
+    intervalRef.current = setInterval(fetchRoom, 1500);
+    return () => clearInterval(intervalRef.current);
+  }, [gameId, roomId]);
+
+  const submitMove = async (payload) => {
+    if (!room || room.status !== 'active') return;
+    const moveSeq = room.moveSeq + 1;
+    try {
+      const { ok, body } = await api(`/api/classic/${gameId}/rooms/${roomId}/move`, {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, moveSeq }),
+      });
+      if (ok && body) setRoom(body);
+      else fetchRoom();
+    } catch { fetchRoom(); }
+  };
+
+  return { room, pollingError, opponentDisconnected, submitMove };
+}
+
+// Per-mode display metadata for the inline mode picker.
+const CLASSIC_MODE_META = {
+  bot:    { icon: '🤖', name: 'Versus Bot',        desc: 'Play against the computer' },
+  '2p':   { icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
+  online: { icon: '🌐', name: 'Online Multiplayer', desc: 'Play a friend via room code' },
+};
+
+// Inline mode picker shown by the Game Menu's "New Game" for games that route
+// their modes through the menu (e.g. Chutes & Ladders). Calls onPlay(mode, opts).
+function ClassicModePicker({ game, onPlay }) {
+  const [mode, setMode] = useState(null);
+  const [onlineAction, setOnlineAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const handlePlay = async () => {
+    if (!mode) return;
+    if (mode !== 'online') { onPlay(mode, {}); return; }
+    if (onlineAction === 'create') {
+      setBusy(true);
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id });
+      else setError('Could not create room. Try again.');
+    } else if (onlineAction === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api(`/api/classic/${game.id}/rooms/${code}/join`, { method: 'POST' });
+      setBusy(false);
+      if (ok) onPlay('online', { roomAction: 'join', roomId: code });
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  const canStart = mode && (mode !== 'online' || onlineAction === 'create' || (onlineAction === 'join' && joinCode.trim().length >= 4));
+
+  return (
+    <div className="mnc-mode-select" style={{ padding: 0 }}>
+      {(game.modes || []).map(m => (
+        <button key={m} className={'mnc-mode-btn' + (mode === m ? ' active' : '')} onClick={() => { setMode(m); setError(''); }}>
+          <span className="mnc-mode-icon">{CLASSIC_MODE_META[m].icon}</span>
+          <span className="mnc-mode-text">
+            <span className="mnc-mode-name">{CLASSIC_MODE_META[m].name}</span>
+            <span className="mnc-mode-desc">{CLASSIC_MODE_META[m].desc}</span>
+          </span>
+        </button>
+      ))}
+      {mode === 'online' && (
+        <div className="mnc-online-actions">
+          <div className="mnc-mode-sub">
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')} onClick={() => { setOnlineAction('create'); setError(''); }}>Create Room</button>
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')} onClick={() => { setOnlineAction('join'); setError(''); }}>Join Room</button>
+          </div>
+          {onlineAction === 'join' && (
+            <div className="mnc-join-form">
+              <input className="mnc-join-input" placeholder="Room code (e.g. AB3K7P)" value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
+            </div>
+          )}
+        </div>
+      )}
+      {error && <div className="mnc-join-error">{error}</div>}
+      {mode && <button className="mnc-mode-start-btn" onClick={handlePlay} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
+    </div>
+  );
+}
+
+// The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
+// only), and Post to Feed (after a result).
+function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onPostToFeed, onClose }) {
+  const [picking, setPicking] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const modes = game.modes || [];
+  const usePicker = !!game.menuModePicker && modes.length > 0;
+  // Default new-game mode for games without an inline picker.
+  const defaultMode = modes.length === 1 ? modes[0] : null;
+
+  const doSave = async () => {
+    const ok = await onSaveGame();
+    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); }
+  };
+
+  return (
+    <div className="cg-menu-section">
+      <div className="cg-menu-label">New game</div>
+      {usePicker ? (
+        picking
+          ? <ClassicModePicker game={game} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
+          : <button className="cg-sheet-action" onClick={() => setPicking(true)}>↺ New Game</button>
+      ) : (
+        <button className="cg-sheet-action" onClick={() => { onNewGameMode(defaultMode, {}); onClose && onClose(); }}>↺ New Game</button>
+      )}
+
+      {game.supportsSave && gameMode === 'bot' && (
+        <>
+          <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Versus Bot</div>
+          <button className="cg-sheet-action" onClick={doSave}>{saved ? 'Saved ✓' : '💾 Save Game'}</button>
+        </>
+      )}
+
+      {lastResult && (
+        <>
+          <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Share</div>
+          <button className="cg-sheet-action" style={{ borderColor: C.emerald, color: C.emerald }}
+            onClick={() => { onPostToFeed(lastResult); onClose && onClose(); }}>📤 Post to Feed</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// A small in-stage banner offering to resume a saved Versus-Bot game.
+function ClassicResumeBanner({ onResume, onDismiss }) {
+  return (
+    <div className="cg-resume-banner">
+      <span>💾 You have a saved game.</span>
+      <div className="cg-resume-actions">
+        <button onClick={onResume}>Resume</button>
+        <button className="ghost" onClick={onDismiss}>New</button>
+      </div>
+    </div>
+  );
+}
+
 // game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
-function ClassicShell({ game, onExit, onNewGame, sheetSections, children }) {
+// menuConfig (optional): wires the first "Menu" tab — New Game / Save / Post to Feed.
+function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [, force] = useState(0);
   const sections = [
+    ...(menuConfig ? [{
+      id: 'menu', label: 'Menu',
+      render: () => <ClassicGameMenuSection {...menuConfig} onClose={() => setSheetOpen(false)} />,
+    }] : []),
     ...(sheetSections || []),
     { id: 'settings', label: 'Settings', render: () => <CgSettings /> },
   ];
@@ -3716,12 +4502,19 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children }) {
   const open = (id) => { setActive(id || sections[0].id); setSheetOpen(true); cgSound('click'); };
   const toggleSound = () => { cgSetPref('sound', !cgPrefs.sound); force(n => n + 1); if (cgPrefs.sound) cgSound('click'); };
   const cur = sections.find(s => s.id === active) || sections[0];
+  // Games whose New Game lives in the menu hide the topbar quick-reset ↺.
+  const hideQuickReset = menuConfig && (game.modes || []).length > 0;
+  const modePill = menuConfig && menuConfig.gameMode && CLASSIC_MODE_META[menuConfig.gameMode];
   return (
     <div className="cg-shell">
       <div className="cg-topbar">
         <button className="cg-btn" onClick={onExit} title="Back to lobby" aria-label="Back">←</button>
-        <div className="cg-title"><span>{game.icon}</span> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{game.name}</span></div>
-        {onNewGame && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
+        <div className="cg-title">
+          <span>{game.icon}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{game.name}</span>
+          {modePill && <span className="cg-mode-pill">{modePill.icon} {menuConfig.gameMode === '2p' ? '2P' : menuConfig.gameMode === 'online' ? 'Online' : 'Bot'}</span>}
+        </div>
+        {onNewGame && !hideQuickReset && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
         <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
         <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
       </div>
@@ -3846,6 +4639,23 @@ function dailyRng(offset, gameId) {
   return mulberry32((utcDayNum(offset) + hashStr(gameId)) >>> 0);
 }
 
+// Mancala Daily Challenge opening board, derived from the server-anchored UTC
+// day. Deals 24 stones into one side via the daily seed, then mirrors them
+// rotationally (pit i ↔ opposite 12-i) so both players start from an identical,
+// fair position; stores (6, 13) stay empty. MUST match srvMncDailyBoard in
+// server.js byte-for-byte or verification fails.
+function mncDailyBoard(offset) {
+  const rng = dailyRng(offset, 'mancaladaily');
+  const side = [0, 0, 0, 0, 0, 0];
+  for (let s = 0; s < 24; s++) side[Math.floor(rng() * 6)]++;
+  const board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < 6; i++) {
+    board[i] = side[i];
+    board[12 - i] = side[i];
+  }
+  return board;
+}
+
 // Periodically persist a game's in-progress state so a resumed attempt picks up
 // the exact board, step count, and accumulated timer. `getState()` returns
 // `{ progress, steps, secs }`; it's read through a ref so the interval and the
@@ -3871,6 +4681,26 @@ function useAutosave(onSaveProgress, getState, active) {
       flush(); // best-effort save when leaving the game screen
     };
   }, []);
+}
+
+/* ============================================================
+   Shared localStorage "recent results" history
+   ============================================================ */
+// Newest-first list of finished-game summaries, persisted per game under its
+// own storage key with a hard length cap. Several classic games (minesweeper,
+// mancala, 2048, knight's tour) each used to carry an identical copy of this
+// load/unshift/cap/save pair — collapsed here into one shared implementation
+// they delegate to (the per-game wrappers keep their names + keys, so behavior
+// is byte-identical: same key, same MAX cap, newest-first, errors swallowed).
+function loadHistory(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); }
+  catch { return []; }
+}
+function saveHistory(key, entry, max) {
+  const h = loadHistory(key);
+  h.unshift(entry);
+  if (h.length > max) h.length = max;
+  try { localStorage.setItem(key, JSON.stringify(h)); } catch {}
 }
 
 /* ============================================================
@@ -3997,6 +4827,54 @@ function nextTierInfo(streak) {
   if (above.length === 0) return null;
   return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
+
+const BADGE_DEFS = [
+  {
+    id: 'first-light',
+    icon: '🕯️',
+    label: 'First Light',
+    desc: 'Solve any daily puzzle',
+    check: (streak, attempts) =>
+      Object.values(attempts).some(a => a.finishedAt && a.score > 0),
+  },
+  {
+    id: 'all-in',
+    icon: '🎯',
+    label: 'All In',
+    desc: 'Complete all 4 daily games in one day',
+    check: (streak, attempts) =>
+      GAMES.filter(g => g.category === 'daily')
+           .every(g => attempts[g.id] && attempts[g.id].finishedAt && attempts[g.id].score > 0),
+  },
+  {
+    id: 'flame-keeper',
+    icon: '🔥',
+    label: 'Flame Keeper',
+    desc: '3-day streak',
+    check: (streak) => streak >= 3,
+  },
+  {
+    id: 'weekly-warrior',
+    icon: '📅',
+    label: 'Weekly Warrior',
+    desc: '7-day streak',
+    check: (streak) => streak >= 7,
+  },
+  {
+    id: 'multiplied',
+    icon: '💫',
+    label: 'Multiplied',
+    desc: '10-day streak (×1.5 points)',
+    check: (streak) => streak >= 10,
+  },
+  {
+    id: 'streak-titan',
+    icon: '⚡',
+    label: 'Streak Titan',
+    desc: '30-day streak',
+    check: (streak) => streak >= 30,
+  },
+];
 
 /* ============================================================
    Streak badges — named milestones unlocked at consecutive-day
@@ -4364,11 +5242,14 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVerify, onDisconnect }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect }) {
   const [copied, setCopied] = React.useState(false);
+  const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [confirmDisc, setConfirmDisc] = React.useState(false);
+  const dappEnabled = !!(integration && integration.enabled);
+  const dappPubkey = integration && integration.pubkey;
   const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
 
   // status: 'verified' | 'linked' | 'none'
@@ -4380,6 +5261,15 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVer
       await navigator.clipboard.writeText(user.usernodePubkey);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  const copyDappPubkey = async () => {
+    if (!dappPubkey) return;
+    try {
+      await navigator.clipboard.writeText(dappPubkey);
+      setDappCopied(true);
+      setTimeout(() => setDappCopied(false), 1500);
     } catch {}
   };
 
@@ -4488,6 +5378,39 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, onBack, onVer
             </div>
             {msg && (
               <div className={`account-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>
+            )}
+          </div>
+
+          {/* Connections — Friends + dApps, shown here only on narrow viewports
+              (hidden ≥561px via CSS, where they live in the top bar instead). */}
+          <div className="wallet-card account-connections">
+            <div className="wallet-card-title">Connections</div>
+            <button
+              type="button"
+              className="account-connection-row"
+              onClick={onOpenFriends}
+            >
+              👥 Friends
+              <span className="chev">›</span>
+            </button>
+            {dappEnabled && (
+              <div className="account-dapps-row">
+                <div className="wallet-card-title">dApps integration</div>
+                <div className="account-status account-status-verified">
+                  <span className="account-status-dot" />
+                  <span>Active</span>
+                </div>
+                {dappPubkey && (
+                  <div className="wallet-addr-row">
+                    <span className="account-dapps-pubkey" title={dappPubkey}>
+                      🔗 {truncAddr(dappPubkey)}
+                    </span>
+                    <button className="back-btn" onClick={copyDappPubkey}>
+                      {dappCopied ? 'Copied ✓' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </>
@@ -4955,21 +5878,77 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 }
 
 /* ============================================================
-   Game 3 — Crypto Wordle (daily 5-letter Web3 term)
+   Game 3 — Crypto Wordle (daily variable-length finance/crypto word)
    ============================================================ */
-const CW_LEN = 5;
-const CW_MAX = 6;
+// The daily word now varies in length (3–8 letters). The board sizes its
+// columns to the word and allows wordLen + 1 guesses (see cwMaxGuesses).
+const CW_MIN_LEN = 3;
+const CW_MAX_LEN = 8;
 
-// Curated, well-known 5-letter Web3 / crypto terms. The daily answer is
-// chosen deterministically from this list, so everyone gets the same word
-// on the same UTC day (shareable, comparable). No dictionary validates the
-// guesses — any 5 letters are accepted — but the answer is always from here.
-const CW_ANSWERS = [
-  'TOKEN', 'BLOCK', 'CHAIN', 'MINER', 'NONCE', 'STAKE', 'VAULT', 'TRADE',
-  'WHALE', 'PROOF', 'AUDIT', 'ETHER', 'YIELD', 'LAYER', 'NODES', 'MOONS',
-  'DEGEN', 'ALPHA', 'FLOOR', 'MINTS', 'ASSET', 'BYTES', 'PEERS', 'SHARD',
-  'BASED', 'VYPER', 'BLOBS', 'WAGMI', 'PUMPS', 'DUMPS',
+// Curated finance / crypto terms of VARYING length (3–8 letters), each with a
+// short themed clue the player reads while solving. The daily answer is chosen
+// deterministically from this list, so everyone gets the same word + length +
+// clue on the same UTC day (shareable, comparable). No dictionary validates the
+// guesses — any letters of the right length are accepted — but the answer is
+// always from here. Every `word` must be UPPERCASE A–Z and 3–8 letters.
+// Each entry: `clue` is the always-visible main clue; `hints` is an ordered
+// list of EXTRA clues (default 2) that unlock progressively — one per wrong
+// guess, or early via the paid Hint button. Keep hints incremental and
+// spoiler-light (never spell the word).
+const CW_WORDS = [
+  { word: 'FEE',      clue: 'What you pay to get a transaction processed',        hints: ['Charged every time you move funds on-chain', 'Spikes when the network is congested'] },
+  { word: 'BID',      clue: 'The price a buyer offers in an order book',          hints: ["The opposite of an 'ask'", 'Sits on the buy side of the book'] },
+  { word: 'APY',      clue: 'Yearly compounded return on a staking deposit',      hints: ['A percentage yield farmers watch', "Three-letter acronym ending in 'yield'"] },
+  { word: 'BULL',     clue: 'An investor betting prices will rise',               hints: ['This market only goes up, they say', 'The opposite of a bear'] },
+  { word: 'BEAR',     clue: 'An investor betting prices will fall',               hints: ['Prices keep sliding in this market', 'The opposite of a bull'] },
+  { word: 'COIN',     clue: "A blockchain's own native digital currency",         hints: ['Bitcoin is the original one', 'Not a token — it has its own chain'] },
+  { word: 'FIAT',     clue: 'Government-issued money like dollars or euros',      hints: ['Backed by a state, not a blockchain', 'The dollar and euro are examples'] },
+  { word: 'HODL',     clue: 'Crypto slang for holding through the swings',        hints: ["Born from a typo of 'hold'", 'A meme for diamond hands'] },
+  { word: 'MINT',     clue: 'To create a brand-new token or NFT',                 hints: ['Happens when an NFT is first created', 'Adds fresh supply to existence'] },
+  { word: 'PUMP',     clue: 'A sharp, sudden rise in a coin’s price',             hints: ['Often followed by a dump', 'A rapid green candle'] },
+  { word: 'TOKEN',    clue: 'A tradable unit of value issued on a chain',         hints: ['Issued on top of an existing chain', 'ERC-20 is a standard for these'] },
+  { word: 'BLOCK',    clue: 'A bundle of transactions added to the chain',        hints: ['Miners race to add the next one', 'Links to the one before it'] },
+  { word: 'CHAIN',    clue: 'The shared ledger of linked blocks',                 hints: ['A linked sequence of blocks', "The 'chain' in blockchain"] },
+  { word: 'STAKE',    clue: 'Lock up coins to secure a network and earn rewards', hints: ['You give this up temporarily to earn passive rewards', 'Proof-of-_____ networks rely on it'] },
+  { word: 'VAULT',    clue: 'A smart contract that safeguards deposited assets',  hints: ['Where a DeFi protocol stores deposits', 'A digital strongbox'] },
+  { word: 'WHALE',    clue: 'A holder big enough to move the market',             hints: ['A sea creature that moves markets', 'Holds enough to cause a splash'] },
+  { word: 'YIELD',    clue: 'The income your crypto earns over time',             hints: ['What farmers chase in DeFi', 'Your return, expressed as a rate'] },
+  { word: 'AUDIT',    clue: 'A security review of a smart contract',             hints: ['Done before a protocol launches', 'Hunts for code vulnerabilities'] },
+  { word: 'ASSET',    clue: 'Anything of value you can hold or trade',            hints: ['On the plus side of a balance sheet', 'Crypto, stocks, and gold all count'] },
+  { word: 'NONCE',    clue: 'The number a miner tweaks to find a valid hash',     hints: ['A miner increments it endlessly', 'Used once, then discarded'] },
+  { word: 'WALLET',   clue: 'App that holds your keys and coins',                 hints: ['Holds your private keys', 'Can be hot software or a cold device'] },
+  { word: 'LEDGER',   clue: 'The record of every transaction ever made',         hints: ['An immutable transaction record', 'Also a famous hardware brand'] },
+  { word: 'MINING',   clue: 'Spending compute to add blocks and earn rewards',    hints: ['How proof-of-work secures a chain', 'Rewards whoever solves the puzzle'] },
+  { word: 'ORACLE',   clue: 'A feed that brings off-chain data on-chain',         hints: ['Feeds real-world prices on-chain', 'Chainlink is the best-known one'] },
+  { word: 'BRIDGE',   clue: 'Moves assets between two different blockchains',     hints: ['Connects two separate chains', 'A frequent hacking target'] },
+  { word: 'TETHER',   clue: 'Nickname for the best-known dollar stablecoin',      hints: ['Its ticker is USDT', 'A coin pegged to the dollar'] },
+  { word: 'CRYPTO',   clue: 'Short name for digital currencies as a whole',       hints: ["Short for a kind of currency", "The whole industry's nickname"] },
+  { word: 'BROKER',   clue: 'A middleman who places trades for you',              hints: ['Places trades on your behalf', 'Earns a commission per trade'] },
+  { word: 'WALLETS',  clue: 'Where holders keep their keys and coins (plural)',   hints: ['Plural of where you keep keys', 'You might own several of these'] },
+  { word: 'NETWORK',  clue: 'The connected nodes that run a blockchain',          hints: ['Nodes connected together', 'Ethereum is one of these'] },
+  { word: 'TRADING',  clue: 'Buying and selling to profit from price moves',      hints: ['Buying low and selling high', 'What day-_____ describes'] },
+  { word: 'STAKING',  clue: 'Earning rewards by locking up your coins',           hints: ['Locking coins to earn rewards', 'Powers proof-of-stake'] },
+  { word: 'DEPOSIT',  clue: 'Funds you put into an account or protocol',          hints: ['Money you put in', 'The opposite of a withdrawal'] },
+  { word: 'AIRDROP',  clue: 'Free tokens dropped to a community of wallets',      hints: ['Free tokens sent to wallets', 'Often rewards early users'] },
+  { word: 'LENDING',  clue: 'Supplying assets so others can borrow for interest', hints: ['Earn interest by supplying assets', 'Aave and Compound enable it'] },
+  { word: 'EXCHANGE', clue: 'A marketplace for swapping one coin for another',    hints: ['Where you swap one coin for another', 'Can be centralized or decentralized'] },
+  { word: 'SOLVENCY', clue: 'Having enough assets to cover what you owe',         hints: ['Enough assets to cover liabilities', 'The opposite of bankruptcy'] },
+  { word: 'TREASURY', clue: 'The shared pool of funds a protocol controls',       hints: ["A DAO's shared war chest", "Holds a protocol's reserves"] },
+  { word: 'VALIDATE', clue: 'To confirm transactions are legitimate',             hints: ['Confirm a transaction is legit', 'Validators do this'] },
+  { word: 'DIVIDEND', clue: 'A share of profits paid out to holders',             hints: ['A payout to shareholders', 'Profit shared with holders'] },
+  { word: 'CURRENCY', clue: 'Money in a particular form, digital or fiat',        hints: ['A medium of exchange', 'Dollars and bitcoin both qualify'] },
+  { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement',       hints: ['Self-executing code on a chain', 'Smart ones run on Ethereum'] },
 ];
+
+// Hint pricing — single tuning knob. Cost of the Nth hint purchased today
+// (0-indexed) is CW_HINT_BASE_COST * 2**N → 1, 2, 4, 8, … in MATCH tokens.
+// The server is authoritative; this client copy is for display only.
+const CW_HINT_BASE_COST = 1;
+const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
+
+// Guesses allowed for a given word length: one more than the length, so a
+// 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
+const cwMaxGuesses = (wordLen) => wordLen + 1;
 
 const CW_EMOJI = { green: '🟩', yellow: '🟨', gray: '⬛' };
 const CW_KEYS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
@@ -4987,100 +5966,238 @@ function cwDayNum(offset) {
 // first, consuming a tally of the answer's letters; then yellows only while
 // an unconsumed copy of the letter remains, else gray.
 function cwScoreGuess(guess, answer) {
-  const res = Array(CW_LEN).fill('gray');
+  const len = answer.length;
+  const res = Array(len).fill('gray');
   const counts = {};
-  for (let i = 0; i < CW_LEN; i++) counts[answer[i]] = (counts[answer[i]] || 0) + 1;
-  for (let i = 0; i < CW_LEN; i++) {
+  for (let i = 0; i < len; i++) counts[answer[i]] = (counts[answer[i]] || 0) + 1;
+  for (let i = 0; i < len; i++) {
     if (guess[i] === answer[i]) { res[i] = 'green'; counts[guess[i]]--; }
   }
-  for (let i = 0; i < CW_LEN; i++) {
+  for (let i = 0; i < len; i++) {
     if (res[i] === 'green') continue;
     if (counts[guess[i]] > 0) { res[i] = 'yellow'; counts[guess[i]]--; }
   }
   return res;
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
-  const dayNum = useRef(cwDayNum(offset)).current;
-  const answer = useRef(
-    CW_ANSWERS[((dayNum % CW_ANSWERS.length) + CW_ANSWERS.length) % CW_ANSWERS.length]
-  ).current;
+// Multi-word daily puzzle: each UTC day is a deterministic stack of 4–7
+// independent words drawn from CW_WORDS via the shared seeded PRNG, so every
+// player faces the identical set. Tunable knobs.
+const CW_MIN_ROWS = 4;
+const CW_MAX_ROWS = 7;
 
-  // Hydrate from a resumed attempt: recompute each guess's colors from the
-  // saved guess words (the answer is deterministic for the day).
-  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.words)
+// Points banked for solving one word in `attemptsUsed` tries. Fewer attempts and
+// longer words score more. Missed words score 0. Single formula, easy to retune.
+const cwRoundPoints = (wordLen, attemptsUsed) =>
+  Math.max((cwMaxGuesses(wordLen) + 1 - attemptsUsed) * 60, 60) + wordLen * 10;
+
+// The day's ordered list of word entries ({ word, clue, hints }). Deterministic
+// from the server-anchored UTC day, so it's identical for everyone (fair board).
+function cwDailyRounds(offset) {
+  const rng = dailyRng(offset, 'cryptowordle');
+  const R = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
+  const picked = [];
+  const used = new Set();
+  let guard = 0;
+  while (picked.length < R && guard < 1000) {
+    guard++;
+    const idx = Math.floor(rng() * CW_WORDS.length);
+    if (used.has(idx)) continue;
+    used.add(idx);
+    picked.push(CW_WORDS[idx]);
+  }
+  return picked;
+}
+
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+  const dayNum = useRef(cwDayNum(offset)).current;
+  // The day's stack of independent word rounds (stable for the render lifetime).
+  const roundsDef = useRef(cwDailyRounds(offset)).current;
+
+  // Resume only today's saved progress (multi-round shape). Board is re-derived
+  // from the seed; we persist only the mutable per-round guess words + hint use.
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.rounds)
     ? savedProgress
     : null;
-  const initGuesses = () => (resumed ? resumed.words : [])
-    .filter(w => typeof w === 'string' && w.length === CW_LEN)
-    .slice(0, CW_MAX)
-    .map(w => ({ word: w, result: cwScoreGuess(w, answer) }));
+  const initRoundGuesses = () => roundsDef.map((rd, i) => {
+    const words = resumed && Array.isArray(resumed.rounds[i]) ? resumed.rounds[i] : [];
+    return words
+      .filter(w => typeof w === 'string' && w.length === rd.word.length)
+      .slice(0, cwMaxGuesses(rd.word.length))
+      .map(w => ({ word: w, result: cwScoreGuess(w, rd.word) }));
+  });
+  const initHintsByRound = () => roundsDef.map((_, i) =>
+    resumed && Array.isArray(resumed.hintsByRound) && Number.isFinite(resumed.hintsByRound[i])
+      ? resumed.hintsByRound[i] : 0
+  );
 
-  const [guesses, setGuesses] = useState(initGuesses); // [{ word, result: ['green'|'yellow'|'gray', …] }]
-  const [cur, setCur] = useState('');          // in-progress letters for the active row
+  // roundGuesses[i] = [{ word, result }]; hintsByRound[i] = paid hints applied to round i.
+  const [roundGuesses, setRoundGuesses] = useState(initRoundGuesses);
+  const [hintsByRound, setHintsByRound] = useState(initHintsByRound);
+  const [cur, setCur] = useState('');
   const [shake, setShake] = useState(false);
   const [done, setDone] = useState(false);
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
 
-  // Idle/leave autosave; per-guess saves happen in submit().
+  // Derive per-round status (solved / missed / active) from the submitted guesses.
+  const resolveRounds = (guessArrays) => roundsDef.map((rd, i) => {
+    const gs = guessArrays[i] || [];
+    const maxG = cwMaxGuesses(rd.word.length);
+    const solved = gs.length > 0 && gs[gs.length - 1].word === rd.word;
+    const missed = !solved && gs.length >= maxG;
+    return { def: rd, guesses: gs, maxG, solved, missed, resolved: solved || missed };
+  });
+  const roundState = resolveRounds(roundGuesses);
+  const activeIdx = roundState.findIndex(r => !r.resolved);
+  const allResolved = activeIdx === -1;
+  const active = activeIdx >= 0 ? roundState[activeIdx] : null;
+
+  const solvedCount = roundState.filter(r => r.solved).length;
+  const totalScore = roundState.reduce(
+    (a, r) => a + (r.solved ? cwRoundPoints(r.def.word.length, r.guesses.length) : 0), 0
+  );
+  const totalSteps = roundGuesses.reduce((a, g) => a + (g ? g.length : 0), 0);
+
+  const buildProgress = (guessArrays, hbr) => ({
+    dayNum,
+    rounds: guessArrays.map(gs => (gs || []).map(g => g.word)),
+    hintsByRound: hbr,
+  });
+
+  // Idle/leave autosave; per-guess + per-purchase saves happen inline.
   const stateRef = useRef({});
-  stateRef.current = { guesses, secs };
+  stateRef.current = { roundGuesses, hintsByRound, secs };
   useAutosave(
     onSaveProgress,
     () => ({
-      progress: { dayNum, words: stateRef.current.guesses.map(g => g.word) },
-      steps: stateRef.current.guesses.length,
+      progress: buildProgress(stateRef.current.roundGuesses, stateRef.current.hintsByRound),
+      steps: stateRef.current.roundGuesses.reduce((a, g) => a + (g ? g.length : 0), 0),
       secs: stateRef.current.secs,
     }),
     !done
   );
 
-  // Best color seen per letter, for the on-screen keyboard tinting.
+  // Paid-hint state. hintsPurchased is the server-authoritative DAILY count that
+  // drives the doubling cost ramp; the MATCH balance is the global nav balance
+  // passed in via props. Both are read on mount and reconciled from purchases.
+  const [hintsPurchased, setHintsPurchased] = useState(0);
+  const [buying, setBuying] = useState(false);
+  const [hintMsg, setHintMsg] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api('/api/cryptowordle/hint');
+      if (!alive || !ok || !body) return;
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Per-round clue reveal: wrong guesses in THIS round + hints applied to it,
+  // capped at the round's available clues. Cost ramp is global across rounds.
+  const activeHints = active ? (active.def.hints || []) : [];
+  const activeWrong = active ? active.guesses.filter(g => g.word !== active.def.word).length : 0;
+  const activeHintsApplied = active ? (hintsByRound[activeIdx] || 0) : 0;
+  const revealedExtra = active ? Math.min(activeWrong + activeHintsApplied, activeHints.length) : 0;
+  const cluesLeft = activeHints.length - revealedExtra;
+  const nextCost = cwHintCost(hintsPurchased);
+  const canAffordHint = matchBalance != null && matchBalance >= nextCost;
+  // Daily cap sent to the server: total clues purchasable across all rounds.
+  const dailyClueTotal = roundsDef.reduce((a, rd) => a + (rd.hints ? rd.hints.length : 0), 0);
+
+  const buyHint = async () => {
+    if (buying || done || !active || cluesLeft <= 0) return;
+    setBuying(true);
+    setHintMsg('');
+    const { ok, status, body } = await api('/api/cryptowordle/hint', {
+      method: 'POST',
+      body: JSON.stringify({ maxHints: dailyClueTotal }),
+    });
+    setBuying(false);
+    if (ok && body) {
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+      // Apply the revealed clue to the active round and persist immediately so a
+      // reload can't lose a paid reveal while the server counter already advanced.
+      const nextHbr = hintsByRound.map((n, i) => (i === activeIdx ? (n || 0) + 1 : n));
+      setHintsByRound(nextHbr);
+      onSaveProgress && onSaveProgress(buildProgress(roundGuesses, nextHbr), totalSteps, secs);
+      return;
+    }
+    if (status === 409 && body && body.code === 'insufficient_funds') {
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+      setHintMsg('Not enough MATCH');
+    } else if (status === 409 && body && body.code === 'no_more_hints') {
+      setHintMsg('No more clues');
+    } else {
+      setHintMsg('Could not buy hint');
+    }
+  };
+
+  // Spoiler-free multi-word share: one line per word (✅/❌ + blank squares).
+  const buildShare = (rs) => {
+    const lines = [`Crypto Wordle #${dayNum} — ${rs.filter(r => r.solved).length}/${rs.length} · ${totalScore} pts`];
+    rs.forEach(r => {
+      lines.push((r.solved ? '✅ ' : '❌ ') + (r.solved ? '🟩' : '⬛').repeat(r.def.word.length));
+    });
+    return lines.join('\n');
+  };
+
+  const finishIfDone = (nextRoundState) => {
+    if (nextRoundState.some(r => !r.resolved)) return false;
+    setDone(true);
+    const share = buildShare(nextRoundState);
+    const solved = nextRoundState.filter(r => r.solved).length;
+    const total = nextRoundState.length;
+    const pts = nextRoundState.reduce(
+      (a, r) => a + (r.solved ? cwRoundPoints(r.def.word.length, r.guesses.length) : 0), 0
+    );
+    const meta = { share, hintsUsed: hintsPurchased, wordsSolved: solved, wordsTotal: total };
+    if (pts > 0) onWin(pts, totalSteps + 1, secs, meta);
+    else onLose(totalSteps + 1, secs, meta);
+    return true;
+  };
+
+  // Best color per letter for the active round's keyboard tinting.
   const keyState = {};
   const rank = { gray: 0, yellow: 1, green: 2 };
-  for (const g of guesses) {
-    for (let i = 0; i < CW_LEN; i++) {
-      const ch = g.word[i], c = g.result[i];
-      if (!(ch in keyState) || rank[c] > rank[keyState[ch]]) keyState[ch] = c;
+  if (active) {
+    for (const g of active.guesses) {
+      for (let i = 0; i < active.def.word.length; i++) {
+        const ch = g.word[i], c = g.result[i];
+        if (!(ch in keyState) || rank[c] > rank[keyState[ch]]) keyState[ch] = c;
+      }
     }
   }
 
-  const buildShare = (rows, solved) =>
-    `Crypto Wordle #${dayNum} ${solved ? rows.length : 'X'}/${CW_MAX}\n` +
-    rows.map(r => r.result.map(c => CW_EMOJI[c]).join('')).join('\n');
-
   const submit = () => {
-    if (done) return;
-    if (cur.length !== CW_LEN) {
+    if (done || !active) return;
+    const answer = active.def.word;
+    const wordLen = answer.length;
+    if (cur.length !== wordLen) {
       setShake(true);
       setTimeout(() => setShake(false), 400);
       return;
     }
     const result = cwScoreGuess(cur, answer);
-    const rows = [...guesses, { word: cur, result }];
-    setGuesses(rows);
+    const newRoundGuesses = roundGuesses.map((g, i) =>
+      i === activeIdx ? [...(g || []), { word: cur, result }] : g
+    );
+    setRoundGuesses(newRoundGuesses);
     setCur('');
-    onStepChange(rows.length);
-
-    // persist this guess immediately (before any terminal finish)
-    onSaveProgress && onSaveProgress({ dayNum, words: rows.map(g => g.word) }, rows.length, secs);
-
-    if (cur === answer) {
-      setDone(true);
-      const score = Math.max((7 - rows.length) * 180 - secs * 2, 100);
-      onWin(score, rows.length, secs, { share: buildShare(rows, true) });
-    } else if (rows.length >= CW_MAX) {
-      setDone(true);
-      onLose(rows.length, secs, { share: buildShare(rows, false), answer });
-    }
+    const steps = newRoundGuesses.reduce((a, g) => a + (g ? g.length : 0), 0);
+    onStepChange(steps);
+    onSaveProgress && onSaveProgress(buildProgress(newRoundGuesses, hintsByRound), steps, secs);
+    finishIfDone(resolveRounds(newRoundGuesses));
   };
 
-  const typeLetter = (ch) => { if (!done && cur.length < CW_LEN) setCur(cur + ch); };
+  const typeLetter = (ch) => { if (!done && active && cur.length < active.def.word.length) setCur(cur + ch); };
   const backspace = () => { if (!done) setCur(cur.slice(0, -1)); };
 
-  // Physical keyboard. The window listener is registered once; it dispatches
-  // through a ref so each keypress runs the latest closure (fresh cur/secs).
+  // Physical keyboard, dispatched through a ref so each keypress runs the latest closure.
   const apiRef = useRef({});
   apiRef.current = { submit, typeLetter, backspace };
   useEffect(() => {
@@ -5094,7 +6211,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const rowsLeft = Math.max(CW_MAX - guesses.length, 0);
+  const wordLen = active ? active.def.word.length : 5;
+  const maxGuesses = active ? active.maxG : 6;
+  const rowsLeft = active ? Math.max(maxGuesses - active.guesses.length, 0) : 0;
+  const boardWidth = Math.min(wordLen * 52, 440);
 
   return (
     <div>
@@ -5104,51 +6224,119 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           <div className="pvalue time">{fmt}</div>
         </div>
         <div className="pill">
-          <div className="plabel">Guesses</div>
-          <div className="pvalue">{Math.min(guesses.length, CW_MAX)}/{CW_MAX}</div>
+          <div className="plabel">Word</div>
+          <div className="pvalue">{Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/{roundsDef.length}</div>
         </div>
         <div className="pill">
-          <div className="plabel">Left</div>
-          <div className="pvalue">{rowsLeft}</div>
+          <div className="plabel">Solved</div>
+          <div className="pvalue">{solvedCount}/{roundsDef.length}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Points</div>
+          <div className="pvalue">{totalScore}</div>
         </div>
       </div>
 
-      <div className="cw-board">
-        {Array.from({ length: CW_MAX }).map((_, r) => {
-          const g = guesses[r];
-          const isCurrent = !g && r === guesses.length && !done;
-          const letters = g ? g.word : (isCurrent ? cur : '');
+      <div className="cw-tracker">
+        {roundState.map((r, i) => {
+          let cls = 'cw-dot';
+          if (r.solved) cls += ' solved';
+          else if (r.missed) cls += ' missed';
+          else if (i === activeIdx) cls += ' active';
           return (
-            <div key={r} className={`cw-row${isCurrent && shake ? ' shake' : ''}`}>
-              {Array.from({ length: CW_LEN }).map((__, c) => {
-                const ch = letters[c] || '';
-                const cls = ['cw-tile'];
-                if (g) cls.push(g.result[c]);
-                else if (ch) cls.push('filled');
-                return <div key={c} className={cls.join(' ')}>{ch}</div>;
-              })}
-            </div>
+            <span
+              key={i}
+              className={cls}
+              title={r.resolved ? `Word ${i + 1}: ${r.def.word}` : `Word ${i + 1}`}
+            >
+              {r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○'}
+            </span>
           );
         })}
       </div>
 
-      <div className="cw-kbd">
-        {CW_KEYS.map((row, ri) => (
-          <div key={ri} className="cw-kbd-row">
-            {ri === 2 && <button className="cw-key wide" onClick={submit}>Enter</button>}
-            {row.split('').map(ch => (
-              <button
-                key={ch}
-                className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
-                onClick={() => typeLetter(ch)}
-              >
-                {ch}
-              </button>
-            ))}
-            {ri === 2 && <button className="cw-key wide" onClick={backspace}>⌫</button>}
+      {active && (
+        <>
+          <div className="cw-clue">
+            <span className="cw-clue-label">Clue</span>
+            <span className="cw-clue-text">{active.def.clue}</span>
+            <span className="cw-clue-len">{wordLen} letters</span>
           </div>
-        ))}
-      </div>
+
+          {activeHints.slice(0, revealedExtra).map((h, i) => (
+            <div key={i} className="cw-clue cw-clue-extra">
+              <span className="cw-clue-label">Hint {i + 1}</span>
+              <span className="cw-clue-text">{h}</span>
+            </div>
+          ))}
+
+          {activeHints.length > 0 && (
+            <div className="cw-hint-bar">
+              <button
+                className="cw-hint-btn"
+                onClick={buyHint}
+                disabled={buying || cluesLeft <= 0 || !canAffordHint}
+              >
+                {cluesLeft <= 0
+                  ? '💡 No more clues'
+                  : <>💡 Hint · {nextCost} 🪙</>}
+              </button>
+              <span className="cw-hint-balance">
+                Balance: {matchBalance == null ? '…' : matchBalance} 🪙 MATCH
+              </span>
+              {hintMsg && <span className="cw-hint-msg">{hintMsg}</span>}
+            </div>
+          )}
+
+          <div
+            className="cw-board"
+            style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
+          >
+            {Array.from({ length: maxGuesses }).map((_, r) => {
+              const g = active.guesses[r];
+              const isCurrent = !g && r === active.guesses.length && !done;
+              const letters = g ? g.word : (isCurrent ? cur : '');
+              return (
+                <div
+                  key={r}
+                  className={`cw-row${isCurrent && shake ? ' shake' : ''}`}
+                  style={{ gridTemplateColumns: `repeat(${wordLen}, 1fr)` }}
+                >
+                  {Array.from({ length: wordLen }).map((__, c) => {
+                    const ch = letters[c] || '';
+                    const cls = ['cw-tile'];
+                    if (g) cls.push(g.result[c]);
+                    else if (ch) cls.push('filled');
+                    return <div key={c} className={cls.join(' ')}>{ch}</div>;
+                  })}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="cw-kbd">
+            {CW_KEYS.map((row, ri) => (
+              <div key={ri} className="cw-kbd-row">
+                {ri === 2 && <button className="cw-key wide" onClick={submit}>Enter</button>}
+                {row.split('').map(ch => (
+                  <button
+                    key={ch}
+                    className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
+                    onClick={() => typeLetter(ch)}
+                  >
+                    {ch}
+                  </button>
+                ))}
+                {ri === 2 && <button className="cw-key wide" onClick={backspace}>⌫</button>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {allResolved && (
+        <div className="cw-alldone">Puzzle complete — {solvedCount}/{roundsDef.length} words · {totalScore} pts</div>
+      )}
     </div>
   );
 }
@@ -5160,17 +6348,11 @@ const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10, MS_SAFE = MS_ROWS * MS_COLS - MS_
 
 const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
 const MS_HISTORY_MAX = 50;
+// Looping background-music asset (served by express.static from public/audio).
+const MS_MUSIC_URL = '/audio/minesweeper-bg.mp3';
 
-function msLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(MS_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-function msSaveEntry(entry) {
-  const h = msLoadHistory();
-  h.unshift(entry);
-  if (h.length > MS_HISTORY_MAX) h.length = MS_HISTORY_MAX;
-  try { localStorage.setItem(MS_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
+function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
 
 function generateMines(firstR, firstC) {
   const protected_ = new Set();
@@ -5239,7 +6421,13 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [gameOverMine, setGameOverMine] = useState(null);
   const [steps, setSteps] = useState(0);
   const [isMock, setIsMock] = useState(false);
+  const [walletAddr, setWalletAddr] = useState(null);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
+  // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
+  // both SFX and music); `musicPaused` is the player's in-game music pause that
+  // leaves SFX untouched.
+  const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
+  const [musicPaused, setMusicPaused] = useState(false);
   const flagTimerRef = useRef(null);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
 
@@ -5253,12 +6441,37 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     setGameOverMine(null);
     setSteps(0);
     setActiveTab('game');
+    setMusicPaused(false);
   }, [resetKey]);
 
-  // Bridge: detect mock mode
+  // Background music: plays while a game is live (board generated on first
+  // reveal), sound is enabled, and the player hasn't paused it. Starting only
+  // after the first reveal means it's triggered by a user gesture, satisfying
+  // browser autoplay policy. Any change to these conditions re-evaluates.
+  useEffect(() => {
+    const shouldPlay = mineSet !== null && !done && soundOn && !musicPaused;
+    if (shouldPlay) startBackgroundMusic(MS_MUSIC_URL);
+    else stopBackgroundMusic();
+  }, [mineSet, done, soundOn, musicPaused]);
+
+  // Always silence the track when leaving the game (unmount → back to lobby).
+  useEffect(() => () => stopBackgroundMusic(), []);
+
+  // Toggle the shared sound master switch (persists to localStorage via cgPrefs)
+  // and mirror it into local state so the component re-renders.
+  const toggleSound = () => {
+    const next = !cgPrefs.sound;
+    cgSetPref('sound', next);
+    setSoundOn(next);
+  };
+
+  // Bridge: detect mock mode and fetch wallet address
   useEffect(() => {
     if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
       window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
+    }
+    if (window.usernode && typeof window.usernode.getNodeAddress === 'function') {
+      window.usernode.getNodeAddress().then(addr => { if (addr) setWalletAddr(addr); }).catch(() => {});
     }
   }, []);
 
@@ -5287,6 +6500,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (mines.has(idx)) {
       setGameOverMine(idx);
       setDone(true);
+      cgSound('lose'); cgHaptic([20, 40, 20]);
       const baseScore = 0;
       const entry = {
         id: String(Date.now()),
@@ -5307,6 +6521,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (newSafeRevealed >= MS_SAFE) {
       // Full board clear
       setDone(true);
+      cgSound('win'); cgHaptic([15, 30, 15]);
       const baseScore = Math.max(newSafeRevealed * 30 - secs * 2, 100) + 200;
       const dateStr = new Date().toISOString().slice(0, 10);
       const entry = {
@@ -5324,6 +6539,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const handleCashOut = () => {
     if (!cashOutActive || !mineSet) return;
     setDone(true);
+    cgSound('win'); cgHaptic([15, 30, 15]);
     const baseScore = Math.max(safeRevealed * 30 - secs * 2, 100);
     const finalScore = Math.round(baseScore * cashoutMultiplier);
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -5355,20 +6571,10 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
   const minesLeft = MS_MINES - flagged.size;
 
-  const bannerText = isMock
-    ? '🔧 Developer Mode — mock wallet active'
-    : (window.usernode ? '🔗 Usernode connected' : null);
-
   const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
 
   return (
     <div>
-      <div className="ms-game-header">
-        {bannerText && <span className="ms-usernode-banner">{bannerText}</span>}
-        <button className="ms-theme-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-          {theme === 'dark' ? '☀' : '🌙'}
-        </button>
-      </div>
 
       {activeTab === 'game' && (
         <div>
@@ -5441,9 +6647,19 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               </button>
               {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
+            <button
+              className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
+              onClick={() => setMusicPaused(p => !p)}
+              disabled={!soundOn}
+              title={!soundOn ? 'Sound is off (Settings)' : musicPaused ? 'Resume music' : 'Pause music'}
+              aria-label={!soundOn ? 'Sound off' : musicPaused ? 'Resume music' : 'Pause music'}
+            >
+              {!soundOn ? '🔇' : musicPaused ? '▶' : '⏸'}
+            </button>
             <button className="ms-newgame-btn" onClick={() => {
               setMineSet(null); setAdjacency(null); setRevealed(new Set());
               setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+              setMusicPaused(false);
             }}>↺ New</button>
           </div>
         </div>
@@ -5487,8 +6703,64 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
+      {activeTab === 'settings' && (
+        <div style={{ padding: '0.5rem 0' }}>
+          <div className="ms-settings-section">
+            <h4>Audio</h4>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Sound &amp; music</span>
+              <button className="ms-theme-toggle" onClick={toggleSound}>
+                {soundOn ? '🔊 On' : '🔇 Off'}
+              </button>
+            </div>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Background music</span>
+              <button
+                className="ms-theme-toggle"
+                onClick={() => setMusicPaused(p => !p)}
+                disabled={!soundOn}
+                style={!soundOn ? { opacity: 0.5, cursor: 'default' } : undefined}
+              >
+                {!soundOn ? '🔇 Off' : musicPaused ? '▶ Paused' : '⏸ Playing'}
+              </button>
+            </div>
+          </div>
+          <div className="ms-settings-section">
+            <h4>Appearance</h4>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Theme</span>
+              <button className="ms-theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+                {theme === 'dark' ? '🌙 Dark' : '☀ Light'}
+              </button>
+            </div>
+          </div>
+          <div className="ms-settings-section">
+            <h4>Usernode Wallet</h4>
+            <div className="ms-settings-row">
+              <span className="ms-settings-label">Connection</span>
+              {isMock ? (
+                <div className="ms-wallet-status">
+                  <span className="ms-ws-label mock">🔧 Dev mode</span>
+                  <span className="ms-ws-addr">mock wallet active</span>
+                </div>
+              ) : window.usernode ? (
+                <div className="ms-wallet-status">
+                  <span className="ms-ws-label">🔗 Connected</span>
+                  {walletAddr && <span className="ms-ws-addr">{truncAddr(walletAddr)}</span>}
+                </div>
+              ) : (
+                <div className="ms-wallet-status">
+                  <span className="ms-ws-label unavail">Not available</span>
+                  <span className="ms-ws-addr">open in Usernode</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="ms-bottom-nav">
-        {['game', 'history', 'leaderboard'].map(tab => (
+        {['game', 'history', 'leaderboard', 'settings'].map(tab => (
           <button
             key={tab}
             className={'ms-tab' + (activeTab === tab ? ' active' : '')}
@@ -5577,17 +6849,8 @@ function MncPitStones({ count, pitSeed, entering, capturing, isStore }) {
 const MNC_HISTORY_MAX = 50;
 const MNC_SOUND_KEY = 'puzzlechain_mancala_sound';
 
-function mncLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(MNC_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-
-function mncSaveEntry(entry) {
-  const h = mncLoadHistory();
-  h.unshift(entry);
-  if (h.length > MNC_HISTORY_MAX) h.length = MNC_HISTORY_MAX;
-  try { localStorage.setItem(MNC_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function mncLoadHistory() { return loadHistory(MNC_HISTORY_KEY); }
+function mncSaveEntry(entry) { saveHistory(MNC_HISTORY_KEY, entry, MNC_HISTORY_MAX); }
 
 function mncInitBoard() {
   return [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
@@ -6241,6 +7504,39 @@ async function mncVerifySession(sessionId, nonce, moveLog, finalPits, timeSecs) 
   } catch { return { verified: false, reason: 'network_error' }; }
 }
 
+// Daily Challenge: claim today's attempt and mint a session whose commitment
+// covers the day's deterministic board. Returns { sessionId, nonce, attempt, ... }
+// or { locked, ... } / null. Mirrors mncStartSession but for the daily board.
+async function mncDailyStart(offset) {
+  try {
+    const board = mncDailyBoard(offset);
+    const nonceBytes = new Uint8Array(16);
+    window.crypto.getRandomValues(nonceBytes);
+    const nonceHex = Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const msgBuf = new TextEncoder().encode(nonceHex + '||' + JSON.stringify(board));
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', msgBuf);
+    const commitment = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    const { ok, status, body } = await api('/api/mancala/daily/start', {
+      method: 'POST',
+      body: JSON.stringify({ commitment }),
+    });
+    if (status === 409) return { locked: true, body };
+    if (ok && body && body.sessionId) return { sessionId: body.sessionId, nonce: nonceHex, body };
+    return null;
+  } catch { return null; }
+}
+
+async function mncDailyFinish(sessionId, nonce, moveLog, finalPits, timeSecs) {
+  try {
+    const { ok, body } = await api('/api/mancala/daily/finish', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, nonce, moveLog, finalPits, timeSecs }),
+    });
+    if (ok && body) return body;
+    return { verified: false, reason: 'network_error' };
+  } catch { return { verified: false, reason: 'network_error' }; }
+}
+
 /* ============================================================
    Mancala Leaderboard component (used inside AI game tab)
    ============================================================ */
@@ -6333,6 +7629,492 @@ function MncLeaderboard() {
 }
 
 /* ============================================================
+   Mancala Daily Challenge — leaderboard (Today / All-Time tabs)
+   ============================================================ */
+function MncDailyLeaderboard({ refreshKey }) {
+  const [scope, setScope]     = useState('today');
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(false);
+    api('/api/mancala/daily/leaderboard?scope=' + scope)
+      .then(({ ok, body }) => {
+        if (!alive) return;
+        if (ok && body) setData(body);
+        else setError(true);
+      })
+      .catch(() => { if (alive) setError(true); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [scope, refreshKey]);
+
+  const fmtSecs = s => {
+    if (s == null) return '—';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+  const meInTop = data && data.me && data.entries && data.entries.some(r => r.rank === data.me.rank);
+  const cols = scope === 'today' ? '2rem 1fr auto auto' : '2rem 1fr auto auto';
+
+  const Row = ({ r, me }) => (
+    <div style={{
+      display: 'grid', gridTemplateColumns: cols, gap: '0 0.5rem',
+      padding: '0.4rem 0.25rem', fontSize: '0.82rem',
+      borderBottom: `1px solid ${C.border}22`,
+      background: me ? C.accent + '18' : 'transparent',
+      borderRadius: me ? '6px' : '0',
+    }}>
+      <span style={{ color: r.rank <= 3 ? C.gold : C.muted, fontWeight: r.rank <= 3 ? 700 : 400 }}>{r.rank}</span>
+      <span style={{ color: me ? C.accent : C.text, fontWeight: me ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.username || '—'}</span>
+      <span style={{ color: C.gold, fontFamily: 'monospace' }}>{r.score}</span>
+      <span style={{ color: C.muted }}>
+        {scope === 'today' ? fmtSecs(r.timeSecs) : `🔥 ${r.daysHeldRecord != null ? r.daysHeldRecord : 0}`}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+        {[['today', 'Today'], ['alltime', 'All-Time']].map(([id, label]) => (
+          <button key={id} className={'mnc-difficulty-pill' + (scope === id ? ' active' : '')} onClick={() => setScope(id)}>{label}</button>
+        ))}
+      </div>
+      {loading && <div style={{ textAlign: 'center', color: C.muted, padding: '1rem', fontSize: '0.85rem' }}>Loading…</div>}
+      {error && <div style={{ textAlign: 'center', color: C.rose, padding: '1rem', fontSize: '0.85rem' }}>Could not load leaderboard.</div>}
+      {!loading && !error && data && (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '0 0.5rem', fontSize: '0.75rem', color: C.muted, padding: '0 0.25rem 0.3rem', borderBottom: `1px solid ${C.border}` }}>
+            <span>#</span><span>Player</span><span>Score</span><span>{scope === 'today' ? 'Time' : 'Record'}</span>
+          </div>
+          {data.entries.length === 0 && (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '1.25rem', fontSize: '0.85rem' }}>No scores yet — be the first!</div>
+          )}
+          {data.entries.map((r, i) => <Row key={i} r={r} me={r.isCurrentUser} />)}
+          {data.me && !meInTop && (
+            <div>
+              <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.7rem', padding: '0.2rem 0' }}>…</div>
+              <Row r={data.me} me={true} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Game 5e — Mancala Daily Challenge (one seeded puzzle/day vs Hard AI)
+   ============================================================ */
+function MancalaDailyGame({ onWin, onStepChange, offset }) {
+  // Phase: 'loading' | 'locked' | 'play' | 'error'
+  const [phase, setPhase]               = useState('loading');
+  const [pits, setPits]                 = useState(() => mncDailyBoard(offset));
+  const [player, setPlayer]             = useState(1);
+  const [done, setDone]                 = useState(false);
+  const [winner, setWinner]             = useState(null);
+  const [moves, setMoves]               = useState(0);
+  const [flashPits, setFlashPits]       = useState(() => new Set());
+  const [captureFlash, setCaptureFlash] = useState(() => new Set());
+  const [bannerMsg, setBannerMsg]       = useState('');
+  const [aiThinking, setAiThinking]     = useState(false);
+  const [soundOn, setSoundOn]           = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
+  const [activeTab, setActiveTab]       = useState('game');
+  const [globalRecord, setGlobalRecord] = useState(null);
+  const [streak, setStreak]             = useState(0);
+  const [nextReset, setNextReset]       = useState(null);
+  const [lockedAttempt, setLockedAttempt] = useState(null);
+  const [verifying, setVerifying]       = useState(false);
+  const [verified, setVerified]         = useState(null);
+  const [becameRecord, setBecameRecord] = useState(false);
+  const [lbKey, setLbKey]               = useState(0);
+  const [resumeSecs, setResumeSecs]     = useState(0);
+
+  const animatingRef = useRef(false);
+  const soundOnRef   = useRef(soundOn);
+  const winTimerRef  = useRef(null);
+  const applyMoveRef = useRef(null);
+  const pitsRef      = useRef(pits);
+  const movesRef     = useRef(moves);
+  const sessionIdRef = useRef(null);
+  const nonceRef     = useRef(null);
+  const moveLogRef   = useRef([]);
+  const startedRef   = useRef(false);
+  soundOnRef.current = soundOn;
+  pitsRef.current    = pits;
+  movesRef.current   = moves;
+
+  const { secs, fmt } = useTimer(phase === 'play' && !done, resumeSecs);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+
+  const countdown = useCountdown(nextReset, offset, null);
+
+  // Hydrate state on mount: derive board, learn record/streak/lock, and (if
+  // playable) claim today's attempt + mint the ZK session.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const demo = new URLSearchParams(window.location.search).get('demo');
+      const { ok, body } = await api('/api/mancala/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : ''));
+      if (!alive) return;
+      if (!ok || !body) { setPhase('error'); return; }
+      setPits(body.board || mncDailyBoard(offset));
+      setGlobalRecord(body.globalRecord != null ? body.globalRecord : null);
+      setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setNextReset(body.nextResetUtc || null);
+      const at = body.attempt;
+      if (at && at.finishedAt) {
+        setLockedAttempt(at);
+        setPhase('locked');
+        return;
+      }
+      // Fresh or resumable — claim/mint a session.
+      const started = await mncDailyStart(offset);
+      if (!alive) return;
+      if (started && started.locked) {
+        setLockedAttempt(started.body && started.body.attempt);
+        if (started.body && started.body.nextResetUtc) setNextReset(started.body.nextResetUtc);
+        setPhase('locked');
+        return;
+      }
+      if (!started || !started.sessionId) { setPhase('error'); return; }
+      sessionIdRef.current = started.sessionId;
+      nonceRef.current = started.nonce;
+      moveLogRef.current = [];
+      if (started.body) {
+        if (started.body.board) setPits(started.body.board);
+        if (started.body.globalRecord != null) setGlobalRecord(started.body.globalRecord);
+        if (started.body.nextResetUtc) setNextReset(started.body.nextResetUtc);
+        const sa = started.body.attempt;
+        // Resume an unfinished attempt: restore move count + elapsed timer. The
+        // board itself is re-derived from the day seed, so only the count is
+        // needed to keep the step display honest (moves replay isn't restored —
+        // a same-day return continues from the live board the server tracks via
+        // the new session; we keep it simple and resume the clock + counter).
+        if (sa && sa.elapsedSecs) setResumeSecs(sa.elapsedSecs);
+        if (sa && typeof sa.moves === 'number') { setMoves(sa.moves); onStepChange(sa.moves); }
+      }
+      startedRef.current = true;
+      setPhase('play');
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Autosave elapsed time + move count for resume (board re-derives from seed).
+  useAutosave(
+    (progress, steps, s) => {
+      if (phase !== 'play' || done) return;
+      api('/api/mancala/daily/progress', {
+        method: 'POST', keepalive: true,
+        body: JSON.stringify({ progress, moves: steps, elapsedSecs: s }),
+      }).catch(() => {});
+    },
+    () => ({ progress: { dayNum: utcDayNum(offset), moves: movesRef.current }, steps: movesRef.current, secs: secsRef.current }),
+    phase === 'play' && !done
+  );
+
+  const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
+    const p = newPits.slice();
+    const p1Empty = p.slice(0, 6).every(v => v === 0);
+    const p2Empty = p.slice(7, 13).every(v => v === 0);
+    const isGameOver = p1Empty || p2Empty;
+    if (isGameOver) {
+      for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+      for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    }
+    setPits(p);
+    setMoves(newMoves);
+    onStepChange(newMoves);
+    if (isGameOver) {
+      const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
+      setWinner(w);
+      setDone(true);
+      setAiThinking(false);
+      const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
+      setBannerMsg(wLabel);
+
+      const finalSecs = secsRef.current;
+      const date = new Date(Date.now() + offset).toISOString().slice(0, 10);
+      const recLine = w === 1 ? '' : '';
+      const share = `Mancala Daily ${date} — 🫘 You ${p[6]} · AI ${p[13]} · ${finalSecs}s${recLine}`;
+      const base = Math.max((p[6] - p[13]) * 15 - finalSecs, 0);
+
+      setVerifying(true);
+      const sid = sessionIdRef.current;
+      const nonce = nonceRef.current;
+      const log = moveLogRef.current.slice();
+      const fp = p.slice();
+      const proceed = (serverScore, ver, became) => {
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          setBannerMsg('');
+          const label = w === 'draw' ? "Draw 🤝"
+            : w === 2 ? 'AI wins 🤖'
+            : became ? '🏆 New daily record!' : 'You win! 🎉';
+          onWin(w === 1 ? serverScore : 0, newMoves, finalSecs, {
+            winner: w, share, verified: ver, daily: true,
+            becameRecord: became, streak, winnerLabel: label,
+          });
+        }, 700);
+      };
+
+      if (sid && nonce) {
+        mncDailyFinish(sid, nonce, log, fp, finalSecs).then(result => {
+          setVerifying(false);
+          const ok = result && result.verified;
+          setVerified(ok);
+          if (ok) {
+            if (result.globalRecord != null) setGlobalRecord(result.globalRecord);
+            if (typeof result.streak === 'number') setStreak(result.streak);
+            setBecameRecord(!!result.becameRecord);
+            setLbKey(k => k + 1);
+            proceed(typeof result.score === 'number' ? result.score : (w === 1 ? base : 0), true, !!result.becameRecord);
+          } else {
+            proceed(w === 1 ? base : 0, false, false);
+          }
+        });
+      } else {
+        setVerifying(false);
+        proceed(w === 1 ? base : 0, false, false);
+      }
+    } else if (extraTurn) {
+      setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
+      setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
+    } else {
+      setPlayer(currentPlayer === 1 ? 2 : 1);
+      setBannerMsg('');
+    }
+  };
+
+  const applyMove = (idx, currentPlayer) => {
+    if (animatingRef.current) return;
+    const curPits = pitsRef.current;
+    if (curPits[idx] === 0) return;
+    const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(curPits, idx, currentPlayer);
+    const newMoves = movesRef.current + 1;
+    moveLogRef.current.push(idx);
+    animatingRef.current = true;
+    const working = curPits.slice();
+    working[idx] = 0;
+    setPits(working.slice());
+    setFlashPits(new Set());
+    let step = 0;
+    const animate = () => {
+      if (!animatingRef.current) { setFlashPits(new Set()); return; }
+      if (step >= sequence.length) {
+        setFlashPits(new Set());
+        if (captureFrom >= 0) {
+          setCaptureFlash(new Set([captureFrom]));
+          setTimeout(() => {
+            if (!animatingRef.current) return;
+            setCaptureFlash(new Set());
+            animatingRef.current = false;
+            finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+          }, 350);
+        } else {
+          animatingRef.current = false;
+          finishMove(newPits, currentPlayer, extraTurn, captureFrom, newMoves);
+        }
+        return;
+      }
+      working[sequence[step]]++;
+      setPits(working.slice());
+      setFlashPits(new Set([sequence[step]]));
+      if (soundOnRef.current) mncPlayClick();
+      step++;
+      setTimeout(animate, 80);
+    };
+    setTimeout(animate, 0);
+  };
+  applyMoveRef.current = applyMove;
+
+  // AI plays P2 at Hard difficulty (deterministic — matches server verification).
+  useEffect(() => {
+    if (phase !== 'play' || player !== 2 || done) return;
+    setAiThinking(true);
+    const FLOOR = 350;
+    let raf = null, applyTimer = null;
+    raf = requestAnimationFrame(() => {
+      const startedAt = Date.now();
+      const idx = mncAIMove(pitsRef.current, 'hard');
+      const elapsed = Date.now() - startedAt;
+      applyTimer = setTimeout(() => {
+        setAiThinking(false);
+        if (idx >= 0) applyMoveRef.current(idx, 2);
+      }, Math.max(0, FLOOR - elapsed));
+    });
+    return () => { if (raf) cancelAnimationFrame(raf); if (applyTimer) clearTimeout(applyTimer); };
+  }, [player, done, phase]);
+
+  useEffect(() => () => { if (winTimerRef.current) clearTimeout(winTimerRef.current); }, []);
+
+  if (phase === 'loading') {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} />
+        <div style={{ color: C.muted, fontSize: '0.85rem' }}>Loading today's challenge…</div>
+      </div>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem', color: C.rose, fontSize: '0.9rem' }}>
+        Couldn't load the Daily Challenge. Make sure you're signed in, then try again.
+      </div>
+    );
+  }
+
+  if (phase === 'locked') {
+    const at = lockedAttempt || {};
+    const solved = at.score != null && at.score > 0;
+    const fmtTime = s => s == null ? '—' : `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    return (
+      <div className="locked-card">
+        <div className="lock-icon">🔒</div>
+        <h2>You've played today</h2>
+        <div className="sub">Mancala Daily Challenge — one attempt per day</div>
+        <div className="mnc-daily-pills" style={{ justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <span className="mnc-record-pill">🏆 Record: {globalRecord != null ? globalRecord : '—'}</span>
+          {streak > 0 && <span className="mnc-streak-chip">🔥 {streak} day{streak === 1 ? '' : 's'}</span>}
+        </div>
+        <div className="countdown-block">
+          <div className="clabel">Next puzzle in</div>
+          <div className="ctime mono">{countdown}</div>
+        </div>
+        {at.score != null && (
+          <div className="locked-result">
+            <div className="score-row"><span className="k">Your score</span><span className="v">{solved ? '+' + at.score : '0'}</span></div>
+            {at.timeSecs != null && <div className="score-row"><span className="k">Time</span><span className="v">{fmtTime(at.timeSecs)}</span></div>}
+            {at.moves != null && <div className="score-row"><span className="k">Moves</span><span className="v">{at.moves}</span></div>}
+          </div>
+        )}
+        <MncDailyLeaderboard refreshKey={lbKey} />
+      </div>
+    );
+  }
+
+  // ----- play phase -----
+  const p2Display = [12, 11, 10, 9, 8, 7];
+  const p1Display = [0, 1, 2, 3, 4, 5];
+  const p1Color = C.accent, p2Color = C.rose;
+  const activeColor = player === 1 ? p1Color : p2Color;
+  const leadingRecord = globalRecord != null && pits[6] > globalRecord;
+
+  const handlePitClick = (idx) => {
+    if (player !== 1 || done || animatingRef.current) return;
+    if (idx < 0 || idx > 5 || pits[idx] === 0) return;
+    applyMove(idx, 1);
+  };
+  const pitClass = (idx) => {
+    const isP1Pit = idx <= 5;
+    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
+    const cls = ['mnc-pit'];
+    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
+    if (flashPits.has(idx)) cls.push('mnc-flash');
+    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
+    return cls.join(' ');
+  };
+
+  return (
+    <div>
+      <div className="mnc-daily-header">
+        <div className="mnc-daily-title">🗓️ Daily Challenge</div>
+        <div className="mnc-daily-pills">
+          <span className="mnc-record-pill" style={leadingRecord ? { borderColor: C.gold, color: C.gold } : null}>
+            {globalRecord != null ? `🏆 Record: ${globalRecord}` : '🏆 Be the first!'}
+          </span>
+          {streak > 0 && <span className="mnc-streak-chip">🔥 {streak} day{streak === 1 ? '' : 's'}</span>}
+        </div>
+      </div>
+
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
+        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: p1Color }}>{pits[6]}</div></div>
+        <div className="pill">
+          <div className="plabel">ZK</div>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
+        color: done ? C.muted : activeColor,
+        background: (done ? C.dim : activeColor) + '22',
+        border: `1px solid ${(done ? C.dim : activeColor)}44`,
+        borderRadius: '999px', padding: '0.32rem 0.8rem',
+        maxWidth: 480, margin: '0 auto 0.65rem',
+      }}>
+        {done
+          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits'}
+      </div>
+
+      <div className="mnc-board">
+        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
+          <div className="mnc-store-label">AI</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p2Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
+          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
+          <div className="mnc-store-label">You</div>
+          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
+          <div className="mnc-store-label">store</div>
+        </div>
+        {p1Display.map((idx, i) => (
+          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
+            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
+            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
+          </div>
+        ))}
+      </div>
+
+      {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
+      {becameRecord && <div className="mnc-banner" style={{ color: C.gold }}>🏆 New daily record!</div>}
+
+      <div className="mnc-controls">
+        <button onClick={() => { const next = !soundOn; setSoundOn(next); soundOnRef.current = next; try { localStorage.setItem(MNC_SOUND_KEY, next ? '1' : '0'); } catch {} }}>
+          {soundOn ? '🔊' : '🔇'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0', marginTop: '1.25rem', borderBottom: `1px solid ${C.border}` }}>
+        {['game', 'leaderboard'].map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{
+              flex: 1, padding: '0.45rem', fontSize: '0.82rem', fontWeight: activeTab === tab ? 700 : 400,
+              background: 'none', border: 'none', borderBottom: activeTab === tab ? `2px solid ${C.accent}` : '2px solid transparent',
+              color: activeTab === tab ? C.accent : C.muted, cursor: 'pointer',
+            }}>{tab === 'game' ? '🎯 Challenge' : '🏆 Leaderboard'}</button>
+        ))}
+      </div>
+      {activeTab === 'game' && (
+        <div style={{ textAlign: 'center', color: C.muted, fontSize: '0.82rem', padding: '0.9rem 0.5rem', lineHeight: 1.5 }}>
+          One puzzle a day — the same board for every player. Win against the Hard AI to score; a bigger,
+          faster win scores higher. Beat the global record to extend your 🔥 streak.
+        </div>
+      )}
+      {activeTab === 'leaderboard' && <MncDailyLeaderboard refreshKey={lbKey} />}
+    </div>
+  );
+}
+
+/* ============================================================
    Game 5b — Mancala AI variant (human P1 vs AI P2)
    ============================================================ */
 function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
@@ -6358,6 +8140,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   const applyMoveRef  = useRef(null);
   const pitsRef       = useRef(pits);
   const movesRef      = useRef(moves);
+  const playerRef     = useRef(player);
+  const doneRef       = useRef(done);
+  // AI turn-loop timers (thinking delay + last-resort watchdog)
+  const aiTimerRef    = useRef(null);
+  const aiWatchdogRef = useRef(null);
   // ZK proof refs
   const sessionIdRef  = useRef(null);
   const nonceRef      = useRef(null);
@@ -6365,10 +8152,35 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   soundOnRef.current  = soundOn;
   pitsRef.current     = pits;
   movesRef.current    = moves;
+  playerRef.current   = player;
+  doneRef.current     = done;
 
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
   secsRef.current = secs;
+
+  // Game Menu Save/Resume for the Versus-Bot (AI) Mancala game.
+  const { loadState, clearState } = useClassicSave('mancala');
+  const [resumeOffer, setResumeOffer] = useState(null);
+  const resumeCheckedRef = useRef(false);
+  useClassicSaveSource(!done, () => ({
+    difficulty, pits: pitsRef.current, currentPlayer: playerRef.current,
+    moves: movesRef.current, secs: secsRef.current,
+  }));
+  useEffect(() => {
+    if (resumeCheckedRef.current) return;
+    resumeCheckedRef.current = true;
+    loadState().then(s => { if (s && Array.isArray(s.pits)) setResumeOffer(s); });
+  }, []);
+  const applyResume = () => {
+    const s = resumeOffer; if (!s) return;
+    setPits(s.pits); pitsRef.current = s.pits;
+    setPlayer(s.currentPlayer || 1); playerRef.current = s.currentPlayer || 1;
+    setMoves(s.moves || 0); movesRef.current = s.moves || 0;
+    setDone(false); doneRef.current = false;
+    setResumeOffer(null);
+  };
+  const dismissResume = () => { setResumeOffer(null); clearState(); };
 
   const startSession = async () => {
     sessionIdRef.current = null;
@@ -6385,6 +8197,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   const resetGame = () => {
     animatingRef.current = false;
+    cancelAiTimers();
     if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
     setPits(mncInitBoard());
     setPlayer(1);
@@ -6415,10 +8228,13 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     setMoves(newMoves);
     onStepChange(newMoves);
     if (isGameOver) {
+      cancelAiTimers();
       const w = p[6] > p[13] ? 1 : p[13] > p[6] ? 2 : 'draw';
       setWinner(w);
       setDone(true);
+      doneRef.current = true;
       setAiThinking(false);
+      clearState(); // a finished bot game has no save to resume
       const wLabel = w === 1 ? 'You win! 🎉' : w === 2 ? 'AI wins! 🤖' : "It's a draw! 🤝";
       setBannerMsg(wLabel);
       const entry = {
@@ -6477,7 +8293,11 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     } else if (extraTurn) {
       setBannerMsg(currentPlayer === 2 ? 'AI gets another turn! 🔄' : 'Extra turn! 🔄');
       setTimeout(() => setBannerMsg(m => (m === 'Extra turn! 🔄' || m === 'AI gets another turn! 🔄') ? '' : m), 1200);
+      // The AI keeps the turn on an extra turn; the [player, done] effect
+      // won't re-fire (player is unchanged), so re-arm the AI loop directly.
+      if (currentPlayer === 2) scheduleAiMove();
     } else {
+      if (currentPlayer === 2) cancelAiTimers();
       setPlayer(currentPlayer === 1 ? 2 : 1);
       setBannerMsg('');
     }
@@ -6525,27 +8345,86 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   };
   applyMoveRef.current = applyMove;
 
-  // Trigger AI when it's P2's turn.
-  // Yield a frame so the "AI is thinking…" banner paints first, then run the
-  // (fast) search and apply the move once a short, consistent thinking floor
-  // has elapsed — measure-then-pad. This keeps the bot snappy and avoids a
-  // synchronous board freeze on Hard, without changing move selection.
-  useEffect(() => {
-    if (player !== 2 || done) return;
+  // --- AI turn loop -------------------------------------------------------
+  // Cancel any pending AI thinking timer + watchdog.
+  const cancelAiTimers = () => {
+    if (aiTimerRef.current)    { clearTimeout(aiTimerRef.current);    aiTimerRef.current = null; }
+    if (aiWatchdogRef.current) { clearTimeout(aiWatchdogRef.current); aiWatchdogRef.current = null; }
+  };
+
+  // Settle every remaining stone into its owner's store and end the game.
+  // Used when the AI has no legal move, or as the watchdog's last resort so
+  // the board can never stay frozen on "AI is thinking…".
+  const forceEndGame = () => {
+    cancelAiTimers();
+    if (doneRef.current) return;
+    const p = pitsRef.current.slice();
+    for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
+    for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
+    animatingRef.current = false;
+    setAiThinking(false);
+    // p has both sides empty, so finishMove detects game-over and runs the
+    // full winner / history / ZK / onWin flow exactly as a normal end would.
+    finishMove(p, 2, false, -1, movesRef.current);
+  };
+
+  // Last-resort safety net: if the AI ever fails to produce a move within a
+  // generous window, force the game to a result rather than hang forever.
+  const armWatchdog = () => {
+    if (aiWatchdogRef.current) { clearTimeout(aiWatchdogRef.current); aiWatchdogRef.current = null; }
+    aiWatchdogRef.current = setTimeout(() => {
+      aiWatchdogRef.current = null;
+      if (doneRef.current || playerRef.current !== 2) return;
+      // A real move may still be animating — give it more time, don't cut in.
+      if (animatingRef.current) { armWatchdog(); return; }
+      forceEndGame();
+    }, 12000);
+  };
+
+  // Compute and play the AI's move. Defends against a thrown engine, a missing
+  // legal move, and a still-running animation (retry instead of dropping it).
+  const performAiMove = () => {
+    aiTimerRef.current = null;
+    if (doneRef.current || playerRef.current !== 2) { setAiThinking(false); return; }
+    if (animatingRef.current) {
+      // Previous animation hasn't settled yet — retry shortly so the busy
+      // guard in applyMove never silently swallows the AI's move.
+      aiTimerRef.current = setTimeout(performAiMove, 120);
+      return;
+    }
+    let idx = -1;
+    try {
+      idx = mncAIMove(pitsRef.current, difficulty);
+    } catch (e) {
+      const legal = mncGetValidMoves(pitsRef.current, 2);
+      idx = legal.length ? legal[Math.floor(Math.random() * legal.length)] : -1;
+    }
+    if (idx < 0) { setAiThinking(false); forceEndGame(); return; }
+    setAiThinking(false);
+    applyMoveRef.current(idx, 2);
+  };
+
+  // Arm a single AI step (thinking delay + watchdog). Cancels any prior timer
+  // first, so chained extra turns never stack up.
+  const scheduleAiMove = () => {
+    if (aiTimerRef.current) { clearTimeout(aiTimerRef.current); aiTimerRef.current = null; }
+    if (doneRef.current || playerRef.current !== 2) return;
     setAiThinking(true);
-    const FLOOR = difficulty === 'easy' ? 250 : difficulty === 'medium' ? 300 : 350;
-    let raf = null, applyTimer = null;
-    raf = requestAnimationFrame(() => {
-      const startedAt = Date.now();
-      const idx = mncAIMove(pitsRef.current, difficulty);
-      const elapsed = Date.now() - startedAt;
-      applyTimer = setTimeout(() => {
-        setAiThinking(false);
-        if (idx >= 0) applyMoveRef.current(idx, 2);
-      }, Math.max(0, FLOOR - elapsed));
-    });
-    return () => { if (raf) cancelAnimationFrame(raf); if (applyTimer) clearTimeout(applyTimer); };
+    armWatchdog();
+    const delay = difficulty === 'easy' ? 500 : difficulty === 'medium' ? 700 : 1100;
+    aiTimerRef.current = setTimeout(performAiMove, delay);
+  };
+
+  // Kick off the AI loop whenever it becomes P2's turn. Chained extra turns
+  // are re-armed from finishMove (player is unchanged, so this won't re-fire).
+  useEffect(() => {
+    if (player !== 2 || done) { cancelAiTimers(); return; }
+    scheduleAiMove();
+    return () => cancelAiTimers();
   }, [player, done]);
+
+  // Cancel all AI timers on unmount.
+  useEffect(() => () => cancelAiTimers(), []);
 
   const handlePitClick = (idx) => {
     if (player !== 1 || done || animatingRef.current) return;
@@ -6578,6 +8457,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   return (
     <div>
+      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
@@ -6587,7 +8467,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
         </div>
         <div className="pill">
           <div className="plabel">ZK</div>
-          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
+          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? C.emerald : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
             {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
           </div>
         </div>
@@ -6808,7 +8688,7 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
 /* ============================================================
    Game 5d — Mancala Mode Selector
    ============================================================ */
-function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
+function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline, onSelectDaily }) {
   const [mode, setMode]             = useState(null);
   const [difficulty, setDifficulty] = useState(() => localStorage.getItem(MNC_AI_DIFF_KEY) || 'medium');
   const [onlineAction, setOnlineAction] = useState(null);
@@ -6818,6 +8698,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 
   const handleStart = async () => {
     if (!mode) return;
+    if (mode === 'daily') { onSelectDaily(); return; }
     if (mode === 'local') { onSelectLocal(); return; }
     if (mode === 'ai') {
       try { localStorage.setItem(MNC_AI_DIFF_KEY, difficulty); } catch {}
@@ -6846,6 +8727,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
   };
 
   const modes = [
+    { id: 'daily',  icon: '🗓️', name: 'Daily Challenge', desc: 'One puzzle a day. Beat the global record.', ranked: true },
     { id: 'local',  icon: '👥', name: 'Local 2-Player', desc: 'Pass and play on this device' },
     { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer', ranked: true },
     { id: 'online', icon: '🌐', name: 'Online',          desc: 'Play with a friend via room code' },
@@ -6921,26 +8803,36 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
 /* ============================================================
    Game 5 — Mancala wrapper (delegates to mode sub-components)
    ============================================================ */
-function MancalaGame({ onWin, onStepChange, resetKey }) {
-  const [mode, setMode]               = useState(null);
+function MancalaGame({ onWin, onStepChange, resetKey, gameMode, onModeChange, offset }) {
+  const [mode, setMode]               = useState(() =>
+    new URLSearchParams(window.location.search).get('mmode') === 'daily' ? 'daily' : null);
   const [difficulty, setDifficulty]   = useState(null);
   const [roomId, setRoomId]           = useState(null);
   const [myPlayerNum, setMyPlayerNum] = useState(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
-  // When "Play Again" fires, keep mode for local/ai but reset online (needs new room).
+  // On "Play Again" / Game-Menu New Game (resetKey change), return to the mode
+  // selector. Skip the initial mount so a ?mmode=daily deep-link survives.
+  const firstReset = useRef(true);
   useEffect(() => {
-    if (modeRef.current === 'online') {
-      setMode(null);
-      setRoomId(null);
-      setMyPlayerNum(null);
-    }
+    if (firstReset.current) { firstReset.current = false; return; }
+    setMode(null);
+    setRoomId(null);
+    setMyPlayerNum(null);
   }, [resetKey]);
+
+  // Report the active mode upward so the top-bar pill + Save toggle reflect it.
+  // 'ai' → 'bot' (saveable), 'local' → '2p', daily/null are non-mode states.
+  useEffect(() => {
+    if (!onModeChange) return;
+    onModeChange(mode === 'ai' ? 'bot' : mode === 'local' ? '2p' : mode === 'online' ? 'online' : null);
+  }, [mode]);
 
   if (!mode) {
     return (
       <MancalaModeSelect
+        onSelectDaily={() => setMode('daily')}
         onSelectLocal={() => setMode('local')}
         onSelectAI={(diff) => { setDifficulty(diff); setMode('ai'); }}
         onSelectOnline={(playerNum, rId) => { setMyPlayerNum(playerNum); setRoomId(rId); setMode('online'); }}
@@ -6948,6 +8840,7 @@ function MancalaGame({ onWin, onStepChange, resetKey }) {
     );
   }
 
+  if (mode === 'daily')  return React.createElement(MancalaDailyGame, { onWin, onStepChange, offset });
   if (mode === 'local') return React.createElement(MancalaLocalGame, { onWin, onStepChange, resetKey });
   if (mode === 'ai')    return React.createElement(MancalaAIGame,    { onWin, onStepChange, resetKey, difficulty });
   if (mode === 'online') return React.createElement(MancalaOnlineGame, { onWin, onStepChange, roomId, myPlayerNum });
@@ -7104,16 +8997,8 @@ function t2048_stripAnim(grid) {
   ));
 }
 
-function t2048LoadHistory() {
-  try { return JSON.parse(localStorage.getItem(T2048_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-function t2048SaveEntry(entry) {
-  const h = t2048LoadHistory();
-  h.unshift(entry);
-  if (h.length > T2048_HISTORY_MAX) h.length = T2048_HISTORY_MAX;
-  try { localStorage.setItem(T2048_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function t2048LoadHistory() { return loadHistory(T2048_HISTORY_KEY); }
+function t2048SaveEntry(entry) { saveHistory(T2048_HISTORY_KEY, entry, T2048_HISTORY_MAX); }
 function t2048LoadSavedBoard() {
   try {
     const raw = localStorage.getItem(T2048_BOARD_KEY);
@@ -7572,7 +9457,7 @@ function SnakeGameModeSelect({ onSelectDifficulty }) {
 }
 
 /* ---- Snake — Gameplay ---- */
-function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty }) {
+function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty, menuConfig }) {
   const N = 15;
   const [, render] = useState(0);
   const [done, setDone] = useState(false);
@@ -7692,7 +9577,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
     cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="snake-board-wrap">
@@ -7727,7 +9612,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
 }
 
 /* ---- Snake — Wrapper (mode selector + gameplay) ---- */
-function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
   const [difficulty, setDifficulty] = useState(null);
   const diffRef = useRef(difficulty);
   diffRef.current = difficulty;
@@ -7740,7 +9625,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
 
   if (!difficulty) {
     return (
-      <ClassicShell game={game} onExit={onBack} sheetSections={[]}>
+      <ClassicShell game={game} onExit={onBack} sheetSections={[]} menuConfig={menuConfig}>
         <div className="cg-stage">
           <SnakeGameModeSelect onSelectDifficulty={(d) => setDifficulty(d)} />
         </div>
@@ -7748,7 +9633,7 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack }) {
     );
   }
 
-  return React.createElement(SnakeGameplay, { onWin, onStepChange, resetKey, game, onBack, difficulty });
+  return React.createElement(SnakeGameplay, { onWin, onStepChange, resetKey, game, onBack, difficulty, menuConfig });
 }
 
 /* ---------------- Block Blast ---------------- */
@@ -7780,7 +9665,7 @@ function bbCanPlaceAny(grid, tray) {
   }
   return false;
 }
-function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
   const [tray, setTray] = useState(() => [bbRandPiece(), bbRandPiece(), bbRandPiece()]);
   const [score, setScore] = useState(0);
@@ -7901,7 +9786,7 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
     cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
   ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="bb-grid" ref={gridRef}>
@@ -7955,12 +9840,33 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack }) {
 }
 
 /* ---------------- Diamond Rush ---------------- */
-const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵'];
-function drMake() {
+const DR_GEMS = ['💎', '🔴', '🟡', '🟢', '🟣', '🔵', '💣', '⚡', '🌈'];
+const DR_POWER_UP_ICONS = { hint: '💡', shuffle: '🔀', extraTime: '⏱️' };
+const DR_POWER_UP_TYPES = { 6: 'hint', 7: 'shuffle', 8: 'extraTime' };
+const DR_POWER_UP_REWARDS = {
+  win: [
+    { cascades: 3, reward: 'shuffle' },
+    { moves: 15, reward: 'hint' },
+    { always: true, reward: 'extraTime' },
+  ],
+};
+function comboMultiplier(combo) {
+  if (combo <= 1) return 1.0;
+  if (combo <= 3) return 1.2;
+  if (combo <= 5) return 1.5;
+  return 2.0;
+}
+function drMake(powerUpSeed = false) {
   const g = new Array(64);
   for (let i = 0; i < 64; i++) {
     let v;
-    do { v = Math.floor(Math.random() * 6); }
+    do {
+      if (powerUpSeed && Math.random() < 0.08) {
+        v = 6 + Math.floor(Math.random() * 3);
+      } else {
+        v = Math.floor(Math.random() * 6);
+      }
+    }
     while (
       (i % 8 >= 2 && g[i - 1] === v && g[i - 2] === v) ||
       (i >= 16 && g[i - 8] === v && g[i - 16] === v)
@@ -7969,28 +9875,105 @@ function drMake() {
   }
   return g;
 }
-function drFindMatches(g) {
+function drFindMatches(g, onPowerUpEarned) {
   const m = new Set();
+  let sourceColor = null;
   for (let r = 0; r < 8; r++) for (let c = 0; c < 6; c++) {
     const i = r * 8 + c, v = g[i];
-    if (v != null && g[i + 1] === v && g[i + 2] === v) { m.add(i); m.add(i + 1); m.add(i + 2); }
+    if (v != null && v < 6 && g[i + 1] === v && g[i + 2] === v) {
+      m.add(i); m.add(i + 1); m.add(i + 2);
+      if (sourceColor === null) sourceColor = v;
+    }
   }
   for (let c = 0; c < 8; c++) for (let r = 0; r < 6; r++) {
     const i = r * 8 + c, v = g[i];
-    if (v != null && g[i + 8] === v && g[i + 16] === v) { m.add(i); m.add(i + 8); m.add(i + 16); }
+    if (v != null && v < 6 && g[i + 8] === v && g[i + 16] === v) {
+      m.add(i); m.add(i + 8); m.add(i + 16);
+      if (sourceColor === null) sourceColor = v;
+    }
   }
-  return m;
+  if (onPowerUpEarned) {
+    m.forEach(i => {
+      const gemType = g[i];
+      if (gemType >= 6 && gemType <= 8) {
+        const powerUpType = DR_POWER_UP_TYPES[gemType];
+        onPowerUpEarned(powerUpType);
+      }
+    });
+  }
+  return { matches: m, sourceColor };
+}
+function drCreateSpecialGem(g, matchSet, sourceColor, rainbowMeta) {
+  const count = matchSet.size;
+  if (count < 3) return null;
+  let gemType = null;
+  if (count >= 7) gemType = 8; // Rainbow
+  else if (count >= 5) gemType = 7; // Lightning
+  else if (count >= 3) gemType = 6; // Bomb
+  if (gemType === null) return null;
+  const positions = Array.from(matchSet).map(i => ({ r: Math.floor(i / 8), c: i % 8 }));
+  const centerR = Math.round(positions.reduce((s, p) => s + p.r, 0) / positions.length);
+  const centerC = Math.round(positions.reduce((s, p) => s + p.c, 0) / positions.length);
+  const centerIndex = centerR * 8 + centerC;
+  g[centerIndex] = gemType;
+  if (gemType === 8) rainbowMeta.set(centerIndex, sourceColor);
+  return centerIndex;
+}
+function drResolveSpecialEffects(g, specialIndex, rainbowMeta, toClear, processed = new Set()) {
+  if (processed.has(specialIndex)) return toClear;
+  processed.add(specialIndex);
+  const gemType = g[specialIndex];
+  const r = Math.floor(specialIndex / 8), c = specialIndex % 8;
+  if (gemType === 6) { // Bomb 3×3
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+          toClear.add(nr * 8 + nc);
+        }
+      }
+    }
+  } else if (gemType === 7) { // Lightning row+col
+    for (let col = 0; col < 8; col++) toClear.add(r * 8 + col);
+    for (let row = 0; row < 8; row++) toClear.add(row * 8 + c);
+  } else if (gemType === 8) { // Rainbow color match
+    const sourceColor = rainbowMeta.get(specialIndex);
+    for (let i = 0; i < 64; i++) {
+      if (g[i] === sourceColor) toClear.add(i);
+    }
+  }
+  const newSpecials = new Set();
+  for (let i of toClear) {
+    if ((g[i] === 6 || g[i] === 7 || g[i] === 8) && !processed.has(i)) {
+      newSpecials.add(i);
+    }
+  }
+  for (let special of newSpecials) {
+    toClear = drResolveSpecialEffects(g, special, rainbowMeta, toClear, processed);
+  }
+  return toClear;
 }
 function drResolve(grid) {
   let g = grid.slice();
+  let rainbowMeta = new Map();
   let total = 0, cascades = 0, maxClear = 0;
   while (true) {
-    const m = drFindMatches(g);
+    const matchResult = drFindMatches(g);
+    const m = matchResult.matches;
+    const sourceColor = matchResult.sourceColor;
     if (!m.size) break;
+    const specialGemIndex = drCreateSpecialGem(g, m, sourceColor, rainbowMeta);
+    let toClear = new Set(m);
+    if (specialGemIndex !== null) {
+      toClear = drResolveSpecialEffects(g, specialGemIndex, rainbowMeta, toClear, new Set());
+    }
     cascades++;
-    maxClear = Math.max(maxClear, m.size);
-    total += m.size * 10 * cascades;
-    m.forEach(i => { g[i] = null; });
+    maxClear = Math.max(maxClear, toClear.size);
+    total += toClear.size * 10 * cascades;
+    toClear.forEach(i => {
+      g[i] = null;
+      rainbowMeta.delete(i);
+    });
     for (let c = 0; c < 8; c++) {
       const col = [];
       for (let r = 7; r >= 0; r--) { const v = g[r * 8 + c]; if (v != null) col.push(v); }
@@ -8002,31 +9985,74 @@ function drResolve(grid) {
   }
   return { grid: g, total, cascades, maxClear };
 }
-function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+
+function findHighestScoringSwap(grid) {
+  let best = { a: -1, b: -1, score: 0 };
+  for (let i = 0; i < 64; i++) {
+    const r = Math.floor(i / 8), c = i % 8;
+    const neighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
+    for (const [nr, nc] of neighbors) {
+      if (nr < 0 || nr >= 8 || nc < 0 || nc >= 8) continue;
+      const j = nr * 8 + nc;
+      if (j <= i) continue;
+      const g = grid.slice();
+      [g[i], g[j]] = [g[j], g[i]];
+      const m = drFindMatches(g);
+      const score = m.matches.size * 10;
+      if (score > best.score) best = { a: i, b: j, score };
+    }
+  }
+  return best;
+}
+function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, savedProgress, onSaveProgress }) {
   const TARGET = 800, START_MOVES = 18;
   const [grid, setGrid] = useState(() => drMake());
   const [sel, setSel] = useState(-1);
   const [moves, setMoves] = useState(START_MOVES);
   const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
   const [done, setDone] = useState(false);
+  const [powerUps, setPowerUps] = useState(() => (savedProgress?.powerUps || { hint: 0, shuffle: 0, extraTime: 0 }));
+  const [hintIndices, setHintIndices] = useState([]);
+  const [timeBoost, setTimeBoost] = useState(false);
   const doneRef = useRef(false);
   const bestCascadeRef = useRef(0);
+  const bestComboRef = useRef(0);
   const touch = useRef(null);
-  const secs = useElapsed(resetKey, !done);
+  const timeAddedRef = useRef(0);
+  const secs = useElapsed(resetKey, !done) + timeAddedRef.current;
   const secsRef = useRef(0); secsRef.current = secs;
 
   const init = () => {
-    setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0);
-    setDone(false); doneRef.current = false; bestCascadeRef.current = 0;
+    setGrid(drMake()); setSel(-1); setMoves(START_MOVES); setScore(0); setCombo(0);
+    setDone(false); doneRef.current = false; bestCascadeRef.current = 0; bestComboRef.current = 0;
+    setHintIndices([]);
+    timeAddedRef.current = 0;
   };
   useEffect(() => { init(); }, [resetKey]);
+
+  const grantPowerUp = (type) => {
+    setPowerUps(prev => ({ ...prev, [type]: prev[type] + 1 }));
+  };
+
+  const onPowerUpEarned = (type) => {
+    grantPowerUp(type);
+  };
 
   const finish = (sc, win, mv) => {
     doneRef.current = true; setDone(true);
     cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
-    cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, ts: Date.now() });
-    if (win) onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
-    else onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+    cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, bestCombo: bestComboRef.current, ts: Date.now() });
+    setCombo(0);
+    if (win) {
+      if (bestCascadeRef.current >= 3) grantPowerUp('shuffle');
+      if (mv >= 15) grantPowerUp('hint');
+      grantPowerUp('extraTime');
+      onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
+    } else {
+      grantPowerUp('extraTime');
+      onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+    }
   };
   const adjacent = (a, b) => {
     const ar = Math.floor(a / 8), ac = a % 8, br = Math.floor(b / 8), bc = b % 8;
@@ -8036,13 +10062,19 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     if (done || a === b || !adjacent(a, b)) { setSel(-1); return; }
     const g = grid.slice();
     [g[a], g[b]] = [g[b], g[a]];
-    if (!drFindMatches(g).size) { cgSound('move'); setSel(-1); return; } // no match, revert
+    if (!drFindMatches(g).matches.size) { cgSound('move'); setCombo(0); setSel(-1); return; }
+    drFindMatches(g, onPowerUpEarned);
+    const newCombo = combo + 1;
+    const multiplier = comboMultiplier(newCombo);
     const res = drResolve(g);
     bestCascadeRef.current = Math.max(bestCascadeRef.current, res.cascades);
     cgSound('clear', 1 + res.cascades * 0.12); cgHaptic(20);
-    const ns = score + res.total;
+    const baseScore = res.total;
+    const multipliedScore = Math.round(baseScore * multiplier);
+    const ns = score + multipliedScore;
     const nm = moves - 1;
-    setGrid(res.grid); setScore(ns); setMoves(nm); setSel(-1);
+    setGrid(res.grid); setScore(ns); setCombo(newCombo); setMoves(nm); setSel(-1);
+    if (newCombo > bestComboRef.current) bestComboRef.current = newCombo;
     onStepChange && onStepChange(START_MOVES - nm);
     if (ns >= TARGET) { setTimeout(() => finish(ns, true, nm), 150); }
     else if (nm <= 0) { setTimeout(() => finish(ns, false, nm), 150); }
@@ -8067,31 +10099,78 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     else if (sel === start.i) { setSel(-1); }
     else trySwap(sel, start.i);
   };
+  const usePowerUp = (type) => {
+    if (done || powerUps[type] <= 0) return;
+    if (type === 'hint') {
+      const best = findHighestScoringSwap(grid);
+      if (best.a !== -1) {
+        setHintIndices([best.a, best.b]);
+        setTimeout(() => setHintIndices([]), 2000);
+      }
+    } else if (type === 'shuffle') {
+      const g = grid.slice();
+      const nonNull = [];
+      for (let i = 0; i < 64; i++) if (g[i] != null && g[i] < 6) nonNull.push(i);
+      for (let i = nonNull.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [g[nonNull[i]], g[nonNull[j]]] = [g[nonNull[j]], g[nonNull[i]]];
+      }
+      setGrid(g);
+      cgSound('click'); cgHaptic(30);
+    } else if (type === 'extraTime') {
+      timeAddedRef.current += 30;
+      setTimeBoost(true);
+      setTimeout(() => setTimeBoost(false), 1000);
+      cgSound('click'); cgHaptic(15);
+    }
+    setPowerUps(prev => ({ ...prev, [type]: prev[type] - 1 }));
+  };
+
   const hist = cgLoadHistory(DR_KEY);
   const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
   const wins = hist.filter(r => r.win).length;
   const bigC = hist.reduce((m, r) => Math.max(m, r.cascade || 0), 0);
+  const bestCombo = hist.reduce((m, r) => Math.max(m, r.bestCombo || 0), 0);
   const sheet = [
-    cgHistorySection(hist, r => <><span>{r.win ? '✅' : '❌'} {r.score} pts</span><span className="mono">x{r.cascade}</span></>),
+    cgHistorySection(hist, r => <><span>{r.win ? '✅' : '❌'} {r.score} pts</span><span className="mono">x{r.cascade}</span><span className="mono">c{r.bestCombo || 0}</span></>),
     cgStatsSection([
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
-      { val: bigC, lbl: 'Best cascade' }, { val: score, lbl: 'This round' },
+      { val: bigC, lbl: 'Best cascade' }, { val: bestCombo, lbl: 'Best combo' },
     ]),
-    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ of one colour to clear them.', 'Falling gems can chain into cascades for big bonuses.']),
+    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
-        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="dr-grid">
-          {grid.map((v, i) => (
-            <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '')}
-              onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
-              onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
-              {DR_GEMS[v]}
-            </div>
+        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
+        <div className="dr-powerups-bar">
+          {['hint', 'shuffle', 'extraTime'].map(type => (
+            <button
+              key={type}
+              className={`dr-powerup-btn ${powerUps[type] > 0 ? 'owned' : 'empty'}`}
+              onClick={() => usePowerUp(type)}
+              disabled={powerUps[type] === 0 || done}
+              title={`${type.charAt(0).toUpperCase() + type.slice(1)} (${powerUps[type]} owned)`}
+            >
+              <span className="icon">{DR_POWER_UP_ICONS[type]}</span>
+              <span className="count">{powerUps[type]}</span>
+            </button>
           ))}
         </div>
+        <div className="dr-grid">
+          {grid.map((v, i) => {
+            const isSpecial = v >= 6 ? ['bomb', 'lightning', 'rainbow'][v - 6] : null;
+            return (
+              <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '') + (isSpecial ? ' ' + isSpecial : '') + (hintIndices.includes(i) ? ' hint-target' : '')}
+                data-special={isSpecial}
+                onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
+                onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
+                {DR_GEMS[v]}
+              </div>
+            );
+          })}
+        </div>
+        {timeBoost && <div className="dr-time-boost">+30 sec</div>}
       </div>
     </ClassicShell>
   );
@@ -8162,7 +10241,7 @@ function thHandStrength(hole, board) {
   if (Math.abs(a.r - b.r) === 1) s += 0.05;
   return Math.min(0.95, s);
 }
-function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }) {
+function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
   const START = 200, BB = 10;
   const [state, setState] = useState(null);
   const [betOpen, setBetOpen] = useState(false);
@@ -8174,6 +10253,31 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
   const [done, setDone] = useState(false);
   const secs = useElapsed(resetKey, !done);
   secsRef.current = secs;
+
+  // Texas is always a Versus-Bot game — report it so the menu shows Save.
+  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
+
+  // Game Menu Save/Resume.
+  const { loadState, clearState } = useClassicSave('texas');
+  const [resumeOffer, setResumeOffer] = useState(null);
+  const resumeCheckedRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useClassicSaveSource(!done && !!state, () => ({
+    th: stateRef.current, hands: handsRef.current, bigPot: bigPotRef.current,
+  }));
+  useEffect(() => {
+    if (resumeCheckedRef.current) return;
+    resumeCheckedRef.current = true;
+    loadState().then(s => { if (s && s.th) setResumeOffer(s); });
+  }, []);
+  const applyResume = () => {
+    const s = resumeOffer; if (!s) return;
+    handsRef.current = s.hands || 0; bigPotRef.current = s.bigPot || 0;
+    setState(s.th); setDone(false); doneRef.current = false;
+    setResumeOffer(null);
+  };
+  const dismissResume = () => { setResumeOffer(null); clearState(); };
 
   const newHand = (pc, ac, dealerIsPlayer) => {
     const deck = thDeck();
@@ -8307,6 +10411,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     onStepChange && onStepChange(handsRef.current);
     if (s.pc <= 0 || s.ac <= 0) {
       doneRef.current = true; setDone(true);
+      clearState(); // match over — no save to resume
       const youWin = s.pc > 0;
       cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
       cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
@@ -8339,13 +10444,14 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
     cgRulesSection(['Heads-up Texas Hold \'Em vs the computer.', 'Tap Check / Call / Fold to act.', 'Tap Bet/Raise to size a wager.', 'Win all the opponent\'s chips to take the match.']),
   ];
 
-  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet}><div className="cg-stage" /></ClassicShell>;
+  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet} menuConfig={menuConfig}><div className="cg-stage" /></ClassicShell>;
   const s = state;
   const toCall = Math.max(0, s.aiBet - s.playerBet);
   const canAct = s.phase === 'betting' && s.toAct === 'player' && !done;
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet}>
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
+        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
         <div className="th-felt">
           <div className="th-seat">
             <div className="who">Opponent</div>
@@ -8400,14 +10506,10 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack }
    ============================================================ */
 
 // Seeded PRNG (mulberry32) — deterministic layouts per level number.
-function mulberry32(seed) {
-  return function() {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
+// mulberry32 is defined once in the shared SDK section above; the Tile Match
+// generator (tmGenerateLevel) uses that single definition. The duplicate copy
+// that previously lived here produced an identical PRNG sequence and has been
+// removed.
 
 const TM_TILE_TYPES = [
   { icon: '🌸', color: '#f43f5e' },
@@ -9937,16 +12039,8 @@ const KT_HISTORY_KEY = 'puzzlechain_knights_history';
 const KT_HISTORY_MAX = 50;
 const KT_MOVES = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 
-function ktLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(KT_HISTORY_KEY) || '[]'); }
-  catch { return []; }
-}
-function ktSaveEntry(entry) {
-  const h = ktLoadHistory();
-  h.unshift(entry);
-  if (h.length > KT_HISTORY_MAX) h.length = KT_HISTORY_MAX;
-  try { localStorage.setItem(KT_HISTORY_KEY, JSON.stringify(h)); } catch {}
-}
+function ktLoadHistory() { return loadHistory(KT_HISTORY_KEY); }
+function ktSaveEntry(entry) { saveHistory(KT_HISTORY_KEY, entry, KT_HISTORY_MAX); }
 function ktValidMoves(pos, visited) {
   if (pos === null) return [];
   const r = Math.floor(pos / 8), c = pos % 8;
@@ -13243,6 +15337,564 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
   return React.createElement('div', { style: { padding: '1rem', color: C.text } }, 'Loading...');
 }
 
+/* ============================================================
+   Chutes & Ladders — 2-player local (pass-and-play) classic game
+   ============================================================ */
+// Standard Milton-Bradley layout. Ladders climb (bottom -> top),
+// chutes slide (top -> bottom). One flat map keyed by landing square.
+const CNL_LADDERS = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+const CNL_CHUTES  = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+const CNL_JUMPS   = Object.assign({}, CNL_LADDERS, CNL_CHUTES);
+
+// Map a square number (1..100) to {row, col} on the boustrophedon board.
+// row 0 is the BOTTOM row (squares 1..10), row 9 is the TOP (91..100).
+// Even rows (0-indexed from bottom) run left->right; odd rows right->left.
+function cnlRowCol(n) {
+  const idx = n - 1;            // 0-based
+  const row = Math.floor(idx / 10);
+  const within = idx % 10;
+  const col = (row % 2 === 0) ? within : (9 - within);
+  return { row, col };
+}
+
+// Center of a square as a percentage of the board box (for SVG + pawns).
+// Visual row 0 sits at the BOTTOM, so flip for top-origin coordinates.
+function cnlCenterPct(n) {
+  if (n <= 0) return { x: 50, y: 104 }; // off-board: just below the board
+  const { row, col } = cnlRowCol(n);
+  const visualRow = 9 - row;
+  return { x: (col + 0.5) * 10, y: (visualRow + 0.5) * 10 };
+}
+
+// Local Chutes & Ladders board: hotseat 2-player, or vs Bot (P2 auto-rolls).
+// `initialState` (a saved bot snapshot) offers an in-stage Resume banner.
+function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialState, onClearSave }) {
+  const [p1Pos, setP1Pos]   = useState(0);
+  const [p2Pos, setP2Pos]   = useState(0);
+  const [player, setPlayer] = useState(1);
+  const [die, setDie]       = useState(null);
+  const [rolls, setRolls]   = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const [rolling, setRolling]     = useState(false);
+  const [done, setDone]     = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [banner, setBanner] = useState('');
+  // Resume offer for a saved bot game; null once dismissed/applied.
+  const [resumeOffer, setResumeOffer] = useState(initialState || null);
+
+  const animatingRef = useRef(false);
+  const winTimerRef  = useRef(null);
+  const timersRef    = useRef([]);
+
+  const { secs, fmt } = useTimer(!done);
+  const secsRef = useRef(0);
+  secsRef.current = secs;
+  const rollsRef = useRef(0);
+  rollsRef.current = rolls;
+
+  const pLabel = (who) => vsBot ? (who === 1 ? 'You' : 'Bot') : `Player ${who}`;
+
+  // Expose a save snapshot to the Game Menu while this is an active bot game.
+  useClassicSaveSource(vsBot && !done, () => ({
+    p1Pos, p2Pos, currentPlayer: player, rolls, secs: secsRef.current,
+  }));
+
+  const applyResume = () => {
+    const s = resumeOffer; if (!s) return;
+    setP1Pos(s.p1Pos || 0); setP2Pos(s.p2Pos || 0);
+    setPlayer(s.currentPlayer || 1); setRolls(s.rolls || 0);
+    rollsRef.current = s.rolls || 0;
+    setResumeOffer(null);
+  };
+  const dismissResume = () => { setResumeOffer(null); if (onClearSave) onClearSave(); };
+
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
+  };
+
+  const resetGame = () => {
+    animatingRef.current = false;
+    clearTimers();
+    setP1Pos(0); setP2Pos(0);
+    setPlayer(1); setDie(null); setRolls(0);
+    setAnimating(false); setRolling(false);
+    setDone(false); setWinner(null); setBanner('');
+  };
+
+  useEffect(() => { resetGame(); }, [resetKey]);
+  useEffect(() => () => clearTimers(), []);
+
+  const p1Color = C.accent;
+  const p2Color = C.rose;
+  const activeColor = done ? C.muted : (player === 1 ? p1Color : p2Color);
+
+  const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
+
+  const finishTurn = (who, landed) => {
+    const jump = CNL_JUMPS[landed];
+    const settle = () => {
+      // Win check: must land exactly on 100 (no chute sits on 100).
+      if (landed === 100) {
+        setDone(true);
+        setWinner(who);
+        if (onClearSave) onClearSave();
+        const label = `${pLabel(who)} win${vsBot && who === 1 ? '' : (vsBot ? 's' : 's')}! 🎉`;
+        setBanner(label);
+        const finalRolls = rollsRef.current;
+        const finalSecs = secsRef.current;
+        const score = Math.max(50, 300 - finalRolls * 5);
+        const share = `🪜 Chutes & Ladders — ${pLabel(who)} won in ${finalRolls} rolls!`;
+        winTimerRef.current = setTimeout(() => {
+          winTimerRef.current = null;
+          onWin(score, finalRolls, finalSecs, { winner: who, winnerLabel: label, share });
+        }, 1300);
+        return;
+      }
+      // Pass turn to the other player.
+      animatingRef.current = false;
+      setAnimating(false);
+      setPlayer(who === 1 ? 2 : 1);
+    };
+
+    if (jump !== undefined) {
+      // Brief pause so players see the landing, then climb/slide.
+      const isLadder = CNL_LADDERS[landed] !== undefined;
+      setBanner(isLadder ? 'Ladder up! 🪜' : 'Down the chute! 🛝');
+      const t = setTimeout(() => {
+        setPos(who, jump);
+        const t2 = setTimeout(() => { setBanner(''); settle(); }, 320);
+        timersRef.current.push(t2);
+      }, 380);
+      timersRef.current.push(t);
+    } else {
+      settle();
+    }
+  };
+
+  const roll = (clickedWho) => {
+    if (animatingRef.current || done || rolling) return;
+    // Buttons pass which player tapped; ignore a tap that isn't the active player.
+    if (clickedWho !== undefined && clickedWho !== player) return;
+    const who = player;
+    const value = Math.floor(Math.random() * 6) + 1;
+    const from = who === 1 ? p1Pos : p2Pos;
+    const newRolls = rolls + 1;
+
+    setRolling(true);
+    setDie(value);
+    setBanner('');
+    setRolls(newRolls);
+    rollsRef.current = newRolls;
+    onStepChange(newRolls);
+
+    const rollT = setTimeout(() => {
+      setRolling(false);
+
+      // Overshoot 100 => stay put, pass turn.
+      if (from + value > 100) {
+        setBanner('Overshoot — stay put');
+        const passT = setTimeout(() => {
+          setBanner('');
+          setPlayer(who === 1 ? 2 : 1);
+        }, 700);
+        timersRef.current.push(passT);
+        return;
+      }
+
+      // Hop square-by-square to the landing square.
+      animatingRef.current = true;
+      setAnimating(true);
+      const target = from + value;
+      let cur = from;
+      const hop = () => {
+        if (!animatingRef.current) return;
+        if (cur >= target) { finishTurn(who, target); return; }
+        cur++;
+        setPos(who, cur);
+        const t = setTimeout(hop, 130);
+        timersRef.current.push(t);
+      };
+      const t0 = setTimeout(hop, 130);
+      timersRef.current.push(t0);
+    }, 720);
+    timersRef.current.push(rollT);
+  };
+
+  // Bot auto-rolls for Player 2 in Versus-Bot mode.
+  useEffect(() => {
+    if (!vsBot || done || resumeOffer) return;
+    if (player !== 2 || animating || rolling) return;
+    const t = setTimeout(() => roll(2), 650);
+    return () => clearTimeout(t);
+  }, [vsBot, player, animating, rolling, done, resumeOffer]);
+
+  // Build the 10x10 cells (top row first for natural DOM order).
+  const cells = [];
+  for (let visualRow = 0; visualRow < 10; visualRow++) {
+    for (let col = 0; col < 10; col++) {
+      const row = 9 - visualRow;              // bottom-origin board row
+      const within = (row % 2 === 0) ? col : (9 - col);
+      const n = row * 10 + within + 1;
+      const mark = CNL_LADDERS[n] !== undefined ? '🪜'
+        : CNL_CHUTES[n] !== undefined ? '🛝' : null;
+      cells.push(
+        <div
+          key={n}
+          className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
+        >
+          <span>{n}</span>
+          {mark && <span className="cnl-cell-mark">{mark}</span>}
+        </div>
+      );
+    }
+  }
+
+  // SVG connector lines for every ladder/chute.
+  const lines = Object.keys(CNL_JUMPS).map(k => {
+    const from = parseInt(k, 10);
+    const to = CNL_JUMPS[from];
+    const a = cnlCenterPct(from);
+    const b = cnlCenterPct(to);
+    const isLadder = CNL_LADDERS[from] !== undefined;
+    return (
+      <line
+        key={k}
+        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+        stroke={isLadder ? C.emerald : C.rose}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        opacity="0.6"
+      />
+    );
+  });
+
+  const p1c = cnlCenterPct(p1Pos);
+  const p2c = cnlCenterPct(p2Pos);
+  // Nudge pawns apart when sharing a square (incl. both off-board) so both stay visible.
+  const sameCell = p1Pos === p2Pos;
+  const p1x = sameCell ? p1c.x - 2.4 : p1c.x;
+  const p2x = sameCell ? p2c.x + 2.4 : p2c.x;
+
+  const bannerActive = !!banner;
+  const bannerColor = done ? C.muted : activeColor;
+
+  return (
+    <div>
+      {resumeOffer && (
+        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
+      )}
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Time</div>
+          <div className="pvalue time">{fmt}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Turn</div>
+          <div className="pvalue" style={{ color: activeColor, fontSize: '0.95rem' }}>
+            {done ? pLabel(winner) : pLabel(player)}
+          </div>
+        </div>
+        <div className="pill">
+          <div className="plabel">{pLabel(1)}</div>
+          <div className="pvalue" style={{ color: p1Color, fontSize: '0.95rem' }}>{p1Pos}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">{pLabel(2)}</div>
+          <div className="pvalue" style={{ color: p2Color, fontSize: '0.95rem' }}>{p2Pos}</div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Rolls</div>
+          <div className="pvalue">{rolls}</div>
+        </div>
+      </div>
+
+      <div
+        className="cnl-banner"
+        style={{
+          color: bannerColor,
+          background: (bannerActive ? bannerColor : activeColor) + '22',
+          border: `1px solid ${(bannerActive ? bannerColor : activeColor)}44`,
+        }}
+      >
+        {done
+          ? `Game over — ${pLabel(winner)} win${vsBot && winner === 1 ? '' : 's'}! 🎉`
+          : (banner || `${pLabel(player)}'s turn`)}
+      </div>
+
+      <div className="cnl-board-wrap">
+        <div className="cnl-board">{cells}</div>
+        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {lines}
+        </svg>
+        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn" />
+        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn" />
+      </div>
+
+      <div className="cnl-die">
+        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: activeColor + '88' }}>
+          {die == null ? '·' : die}
+        </div>
+      </div>
+
+      <div className="cnl-roll-buttons">
+        <button
+          className="cnl-roll-btn"
+          style={{ background: p1Color }}
+          onClick={() => roll(1)}
+          disabled={done || animating || rolling || player !== 1 || !!resumeOffer}
+        >
+          {vsBot ? 'Your' : 'Player 1 -'} Roll
+        </button>
+        {vsBot ? (
+          <button className="cnl-roll-btn" style={{ background: p2Color, opacity: 0.85 }} disabled>
+            {player === 2 && !done ? 'Bot rolling…' : 'Bot'}
+          </button>
+        ) : (
+          <button
+            className="cnl-roll-btn"
+            style={{ background: p2Color }}
+            onClick={() => roll(2)}
+            disabled={done || animating || rolling || player !== 2}
+          >
+            Player 2 - Roll
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// In-stage mode selector for Chutes & Ladders (shown on first launch from the
+// lobby; the Game Menu's New Game also routes here via the mode picker).
+function ChutesLaddersModeSelect({ game, onPick }) {
+  const [mode, setMode] = useState(null);
+  const [onlineAction, setOnlineAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const modes = [
+    { id: '2p',     icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
+    { id: 'bot',    icon: '🤖', name: 'Versus Bot',        desc: 'The computer rolls for Player 2' },
+    { id: 'online', icon: '🌐', name: 'Online Multiplayer', desc: 'Play a friend via room code' },
+  ];
+
+  const handleStart = async () => {
+    if (!mode) return;
+    if (mode !== 'online') { onPick(mode, {}); return; }
+    if (onlineAction === 'create') {
+      setBusy(true);
+      const { ok, body } = await api('/api/classic/chutes-ladders/rooms', { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onPick('online', { roomAction: 'create', roomId: body.id });
+      else setError('Could not create room. Try again.');
+    } else if (onlineAction === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api('/api/classic/chutes-ladders/rooms/' + code + '/join', { method: 'POST' });
+      setBusy(false);
+      if (ok) onPick('online', { roomAction: 'join', roomId: code });
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  const canStart = mode && (mode !== 'online' || onlineAction === 'create' || (onlineAction === 'join' && joinCode.trim().length >= 4));
+
+  return (
+    <div className="mnc-mode-select">
+      {modes.map(m => (
+        <button key={m.id} className={'mnc-mode-btn' + (mode === m.id ? ' active' : '')} onClick={() => { setMode(m.id); setError(''); }}>
+          <span className="mnc-mode-icon">{m.icon}</span>
+          <span className="mnc-mode-text">
+            <span className="mnc-mode-name">{m.name}</span>
+            <span className="mnc-mode-desc">{m.desc}</span>
+          </span>
+        </button>
+      ))}
+      {mode === 'online' && (
+        <div className="mnc-online-actions">
+          <div className="mnc-mode-sub">
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')} onClick={() => { setOnlineAction('create'); setError(''); }}>Create Room</button>
+            <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')} onClick={() => { setOnlineAction('join'); setError(''); }}>Join Room</button>
+          </div>
+          {onlineAction === 'join' && (
+            <div className="mnc-join-form">
+              <input className="mnc-join-input" placeholder="Room code (e.g. AB3K7P)" value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
+            </div>
+          )}
+        </div>
+      )}
+      {error && <div className="mnc-join-error">{error}</div>}
+      {mode && <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
+    </div>
+  );
+}
+
+// Online Chutes & Ladders over classic_rooms. Server owns the dice; the client
+// just sends a "roll" and renders the polled room state.
+function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
+  const { room, pollingError, opponentDisconnected, submitMove } = useClassicRoom('chutes-ladders', roomId);
+  const winCalledRef = useRef(false);
+  const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
+  const secsRef = useRef(0); secsRef.current = secs;
+  const movesRef = useRef(0);
+
+  useEffect(() => {
+    if (!room || room.status !== 'finished' || winCalledRef.current) return;
+    winCalledRef.current = true;
+    const youWin = room.winner === String(myPlayerNum);
+    const rolls = (room.state && room.state.rolls) || 0;
+    const score = youWin ? Math.max(50, 300 - rolls * 5) : 0;
+    const share = `🪜 Chutes & Ladders Online — ${youWin ? 'I won' : 'good game'} in ${rolls} rolls!`;
+    onWin(score, movesRef.current, secsRef.current, { winnerLabel: youWin ? 'You win! 🎉' : 'Opponent wins', share });
+  }, [room && room.status]);
+
+  if (!room && !pollingError) {
+    return <div style={{ textAlign: 'center', padding: '2rem' }}><div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} /><div style={{ color: C.muted, fontSize: '0.85rem' }}>Connecting…</div></div>;
+  }
+  if (pollingError === 'room_not_found') {
+    return <div style={{ textAlign: 'center', padding: '1.5rem', color: C.rose }}>Room not found.</div>;
+  }
+
+  const status = room ? room.status : 'waiting';
+  if (status === 'waiting') {
+    return (
+      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+        <div style={{ color: C.muted, marginBottom: '0.6rem', fontSize: '0.85rem' }}>Waiting for opponent to join…</div>
+        <div className="mnc-room-code">{roomId}</div>
+        <div style={{ color: C.muted, fontSize: '0.78rem', marginTop: '0.4rem' }}>Share this room code</div>
+        <div className="mnc-spinner" style={{ margin: '1rem auto 0' }} />
+      </div>
+    );
+  }
+
+  const st = room.state || {};
+  const cur = st.currentPlayer || 1;
+  const isMyTurn = status === 'active' && cur === myPlayerNum;
+  const p1Color = C.accent, p2Color = C.rose;
+  const myColor = myPlayerNum === 1 ? p1Color : p2Color;
+
+  const doRoll = () => {
+    if (!isMyTurn) return;
+    movesRef.current += 1; onStepChange && onStepChange(movesRef.current);
+    submitMove({ type: 'roll' });
+  };
+
+  // Reuse the static board renderer by mapping positions onto pawns.
+  const cells = [];
+  for (let visualRow = 0; visualRow < 10; visualRow++) {
+    for (let col = 0; col < 10; col++) {
+      const row = 9 - visualRow;
+      const within = (row % 2 === 0) ? col : (9 - col);
+      const n = row * 10 + within + 1;
+      const mark = CNL_LADDERS[n] !== undefined ? '🪜' : CNL_CHUTES[n] !== undefined ? '🛝' : null;
+      cells.push(<div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}><span>{n}</span>{mark && <span className="cnl-cell-mark">{mark}</span>}</div>);
+    }
+  }
+  const lines = Object.keys(CNL_JUMPS).map(k => {
+    const from = parseInt(k, 10), to = CNL_JUMPS[from];
+    const a = cnlCenterPct(from), b = cnlCenterPct(to);
+    const isLadder = CNL_LADDERS[from] !== undefined;
+    return <line key={k} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={isLadder ? C.emerald : C.rose} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />;
+  });
+  const p1c = cnlCenterPct(st.p1Pos || 0), p2c = cnlCenterPct(st.p2Pos || 0);
+  const same = (st.p1Pos || 0) === (st.p2Pos || 0);
+  const p1x = same ? p1c.x - 2.4 : p1c.x, p2x = same ? p2c.x + 2.4 : p2c.x;
+
+  const turnLabel = status === 'finished'
+    ? (room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
+    : isMyTurn ? 'Your turn' : "Opponent's turn";
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
+        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.95rem' }}>{myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0)}</div></div>
+        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
+      </div>
+      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <div className="cnl-board-wrap">
+        <div className="cnl-board">{cells}</div>
+        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">{lines}</svg>
+        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} />
+        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} />
+      </div>
+      <div className="cnl-die">
+        <div className="cnl-die-face" style={{ borderColor: myColor + '88' }}>{st.die == null ? '·' : st.die}</div>
+      </div>
+      <div className="cnl-roll-buttons">
+        <button className="cnl-roll-btn" style={{ background: myColor }} onClick={doRoll} disabled={!isMyTurn}>
+          {status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Chutes & Ladders wrapper — picks a mode (2P / Versus Bot / Online) and
+// delegates. Honors the Game Menu's gameMode/gameModeOpts props.
+function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
+  const [mode, setMode] = useState(gameMode || null);
+  const [roomId, setRoomId] = useState((gameModeOpts && gameModeOpts.roomId) || null);
+  const [myPlayerNum, setMyPlayerNum] = useState(gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1);
+  const [resumeState, setResumeState] = useState(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
+  const { loadState, clearState } = useClassicSave('chutes-ladders');
+
+  // Sync mode from the Game Menu's New Game selection.
+  useEffect(() => {
+    setMode(gameMode || null);
+    if (gameModeOpts && gameModeOpts.roomId) {
+      setRoomId(gameModeOpts.roomId);
+      setMyPlayerNum(gameModeOpts.roomAction === 'join' ? 2 : 1);
+    }
+  }, [gameMode, gameModeOpts, resetKey]);
+
+  // Report active mode upward for the top-bar pill + Save visibility.
+  useEffect(() => { onModeChange && onModeChange(mode); }, [mode]);
+
+  // Check for a saved bot game when entering bot mode.
+  useEffect(() => {
+    let cancelled = false;
+    if (mode === 'bot' && !resumeChecked) {
+      loadState().then(s => { if (!cancelled) { setResumeState(s); setResumeChecked(true); } });
+    } else if (mode !== 'bot') {
+      setResumeChecked(false); setResumeState(null);
+    }
+    return () => { cancelled = true; };
+  }, [mode]);
+
+  if (!mode) {
+    return <ChutesLaddersModeSelect game={{ id: 'chutes-ladders' }} onPick={(m, opts) => {
+      if (m === 'online') { setRoomId(opts.roomId); setMyPlayerNum(opts.roomAction === 'join' ? 2 : 1); }
+      setMode(m);
+    }} />;
+  }
+  if (mode === 'online') {
+    return <ChutesLaddersOnlineGame onWin={onWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
+  }
+  if (mode === 'bot' && !resumeChecked) {
+    return <div style={{ textAlign: 'center', padding: '2rem', color: C.muted }}>Loading…</div>;
+  }
+  return (
+    <ChutesLaddersLocalGame
+      onWin={onWin}
+      onStepChange={onStepChange}
+      resetKey={resetKey}
+      vsBot={mode === 'bot'}
+      initialState={mode === 'bot' ? resumeState : null}
+      onClearSave={mode === 'bot' ? clearState : null}
+    />
+  );
+}
+
 // Declarative client game registry — the single source of truth for how each
 // game is launched, wrapped, and scored on the client (mirrors the server's
 // authoritative GAME_REGISTRY in server.js). Every entry MUST carry an `id`.
@@ -13288,7 +15940,7 @@ const GAMES = [
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Guess the daily 5-letter Web3 term in 6 tries.',
+    desc: 'Solve a daily stack of crypto words — clues unlock as you go, or buy a hint.',
     tag: 'Web3',
     tagColor: C.emerald,
     component: CryptoWordleGame,
@@ -13314,6 +15966,22 @@ const GAMES = [
     tag: 'Strategy',
     tagColor: C.gold,
     component: MancalaGame,
+    modes: ['bot', '2p', 'online'],
+    supportsSave: true,
+  },
+  {
+    id: 'chutes-ladders',
+    name: 'Chutes & Ladders',
+    icon: '🪜',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
+    tag: 'Board',
+    tagColor: C.emerald,
+    component: ChutesLaddersGame,
+    modes: ['bot', '2p', 'online'],
+    supportsSave: true,
+    menuModePicker: true,
   },
   {
     id: '2048',
@@ -13380,6 +16048,8 @@ const GAMES = [
     tag: 'Cards',
     tagColor: C.gold,
     component: TexasHoldemGame,
+    modes: ['bot'],
+    supportsSave: true,
   },
   {
     id: 'tilematching',
@@ -13389,7 +16059,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
-    tagColor: '#6366f1',
+    tagColor: C.accent,
     component: TileMatchingGame,
   },
   {
@@ -13422,7 +16092,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
-    tagColor: '#f59e0b',
+    tagColor: C.gold,
     component: Match3Game,
   },
   {
@@ -13434,7 +16104,7 @@ const GAMES = [
     daily: true,
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',
     tag: 'Puzzle',
-    tagColor: '#6366f1',
+    tagColor: C.accent,
     component: TileMatchingDailyGame,
   },
   {
@@ -13702,6 +16372,26 @@ function PostDetail({ post, onBack }) {
 /* ============================================================
    Root app
    ============================================================ */
+function BadgesSection({ streak, attempts, open, onToggle }) {
+  const badges = BADGE_DEFS.map(b => ({ ...b, earned: b.check(streak, attempts) }));
+  return (
+    <div className="badges-section">
+      <button className="badges-toggle" onClick={onToggle}>
+        Badges
+        <span className="badges-toggle-arrow">{open ? '▾' : '▸'}</span>
+      </button>
+      <div className={'badges-grid' + (open ? ' open' : '')}>
+        {badges.map(b => (
+          <div key={b.id} className={'badge-chip' + (b.earned ? '' : ' dim')} title={b.desc}>
+            <span>{b.icon}</span>
+            <span>{b.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=wallet / ?screen=session deep links for testing
@@ -13747,14 +16437,25 @@ function App() {
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
+  // Classic Games — Game Menu state. `classicGameMode` is the active mode of
+  // the current classic game ('bot' | '2p' | 'online' | null); `classicLastResult`
+  // is the most recent finished classic result so the menu's Post to Feed works
+  // even after Play Again.
+  const [classicGameMode, setClassicGameMode] = useState(null);
+  const [classicGameModeOpts, setClassicGameModeOpts] = useState(null);
+  const [classicLastResult, setClassicLastResult] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
   // Wallet state (app-level so PvP and nav share one source)
   const [walletAddr, setWalletAddr] = useState(null);
   const [walletBalance, setWalletBalance] = useState(null); // wei string
   const [walletMock, setWalletMock] = useState(true);
+  // Global off-chain MATCH token balance, shown in the nav and spent on hints.
+  const [matchBalance, setMatchBalance] = useState(null); // integer, null = loading
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
+  // Badges section toggle (mobile: collapsed by default)
+  const [badgesOpen, setBadgesOpen] = useState(false);
   // dApps-integration availability. Disabled (e.g. staging with an empty
   // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
   // gracefully alongside the server.
@@ -13799,6 +16500,14 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  // Global MATCH token balance for the nav chip + hint spending. Re-fetchable so
+  // the chip refreshes when returning to the lobby after a Tile Match earn/spend.
+  const loadMatchBalance = React.useCallback(async () => {
+    const { ok, body } = await api('/api/tilematch/wallet');
+    if (ok && body && Number.isFinite(body.balance)) setMatchBalance(body.balance);
+  }, []);
+  useEffect(() => { loadMatchBalance(); }, [loadMatchBalance]);
 
   // dApps-integration status. Degrades gracefully: a failed/absent response
   // leaves the feature disabled (chip stays hidden) rather than erroring.
@@ -13935,6 +16644,18 @@ function App() {
     }
   };
 
+  // Deep-link: ?game=<id> auto-opens that game once loaded. Combined with
+  // ?mmode=daily it jumps straight into Mancala's Daily Challenge — used by the
+  // Daily Challenge proposal tests and shareable links. Runs once after hydrate.
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (loading || deepLinkedRef.current) return;
+    const gid = new URLSearchParams(window.location.search).get('game');
+    if (!gid) return;
+    const g = GAMES.find(x => x.id === gid);
+    if (g) { deepLinkedRef.current = true; launchGame(g); }
+  }, [loading]);
+
   // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
   // a game component can hydrate from a single savedProgress object.
   const progressFor = (attempt) => {
@@ -14035,6 +16756,9 @@ function App() {
           gameId: currentGame.id,
           canPost: true,
         });
+        // Remember this result so the Game Menu's Post to Feed stays reachable
+        // after Play Again.
+        setClassicLastResult({ gameId: currentGame.id, score, steps, timeSecs });
         return;
       }
       // Declare gameId FIRST — referencing it before this line is a temporal
@@ -14062,6 +16786,9 @@ function App() {
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
         share: meta && meta.share,
+        hintsUsed: meta && meta.hintsUsed,
+        wordsSolved: meta && meta.wordsSolved,
+        wordsTotal: meta && meta.wordsTotal,
         canPost: true,
         gameId,
         syncError: false,
@@ -14106,6 +16833,8 @@ function App() {
           answer: meta && meta.answer,
           isClassic: true,
         });
+        // A loss can still be posted ("Game Over" result). score 0.
+        setClassicLastResult({ gameId: currentGame.id, score: 0, steps, timeSecs });
         return;
       }
       const gameId = currentGame.id;
@@ -14114,6 +16843,9 @@ function App() {
         timeSecs,
         share: meta && meta.share,
         answer: meta && meta.answer,
+        hintsUsed: meta && meta.hintsUsed,
+        wordsSolved: meta && meta.wordsSolved,
+        wordsTotal: meta && meta.wordsTotal,
       });
 
       let ok = false, body = null;
@@ -14140,6 +16872,9 @@ function App() {
     setCurrentGame(null);
     setWinData(null);
     setLoseData(null);
+    setClassicGameMode(null);
+    setClassicGameModeOpts(null);
+    setClassicLastResult(null);
     if (tab) setLobbyTab(tab);
   };
 
@@ -14148,7 +16883,43 @@ function App() {
     setLoseData(null);
     setStepCount(0);
     setPlayAgainKey(k => k + 1);
+    // Keep classicLastResult so the Game Menu's Post to Feed stays reachable.
   };
+
+  // Game Menu "New Game": optionally re-mount the current classic game in a
+  // chosen mode (Versus Bot / 2 Players / Online), clearing the prior result.
+  const handleNewGameMode = (mode, opts) => {
+    setClassicGameMode(mode || null);
+    setClassicGameModeOpts(opts || null);
+    setClassicLastResult(null);
+    setWinData(null);
+    setLoseData(null);
+    setStepCount(0);
+    setPlayAgainKey(k => k + 1);
+  };
+
+  // Game Menu "Save Game": persist the active Versus-Bot game's snapshot via
+  // the generic user_game_state store. Returns true on success.
+  const handleSaveGame = async () => {
+    if (!currentGame) return false;
+    const snap = ClassicBridge.getSnapshot ? ClassicBridge.getSnapshot() : null;
+    if (!snap) return false;
+    const { ok } = await api(`/api/state/${currentGame.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...snap } }),
+    }).catch(() => ({ ok: false }));
+    return !!ok;
+  };
+
+  // Build the menu config passed into ClassicShell for classic games.
+  const classicMenuConfig = (currentGame && currentGame.category === 'classic') ? {
+    game: currentGame,
+    gameMode: classicGameMode,
+    lastResult: classicLastResult,
+    onNewGameMode: handleNewGameMode,
+    onSaveGame: handleSaveGame,
+    onPostToFeed: (r) => setShareModal({ show: true, caption: '', gameId: r.gameId, score: r.score, steps: r.steps, timeSecs: r.timeSecs }),
+  } : null;
 
   // Copy-to-clipboard Share button for the win/loss overlays. Flips its label
   // to "Copied!" briefly; degrades to a no-op where clipboard is unavailable.
@@ -14208,6 +16979,10 @@ function App() {
             onStepChange={setStepCount}
             offset={offset}
             resetKey={playAgainKey}
+            menuConfig={classicMenuConfig}
+            gameMode={classicGameMode}
+            gameModeOpts={classicGameModeOpts}
+            onModeChange={setClassicGameMode}
           />
         );
       case 'classic':
@@ -14217,6 +16992,7 @@ function App() {
             game={currentGame}
             onExit={() => backToLobby('classic')}
             onNewGame={() => setPlayAgainKey(k => k + 1)}
+            menuConfig={classicMenuConfig}
           >
             <div className="cg-stage cg-scroll">
               <GameComponent
@@ -14225,6 +17001,9 @@ function App() {
                 onStepChange={setStepCount}
                 offset={offset}
                 resetKey={playAgainKey}
+                gameMode={classicGameMode}
+                gameModeOpts={classicGameModeOpts}
+                onModeChange={setClassicGameMode}
               />
             </div>
           </ClassicShell>
@@ -14247,6 +17026,8 @@ function App() {
               offset={offset}
               savedProgress={progressFor(attempts[currentGame.id])}
               onSaveProgress={handleSaveProgress}
+              matchBalance={matchBalance}
+              onMatchBalanceChange={setMatchBalance}
               resetKey={playAgainKey}
             />
           </div>
@@ -14287,6 +17068,11 @@ function App() {
               </div>
             </div>
           </div>
+          {authOk && (
+            <span className="nav-match-chip" title="MATCH tokens — earned in games, spent on hints">
+              🪙 {matchBalance == null ? '…' : matchBalance} MATCH
+            </span>
+          )}
           {authOk && walletBalance && (
             <button
               className="nav-wallet-chip"
@@ -14299,7 +17085,7 @@ function App() {
           )}
           {authOk && (
             <button
-              className="primary-btn"
+              className="primary-btn nav-friends-btn"
               style={{
                 background: 'transparent',
                 border: `1px solid ${C.border}`,
@@ -14364,6 +17150,8 @@ function App() {
           authOk={authOk}
           walletAddr={walletAddr}
           walletVerified={walletVerified}
+          integration={integration}
+          onOpenFriends={() => setScreen('friends')}
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
           onDisconnect={disconnectWallet}
@@ -14469,6 +17257,14 @@ function App() {
             })}
           </div>
           )}
+          {authOk && (
+            <BadgesSection
+              streak={streak}
+              attempts={attempts}
+              open={badgesOpen}
+              onToggle={() => setBadgesOpen(b => !b)}
+            />
+          )}
           {lobbyTab === 'daily' && authOk && (
             <TodayChampions
               onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
@@ -14521,10 +17317,22 @@ function App() {
                   <span className="v mono">+{winData.bonus}</span>
                 </div>
               )}
+              {Number.isFinite(winData.wordsTotal) && (
+                <div className="score-row">
+                  <span className="k">Words solved</span>
+                  <span className="v mono">{winData.wordsSolved} / {winData.wordsTotal}</span>
+                </div>
+              )}
               <div className="score-row">
                 <span className="k">Steps · Time</span>
                 <span className="v mono">{winData.steps} · {fmtTime(winData.timeSecs)}</span>
               </div>
+              {winData.hintsUsed > 0 && (
+                <div className="score-row">
+                  <span className="k">💡 Hints used</span>
+                  <span className="v mono">{winData.hintsUsed}</span>
+                </div>
+              )}
               <div className="score-row total">
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
@@ -14612,10 +17420,22 @@ function App() {
                   <span className="v mono">{loseData.answer}</span>
                 </div>
               )}
+              {Number.isFinite(loseData.wordsTotal) && (
+                <div className="score-row">
+                  <span className="k">Words solved</span>
+                  <span className="v mono">{loseData.wordsSolved} / {loseData.wordsTotal}</span>
+                </div>
+              )}
               <div className="score-row">
                 <span className="k">{loseData.isClassic ? 'Steps' : 'Guesses'} · Time</span>
                 <span className="v mono">{loseData.steps} · {fmtTime(loseData.timeSecs)}</span>
               </div>
+              {loseData.hintsUsed > 0 && (
+                <div className="score-row">
+                  <span className="k">💡 Hints used</span>
+                  <span className="v mono">{loseData.hintsUsed}</span>
+                </div>
+              )}
               <div className="score-row total">
                 <span className="k">Earned</span>
                 <span className="v mono">+0</span>

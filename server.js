@@ -976,6 +976,8 @@ async function migrate() {
       PRIMARY KEY (user_id, game_id)
     )
   `);
+  await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS save_hash TEXT`);
+  await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS anchor_tx_hash TEXT`);
 
   // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
   // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
@@ -1341,6 +1343,11 @@ async function migrate() {
         pits: [3, 4, 2, 5, 1, 4, 6, 3, 4, 3, 5, 2, 4, 5],
         currentPlayer: 1, moves: 8, secs: 64,
       })]
+    );
+    // Set the on-chain anchor demo so the ⛓ On-chain badge is visible.
+    await pool.query(
+      `UPDATE user_game_state SET anchor_tx_hash = '0xstaginganchor'
+       WHERE user_id = 'staging-demo-user' AND game_id = 'mancala'`
     );
     // 2) A waiting Chutes & Ladders online room so a tester can demo "Join Room"
     //    with code CLTST.
@@ -7035,11 +7042,16 @@ app.get('/api/state/:gameId', async (req, res) => {
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   try {
     const { rows } = await pool.query(
-      `SELECT state, updated_at FROM user_game_state WHERE user_id = $1 AND game_id = $2`,
+      `SELECT state, updated_at, save_hash, anchor_tx_hash FROM user_game_state WHERE user_id = $1 AND game_id = $2`,
       [req.user.id, gameId]
     );
     if (rows.length === 0) return res.json({ state: null });
-    res.json({ state: rows[0].state, updatedAt: rows[0].updated_at });
+    res.json({
+      state: rows[0].state,
+      updatedAt: rows[0].updated_at,
+      saveHash: rows[0].save_hash || null,
+      anchorTxHash: rows[0].anchor_tx_hash || null,
+    });
   } catch (err) {
     console.error('[state] GET failed:', err.message);
     res.status(500).json({ error: 'Failed to load state' });
@@ -7061,19 +7073,44 @@ app.put('/api/state/:gameId', async (req, res) => {
   if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
     return res.status(400).json({ error: 'state too large (max 100KB)' });
   }
+  const saveHash = crypto.createHash('sha256')
+    .update(serialized + '|' + req.user.id + '|' + gameId)
+    .digest('hex');
   try {
-    // Last-write-wins upsert.
+    // Last-write-wins upsert. Resets anchor_tx_hash so a stale anchor from a
+    // previous save doesn't carry forward after the state is overwritten.
     await pool.query(
-      `INSERT INTO user_game_state (user_id, username, game_id, state, updated_at)
-       VALUES ($1, $2, $3, $4::jsonb, now())
+      `INSERT INTO user_game_state (user_id, username, game_id, state, save_hash, anchor_tx_hash, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5, NULL, now())
        ON CONFLICT (user_id, game_id) DO UPDATE
-         SET state = EXCLUDED.state, username = EXCLUDED.username, updated_at = now()`,
-      [req.user.id, req.user.username || null, gameId, serialized]
+         SET state = EXCLUDED.state, username = EXCLUDED.username,
+             save_hash = EXCLUDED.save_hash, anchor_tx_hash = NULL, updated_at = now()`,
+      [req.user.id, req.user.username || null, gameId, serialized, saveHash]
     );
-    res.json({ ok: true });
+    res.json({ ok: true, saveHash });
   } catch (err) {
     console.error('[state] PUT failed:', err.message);
     res.status(500).json({ error: 'Failed to save state' });
+  }
+});
+
+// POST /api/state/:gameId/anchor/confirm { txHash }
+// Records the on-chain tx hash for the current save. Idempotent; no-ops if
+// the row is missing. Only the owning user can confirm their own save.
+app.post('/api/state/:gameId/anchor/confirm', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const { txHash } = req.body || {};
+  if (!txHash || typeof txHash !== 'string') return res.status(400).json({ error: 'txHash required' });
+  try {
+    await pool.query(
+      `UPDATE user_game_state SET anchor_tx_hash = $1 WHERE user_id = $2 AND game_id = $3`,
+      [txHash, req.user.id, gameId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[state] anchor/confirm failed:', err.message);
+    res.status(500).json({ error: 'Failed to confirm anchor' });
   }
 });
 

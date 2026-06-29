@@ -15895,12 +15895,27 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   );
 }
 
+// Declarative client game registry — the single source of truth for how each
+// game is launched, wrapped, and scored on the client (mirrors the server's
+// authoritative GAME_REGISTRY in server.js). Every entry MUST carry an `id`.
+//
+// Capability fields read by the App dispatch:
+//   shell — how App renders the game body:
+//     'daily'   → back-header game-wrap; receives savedProgress/onSaveProgress
+//     'classic' → wrapped in ClassicShell + .cg-stage.cg-scroll (in-frame)
+//     'self'    → game renders its own ClassicShell (full-screen, gesture-first)
+//     'custom'  → App renders a bespoke screen (e.g. PvP Arena), not `component`
+//   daily — true only for category 'daily' games: the single gate for the
+//           per-day start/lock/finish/streak/resume machinery.
+//   category — lobby tab grouping (maps 1:1 to the tabs).
 const GAMES = [
   {
     id: 'sudoku',
     name: 'Mini Sudoku',
     icon: '🔢',
     category: 'daily',
+    shell: 'daily',
+    daily: true,
     desc: 'Fill the 6×6 grid so every row, column, and box has 1–6.',
     tag: 'Logic',
     tagColor: C.accent,
@@ -15911,6 +15926,8 @@ const GAMES = [
     name: 'Word Hunt',
     icon: '🔤',
     category: 'daily',
+    shell: 'daily',
+    daily: true,
     desc: 'Find every hidden word in the letter grid.',
     tag: 'Word',
     tagColor: C.violet,
@@ -15921,6 +15938,8 @@ const GAMES = [
     name: 'Crypto Wordle',
     icon: '🟩',
     category: 'daily',
+    shell: 'daily',
+    daily: true,
     desc: 'Solve a daily stack of crypto words — clues unlock as you go, or buy a hint.',
     tag: 'Web3',
     tagColor: C.emerald,
@@ -15931,6 +15950,7 @@ const GAMES = [
     name: 'Minesweeper',
     icon: '💣',
     category: 'classic',
+    shell: 'classic',
     desc: 'Clear the 8×8 grid of mines. Cash Out early to lock in a risk multiplier.',
     tag: 'Risk',
     tagColor: C.rose,
@@ -15941,6 +15961,7 @@ const GAMES = [
     name: 'Mancala',
     icon: '🫘',
     category: 'classic',
+    shell: 'classic',
     desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
     tag: 'Strategy',
     tagColor: C.gold,
@@ -15953,6 +15974,7 @@ const GAMES = [
     name: 'Chutes & Ladders',
     icon: '🪜',
     category: 'classic',
+    shell: 'classic',
     desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
     tag: 'Board',
     tagColor: C.emerald,
@@ -15966,6 +15988,7 @@ const GAMES = [
     name: '2048',
     icon: '🔢',
     category: 'classic',
+    shell: 'classic',
     desc: 'Slide tiles to merge numbers and reach 2048.',
     tag: 'Numbers',
     tagColor: C.emerald,
@@ -15976,6 +15999,7 @@ const GAMES = [
     name: "Knight's Tour",
     icon: '♞',
     category: 'classic',
+    shell: 'classic',
     desc: "Move a chess knight to visit all 64 squares exactly once.",
     tag: 'Puzzle',
     tagColor: C.violet,
@@ -15986,6 +16010,7 @@ const GAMES = [
     name: 'Snake',
     icon: '🐍',
     category: 'classic',
+    shell: 'self',
     desc: 'Swipe to steer, eat to grow, and chase a high score without crashing.',
     tag: 'Arcade',
     tagColor: C.emerald,
@@ -15996,6 +16021,7 @@ const GAMES = [
     name: 'Block Blast',
     icon: '🧱',
     category: 'classic',
+    shell: 'self',
     desc: 'Drag blocks onto the grid and clear full lines. How long can you last?',
     tag: 'Puzzle',
     tagColor: C.accent,
@@ -16006,6 +16032,7 @@ const GAMES = [
     name: 'Diamond Rush',
     icon: '💎',
     category: 'classic',
+    shell: 'self',
     desc: 'Swap gems to line up 3+ and cascade your way to the target score.',
     tag: 'Match',
     tagColor: C.rose,
@@ -16016,6 +16043,7 @@ const GAMES = [
     name: "Texas Hold 'Em",
     icon: '🃏',
     category: 'classic',
+    shell: 'self',
     desc: 'Heads-up poker vs the computer. Bet smart and take all the chips.',
     tag: 'Cards',
     tagColor: C.gold,
@@ -16028,6 +16056,7 @@ const GAMES = [
     name: 'Tile Match Puzzle',
     icon: '🀄',
     category: 'classic',
+    shell: 'classic',
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
     tagColor: C.accent,
@@ -16038,6 +16067,7 @@ const GAMES = [
     name: 'Bounce',
     icon: '🧱',
     category: 'classic',
+    shell: 'classic',
     desc: "Smash every brick with a bouncing ball. Don't let it fall — climb the leaderboard.",
     tag: 'Arcade',
     tagColor: C.rose,
@@ -16048,6 +16078,7 @@ const GAMES = [
     name: 'Zuma',
     icon: '🐸',
     category: 'classic',
+    shell: 'classic',
     desc: 'Shoot colored balls to match 3 in a row before the chain reaches the skull.',
     tag: 'Arcade',
     tagColor: C.emerald,
@@ -16058,6 +16089,7 @@ const GAMES = [
     name: 'Match-3 Puzzle',
     icon: '🟩',
     category: 'classic',
+    shell: 'classic',
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
     tagColor: C.gold,
@@ -16068,6 +16100,8 @@ const GAMES = [
     name: 'Daily Tile Match Puzzle',
     icon: '🀄',
     category: 'daily',
+    shell: 'daily',
+    daily: true,
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',
     tag: 'Puzzle',
     tagColor: C.accent,
@@ -16078,6 +16112,7 @@ const GAMES = [
     name: 'Idle Empire',
     icon: '🐹',
     category: 'classic',
+    shell: 'classic',
     desc: 'Tap, upgrade, and build your hamster empire with prestige rewards.',
     tag: 'Idle',
     tagColor: C.gold,
@@ -16088,15 +16123,13 @@ const GAMES = [
     name: 'PvP Arena',
     icon: '⚔️',
     category: 'classic',
+    shell: 'custom',
     desc: 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.',
     tag: 'Wager',
     tagColor: C.rose,
     component: () => null,
   },
 ];
-
-// Games that render their own ClassicShell (full-screen, gesture-first).
-const SELF_SHELL_GAMES = new Set(['snake', 'blockblast', 'diamondrush', 'texas']);
 
 /* ============================================================
    Social: Feed & Posts
@@ -16567,8 +16600,8 @@ function App() {
   };
 
   const launchGame = async (game) => {
-    // Classic games and idle games skip the daily system; PvP Arena is handled specially
-    if (game.category === 'classic' || game.category === 'idle' || game.id === 'pvp-arena') {
+    // Non-daily games (classic, idle, PvP) skip the per-day start/lock system.
+    if (!game.daily) {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -16701,8 +16734,8 @@ function App() {
 
   const handleWin = async (score, steps, timeSecs, meta) => {
     try {
-      // Classic games skip server, streak, and totalScore nav update
-      if (currentGame && currentGame.category === 'classic') {
+      // Non-daily games skip the server, streak, and totalScore nav update.
+      if (currentGame && !currentGame.daily) {
         const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
         setWinData({
           score,
@@ -16791,8 +16824,8 @@ function App() {
   // streak. Existing win-only games never call this.
   const handleLose = async (steps, timeSecs, meta) => {
     try {
-      // Classic games skip server entirely
-      if (currentGame && currentGame.category === 'classic') {
+      // Non-daily games skip the server entirely.
+      if (currentGame && !currentGame.daily) {
         setLoseData({
           steps,
           timeSecs,
@@ -16915,6 +16948,92 @@ function App() {
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const GameComponent = currentGame ? currentGame.component : null;
+
+  // Render the active game's body according to its declarative `shell` flag.
+  // Collapses what used to be a thicket of id/category/SELF_SHELL_GAMES checks
+  // into one switch — adding a game is now purely a matter of its registry entry.
+  const renderGameBody = () => {
+    if (!currentGame) return null;
+    switch (currentGame.shell) {
+      case 'custom':
+        // Bespoke screen (e.g. PvP Arena) — App owns the layout, not `component`.
+        return (
+          <div className="game-wrap">
+            <div className="game-head">
+              <button className="back-btn" onClick={backToLobby}>← Back</button>
+              <div className="game-title">
+                <span>{currentGame.icon}</span> {currentGame.name}
+              </div>
+            </div>
+            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
+          </div>
+        );
+      case 'self':
+        // Full-screen, gesture-first game that renders its own ClassicShell.
+        return (
+          <GameComponent
+            game={currentGame}
+            onBack={() => backToLobby('classic')}
+            onWin={handleWin}
+            onLose={handleLose}
+            onStepChange={setStepCount}
+            offset={offset}
+            resetKey={playAgainKey}
+            menuConfig={classicMenuConfig}
+            gameMode={classicGameMode}
+            gameModeOpts={classicGameModeOpts}
+            onModeChange={setClassicGameMode}
+          />
+        );
+      case 'classic':
+        // In-frame classic game wrapped in the shared ClassicShell.
+        return (
+          <ClassicShell
+            game={currentGame}
+            onExit={() => backToLobby('classic')}
+            onNewGame={() => setPlayAgainKey(k => k + 1)}
+            menuConfig={classicMenuConfig}
+          >
+            <div className="cg-stage cg-scroll">
+              <GameComponent
+                onWin={handleWin}
+                onLose={handleLose}
+                onStepChange={setStepCount}
+                offset={offset}
+                resetKey={playAgainKey}
+                gameMode={classicGameMode}
+                gameModeOpts={classicGameModeOpts}
+                onModeChange={setClassicGameMode}
+              />
+            </div>
+          </ClassicShell>
+        );
+      case 'daily':
+      default:
+        // Daily puzzle (and any back-header game-wrap game): resumable, locked.
+        return (
+          <div className="game-wrap">
+            <div className="game-head">
+              <button className="back-btn" onClick={backToLobby}>← Back</button>
+              <div className="game-title">
+                <span>{currentGame.icon}</span> {currentGame.name}
+              </div>
+            </div>
+            <GameComponent
+              onWin={handleWin}
+              onLose={handleLose}
+              onStepChange={setStepCount}
+              offset={offset}
+              savedProgress={progressFor(attempts[currentGame.id])}
+              onSaveProgress={handleSaveProgress}
+              matchBalance={matchBalance}
+              onMatchBalanceChange={setMatchBalance}
+              resetKey={playAgainKey}
+            />
+          </div>
+        );
+    }
+  };
 
   // Reward level surfaced in the nav + lobby. Suppressed when signed out so we
   // never show a multiplier the server can't back.
@@ -17102,16 +17221,16 @@ function App() {
           ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
-              const isClassicOrIdle = g.category === 'classic' || g.category === 'idle';
+              // Only daily games carry the per-day finished/in-progress lock state.
               const a = attempts[g.id];
-              const finished = !isClassicOrIdle && !!(a && a.finishedAt);
-              const inProgress = !isClassicOrIdle && !!a && !finished;
+              const finished = !!g.daily && !!(a && a.finishedAt);
+              const inProgress = !!g.daily && !!a && !finished;
               return (
                 <div
                   key={g.id}
                   className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
                   style={{ '--accent': g.tagColor }}
-                  onClick={() => !loading && (g.id === 'pvp-arena' ? setCurrentGame(g) : launchGame(g))}
+                  onClick={() => !loading && (g.shell === 'custom' ? setCurrentGame(g) : launchGame(g))}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
@@ -17173,77 +17292,7 @@ function App() {
         </div>
       )}
 
-      {screen === 'game' && currentGame && !winData && !loseData && currentGame.id === 'pvp-arena' && (
-        <div className="game-wrap">
-          <div className="game-head">
-            <button className="back-btn" onClick={backToLobby}>← Back</button>
-            <div className="game-title">
-              <span>{currentGame.icon}</span> {currentGame.name}
-            </div>
-          </div>
-          <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
-        </div>
-      )}
-
-      {screen === 'game' && currentGame && !winData && !loseData && currentGame.id !== 'pvp-arena' && (
-        currentGame.category === 'classic' ? (
-          SELF_SHELL_GAMES.has(currentGame.id) ? (
-            <GameComponent
-              game={currentGame}
-              onBack={() => backToLobby('classic')}
-              onWin={handleWin}
-              onLose={handleLose}
-              onStepChange={setStepCount}
-              offset={offset}
-              resetKey={playAgainKey}
-              menuConfig={classicMenuConfig}
-              gameMode={classicGameMode}
-              gameModeOpts={classicGameModeOpts}
-              onModeChange={setClassicGameMode}
-            />
-          ) : (
-            <ClassicShell
-              game={currentGame}
-              onExit={() => backToLobby('classic')}
-              onNewGame={() => setPlayAgainKey(k => k + 1)}
-              menuConfig={classicMenuConfig}
-            >
-              <div className="cg-stage cg-scroll">
-                <GameComponent
-                  onWin={handleWin}
-                  onLose={handleLose}
-                  onStepChange={setStepCount}
-                  offset={offset}
-                  resetKey={playAgainKey}
-                  gameMode={classicGameMode}
-                  gameModeOpts={classicGameModeOpts}
-                  onModeChange={setClassicGameMode}
-                />
-              </div>
-            </ClassicShell>
-          )
-        ) : (
-          <div className="game-wrap">
-            <div className="game-head">
-              <button className="back-btn" onClick={backToLobby}>← Back</button>
-              <div className="game-title">
-                <span>{currentGame.icon}</span> {currentGame.name}
-              </div>
-            </div>
-            <GameComponent
-              onWin={handleWin}
-              onLose={handleLose}
-              onStepChange={setStepCount}
-              offset={offset}
-              savedProgress={progressFor(attempts[currentGame.id])}
-              onSaveProgress={handleSaveProgress}
-              matchBalance={matchBalance}
-              onMatchBalanceChange={setMatchBalance}
-              resetKey={playAgainKey}
-            />
-          </div>
-        )
-      )}
+      {screen === 'game' && currentGame && !winData && !loseData && renderGameBody()}
 
       {screen === 'game' && winData && (
         <div className="win-overlay">

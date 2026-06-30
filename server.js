@@ -3163,6 +3163,17 @@ app.get('/api/daily', async (req, res) => {
     const streak = await computeStreak(req.user.id);
     const badges = await earnedStreakBadges(req.user.id);
     const achievements = await earnedAchievementBadges(req.user.id);
+    // Lifetime won-solve count for the "X/Y solves → milestone" progress hint.
+    let solveCount = 0;
+    try {
+      const { rows: scRows } = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM daily_attempts
+          WHERE user_id = $1 AND finished_at IS NOT NULL
+            AND score IS NOT NULL AND score > 0`,
+        [req.user.id]
+      );
+      solveCount = (scRows[0] && scRows[0].n) || 0;
+    } catch { solveCount = 0; }
 
     res.json({
       // Surface the signed-in account so the UI can confirm login +
@@ -3182,6 +3193,8 @@ app.get('/api/daily', async (req, res) => {
       badges,
       // Non-streak achievement badges earned (types) + solve-milestone counts.
       achievements,
+      // Lifetime won-solve count, drives the solve-milestone progress hint.
+      solveCount,
       attempts,
     });
   } catch (err) {
@@ -3326,25 +3339,41 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
     // reconcile its optimistic value without a full reload.
     const streak = await computeStreak(req.user.id);
 
+    // Newly-awarded achievements THIS finish, so the client can pop a one-time
+    // celebration. Both the streak-milestone block and the non-streak award()
+    // helper push into it via their RETURNING clauses.
+    const newAchievements = [];
+    // Lifetime won-solve count, surfaced in the response so the client can drive
+    // the "X/Y solves → milestone" progress hint. Set from the solve_milestone
+    // block below (which already counts it); falls back to 0 on a non-win.
+    let lifetimeSolves = 0;
+
     // Award streak-milestone badges as permanent achievements when this win
     // pushes the consecutive-day streak to (or past) a threshold. Idempotent:
     // each threshold is recorded at most once per user via a NOT EXISTS guard,
     // so a second daily game the same day (or a re-finish) never duplicates a
-    // badge. Best-effort — a failure here never blocks the puzzle result.
+    // badge. RETURNING surfaces only the threshold(s) NEWLY crossed this finish
+    // into newAchievements (shape { type:'streak_milestone', metadata:{streak} })
+    // so the win overlay can celebrate them server-authoritatively — not relying
+    // on the client's optimistic streak math. Best-effort; never blocks.
     if (score && score > 0) {
       try {
         for (const days of STREAK_BADGE_DAYS) {
           if (streak >= days) {
-            await pool.query(
+            const { rows: sIns } = await pool.query(
               `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
                SELECT $1, 'streak_milestone', NULL, NULL, $2::jsonb
                 WHERE NOT EXISTS (
                   SELECT 1 FROM user_achievements
                    WHERE user_id = $1 AND type = 'streak_milestone'
                      AND (metadata->>'streak')::int = $3
-                )`,
+                )
+               RETURNING type`,
               [req.user.id, JSON.stringify({ streak: days }), days]
             );
+            if (sIns.length > 0) {
+              newAchievements.push({ type: 'streak_milestone', metadata: { streak: days } });
+            }
           }
         }
       } catch (badgeErr) {
@@ -3357,7 +3386,6 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
     // NOT EXISTS so it's awarded at most once per user (per milestone count for
     // solve_milestone), and RETURNING tells us which ones were NEW this finish
     // so the client can pop a one-time celebration. Best-effort; never blocks.
-    const newAchievements = [];
     if (score && score > 0) {
       try {
         // Helper: idempotent guarded insert; returns true if newly inserted.
@@ -3439,6 +3467,7 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
           [req.user.id]
         );
         const totalSolves = (cntRows[0] && cntRows[0].n) || 0;
+        lifetimeSolves = totalSolves;
         for (const m of SOLVE_MILESTONES) {
           if (totalSolves >= m) await award('solve_milestone', { count: m });
         }
@@ -3504,7 +3533,7 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, matchEarned, matchReceipt, dapp: dappSession, newAchievements });
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, solveCount: lifetimeSolves, matchEarned, matchReceipt, dapp: dappSession, newAchievements });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });

@@ -93,6 +93,7 @@
     { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
     { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
     { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
+    { "name": "Badge next-milestone progress hint renders", "path": "/?demo=streak", "expectText": "days →" },
     { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
     { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
     { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },

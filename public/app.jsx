@@ -10550,6 +10550,12 @@ function thHandStrength(hole, board) {
   if (Math.abs(a.r - b.r) === 1) s += 0.05;
   return Math.min(0.95, s);
 }
+/*
+ * CLIENT-SIDE ONLY — never send results via WebSocket, API, or any shared state.
+ * For UX display to the local player only. Winner determination is always
+ * server-authoritative. Bot hole cards must never be passed to these functions
+ * before showdown; the isPlayer guard in PokerSeat enforces this invariant.
+ */
 /* ---- Poker hand evaluator ---- */
 const POKER_HAND_INFO = [
   null,
@@ -10654,6 +10660,11 @@ function evaluateBestHand(holeCards, boardCards) {
   };
 }
 
+/*
+ * CLIENT-SIDE ONLY — rendered exclusively for the local human player
+ * (isPlayer === true). Never serialised, broadcast, or sent to the server.
+ * The server evaluates hands independently at showdown for authoritative results.
+ */
 /* ---- HandStrengthPanel component ---- */
 function HandStrengthPanel({ holeCards, board, handNum }) {
   const prevRankRef = useRef(0);

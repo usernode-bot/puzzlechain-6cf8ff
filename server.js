@@ -4882,6 +4882,9 @@ app.get('/api/mancala/daily/leaderboard', async (req, res) => {
 });
 
 // ---- Poker chips API -----------------------------------------------------
+// Hand evaluation is client-side UX only. The server determines winners via
+// authoritative evaluation at showdown and never returns hole card data or
+// hand-rank results through any API endpoint.
 
 // GET /api/poker/chips — returns the player's persistent chip count.
 // Lazy init: no row yet → return the default 1000 without inserting.

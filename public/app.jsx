@@ -37,7 +37,79 @@ body {
 
 #root { min-height: 100vh; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app { min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+/* ---- AI background themes ----
+   Two fixed full-screen layers behind everything: the gradient, then a dark
+   scrim that keeps surfaces/text legible over any theme. With no active theme
+   the gradient is transparent (body's ${C.bg} shows) and the scrim is 0. */
+.app-bg {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background: var(--bg-grad, transparent);
+  transition: background 0.4s ease;
+}
+.app-bg-scrim {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: #0A0D14;
+  opacity: var(--bg-scrim, 0);
+  transition: opacity 0.4s ease;
+}
+
+/* Themes screen */
+.themes-wrap { max-width: 920px; margin: 0 auto; padding: 1.5rem 1.25rem; width: 100%; }
+.themes-create {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.1rem 1.1rem 1.25rem; margin-bottom: 1.5rem;
+}
+.themes-create h2 { font-size: 1.05rem; margin-bottom: 0.3rem; }
+.themes-create p.sub { color: ${C.muted}; font-size: 0.85rem; margin-bottom: 0.8rem; }
+.themes-prompt-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.themes-prompt-row input {
+  flex: 1; min-width: 200px; background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 9px; padding: 0.65rem 0.8rem; color: ${C.text}; font: inherit; font-size: 0.9rem;
+}
+.themes-prompt-row input:focus { outline: none; border-color: ${C.accent}; }
+.themes-msg { margin-top: 0.7rem; font-size: 0.85rem; padding: 0.55rem 0.7rem; border-radius: 8px; }
+.themes-msg.err { background: ${C.rose}1a; color: ${C.rose}; border: 1px solid ${C.rose}55; }
+.themes-msg.info { background: ${C.accent}14; color: ${C.text}; border: 1px solid ${C.border}; }
+.themes-preview {
+  margin-top: 0.9rem; border-radius: 12px; border: 1px solid ${C.border};
+  padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;
+}
+.themes-preview .swatch {
+  height: 110px; border-radius: 10px; border: 1px solid ${C.border};
+  display: flex; align-items: flex-end; padding: 0.6rem;
+}
+.themes-preview .swatch .pname {
+  font-weight: 600; font-size: 0.9rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.themes-preview .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.themes-gallery-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem; }
+.themes-gallery-head h2 { font-size: 1.05rem; }
+.themes-sort { display: flex; gap: 0.35rem; }
+.themes-sort button {
+  background: ${C.surface}; border: 1px solid ${C.border}; color: ${C.muted};
+  border-radius: 7px; padding: 0.3rem 0.7rem; font: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.themes-sort button.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.themes-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.85rem;
+}
+.theme-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.theme-card .tswatch { height: 90px; }
+.theme-card .tbody { padding: 0.6rem 0.7rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.theme-card .tname { font-weight: 600; font-size: 0.88rem; }
+.theme-card .tmeta { font-size: 0.72rem; color: ${C.muted}; display: flex; justify-content: space-between; gap: 0.4rem; }
+.theme-card .tapply {
+  margin-top: 0.2rem; background: var(--accent, ${C.accent}); border: none; color: #fff;
+  border-radius: 7px; padding: 0.4rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.theme-card.active-theme { border-color: ${C.emerald}; }
+.theme-card .tapply.applied { background: ${C.emerald}; cursor: default; }
+.themes-empty { color: ${C.muted}; font-size: 0.9rem; text-align: center; padding: 2rem 1rem; }
 
 /* ---- Nav bar ---- */
 .nav {
@@ -838,6 +910,61 @@ body {
   font-weight: 600;
   color: ${C.rose};
 }
+/* MATCH on-chain explorer affordances (shared across games + wallet) */
+.match-explorer-link {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: ${C.accent};
+  text-decoration: none;
+  white-space: nowrap;
+}
+.match-explorer-link:hover { text-decoration: underline; }
+.match-explorer-mock, .match-explorer-pending {
+  font-size: 0.7rem;
+  color: ${C.muted};
+  white-space: nowrap;
+}
+/* Hinted reveals in the daily puzzles */
+.scell.hinted {
+  color: ${C.gold};
+  font-weight: 700;
+  background: ${C.gold}1a;
+}
+.wcell.hinted {
+  background: ${C.gold}33;
+  outline: 2px solid ${C.gold};
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.tm-tile.hint-target {
+  outline: 3px solid ${C.gold};
+  outline-offset: -1px;
+  animation: tmHintPulse 0.7s ease-in-out infinite;
+  z-index: 999 !important;
+}
+@keyframes tmHintPulse {
+  0%, 100% { box-shadow: 0 0 6px ${C.gold}; }
+  50% { box-shadow: 0 0 16px ${C.gold}; }
+}
+/* Wallet — MATCH activity list */
+.match-activity-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.match-activity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  background: ${C.panel2 || C.panel};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+}
+.match-activity-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.match-activity-what { font-size: 0.82rem; font-weight: 600; }
+.match-activity-sub { font-size: 0.7rem; color: ${C.muted}; }
+.match-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; }
+.match-activity-amt.earn { color: ${C.mint || C.accent}; }
+.match-activity-amt.spend { color: ${C.rose}; }
+.match-activity-empty { font-size: 0.8rem; color: ${C.muted}; text-align: center; padding: 0.5rem; }
 .cw-board {
   display: grid;
   gap: 0.4rem;
@@ -4848,6 +4975,52 @@ async function dappAnchor(session) {
   return session;
 }
 
+/* ============================================================
+   MATCH on-chain ledger — bridge-memo anchoring + explorer links
+   Every MATCH spend/earn is mirrored as a real, zero-value usernode
+   transaction whose calldata carries the structured memo the server
+   built. Mirrors dappAnchor's best-effort, degrade-to-mock pattern.
+   ============================================================ */
+
+// Public block-explorer link for a tx hash (via the platform's public proxy).
+function explorerTxUrl(txHash) {
+  return `/explorer-api/tx/${encodeURIComponent(txHash)}`;
+}
+
+// Anchor a pending MATCH ledger row on-chain: hex-encode the memo into a
+// zero-value tx to the node address, send via the bridge, then confirm with the
+// server. Best-effort — degrades to a 'mock' record when the bridge is absent
+// or in mock mode, and never throws. Returns { txHash, status } (status is
+// 'onchain' | 'mock'); returns null when there's nothing to anchor.
+async function anchorMatchLedger(ledgerId, memo) {
+  if (ledgerId == null || !memo) return null;
+  let txHash = null;
+  let mock = true;
+  try {
+    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
+      ? !(await window.usernode.isMockEnabled())
+      : false;
+    if (window.usernode && window.usernode.sendTransaction && window.usernode.getNodeAddress && bridgeMockOff) {
+      const addr = await window.usernode.getNodeAddress();
+      if (addr) {
+        // Hex-encode the ASCII memo into the tx data field.
+        let hex = '0x';
+        for (let i = 0; i < memo.length; i++) hex += memo.charCodeAt(i).toString(16).padStart(2, '0');
+        const tx = await window.usernode.sendTransaction({ to: addr, data: hex, value: 0 });
+        txHash = tx && tx.hash ? tx.hash : null;
+        mock = !txHash;
+      }
+    }
+  } catch (e) { /* fall through to mock record */ }
+  try {
+    const { ok, body } = await api(`/api/match/ledger/${ledgerId}/confirm`, {
+      method: 'POST', body: JSON.stringify({ txHash, mock }),
+    });
+    if (ok && body) return { txHash: body.txHash || txHash, status: body.status || (mock ? 'mock' : 'onchain') };
+  } catch (e) {}
+  return { txHash, status: mock ? 'mock' : 'onchain' };
+}
+
 // Anchor a MATCH ledger movement (earn / spend / tip) on-chain via the bridge,
 // then confirm with the server. Best-effort and modeled on dappAnchor: degrades
 // to a 'mock' anchor when the bridge/wallet is unavailable (staging) and never
@@ -4876,6 +5049,115 @@ async function matchAnchor(receipt) {
     if (ok && body) return { ...receipt, anchorStatus: body.anchorStatus, anchorTxHash: body.anchorTxHash };
   } catch (e) {}
   return { ...receipt, anchorStatus: 'mock' };
+}
+
+// Small inline "View on explorer" affordance for a confirmed MATCH movement.
+// Renders a link only for a real on-chain tx; otherwise a muted local marker.
+function MatchExplorerLink({ txHash, status, compact }) {
+  if (status === 'onchain' && txHash) {
+    return (
+      <a className="match-explorer-link" href={explorerTxUrl(txHash)} target="_blank" rel="noopener noreferrer"
+         title={txHash}>
+        🔗 View on explorer
+      </a>
+    );
+  }
+  if (status === 'pending') {
+    return <span className="match-explorer-pending">⏳ recording on-chain…</span>;
+  }
+  return <span className="match-explorer-mock">{compact ? '· local' : '· local record'}</span>;
+}
+
+// Shared hint bar for every daily puzzle. Renders the "💡 Hint · cost 🪙"
+// button, the live MATCH balance, an optional message, and the explorer link
+// for the most recent purchase. Behaviour-free: the parent owns the hint state
+// and passes a `buy` handler (kept identical across all four daily games so the
+// control looks and feels the same everywhere).
+function HintBar({ nextCost, balance, canAfford, exhausted, buying, onBuy, msg, lastTx, label }) {
+  return (
+    <div className="cw-hint-bar">
+      <button
+        className="cw-hint-btn"
+        onClick={onBuy}
+        disabled={buying || exhausted || !canAfford}
+      >
+        {exhausted
+          ? `💡 ${label || 'No more hints'}`
+          : <>💡 Hint · {nextCost} 🪙</>}
+      </button>
+      <span className="cw-hint-balance">
+        Balance: {balance == null ? '…' : balance} 🪙 MATCH
+      </span>
+      {msg && <span className="cw-hint-msg">{msg}</span>}
+      {lastTx && <MatchExplorerLink txHash={lastTx.txHash} status={lastTx.status} compact />}
+    </div>
+  );
+}
+
+// Shared hint state hook for the daily games that buy a generic "reveal" (Sudoku
+// cell, Word Hunt start, Tile Match nudge). Reads today's server-authoritative
+// count, exposes the doubling next cost, and performs the atomic buy + on-chain
+// anchor. `onReveal(purchasedIndex)` applies the game-specific reveal and should
+// return false to abort (e.g. nothing left to reveal) — the purchase only fires
+// when a reveal is actually available. Crypto Wordle keeps its own bespoke
+// per-round logic and does not use this hook.
+function useDailyHints({ gameId, maxHints, matchBalance, onMatchBalanceChange }) {
+  const { useState, useEffect } = React;
+  const [hintsPurchased, setHintsPurchased] = useState(0);
+  const [buying, setBuying] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [lastTx, setLastTx] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { ok, body } = await api(`/api/daily/${gameId}/hint`);
+      if (!alive || !ok || !body) return;
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const nextCost = DAILY_HINT_BASE_COST * Math.pow(2, hintsPurchased);
+  const canAfford = matchBalance != null && matchBalance >= nextCost;
+  const exhausted = maxHints != null && hintsPurchased >= maxHints;
+
+  // onReveal(index) must apply the reveal and return true; returning false
+  // aborts before charging.
+  const buy = async (onReveal) => {
+    if (buying || exhausted) return;
+    setBuying(true);
+    setMsg('');
+    setLastTx(null);
+    const { ok, status, body } = await api(`/api/daily/${gameId}/hint`, {
+      method: 'POST', body: JSON.stringify({ maxHints }),
+    });
+    setBuying(false);
+    if (ok && body) {
+      const idx = (Number.isFinite(body.hintsPurchased) ? body.hintsPurchased : hintsPurchased + 1) - 1;
+      const applied = onReveal ? onReveal(idx) : true;
+      if (applied === false) return; // shouldn't happen — server already charged
+      if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+      // Anchor the spend on-chain in the background, then surface the link.
+      if (body.ledgerId) {
+        setLastTx({ status: 'pending', txHash: null });
+        anchorMatchLedger(body.ledgerId, body.memo).then(r => { if (r) setLastTx(r); });
+      }
+      return;
+    }
+    if (status === 409 && body && body.code === 'insufficient_funds') {
+      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
+      setMsg('Not enough MATCH');
+    } else if (status === 409 && body && body.code === 'no_more_hints') {
+      setMsg('No more hints');
+    } else {
+      setMsg('Could not buy hint');
+    }
+  };
+
+  return { hintsPurchased, nextCost, canAfford, exhausted, buying, msg, lastTx, buy };
 }
 
 // HH:MM:SS for a millisecond remainder.
@@ -5166,9 +5448,9 @@ function sudokuSolved(grid) {
   return sudokuConflicts(grid).size === 0;
 }
 
-function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
   const init = useRef(generateSudoku6(dailyRng(offset, 'sudoku'))).current;
-  const { puzzle } = init;
+  const { puzzle, solution } = init;
   const dayNum = useRef(utcDayNum(offset)).current;
 
   // Hydrate from a resumed attempt when the saved board is for today's puzzle.
@@ -5177,6 +5459,10 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     : null;
   const [grid, setGrid] = useState(() =>
     resumed ? resumed.grid.map(row => row.slice()) : puzzle.map(row => row.slice())
+  );
+  // Cells revealed by a paid hint — locked like givens, persisted across resume.
+  const [hintedCells, setHintedCells] = useState(() =>
+    new Set(resumed && Array.isArray(resumed.hintedCells) ? resumed.hintedCells : [])
   );
   const [selected, setSelected] = useState(null); // [r, c]
   const [errors, setErrors] = useState(() => sudokuConflicts(grid));
@@ -5187,21 +5473,68 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
 
+  const cellKey = (r, c) => r * 6 + c;
   const isGiven = (r, c) => puzzle[r][c] !== 0;
+  const isLocked = (r, c) => isGiven(r, c) || hintedCells.has(cellKey(r, c));
+
+  // Paid hints: total empty cells in the puzzle is the per-day cap.
+  const totalEmpty = useRef(puzzle.flat().filter(v => v === 0).length).current;
+  const hints = useDailyHints({ gameId: 'sudoku', maxHints: totalEmpty, matchBalance, onMatchBalanceChange });
+  const emptyCells = () => {
+    const out = [];
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) if (grid[r][c] === 0) out.push([r, c]);
+    return out;
+  };
+  const noEmpty = grid.flat().every(v => v !== 0);
 
   // Idle/leave autosave (timer advance + tab close). Per-move saves happen in place().
   const stateRef = useRef({});
-  stateRef.current = { grid, steps, secs };
+  stateRef.current = { grid, steps, secs, hintedCells };
   useAutosave(
     onSaveProgress,
-    () => ({ progress: { dayNum, grid: stateRef.current.grid }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    () => ({
+      progress: { dayNum, grid: stateRef.current.grid, hintedCells: [...stateRef.current.hintedCells] },
+      steps: stateRef.current.steps, secs: stateRef.current.secs,
+    }),
     !done
   );
+
+  const saveNow = (ng, ns, hc) =>
+    onSaveProgress && onSaveProgress({ dayNum, grid: ng, hintedCells: [...hc] }, ns, secs);
+
+  // Reveal one correct cell — the selected empty cell if any, else a random one.
+  const buyHint = () => {
+    if (done || noEmpty) return;
+    hints.buy(() => {
+      let target = null;
+      if (selected && grid[selected[0]][selected[1]] === 0 && !isGiven(selected[0], selected[1])) {
+        target = selected;
+      } else {
+        const empties = emptyCells();
+        if (!empties.length) return true; // nothing to reveal (server already charged)
+        target = empties[Math.floor(Math.random() * empties.length)];
+      }
+      const [r, c] = target;
+      const ng = grid.map(row => row.slice());
+      ng[r][c] = solution[r][c];
+      const hc = new Set(hintedCells); hc.add(cellKey(r, c));
+      setGrid(ng);
+      setHintedCells(hc);
+      setErrors(sudokuConflicts(ng));
+      saveNow(ng, steps, hc);
+      if (sudokuSolved(ng)) {
+        setDone(true);
+        const score = Math.max(1200 - steps * 15 - secs * 2, 200);
+        onWin(score, steps, secs);
+      }
+      return true;
+    });
+  };
 
   const place = (val) => {
     if (done || !selected) return;
     const [r, c] = selected;
-    if (isGiven(r, c)) return;
+    if (isLocked(r, c)) return;
 
     const ng = grid.map(row => row.slice());
     ng[r][c] = val;
@@ -5215,7 +5548,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     setErrors(sudokuConflicts(ng));
 
     // persist this move immediately
-    onSaveProgress && onSaveProgress({ dayNum, grid: ng }, newSteps, secs);
+    saveNow(ng, newSteps, hintedCells);
 
     // win check — fully filled and no conflicts
     if (sudokuSolved(ng)) {
@@ -5252,12 +5585,14 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
           row.map((v, c) => {
             const key = `${r},${c}`;
             const given = isGiven(r, c);
+            const hinted = hintedCells.has(cellKey(r, c));
+            const locked = given || hinted;
             const isSel = selKey === key;
             const isHl = !isSel && selected &&
               (selected[0] === r || selected[1] === c || boxAt(r, c) === selBox);
             const isErr = errors.has(key);
             const cls = ['scell'];
-            if (given) cls.push('given'); else if (v !== 0) cls.push('user');
+            if (given) cls.push('given'); else if (hinted) cls.push('hinted'); else if (v !== 0) cls.push('user');
             if (isSel) cls.push('sel'); else if (isHl) cls.push('hl');
             if (isErr) cls.push('err');
             return (
@@ -5268,7 +5603,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
                   borderRight: c === 2 ? `2px solid ${C.border}` : undefined,
                   borderBottom: (r === 1 || r === 3) ? `2px solid ${C.border}` : undefined,
                 }}
-                onClick={() => !given && !done && setSelected([r, c])}
+                onClick={() => !locked && !done && setSelected([r, c])}
               >
                 {v !== 0 ? v : ''}
               </div>
@@ -5276,6 +5611,20 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
           })
         )}
       </div>
+
+      {!done && (
+        <HintBar
+          nextCost={hints.nextCost}
+          balance={matchBalance}
+          canAfford={hints.canAfford}
+          exhausted={hints.exhausted || noEmpty}
+          buying={hints.buying}
+          onBuy={buyHint}
+          msg={hints.msg}
+          lastTx={hints.lastTx}
+          label={noEmpty ? 'Board full' : 'No more hints'}
+        />
+      )}
 
       <div className="numpad">
         {[1, 2, 3, 4, 5, 6].map(n => (
@@ -5806,7 +6155,7 @@ function locateWord(letters, word) {
   return null;
 }
 
-function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
   const board = useRef(generateWordSearch(dailyRng(offset, 'wordhunt'))).current;
   const { theme, words, letters } = board;
   const total = words.length;
@@ -5828,6 +6177,10 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const [found, setFound] = useState(initFound);            // found word strings
   const [foundCells, setFoundCells] = useState(initCells);  // locked cell indices
+  // First-cell hints bought for not-yet-found words (cell indices), persisted.
+  const [hintedStarts, setHintedStarts] = useState(() =>
+    new Set(resumed && Array.isArray(resumed.hintedStarts) ? resumed.hintedStarts : [])
+  );
   const [anchor, setAnchor] = useState(null);                // [r, c] drag start
   const [sel, setSel] = useState([]);                        // cell indices in current drag
   const [steps, setSteps] = useState(() => (resumed && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
@@ -5849,12 +6202,40 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   // Idle/leave autosave; per-find saves happen in endSel().
   const stateRef = useRef({});
-  stateRef.current = { found, steps, secs };
+  stateRef.current = { found, steps, secs, hintedStarts };
   useAutosave(
     onSaveProgress,
-    () => ({ progress: { dayNum, found: [...stateRef.current.found] }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    () => ({
+      progress: { dayNum, found: [...stateRef.current.found], hintedStarts: [...stateRef.current.hintedStarts] },
+      steps: stateRef.current.steps, secs: stateRef.current.secs,
+    }),
     !done
   );
+
+  // Paid hint: highlight the first cell of one random not-yet-found word.
+  const hints = useDailyHints({ gameId: 'wordhunt', maxHints: total, matchBalance, onMatchBalanceChange });
+  const buyHint = () => {
+    if (done) return;
+    hints.buy(() => {
+      // Words still unfound and not already hinted.
+      const candidates = words.filter(w => {
+        if (found.has(w)) return false;
+        const cells = locateWord(letters, w);
+        return cells && cells.length && !hintedStarts.has(cells[0]);
+      });
+      if (!candidates.length) return true; // nothing to reveal (server already charged)
+      const w = candidates[Math.floor(Math.random() * candidates.length)];
+      const cells = locateWord(letters, w);
+      const hs = new Set(hintedStarts); hs.add(cells[0]);
+      setHintedStarts(hs);
+      onSaveProgress && onSaveProgress(
+        { dayNum, found: [...found], hintedStarts: [...hs] }, steps, secsRef.current
+      );
+      return true;
+    });
+  };
+  const hintsExhausted = found.size >= total ||
+    words.every(w => found.has(w) || (locateWord(letters, w) && hintedStarts.has(locateWord(letters, w)[0])));
 
   // Straight-line path of cell indices from the anchor to (r, c), or null if
   // the target isn't on a horizontal / vertical / 45° diagonal from the anchor.
@@ -5903,7 +6284,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       setScore(newScore);
 
       // persist this find immediately
-      onSaveProgress && onSaveProgress({ dayNum, found: [...nf] }, newSteps, secsRef.current);
+      onSaveProgress && onSaveProgress({ dayNum, found: [...nf], hintedStarts: [...hintedStarts] }, newSteps, secsRef.current);
 
       if (nf.size === total) {
         setDone(true);
@@ -5943,6 +6324,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
             const i = idx(r, c);
             const cls = ['wcell'];
             if (foundCells.has(i)) cls.push('found');
+            else if (hintedStarts.has(i)) cls.push('hinted');
             if (selSet.has(i)) cls.push('sel');
             return (
               <div
@@ -5965,6 +6347,20 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           })
         )}
       </div>
+
+      {!done && (
+        <HintBar
+          nextCost={hints.nextCost}
+          balance={matchBalance}
+          canAfford={hints.canAfford}
+          exhausted={hints.exhausted || hintsExhausted}
+          buying={hints.buying}
+          onBuy={buyHint}
+          msg={hints.msg}
+          lastTx={hints.lastTx}
+          label="No more hints"
+        />
+      )}
 
       <div className="word-list">
         {words.map(w => (
@@ -6041,8 +6437,9 @@ const CW_WORDS = [
 // Hint pricing — single tuning knob. Cost of the Nth hint purchased today
 // (0-indexed) is CW_HINT_BASE_COST * 2**N → 1, 2, 4, 8, … in MATCH tokens.
 // The server is authoritative; this client copy is for display only.
-const CW_HINT_BASE_COST = 1;
-const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
+const DAILY_HINT_BASE_COST = 1;
+const CW_HINT_BASE_COST = DAILY_HINT_BASE_COST;
+const cwHintCost = (purchased) => DAILY_HINT_BASE_COST * Math.pow(2, purchased);
 
 // Guesses allowed for a given word length: one more than the length, so a
 // 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
@@ -6182,6 +6579,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const [hintsPurchased, setHintsPurchased] = useState(0);
   const [buying, setBuying] = useState(false);
   const [hintMsg, setHintMsg] = useState('');
+  const [lastHintTx, setLastHintTx] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -6210,6 +6608,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     if (buying || done || !active || cluesLeft <= 0) return;
     setBuying(true);
     setHintMsg('');
+    setLastHintTx(null);
     const { ok, status, body } = await api('/api/cryptowordle/hint', {
       method: 'POST',
       body: JSON.stringify({ maxHints: dailyClueTotal }),
@@ -6223,6 +6622,11 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
       const nextHbr = hintsByRound.map((n, i) => (i === activeIdx ? (n || 0) + 1 : n));
       setHintsByRound(nextHbr);
       onSaveProgress && onSaveProgress(buildProgress(roundGuesses, nextHbr), totalSteps, secs);
+      // Mirror the spend on-chain (best-effort) and surface the explorer link.
+      if (body.ledgerId) {
+        setLastHintTx({ status: 'pending', txHash: null });
+        anchorMatchLedger(body.ledgerId, body.memo).then(r => { if (r) setLastHintTx(r); });
+      }
       return;
     }
     if (status === 409 && body && body.code === 'insufficient_funds') {
@@ -6369,21 +6773,17 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           ))}
 
           {activeHints.length > 0 && (
-            <div className="cw-hint-bar">
-              <button
-                className="cw-hint-btn"
-                onClick={buyHint}
-                disabled={buying || cluesLeft <= 0 || !canAffordHint}
-              >
-                {cluesLeft <= 0
-                  ? '💡 No more clues'
-                  : <>💡 Hint · {nextCost} 🪙</>}
-              </button>
-              <span className="cw-hint-balance">
-                Balance: {matchBalance == null ? '…' : matchBalance} 🪙 MATCH
-              </span>
-              {hintMsg && <span className="cw-hint-msg">{hintMsg}</span>}
-            </div>
+            <HintBar
+              nextCost={nextCost}
+              balance={matchBalance}
+              canAfford={canAffordHint}
+              exhausted={cluesLeft <= 0}
+              buying={buying}
+              onBuy={buyHint}
+              msg={hintMsg}
+              lastTx={lastHintTx}
+              label="No more clues"
+            />
           )}
 
           <div
@@ -11535,7 +11935,9 @@ const TM_DAILY_CONFIG = {
 };
 const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
 
-function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile }) {
+const TM_DAILY_HINT_CAP = 5; // paid hints per day for the Daily Tile Match
+
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile, matchBalance, onMatchBalanceChange }) {
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -11546,6 +11948,8 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   const [barFull, setBarFull] = useState(false);
   const [flashIds, setFlashIds] = useState(new Set());
   const [secs, setSecs] = useState(0);
+  const [hintsApplied, setHintsApplied] = useState(0); // count, persisted
+  const [hintTileId, setHintTileId] = useState(null);  // transient highlight
   const secsRef = useRef(0);
   const movesRef = useRef(0);
 
@@ -11591,13 +11995,16 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
       setMoves(Number.isFinite(resume.moves) ? resume.moves : 0);
       setSecs(Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0);
       setBoosters(resume.boosters ? { ...resume.boosters } : { ...TM_DAILY_CONFIG.boosters });
+      setHintsApplied(Number.isFinite(resume.hintsApplied) ? resume.hintsApplied : 0);
     } else {
       setTiles(freshTiles);
       setBar([]);
       setMoves(0);
       setSecs(0);
       setBoosters({ ...TM_DAILY_CONFIG.boosters });
+      setHintsApplied(0);
     }
+    setHintTileId(null);
     setDone(false);
     setLastBarEntry(null);
     setClearSlotMode(false);
@@ -11610,7 +12017,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   // (tile placed, undo, shuffle, clear); useAutosave covers idle timer advance
   // and the tab-close case. Both are no-ops once finished.
   const tmStateRef = useRef({});
-  tmStateRef.current = { tiles, bar, moves, boosters, secs };
+  tmStateRef.current = { tiles, bar, moves, boosters, secs, hintsApplied };
   const buildTmProgress = () => ({
     progress: {
       dayNum,
@@ -11618,6 +12025,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
       bar: tmStateRef.current.bar,
       moves: tmStateRef.current.moves,
       boosters: tmStateRef.current.boosters,
+      hintsApplied: tmStateRef.current.hintsApplied,
     },
     steps: tmStateRef.current.moves,
     secs: tmStateRef.current.secs,
@@ -11627,7 +12035,39 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     if (done || !hydratedRef.current || tiles.length === 0 || !onSaveProgress) return;
     const s = buildTmProgress();
     onSaveProgress(s.progress, s.steps, s.secs);
-  }, [tiles, bar, moves, boosters, done]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tiles, bar, moves, boosters, hintsApplied, done]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Paid hint: highlight a recommended next tile. Prefer a free tile whose type
+  // already has ≥2 copies in the bar (completes a triple), else any free tile
+  // whose type has another free copy on the board, else any free tile.
+  const tmHints = useDailyHints({ gameId: 'tilematchingdaily', maxHints: TM_DAILY_HINT_CAP, matchBalance, onMatchBalanceChange });
+  const recommendTile = () => {
+    const free = tiles.filter(t => !t.removed && !t.inBar && !tmIsLocked(t, tiles));
+    if (!free.length) return null;
+    const byId = {};
+    tiles.forEach(t => { byId[t.id] = t; });
+    const barCounts = {};
+    bar.forEach(id => { const t = byId[id]; if (t) barCounts[t.type] = (barCounts[t.type] || 0) + 1; });
+    // 1) completes a triple already started in the bar
+    let pick = free.find(t => (barCounts[t.type] || 0) >= 2);
+    if (pick) return pick;
+    // 2) a type that has at least two free copies (progress toward a triple)
+    const freeCounts = {};
+    free.forEach(t => { freeCounts[t.type] = (freeCounts[t.type] || 0) + 1; });
+    pick = free.find(t => freeCounts[t.type] >= 2);
+    return pick || free[0];
+  };
+  const buyTmHint = () => {
+    if (done) return;
+    tmHints.buy(() => {
+      const pick = recommendTile();
+      if (!pick) return true; // nothing to suggest (server already charged)
+      setHintTileId(pick.id);
+      setHintsApplied(n => n + 1);
+      setTimeout(() => setHintTileId(cur => (cur === pick.id ? null : cur)), 2500);
+      return true;
+    });
+  };
 
   const tilesMap = {};
   tiles.forEach(t => { tilesMap[t.id] = t; });
@@ -11779,11 +12219,12 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
         {boardTiles.map(tile => {
           const locked = tmIsLocked(tile, tiles);
           const isFlash = flashIds.has(tile.id);
+          const isHint = hintTileId === tile.id;
           const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
           return (
             <div
               key={tile.id}
-              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}`}
+              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}${isHint ? ' hint-target' : ''}`}
               style={{ left: tile.col * TM_TILE_STEP, top: tile.row * TM_TILE_STEP, zIndex: tile.layer * 10 + 1, background: tt.color }}
               onClick={() => selectTile(tile.id)}
             >
@@ -11831,6 +12272,20 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
           <span className="tm-booster-count">{boosters.clear} left</span>
         </button>
       </div>
+
+      {!done && (
+        <HintBar
+          nextCost={tmHints.nextCost}
+          balance={matchBalance}
+          canAfford={tmHints.canAfford}
+          exhausted={tmHints.exhausted || boardTiles.length === 0}
+          buying={tmHints.buying}
+          onBuy={buyTmHint}
+          msg={tmHints.msg}
+          lastTx={tmHints.lastTx}
+          label="No more hints"
+        />
+      )}
     </div>
   );
 }
@@ -13884,6 +14339,7 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
   const [buyingFreeze, setBuyingFreeze] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [freezeMsg, setFreezeMsg] = React.useState(null);
+  const [matchLedger, setMatchLedger] = React.useState(null);
 
   const loadWallet = async () => {
     const demo = new URLSearchParams(window.location.search).get('demo');
@@ -13893,7 +14349,24 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
     setLoading(false);
   };
 
-  React.useEffect(() => { loadWallet(); }, []);
+  const loadMatchLedger = async () => {
+    const demo = new URLSearchParams(window.location.search).get('demo');
+    const path = '/api/match/ledger' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
+    const { ok, body } = await api(path);
+    if (ok && body && Array.isArray(body.entries)) {
+      // Opportunistically anchor any still-pending rows (e.g. a duel payout
+      // credited server-side) so their explorer links appear on next refresh.
+      const pending = body.entries.filter(e => e.status === 'pending');
+      if (pending.length) {
+        Promise.all(pending.map(e => anchorMatchLedger(e.id, e.memo))).then(() => {
+          api(path).then(r => { if (r.ok && r.body && Array.isArray(r.body.entries)) setMatchLedger(r.body.entries); });
+        });
+      }
+      setMatchLedger(body.entries);
+    }
+  };
+
+  React.useEffect(() => { loadWallet(); loadMatchLedger(); }, []);
 
   const handleCopy = async () => {
     if (!walletData || !walletData.addr) return;
@@ -14091,8 +14564,45 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
           })}
         </div>
       )}
+
+      {/* MATCH on-chain activity */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">MATCH activity</div>
+        {matchLedger == null ? (
+          <div className="match-activity-empty">Loading…</div>
+        ) : matchLedger.length === 0 ? (
+          <div className="match-activity-empty">No MATCH movements yet — buy a hint or win a duel to see on-chain activity here.</div>
+        ) : (
+          <div className="match-activity-list">
+            {matchLedger.map(e => (
+              <div className="match-activity-row" key={e.id}>
+                <div className="match-activity-main">
+                  <span className="match-activity-what">{matchLedgerLabel(e)}</span>
+                  <span className="match-activity-sub">
+                    <MatchExplorerLink txHash={e.txHash} status={e.status} />
+                  </span>
+                </div>
+                <span className={`match-activity-amt ${e.action}`}>
+                  {e.action === 'earn' ? '+' : '−'}{e.amount} 🪙
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+// Human label for a MATCH ledger row.
+function matchLedgerLabel(e) {
+  const names = {
+    cryptowordle: 'Crypto Wordle', sudoku: 'Mini Sudoku', wordhunt: 'Word Hunt',
+    tilematchingdaily: 'Daily Tile Match', tilematching: 'Tile Match task',
+    tilematch_pvp: 'Tile Match duel', match: 'MATCH',
+  };
+  const where = names[e.gameId] || e.gameId || 'MATCH';
+  return e.action === 'earn' ? `Earned · ${where}` : `Hint · ${where}`;
 }
 
 /* ============================================================
@@ -16484,6 +16994,257 @@ function BadgesSection({ streak, attempts, open, onToggle }) {
   );
 }
 
+/* ============================================================
+   AI Background Themes — helpers + screen
+   ============================================================ */
+const THEME_STORAGE_KEY = 'puzzlechain.activeTheme.v1';
+
+// Build the CSS background string for a theme's params. A radial highlight on
+// top of a linear base reads as a richer "scene" than a flat linear gradient.
+function themeGradient(params) {
+  if (!params || !Array.isArray(params.colors) || params.colors.length < 2) return null;
+  const cols = params.colors;
+  const angle = Number.isFinite(params.angle) ? params.angle : 135;
+  const linear = `linear-gradient(${angle}deg, ${cols.join(', ')})`;
+  const highlight = `radial-gradient(circle at 30% 20%, ${cols[0]}88, transparent 60%)`;
+  return `${highlight}, ${linear}`;
+}
+
+// Read/write the active theme to localStorage (device-local persistence).
+function loadActiveTheme() {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (obj && obj.params && Array.isArray(obj.params.colors)) return obj;
+  } catch {}
+  return null;
+}
+function persistActiveTheme(theme) {
+  try {
+    if (theme) localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
+    else localStorage.removeItem(THEME_STORAGE_KEY);
+  } catch {}
+}
+
+// A small inline gradient swatch (used in preview + gallery cards).
+function ThemeSwatch({ params, className, children }) {
+  const grad = themeGradient(params);
+  return (
+    <div className={className} style={{ background: grad || C.bg }}>
+      {children}
+    </div>
+  );
+}
+
+function ThemesScreen({ user, authOk, activeTheme, onApply, onReset, onPreview, onBack }) {
+  const [prompt, setPrompt] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [draft, setDraft] = useState(null);     // { params, prompt } from generate
+  const [draftName, setDraftName] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [msg, setMsg] = useState(null);         // { kind, text }
+  const [gallery, setGallery] = useState(null); // null = loading
+  const [sort, setSort] = useState('recent');
+  const [applyingId, setApplyingId] = useState(null);
+
+  const loadGallery = React.useCallback(async (sortMode) => {
+    const q = sortMode === 'popular' ? '?sort=popular' : '';
+    const { ok, body } = await api('/api/themes' + q);
+    if (ok && body && Array.isArray(body.themes)) setGallery(body.themes);
+    else setGallery([]);
+  }, []);
+  useEffect(() => { loadGallery(sort); }, [loadGallery, sort]);
+
+  const doGenerate = async (retried) => {
+    const p = prompt.trim();
+    if (!p) { setMsg({ kind: 'err', text: 'Type a vibe to generate a theme.' }); return; }
+    setGenerating(true);
+    setMsg(null);
+    setShared(false);
+    const { ok, status, body } = await api('/api/themes/generate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt: p }),
+    });
+    if (ok && body && body.params) {
+      setDraft({ params: body.params, prompt: p });
+      setDraftName(body.params.name || '');
+      onPreview(body.params); // live full-screen preview
+      setGenerating(false);
+      return;
+    }
+    // 403 grant_required → ask the platform shell for consent, then retry once.
+    if (status === 403 && !retried && window.usernode && typeof window.usernode.requestLlmAccess === 'function') {
+      try {
+        const r = await window.usernode.requestLlmAccess();
+        if (r && r.granted) { setGenerating(false); return doGenerate(true); }
+      } catch {}
+      setGenerating(false);
+      setMsg({ kind: 'err', text: 'AI access is needed to generate themes — try a gallery theme below.' });
+      return;
+    }
+    setGenerating(false);
+    if (status === 503) {
+      setMsg({ kind: 'info', text: 'Theme generation is unavailable here — browse and apply a community theme below instead.' });
+    } else if (status === 429) {
+      setMsg({ kind: 'err', text: 'Daily AI limit reached — resets at midnight UTC. Try a gallery theme below.' });
+    } else if (status === 403) {
+      setMsg({ kind: 'err', text: 'AI access not granted — try a gallery theme below.' });
+    } else {
+      setMsg({ kind: 'err', text: 'Theme generation is busy right now — try a gallery theme instead.' });
+    }
+  };
+
+  const applyDraft = () => {
+    if (!draft) return;
+    const params = { ...draft.params, name: (draftName || draft.params.name || 'Custom theme').slice(0, 40) };
+    onApply({ id: null, name: params.name, params, prompt: draft.prompt });
+    setMsg({ kind: 'info', text: 'Applied! This background now follows you across the app.' });
+  };
+
+  const shareDraft = async () => {
+    if (!draft || sharing) return;
+    setSharing(true);
+    const name = (draftName || draft.params.name || 'Custom theme').slice(0, 40);
+    const { ok, body } = await api('/api/themes', {
+      method: 'POST',
+      body: JSON.stringify({ params: { ...draft.params, name }, name, prompt: draft.prompt }),
+    });
+    setSharing(false);
+    if (ok && body && body.theme) {
+      setShared(true);
+      setMsg({ kind: 'info', text: 'Shared to the community gallery — everyone can apply it now.' });
+      // prepend so the creator sees it immediately in the recent view
+      setGallery(g => [body.theme, ...(g || [])]);
+    } else {
+      setMsg({ kind: 'err', text: 'Could not share that theme — please try again.' });
+    }
+  };
+
+  const applyGallery = async (t) => {
+    setApplyingId(t.id);
+    onApply({ id: t.id, name: t.name, params: t.params, prompt: t.prompt });
+    // best-effort popularity bump; non-fatal
+    try { await api(`/api/themes/${t.id}/apply`, { method: 'POST' }); } catch {}
+    setGallery(g => (g || []).map(x => x.id === t.id ? { ...x, applyCount: (x.applyCount || 0) + 1 } : x));
+    setApplyingId(null);
+  };
+
+  const canGenerate = authOk;
+  const draftGrad = draft ? themeGradient(draft.params) : null;
+
+  return (
+    <div className="themes-wrap">
+      <div className="game-head">
+        <button className="back-btn" onClick={() => { onPreview(null); onBack && onBack(); }}>← Back</button>
+        <div className="game-title"><span>🎨</span> Background Themes</div>
+      </div>
+
+      <div className="themes-create">
+        <h2>Create a theme</h2>
+        <p className="sub">Describe a vibe and AI turns it into a full-screen background.</p>
+        <div className="themes-prompt-row">
+          <input
+            type="text"
+            value={prompt}
+            maxLength={240}
+            placeholder="Describe a vibe… e.g. 'sunset over neon city', 'calm forest morning', 'deep space'"
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && canGenerate && !generating) doGenerate(false); }}
+            disabled={!canGenerate || generating}
+          />
+          <button
+            className="primary-btn"
+            style={{ minWidth: '120px' }}
+            disabled={!canGenerate || generating || !prompt.trim()}
+            onClick={() => doGenerate(false)}
+          >
+            {generating ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+        {!authOk && (
+          <div className="themes-msg info">Sign in to generate and share themes. You can still preview the gallery below.</div>
+        )}
+        {msg && <div className={`themes-msg ${msg.kind}`}>{msg.text}</div>}
+
+        {draft && (
+          <div className="themes-preview">
+            <div className="swatch" style={{ background: draftGrad || C.bg }}>
+              <span className="pname">{draftName || draft.params.name}</span>
+            </div>
+            <div className="themes-prompt-row">
+              <input
+                type="text"
+                value={draftName}
+                maxLength={40}
+                placeholder="Theme name"
+                onChange={e => setDraftName(e.target.value)}
+              />
+            </div>
+            <div className="actions">
+              <button className="primary-btn" onClick={applyDraft}>Apply</button>
+              <button
+                className="primary-btn"
+                style={{ background: C.violet }}
+                disabled={sharing || shared}
+                onClick={shareDraft}
+              >
+                {shared ? 'Shared ✓' : sharing ? 'Sharing…' : 'Share to gallery'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="themes-gallery-head">
+        <h2>Community gallery</h2>
+        <div className="themes-sort">
+          <button className={sort === 'recent' ? 'active' : ''} onClick={() => setSort('recent')}>Recent</button>
+          <button className={sort === 'popular' ? 'active' : ''} onClick={() => setSort('popular')}>Popular</button>
+        </div>
+      </div>
+
+      {activeTheme && (
+        <div style={{ marginBottom: '0.9rem' }}>
+          <button className="back-btn" onClick={() => { onReset && onReset(true); }}>Reset to default background</button>
+        </div>
+      )}
+
+      {gallery === null ? (
+        <div className="themes-empty">Loading themes…</div>
+      ) : gallery.length === 0 ? (
+        <div className="themes-empty">No community themes yet — generate one above and be the first to share!</div>
+      ) : (
+        <div className="themes-grid">
+          {gallery.map(t => {
+            const isActive = activeTheme && activeTheme.id === t.id;
+            return (
+              <div key={t.id} className={`theme-card${isActive ? ' active-theme' : ''}`} style={{ '--accent': (t.params && t.params.accent) || C.accent }}>
+                <ThemeSwatch params={t.params} className="tswatch" />
+                <div className="tbody">
+                  <span className="tname">{t.name}</span>
+                  <span className="tmeta">
+                    <span>by {t.creatorUsername}</span>
+                    <span>▶ {t.applyCount || 0}</span>
+                  </span>
+                  <button
+                    className={`tapply${isActive ? ' applied' : ''}`}
+                    disabled={isActive || applyingId === t.id}
+                    onClick={() => applyGallery(t)}
+                  >
+                    {isActive ? 'Applied ✓' : applyingId === t.id ? 'Applying…' : 'Apply'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=wallet / ?screen=session deep links for testing
@@ -16491,9 +17252,10 @@ function App() {
     const s = params.get('screen');
     if (s === 'wallet') return 'wallet';
     if (s === 'account') return 'account';
+    if (s === 'themes') return 'themes';
     if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'themes' | 'wallet' | 'account' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
   const [receiptSessionId, setReceiptSessionId] = useState(() => {
@@ -16552,11 +17314,38 @@ function App() {
   // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
   // gracefully alongside the server.
   const [integration, setIntegration] = useState({ enabled: false, pubkey: null });
+  // Active background theme (device-local, hydrated from localStorage before
+  // first paint) and a transient live preview that overrides it while the
+  // player auditions a generated/gallery theme on the Themes screen.
+  const [activeTheme, setActiveTheme] = useState(() => loadActiveTheme());
+  const [previewTheme, setPreviewTheme] = useState(null);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Apply (and persist) a chosen theme everywhere.
+  const handleApplyTheme = (theme) => {
+    setActiveTheme(theme);
+    setPreviewTheme(null);
+    persistActiveTheme(theme);
+  };
+  // Reset to the default dark background. `clearActive` true wipes the saved
+  // theme; false just drops the transient preview (used on Back).
+  const handleResetTheme = (clearActive) => {
+    setPreviewTheme(null);
+    if (clearActive) { setActiveTheme(null); persistActiveTheme(null); }
+  };
+  // The theme actually shown: a live preview (only while auditioning on the
+  // Themes screen) wins, else the saved active theme.
+  const effectivePreview = screen === 'themes' ? previewTheme : null;
+  const shownTheme = effectivePreview ? { params: effectivePreview } : activeTheme;
+  const shownGrad = shownTheme && shownTheme.params ? themeGradient(shownTheme.params) : null;
+  const shownScrim = shownTheme && shownTheme.params
+    ? (Number.isFinite(shownTheme.params.overlayOpacity) ? shownTheme.params.overlayOpacity : 0.55)
+    : 0;
+  const shownAccent = shownTheme && shownTheme.params && shownTheme.params.accent;
 
   // Hydrate today's locked/result state from the server on mount, and
   // recompute the score from finished attempts so it survives reloads.
@@ -17174,8 +17963,17 @@ function App() {
   const tierAhead = authOk && streak > 0 ? nextTierInfo(streak) : null;
 
   return (
-    <div className="app">
+    <div
+      className={`app${shownGrad ? ' themed' : ''}`}
+      style={{
+        '--bg-grad': shownGrad || undefined,
+        '--bg-scrim': shownScrim || undefined,
+        ...(shownAccent ? { '--accent': shownAccent } : {}),
+      }}
+    >
       <style>{css}</style>
+      <div className="app-bg" />
+      <div className="app-bg-scrim" />
 
       <nav className="nav">
         <div className="nav-brand"><span className="logo">⬢</span> PuzzleChain</div>
@@ -17209,6 +18007,22 @@ function App() {
               style={{ cursor: 'pointer', border: 'none' }}
             >
               🪙 {matchBalance == null ? '…' : matchBalance} MATCH
+            </button>
+          )}
+          {authOk && (
+            <button
+              className="primary-btn nav-themes-btn"
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                borderRadius: '8px'
+              }}
+              onClick={() => setScreen('themes')}
+            >
+              🎨 Themes
             </button>
           )}
           {authOk && (
@@ -17256,6 +18070,18 @@ function App() {
       {screen === 'friends' && (
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+          onBack={() => setScreen('lobby')}
+        />
+      )}
+
+      {screen === 'themes' && (
+        <ThemesScreen
+          user={user}
+          authOk={authOk}
+          activeTheme={activeTheme}
+          onApply={handleApplyTheme}
+          onReset={handleResetTheme}
+          onPreview={setPreviewTheme}
           onBack={() => setScreen('lobby')}
         />
       )}

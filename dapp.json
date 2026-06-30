@@ -1,5 +1,9 @@
 {
   "name": "PuzzleChain",
+  "llm": {
+    "purpose": "Turns a text prompt into a custom full-screen background theme",
+    "suggested_daily_cap_cents": 50
+  },
   "secrets": [
     {
       "key": "VALIDATOR_PRIVATE_KEY",
@@ -97,10 +101,19 @@
     { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
     { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
     { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },
+    { "name": "Mini Sudoku shows paid Hint bar", "path": "/?game=sudoku", "expectText": "Hint" },
+    { "name": "Word Hunt shows paid Hint bar", "path": "/?game=wordhunt", "expectText": "Hint" },
+    { "name": "Daily Tile Match shows paid Hint bar", "path": "/?game=tilematchingdaily", "expectText": "Hint" },
+    { "name": "Wallet MATCH activity section renders", "path": "/?screen=wallet&demo=match", "expectText": "MATCH activity" },
+    { "name": "MATCH activity shows View on explorer link", "path": "/?screen=wallet&demo=match", "expectText": "View on explorer" },
     { "name": "Mancala mode picker offers Daily Challenge", "path": "/?game=mancala", "expectText": "Daily Challenge" },
     { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" },
     { "name": "Chutes & Ladders mode select offers Versus Bot", "path": "/?game=chutes-ladders", "expectText": "Versus Bot" },
     { "name": "Chutes & Ladders mode select offers Online Multiplayer", "path": "/?game=chutes-ladders", "expectText": "Online Multiplayer" },
-    { "name": "Minesweeper game screen renders (audio controls load cleanly)", "path": "/?game=minesweeper", "expectText": "Safe Revealed" }
+    { "name": "Minesweeper game screen renders (audio controls load cleanly)", "path": "/?game=minesweeper", "expectText": "Safe Revealed" },
+    { "name": "Themes screen renders", "path": "/?screen=themes", "expectText": "Create a theme" },
+    { "name": "Themes nav button in lobby", "path": "/", "expectText": "Themes" },
+    { "name": "Themes gallery shows seeded community theme", "path": "/?screen=themes&demo=themes", "expectText": "Neon Sunset" },
+    { "name": "Themes gallery shows seeded creator", "path": "/?screen=themes&demo=themes", "expectText": "Staging demo ada" }
   ]
 }

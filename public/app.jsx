@@ -37,7 +37,79 @@ body {
 
 #root { min-height: 100vh; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app { min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+/* ---- AI background themes ----
+   Two fixed full-screen layers behind everything: the gradient, then a dark
+   scrim that keeps surfaces/text legible over any theme. With no active theme
+   the gradient is transparent (body's ${C.bg} shows) and the scrim is 0. */
+.app-bg {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background: var(--bg-grad, transparent);
+  transition: background 0.4s ease;
+}
+.app-bg-scrim {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: #0A0D14;
+  opacity: var(--bg-scrim, 0);
+  transition: opacity 0.4s ease;
+}
+
+/* Themes screen */
+.themes-wrap { max-width: 920px; margin: 0 auto; padding: 1.5rem 1.25rem; width: 100%; }
+.themes-create {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.1rem 1.1rem 1.25rem; margin-bottom: 1.5rem;
+}
+.themes-create h2 { font-size: 1.05rem; margin-bottom: 0.3rem; }
+.themes-create p.sub { color: ${C.muted}; font-size: 0.85rem; margin-bottom: 0.8rem; }
+.themes-prompt-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.themes-prompt-row input {
+  flex: 1; min-width: 200px; background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 9px; padding: 0.65rem 0.8rem; color: ${C.text}; font: inherit; font-size: 0.9rem;
+}
+.themes-prompt-row input:focus { outline: none; border-color: ${C.accent}; }
+.themes-msg { margin-top: 0.7rem; font-size: 0.85rem; padding: 0.55rem 0.7rem; border-radius: 8px; }
+.themes-msg.err { background: ${C.rose}1a; color: ${C.rose}; border: 1px solid ${C.rose}55; }
+.themes-msg.info { background: ${C.accent}14; color: ${C.text}; border: 1px solid ${C.border}; }
+.themes-preview {
+  margin-top: 0.9rem; border-radius: 12px; border: 1px solid ${C.border};
+  padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;
+}
+.themes-preview .swatch {
+  height: 110px; border-radius: 10px; border: 1px solid ${C.border};
+  display: flex; align-items: flex-end; padding: 0.6rem;
+}
+.themes-preview .swatch .pname {
+  font-weight: 600; font-size: 0.9rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.themes-preview .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.themes-gallery-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem; }
+.themes-gallery-head h2 { font-size: 1.05rem; }
+.themes-sort { display: flex; gap: 0.35rem; }
+.themes-sort button {
+  background: ${C.surface}; border: 1px solid ${C.border}; color: ${C.muted};
+  border-radius: 7px; padding: 0.3rem 0.7rem; font: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.themes-sort button.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.themes-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.85rem;
+}
+.theme-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.theme-card .tswatch { height: 90px; }
+.theme-card .tbody { padding: 0.6rem 0.7rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.theme-card .tname { font-weight: 600; font-size: 0.88rem; }
+.theme-card .tmeta { font-size: 0.72rem; color: ${C.muted}; display: flex; justify-content: space-between; gap: 0.4rem; }
+.theme-card .tapply {
+  margin-top: 0.2rem; background: var(--accent, ${C.accent}); border: none; color: #fff;
+  border-radius: 7px; padding: 0.4rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.theme-card.active-theme { border-color: ${C.emerald}; }
+.theme-card .tapply.applied { background: ${C.emerald}; cursor: default; }
+.themes-empty { color: ${C.muted}; font-size: 0.9rem; text-align: center; padding: 2rem 1rem; }
 
 /* ---- Nav bar ---- */
 .nav {
@@ -16465,6 +16537,257 @@ function BadgesSection({ badges, achievements, streak, solveCount, open, onToggl
   );
 }
 
+/* ============================================================
+   AI Background Themes — helpers + screen
+   ============================================================ */
+const THEME_STORAGE_KEY = 'puzzlechain.activeTheme.v1';
+
+// Build the CSS background string for a theme's params. A radial highlight on
+// top of a linear base reads as a richer "scene" than a flat linear gradient.
+function themeGradient(params) {
+  if (!params || !Array.isArray(params.colors) || params.colors.length < 2) return null;
+  const cols = params.colors;
+  const angle = Number.isFinite(params.angle) ? params.angle : 135;
+  const linear = `linear-gradient(${angle}deg, ${cols.join(', ')})`;
+  const highlight = `radial-gradient(circle at 30% 20%, ${cols[0]}88, transparent 60%)`;
+  return `${highlight}, ${linear}`;
+}
+
+// Read/write the active theme to localStorage (device-local persistence).
+function loadActiveTheme() {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (obj && obj.params && Array.isArray(obj.params.colors)) return obj;
+  } catch {}
+  return null;
+}
+function persistActiveTheme(theme) {
+  try {
+    if (theme) localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
+    else localStorage.removeItem(THEME_STORAGE_KEY);
+  } catch {}
+}
+
+// A small inline gradient swatch (used in preview + gallery cards).
+function ThemeSwatch({ params, className, children }) {
+  const grad = themeGradient(params);
+  return (
+    <div className={className} style={{ background: grad || C.bg }}>
+      {children}
+    </div>
+  );
+}
+
+function ThemesScreen({ user, authOk, activeTheme, onApply, onReset, onPreview, onBack }) {
+  const [prompt, setPrompt] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [draft, setDraft] = useState(null);     // { params, prompt } from generate
+  const [draftName, setDraftName] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [msg, setMsg] = useState(null);         // { kind, text }
+  const [gallery, setGallery] = useState(null); // null = loading
+  const [sort, setSort] = useState('recent');
+  const [applyingId, setApplyingId] = useState(null);
+
+  const loadGallery = React.useCallback(async (sortMode) => {
+    const q = sortMode === 'popular' ? '?sort=popular' : '';
+    const { ok, body } = await api('/api/themes' + q);
+    if (ok && body && Array.isArray(body.themes)) setGallery(body.themes);
+    else setGallery([]);
+  }, []);
+  useEffect(() => { loadGallery(sort); }, [loadGallery, sort]);
+
+  const doGenerate = async (retried) => {
+    const p = prompt.trim();
+    if (!p) { setMsg({ kind: 'err', text: 'Type a vibe to generate a theme.' }); return; }
+    setGenerating(true);
+    setMsg(null);
+    setShared(false);
+    const { ok, status, body } = await api('/api/themes/generate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt: p }),
+    });
+    if (ok && body && body.params) {
+      setDraft({ params: body.params, prompt: p });
+      setDraftName(body.params.name || '');
+      onPreview(body.params); // live full-screen preview
+      setGenerating(false);
+      return;
+    }
+    // 403 grant_required → ask the platform shell for consent, then retry once.
+    if (status === 403 && !retried && window.usernode && typeof window.usernode.requestLlmAccess === 'function') {
+      try {
+        const r = await window.usernode.requestLlmAccess();
+        if (r && r.granted) { setGenerating(false); return doGenerate(true); }
+      } catch {}
+      setGenerating(false);
+      setMsg({ kind: 'err', text: 'AI access is needed to generate themes — try a gallery theme below.' });
+      return;
+    }
+    setGenerating(false);
+    if (status === 503) {
+      setMsg({ kind: 'info', text: 'Theme generation is unavailable here — browse and apply a community theme below instead.' });
+    } else if (status === 429) {
+      setMsg({ kind: 'err', text: 'Daily AI limit reached — resets at midnight UTC. Try a gallery theme below.' });
+    } else if (status === 403) {
+      setMsg({ kind: 'err', text: 'AI access not granted — try a gallery theme below.' });
+    } else {
+      setMsg({ kind: 'err', text: 'Theme generation is busy right now — try a gallery theme instead.' });
+    }
+  };
+
+  const applyDraft = () => {
+    if (!draft) return;
+    const params = { ...draft.params, name: (draftName || draft.params.name || 'Custom theme').slice(0, 40) };
+    onApply({ id: null, name: params.name, params, prompt: draft.prompt });
+    setMsg({ kind: 'info', text: 'Applied! This background now follows you across the app.' });
+  };
+
+  const shareDraft = async () => {
+    if (!draft || sharing) return;
+    setSharing(true);
+    const name = (draftName || draft.params.name || 'Custom theme').slice(0, 40);
+    const { ok, body } = await api('/api/themes', {
+      method: 'POST',
+      body: JSON.stringify({ params: { ...draft.params, name }, name, prompt: draft.prompt }),
+    });
+    setSharing(false);
+    if (ok && body && body.theme) {
+      setShared(true);
+      setMsg({ kind: 'info', text: 'Shared to the community gallery — everyone can apply it now.' });
+      // prepend so the creator sees it immediately in the recent view
+      setGallery(g => [body.theme, ...(g || [])]);
+    } else {
+      setMsg({ kind: 'err', text: 'Could not share that theme — please try again.' });
+    }
+  };
+
+  const applyGallery = async (t) => {
+    setApplyingId(t.id);
+    onApply({ id: t.id, name: t.name, params: t.params, prompt: t.prompt });
+    // best-effort popularity bump; non-fatal
+    try { await api(`/api/themes/${t.id}/apply`, { method: 'POST' }); } catch {}
+    setGallery(g => (g || []).map(x => x.id === t.id ? { ...x, applyCount: (x.applyCount || 0) + 1 } : x));
+    setApplyingId(null);
+  };
+
+  const canGenerate = authOk;
+  const draftGrad = draft ? themeGradient(draft.params) : null;
+
+  return (
+    <div className="themes-wrap">
+      <div className="game-head">
+        <button className="back-btn" onClick={() => { onPreview(null); onBack && onBack(); }}>← Back</button>
+        <div className="game-title"><span>🎨</span> Background Themes</div>
+      </div>
+
+      <div className="themes-create">
+        <h2>Create a theme</h2>
+        <p className="sub">Describe a vibe and AI turns it into a full-screen background.</p>
+        <div className="themes-prompt-row">
+          <input
+            type="text"
+            value={prompt}
+            maxLength={240}
+            placeholder="Describe a vibe… e.g. 'sunset over neon city', 'calm forest morning', 'deep space'"
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && canGenerate && !generating) doGenerate(false); }}
+            disabled={!canGenerate || generating}
+          />
+          <button
+            className="primary-btn"
+            style={{ minWidth: '120px' }}
+            disabled={!canGenerate || generating || !prompt.trim()}
+            onClick={() => doGenerate(false)}
+          >
+            {generating ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+        {!authOk && (
+          <div className="themes-msg info">Sign in to generate and share themes. You can still preview the gallery below.</div>
+        )}
+        {msg && <div className={`themes-msg ${msg.kind}`}>{msg.text}</div>}
+
+        {draft && (
+          <div className="themes-preview">
+            <div className="swatch" style={{ background: draftGrad || C.bg }}>
+              <span className="pname">{draftName || draft.params.name}</span>
+            </div>
+            <div className="themes-prompt-row">
+              <input
+                type="text"
+                value={draftName}
+                maxLength={40}
+                placeholder="Theme name"
+                onChange={e => setDraftName(e.target.value)}
+              />
+            </div>
+            <div className="actions">
+              <button className="primary-btn" onClick={applyDraft}>Apply</button>
+              <button
+                className="primary-btn"
+                style={{ background: C.violet }}
+                disabled={sharing || shared}
+                onClick={shareDraft}
+              >
+                {shared ? 'Shared ✓' : sharing ? 'Sharing…' : 'Share to gallery'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="themes-gallery-head">
+        <h2>Community gallery</h2>
+        <div className="themes-sort">
+          <button className={sort === 'recent' ? 'active' : ''} onClick={() => setSort('recent')}>Recent</button>
+          <button className={sort === 'popular' ? 'active' : ''} onClick={() => setSort('popular')}>Popular</button>
+        </div>
+      </div>
+
+      {activeTheme && (
+        <div style={{ marginBottom: '0.9rem' }}>
+          <button className="back-btn" onClick={() => { onReset && onReset(true); }}>Reset to default background</button>
+        </div>
+      )}
+
+      {gallery === null ? (
+        <div className="themes-empty">Loading themes…</div>
+      ) : gallery.length === 0 ? (
+        <div className="themes-empty">No community themes yet — generate one above and be the first to share!</div>
+      ) : (
+        <div className="themes-grid">
+          {gallery.map(t => {
+            const isActive = activeTheme && activeTheme.id === t.id;
+            return (
+              <div key={t.id} className={`theme-card${isActive ? ' active-theme' : ''}`} style={{ '--accent': (t.params && t.params.accent) || C.accent }}>
+                <ThemeSwatch params={t.params} className="tswatch" />
+                <div className="tbody">
+                  <span className="tname">{t.name}</span>
+                  <span className="tmeta">
+                    <span>by {t.creatorUsername}</span>
+                    <span>▶ {t.applyCount || 0}</span>
+                  </span>
+                  <button
+                    className={`tapply${isActive ? ' applied' : ''}`}
+                    disabled={isActive || applyingId === t.id}
+                    onClick={() => applyGallery(t)}
+                  >
+                    {isActive ? 'Applied ✓' : applyingId === t.id ? 'Applying…' : 'Apply'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=wallet / ?screen=session deep links for testing
@@ -16472,9 +16795,10 @@ function App() {
     const s = params.get('screen');
     if (s === 'wallet') return 'wallet';
     if (s === 'account') return 'account';
+    if (s === 'themes') return 'themes';
     if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'themes' | 'wallet' | 'account' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
   const [receiptSessionId, setReceiptSessionId] = useState(() => {
@@ -16536,11 +16860,38 @@ function App() {
   // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
   // gracefully alongside the server.
   const [integration, setIntegration] = useState({ enabled: false, pubkey: null });
+  // Active background theme (device-local, hydrated from localStorage before
+  // first paint) and a transient live preview that overrides it while the
+  // player auditions a generated/gallery theme on the Themes screen.
+  const [activeTheme, setActiveTheme] = useState(() => loadActiveTheme());
+  const [previewTheme, setPreviewTheme] = useState(null);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Apply (and persist) a chosen theme everywhere.
+  const handleApplyTheme = (theme) => {
+    setActiveTheme(theme);
+    setPreviewTheme(null);
+    persistActiveTheme(theme);
+  };
+  // Reset to the default dark background. `clearActive` true wipes the saved
+  // theme; false just drops the transient preview (used on Back).
+  const handleResetTheme = (clearActive) => {
+    setPreviewTheme(null);
+    if (clearActive) { setActiveTheme(null); persistActiveTheme(null); }
+  };
+  // The theme actually shown: a live preview (only while auditioning on the
+  // Themes screen) wins, else the saved active theme.
+  const effectivePreview = screen === 'themes' ? previewTheme : null;
+  const shownTheme = effectivePreview ? { params: effectivePreview } : activeTheme;
+  const shownGrad = shownTheme && shownTheme.params ? themeGradient(shownTheme.params) : null;
+  const shownScrim = shownTheme && shownTheme.params
+    ? (Number.isFinite(shownTheme.params.overlayOpacity) ? shownTheme.params.overlayOpacity : 0.55)
+    : 0;
+  const shownAccent = shownTheme && shownTheme.params && shownTheme.params.accent;
 
   // Hydrate today's locked/result state from the server on mount, and
   // recompute the score from finished attempts so it survives reloads.
@@ -17185,8 +17536,17 @@ function App() {
   const tierAhead = authOk && streak > 0 ? nextTierInfo(streak) : null;
 
   return (
-    <div className="app">
+    <div
+      className={`app${shownGrad ? ' themed' : ''}`}
+      style={{
+        '--bg-grad': shownGrad || undefined,
+        '--bg-scrim': shownScrim || undefined,
+        ...(shownAccent ? { '--accent': shownAccent } : {}),
+      }}
+    >
       <style>{css}</style>
+      <div className="app-bg" />
+      <div className="app-bg-scrim" />
 
       <nav className="nav">
         <div className="nav-brand"><span className="logo">⬢</span> PuzzleChain</div>
@@ -17220,6 +17580,22 @@ function App() {
               style={{ cursor: 'pointer', border: 'none' }}
             >
               🪙 {matchBalance == null ? '…' : matchBalance} MATCH
+            </button>
+          )}
+          {authOk && (
+            <button
+              className="primary-btn nav-themes-btn"
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                borderRadius: '8px'
+              }}
+              onClick={() => setScreen('themes')}
+            >
+              🎨 Themes
             </button>
           )}
           {authOk && (
@@ -17267,6 +17643,18 @@ function App() {
       {screen === 'friends' && (
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+          onBack={() => setScreen('lobby')}
+        />
+      )}
+
+      {screen === 'themes' && (
+        <ThemesScreen
+          user={user}
+          authOk={authOk}
+          activeTheme={activeTheme}
+          onApply={handleApplyTheme}
+          onReset={handleResetTheme}
+          onPreview={setPreviewTheme}
           onBack={() => setScreen('lobby')}
         />
       )}

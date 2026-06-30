@@ -1,5 +1,9 @@
 {
   "name": "PuzzleChain",
+  "llm": {
+    "purpose": "Turns a text prompt into a custom full-screen background theme",
+    "suggested_daily_cap_cents": 50
+  },
   "secrets": [
     {
       "key": "VALIDATOR_PRIVATE_KEY",
@@ -101,6 +105,10 @@
     { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" },
     { "name": "Chutes & Ladders mode select offers Versus Bot", "path": "/?game=chutes-ladders", "expectText": "Versus Bot" },
     { "name": "Chutes & Ladders mode select offers Online Multiplayer", "path": "/?game=chutes-ladders", "expectText": "Online Multiplayer" },
-    { "name": "Minesweeper game screen renders (audio controls load cleanly)", "path": "/?game=minesweeper", "expectText": "Safe Revealed" }
+    { "name": "Minesweeper game screen renders (audio controls load cleanly)", "path": "/?game=minesweeper", "expectText": "Safe Revealed" },
+    { "name": "Themes screen renders", "path": "/?screen=themes", "expectText": "Create a theme" },
+    { "name": "Themes nav button in lobby", "path": "/", "expectText": "Themes" },
+    { "name": "Themes gallery shows seeded community theme", "path": "/?screen=themes&demo=themes", "expectText": "Neon Sunset" },
+    { "name": "Themes gallery shows seeded creator", "path": "/?screen=themes&demo=themes", "expectText": "Staging demo ada" }
   ]
 }

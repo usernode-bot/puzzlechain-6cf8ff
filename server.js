@@ -14,6 +14,65 @@ const IS_STAGING = process.env.USERNODE_ENV === 'staging';
 // App identity secrets (APP_PUBKEY, APP_SECRET_KEY) are declared in dapp.json
 // and available via process.env for cryptographic operations when needed.
 
+// ---- AI Background Themes — platform Claude proxy ---------------------------
+// The platform injects USERNODE_LLM_PROXY_URL/TOKEN into PRODUCTION containers
+// only; staging + standalone get neither (unreviewed PR code must not spend a
+// user's AI budget). Detect absence and degrade gracefully — the /generate
+// route returns 503 and the gallery (DB-backed) keeps working.
+const LLM_ENABLED = !!process.env.USERNODE_LLM_PROXY_TOKEN;
+const LLM_PROXY_URL = process.env.USERNODE_LLM_PROXY_URL;
+const LLM_PROXY_TOKEN = process.env.USERNODE_LLM_PROXY_TOKEN;
+// Modest model + token budget: a theme is a tiny JSON object.
+const THEME_MODEL = 'claude-haiku-4-5-20251001';
+const THEME_PROMPT_MAX = 240; // chars accepted from the client
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+// Clamp/validate an AI- or client-supplied theme into a safe, renderable shape.
+// Returns a normalized object on success, or null if it can't be coerced.
+function sanitizeThemeParams(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  let colors = Array.isArray(raw.colors) ? raw.colors.filter((c) => typeof c === 'string' && HEX_RE.test(c.trim())).map((c) => c.trim().toLowerCase()) : [];
+  if (colors.length < 2) return null;
+  if (colors.length > 4) colors = colors.slice(0, 4);
+  let angle = Number(raw.angle);
+  if (!Number.isFinite(angle)) angle = 135;
+  angle = Math.round(((angle % 360) + 360) % 360);
+  let accent = typeof raw.accent === 'string' && HEX_RE.test(raw.accent.trim()) ? raw.accent.trim().toLowerCase() : '#6366f1';
+  let overlay = Number(raw.overlayOpacity);
+  if (!Number.isFinite(overlay)) overlay = 0.55;
+  overlay = Math.min(0.75, Math.max(0.35, overlay));
+  let name = typeof raw.name === 'string' ? raw.name.trim().slice(0, 40) : '';
+  if (!name) name = 'Custom theme';
+  return { name, colors, angle, accent, overlayOpacity: Math.round(overlay * 100) / 100 };
+}
+
+// Deterministic fallback palette derived from a hash of the prompt, so theme
+// generation NEVER hard-fails even if the model returns garbage twice. Same
+// prompt → same colors. Produces a pleasant 3-stop gradient + accent.
+function fallbackThemeFromPrompt(prompt) {
+  const hash = crypto.createHash('sha256').update(String(prompt || 'puzzlechain')).digest();
+  const hsl = (h, s, l) => {
+    // minimal HSL→hex (s,l in 0..1)
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => {
+      const k = (n + h / 30) % 12;
+      const col = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+      return Math.round(255 * col).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  };
+  const baseHue = hash[0] / 255 * 360;
+  const colors = [
+    hsl(baseHue, 0.55, 0.32),
+    hsl((baseHue + 40) % 360, 0.5, 0.22),
+    hsl((baseHue + 200) % 360, 0.45, 0.14),
+  ];
+  const accent = hsl((baseHue + 20) % 360, 0.7, 0.6);
+  const angle = 90 + Math.round((hash[1] / 255) * 180);
+  return { name: 'Generated theme', colors, angle, accent, overlayOpacity: 0.55 };
+}
+
 // ---- PvP wager config -------------------------------------------------------
 
 const VALIDATOR_PRIVATE_KEY = process.env.VALIDATOR_PRIVATE_KEY;
@@ -78,8 +137,36 @@ const CLAIM_REWARDS_IFACE = new ethers.Interface(['function claimRewards(address
 
 // Reward economics — single source of truth for balance/tuning.
 // 1 UTGO per 1000 final points; streak multiplier already baked into finalScore.
+// NOTE: $UTGO rewards are RETIRED — the daily win now pays MATCH (the single
+// in-app currency). These constants are kept only for the one-time migration of
+// legacy unclaimed pending_wei into MATCH.
 const REWARD_PER_POINT_WEI = BigInt('1000000000000000'); // 0.001 UTGO per point → ~0.96 UTGO for ~960pts
-const STREAK_FREEZE_PRICE_WEI = BigInt('5000000000000000000'); // 5 UTGO
+const STREAK_FREEZE_PRICE_WEI = BigInt('5000000000000000000'); // 5 UTGO (legacy)
+
+// ---- Single-currency (MATCH) economics — the only balance knobs --------------
+// MATCH is the app's one in-app currency (off-chain ledger in tilematch_tokens,
+// every movement anchored on-chain). Daily wins earn MATCH; hints / streak
+// freezes / tips spend MATCH.
+const MATCH_PER_POINT = 0.01;         // 1 MATCH per 100 final points
+const MATCH_MIN_PER_WIN = 1;          // every win pays at least this
+const MATCH_PER_UTGO = 10;            // legacy-$UTGO → MATCH migration rate (0.001 UTGO/pt ↔ 0.01 MATCH/pt)
+const STREAK_FREEZE_PRICE_MATCH = 50; // 5 legacy UTGO × 10
+const matchEarnedForScore = (finalScore) =>
+  Math.max(MATCH_MIN_PER_WIN, Math.round((Number(finalScore) || 0) * MATCH_PER_POINT));
+
+// Deterministic 32-byte hash committing a MATCH ledger movement, written
+// on-chain (as tx calldata) by the client's bridge. Returned WITHOUT the 0x
+// prefix to match the dappAnchor `'0x'+chainHash` convention.
+function matchChainHash({ userId, kind, gameId, attemptDate, amount, eventId }) {
+  try {
+    const h = ethers.keccak256(
+      ethers.toUtf8Bytes([userId, kind, gameId || '', attemptDate || '', amount, eventId].join('|'))
+    );
+    return h.startsWith('0x') ? h.slice(2) : h;
+  } catch {
+    return null;
+  }
+}
 
 // Crypto Wordle paid hints — cost of the Nth hint bought today (0-indexed) is
 // CW_HINT_BASE_COST * 2**N in MATCH tokens → 1, 2, 4, 8, … Resets per UTC day.
@@ -622,6 +709,7 @@ async function migrate() {
 
   // token_tips is PUBLIC: one row per tip between users.
   // Mirrors public on-chain transfers; powers profile "tips received" panel.
+  // LEGACY: retained for history; tips now move MATCH via match_ledger_events.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS token_tips (
       id           BIGSERIAL PRIMARY KEY,
@@ -635,6 +723,47 @@ async function migrate() {
       created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+
+  // match_ledger_events is PUBLIC: the unified, append-only log of every MATCH
+  // movement (the single in-app currency) plus its on-chain anchor receipt.
+  // No sensitive data — only user ids, kind, amount (integer MATCH),
+  // counterpart user id (for tips), and public chain/tx hashes. No FK to any
+  // private table. `amount` is the signed delta (earn/tip_received positive,
+  // spend_*/tip_sent negative). `balance_after` is the post-movement balance.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS match_ledger_events (
+      id            BIGSERIAL PRIMARY KEY,
+      user_id       TEXT NOT NULL,
+      kind          TEXT NOT NULL,
+      game_id       TEXT,
+      attempt_date  DATE,
+      amount        INTEGER NOT NULL,
+      balance_after INTEGER,
+      counterpart   TEXT,
+      chain_hash    TEXT,
+      anchor_status TEXT NOT NULL DEFAULT 'pending',
+      anchor_tx_hash TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // Idempotent earns: at most one 'earn' row per (user, game, day) — the direct
+  // successor to token_reward_events' constraint, so a double-finish can't
+  // double-credit MATCH.
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS match_ledger_earn_unique
+      ON match_ledger_events (user_id, game_id, attempt_date)
+      WHERE kind = 'earn'
+  `);
+  // Idempotent hint spends: one row per (user, day, hint index).
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS match_ledger_hint_unique
+      ON match_ledger_events (user_id, attempt_date, amount, kind)
+      WHERE kind = 'spend_hint'
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS match_ledger_user_idx ON match_ledger_events (user_id, created_at DESC)`);
+
+  // Migration marker for the one-time legacy $UTGO → MATCH fold.
+  await pool.query(`ALTER TABLE token_rewards_ledger ADD COLUMN IF NOT EXISTS migrated_to_match_at TIMESTAMPTZ`);
 
   // user_follows is PUBLIC: directional follow relationships.
   // One row per (follower_id, followee_id) pair.
@@ -976,6 +1105,127 @@ async function migrate() {
       PRIMARY KEY (user_id, game_id)
     )
   `);
+  await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS save_hash TEXT`);
+  await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS anchor_tx_hash TEXT`);
+
+  // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
+  // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
+  // `state` JSONB is game-specific and `game_id` is validated against
+  // ALL_GAME_IDS. No sensitive data (gameplay results only). Any user can join
+  // a waiting room by code, so no inviteeId is required (unlike collab_sessions).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS classic_rooms (
+      id             TEXT PRIMARY KEY,
+      game_id        TEXT NOT NULL,
+      player1_id     TEXT NOT NULL,
+      player2_id     TEXT,
+      player1_name   TEXT,
+      player2_name   TEXT,
+      state          JSONB NOT NULL DEFAULT '{}',
+      move_seq       INTEGER NOT NULL DEFAULT 0,
+      status         TEXT NOT NULL DEFAULT 'waiting',
+      winner         TEXT,
+      last_move_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // bg_themes is PUBLIC: a shared gallery of AI-generated background themes.
+  // Cosmetic only (gradient color params + the prompt + creator name) — no
+  // sensitive data, so it stays public (a stranger seeing every row is fine)
+  // and gets copied into staging with production rows. `params` is the
+  // validated theme shape { name, colors[], angle, accent, overlayOpacity }.
+  // creator_user_id references the public users table (a public table may not
+  // FK into a private one — users is public, so this is allowed).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bg_themes (
+      id               BIGSERIAL PRIMARY KEY,
+      creator_user_id  TEXT NOT NULL REFERENCES users(id),
+      creator_username TEXT,
+      prompt           TEXT,
+      name             TEXT NOT NULL,
+      params           JSONB NOT NULL,
+      apply_count      INTEGER NOT NULL DEFAULT 0,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Staging-only: a fake user with unclaimed legacy $UTGO so the migration below
+  // actually folds a row each fresh boot (and no-ops idempotently thereafter).
+  if (IS_STAGING) {
+    await pool.query(
+      `INSERT INTO users (id, username) VALUES ('staging-demo-legacy', 'staging-demo-legacy')
+       ON CONFLICT (id) DO NOTHING`
+    );
+    await pool.query(
+      `INSERT INTO token_rewards_ledger (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
+       VALUES ('staging-demo-legacy', '3000000000000000000', '3000000000000000000', 0)
+       ON CONFLICT (user_id) DO NOTHING`
+    );
+  }
+
+  // ---- One-time migration: legacy unclaimed $UTGO → MATCH ---------------------
+  // Fold every player's unclaimed pending_wei into their single MATCH balance,
+  // once. Idempotent: rows are stamped `migrated_to_match_at` and their
+  // pending_wei zeroed, so re-running boot (or overlapping boots) never
+  // double-credits. The daily finish no longer writes pending_wei after this
+  // deploy, so there is no concurrent re-accrual race. MATCH granted =
+  // floor(pending_wei / 10^17) (i.e. UTGO × MATCH_PER_UTGO). A 'migration'
+  // ledger row records the credit (no on-chain anchor — this is a server-side
+  // bulk credit with no interactive wallet).
+  try {
+    const { rows: legacyRows } = await pool.query(
+      `SELECT user_id, pending_wei
+         FROM token_rewards_ledger
+        WHERE migrated_to_match_at IS NULL AND pending_wei > 0`
+    );
+    for (const lr of legacyRows) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // Re-check + lock so a concurrent boot can't migrate the same row twice.
+        const { rows: lock } = await client.query(
+          `SELECT pending_wei FROM token_rewards_ledger
+             WHERE user_id = $1 AND migrated_to_match_at IS NULL AND pending_wei > 0
+             FOR UPDATE`,
+          [lr.user_id]
+        );
+        if (lock.length === 0) { await client.query('ROLLBACK'); client.release(); continue; }
+        const pendingWei = BigInt(lock[0].pending_wei.toString());
+        const granted = Number(pendingWei / (10n ** 17n)); // UTGO × MATCH_PER_UTGO, floored
+        if (granted > 0) {
+          const { rows: balRows } = await client.query(
+            `INSERT INTO tilematch_tokens (user_id, balance)
+             VALUES ($1, $2)
+             ON CONFLICT (user_id) DO UPDATE SET
+               balance = tilematch_tokens.balance + $2, updated_at = now()
+             RETURNING balance`,
+            [lr.user_id, granted]
+          );
+          await client.query(
+            `INSERT INTO match_ledger_events (user_id, kind, amount, balance_after, anchor_status)
+             VALUES ($1, 'migration', $2, $3, 'migration')`,
+            [lr.user_id, granted, balRows[0].balance]
+          );
+        }
+        await client.query(
+          `UPDATE token_rewards_ledger
+              SET pending_wei = 0, migrated_to_match_at = now(), updated_at = now()
+            WHERE user_id = $1`,
+          [lr.user_id]
+        );
+        await client.query('COMMIT');
+      } catch (mErr) {
+        try { await client.query('ROLLBACK'); } catch {}
+        console.error('[migrate] $UTGO→MATCH failed for', lr.user_id, mErr.message);
+      } finally {
+        client.release();
+      }
+    }
+    if (legacyRows.length) console.log(`[migrate] folded legacy $UTGO into MATCH for ${legacyRows.length} user(s)`);
+  } catch (migErr) {
+    console.error('[migrate] $UTGO→MATCH scan failed (non-fatal):', migErr.message);
+  }
 
   if (IS_STAGING) {
     // PvP staging seeds: three match states for UI testing.
@@ -1305,6 +1555,33 @@ async function migrate() {
                $1, 'active', 1)
        ON CONFLICT (id) DO NOTHING`,
       [midPits]
+    );
+
+    // Game Menu staging seeds (this change). Both are no-ops in production.
+    // 1) A saved Versus-Bot Mancala game so the "Resume Saved" prompt is
+    //    demonstrable without playing an AI game to completion.
+    await pool.query(
+      `INSERT INTO user_game_state (user_id, username, game_id, state)
+       VALUES ('staging-demo-user', 'staging-demo-user', 'mancala', $1::jsonb)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [JSON.stringify({
+        mode: 'bot', difficulty: 'medium',
+        pits: [3, 4, 2, 5, 1, 4, 6, 3, 4, 3, 5, 2, 4, 5],
+        currentPlayer: 1, moves: 8, secs: 64,
+      })]
+    );
+    // Set the on-chain anchor demo so the ⛓ On-chain badge is visible.
+    await pool.query(
+      `UPDATE user_game_state SET anchor_tx_hash = '0xstaginganchor'
+       WHERE user_id = 'staging-demo-user' AND game_id = 'mancala'`
+    );
+    // 2) A waiting Chutes & Ladders online room so a tester can demo "Join Room"
+    //    with code CLTST.
+    await pool.query(
+      `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state, status)
+       VALUES ('CLTST', 'chutes-ladders', 'staging-demo-user', 'staging-p1', $1::jsonb, 'waiting')
+       ON CONFLICT (id) DO NOTHING`,
+      [JSON.stringify({ p1Pos: 0, p2Pos: 0, currentPlayer: 1, die: null, rolls: 0 })]
     );
 
     // Snake leaderboard seed — newly created table is empty in staging, so the
@@ -2140,25 +2417,26 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
     );
     const walletLinked = walletRows.length > 0;
 
+    // Tips received now come from the unified MATCH ledger (integer MATCH).
     const { rows: tipRows } = await pool.query(
-      `SELECT SUM(amount_wei) as total_wei,
+      `SELECT SUM(amount) as total_match,
               JSON_AGG(
                 JSON_BUILD_OBJECT(
-                  'fromUserId', from_user_id,
-                  'amountWei', amount_wei::text,
+                  'fromUserId', counterpart,
+                  'amount', amount,
                   'createdAt', created_at
                 ) ORDER BY created_at DESC
               ) as tips
          FROM (
-           SELECT from_user_id, amount_wei, created_at
-             FROM token_tips
-            WHERE to_user_id = $1 AND status = 'confirmed'
+           SELECT counterpart, amount, created_at
+             FROM match_ledger_events
+            WHERE user_id = $1 AND kind = 'tip_received'
             ORDER BY created_at DESC
             LIMIT 5
          ) sub`,
       [viewedUserId]
     );
-    const tipsReceivedWei = tipRows[0].total_wei ? tipRows[0].total_wei.toString() : '0';
+    const tipsReceivedMatch = tipRows[0].total_match ? Number(tipRows[0].total_match) : 0;
     const recentTippers = tipRows[0].tips || [];
 
     // Live, authoritative streak (computed from finished daily_attempts) rather
@@ -2188,7 +2466,7 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
       followerCount,
       followingCount,
       walletLinked,
-      tipsReceivedWei,
+      tipsReceivedMatch,
       recentTippers,
     });
   } catch (err) {
@@ -2826,6 +3104,39 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: populate the shared themes gallery with ~6
+    // obviously-fake community themes so the gallery grid, preview swatches,
+    // and the recent-vs-popular ordering are demonstrable WITHOUT the LLM proxy
+    // (which staging never receives). Idempotent (fixed ids), strict no-op in
+    // production. Each row needs a creator in the public users table because
+    // bg_themes FKs into it.
+    if (IS_STAGING && req.query.demo === 'themes') {
+      const demoThemes = [
+        { id: 990001, user: 'staging-demo-ada',  name: 'Neon Sunset',   prompt: 'sunset over neon city',   colors: ['#ff5f8f', '#7a3cff', '#1b1140'], angle: 135, accent: '#ff5f8f', overlay: 0.5,  applies: 142 },
+        { id: 990002, user: 'staging-demo-borg', name: 'Forest Morning', prompt: 'calm forest morning',     colors: ['#3fa34d', '#1f5e3a', '#0c2218'], angle: 120, accent: '#7fe0a0', overlay: 0.55, applies: 87 },
+        { id: 990003, user: 'staging-demo-cleo', name: 'Deep Ocean',     prompt: 'deep ocean trench',        colors: ['#1c6dd0', '#0a2e6e', '#04122e'], angle: 160, accent: '#4fc3f7', overlay: 0.6,  applies: 64 },
+        { id: 990004, user: 'staging-demo-dex',  name: 'Mono Slate',     prompt: 'minimal monochrome slate', colors: ['#3a3f4a', '#23262e', '#101218'], angle: 135, accent: '#9aa3b2', overlay: 0.5,  applies: 31 },
+        { id: 990005, user: 'staging-demo-eve',  name: 'Cyber Neon',     prompt: 'cyberpunk neon grid',      colors: ['#ff2bd6', '#5a18ff', '#0a0420'], angle: 145, accent: '#ff2bd6', overlay: 0.6,  applies: 12 },
+        { id: 990006, user: 'staging-demo-fin',  name: 'Candy Pop',      prompt: 'sweet candy pastel pop',   colors: ['#ff9ec7', '#b388ff', '#3a2a52'], angle: 110, accent: '#ffb3d9', overlay: 0.45, applies: 3 },
+      ];
+      for (const t of demoThemes) {
+        await pool.query(
+          `INSERT INTO users (id, username) VALUES ($1, $1) ON CONFLICT (id) DO NOTHING`,
+          [t.user]
+        );
+        await pool.query(
+          `INSERT INTO bg_themes (id, creator_user_id, creator_username, prompt, name, params, apply_count)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            t.id, t.user, `Staging demo ${t.user.split('-').pop()}`, t.prompt, t.name,
+            JSON.stringify({ name: t.name, colors: t.colors, angle: t.angle, accent: t.accent, overlayOpacity: t.overlay }),
+            t.applies,
+          ]
+        );
+      }
+    }
+
     // Staging-only demo seed: set up the Crypto Wordle paid-hint flow for the
     // viewer — top up MATCH so hints are affordable, drop them into a claimed,
     // unfinished cryptowordle attempt (lobby shows "In progress · resume"), and
@@ -2871,6 +3182,41 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: a finished daily win that already earned MATCH and
+    // anchored its earn on-chain, so the "+N MATCH earned" Solved! receipt and
+    // its on-chain badge are demonstrable. Idempotent, no-op in production.
+    if (IS_STAGING && req.query.demo === 'earn') {
+      await pool.query(
+        `INSERT INTO tilematch_tokens (user_id, username, balance)
+         VALUES ($1, $2, 10)
+         ON CONFLICT (user_id) DO UPDATE
+           SET balance = GREATEST(tilematch_tokens.balance, 10), updated_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+         VALUES ($1, $2, 'sudoku', (now() AT TIME ZONE 'utc')::date, 960, 30, 95, now())
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET score = 960, steps = 30, time_secs = 95, finished_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+      const { rows: dEarn } = await pool.query(
+        `SELECT 1 FROM match_ledger_events
+          WHERE user_id = $1 AND kind = 'earn' AND game_id = 'sudoku'
+            AND attempt_date = (now() AT TIME ZONE 'utc')::date LIMIT 1`,
+        [req.user.id]
+      );
+      if (dEarn.length === 0) {
+        await pool.query(
+          `INSERT INTO match_ledger_events
+             (user_id, kind, game_id, attempt_date, amount, balance_after, chain_hash, anchor_status, anchor_tx_hash)
+           VALUES ($1, 'earn', 'sudoku', (now() AT TIME ZONE 'utc')::date, 10, 10, 'deadbeefearn', 'anchored', '0xstagingmatchearn')`,
+          [req.user.id]
+        );
+      }
+    }
+
     // Staging-only demo seed: create a Bounce game attempt with active power-ups
     // so the power-up UI and mechanics are demonstrable on a fresh staging DB.
     if (IS_STAGING && req.query.demo === 'powerup') {
@@ -2882,6 +3228,34 @@ app.get('/api/daily', async (req, res) => {
            SET best_score = GREATEST(breakout_scores.best_score, EXCLUDED.best_score),
                best_level = GREATEST(breakout_scores.best_level, EXCLUDED.best_level)`,
         [req.user.id, req.user.username || 'staging-demo-user']
+      );
+    }
+
+    // Staging-only demo seed: create a Diamond Rush attempt with power-up gems
+    // on the board so the power-up earning and usage UI is demonstrable.
+    // Claimed but unfinished, with a board containing power-up gems at specific positions.
+    if (IS_STAGING && req.query.demo === 'powerups') {
+      const demoBoard = new Array(64).fill(null);
+      for (let i = 0; i < 64; i++) demoBoard[i] = Math.floor(Math.random() * 6);
+      demoBoard[10] = 6; demoBoard[25] = 7; demoBoard[40] = 8;
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'diamondrush', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL,
+               score = NULL,
+               time_secs = NULL,
+               steps = EXCLUDED.steps,
+               elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          3,
+          45,
+          JSON.stringify({ grid: demoBoard, powerUps: { hint: 1, shuffle: 1, extraTime: 0 } }),
+        ]
       );
     }
 
@@ -3013,39 +3387,45 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
-    // Credit puzzle reward to ledger (idempotent via unique event constraint).
-    // Only for daily-category games (classic/idle/pvp skip this; the score guard
-    // below handles the rest). Credit amount = score * REWARD_PER_POINT_WEI.
-    let rewardWei = '0';
+    // Credit the daily-win MATCH reward (the single in-app currency) idempotently
+    // via the unique (user, game, day) 'earn' ledger row. Only when a NEW row is
+    // created do we credit tilematch_tokens, so a double-finish never
+    // double-credits. The earn is anchored on-chain client-side via matchAnchor.
+    let matchEarned = 0;
+    let matchReceipt = null;
     if (score && score > 0) {
       try {
-        const amountWei = (BigInt(score) * REWARD_PER_POINT_WEI).toString();
         const today = new Date().toISOString().slice(0, 10);
+        const earned = matchEarnedForScore(score);
         const { rows: evtRows } = await pool.query(
-          `INSERT INTO token_reward_events
-             (user_id, game_id, attempt_date, amount_wei)
-           VALUES ($1, $2, $3::date, $4)
-           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
-           RETURNING amount_wei`,
-          [req.user.id, gameId, today, amountWei]
+          `INSERT INTO match_ledger_events (user_id, kind, game_id, attempt_date, amount, anchor_status)
+           VALUES ($1, 'earn', $2, $3::date, $4, 'pending')
+           ON CONFLICT (user_id, game_id, attempt_date) WHERE kind = 'earn' DO NOTHING
+           RETURNING id`,
+          [req.user.id, gameId, today, earned]
         );
         if (evtRows.length > 0) {
-          // New event — credit the ledger
-          await pool.query(
-            `INSERT INTO token_rewards_ledger
-               (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
-             VALUES ($1, $2, $2, 0)
-             ON CONFLICT (user_id) DO UPDATE
-               SET pending_wei         = token_rewards_ledger.pending_wei + EXCLUDED.pending_wei,
-                   lifetime_earned_wei = token_rewards_ledger.lifetime_earned_wei + EXCLUDED.lifetime_earned_wei,
-                   updated_at          = now()`,
-            [req.user.id, amountWei]
+          const eventId = evtRows[0].id;
+          const { rows: balRows } = await pool.query(
+            `INSERT INTO tilematch_tokens (user_id, username, balance)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id) DO UPDATE SET
+               balance = tilematch_tokens.balance + $3, updated_at = now()
+             RETURNING balance`,
+            [req.user.id, req.user.username || null, earned]
           );
-          rewardWei = amountWei;
+          const balanceAfter = balRows[0].balance;
+          const chainHash = matchChainHash({ userId: req.user.id, kind: 'earn', gameId, attemptDate: today, amount: earned, eventId });
+          await pool.query(
+            `UPDATE match_ledger_events SET chain_hash = $2, balance_after = $3 WHERE id = $1`,
+            [eventId, chainHash, balanceAfter]
+          );
+          matchEarned = earned;
+          matchReceipt = { eventId, chainHash, amount: earned, anchorStatus: 'pending', balanceAfter };
         }
       } catch (rewardErr) {
-        // Non-fatal: reward crediting is best-effort; the puzzle result still records.
-        console.error('[daily] reward credit failed:', rewardErr.message);
+        // Non-fatal: MATCH crediting is best-effort; the puzzle result still records.
+        console.error('[daily] MATCH credit failed:', rewardErr.message);
       }
     }
 
@@ -3231,7 +3611,7 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       }
     }
 
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, rewardWei, dapp: dappSession, newAchievements });
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, matchEarned, matchReceipt, dapp: dappSession, newAchievements });
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
@@ -3356,6 +3736,188 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
   }
 });
 
+// ---- AI Background Themes API -------------------------------------------
+// POST /api/themes/generate — turn a free-text prompt into a validated theme
+// via the platform Claude proxy. Text-only proxy → we ask for a tiny JSON
+// object describing a gradient. Does NOT persist. Degrades gracefully when the
+// proxy is absent (staging/standalone → 503) and never hard-fails on bad model
+// output (one stricter retry, then a deterministic prompt-hash fallback).
+const THEME_SYSTEM = [
+  'You design color themes for a puzzle game background.',
+  'Given a short mood/scene prompt, respond with ONLY a JSON object — no prose, no markdown, no code fences.',
+  'Schema: {"name": string (<=40 chars), "colors": [2-4 hex strings like "#1a2b3c"], "angle": integer 0-360, "accent": hex string, "overlayOpacity": number 0.35-0.55}.',
+  'Pick colors that evoke the prompt and form a pleasing gradient from darker edges to a richer center; the UI overlays a dark scrim, so favor deep, saturated tones over pale ones. "accent" is a vivid highlight color used for buttons.',
+].join(' ');
+
+async function callThemeProxy(userPrompt, userToken, strict) {
+  const sys = strict
+    ? THEME_SYSTEM + ' IMPORTANT: your previous answer was invalid. Output ONLY the raw JSON object, nothing else, with exactly the keys named.'
+    : THEME_SYSTEM;
+  const resp = await fetch(`${LLM_PROXY_URL}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'x-usernode-app-token': LLM_PROXY_TOKEN,
+      'x-usernode-user-token': userToken || '',
+    },
+    body: JSON.stringify({
+      model: THEME_MODEL,
+      max_tokens: 300,
+      system: sys,
+      messages: [{ role: 'user', content: `Prompt: ${userPrompt}` }],
+    }),
+  });
+  return resp;
+}
+
+// Pull the first JSON object out of a model text response (tolerant of stray
+// prose or accidental code fences), then sanitize it. Returns null on failure.
+function parseThemeFromText(text) {
+  if (typeof text !== 'string') return null;
+  let s = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) return null;
+  let obj;
+  try { obj = JSON.parse(s.slice(start, end + 1)); } catch { return null; }
+  return sanitizeThemeParams(obj);
+}
+
+app.post('/api/themes/generate', async (req, res) => {
+  const prompt = String((req.body && req.body.prompt) || '').trim().slice(0, THEME_PROMPT_MAX);
+  if (!prompt) return res.status(400).json({ error: 'A prompt is required' });
+  if (!LLM_ENABLED) {
+    return res.status(503).json({
+      code: 'llm_unavailable',
+      error: 'AI theme generation is unavailable in this environment — try a gallery theme instead.',
+    });
+  }
+  const userToken = req.headers['x-usernode-token'];
+  try {
+    let resp = await callThemeProxy(prompt, userToken, false);
+    // Forward consent/quota errors so the client can react (request access / wait).
+    if (resp.status === 403) {
+      return res.status(403).json({ code: 'grant_required', error: 'AI access not granted for this app yet.' });
+    }
+    if (resp.status === 429) {
+      let code = 'budget_exceeded';
+      try { const j = await resp.json(); if (j && j.code) code = j.code; } catch {}
+      return res.status(429).json({ code, error: 'Daily AI limit reached — resets at midnight UTC.' });
+    }
+    let theme = null;
+    if (resp.ok) {
+      try {
+        const data = await resp.json();
+        const text = Array.isArray(data.content) ? data.content.map((b) => b && b.text ? b.text : '').join('') : '';
+        theme = parseThemeFromText(text);
+      } catch {}
+    }
+    // One stricter retry if the first answer didn't validate.
+    if (!theme) {
+      try {
+        const r2 = await callThemeProxy(prompt, userToken, true);
+        if (r2.ok) {
+          const d2 = await r2.json();
+          const t2 = Array.isArray(d2.content) ? d2.content.map((b) => b && b.text ? b.text : '').join('') : '';
+          theme = parseThemeFromText(t2);
+        }
+      } catch {}
+    }
+    // Never hard-fail: deterministic palette derived from the prompt.
+    if (!theme) theme = fallbackThemeFromPrompt(prompt);
+    res.json({ theme, prompt });
+  } catch (err) {
+    console.error('[themes] generate failed:', err.message);
+    // Even on a transport error, give the player something usable.
+    res.json({ theme: fallbackThemeFromPrompt(prompt), prompt, fallback: true });
+  }
+});
+
+// GET /api/themes — shared gallery. ?sort=popular ranks by apply_count.
+app.get('/api/themes', async (req, res) => {
+  const popular = req.query.sort === 'popular';
+  const order = popular
+    ? 'apply_count DESC, created_at DESC'
+    : 'created_at DESC';
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, creator_user_id, creator_username, prompt, name, params, apply_count, created_at
+         FROM bg_themes
+        ORDER BY ${order}
+        LIMIT 60`
+    );
+    const themes = rows.map((r) => ({
+      id: Number(r.id),
+      name: r.name,
+      prompt: r.prompt,
+      params: sanitizeThemeParams(r.params) || fallbackThemeFromPrompt(r.prompt || r.name),
+      creatorUsername: r.creator_username || 'anon',
+      isMine: r.creator_user_id === req.user.id,
+      applyCount: r.apply_count,
+      createdAt: r.created_at,
+    }));
+    res.json({ themes, total: themes.length });
+  } catch (err) {
+    console.error('[themes] list failed:', err.message);
+    res.status(500).json({ error: 'Failed to load themes' });
+  }
+});
+
+// POST /api/themes — publish a theme to the shared gallery. Re-validates params
+// server-side (never trust the client) and keys the row to req.user.
+app.post('/api/themes', async (req, res) => {
+  const body = req.body || {};
+  const params = sanitizeThemeParams(body.params);
+  if (!params) return res.status(400).json({ error: 'Invalid theme parameters' });
+  const prompt = String(body.prompt || '').trim().slice(0, THEME_PROMPT_MAX);
+  const name = (typeof body.name === 'string' && body.name.trim()) ? body.name.trim().slice(0, 40) : params.name;
+  params.name = name;
+  try {
+    await ensureUser(req.user.id, req.user.username, req.user.usernode_pubkey);
+    const { rows } = await pool.query(
+      `INSERT INTO bg_themes (creator_user_id, creator_username, prompt, name, params)
+       VALUES ($1, $2, $3, $4, $5::jsonb)
+       RETURNING id, creator_username, prompt, name, params, apply_count, created_at`,
+      [req.user.id, req.user.username || 'anon', prompt, name, JSON.stringify(params)]
+    );
+    const r = rows[0];
+    res.json({
+      theme: {
+        id: Number(r.id),
+        name: r.name,
+        prompt: r.prompt,
+        params: sanitizeThemeParams(r.params),
+        creatorUsername: r.creator_username || 'anon',
+        isMine: true,
+        applyCount: r.apply_count,
+        createdAt: r.created_at,
+      },
+    });
+  } catch (err) {
+    console.error('[themes] save failed:', err.message);
+    res.status(500).json({ error: 'Failed to save theme' });
+  }
+});
+
+// POST /api/themes/:id/apply — bump the popularity counter. Best-effort: the
+// client applies locally regardless, so a failure here is non-fatal.
+app.post('/api/themes/:id/apply', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad theme id' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE bg_themes SET apply_count = apply_count + 1 WHERE id = $1 RETURNING apply_count`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Theme not found' });
+    res.json({ applyCount: rows[0].apply_count });
+  } catch (err) {
+    console.error('[themes] apply failed:', err.message);
+    res.status(500).json({ error: 'Failed to record apply' });
+  }
+});
+
 // ---- Mancala multiplayer API --------------------------------------------
 
 // Create a new room. Retries up to 3 times on ID collision.
@@ -3463,6 +4025,177 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
   } catch (err) {
     console.error('[mancala] move failed:', err.message);
     res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// ---- Classic Games generic online rooms (classic_rooms) ------------------
+// Open room-code multiplayer used by the Game Menu's "Online Multiplayer".
+// Currently wired for Chutes & Ladders; the table/state is generic so other
+// classic games can slot in later. Any authenticated user can join by code.
+
+// Chutes & Ladders board map (mirrors CNL_LADDERS/CNL_CHUTES in public/app.jsx).
+const CNL_LADDERS_SRV = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+const CNL_CHUTES_SRV  = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+const CNL_JUMPS_SRV   = Object.assign({}, CNL_LADDERS_SRV, CNL_CHUTES_SRV);
+
+function shapeClassicRoom(r) {
+  return {
+    id: r.id,
+    gameId: r.game_id,
+    player1Id: r.player1_id,
+    player2Id: r.player2_id,
+    player1Name: r.player1_name,
+    player2Name: r.player2_name,
+    state: r.state || {},
+    moveSeq: r.move_seq,
+    status: r.status,
+    winner: r.winner,
+  };
+}
+
+// Apply a single Chutes & Ladders roll for `player` (1|2) to the room state.
+// Returns the next state plus terminal info. Server owns the dice (anti-cheat).
+function cnlApplyRoll(state, player) {
+  const die = crypto.randomInt(1, 7); // 1..6
+  const fromKey = player === 1 ? 'p1Pos' : 'p2Pos';
+  const from = state[fromKey] || 0;
+  const next = { ...state, die, rolls: (state.rolls || 0) + 1, lastJump: null };
+  let landed = from;
+  if (from + die <= 100) {
+    landed = from + die;
+    if (CNL_JUMPS_SRV[landed] !== undefined) {
+      next.lastJump = { from: landed, to: CNL_JUMPS_SRV[landed] };
+      landed = CNL_JUMPS_SRV[landed];
+    }
+  }
+  next[fromKey] = landed;
+  const gameOver = landed === 100;
+  next.currentPlayer = gameOver ? player : (player === 1 ? 2 : 1);
+  return { state: next, gameOver, winner: gameOver ? String(player) : null };
+}
+
+// Create an open room. Body: nothing needed; gameId is the path param.
+app.post('/api/classic/:gameId/rooms', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const initState = gameId === 'chutes-ladders'
+    ? { p1Pos: 0, p2Pos: 0, currentPlayer: 1, die: null, rolls: 0 }
+    : {};
+  let roomId = generateRoomId();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state)
+         VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING *`,
+        [roomId, gameId, req.user.id, req.user.username || null, JSON.stringify(initState)]
+      );
+      return res.json(shapeClassicRoom(rows[0]));
+    } catch (err) {
+      if (err.code === '23505') { roomId = generateRoomId(); continue; }
+      console.error('[classic] create room failed:', err.message);
+      return res.status(500).json({ error: 'Failed to create room' });
+    }
+  }
+  res.status(500).json({ error: 'Failed to generate unique room ID' });
+});
+
+// Join an existing waiting room as player 2.
+app.post('/api/classic/:gameId/rooms/:roomId/join', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE classic_rooms
+         SET player2_id = $1, player2_name = $2, status = 'active', last_move_at = now()
+       WHERE id = $3 AND game_id = $4 AND status = 'waiting' AND player2_id IS NULL
+         AND player1_id != $1
+       RETURNING *`,
+      [req.user.id, req.user.username || null, roomId, gameId]
+    );
+    if (rows.length === 0) {
+      const existing = await pool.query('SELECT id, status, player1_id FROM classic_rooms WHERE id = $1', [roomId]);
+      if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+      if (existing.rows[0].player1_id === req.user.id) {
+        return res.status(409).json({ error: 'You created this room — share the code with a friend' });
+      }
+      return res.status(409).json({ error: 'Room is already full or finished' });
+    }
+    res.json(shapeClassicRoom(rows[0]));
+  } catch (err) {
+    console.error('[classic] join room failed:', err.message);
+    res.status(500).json({ error: 'Failed to join room' });
+  }
+});
+
+// Poll room state.
+app.get('/api/classic/:gameId/rooms/:roomId', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    res.json(shapeClassicRoom(rows[0]));
+  } catch (err) {
+    console.error('[classic] get room failed:', err.message);
+    res.status(500).json({ error: 'Failed to get room' });
+  }
+});
+
+// Apply a move. For Chutes & Ladders the only move is { type: 'roll' }; the
+// server rolls the die so neither client can cheat. move_seq guards duplicates.
+app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  const { moveSeq } = req.body || {};
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  if (gameId !== 'chutes-ladders') return res.status(400).json({ error: 'Online moves not supported for this game' });
+  if (typeof moveSeq !== 'number') return res.status(400).json({ error: 'moveSeq is required' });
+  try {
+    const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    const r = rows[0];
+    if (r.status !== 'active') return res.status(409).json({ error: 'Game is not active' });
+    if (r.move_seq !== moveSeq - 1) return res.status(409).json({ error: 'Stale move_seq', serverMoveSeq: r.move_seq });
+
+    const player = (r.state && r.state.currentPlayer) || 1;
+    if (player === 1 && req.user.id !== r.player1_id) return res.status(403).json({ error: 'Not your turn' });
+    if (player === 2 && req.user.id !== r.player2_id) return res.status(403).json({ error: 'Not your turn' });
+
+    const { state: newState, gameOver, winner } = cnlApplyRoll(r.state || {}, player);
+    const newStatus = gameOver ? 'finished' : 'active';
+
+    const { rows: updated } = await pool.query(
+      `UPDATE classic_rooms
+         SET state = $1::jsonb, status = $2, winner = $3, move_seq = $4, last_move_at = now()
+       WHERE id = $5 AND move_seq = $6
+       RETURNING *`,
+      [JSON.stringify(newState), newStatus, winner, moveSeq, roomId, moveSeq - 1]
+    );
+    if (updated.length === 0) return res.status(409).json({ error: 'Concurrent update conflict' });
+    res.json(shapeClassicRoom(updated[0]));
+  } catch (err) {
+    console.error('[classic] move failed:', err.message);
+    res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// Mark a room finished early (forfeit / opponent left). Idempotent.
+app.post('/api/classic/:gameId/rooms/:roomId/finish', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  const { winner } = req.body || {};
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE classic_rooms
+         SET status = 'finished', winner = COALESCE(winner, $3), last_move_at = now()
+       WHERE id = $1 AND game_id = $2
+       RETURNING *`,
+      [roomId, gameId, winner != null ? String(winner) : null]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    res.json(shapeClassicRoom(rows[0]));
+  } catch (err) {
+    console.error('[classic] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish room' });
   }
 });
 
@@ -5535,8 +6268,9 @@ app.post('/api/wallet/link', async (req, res) => {
 // streak freezes, and recent activity (rewards earned + tips sent/received + claims).
 app.get('/api/wallet', async (req, res) => {
   try {
-    // Staging demo seed: insert a fake wallet address and rewards for the current
-    // viewer so the Wallet screen is demonstrable on a fresh staging DB.
+    // Staging demo seed: a MATCH balance + a handful of ledger movements for the
+    // current viewer so the (single-currency) Wallet screen is demonstrable on a
+    // fresh staging DB. Obviously-fake, idempotent, no-op in production.
     if (IS_STAGING && req.query.demo === '1') {
       const fakeAddr = '0xDEAD000000000000000000000000000000009999';
       await pool.query(
@@ -5544,58 +6278,75 @@ app.get('/api/wallet', async (req, res) => {
          ON CONFLICT (user_id) DO NOTHING`,
         [req.user.id, fakeAddr]
       );
-      await pool.query(
-        `INSERT INTO token_rewards_ledger
-           (user_id, pending_wei, lifetime_earned_wei, lifetime_claimed_wei)
-         VALUES ($1, '3000000000000000000', '5000000000000000000', '2000000000000000000')
-         ON CONFLICT (user_id) DO NOTHING`,
-        [req.user.id]
-      );
-      // DApp Mode: seed a verified ownership proof for the viewer so the
-      // "Verified identity" badge renders on the Wallet screen.
+      // DApp Mode: seed a verified ownership proof so the "Verified identity"
+      // badge renders.
       await pool.query(
         `INSERT INTO wallet_ownership_proofs (user_id, usernode_pubkey, wallet_addr, nonce, signature)
          VALUES ($1, $2, $3, 'staging-demo-nonce', '0xstagingdemosignature')
          ON CONFLICT (user_id) DO NOTHING`,
         [req.user.id, req.user.usernode_pubkey || 'ut1stagingdemo', fakeAddr]
       );
+      // MATCH balance + a banked freeze.
+      await pool.query(
+        `INSERT INTO tilematch_tokens (user_id, username, balance)
+         VALUES ($1, $2, 120)
+         ON CONFLICT (user_id) DO UPDATE SET balance = GREATEST(tilematch_tokens.balance, 120)`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+      await pool.query(
+        `INSERT INTO user_stats_snapshot (user_id, streak_freezes)
+         VALUES ($1, 1) ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id]
+      );
+      // A few demo ledger rows (anchored earn, hint spend, received tip, migration).
+      const { rows: existing } = await pool.query(
+        `SELECT 1 FROM match_ledger_events WHERE user_id = $1 AND anchor_tx_hash = '0xstagingmatch01' LIMIT 1`,
+        [req.user.id]
+      );
+      if (existing.length === 0) {
+        await pool.query(
+          `INSERT INTO match_ledger_events
+             (user_id, kind, game_id, attempt_date, amount, balance_after, counterpart, chain_hash, anchor_status, anchor_tx_hash)
+           VALUES
+             ($1, 'earn', 'sudoku', (now() AT TIME ZONE 'utc')::date, 10, 120, NULL, 'deadbeefearn', 'anchored', '0xstagingmatch01'),
+             ($1, 'spend_hint', 'cryptowordle', (now() AT TIME ZONE 'utc')::date, -2, 118, NULL, 'deadbeefhint', 'mock', NULL),
+             ($1, 'tip_received', NULL, NULL, 5, 125, 'Staging demo Ada', 'deadbeeftip', 'anchored', '0xstagingmatch02'),
+             ($1, 'migration', NULL, NULL, 30, 150, NULL, NULL, 'migration', NULL)`,
+          [req.user.id]
+        );
+      }
     }
 
-    // Wallet address
+    // Optional linked wallet address (for the identity card only — MATCH itself
+    // is off-chain and needs no linked wallet).
     const { rows: wRows } = await pool.query(
       `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
       [req.user.id]
     );
     const addr = wRows.length > 0 ? wRows[0].wallet_addr : null;
 
-    // On-chain balance (mock in staging/no-contract)
-    let balanceWei = '0';
-    let mock = true;
-    if (addr) {
-      if (IS_STAGING || !utgoProvider || !UTGO_CONTRACT_ADDRESS) {
-        balanceWei = ethers.parseUnits('10', 18).toString();
-        mock = true;
-      } else {
-        try {
-          const token = new ethers.Contract(UTGO_CONTRACT_ADDRESS, UTGO_ABI_BALANCE, utgoProvider);
-          balanceWei = (await token.balanceOf(addr)).toString();
-          mock = false;
-        } catch (e) {
-          console.error('[wallet] balance check failed:', e.message);
-          balanceWei = '0';
-        }
-      }
-    }
-
-    // Pending rewards ledger
-    const { rows: lRows } = await pool.query(
-      `SELECT pending_wei, lifetime_earned_wei, lifetime_claimed_wei
-         FROM token_rewards_ledger WHERE user_id = $1`,
+    // MATCH balance (the single currency).
+    await pool.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0) ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows: bRows } = await pool.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1`,
       [req.user.id]
     );
-    const pendingWei          = lRows.length > 0 ? lRows[0].pending_wei.toString()          : '0';
-    const lifetimeEarnedWei   = lRows.length > 0 ? lRows[0].lifetime_earned_wei.toString()  : '0';
-    const lifetimeClaimedWei  = lRows.length > 0 ? lRows[0].lifetime_claimed_wei.toString() : '0';
+    const balance = bRows.length ? bRows[0].balance : 0;
+
+    // Lifetime earned / spent derived from the ledger.
+    const { rows: lifeRows } = await pool.query(
+      `SELECT
+         COALESCE(SUM(amount) FILTER (WHERE amount > 0), 0)::int AS earned,
+         COALESCE(-SUM(amount) FILTER (WHERE amount < 0), 0)::int AS spent
+       FROM match_ledger_events WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const lifetimeEarned = lifeRows.length ? lifeRows[0].earned : 0;
+    const lifetimeSpent  = lifeRows.length ? lifeRows[0].spent  : 0;
 
     // Streak freezes
     const { rows: sRows } = await pool.query(
@@ -5611,34 +6362,21 @@ app.get('/api/wallet', async (req, res) => {
     );
     const identityVerified = proofRows.length > 0;
 
-    // Recent activity: rewards + tips (sent/received) + claims — last 10 events
+    // Recent activity from the unified MATCH ledger — last 10 events.
     const { rows: evtRows } = await pool.query(
-      `(SELECT 'reward' AS kind, amount_wei::text AS amount_wei,
-               NULL AS counterpart, created_at
-          FROM token_reward_events WHERE user_id = $1
-      )
-      UNION ALL
-      (SELECT 'tip_sent' AS kind, amount_wei::text AS amount_wei,
-               to_user_id AS counterpart, created_at
-          FROM token_tips WHERE from_user_id = $1 AND status = 'confirmed'
-      )
-      UNION ALL
-      (SELECT 'tip_received' AS kind, amount_wei::text AS amount_wei,
-               from_user_id AS counterpart, created_at
-          FROM token_tips WHERE to_user_id = $1 AND status = 'confirmed'
-      )
-      ORDER BY created_at DESC LIMIT 10`,
+      `SELECT kind, amount, counterpart, anchor_status, anchor_tx_hash, chain_hash, created_at
+         FROM match_ledger_events WHERE user_id = $1
+        ORDER BY created_at DESC LIMIT 10`,
       [req.user.id]
     );
 
     res.json({
       addr,
-      balanceWei,
-      mock,
-      pendingWei,
-      lifetimeEarnedWei,
-      lifetimeClaimedWei,
+      balance,
+      lifetimeEarned,
+      lifetimeSpent,
       streakFreezes,
+      streakFreezePrice: STREAK_FREEZE_PRICE_MATCH,
       identityVerified,
       recent: evtRows,
     });
@@ -5668,208 +6406,168 @@ app.get('/api/wallet/balance', async (req, res) => {
   }
 });
 
-// POST /api/wallet/tip/prepare { toUserId, amount }
-// Look up recipient's wallet address, build transfer calldata, return to client.
-// The client sends the transaction, then calls /tip/confirm.
-app.post('/api/wallet/tip/prepare', async (req, res) => {
-  const { toUserId, amount } = req.body;
-  if (!toUserId || typeof amount !== 'string') {
-    return res.status(400).json({ error: 'toUserId and amount (wei string) required' });
-  }
-  if (toUserId === req.user.id) {
-    return res.status(400).json({ error: 'Cannot tip yourself' });
-  }
-  let amountWei;
-  try { amountWei = BigInt(amount); } catch { return res.status(400).json({ error: 'Invalid amount' }); }
-  if (amountWei <= 0n) return res.status(400).json({ error: 'Amount must be positive' });
+// LEGACY tip/prepare + tip/confirm (on-chain $UTGO transfer) removed — tips now
+// move MATCH via POST /api/wallet/tip (defined below).
 
-  try {
-    const { rows } = await pool.query(
-      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
-      [toUserId]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Recipient has not linked a wallet' });
-    }
-    const toAddr = rows[0].wallet_addr;
-
-    let calldata = null;
-    if (UTGO_CONTRACT_ADDRESS && TRANSFER_IFACE) {
-      calldata = TRANSFER_IFACE.encodeFunctionData('transfer', [toAddr, amountWei]);
-    }
-
-    res.json({
-      toAddr,
-      calldata,
-      contractAddr: UTGO_CONTRACT_ADDRESS || null,
-    });
-  } catch (err) {
-    console.error('[wallet] tip/prepare failed:', err.message);
-    res.status(500).json({ error: 'Failed to prepare tip' });
-  }
+// RETIRED: $UTGO rewards are folded into MATCH (the single in-app currency),
+// which is earned and spent in-app with no claim step. These endpoints return
+// 410 Gone so any stale client falls back gracefully.
+app.post('/api/wallet/rewards/claim', (_req, res) => {
+  res.status(410).json({ error: 'Rewards are now MATCH — claiming has been retired.' });
 });
-
-// POST /api/wallet/tip/confirm { toUserId, amount, txHash }
-// Record a completed tip (client reports after sendTransaction).
-app.post('/api/wallet/tip/confirm', async (req, res) => {
-  const { toUserId, amount, txHash } = req.body;
-  if (!toUserId || typeof amount !== 'string' || !txHash) {
-    return res.status(400).json({ error: 'toUserId, amount, txHash required' });
-  }
-  if (toUserId === req.user.id) {
-    return res.status(400).json({ error: 'Cannot tip yourself' });
-  }
-  let amountWei;
-  try { amountWei = BigInt(amount); } catch { return res.status(400).json({ error: 'Invalid amount' }); }
-  if (amountWei <= 0n) return res.status(400).json({ error: 'Amount must be positive' });
-
-  try {
-    const [fromWallet, toWallet] = await Promise.all([
-      pool.query(`SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [req.user.id]),
-      pool.query(`SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [toUserId]),
-    ]);
-    const fromAddr = fromWallet.rows.length > 0 ? fromWallet.rows[0].wallet_addr : null;
-    const toAddr   = toWallet.rows.length > 0   ? toWallet.rows[0].wallet_addr   : null;
-
-    await pool.query(
-      `INSERT INTO token_tips
-         (from_user_id, to_user_id, from_addr, to_addr, amount_wei, tx_hash, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')`,
-      [req.user.id, toUserId, fromAddr, toAddr, amount, txHash]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('[wallet] tip/confirm failed:', err.message);
-    res.status(500).json({ error: 'Failed to confirm tip' });
-  }
-});
-
-// POST /api/wallet/rewards/claim
-// Validator signs a claimRewards call; client sends via bridge.
-// In staging/no-contract: immediately marks rewards as claimed and returns mock.
-app.post('/api/wallet/rewards/claim', async (req, res) => {
-  try {
-    // Get user's wallet address
-    const { rows: wRows } = await pool.query(
-      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
-      [req.user.id]
-    );
-    if (wRows.length === 0) {
-      return res.status(400).json({ error: 'No wallet linked' });
-    }
-    const addr = wRows[0].wallet_addr;
-
-    // Atomically read and zero pending_wei
-    const { rows: lRows } = await pool.query(
-      `UPDATE token_rewards_ledger
-          SET pending_wei = 0, updated_at = now()
-        WHERE user_id = $1 AND pending_wei > 0
-        RETURNING pending_wei`,
-      [req.user.id]
-    );
-    // If no row was updated, check if there's just nothing pending
-    if (lRows.length === 0) {
-      const { rows: check } = await pool.query(
-        `SELECT pending_wei FROM token_rewards_ledger WHERE user_id = $1`,
-        [req.user.id]
-      );
-      if (check.length === 0 || check[0].pending_wei === '0' || check[0].pending_wei === 0) {
-        return res.status(409).json({ error: 'No pending rewards to claim' });
-      }
-    }
-
-    // pending_wei was already zeroed above — reconstruct the claimed amount
-    // Note: the UPDATE returns the OLD pending_wei only on Postgres 12+
-    // We re-read lifetime for confirmation display
-    const { rows: afterRows } = await pool.query(
-      `UPDATE token_rewards_ledger
-          SET lifetime_claimed_wei = lifetime_claimed_wei + $2, updated_at = now()
-        WHERE user_id = $1
-        RETURNING lifetime_claimed_wei, pending_wei`,
-      [req.user.id, lRows.length > 0 ? lRows[0].pending_wei.toString() : '0']
-    );
-
-    const amountWei = lRows.length > 0 ? lRows[0].pending_wei.toString() : '0';
-
-    // Staging / no contract: mock claim
-    if (IS_STAGING || !validatorWallet || !UTGO_CONTRACT_ADDRESS) {
-      return res.json({
-        claimCalldata: null,
-        contractAddr: null,
-        amountWei,
-        mock: true,
-        txHash: '0xstagingclaim',
-      });
-    }
-
-    // Production: validator-signed claim calldata
-    try {
-      const nonce = Date.now();
-      const innerHash = ethers.keccak256(
-        ethers.solidityPacked(
-          ['address', 'uint256', 'uint256'],
-          [addr, BigInt(amountWei), BigInt(nonce)]
-        )
-      );
-      const sig = await validatorWallet.signMessage(ethers.getBytes(innerHash));
-      const claimCalldata = CLAIM_REWARDS_IFACE.encodeFunctionData(
-        'claimRewards',
-        [addr, BigInt(amountWei), BigInt(nonce), sig]
-      );
-      res.json({ claimCalldata, contractAddr: UTGO_CONTRACT_ADDRESS, amountWei, mock: false });
-    } catch (sigErr) {
-      console.error('[wallet] claim signing failed:', sigErr.message);
-      res.status(500).json({ error: 'Failed to sign claim' });
-    }
-  } catch (err) {
-    console.error('[wallet] claim failed:', err.message);
-    res.status(500).json({ error: 'Failed to claim rewards' });
-  }
-});
-
-// POST /api/wallet/rewards/claim/confirm { txHash }
-// Client reports successful on-chain claim — already settled in /claim, so this is a no-op
-// record for auditability. In production you'd verify via RPC here.
-app.post('/api/wallet/rewards/claim/confirm', async (req, res) => {
-  res.json({ ok: true });
+app.post('/api/wallet/rewards/claim/confirm', (_req, res) => {
+  res.status(410).json({ error: 'Rewards are now MATCH — claiming has been retired.' });
 });
 
 // POST /api/wallet/spend/streak-freeze
-// Debit STREAK_FREEZE_PRICE_WEI from pending rewards and add one freeze.
+// Debit STREAK_FREEZE_PRICE_MATCH from the MATCH balance and add one freeze.
+// Atomic (SERIALIZABLE + FOR UPDATE), mirroring the hint-spend pattern, and
+// records a 'spend_freeze' ledger row that the client anchors on-chain.
 app.post('/api/wallet/spend/streak-freeze', async (req, res) => {
+  const cost = STREAK_FREEZE_PRICE_MATCH;
+  const client = await pool.connect();
   try {
-    const priceWei = STREAK_FREEZE_PRICE_WEI;
-
-    const { rows } = await pool.query(
-      `UPDATE token_rewards_ledger
-          SET pending_wei = pending_wei - $2, updated_at = now()
-        WHERE user_id = $1 AND pending_wei >= $2
-        RETURNING pending_wei`,
-      [req.user.id, priceWei.toString()]
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+    await client.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0) ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
     );
-    if (rows.length === 0) {
-      return res.status(409).json({ error: 'Insufficient pending rewards' });
-    }
-
-    await pool.query(
-      `UPDATE user_stats_snapshot
-          SET streak_freezes = streak_freezes + 1, updated_at = now()
-        WHERE user_id = $1`,
+    const { rows: balRows } = await client.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1 FOR UPDATE`,
       [req.user.id]
     );
-
-    const { rows: sRows } = await pool.query(
+    const balance = balRows.length ? balRows[0].balance : 0;
+    if (balance < cost) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ code: 'insufficient_funds', error: 'Insufficient MATCH', balance });
+    }
+    const { rows: newBal } = await client.query(
+      `UPDATE tilematch_tokens SET balance = balance - $2, updated_at = now()
+        WHERE user_id = $1 RETURNING balance`,
+      [req.user.id, cost]
+    );
+    const balanceAfter = newBal[0].balance;
+    await client.query(
+      `INSERT INTO user_stats_snapshot (user_id, streak_freezes)
+       VALUES ($1, 1)
+       ON CONFLICT (user_id) DO UPDATE SET streak_freezes = user_stats_snapshot.streak_freezes + 1, updated_at = now()`,
+      [req.user.id]
+    );
+    const { rows: evt } = await client.query(
+      `INSERT INTO match_ledger_events (user_id, kind, amount, balance_after, anchor_status)
+       VALUES ($1, 'spend_freeze', $2, $3, 'pending') RETURNING id`,
+      [req.user.id, -cost, balanceAfter]
+    );
+    const eventId = evt[0].id;
+    const chainHash = matchChainHash({ userId: req.user.id, kind: 'spend_freeze', amount: -cost, eventId });
+    await client.query(`UPDATE match_ledger_events SET chain_hash = $2 WHERE id = $1`, [eventId, chainHash]);
+    const { rows: sRows } = await client.query(
       `SELECT streak_freezes FROM user_stats_snapshot WHERE user_id = $1`,
       [req.user.id]
     );
+    await client.query('COMMIT');
     res.json({
       ok: true,
       streakFreezes: sRows.length > 0 ? sRows[0].streak_freezes : 1,
-      newPendingWei: rows[0].pending_wei.toString(),
+      balance: balanceAfter,
+      receipt: { eventId, chainHash, amount: -cost, anchorStatus: 'pending', balanceAfter },
     });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
     console.error('[wallet] streak-freeze failed:', err.message);
     res.status(500).json({ error: 'Failed to purchase streak freeze' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/wallet/tip { toUserId, amount } — MATCH ledger transfer (replaces
+// the legacy on-chain $UTGO transfer). Atomic: debit sender, credit recipient,
+// write paired tip_sent / tip_received ledger rows. The sender's row is
+// anchored on-chain client-side.
+app.post('/api/wallet/tip', async (req, res) => {
+  const toUserId = req.body.toUserId;
+  const amount = Number.isFinite(req.body.amount) ? Math.round(req.body.amount) : null;
+  if (!toUserId || !amount || amount <= 0) {
+    return res.status(400).json({ error: 'toUserId and positive integer amount required' });
+  }
+  if (toUserId === req.user.id) {
+    return res.status(400).json({ error: 'Cannot tip yourself' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+    await client.query(
+      `INSERT INTO tilematch_tokens (user_id, username, balance)
+       VALUES ($1, $2, 0) ON CONFLICT (user_id) DO NOTHING`,
+      [req.user.id, req.user.username || null]
+    );
+    const { rows: balRows } = await client.query(
+      `SELECT balance FROM tilematch_tokens WHERE user_id = $1 FOR UPDATE`,
+      [req.user.id]
+    );
+    const balance = balRows.length ? balRows[0].balance : 0;
+    if (balance < amount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ code: 'insufficient_funds', error: 'Insufficient MATCH', balance });
+    }
+    const { rows: senderBal } = await client.query(
+      `UPDATE tilematch_tokens SET balance = balance - $2, updated_at = now()
+        WHERE user_id = $1 RETURNING balance`,
+      [req.user.id, amount]
+    );
+    await client.query(
+      `INSERT INTO tilematch_tokens (user_id, balance)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()`,
+      [toUserId, amount]
+    );
+    const senderAfter = senderBal[0].balance;
+    const { rows: evt } = await client.query(
+      `INSERT INTO match_ledger_events (user_id, kind, amount, balance_after, counterpart, anchor_status)
+       VALUES ($1, 'tip_sent', $2, $3, $4, 'pending') RETURNING id`,
+      [req.user.id, -amount, senderAfter, toUserId]
+    );
+    const eventId = evt[0].id;
+    const chainHash = matchChainHash({ userId: req.user.id, kind: 'tip_sent', amount: -amount, eventId });
+    await client.query(`UPDATE match_ledger_events SET chain_hash = $2 WHERE id = $1`, [eventId, chainHash]);
+    await client.query(
+      `INSERT INTO match_ledger_events (user_id, kind, amount, counterpart, anchor_status)
+       VALUES ($1, 'tip_received', $2, $3, 'pending')`,
+      [toUserId, amount, req.user.id]
+    );
+    await client.query('COMMIT');
+    res.json({ ok: true, balance: senderAfter, receipt: { eventId, chainHash, amount: -amount, anchorStatus: 'pending', balanceAfter: senderAfter } });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error('[wallet] tip failed:', err.message);
+    res.status(500).json({ error: 'Failed to send tip' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/match/ledger/:eventId/anchor/confirm { txHash, mock }
+// Record the on-chain anchor result for a MATCH ledger event the client just
+// sent via the bridge. Mirrors the dapp session anchor/confirm.
+app.post('/api/match/ledger/:eventId/anchor/confirm', async (req, res) => {
+  const eventId = req.params.eventId;
+  const txHash = typeof req.body.txHash === 'string' ? req.body.txHash : null;
+  const mock = !!req.body.mock || IS_STAGING || !UTGO_CONTRACT_ADDRESS || !txHash;
+  try {
+    const { rows } = await pool.query(`SELECT user_id, anchor_status FROM match_ledger_events WHERE id = $1`, [eventId]);
+    if (!rows.length) return res.status(404).json({ error: 'Ledger event not found' });
+    if (rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Not your event' });
+    const status = mock ? 'mock' : 'anchored';
+    await pool.query(
+      `UPDATE match_ledger_events SET anchor_status = $2, anchor_tx_hash = $3 WHERE id = $1`,
+      [eventId, status, mock ? null : txHash]
+    );
+    res.json({ ok: true, anchorStatus: status, anchorTxHash: mock ? null : txHash });
+  } catch (err) {
+    console.error('[match] anchor confirm failed:', err.message);
+    res.status(500).json({ error: 'Failed to record anchor' });
   }
 });
 
@@ -5967,12 +6665,34 @@ app.post('/api/cryptowordle/hint', async (req, res) => {
       [req.user.id]
     );
 
+    // Record the spend in the unified MATCH ledger (idempotent per day+amount).
+    const balanceAfter = balance - cost;
+    let receipt = null;
+    try {
+      const { rows: evt } = await client.query(
+        `INSERT INTO match_ledger_events (user_id, kind, game_id, attempt_date, amount, balance_after, anchor_status)
+         VALUES ($1, 'spend_hint', 'cryptowordle', (now() AT TIME ZONE 'utc')::date, $2, $3, 'pending')
+         ON CONFLICT (user_id, attempt_date, amount, kind) WHERE kind = 'spend_hint' DO NOTHING
+         RETURNING id`,
+        [req.user.id, -cost, balanceAfter]
+      );
+      if (evt.length > 0) {
+        const eventId = evt[0].id;
+        const chainHash = matchChainHash({ userId: req.user.id, kind: 'spend_hint', gameId: 'cryptowordle', amount: -cost, eventId });
+        await client.query(`UPDATE match_ledger_events SET chain_hash = $2 WHERE id = $1`, [eventId, chainHash]);
+        receipt = { eventId, chainHash, amount: -cost, anchorStatus: 'pending', balanceAfter };
+      }
+    } catch (ledgerErr) {
+      console.warn('[cryptowordle] hint ledger write failed (non-fatal):', ledgerErr.message);
+    }
+
     await client.query('COMMIT');
     const hintsPurchased = purchased + 1;
     res.json({
       hintsPurchased,
       nextCost: cwHintCost(hintsPurchased),
-      balance: balance - cost,
+      balance: balanceAfter,
+      receipt,
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch {}
@@ -6792,11 +7512,16 @@ app.get('/api/state/:gameId', async (req, res) => {
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   try {
     const { rows } = await pool.query(
-      `SELECT state, updated_at FROM user_game_state WHERE user_id = $1 AND game_id = $2`,
+      `SELECT state, updated_at, save_hash, anchor_tx_hash FROM user_game_state WHERE user_id = $1 AND game_id = $2`,
       [req.user.id, gameId]
     );
     if (rows.length === 0) return res.json({ state: null });
-    res.json({ state: rows[0].state, updatedAt: rows[0].updated_at });
+    res.json({
+      state: rows[0].state,
+      updatedAt: rows[0].updated_at,
+      saveHash: rows[0].save_hash || null,
+      anchorTxHash: rows[0].anchor_tx_hash || null,
+    });
   } catch (err) {
     console.error('[state] GET failed:', err.message);
     res.status(500).json({ error: 'Failed to load state' });
@@ -6818,19 +7543,44 @@ app.put('/api/state/:gameId', async (req, res) => {
   if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
     return res.status(400).json({ error: 'state too large (max 100KB)' });
   }
+  const saveHash = crypto.createHash('sha256')
+    .update(serialized + '|' + req.user.id + '|' + gameId)
+    .digest('hex');
   try {
-    // Last-write-wins upsert.
+    // Last-write-wins upsert. Resets anchor_tx_hash so a stale anchor from a
+    // previous save doesn't carry forward after the state is overwritten.
     await pool.query(
-      `INSERT INTO user_game_state (user_id, username, game_id, state, updated_at)
-       VALUES ($1, $2, $3, $4::jsonb, now())
+      `INSERT INTO user_game_state (user_id, username, game_id, state, save_hash, anchor_tx_hash, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5, NULL, now())
        ON CONFLICT (user_id, game_id) DO UPDATE
-         SET state = EXCLUDED.state, username = EXCLUDED.username, updated_at = now()`,
-      [req.user.id, req.user.username || null, gameId, serialized]
+         SET state = EXCLUDED.state, username = EXCLUDED.username,
+             save_hash = EXCLUDED.save_hash, anchor_tx_hash = NULL, updated_at = now()`,
+      [req.user.id, req.user.username || null, gameId, serialized, saveHash]
     );
-    res.json({ ok: true });
+    res.json({ ok: true, saveHash });
   } catch (err) {
     console.error('[state] PUT failed:', err.message);
     res.status(500).json({ error: 'Failed to save state' });
+  }
+});
+
+// POST /api/state/:gameId/anchor/confirm { txHash }
+// Records the on-chain tx hash for the current save. Idempotent; no-ops if
+// the row is missing. Only the owning user can confirm their own save.
+app.post('/api/state/:gameId/anchor/confirm', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const { txHash } = req.body || {};
+  if (!txHash || typeof txHash !== 'string') return res.status(400).json({ error: 'txHash required' });
+  try {
+    await pool.query(
+      `UPDATE user_game_state SET anchor_tx_hash = $1 WHERE user_id = $2 AND game_id = $3`,
+      [txHash, req.user.id, gameId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[state] anchor/confirm failed:', err.message);
+    res.status(500).json({ error: 'Failed to confirm anchor' });
   }
 });
 

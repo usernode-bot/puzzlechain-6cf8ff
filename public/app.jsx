@@ -3256,6 +3256,44 @@ body {
   transition: opacity 0.12s;
 }
 .poker-start-btn:hover { opacity: 0.88; }
+/* ---- Hand Strength Panel ---- */
+.poker-hand-panel {
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px;
+  padding: 0.28rem 0.38rem; margin-top: 0.28rem; font-size: 0.62rem; width: 100%;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.poker-hand-panel.improved {
+  animation: poker-hand-improve 0.55s ease;
+  border-color: ${C.gold}88;
+}
+@keyframes poker-hand-improve {
+  0%   { transform: scale(1); box-shadow: none; }
+  30%  { transform: scale(1.06); box-shadow: 0 0 10px ${C.gold}55; }
+  100% { transform: scale(1); box-shadow: none; }
+}
+.poker-hand-panel-rank {
+  display: flex; align-items: center; gap: 0.22rem; font-weight: 700; font-size: 0.65rem; line-height: 1.2;
+}
+.poker-hand-panel-name { color: ${C.gold}; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.poker-hand-panel-num { color: ${C.dim}; font-size: 0.58rem; font-family: 'JetBrains Mono', monospace; }
+.poker-hand-panel-desc { color: ${C.muted}; font-size: 0.58rem; margin: 0.12rem 0 0.18rem; line-height: 1.2; }
+.poker-hand-panel-cards { display: flex; gap: 0.12rem; flex-wrap: wrap; }
+.poker-hand-card {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; padding: 0.08rem 0.14rem;
+  border-radius: 3px; border: 1px solid transparent; background: rgba(255,255,255,0.05);
+  color: ${C.text}; letter-spacing: -0.02em;
+}
+.poker-hand-card.used {
+  border-color: ${C.gold}99; background: rgba(251,191,36,0.15); box-shadow: 0 0 5px ${C.gold}44;
+}
+.poker-hand-card.unused { opacity: 0.42; }
+.poker-hand-card.red { color: ${C.rose}; }
+/* ---- Seat card highlighting (hole cards) ---- */
+.poker-seat-card-hl { position: relative; display: inline-block; }
+.poker-seat-card-hl.hl-used .poker-card,
+.poker-seat-card-hl.hl-used .poker-card-lg { box-shadow: 0 0 7px ${C.gold}88; border-color: ${C.gold}; }
+.poker-seat-card-hl.hl-unused .poker-card,
+.poker-seat-card-hl.hl-unused .poker-card-lg { opacity: 0.45; }
 .poker-winner-overlay {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: rgba(0,0,0,0.75); z-index: 25;
@@ -10512,6 +10550,165 @@ function thHandStrength(hole, board) {
   if (Math.abs(a.r - b.r) === 1) s += 0.05;
   return Math.min(0.95, s);
 }
+/* ---- Poker hand evaluator ---- */
+const POKER_HAND_INFO = [
+  null,
+  { rank: 1,  name: 'High Card',       emoji: '🃏', desc: 'Highest card plays'                  },
+  { rank: 2,  name: 'One Pair',        emoji: '1️⃣', desc: 'Two cards of the same rank'          },
+  { rank: 3,  name: 'Two Pair',        emoji: '2️⃣', desc: 'Two different pairs'                  },
+  { rank: 4,  name: 'Three of a Kind', emoji: '3️⃣', desc: 'Three cards of the same rank'        },
+  { rank: 5,  name: 'Straight',        emoji: '➡️', desc: 'Five consecutive cards'              },
+  { rank: 6,  name: 'Flush',           emoji: '💧', desc: 'Five cards of the same suit'         },
+  { rank: 7,  name: 'Full House',      emoji: '🏠', desc: 'Three of a kind plus a pair'         },
+  { rank: 8,  name: 'Four of a Kind',  emoji: '💥', desc: 'Four cards of the same rank'         },
+  { rank: 9,  name: 'Straight Flush',  emoji: '🔥', desc: 'Five consecutive cards, same suit'   },
+  { rank: 10, name: 'Royal Flush',     emoji: '👑', desc: 'A, K, Q, J, 10 of the same suit'    },
+];
+
+function pokerCombinations(arr, k) {
+  if (k === 0) return [[]];
+  if (arr.length < k) return [];
+  const [h, ...t] = arr;
+  return [
+    ...pokerCombinations(t, k - 1).map(c => [h, ...c]),
+    ...pokerCombinations(t, k),
+  ];
+}
+
+function pokerScoreCat(score) {
+  let c = score;
+  for (let i = 0; i < 5; i++) c = Math.floor(c / 15);
+  return c; // 0=high card … 8=straight flush
+}
+
+function pokerDescHand(cards, cat, isRoyal) {
+  if (isRoyal) return 'A, K, Q, J, 10 — same suit';
+  const rg = {};
+  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
+  const rn = r => TH_RANKS[r - 2] || String(r);
+  switch (cat) {
+    case 0: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)} high`; }
+    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? `Pair of ${rn(p[0].r)}s` : ''; }
+    case 2: {
+      const ps = Object.values(rg).filter(g => g.length >= 2).sort((a, b) => b[0].r - a[0].r);
+      return ps.length >= 2 ? `${rn(ps[0][0].r)}s and ${rn(ps[1][0].r)}s` : '';
+    }
+    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? `Three ${rn(t[0].r)}s` : ''; }
+    case 4: { const rs = cards.map(c => c.r).sort((a, b) => b - a); return `${rn(rs[0])}-high straight`; }
+    case 5: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high flush`; }
+    case 6: {
+      const t = Object.values(rg).find(g => g.length >= 3);
+      const p = Object.values(rg).find(g => g.length >= 2 && t && g[0].r !== t[0].r);
+      return t && p ? `${rn(t[0].r)}s full of ${rn(p[0].r)}s` : '';
+    }
+    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? `Four ${rn(q[0].r)}s` : ''; }
+    case 8: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high straight flush`; }
+    default: return '';
+  }
+}
+
+function pokerHandCards(cards, cat) {
+  // Returns the subset of cards that form the hand pattern (excluding pure kickers)
+  const rg = {};
+  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
+  switch (cat) {
+    case 0: return [cards.reduce((m, c) => c.r > m.r ? c : m)];
+    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? p.slice(0, 2) : cards; }
+    case 2: { const ps = Object.values(rg).filter(g => g.length >= 2); return ps.flatMap(p => p.slice(0, 2)).slice(0, 4); }
+    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? t.slice(0, 3) : cards; }
+    case 4: return cards;  // straight: all 5 are key
+    case 5: return cards;  // flush: all 5 are key
+    case 6: return cards;  // full house: all 5 are key
+    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? q.slice(0, 4) : cards; }
+    case 8: return cards;  // straight flush: all 5 are key
+    default: return cards;
+  }
+}
+
+function evaluateBestHand(holeCards, boardCards) {
+  if (!holeCards || holeCards.length < 2) return null;
+  const all = [...holeCards, ...(boardCards || [])];
+  const combos = all.length >= 5 ? pokerCombinations(all, 5) : [all];
+
+  let bestScore = -1, bestCombo = null;
+  for (const combo of combos) {
+    const score = thScore5(combo);
+    if (score > bestScore) { bestScore = score; bestCombo = combo; }
+  }
+  if (!bestCombo) return null;
+
+  const cat = pokerScoreCat(bestScore);
+  // Royal Flush = straight flush containing A, K, Q, J, 10
+  const isRoyal = cat === 8 && [10, 11, 12, 13, 14].every(r => bestCombo.some(c => c.r === r));
+  const idx = isRoyal ? 10 : cat + 1;
+  const info = POKER_HAND_INFO[idx];
+
+  return {
+    rank: info.rank,
+    rankName: info.name,
+    emoji: info.emoji,
+    desc: pokerDescHand(bestCombo, cat, isRoyal),
+    bestFive: bestCombo,
+    handCards: isRoyal ? bestCombo : pokerHandCards(bestCombo, cat),
+    partial: all.length < 5,
+  };
+}
+
+/* ---- HandStrengthPanel component ---- */
+function HandStrengthPanel({ holeCards, board, handNum }) {
+  const prevRankRef = useRef(0);
+  const timerRef = useRef(null);
+  const [improved, setImproved] = useState(false);
+
+  const result = evaluateBestHand(holeCards, board || []);
+  const currentRank = result ? result.rank : 0;
+
+  useEffect(() => {
+    if (currentRank > 0 && prevRankRef.current > 0 && currentRank > prevRankRef.current) {
+      setImproved(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setImproved(false), 600);
+    }
+    prevRankRef.current = currentRank;
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [currentRank]);
+
+  // Reset on new hand
+  useEffect(() => {
+    prevRankRef.current = 0;
+    setImproved(false);
+  }, [handNum]);
+
+  if (!result) return null;
+
+  const cardKey = (c) => `${c.r}.${c.s}`;
+  const usedKeys = new Set((result.handCards || []).map(cardKey));
+
+  return (
+    <div className={'poker-hand-panel' + (improved ? ' improved' : '')}>
+      <div className="poker-hand-panel-rank">
+        <span>{result.emoji}</span>
+        <span className="poker-hand-panel-name">{result.rankName}</span>
+        <span className="poker-hand-panel-num">#{result.rank}</span>
+      </div>
+      <div className="poker-hand-panel-desc">{result.desc}</div>
+      {result.bestFive && result.bestFive.length >= 2 && (
+        <div className="poker-hand-panel-cards">
+          {result.bestFive.map((card, i) => {
+            const used = usedKeys.has(cardKey(card));
+            const red = card.s === 1 || card.s === 2;
+            return (
+              <span key={i} className={'poker-hand-card' + (used ? ' used' : ' unused') + (red ? ' red' : '')}>
+                {TH_RANKS[card.r - 2]}{TH_SUITS[card.s]}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---- Poker sub-components ---- */
 const POKER_BOT_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
 const POKER_SEAT_COLORS = ['#6366F1', '#FBBF24', '#34D399', '#FB7185', '#A78BFA', '#F97316'];
@@ -10606,10 +10803,19 @@ function pokerSeatPos(i, n) {
   return { x, y };
 }
 
-function PokerSeat({ seat, isPlayer, dealerIdx, sbIdx, bbIdx, isActive, isWinner, actionLabel, showCards, seatIdx }) {
+function PokerSeat({ seat, isPlayer, dealerIdx, sbIdx, bbIdx, isActive, isWinner, actionLabel, showCards, seatIdx, board, handNum, gamePhase }) {
   const color = POKER_SEAT_COLORS[seatIdx % POKER_SEAT_COLORS.length];
   const cls = 'poker-seat' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '') +
     (seat.folded ? ' folded' : '') + (seat.chips <= 0 && !isActive ? ' eliminated' : '');
+
+  // Compute hand eval for player seat (cheap: ≤21 combos)
+  const showPanel = isPlayer && seat.hand && seat.hand.length >= 2 && gamePhase === 'playing';
+  const handEval = showPanel ? evaluateBestHand(seat.hand, board || []) : null;
+
+  const cardKey = (c) => `${c.r}.${c.s}`;
+  const bestKeys = handEval ? new Set((handEval.bestFive || []).map(cardKey)) : null;
+  const usedKeys = handEval ? new Set((handEval.handCards || []).map(cardKey)) : null;
+
   return (
     <div className={cls}>
       <div className="poker-seat-avatar" style={{ background: color + '33', border: `1.5px solid ${color}` }}>
@@ -10623,12 +10829,25 @@ function PokerSeat({ seat, isPlayer, dealerIdx, sbIdx, bbIdx, isActive, isWinner
       </div>
       <div className="poker-seat-chips">{seat.chips}</div>
       {seat.bet > 0 && <div style={{ fontSize: '0.6rem', color: '#FBBF2488', fontFamily: 'monospace' }}>bet {seat.bet}</div>}
-      {actionLabel && <div className={'poker-seat-label ' + actionLabel.type}>{actionLabel.text}</div>}
       <div className="poker-seat-cards">
-        {seat.hand && seat.hand.map((card, ci) => (
-          <PokerCardFace key={ci} card={card} hidden={!showCards && !isPlayer && !seat.revealed} />
-        ))}
+        {seat.hand && seat.hand.map((card, ci) => {
+          const hidden = !showCards && !isPlayer && !seat.revealed;
+          if (isPlayer && bestKeys && !hidden) {
+            const k = cardKey(card);
+            const hlCls = usedKeys.has(k) ? 'hl-used' : bestKeys.has(k) ? '' : 'hl-unused';
+            return (
+              <div key={ci} className={'poker-seat-card-hl' + (hlCls ? ' ' + hlCls : '')}>
+                <PokerCardFace card={card} hidden={false} />
+              </div>
+            );
+          }
+          return <PokerCardFace key={ci} card={card} hidden={hidden} />;
+        })}
       </div>
+      {showPanel && handEval && (
+        <HandStrengthPanel holeCards={seat.hand} board={board} handNum={handNum} />
+      )}
+      {actionLabel && <div className={'poker-seat-label ' + actionLabel.type}>{actionLabel.text}</div>}
     </div>
   );
 }
@@ -11190,6 +11409,9 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
                     actionLabel={gs.actionLabels && gs.actionLabels[i]}
                     showCards={gs.phase === 'handover'}
                     seatIdx={i}
+                    board={gs.board}
+                    handNum={gs.handNum}
+                    gamePhase={phase}
                   />
                 </div>
               );

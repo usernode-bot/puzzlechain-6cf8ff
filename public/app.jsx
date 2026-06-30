@@ -2897,6 +2897,18 @@ body {
   cursor: pointer;
 }
 .cg-resume-actions button.ghost { background: transparent; color: ${C.muted}; border: 1px solid ${C.border}; }
+.cg-onchain-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: ${C.accent};
+  text-decoration: none;
+  opacity: 0.85;
+}
+.cg-onchain-badge:hover { opacity: 1; text-decoration: underline; }
 
 /* Keep existing classic boards fitting inside the shell stage */
 .cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
@@ -4347,7 +4359,9 @@ function useClassicSave(gameId) {
   };
   const loadState = async () => {
     const { ok, body } = await api(`/api/state/${gameId}`);
-    if (ok && body && body.state && body.state.mode === 'bot') return body.state;
+    if (ok && body && body.state && body.state.mode === 'bot') {
+      return { ...body.state, __anchorTxHash: body.anchorTxHash || null };
+    }
     return null;
   };
   const clearState = async () => {
@@ -4487,16 +4501,29 @@ function ClassicModePicker({ game, onPlay }) {
 // only), and Post to Feed (after a result).
 function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onPostToFeed, onClose }) {
   const [picking, setPicking] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain' | 'onchain'
   const modes = game.modes || [];
   const usePicker = !!game.menuModePicker && modes.length > 0;
   // Default new-game mode for games without an inline picker.
   const defaultMode = modes.length === 1 ? modes[0] : null;
 
   const doSave = async () => {
-    const ok = await onSaveGame();
-    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); }
+    if (saveStatus === 'saving') return;
+    setSaveStatus('saving');
+    const result = await onSaveGame();
+    if (result && result.ok) {
+      const next = result.anchored ? 'onchain' : 'plain';
+      setSaveStatus(next);
+      setTimeout(() => setSaveStatus(null), 1500);
+    } else {
+      setSaveStatus(null);
+    }
   };
+
+  const saveLabel = saveStatus === 'saving' ? 'Saving…'
+    : saveStatus === 'onchain' ? 'Saved on-chain ✓'
+    : saveStatus === 'plain' ? 'Saved ✓'
+    : '💾 Save Game';
 
   return (
     <div className="cg-menu-section">
@@ -4512,7 +4539,7 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
       {game.supportsSave && gameMode === 'bot' && (
         <>
           <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Versus Bot</div>
-          <button className="cg-sheet-action" onClick={doSave}>{saved ? 'Saved ✓' : '💾 Save Game'}</button>
+          <button className="cg-sheet-action" onClick={doSave} disabled={saveStatus === 'saving'}>{saveLabel}</button>
         </>
       )}
 
@@ -4528,10 +4555,21 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
 }
 
 // A small in-stage banner offering to resume a saved Versus-Bot game.
-function ClassicResumeBanner({ onResume, onDismiss }) {
+// anchorTxHash — when present, shows an ⛓ On-chain badge linking to the explorer.
+function ClassicResumeBanner({ onResume, onDismiss, anchorTxHash }) {
   return (
     <div className="cg-resume-banner">
-      <span>💾 You have a saved game.</span>
+      <span>
+        💾 You have a saved game.
+        {anchorTxHash && (
+          <a
+            href={`https://social-vibecoding.usernodelabs.org/explorer/tx/${anchorTxHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cg-onchain-badge"
+          >⛓ On-chain</a>
+        )}
+      </span>
       <div className="cg-resume-actions">
         <button onClick={onResume}>Resume</button>
         <button className="ghost" onClick={onDismiss}>New</button>
@@ -4879,6 +4917,36 @@ async function anchorMatchLedger(ledgerId, memo) {
     if (ok && body) return { txHash: body.txHash || txHash, status: body.status || (mock ? 'mock' : 'onchain') };
   } catch (e) {}
   return { txHash, status: mock ? 'mock' : 'onchain' };
+}
+
+// Anchor a MATCH ledger movement (earn / spend / tip) on-chain via the bridge,
+// then confirm with the server. Best-effort and modeled on dappAnchor: degrades
+// to a 'mock' anchor when the bridge/wallet is unavailable (staging) and never
+// throws. `receipt` is { eventId, chainHash, ... }; returns the updated receipt.
+async function matchAnchor(receipt) {
+  if (!receipt || !receipt.eventId || !receipt.chainHash) return receipt;
+  let txHash = null;
+  let mock = true;
+  try {
+    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
+      ? !(await window.usernode.isMockEnabled())
+      : false;
+    if (window.usernode && window.usernode.sendTransaction && window.usernode.getNodeAddress && bridgeMockOff) {
+      const addr = await window.usernode.getNodeAddress();
+      if (addr) {
+        const tx = await window.usernode.sendTransaction({ to: addr, data: '0x' + receipt.chainHash, value: 0 });
+        txHash = tx && tx.hash ? tx.hash : null;
+        mock = false;
+      }
+    }
+  } catch (e) { /* fall through to mock anchor */ }
+  try {
+    const { ok, body } = await api(`/api/match/ledger/${receipt.eventId}/anchor/confirm`, {
+      method: 'POST', body: JSON.stringify({ txHash, mock }),
+    });
+    if (ok && body) return { ...receipt, anchorStatus: body.anchorStatus, anchorTxHash: body.anchorTxHash };
+  } catch (e) {}
+  return { ...receipt, anchorStatus: 'mock' };
 }
 
 // Small inline "View on explorer" affordance for a confirmed MATCH movement.
@@ -8785,7 +8853,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   return (
     <div>
-      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
+      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
@@ -10779,7 +10847,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
-        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
+        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
         <div className="th-felt">
           <div className="th-seat">
             <div className="who">Opponent</div>
@@ -13984,13 +14052,39 @@ function fmtUtgo(weiStr) {
   } catch { return '0.00 UTGO'; }
 }
 
+// MATCH is the single in-app currency — an integer count, not wei.
+function fmtMatch(n) {
+  const v = Number.isFinite(n) ? n : 0;
+  return `${v} MATCH`;
+}
+
+// Feature flag: the $UTGO-staked PvP Arena is hidden while the app runs a single
+// in-app currency (MATCH). Flip to true once PvP is relaunched on MATCH stakes.
+const PVP_ENABLED = false;
+
+// The "returning soon on MATCH" placeholder shown where the $UTGO PvP Arena used
+// to render.
+function PvpReturningSoon() {
+  return (
+    <div className="pvp-arena" style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+      <div style={{ fontSize: '2.4rem', marginBottom: '0.75rem' }}>⚔️</div>
+      <div className="pvp-title" style={{ marginBottom: '0.5rem' }}>PvP Arena</div>
+      <p style={{ color: C.muted, maxWidth: '28rem', margin: '0 auto' }}>
+        PvP is being rebuilt to wager <strong style={{ color: C.gold }}>MATCH</strong>, PuzzleChain's
+        single in-app currency. It's <strong>returning soon on MATCH</strong> — meanwhile, duel for
+        MATCH in the Tile Match Puzzle arena.
+      </p>
+    </div>
+  );
+}
+
 function shortAddr(addr) {
   if (!addr) return '';
   return addr.slice(0, 6) + '…' + addr.slice(-4);
 }
 
 /* ============================================================
-   TipModal — send $UTGO to another user
+   TipModal — send MATCH (the single in-app currency) to another user
    ============================================================ */
 function TipModal({ toUser, onClose, onSuccess }) {
   const TIP_PRESETS = ['1', '5', '10'];
@@ -14003,50 +14097,28 @@ function TipModal({ toUser, onClose, onSuccess }) {
   const selectedAmount = customAmount || amount;
 
   const handleSend = async () => {
-    const amountFloat = parseFloat(selectedAmount);
-    if (!amountFloat || amountFloat <= 0) {
+    const amountInt = Math.round(parseFloat(selectedAmount));
+    if (!amountInt || amountInt <= 0) {
       setErr('Enter a valid amount');
       return;
     }
-    const amountWei = BigInt(Math.round(amountFloat * 1e18)).toString();
     setSending(true);
     setErr(null);
     try {
-      // Prepare: get calldata + recipient addr
-      const { ok: prepOk, body: prep } = await api('/api/wallet/tip/prepare', {
+      const { ok, body } = await api('/api/wallet/tip', {
         method: 'POST',
-        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei }),
+        body: JSON.stringify({ toUserId: toUser.id, amount: amountInt }),
       });
-      if (!prepOk) {
-        setErr(prep && prep.error ? prep.error : 'Failed to prepare tip');
+      if (!ok) {
+        setErr(body && body.error ? body.error : 'Failed to send tip');
         setSending(false);
         return;
       }
-
-      let txHash = '0xmock';
-      const isMock = !window.usernode || !prep.calldata || !prep.contractAddr
-        || (window.usernode.isMockEnabled && await window.usernode.isMockEnabled());
-      if (!isMock && window.usernode && window.usernode.sendTransaction) {
-        const tx = await window.usernode.sendTransaction({
-          to: prep.contractAddr,
-          data: prep.calldata,
-        });
-        txHash = tx && tx.hash ? tx.hash : '0xunknown';
-      }
-
-      // Confirm
-      const { ok: confOk } = await api('/api/wallet/tip/confirm', {
-        method: 'POST',
-        body: JSON.stringify({ toUserId: toUser.id, amount: amountWei, txHash }),
-      });
-      if (!confOk) {
-        setErr('Tip sent but confirmation failed — check your wallet history');
-        setSending(false);
-        return;
-      }
-      setDone({ txHash, amount: fmtUtgo(amountWei), isMock });
+      // Anchor the MATCH transfer on-chain (best-effort).
+      if (body.receipt && body.receipt.eventId) { matchAnchor(body.receipt).catch(() => {}); }
+      setDone({ amount: `${amountInt} MATCH` });
     } catch (e) {
-      setErr(e && e.message ? e.message : 'Transaction failed');
+      setErr(e && e.message ? e.message : 'Failed to send tip');
     }
     setSending(false);
   };
@@ -14058,19 +14130,17 @@ function TipModal({ toUser, onClose, onSuccess }) {
         {done ? (
           <div>
             <div style={{ color: C.emerald, fontWeight: 600, marginBottom: '0.5rem' }}>
-              Sent {done.amount}! {done.isMock && <span style={{ color: C.muted, fontSize: '0.8rem' }}>(demo)</span>}
+              Sent {done.amount}! 🪙
             </div>
-            {done.txHash && !done.isMock && (
-              <div style={{ fontSize: '0.72rem', color: C.muted, wordBreak: 'break-all', marginBottom: '0.75rem' }}>
-                Tx: {done.txHash}
-              </div>
-            )}
+            <div style={{ fontSize: '0.72rem', color: C.muted, marginBottom: '0.75rem' }}>
+              Recorded on the Usernode chain.
+            </div>
             <button className="primary-btn" onClick={() => { onSuccess && onSuccess(); onClose(); }}>Done</button>
           </div>
         ) : (
           <div>
             <div style={{ fontSize: '0.82rem', color: C.muted, marginBottom: '0.75rem' }}>
-              Quick amounts (UTGO):
+              Quick amounts (MATCH):
             </div>
             <div className="tip-presets">
               {TIP_PRESETS.map(p => (
@@ -14093,7 +14163,7 @@ function TipModal({ toUser, onClose, onSuccess }) {
             {err && <div style={{ color: C.rose, fontSize: '0.82rem', marginBottom: '0.5rem' }}>{err}</div>}
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button className="primary-btn" disabled={sending} onClick={handleSend} style={{ flex: 1 }}>
-                {sending ? 'Sending…' : `Send ${selectedAmount || '?'} UTGO`}
+                {sending ? 'Sending…' : `Send ${selectedAmount || '?'} MATCH`}
               </button>
               <button
                 className="primary-btn"
@@ -14114,8 +14184,6 @@ function TipModal({ toUser, onClose, onSuccess }) {
 function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh, onOpenReceipt }) {
   const [walletData, setWalletData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
-  const [claiming, setClaiming] = React.useState(false);
-  const [claimResult, setClaimResult] = React.useState(null);
   const [buyingFreeze, setBuyingFreeze] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [freezeMsg, setFreezeMsg] = React.useState(null);
@@ -14157,52 +14225,17 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
     } catch {}
   };
 
-  const handleClaim = async () => {
-    setClaiming(true);
-    setClaimResult(null);
-    try {
-      const { ok, body } = await api('/api/wallet/rewards/claim', { method: 'POST' });
-      if (!ok) {
-        setClaimResult({ err: (body && body.error) || 'Failed to claim' });
-        setClaiming(false);
-        return;
-      }
-      // Mock or signed claim
-      if (body.mock || !body.claimCalldata) {
-        setClaimResult({ txHash: body.txHash || '0xstagingclaim', mock: true, amount: fmtUtgo(body.amountWei) });
-        await loadWallet();
-        onBalanceRefresh && onBalanceRefresh();
-        setClaiming(false);
-        return;
-      }
-      // Real on-chain claim
-      const tx = await window.usernode.sendTransaction({
-        to: body.contractAddr,
-        data: body.claimCalldata,
-      });
-      const txHash = tx && tx.hash ? tx.hash : '0xunknown';
-      await api('/api/wallet/rewards/claim/confirm', {
-        method: 'POST',
-        body: JSON.stringify({ txHash }),
-      });
-      setClaimResult({ txHash, mock: false, amount: fmtUtgo(body.amountWei) });
-      await loadWallet();
-      onBalanceRefresh && onBalanceRefresh();
-    } catch (e) {
-      setClaimResult({ err: e && e.message ? e.message : 'Transaction failed' });
-    }
-    setClaiming(false);
-  };
-
   const handleBuyFreeze = async () => {
     setBuyingFreeze(true);
     setFreezeMsg(null);
     const { ok, body } = await api('/api/wallet/spend/streak-freeze', { method: 'POST' });
     if (ok && body) {
       setFreezeMsg(`Freeze purchased! You now have ${body.streakFreezes} freeze${body.streakFreezes === 1 ? '' : 's'}.`);
+      if (body.receipt && body.receipt.eventId) { matchAnchor(body.receipt).catch(() => {}); }
       await loadWallet();
+      onBalanceRefresh && onBalanceRefresh(body.balance);
     } else {
-      setFreezeMsg((body && body.error) || 'Insufficient pending rewards');
+      setFreezeMsg((body && body.error) || 'Insufficient MATCH');
     }
     setBuyingFreeze(false);
   };
@@ -14258,108 +14291,77 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
     );
   }
 
-  if (!walletData || !walletData.addr) {
+  if (!walletData) {
     return (
       <div className="wallet-screen">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <h2>My Wallet</h2>
         <div className="wallet-no-wallet">
-          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔗</div>
-          <div>No wallet linked yet.</div>
-          <div style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
-            Open this app inside Usernode with a linked wallet to see your balance.
-          </div>
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🪙</div>
+          <div>Couldn't load your wallet right now.</div>
         </div>
       </div>
     );
   }
 
   const d = walletData;
-  const isMock = d.mock || walletMock;
-  const hasPending = d.pendingWei && d.pendingWei !== '0';
-  const FREEZE_PRICE = '5.00 UTGO';
+  const balance = Number.isFinite(d.balance) ? d.balance : 0;
+  const freezePrice = Number.isFinite(d.streakFreezePrice) ? d.streakFreezePrice : 50;
+  const canAffordFreeze = balance >= freezePrice;
 
   return (
     <div className="wallet-screen">
       <button className="back-btn" onClick={onBack}>← Back</button>
       <h2>My Wallet</h2>
 
-      {isMock && (
-        <div className="wallet-mock-badge">Demo wallet — balances are simulated</div>
+      {/* MATCH balance — the single in-app currency */}
+      <div className="wallet-card">
+        <div className="wallet-card-title">MATCH Balance</div>
+        <div className="wallet-balance-big">🪙 {balance} MATCH</div>
+        <div className="wallet-balance-sub">
+          {d.lifetimeEarned || 0} earned · {d.lifetimeSpent || 0} spent (lifetime)
+        </div>
+        <div className="wallet-freeze-info" style={{ marginTop: '0.5rem' }}>
+          Earn MATCH by solving daily puzzles. Spend it on hints, streak freezes, and tips —
+          every move is anchored on the Usernode chain.
+        </div>
+      </div>
+
+      {/* Identity / linked wallet (optional — MATCH itself is in-app) */}
+      {d.addr && (
+        <div className="wallet-card">
+          <div className="wallet-card-title">
+            Connected Wallet
+            {d.identityVerified
+              ? <span className="dapp-identity-badge">✓ Verified identity</span>
+              : <span className="dapp-identity-badge unproven">Linked (unproven)</span>}
+          </div>
+          <div className="wallet-addr-row">
+            <span className="wallet-addr mono">{d.addr}</span>
+            <button
+              className="primary-btn"
+              style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
+              onClick={handleCopy}
+            >{copied ? 'Copied!' : 'Copy'}</button>
+          </div>
+          <div className="dapp-wallet-btns">
+            {!d.identityVerified && (
+              <button className="primary-btn" disabled={proving}
+                style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem' }}
+                onClick={handleProve}>
+                {proving ? 'Signing…' : 'Prove ownership'}
+              </button>
+            )}
+            <button className="primary-btn"
+              style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+              onClick={handleDisconnect}>
+              Disconnect
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Address + identity */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">
-          Connected Wallet
-          {d.identityVerified
-            ? <span className="dapp-identity-badge">✓ Verified identity</span>
-            : <span className="dapp-identity-badge unproven">Linked (unproven)</span>}
-        </div>
-        <div className="wallet-addr-row">
-          <span className="wallet-addr mono">{d.addr}</span>
-          <button
-            className="primary-btn"
-            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
-            onClick={handleCopy}
-          >{copied ? 'Copied!' : 'Copy'}</button>
-        </div>
-        <div className="dapp-wallet-btns">
-          {!d.identityVerified && (
-            <button className="primary-btn" disabled={proving}
-              style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem' }}
-              onClick={handleProve}>
-              {proving ? 'Signing…' : 'Prove ownership'}
-            </button>
-          )}
-          <button className="primary-btn"
-            style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-            onClick={handleDisconnect}>
-            Disconnect
-          </button>
-        </div>
-      </div>
-
-      {/* On-chain balance */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">On-Chain Balance</div>
-        <div className="wallet-balance-big">{fmtUtgo(d.balanceWei)}</div>
-        {isMock && <div className="wallet-balance-sub">(simulated)</div>}
-      </div>
-
-      {/* Pending rewards */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">Pending Puzzle Rewards</div>
-        <div className="wallet-pending-big">{fmtUtgo(d.pendingWei)}</div>
-        <div className="wallet-balance-sub">
-          {fmtUtgo(d.lifetimeEarnedWei)} lifetime earned · {fmtUtgo(d.lifetimeClaimedWei)} claimed
-        </div>
-        {claimResult && !claimResult.err && (
-          <div style={{ color: C.emerald, fontSize: '0.83rem', margin: '0.5rem 0' }}>
-            Claimed {claimResult.amount}! {claimResult.mock && '(demo)'}
-            {claimResult.txHash && !claimResult.mock && (
-              <div style={{ fontSize: '0.7rem', color: C.muted, wordBreak: 'break-all' }}>
-                Tx: {claimResult.txHash}
-              </div>
-            )}
-          </div>
-        )}
-        {claimResult && claimResult.err && (
-          <div style={{ color: C.rose, fontSize: '0.82rem', margin: '0.5rem 0' }}>{claimResult.err}</div>
-        )}
-        <div className="wallet-btn-row">
-          <button
-            className="primary-btn"
-            disabled={!hasPending || claiming}
-            onClick={handleClaim}
-            style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
-          >
-            {claiming ? 'Claiming…' : 'Claim to Wallet'}
-          </button>
-        </div>
-      </div>
-
-      {/* Streak freeze */}
+      {/* Streak freeze — now priced in MATCH */}
       <div className="wallet-card">
         <div className="wallet-card-title">Streak Freeze</div>
         <div style={{ fontSize: '0.88rem', marginBottom: '0.6rem' }}>
@@ -14371,13 +14373,13 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
         )}
         <button
           className="primary-btn"
-          disabled={buyingFreeze || !hasPending}
+          disabled={buyingFreeze || !canAffordFreeze}
           onClick={handleBuyFreeze}
-          style={!hasPending ? { opacity: 0.45, cursor: 'not-allowed' } : { background: C.gold + 'cc' }}
+          style={!canAffordFreeze ? { opacity: 0.45, cursor: 'not-allowed' } : { background: C.gold + 'cc' }}
         >
-          {buyingFreeze ? 'Purchasing…' : `Buy Freeze (${FREEZE_PRICE})`}
+          {buyingFreeze ? 'Purchasing…' : `Buy Freeze (${freezePrice} MATCH)`}
         </button>
-        {!hasPending && <div className="wallet-freeze-info">Earn rewards by solving daily puzzles first.</div>}
+        {!canAffordFreeze && <div className="wallet-freeze-info">Earn more MATCH by solving daily puzzles first.</div>}
       </div>
 
       {/* Recent activity */}
@@ -14385,16 +14387,26 @@ function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceR
         <div className="wallet-card">
           <div className="wallet-card-title">Recent Activity</div>
           {d.recent.map((ev, i) => {
-            const isReward = ev.kind === 'reward';
-            const isTipRecv = ev.kind === 'tip_received';
-            const isTipSent = ev.kind === 'tip_sent';
-            const label = isReward ? '🪙 Puzzle reward' : isTipRecv ? '💰 Tip received' : '→ Tip sent';
-            const amtClass = isReward ? 'wallet-activity-earned' : isTipRecv ? 'wallet-activity-tip-recv' : 'wallet-activity-tip-sent';
-            const prefix = isReward || isTipRecv ? '+' : '-';
+            const positive = ev.amount > 0;
+            const labels = {
+              earn: '🪙 Daily win',
+              spend_hint: '💡 Hint',
+              spend_freeze: '🧊 Streak freeze',
+              tip_received: '💰 Tip received',
+              tip_sent: '→ Tip sent',
+              migration: '↪ Converted from $UTGO',
+            };
+            const label = labels[ev.kind] || ev.kind;
+            const amtClass = positive ? 'wallet-activity-earned' : 'wallet-activity-tip-sent';
+            const anchorTag = ev.anchor_status === 'anchored'
+              ? <span style={{ fontSize: '0.66rem', color: C.emerald, marginLeft: '0.4rem' }} title={ev.anchor_tx_hash || ''}>⛓️ on-chain ✓</span>
+              : ev.anchor_status === 'migration'
+                ? null
+                : <span style={{ fontSize: '0.66rem', color: C.muted, marginLeft: '0.4rem' }}>⛓️ demo</span>;
             return (
               <div className="wallet-activity-row" key={i}>
-                <span className="wallet-activity-kind">{label}</span>
-                <span className={`wallet-activity-amt ${amtClass}`}>{prefix}{fmtUtgo(ev.amount_wei)}</span>
+                <span className="wallet-activity-kind">{label}{anchorTag}</span>
+                <span className={`wallet-activity-amt ${amtClass}`}>{positive ? '+' : ''}{ev.amount} MATCH</span>
               </div>
             );
           })}
@@ -14743,11 +14755,11 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             <span style={{ color: C.muted }}>Following:</span>{' '}
             <span style={{ fontWeight: 600, color: C.accent }}>{profile.followingCount}</span>
           </p>
-          {profile.tipsReceivedWei && profile.tipsReceivedWei !== '0' && (
+          {profile.tipsReceivedMatch > 0 && (
             <p style={{ margin: '0.5rem 0' }}>
               <span style={{ color: C.muted }}>Tips received:</span>{' '}
               <span style={{ fontWeight: 600, color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
-                {fmtUtgo(profile.tipsReceivedWei)}
+                {profile.tipsReceivedMatch} MATCH
               </span>
             </p>
           )}
@@ -14756,7 +14768,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
               <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: '0.25rem' }}>Recent tips:</div>
               {profile.recentTippers.slice(0, 3).map((t, i) => (
                 <div key={i} style={{ fontSize: '0.82rem', color: C.text }}>
-                  {t.fromUserId} → <span style={{ color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>{fmtUtgo(t.amountWei)}</span>
+                  {t.fromUserId} → <span style={{ color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>{t.amount} MATCH</span>
                 </div>
               ))}
             </div>
@@ -16021,7 +16033,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   return (
     <div>
       {resumeOffer && (
-        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
+        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />
       )}
       <div className="status-bar">
         <div className="pill">
@@ -17153,10 +17165,21 @@ function App() {
       setWinData(prev => prev ? {
         ...prev,
         syncError: false,
-        rewardWei: body && body.rewardWei,
+        matchEarned: body && body.matchEarned,
+        matchReceipt: body && body.matchReceipt,
         newAchievements: newAch,
         justAchievement: newAch.length ? achievementBadgeFor(newAch[0]) : prev.justAchievement,
       } : prev);
+      // Reflect the new MATCH balance in the nav chip immediately.
+      if (body && body.matchReceipt && Number.isFinite(body.matchReceipt.balanceAfter)) {
+        setMatchBalance(body.matchReceipt.balanceAfter);
+      }
+      // Anchor the MATCH earn on-chain (best-effort), then update the receipt badge.
+      if (body && body.matchReceipt && body.matchReceipt.eventId) {
+        matchAnchor(body.matchReceipt).then(updated => {
+          setWinData(prev => prev ? { ...prev, matchReceipt: updated } : prev);
+        }).catch(() => {});
+      }
       // DApp Mode: surface the Verified badge, then anchor on-chain (best-effort).
       if (body && body.dapp) {
         setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
@@ -17337,16 +17360,46 @@ function App() {
   };
 
   // Game Menu "Save Game": persist the active Versus-Bot game's snapshot via
-  // the generic user_game_state store. Returns true on success.
+  // the generic user_game_state store, then attempt an on-chain hash anchor.
+  // Returns { ok, anchored } — the on-chain step is fire-and-continue; a tx
+  // failure still returns ok:true as long as the server save succeeded.
   const handleSaveGame = async () => {
-    if (!currentGame) return false;
+    if (!currentGame) return { ok: false, anchored: false };
     const snap = ClassicBridge.getSnapshot ? ClassicBridge.getSnapshot() : null;
-    if (!snap) return false;
-    const { ok } = await api(`/api/state/${currentGame.id}`, {
+    if (!snap) return { ok: false, anchored: false };
+    const { ok, body } = await api(`/api/state/${currentGame.id}`, {
       method: 'PUT',
       body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...snap } }),
-    }).catch(() => ({ ok: false }));
-    return !!ok;
+    }).catch(() => ({ ok: false, body: null }));
+    if (!ok) return { ok: false, anchored: false };
+
+    // Attempt on-chain anchor: send 0-value tx with the save hash as calldata,
+    // mirroring the dappAnchor pattern. Silently skipped in mock/no-wallet mode.
+    let anchored = false;
+    try {
+      const saveHash = body && body.saveHash;
+      const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
+        ? !(await window.usernode.isMockEnabled())
+        : false;
+      if (saveHash && window.usernode && window.usernode.sendTransaction && bridgeMockOff) {
+        const userAddr = window.usernode.getNodeAddress
+          ? await window.usernode.getNodeAddress()
+          : null;
+        if (userAddr) {
+          const tx = await window.usernode.sendTransaction({ to: userAddr, data: '0x' + saveHash, value: 0 });
+          const txHash = tx && tx.hash ? tx.hash : null;
+          if (txHash) {
+            await api(`/api/state/${currentGame.id}/anchor/confirm`, {
+              method: 'POST',
+              body: JSON.stringify({ txHash }),
+            }).catch(() => {});
+            anchored = true;
+          }
+        }
+      }
+    } catch (_e) { /* on-chain step is optional — save already succeeded */ }
+
+    return { ok: true, anchored };
   };
 
   // Build the menu config passed into ClassicShell for classic games.
@@ -17507,18 +17560,13 @@ function App() {
             </div>
           </div>
           {authOk && (
-            <span className="nav-match-chip" title="MATCH tokens — earned in games, spent on hints">
-              🪙 {matchBalance == null ? '…' : matchBalance} MATCH
-            </span>
-          )}
-          {authOk && walletBalance && (
             <button
-              className="nav-wallet-chip"
-              title="Open Wallet"
+              className="nav-match-chip"
+              title="MATCH — your in-app currency. Earned from daily wins, spent on hints, freezes & tips. Tap to open your wallet."
               onClick={() => setScreen('wallet')}
+              style={{ cursor: 'pointer', border: 'none' }}
             >
-              🪙 {fmtUtgo(walletBalance)}
-              {walletMock && <span style={{ fontSize: '0.6rem', color: C.muted, marginLeft: '0.2rem' }}>(demo)</span>}
+              🪙 {matchBalance == null ? '…' : matchBalance} MATCH
             </button>
           )}
           {authOk && (
@@ -17653,7 +17701,9 @@ function App() {
             )}
           </div>
           {lobbyTab === 'pvp' ? (
-            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />
+            PVP_ENABLED
+              ? <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />
+              : <PvpReturningSoon />
           ) : lobbyTab === 'feed' ? (
             <FeedScreen user={user} setScreen={setScreen} />
           ) : (
@@ -17775,10 +17825,26 @@ function App() {
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
-              {winData.rewardWei && winData.rewardWei !== '0' && !winData.isClassic && (
+              {winData.matchEarned > 0 && !winData.isClassic && (
                 <div className="win-reward-row">
-                  <span className="k">🪙 Token reward</span>
-                  <span className="v">+{fmtUtgo(winData.rewardWei)}</span>
+                  <span className="k">🪙 MATCH earned</span>
+                  <span className="v">+{winData.matchEarned} MATCH</span>
+                </div>
+              )}
+              {winData.matchReceipt && !winData.isClassic && (
+                <div className="win-reward-row" style={{ fontSize: '0.74rem' }}>
+                  <span className="k">
+                    {winData.matchReceipt.anchorStatus === 'anchored'
+                      ? '⛓️ On-chain ✓'
+                      : winData.matchReceipt.anchorStatus === 'pending'
+                        ? '⛓️ Anchoring…'
+                        : '⛓️ Demo — not anchored'}
+                  </span>
+                  <span className="v mono">
+                    {winData.matchReceipt.anchorTxHash
+                      ? shortHash(winData.matchReceipt.anchorTxHash)
+                      : (winData.matchReceipt.chainHash ? shortHash(winData.matchReceipt.chainHash) : '—')}
+                  </span>
                 </div>
               )}
               {winData.isClassic && winData.bestScore !== undefined && (

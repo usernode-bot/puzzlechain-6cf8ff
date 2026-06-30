@@ -259,6 +259,15 @@ const GAME_IDS = new Set(
 // Any game id known to the hub (used by DApp session validation).
 const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
+// Classic games that persist a single global best score via the generic
+// /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
+const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush']);
+
+// Classic games that support online "race" multiplayer (each player plays
+// their own board; highest final score wins) over classic_rooms.
+const CLASSIC_RACE_GAME_IDS = new Set(['2048', 'blockblast']);
+const CLASSIC_LB_LIMIT = 20;
+
 // Consecutive-day streak milestones that unlock a named badge. Kept in sync
 // with STREAK_BADGES in public/app.jsx (the client owns the icon/name copy;
 // the server only persists the day thresholds as streak_milestone achievements
@@ -1129,6 +1138,45 @@ async function migrate() {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  // Race-mode columns (used by 2048 / Block Blast online race; ignored by
+  // Chutes & Ladders, which uses turn-based `state`/`move_seq`). Each player
+  // plays their own board and submits a final score; when both are in the
+  // server picks the winner. Idempotent ADD COLUMN per platform DB convention.
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS p1_score INTEGER`);
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS p2_score INTEGER`);
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS p1_finished_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS p2_finished_at TIMESTAMPTZ`);
+
+  // Stale-room cleanup — classic_rooms has no TTL, so abandoned waiting rooms
+  // and old finished races accumulate. Prune them on boot (idempotent, cheap).
+  await pool.query(
+    `DELETE FROM classic_rooms
+      WHERE (status = 'waiting'  AND created_at   < now() - interval '24 hours')
+         OR (status = 'finished' AND last_move_at < now() - interval '7 days')`
+  );
+
+  // classic_scores is PUBLIC — global all-time best score per (user, game) for
+  // the score-based classic games (Minesweeper, 2048, Knight's Tour, Block
+  // Blast, Hash Rush). Mirrors snake_scores/breakout_scores but generic: one
+  // row per (user_id, game_id), upserted with GREATEST so a worse run never
+  // lowers a personal best. `extra` holds game-specific stats (best_time_secs,
+  // best_level, …) for display. No foreign keys (public-table rule).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS classic_scores (
+      user_id      TEXT NOT NULL,
+      username     TEXT,
+      game_id      TEXT NOT NULL,
+      best_score   INTEGER NOT NULL DEFAULT 0,
+      games_played INTEGER NOT NULL DEFAULT 0,
+      extra        JSONB,
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_classic_scores_game_score
+       ON classic_scores(game_id, best_score DESC, updated_at ASC)`
+  );
 
   // bg_themes is PUBLIC: a shared gallery of AI-generated background themes.
   // Cosmetic only (gradient color params + the prompt + creator name) — no
@@ -3259,6 +3307,44 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: populate the classic-game leaderboards
+    // (classic_scores) with a handful of obviously-fake players so the
+    // ClassicLeaderboard (in-game tab + mode-modal "Top players" preview) and
+    // its ranking are demonstrable on a fresh staging DB. Idempotent (fixed
+    // user ids + ON CONFLICT), obviously fake names, strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'classic-scores') {
+      const csUsers = [
+        { id: 'staging-demo-ada',  name: 'Staging demo Ada' },
+        { id: 'staging-demo-borg', name: 'Staging demo Borg' },
+        { id: 'staging-demo-cal',  name: 'Staging demo Cal' },
+      ];
+      for (const u of csUsers) {
+        await pool.query(`INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`, [u.id, u.name]);
+      }
+      const csSeed = [
+        ['staging-demo-ada',  'Staging demo Ada',  'minesweeper',  950, 3],
+        ['staging-demo-borg', 'Staging demo Borg', 'minesweeper',  720, 5],
+        ['staging-demo-cal',  'Staging demo Cal',  'minesweeper',  510, 2],
+        ['staging-demo-ada',  'Staging demo Ada',  '2048',        8200, 5],
+        ['staging-demo-borg', 'Staging demo Borg', '2048',        5120, 8],
+        ['staging-demo-cal',  'Staging demo Cal',  '2048',        3040, 4],
+        ['staging-demo-ada',  'Staging demo Ada',  'knights-tour', 5400, 2],
+        ['staging-demo-borg', 'Staging demo Borg', 'knights-tour', 4100, 3],
+        ['staging-demo-ada',  'Staging demo Ada',  'blockblast',  1240, 6],
+        ['staging-demo-borg', 'Staging demo Borg', 'blockblast',   820, 4],
+        ['staging-demo-ada',  'Staging demo Ada',  'hashrush',    1450, 6],
+        ['staging-demo-borg', 'Staging demo Borg', 'hashrush',     930, 3],
+      ];
+      for (const [uid, uname, gid, score, played] of csSeed) {
+        await pool.query(
+          `INSERT INTO classic_scores (user_id, username, game_id, best_score, games_played)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [uid, uname, gid, score, played]
+        );
+      }
+    }
+
     const { rows } = await pool.query(
       `SELECT * FROM daily_attempts
        WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
@@ -4050,6 +4136,11 @@ function shapeClassicRoom(r) {
     moveSeq: r.move_seq,
     status: r.status,
     winner: r.winner,
+    p1Score: r.p1_score != null ? Number(r.p1_score) : null,
+    p2Score: r.p2_score != null ? Number(r.p2_score) : null,
+    p1FinishedAt: r.p1_finished_at || null,
+    p2FinishedAt: r.p2_finished_at || null,
+    lastMoveAt: r.last_move_at || null,
   };
 }
 
@@ -4080,6 +4171,8 @@ app.post('/api/classic/:gameId/rooms', async (req, res) => {
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   const initState = gameId === 'chutes-ladders'
     ? { p1Pos: 0, p2Pos: 0, currentPlayer: 1, die: null, rolls: 0 }
+    : CLASSIC_RACE_GAME_IDS.has(gameId)
+    ? { mode: 'race' }
     : {};
   let roomId = generateRoomId();
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -4196,6 +4289,178 @@ app.post('/api/classic/:gameId/rooms/:roomId/finish', async (req, res) => {
   } catch (err) {
     console.error('[classic] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to finish room' });
+  }
+});
+
+// Submit a race-mode player's final score. When both players are in, the
+// server determines the winner (higher score; earlier finish breaks ties;
+// player1 wins a full tie) and flips the room to finished. Idempotent per
+// player (a retry overwrites the same value). move_seq CAS serializes writes.
+app.post('/api/classic/:gameId/rooms/:roomId/score', async (req, res) => {
+  const { gameId, roomId } = req.params;
+  if (!CLASSIC_RACE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Race not supported for this game' });
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+      const r = rows[0];
+      const isP1 = r.player1_id === req.user.id;
+      const isP2 = r.player2_id === req.user.id;
+      if (!isP1 && !isP2) return res.status(403).json({ error: 'Not a player in this room' });
+      if (r.status === 'finished') return res.json(shapeClassicRoom(r));
+
+      const p1Score = isP1 ? score : r.p1_score;
+      const p2Score = isP2 ? score : r.p2_score;
+      // Stamp this player's finish time; keep the other side's.
+      const p1Fin = isP1 ? new Date() : r.p1_finished_at;
+      const p2Fin = isP2 ? new Date() : r.p2_finished_at;
+      const bothIn = p1Score != null && p2Score != null && r.player2_id != null;
+
+      let winner = r.winner;
+      let status = r.status;
+      if (bothIn) {
+        status = 'finished';
+        if (p1Score > p2Score) winner = '1';
+        else if (p2Score > p1Score) winner = '2';
+        else {
+          // tie on score → earlier finisher wins; if still equal, player1.
+          const t1 = p1Fin ? new Date(p1Fin).getTime() : Infinity;
+          const t2 = p2Fin ? new Date(p2Fin).getTime() : Infinity;
+          winner = t2 < t1 ? '2' : '1';
+        }
+      }
+
+      const { rows: updated } = await pool.query(
+        `UPDATE classic_rooms
+           SET p1_score = $1, p2_score = $2,
+               p1_finished_at = $3, p2_finished_at = $4,
+               winner = $5, status = $6,
+               move_seq = move_seq + 1, last_move_at = now()
+         WHERE id = $7 AND game_id = $8 AND move_seq = $9
+         RETURNING *`,
+        [p1Score, p2Score, p1Fin, p2Fin, winner, status, roomId, gameId, r.move_seq]
+      );
+      if (updated.length === 0) continue; // concurrent write — retry
+      return res.json(shapeClassicRoom(updated[0]));
+    }
+    res.status(409).json({ error: 'Concurrent update conflict' });
+  } catch (err) {
+    console.error('[classic] race score failed:', err.message);
+    res.status(500).json({ error: 'Failed to submit score' });
+  }
+});
+
+// ---- Generic classic-game score + leaderboard (classic_scores) -------------
+
+function shapeClassicScoreRow(row) {
+  return {
+    rank: Number(row.rank),
+    username: row.username || 'anon',
+    bestScore: Number(row.best_score),
+    extra: row.extra || null,
+  };
+}
+
+// Submit a finished classic-game run. Upserts the caller's personal-best row
+// (GREATEST so a worse run never lowers it) and bumps games_played. Returns
+// the new best, the caller's rank, and games played.
+app.post('/api/classic/:gameId/score', async (req, res) => {
+  const { gameId } = req.params;
+  if (!CLASSIC_SCORE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  const extra = (req.body.extra && typeof req.body.extra === 'object' && !Array.isArray(req.body.extra))
+    ? req.body.extra : null;
+  try {
+    const { rows: prevRows } = await pool.query(
+      `SELECT best_score FROM classic_scores WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]
+    );
+    const prevBest = prevRows.length > 0 ? prevRows[0].best_score : null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO classic_scores (user_id, username, game_id, best_score, games_played, extra, updated_at)
+       VALUES ($1, $2, $3, $4, 1, $5::jsonb, now())
+       ON CONFLICT (user_id, game_id) DO UPDATE SET
+         username     = EXCLUDED.username,
+         extra        = CASE WHEN EXCLUDED.best_score > classic_scores.best_score
+                             THEN EXCLUDED.extra ELSE classic_scores.extra END,
+         best_score   = GREATEST(classic_scores.best_score, EXCLUDED.best_score),
+         games_played = classic_scores.games_played + 1,
+         updated_at   = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, gameId, score, extra ? JSON.stringify(extra) : null]
+    );
+    const me = rows[0];
+
+    // Best-effort stats snapshot bump (row may not exist for this user yet).
+    await pool.query(
+      `UPDATE user_stats_snapshot
+         SET total_score = total_score + $2, classics_played = classics_played + 1,
+             last_win_at = now(), updated_at = now()
+       WHERE user_id = $1`,
+      [req.user.id, score]
+    ).catch(() => {});
+
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', $2, $3, $4)`,
+        [req.user.id, gameId, score, JSON.stringify({ previousBest: prevBest })]
+      ).catch(() => {});
+    }
+
+    const { rows: rankRows } = await pool.query(
+      `SELECT COUNT(*) + 1 AS rank FROM classic_scores
+        WHERE game_id = $1 AND (best_score > $2 OR (best_score = $2 AND updated_at < $3))`,
+      [gameId, me.best_score, me.updated_at]
+    );
+    res.json({ bestScore: me.best_score, rank: Number(rankRows[0].rank), gamesPlayed: me.games_played });
+  } catch (err) {
+    console.error('[classic] score failed:', err.message);
+    res.status(500).json({ error: 'Failed to record score' });
+  }
+});
+
+// Top-N classic-game leaderboard plus the caller's own standing.
+app.get('/api/classic/:gameId/leaderboard', async (req, res) => {
+  const { gameId } = req.params;
+  if (!CLASSIC_SCORE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, best_score, extra,
+              ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
+         FROM classic_scores
+        WHERE game_id = $1
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT $2`,
+      [gameId, CLASSIC_LB_LIMIT]
+    );
+    const { rows: totalRows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM classic_scores WHERE game_id = $1`, [gameId]
+    );
+
+    let me = null;
+    const { rows: mine } = await pool.query(
+      `SELECT username, best_score, extra, updated_at FROM classic_scores WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]
+    );
+    if (mine.length) {
+      const row = mine[0];
+      const { rows: rankRows } = await pool.query(
+        `SELECT COUNT(*) + 1 AS rank FROM classic_scores
+          WHERE game_id = $1 AND (best_score > $2 OR (best_score = $2 AND updated_at < $3))`,
+        [gameId, row.best_score, row.updated_at]
+      );
+      me = { rank: Number(rankRows[0].rank), username: row.username || 'you', bestScore: Number(row.best_score), extra: row.extra || null };
+    }
+
+    res.json({ entries: top.map(shapeClassicScoreRow), me, total: totalRows[0].n });
+  } catch (err) {
+    console.error('[classic] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
 

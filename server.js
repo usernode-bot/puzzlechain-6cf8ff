@@ -439,6 +439,13 @@ async function migrate() {
        VALUES ('staging-demo-user', 2500)
        ON CONFLICT (user_id) DO NOTHING`
     );
+    await pool.query(`
+      INSERT INTO poker_chips (user_id, chips) VALUES
+        ('staging-demo-alice', 3200),
+        ('staging-demo-bob', 450),
+        ('staging-demo-carol', 1800)
+      ON CONFLICT (user_id) DO NOTHING
+    `);
   }
 
   // idle_game_state is PUBLIC: game state, no sensitive data.

@@ -1880,165 +1880,9 @@ body {
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
 
-/* ---- Texas Hold 'Em ---- */
-.poker-wrap { max-width: 620px; margin: 0 auto; width: 100%; }
-.poker-mode-screen {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 1.25rem; padding: 1.5rem 1rem; text-align: center;
-}
-.poker-mode-title { font-size: 1.3rem; font-weight: 700; }
-.poker-mode-note { color: ${C.muted}; font-size: 0.88rem; font-family: 'JetBrains Mono', monospace; }
-.poker-diff-row { display: flex; gap: 0.6rem; }
-.poker-diff-btn {
-  padding: 0.55rem 1.1rem; border-radius: 10px; cursor: pointer; font-family: inherit;
-  font-size: 0.9rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.card}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
-}
-.poker-diff-btn:hover { border-color: ${C.accent}; }
-.poker-diff-btn.sel { background: ${C.accent}22; border-color: ${C.accent}; color: ${C.accent}; }
-.poker-deal-btn {
-  padding: 0.7rem 2rem; border-radius: 10px; cursor: pointer; font-family: inherit;
-  font-size: 1rem; font-weight: 700; border: none; background: ${C.accent}; color: #fff;
-  transition: opacity 0.12s;
-}
-.poker-deal-btn:hover { opacity: 0.88; }
-
-.poker-table { display: flex; flex-direction: column; gap: 0.9rem; padding: 0.5rem 0; }
-.poker-ai-row { display: flex; gap: 0.75rem; }
-.poker-ai-panel {
-  flex: 1; background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
-  padding: 0.7rem 0.85rem; display: flex; flex-direction: column; gap: 0.35rem;
-}
-.poker-ai-panel.dealer-btn { border-color: ${C.gold}; }
-.poker-ai-label {
-  font-size: 0.75rem; font-weight: 600; color: ${C.muted};
-  display: flex; align-items: center; gap: 0.4rem;
-}
-.poker-ai-stack { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: ${C.text}; }
-.poker-ai-cards { display: flex; gap: 0.35rem; }
-.poker-ai-badge {
-  font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 999px;
-  background: ${C.accent}22; color: ${C.accent}; border: 1px solid ${C.accent}44;
-  align-self: flex-start;
-}
-.poker-ai-badge.fold { background: ${C.rose}22; color: ${C.rose}; border-color: ${C.rose}44; }
-.poker-ai-badge.raise { background: ${C.gold}22; color: ${C.gold}; border-color: ${C.gold}44; }
-.poker-ai-badge.allin { background: ${C.violet}22; color: ${C.violet}; border-color: ${C.violet}44; }
-.poker-ai-thinking { font-size: 0.72rem; color: ${C.muted}; font-style: italic; }
-
-.poker-community {
-  background: #0d2a15; border: 1px solid #1a4a25; border-radius: 14px;
-  padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: center;
-}
-.poker-community-cards { display: flex; gap: 0.5rem; justify-content: center; }
-.poker-phase-row {
-  display: flex; gap: 1rem; font-size: 0.8rem;
-  font-family: 'JetBrains Mono', monospace;
-}
-.poker-phase-label { color: ${C.emerald}; font-weight: 600; }
-.poker-pot-label { color: ${C.gold}; }
-
-.poker-card {
-  width: 42px; height: 62px; border-radius: 7px; background: #fff; color: #111;
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 3px 4px; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.85rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.15);
-  position: relative; flex-shrink: 0; user-select: none;
-  animation: poker-card-deal 200ms ease both;
-}
-.poker-card.back {
-  background: ${C.accent}; border-color: ${C.accent}; color: transparent;
-  background-image: repeating-linear-gradient(
-    45deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 2px, transparent 2px, transparent 8px
-  );
-}
-.poker-card.empty {
-  background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.15);
-}
-.poker-card .cr { font-size: 0.7rem; line-height: 1; }
-.poker-card .cs { font-size: 0.8rem; line-height: 1; }
-.poker-card .cs-bot { transform: rotate(180deg); align-self: flex-end; }
-.poker-card.red .cr, .poker-card.red .cs { color: ${C.rose}; }
-.poker-card.black .cr, .poker-card.black .cs { color: #1a1a1a; }
-.poker-card.lg { width: 52px; height: 76px; border-radius: 9px; font-size: 1rem; }
-.poker-card.lg .cr { font-size: 0.82rem; }
-.poker-card.lg .cs { font-size: 1rem; }
-@keyframes poker-card-deal {
-  from { opacity: 0; transform: scale(0.7) translateY(-8px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.poker-player-panel {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
-  padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.7rem;
-}
-.poker-player-top {
-  display: flex; align-items: center; gap: 0.75rem;
-}
-.poker-player-info { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
-.poker-player-label { font-size: 0.75rem; font-weight: 600; color: ${C.muted}; }
-.poker-player-stack { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; }
-.poker-player-cards { display: flex; gap: 0.4rem; }
-.poker-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.poker-action-btn {
-  flex: 1; min-width: 70px; padding: 0.55rem 0.5rem; border-radius: 10px; cursor: pointer;
-  font-family: inherit; font-size: 0.88rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, opacity 0.12s;
-}
-.poker-action-btn:hover:not(:disabled) { border-color: ${C.accent}; }
-.poker-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.poker-action-btn.fold { border-color: ${C.rose}44; color: ${C.rose}; }
-.poker-action-btn.fold:hover { border-color: ${C.rose}; }
-.poker-action-btn.call { background: ${C.accent}; color: #fff; border-color: ${C.accent}; }
-.poker-action-btn.call:hover { opacity: 0.88; }
-.poker-action-btn.raise { background: ${C.gold}22; border-color: ${C.gold}44; color: ${C.gold}; }
-.poker-action-btn.raise:hover { border-color: ${C.gold}; }
-.poker-raise-picker {
-  background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 10px;
-  padding: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem;
-}
-.poker-raise-presets { display: flex; gap: 0.4rem; }
-.poker-raise-preset-btn {
-  flex: 1; padding: 0.4rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.78rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.card}; color: ${C.text}; transition: border-color 0.12s;
-}
-.poker-raise-preset-btn:hover { border-color: ${C.gold}; color: ${C.gold}; }
-.poker-raise-preset-btn.sel { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}15; }
-.poker-raise-confirm-btn {
-  padding: 0.45rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.88rem; font-weight: 700; border: none; background: ${C.gold}; color: #000;
-}
-.poker-hand-result {
-  border-radius: 12px; padding: 0.8rem 1rem; text-align: center;
-  font-weight: 700; font-size: 0.95rem; background: ${C.surface};
-  border: 1px solid ${C.border}; animation: poker-card-deal 200ms ease both;
-}
-.poker-hand-result.win { background: ${C.emerald}22; border-color: ${C.emerald}; color: ${C.emerald}; }
-.poker-hand-result.lose { background: ${C.rose}15; border-color: ${C.rose}44; color: ${C.muted}; }
-.poker-showdown-hands {
-  display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;
-}
-.poker-showdown-player {
-  display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem;
-}
-.poker-showdown-player .name { min-width: 5rem; color: ${C.muted}; }
-.poker-showdown-player .hand-name { font-weight: 600; }
-.poker-showdown-player.winner .hand-name { color: ${C.emerald}; }
-.poker-showdown-player.loser .hand-name { color: ${C.dim}; }
-.poker-ai-folded-label { font-size: 0.78rem; color: ${C.dim}; font-style: italic; }
-
 .poker-auth-notice {
   font-size: 0.75rem; color: ${C.muted}; text-align: center; padding: 0.4rem;
   border-radius: 8px; background: ${C.surface}; border: 1px solid ${C.border};
-}
-
-@media (max-width: 480px) {
-  .poker-ai-row { flex-direction: column; }
-  .poker-diff-row { flex-wrap: wrap; justify-content: center; }
-  .poker-actions { gap: 0.4rem; }
-  .poker-action-btn { min-width: 60px; font-size: 0.8rem; }
-  .poker-raise-presets { flex-direction: column; }
 }
 
 /* ---- Snake ---- */
@@ -3111,67 +2955,354 @@ body {
 }
 @keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
-/* ---- Texas Hold 'Em ---- */
-.th-felt {
-  width: var(--cg-board);
-  max-width: 94vw;
-  background: radial-gradient(ellipse at center, #155e3a, #0c3d26);
-  border: 2px solid ${C.gold}66;
-  border-radius: 18px;
-  padding: clamp(0.6rem, 2.5vw, 1.1rem);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: clamp(0.5rem, 2vh, 0.9rem);
+/* ---- Texas Hold 'Em (redesigned) ---- */
+.poker-shell {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  background: #050a0e; color: ${C.text}; font-family: 'Space Grotesk', system-ui, sans-serif;
+  overflow: hidden; z-index: 10;
 }
-.th-seat { text-align: center; }
-.th-seat .who { font-size: 0.72rem; color: #d6e8d6; letter-spacing: 0.04em; }
-.th-seat .chips { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: ${C.gold}; font-weight: 600; }
-.th-cards { display: flex; gap: 0.35rem; justify-content: center; }
-.th-card {
-  width: clamp(2rem, 9vw, 3rem);
-  height: clamp(2.8rem, 12.5vw, 4.2rem);
-  border-radius: 7px;
-  background: #fbfbfb;
-  color: #111;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: clamp(0.85rem, 4vw, 1.25rem);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-  line-height: 1;
+.poker-top-bar {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.5);
+  border-bottom: 1px solid ${C.border}44; flex-shrink: 0; min-height: 44px;
 }
-.th-card.red { color: ${C.rose}; }
-.th-card.back { background: repeating-linear-gradient(45deg, ${C.accent}, ${C.accent} 6px, ${C.border} 6px, ${C.border} 12px); color: transparent; }
-.th-pot { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; font-size: 0.95rem; }
-.th-msg { color: #d6e8d6; font-size: 0.82rem; min-height: 1.2rem; text-align: center; }
-.th-community { display: flex; gap: 0.3rem; min-height: clamp(2.8rem, 12.5vw, 4.2rem); align-items: center; }
-.th-actions {
-  display: flex;
-  gap: 0.5rem;
-  width: var(--cg-board);
-  max-width: 94vw;
+.poker-top-bar-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
+.poker-top-bar-info { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: ${C.muted}; }
+.poker-conn-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: ${C.emerald};
+  flex-shrink: 0;
 }
-.th-actions button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.7rem 0.3rem;
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
+.poker-conn-dot.slow { background: ${C.gold}; }
+.poker-back-btn {
+  background: none; border: none; color: ${C.muted}; cursor: pointer;
+  font-size: 1.1rem; padding: 0.2rem 0.4rem; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.12s, background 0.12s;
 }
-.th-actions button:hover:not(:disabled) { border-color: ${C.gold}; }
-.th-actions button:disabled { opacity: 0.35; cursor: not-allowed; }
-.th-actions button.bet { background: ${C.gold}; color: #000; border-color: ${C.gold}; }
-.th-betsizer { display: flex; align-items: center; gap: 0.5rem; width: var(--cg-board); max-width: 94vw; }
-.th-betsizer input { flex: 1; }
-.th-betsizer .amt { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; min-width: 3rem; text-align: right; }
+.poker-back-btn:hover { color: ${C.text}; background: ${C.border}44; }
+.poker-main {
+  flex: 1; position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.poker-oval-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  position: relative; padding: 0.5rem;
+}
+.poker-oval {
+  position: relative;
+  width: min(90vw, 540px);
+  height: min(54vw, 320px);
+  background: radial-gradient(ellipse at center, #1a5c32 0%, #0d3a1e 55%, #071f10 100%);
+  border-radius: 50%;
+  border: 3px solid ${C.gold}55;
+  box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
+  overflow: visible;
+}
+.poker-seat {
+  position: absolute; transform: translate(-50%, -50%);
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 12px; padding: 0.35rem 0.5rem;
+  min-width: 80px; max-width: 110px;
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  cursor: default; user-select: none; transition: border-color 0.2s, box-shadow 0.2s;
+  z-index: 2;
+}
+.poker-seat.active {
+  border-color: ${C.gold}; box-shadow: 0 0 12px ${C.gold}55;
+  animation: poker-pulse 1.2s ease-in-out infinite;
+}
+.poker-seat.winner { border-color: ${C.emerald}; box-shadow: 0 0 16px ${C.emerald}66; animation: poker-winner-glow 0.6s ease-in-out 3; }
+.poker-seat.folded { opacity: 0.45; }
+.poker-seat.eliminated { opacity: 0.25; border-style: dashed; }
+.poker-seat-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+}
+.poker-seat-name {
+  font-size: 0.68rem; font-weight: 600; color: ${C.text};
+  display: flex; align-items: center; gap: 0.25rem; white-space: nowrap;
+}
+.poker-seat-badge {
+  font-size: 0.55rem; font-weight: 700; padding: 0.08rem 0.3rem;
+  border-radius: 999px; background: ${C.border}; color: ${C.muted};
+}
+.poker-seat-badge.dealer { background: ${C.gold}33; color: ${C.gold}; }
+.poker-seat-badge.sb { background: ${C.accent}22; color: ${C.accent}; }
+.poker-seat-badge.bb { background: ${C.violet}22; color: ${C.violet}; }
+.poker-seat-chips {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+  color: ${C.gold}; font-weight: 600;
+}
+.poker-seat-cards { display: flex; gap: 0.18rem; justify-content: center; }
+.poker-seat-label {
+  font-size: 0.6rem; font-weight: 700; padding: 0.1rem 0.35rem;
+  border-radius: 999px; white-space: nowrap;
+}
+.poker-seat-label.fold { background: ${C.rose}22; color: ${C.rose}; }
+.poker-seat-label.check { background: ${C.border}; color: ${C.muted}; }
+.poker-seat-label.call { background: ${C.accent}22; color: ${C.accent}; }
+.poker-seat-label.raise { background: ${C.gold}22; color: ${C.gold}; }
+.poker-seat-label.allin { background: ${C.violet}22; color: ${C.violet}; }
+.poker-seat-label.bet { background: ${C.gold}22; color: ${C.gold}; }
+.poker-seat-timer {
+  width: 100%; height: 2px; background: ${C.border}; border-radius: 1px; overflow: hidden; margin-top: 0.1rem;
+}
+.poker-seat-timer-bar { height: 100%; background: ${C.gold}; transition: width 0.3s linear; border-radius: 1px; }
+.poker-community {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  pointer-events: none;
+}
+.poker-pot-row {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  color: ${C.gold}; font-weight: 600;
+  background: rgba(0,0,0,0.5); padding: 0.18rem 0.5rem; border-radius: 999px;
+}
+.poker-board { display: flex; gap: 0.28rem; }
+.poker-card-slot {
+  width: 34px; height: 50px; border-radius: 5px;
+  background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.18);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; overflow: hidden;
+}
+.poker-card {
+  width: 34px; height: 50px; border-radius: 5px; background: #fff; color: #111;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
+  flex-shrink: 0; user-select: none;
+}
+.poker-card.back {
+  background: ${C.accent}; border-color: ${C.accent}80;
+  background-image: repeating-linear-gradient(
+    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
+  );
+}
+.poker-card.red { color: ${C.rose}; }
+.poker-card.flip-in { animation: poker-flip-in 220ms ease both; }
+.poker-card-rank { font-size: 0.65rem; line-height: 1; }
+.poker-card-suit { font-size: 0.75rem; line-height: 1; align-self: center; }
+.poker-card-suit-bot { transform: rotate(180deg); align-self: flex-end; }
+.poker-card-lg {
+  width: 40px; height: 58px; border-radius: 6px; background: #fff; color: #111;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
+  flex-shrink: 0; user-select: none;
+}
+.poker-card-lg.back {
+  background: ${C.accent}; border-color: ${C.accent}80;
+  background-image: repeating-linear-gradient(
+    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
+  );
+}
+.poker-card-lg.red { color: ${C.rose}; }
+.poker-street {
+  font-size: 0.65rem; font-weight: 600; color: ${C.emerald};
+  letter-spacing: 0.07em; text-transform: uppercase;
+}
+.poker-action-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.55);
+  border-top: 1px solid ${C.border}44; flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.poker-action-btn {
+  flex: 1; min-width: 62px; padding: 0.55rem 0.4rem; border-radius: 10px; cursor: pointer;
+  font-family: inherit; font-size: 0.82rem; font-weight: 700; border: 1px solid transparent;
+  transition: opacity 0.12s, transform 0.08s; text-align: center;
+}
+.poker-action-btn:active:not(:disabled) { transform: scale(0.96); }
+.poker-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.poker-action-btn.fold { background: ${C.rose}22; border-color: ${C.rose}55; color: ${C.rose}; }
+.poker-action-btn.fold:hover:not(:disabled) { background: ${C.rose}33; }
+.poker-action-btn.check { background: ${C.border}; border-color: ${C.border}; color: ${C.text}; }
+.poker-action-btn.check:hover:not(:disabled) { background: ${C.dim}; }
+.poker-action-btn.call { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.poker-action-btn.call:hover:not(:disabled) { opacity: 0.88; }
+.poker-action-btn.raise { background: ${C.gold}22; border-color: ${C.gold}55; color: ${C.gold}; }
+.poker-action-btn.raise:hover:not(:disabled) { background: ${C.gold}33; }
+.poker-action-btn.allin { background: ${C.violet}22; border-color: ${C.violet}55; color: ${C.violet}; }
+.poker-action-btn.allin:hover:not(:disabled) { background: ${C.violet}33; }
+.poker-action-btn.next { background: ${C.emerald}22; border-color: ${C.emerald}55; color: ${C.emerald}; }
+.poker-action-btn.next:hover:not(:disabled) { background: ${C.emerald}33; }
+.poker-raise-panel {
+  position: absolute; bottom: 100%; left: 0; right: 0;
+  background: ${C.card}; border-top: 1px solid ${C.border};
+  padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;
+  animation: slideUp 0.18s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.poker-preset-row { display: flex; gap: 0.4rem; }
+.poker-preset-btn {
+  flex: 1; padding: 0.4rem; border-radius: 8px; cursor: pointer; font-family: inherit;
+  font-size: 0.75rem; font-weight: 600; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s;
+}
+.poker-preset-btn:hover { border-color: ${C.gold}; color: ${C.gold}; }
+.poker-preset-btn.sel { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}15; }
+.poker-raise-row { display: flex; align-items: center; gap: 0.5rem; }
+.poker-raise-slider { flex: 1; accent-color: ${C.gold}; }
+.poker-raise-input {
+  width: 60px; background: ${C.surface}; border: 1px solid ${C.border};
+  color: ${C.gold}; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+  border-radius: 6px; padding: 0.3rem 0.4rem; text-align: center;
+}
+.poker-raise-row-btns { display: flex; gap: 0.4rem; }
+.poker-raise-confirm { flex: 1; background: ${C.gold}; color: #000; border: none; border-radius: 8px; padding: 0.45rem; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
+.poker-raise-cancel { background: none; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
+.poker-float-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 20; }
+.poker-float-btn {
+  width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6);
+  border: 1px solid ${C.border}55; color: ${C.text}; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+  transition: background 0.12s;
+}
+.poker-float-btn:hover { background: rgba(0,0,0,0.8); }
+.poker-float-popover {
+  position: absolute; top: 100%; right: 0; margin-top: 0.4rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  padding: 0.4rem; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  display: flex; flex-direction: column; gap: 0.2rem;
+}
+.poker-float-item {
+  background: none; border: none; color: ${C.text}; cursor: pointer;
+  font-family: inherit; font-size: 0.85rem; padding: 0.5rem 0.75rem;
+  text-align: left; border-radius: 7px; transition: background 0.1s;
+}
+.poker-float-item:hover { background: ${C.border}44; }
+.poker-sidebar {
+  position: fixed; top: 0; bottom: 0; width: 280px; max-width: 85vw;
+  background: ${C.card}; border: 1px solid ${C.border};
+  display: flex; flex-direction: column; z-index: 30;
+  transition: transform 0.22s ease; overflow: hidden;
+}
+.poker-sidebar.left { left: 0; border-radius: 0 14px 14px 0; transform: translateX(-100%); }
+.poker-sidebar.left.open { transform: translateX(0); }
+.poker-sidebar.right { right: 0; border-radius: 14px 0 0 14px; transform: translateX(100%); }
+.poker-sidebar.right.open { transform: translateX(0); }
+.poker-sidebar-header {
+  display: flex; align-items: center; padding: 0.75rem 1rem;
+  border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; flex-shrink: 0;
+}
+.poker-sidebar-close {
+  margin-left: auto; background: none; border: none; color: ${C.muted};
+  cursor: pointer; font-size: 1.1rem; display: flex; align-items: center;
+}
+.poker-sidebar-close:hover { color: ${C.text}; }
+.poker-sidebar-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.poker-sidebar-section { border-bottom: 1px solid ${C.border}22; padding-bottom: 0.5rem; }
+.poker-sidebar-section-title { font-size: 0.72rem; font-weight: 700; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.4rem; }
+.poker-log-entry { font-size: 0.78rem; color: ${C.muted}; padding: 0.2rem 0; border-bottom: 1px solid ${C.border}22; }
+.poker-log-entry.win { color: ${C.emerald}; }
+.poker-log-entry.lose { color: ${C.rose}; }
+.poker-log-entry.hand { color: ${C.gold}; font-weight: 600; }
+.poker-chat-msg { font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid ${C.border}22; }
+.poker-chat-msg .who { font-weight: 600; }
+.poker-chat-msg .who.player { color: ${C.accent}; }
+.poker-chat-msg .who.bot { color: ${C.muted}; }
+.poker-chat-input-row { display: flex; gap: 0.4rem; padding-top: 0.5rem; flex-shrink: 0; }
+.poker-chat-input {
+  flex: 1; background: ${C.surface}; border: 1px solid ${C.border};
+  color: ${C.text}; border-radius: 8px; padding: 0.45rem 0.6rem;
+  font-family: inherit; font-size: 0.82rem;
+}
+.poker-chat-send {
+  background: ${C.accent}; border: none; color: #fff; border-radius: 8px;
+  padding: 0.45rem 0.75rem; cursor: pointer; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+}
+.poker-drawer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: ${C.card}; border-top: 1px solid ${C.border};
+  border-radius: 14px 14px 0 0; z-index: 30;
+  max-height: 60vh; display: flex; flex-direction: column;
+  transform: translateY(100%); transition: transform 0.22s ease;
+}
+.poker-drawer.open { transform: translateY(0); }
+.poker-drawer-handle { width: 36px; height: 4px; background: ${C.border}; border-radius: 2px; margin: 0.6rem auto 0; }
+.poker-drawer-header { display: flex; align-items: center; padding: 0.6rem 1rem; border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; }
+.poker-drawer-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.poker-setup {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.25rem; padding: 1.5rem 1.25rem; text-align: center; overflow-y: auto;
+}
+.poker-setup-title { font-size: 1.4rem; font-weight: 700; }
+.poker-setup-sub { font-size: 0.85rem; color: ${C.muted}; }
+.poker-setup-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.25rem; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 1rem;
+}
+.poker-setup-label { font-size: 0.78rem; font-weight: 600; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+.poker-setup-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.poker-bot-btn {
+  flex: 1; min-width: 44px; padding: 0.5rem; border-radius: 8px; cursor: pointer; font-family: inherit;
+  font-size: 0.88rem; font-weight: 600; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
+}
+.poker-bot-btn:hover { border-color: ${C.accent}; }
+.poker-bot-btn.sel { background: ${C.accent}22; border-color: ${C.accent}; color: ${C.accent}; }
+.poker-diff-btn {
+  flex: 1; padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer; font-family: inherit;
+  font-size: 0.82rem; font-weight: 600; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
+}
+.poker-diff-btn:hover { border-color: ${C.gold}; }
+.poker-diff-btn.sel { background: ${C.gold}15; border-color: ${C.gold}; color: ${C.gold}; }
+.poker-setup-chips { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: ${C.gold}; font-weight: 600; }
+.poker-start-btn {
+  width: 100%; padding: 0.75rem; border-radius: 10px; cursor: pointer; font-family: inherit;
+  font-size: 1rem; font-weight: 700; border: none; background: ${C.accent}; color: #fff;
+  transition: opacity 0.12s;
+}
+.poker-start-btn:hover { opacity: 0.88; }
+.poker-winner-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.75); z-index: 25;
+}
+.poker-winner-msg {
+  background: ${C.card}; border: 2px solid ${C.gold}; border-radius: 16px;
+  padding: 1.5rem 2rem; text-align: center; display: flex; flex-direction: column; gap: 0.6rem;
+  box-shadow: 0 0 30px ${C.gold}44;
+}
+.poker-winner-msg h2 { font-size: 1.4rem; font-weight: 700; color: ${C.gold}; }
+.poker-winner-msg .sub { font-size: 0.88rem; color: ${C.muted}; }
+.poker-hand-hist-item { background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.8rem; }
+.poker-hand-hist-title { font-weight: 600; color: ${C.text}; margin-bottom: 0.25rem; }
+.poker-hand-hist-detail { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+.poker-overlay-backdrop { position: fixed; inset: 0; z-index: 25; }
+@keyframes poker-pulse {
+  0%, 100% { box-shadow: 0 0 8px ${C.gold}44; }
+  50% { box-shadow: 0 0 18px ${C.gold}99, 0 0 32px ${C.gold}44; }
+}
+@keyframes poker-flip-in {
+  from { transform: rotateY(90deg) scale(0.8); opacity: 0; }
+  to { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+@keyframes poker-winner-glow {
+  0%, 100% { box-shadow: 0 0 8px ${C.emerald}44; }
+  50% { box-shadow: 0 0 24px ${C.emerald}88; }
+}
+@media (max-width: 768px) {
+  .poker-oval { width: min(95vw, 480px); height: min(57vw, 280px); }
+  .poker-seat { min-width: 70px; max-width: 95px; }
+  .poker-card { width: 28px; height: 42px; font-size: 0.6rem; }
+  .poker-card-slot { width: 28px; height: 42px; }
+  .poker-card-lg { width: 32px; height: 48px; }
+  .poker-action-btn { min-width: 52px; font-size: 0.75rem; padding: 0.45rem 0.3rem; }
+}
+@media (max-width: 480px) {
+  .poker-oval { width: 98vw; height: 58vw; }
+  .poker-seat { min-width: 62px; max-width: 82px; padding: 0.25rem 0.35rem; }
+  .poker-seat-avatar { width: 22px; height: 22px; font-size: 0.6rem; }
+  .poker-card { width: 22px; height: 34px; font-size: 0.5rem; }
+  .poker-card-slot { width: 22px; height: 34px; }
+  .poker-card-lg { width: 26px; height: 38px; }
+  .poker-card-rank { font-size: 0.5rem; }
+  .poker-card-suit { font-size: 0.6rem; }
+  .poker-action-btn { min-width: 44px; font-size: 0.7rem; padding: 0.4rem 0.2rem; }
+  .poker-action-bar { padding: 0.4rem 0.5rem; gap: 0.35rem; }
+}
 
 @media (orientation: landscape) and (max-height: 560px) {
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
@@ -10316,7 +10447,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   );
 }
 
-/* ---------------- Texas Hold 'Em ---------------- */
+/* ---------------- Texas Hold 'Em (redesigned) ---------------- */
 const TH_SUITS = ['♠', '♥', '♦', '♣'];
 const TH_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 function thDeck() {
@@ -10381,262 +10512,748 @@ function thHandStrength(hole, board) {
   if (Math.abs(a.r - b.r) === 1) s += 0.05;
   return Math.min(0.95, s);
 }
-function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
-  const START = 200, BB = 10;
-  const [state, setState] = useState(null);
-  const [betOpen, setBetOpen] = useState(false);
-  const [betAmt, setBetAmt] = useState(BB);
-  const doneRef = useRef(false);
-  const handsRef = useRef(0);
-  const bigPotRef = useRef(0);
-  const secsRef = useRef(0);
-  const [done, setDone] = useState(false);
-  const secs = useElapsed(resetKey, !done);
-  secsRef.current = secs;
+/* ---- Poker sub-components ---- */
+const POKER_BOT_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
+const POKER_SEAT_COLORS = ['#6366F1', '#FBBF24', '#34D399', '#FB7185', '#A78BFA', '#F97316'];
 
-  // Texas is always a Versus-Bot game — report it so the menu shows Save.
-  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
-
-  // Game Menu Save/Resume.
-  const { loadState, clearState } = useClassicSave('texas');
-  const [resumeOffer, setResumeOffer] = useState(null);
-  const resumeCheckedRef = useRef(false);
-  const stateRef = useRef(state);
-  stateRef.current = state;
-  useClassicSaveSource(!done && !!state, () => ({
-    th: stateRef.current, hands: handsRef.current, bigPot: bigPotRef.current,
-  }));
-  useEffect(() => {
-    if (resumeCheckedRef.current) return;
-    resumeCheckedRef.current = true;
-    loadState().then(s => { if (s && s.th) setResumeOffer(s); });
-  }, []);
-  const applyResume = () => {
-    const s = resumeOffer; if (!s) return;
-    handsRef.current = s.hands || 0; bigPotRef.current = s.bigPot || 0;
-    setState(s.th); setDone(false); doneRef.current = false;
-    setResumeOffer(null);
-  };
-  const dismissResume = () => { setResumeOffer(null); clearState(); };
-
-  const newHand = (pc, ac, dealerIsPlayer) => {
-    const deck = thDeck();
-    const player = [deck.pop(), deck.pop()];
-    const ai = [deck.pop(), deck.pop()];
-    // simple blinds: dealer posts SB(BB/2), other posts BB
-    const sb = BB / 2;
-    let playerBet = dealerIsPlayer ? sb : BB;
-    let aiBet = dealerIsPlayer ? BB : sb;
-    playerBet = Math.min(playerBet, pc); aiBet = Math.min(aiBet, ac);
-    return {
-      deck, player, ai, board: [],
-      pot: 0, pc: pc - playerBet, ac: ac - aiBet,
-      playerBet, aiBet, street: 0,
-      toAct: dealerIsPlayer ? 'player' : 'ai', // dealer/SB acts first preflop
-      dealerIsPlayer, msg: 'Your move', reveal: false, phase: 'betting',
-    };
-  };
-  const init = () => {
-    handsRef.current = 0; doneRef.current = false; setDone(false);
-    setState(newHand(START, START, true));
-    setBetOpen(false); setBetAmt(BB);
-  };
-  useEffect(() => { init(); }, [resetKey]);
-
-  // AI acts when it's their turn
-  useEffect(() => {
-    if (!state || state.phase !== 'betting' || state.toAct !== 'ai' || done) return;
-    const t = setTimeout(() => aiAct(), 700);
-    return () => clearTimeout(t);
-  }, [state, done]);
-
-  const dealNext = (s) => {
-    const d = s.deck.slice();
-    const board = s.board.slice();
-    if (s.street === 0) { board.push(d.pop(), d.pop(), d.pop()); }
-    else { board.push(d.pop()); }
-    return { ...s, deck: d, board, street: s.street + 1 };
-  };
-  const showdown = (s) => {
-    const pv = thBest([...s.player, ...s.board]);
-    const av = thBest([...s.ai, ...s.board]);
-    let pc = s.pc, ac = s.ac, msg;
-    if (pv > av) { pc += s.pot; msg = `You win ${s.pot} with ${thCatName(pv)}`; cgSound('win'); }
-    else if (av > pv) { ac += s.pot; msg = `Opponent wins with ${thCatName(av)}`; cgSound('lose'); }
-    else { pc += Math.floor(s.pot / 2); ac += Math.ceil(s.pot / 2); msg = `Split pot (${thCatName(pv)})`; }
-    bigPotRef.current = Math.max(bigPotRef.current, s.pot);
-    return { ...s, pc, ac, msg, reveal: true, phase: 'handover' };
-  };
-  const advanceStreet = (s) => {
-    const pot = s.pot + s.playerBet + s.aiBet;
-    let ns = { ...s, pot, playerBet: 0, aiBet: 0, _pAct: false, _aAct: false };
-    if (s.street >= 4) return showdown(ns);
-    ns = dealNext(ns);
-    ns.toAct = ns.dealerIsPlayer ? 'ai' : 'player'; // non-dealer acts first post-flop
-    ns.msg = ns.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
-    return ns;
-  };
-  const endFold = (s, who) => {
-    const pot = s.pot + s.playerBet + s.aiBet;
-    let pc = s.pc, ac = s.ac, msg;
-    if (who === 'ai') { pc += pot; msg = `Opponent folds — you win ${pot}`; cgSound('chip'); }
-    else { ac += pot; msg = `You fold — opponent wins ${pot}`; }
-    bigPotRef.current = Math.max(bigPotRef.current, pot);
-    return { ...s, pc, ac, pot, playerBet: 0, aiBet: 0, msg, reveal: who !== 'player', phase: 'handover' };
-  };
-  // Unified heads-up round resolution: a betting round closes when bets are
-  // equal AND the other player has already acted since the last aggression.
-  const resolve = (s, actorIsPlayer) => {
-    const equal = s.playerBet === s.aiBet;
-    const otherActed = actorIsPlayer ? s._aAct : s._pAct;
-    if (equal && otherActed) return advanceStreet(s);
-    s.toAct = actorIsPlayer ? 'ai' : 'player';
-    s.msg = s.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
-    return s;
-  };
-  const playerAction = (action, amount) => {
-    if (!state || state.toAct !== 'player' || state.phase !== 'betting') return;
-    let s = { ...state };
-    const toCall = s.aiBet - s.playerBet;
-    if (action === 'fold') { const ns = endFold(s, 'player'); setState(ns); setTimeout(() => checkMatch(ns), 0); return; }
-    if (action === 'check') {
-      if (toCall > 0) return;
-      s._pAct = true; cgSound('chip');
-      setState(resolve(s, true)); return;
-    }
-    if (action === 'call') {
-      const pay = Math.min(toCall, s.pc);
-      s.pc -= pay; s.playerBet += pay; s._pAct = true; cgSound('chip');
-      setState(resolve(s, true)); return;
-    }
-    if (action === 'bet') {
-      const minAdd = Math.min(toCall > 0 ? toCall + BB : BB, s.pc);
-      let add = Math.min(Math.max(amount || BB, minAdd), s.pc);
-      s.pc -= add; s.playerBet += add; s._pAct = true; s._aAct = false;
-      cgSound('chip'); cgHaptic(12); setBetOpen(false);
-      setState(resolve(s, true)); return;
-    }
-  };
-  const aiAct = () => {
-    setState(prev => {
-      if (!prev || prev.toAct !== 'ai' || prev.phase !== 'betting') return prev;
-      let s = { ...prev };
-      const toCall = s.playerBet - s.aiBet;
-      const strength = thHandStrength(s.ai, s.board);
-      const r = Math.random();
-      if (toCall > 0) {
-        const potOdds = toCall / (s.pot + s.playerBet + s.aiBet + toCall);
-        if (strength < 0.25 && potOdds > 0.18 && r > 0.2) { const ns = endFold(s, 'ai'); setTimeout(() => checkMatch(ns), 0); return ns; }
-        if (strength > 0.7 && s.ac > toCall + BB && r > 0.55) {
-          const add = Math.min(toCall + BB * 2, s.ac);
-          s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
-          return resolve(s, false);
-        }
-        const pay = Math.min(toCall, s.ac);
-        s.ac -= pay; s.aiBet += pay; s._aAct = true; cgSound('chip');
-        return resolve(s, false);
-      }
-      if (strength > 0.6 && r > 0.5 && s.ac > BB) {
-        const add = Math.min(BB * 2, s.ac);
-        s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
-        return resolve(s, false);
-      }
-      s._aAct = true; cgSound('chip');
-      return resolve(s, false);
-    });
-  };
-  const checkMatch = (s) => {
-    if (doneRef.current) return;
-    handsRef.current++;
-    onStepChange && onStepChange(handsRef.current);
-    if (s.pc <= 0 || s.ac <= 0) {
-      doneRef.current = true; setDone(true);
-      clearState(); // match over — no save to resume
-      const youWin = s.pc > 0;
-      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
-      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
-      if (youWin) onWin(s.pc, handsRef.current, secsRef.current, { winnerLabel: 'You win!', share: `🃏 Won heads-up poker in ${handsRef.current} hands` });
-      else onLose(handsRef.current, secsRef.current, { share: `🃏 Busted after ${handsRef.current} hands`, answer: 'Opponent wins' });
-    }
-  };
-  const nextHand = () => {
-    if (!state || doneRef.current) return;
-    checkMatch(state);
-    if (doneRef.current) return;
-    setState(newHand(state.pc, state.ac, !state.dealerIsPlayer));
-    setBetAmt(BB);
-  };
-
-  const Card = ({ c, hidden }) => {
-    if (hidden) return <div className="th-card back">?</div>;
-    const red = c.s === 1 || c.s === 2;
-    return <div className={'th-card' + (red ? ' red' : '')}><span>{TH_RANKS[c.r - 2]}</span><span>{TH_SUITS[c.s]}</span></div>;
-  };
-
-  const hist = cgLoadHistory(TH_KEY);
-  const wins = hist.filter(r => r.win).length;
-  const sheet = [
-    cgHistorySection(hist, r => <><span>{r.win ? '🏆 Won match' : '💀 Lost match'}</span><span className="mono">{r.hands} hands</span></>),
-    cgStatsSection([
-      { val: wins, lbl: 'Matches won' }, { val: hist.length, lbl: 'Matches' },
-      { val: bigPotRef.current, lbl: 'Biggest pot' }, { val: handsRef.current, lbl: 'Hands (match)' },
-    ]),
-    cgRulesSection(['Heads-up Texas Hold \'Em vs the computer.', 'Tap Check / Call / Fold to act.', 'Tap Bet/Raise to size a wager.', 'Win all the opponent\'s chips to take the match.']),
-  ];
-
-  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet} menuConfig={menuConfig}><div className="cg-stage" /></ClassicShell>;
-  const s = state;
-  const toCall = Math.max(0, s.aiBet - s.playerBet);
-  const canAct = s.phase === 'betting' && s.toAct === 'player' && !done;
+function PokerCardFace({ card, hidden, lg }) {
+  if (!card) {
+    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
+    return <div className={cls} />;
+  }
+  if (hidden) {
+    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
+    return <div className={cls} />;
+  }
+  const red = card.s === 1 || card.s === 2;
+  const rank = TH_RANKS[card.r - 2];
+  const suit = TH_SUITS[card.s];
+  const cls = (lg ? 'poker-card-lg' : 'poker-card') + (red ? ' red flip-in' : ' flip-in');
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
-      <div className="cg-stage">
-        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
-        <div className="th-felt">
-          <div className="th-seat">
-            <div className="who">Opponent</div>
-            <div className="chips">{s.ac} chips{s.aiBet ? ` · bet ${s.aiBet}` : ''}</div>
-          </div>
-          <div className="th-cards">
-            <Card c={s.ai[0]} hidden={!s.reveal} /><Card c={s.ai[1]} hidden={!s.reveal} />
-          </div>
-          <div className="th-pot">Pot {s.pot + s.playerBet + s.aiBet}</div>
-          <div className="th-community">
-            {s.board.length === 0 ? <span className="th-msg">— flop comes after betting —</span> : s.board.map((c, i) => <Card key={i} c={c} />)}
-          </div>
-          <div className="th-msg">{s.msg}</div>
-          <div className="th-cards">
-            <Card c={s.player[0]} /><Card c={s.player[1]} />
-          </div>
-          <div className="th-seat">
-            <div className="who">You{s.dealerIsPlayer ? ' (D)' : ''}</div>
-            <div className="chips">{s.pc} chips{s.playerBet ? ` · bet ${s.playerBet}` : ''}</div>
+    <div className={cls}>
+      <span className="poker-card-rank">{rank}</span>
+      <span className="poker-card-suit">{suit}</span>
+    </div>
+  );
+}
+
+function PokerSetupScreen({ onStart, savedChips, numBots, setNumBots, difficulty, setDifficulty }) {
+  const BB = 10;
+  const startChips = savedChips || 1000;
+  return (
+    <div className="poker-setup">
+      <div className="poker-setup-title">Texas Hold 'Em</div>
+      <div className="poker-setup-sub">Heads-up and multi-player poker vs bots</div>
+      <div className="poker-setup-card">
+        <div>
+          <div className="poker-setup-label">Your chips</div>
+          <div className="poker-setup-chips">{startChips} chips</div>
+        </div>
+        <div>
+          <div className="poker-setup-label">How many bots?</div>
+          <div className="poker-setup-row">
+            {[1, 2, 3, 4].map(n => (
+              <button key={n} className={'poker-bot-btn' + (numBots === n ? ' sel' : '')} onClick={() => setNumBots(n)}>{n}</button>
+            ))}
           </div>
         </div>
-        {s.phase === 'handover' ? (
-          <div className="th-actions"><button className="bet" onClick={nextHand}>Next hand →</button></div>
-        ) : betOpen ? (
-          <>
-            <div className="th-betsizer">
-              <input type="range" min={BB} max={Math.max(BB, s.pc)} step={BB} value={betAmt} onChange={e => setBetAmt(+e.target.value)} />
-              <span className="amt">{betAmt}</span>
-            </div>
-            <div className="th-actions">
-              <button onClick={() => setBetOpen(false)}>Cancel</button>
-              <button className="bet" disabled={!canAct} onClick={() => playerAction('bet', betAmt)}>{toCall > 0 ? 'Raise' : 'Bet'} {betAmt}</button>
-            </div>
-          </>
-        ) : (
-          <div className="th-actions">
-            <button disabled={!canAct} onClick={() => playerAction('fold')}>Fold</button>
-            {toCall > 0
-              ? <button disabled={!canAct} onClick={() => playerAction('call')}>Call {toCall}</button>
-              : <button disabled={!canAct} onClick={() => playerAction('check')}>Check</button>}
-            <button className="bet" disabled={!canAct || s.pc <= 0} onClick={() => { setBetAmt(Math.min(Math.max(BB, toCall + BB), s.pc)); setBetOpen(true); cgSound('click'); }}>{toCall > 0 ? 'Raise' : 'Bet'}</button>
+        <div>
+          <div className="poker-setup-label">Difficulty</div>
+          <div className="poker-setup-row">
+            {['Easy', 'Normal', 'Hard'].map(d => (
+              <button key={d} className={'poker-diff-btn' + (difficulty === d ? ' sel' : '')} onClick={() => setDifficulty(d)}>{d}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize: '0.78rem', color: '#8B95A8' }}>
+          Big blind: {BB} chips &middot; Starting stack: {startChips}
+        </div>
+        <button className="poker-start-btn" onClick={() => onStart(startChips)}>Start Game</button>
+      </div>
+    </div>
+  );
+}
+
+function PokerTopBar({ handNum, phase, onBack, playerChips, BB }) {
+  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
+  const streetName = streetNames[phase] || '';
+  return (
+    <div className="poker-top-bar">
+      <button className="poker-back-btn" onClick={onBack} title="Leave game">&#8592;</button>
+      <div className="poker-top-bar-title">Texas Hold 'Em</div>
+      <div className="poker-top-bar-info">{streetName} &middot; Hand #{handNum}</div>
+      <div className="poker-conn-dot" title="Connected" />
+    </div>
+  );
+}
+
+function pokerSeatPos(i, n) {
+  // Distribute seats around the oval. Player (seat 0) is always at the bottom.
+  // Angles in degrees: 0 = bottom, clockwise.
+  const angles = {
+    1: [180, 0],           // heads-up: opponent top, player bottom
+    2: [180, 300, 60],     // 3-way
+    3: [180, 270, 0, 90],  // 4-way
+    4: [180, 252, 324, 36, 108], // 5-way
+  };
+  const arr = angles[n] || angles[4];
+  const deg = arr[i] || (i * (360 / (n + 1)));
+  const rad = (deg - 90) * Math.PI / 180;
+  // Use oval proportions: rx=50, ry=50 (percentage), but oval is wider than tall
+  const rx = 46, ry = 42;
+  const x = 50 + rx * Math.cos(rad);
+  const y = 50 + ry * Math.sin(rad);
+  return { x, y };
+}
+
+function PokerSeat({ seat, isPlayer, dealerIdx, sbIdx, bbIdx, isActive, isWinner, actionLabel, showCards, seatIdx }) {
+  const color = POKER_SEAT_COLORS[seatIdx % POKER_SEAT_COLORS.length];
+  const cls = 'poker-seat' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '') +
+    (seat.folded ? ' folded' : '') + (seat.chips <= 0 && !isActive ? ' eliminated' : '');
+  return (
+    <div className={cls}>
+      <div className="poker-seat-avatar" style={{ background: color + '33', border: `1.5px solid ${color}` }}>
+        {isPlayer ? 'You' : seat.name[0]}
+      </div>
+      <div className="poker-seat-name">
+        <span>{isPlayer ? 'You' : seat.name}</span>
+        {seatIdx === dealerIdx && <span className="poker-seat-badge dealer">D</span>}
+        {seatIdx === sbIdx && <span className="poker-seat-badge sb">SB</span>}
+        {seatIdx === bbIdx && <span className="poker-seat-badge bb">BB</span>}
+      </div>
+      <div className="poker-seat-chips">{seat.chips}</div>
+      {seat.bet > 0 && <div style={{ fontSize: '0.6rem', color: '#FBBF2488', fontFamily: 'monospace' }}>bet {seat.bet}</div>}
+      {actionLabel && <div className={'poker-seat-label ' + actionLabel.type}>{actionLabel.text}</div>}
+      <div className="poker-seat-cards">
+        {seat.hand && seat.hand.map((card, ci) => (
+          <PokerCardFace key={ci} card={card} hidden={!showCards && !isPlayer && !seat.revealed} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CommunityArea({ board, pot, street }) {
+  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
+  const slots = [0, 1, 2, 3, 4];
+  return (
+    <div className="poker-community">
+      {pot > 0 && <div className="poker-pot-row">Pot: {pot}</div>}
+      <div className="poker-board">
+        {slots.map(i => (
+          <div key={i} className="poker-card-slot">
+            {board[i] ? <PokerCardFace card={board[i]} /> : null}
+          </div>
+        ))}
+      </div>
+      {street > 0 && <div className="poker-street">{streetNames[street] || ''}</div>}
+    </div>
+  );
+}
+
+function RaisePanel({ minRaise, maxRaise, BB, onRaise, onClose }) {
+  const [amt, setAmt] = useState(minRaise);
+  const presets = [
+    { lbl: '0.5 pot', mult: 0.5 },
+    { lbl: 'Pot', mult: 1 },
+    { lbl: '2x', mult: 2 },
+    { lbl: 'All-in', mult: 999 },
+  ];
+  return (
+    <div className="poker-raise-panel">
+      <div className="poker-preset-row">
+        {presets.map(p => {
+          const v = p.mult >= 999 ? maxRaise : Math.min(maxRaise, Math.max(minRaise, Math.round(minRaise * p.mult)));
+          return (
+            <button key={p.lbl} className={'poker-preset-btn' + (amt === v ? ' sel' : '')}
+              onClick={() => setAmt(v)}>{p.lbl}</button>
+          );
+        })}
+      </div>
+      <div className="poker-raise-row">
+        <input type="range" className="poker-raise-slider"
+          min={minRaise} max={maxRaise} step={BB}
+          value={Math.min(amt, maxRaise)} onChange={e => setAmt(+e.target.value)} />
+        <input type="number" className="poker-raise-input"
+          min={minRaise} max={maxRaise} value={amt}
+          onChange={e => setAmt(Math.min(maxRaise, Math.max(minRaise, +e.target.value || minRaise)))} />
+      </div>
+      <div className="poker-raise-row-btns">
+        <button className="poker-raise-cancel" onClick={onClose}>Cancel</button>
+        <button className="poker-raise-confirm" onClick={() => { onRaise(Math.min(amt, maxRaise)); onClose(); }}>
+          Raise to {Math.min(amt, maxRaise)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FloatingMenu({ onLeave, onLog, onHistory, soundOn, onToggleSound }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="poker-float-menu">
+      <button className="poker-float-btn" onClick={() => setOpen(o => !o)}>&#9776;</button>
+      {open && (
+        <>
+          <div className="poker-overlay-backdrop" onClick={() => setOpen(false)} />
+          <div className="poker-float-popover">
+            <button className="poker-float-item" onClick={() => { onToggleSound(); setOpen(false); }}>
+              {soundOn ? 'Mute sounds' : 'Unmute sounds'}
+            </button>
+            <button className="poker-float-item" onClick={() => { onLog(); setOpen(false); }}>Game log</button>
+            <button className="poker-float-item" onClick={() => { onHistory(); setOpen(false); }}>Hand history</button>
+            <button className="poker-float-item" onClick={() => { onLeave(); setOpen(false); }}>Leave table</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function GameLogSidebar({ open, onClose, log }) {
+  return (
+    <div className={'poker-sidebar right' + (open ? ' open' : '')}>
+      <div className="poker-sidebar-header">
+        Game Log
+        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
+      </div>
+      <div className="poker-sidebar-body">
+        {log.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No events yet.</div>}
+        {log.slice().reverse().map((entry, i) => (
+          <div key={i} className={'poker-log-entry' + (entry.type === 'win' ? ' win' : entry.type === 'lose' ? ' lose' : entry.type === 'hand' ? ' hand' : '')}>
+            {entry.msg}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HandHistoryDrawer({ open, onClose, history }) {
+  return (
+    <div className={'poker-drawer' + (open ? ' open' : '')}>
+      <div className="poker-drawer-handle" />
+      <div className="poker-drawer-header">
+        Hand History
+        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
+      </div>
+      <div className="poker-drawer-body">
+        {history.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No completed hands yet.</div>}
+        {history.slice().reverse().map((h, i) => (
+          <div key={i} className="poker-hand-hist-item">
+            <div className="poker-hand-hist-title">Hand #{h.num}: {h.result}</div>
+            <div className="poker-hand-hist-detail">{h.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---- Texas Hold 'Em main component ---- */
+function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
+  const BB = 10;
+
+  // Setup state
+  const [phase, setPhase] = useState('setup'); // 'setup' | 'playing'
+  const [numBots, setNumBots] = useState(1);
+  const [difficulty, setDifficulty] = useState('Normal');
+  const [savedChips, setSavedChips] = useState(1000);
+
+  // Game state
+  const [gs, setGs] = useState(null);
+  const [raiseOpen, setRaiseOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  const [handHistory, setHandHistory] = useState([]);
+  const [gameLog, setGameLog] = useState([]);
+  const [soundOn, setSoundOn] = useState(cgPrefs.sound);
+
+  const doneRef = useRef(false);
+  const handsRef = useRef(0);
+  const secsRef = useRef(0);
+  const gsRef = useRef(gs);
+  gsRef.current = gs;
+
+  const secs = useElapsed(resetKey, phase === 'playing' && !doneRef.current);
+  secsRef.current = secs;
+
+  // Report bot mode
+  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
+
+  // Load saved chips from server on mount
+  useEffect(() => {
+    api('/api/poker/chips').then(r => {
+      if (r && typeof r.chips === 'number') setSavedChips(r.chips);
+    }).catch(() => {});
+  }, []);
+
+  const addLog = (msg, type) => {
+    setGameLog(prev => [...prev, { msg, type: type || 'info', ts: Date.now() }]);
+  };
+
+  // --- Game logic helpers ---
+  const buildSeats = (playerChips, n) => {
+    const seats = [];
+    seats.push({ name: 'You', chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: true });
+    for (let i = 0; i < n; i++) {
+      seats.push({ name: POKER_BOT_NAMES[i % POKER_BOT_NAMES.length], chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: false });
+    }
+    return seats;
+  };
+
+  const nextActive = (seats, from, dir) => {
+    const n = seats.length;
+    let idx = (from + (dir || 1) + n) % n;
+    let tries = 0;
+    while ((seats[idx].folded || seats[idx].chips <= 0) && tries < n) {
+      idx = (idx + (dir || 1) + n) % n;
+      tries++;
+    }
+    return tries < n ? idx : -1;
+  };
+
+  const activeSeatCount = (seats) => seats.filter(s => !s.folded && s.chips > 0).length;
+
+  const dealNewHand = (seats, dealerIdx) => {
+    const deck = thDeck();
+    const newSeats = seats.map(s => ({
+      ...s, hand: [], bet: 0, folded: s.chips <= 0,
+      allIn: false, revealed: false, lastAction: null,
+    }));
+
+    // Deal 2 cards to each active seat
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < newSeats.length; i++) {
+        if (!newSeats[i].folded) newSeats[i].hand.push(deck.pop());
+      }
+    }
+
+    const n = newSeats.length;
+    const activeCount = newSeats.filter(s => !s.folded).length;
+    let sbIdx, bbIdx, toActIdx;
+
+    if (activeCount === 2) {
+      // heads-up: dealer=SB acts first preflop
+      sbIdx = dealerIdx;
+      bbIdx = nextActive(newSeats, sbIdx);
+      toActIdx = sbIdx; // dealer/SB acts first preflop in heads-up
+    } else {
+      sbIdx = nextActive(newSeats, dealerIdx);
+      bbIdx = nextActive(newSeats, sbIdx);
+      toActIdx = nextActive(newSeats, bbIdx); // UTG acts first
+    }
+
+    // Post blinds
+    const postBlind = (seatArr, idx, amount) => {
+      const actual = Math.min(amount, seatArr[idx].chips);
+      seatArr[idx].chips -= actual;
+      seatArr[idx].bet = actual;
+      if (seatArr[idx].chips === 0) seatArr[idx].allIn = true;
+      return actual;
+    };
+    postBlind(newSeats, sbIdx, BB / 2);
+    postBlind(newSeats, bbIdx, BB);
+
+    const maxBet = Math.max(...newSeats.map(s => s.bet));
+
+    return {
+      seats: newSeats,
+      board: [],
+      deck,
+      pot: 0,
+      dealerIdx,
+      sbIdx,
+      bbIdx,
+      toActIdx,
+      street: 0, // 0=preflop,1=flop,2=turn,3=river,4=showdown
+      maxBet,
+      roundActed: new Array(newSeats.length).fill(false),
+      phase: 'betting',
+      handNum: handsRef.current + 1,
+      actionLabels: new Array(newSeats.length).fill(null),
+    };
+  };
+
+  const allBetsEqual = (gs) => {
+    const seats = gs.seats;
+    const active = seats.filter(s => !s.folded && !s.allIn);
+    if (active.length === 0) return true;
+    return active.every(s => s.bet === gs.maxBet) && gs.roundActed.every((a, i) => a || seats[i].folded || seats[i].allIn || seats[i].chips <= 0);
+  };
+
+  const collectBets = (seats, pot) => {
+    let newPot = pot;
+    const newSeats = seats.map(s => { newPot += s.bet; return { ...s, bet: 0 }; });
+    return { seats: newSeats, pot: newPot };
+  };
+
+  const advanceStreet = (g) => {
+    const { seats, pot } = collectBets(g.seats, g.pot);
+    const newRoundActed = new Array(seats.length).fill(false);
+    const actionLabels = new Array(seats.length).fill(null);
+
+    let newStreet = g.street + 1;
+    let board = g.board.slice();
+    const deck = g.deck.slice();
+
+    if (newStreet === 1) { board.push(deck.pop(), deck.pop(), deck.pop()); } // flop
+    else if (newStreet === 2 || newStreet === 3) { board.push(deck.pop()); } // turn/river
+    else if (newStreet >= 4) {
+      // Showdown
+      return doShowdown({ ...g, seats, pot, board, deck, street: 4, actionLabels });
+    }
+
+    // First to act post-flop: first active after dealer
+    const firstToAct = nextActive(seats, g.dealerIdx);
+    return {
+      ...g, seats, pot, board, deck, street: newStreet,
+      toActIdx: firstToAct, maxBet: 0, roundActed: newRoundActed,
+      phase: 'betting', actionLabels,
+    };
+  };
+
+  const doShowdown = (g) => {
+    const { seats, pot, board } = g;
+    // Reveal all non-folded hands
+    const newSeats = seats.map(s => ({ ...s, revealed: true }));
+    // Find best hand among active players
+    const active = newSeats.map((s, i) => ({ s, i, score: s.folded ? -1 : thBest([...s.hand, ...board]) })).filter(x => x.score >= 0);
+    const bestScore = Math.max(...active.map(x => x.score));
+    const winners = active.filter(x => x.score === bestScore);
+    const share = Math.floor(pot / winners.length);
+    winners.forEach(w => { newSeats[w.i].chips += share; });
+    // Leftover chips (rounding) go to first winner
+    const leftover = pot - share * winners.length;
+    if (leftover > 0 && winners.length > 0) newSeats[winners[0].i].chips += leftover;
+
+    const winnerNames = winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ');
+    const handName = winners[0] ? thCatName(bestScore) : '';
+    addLog(`Hand #${g.handNum}: ${winnerNames} win${winners.length > 1 ? '' : 's'} pot ${pot} (${handName})`, winners.some(w => w.s.isPlayer) ? 'win' : 'lose');
+
+    setHandHistory(prev => [...prev, {
+      num: g.handNum,
+      result: winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ') + ' won',
+      detail: `Pot: ${pot} · ${handName}`,
+    }]);
+
+    return {
+      ...g, seats: newSeats, pot: 0, phase: 'handover', street: 4,
+      winnerIdxs: winners.map(w => w.i), actionLabels: new Array(newSeats.length).fill(null),
+    };
+  };
+
+  const processBotTurn = (g) => {
+    if (!g || g.phase !== 'betting') return g;
+    const seat = g.seats[g.toActIdx];
+    if (!seat || seat.isPlayer || seat.folded) return g;
+
+    const toCall = g.maxBet - seat.bet;
+    const strength = thHandStrength(seat.hand, g.board);
+    const r = Math.random();
+    const diffMult = difficulty === 'Easy' ? 0.7 : difficulty === 'Hard' ? 1.3 : 1.0;
+
+    let action, amount;
+    if (toCall > 0) {
+      const potOdds = toCall / (g.pot + toCall);
+      if (strength * diffMult < 0.25 && potOdds > 0.2 && r > 0.25) {
+        action = 'fold';
+      } else if (strength * diffMult > 0.72 && seat.chips > toCall + BB && r > 0.5) {
+        action = 'raise';
+        amount = Math.min(seat.chips, toCall + BB * 2);
+      } else {
+        action = 'call';
+      }
+    } else {
+      if (strength * diffMult > 0.6 && r > 0.5 && seat.chips > BB) {
+        action = 'raise';
+        amount = Math.min(seat.chips, BB * 2);
+      } else {
+        action = 'check';
+      }
+    }
+
+    return applyAction(g, g.toActIdx, action, amount);
+  };
+
+  const applyAction = (g, seatIdx, action, amount) => {
+    const seats = g.seats.map(s => ({ ...s }));
+    const seat = seats[seatIdx];
+    const roundActed = [...g.roundActed];
+    const actionLabels = new Array(seats.length).fill(null);
+
+    let maxBet = g.maxBet;
+
+    if (action === 'fold') {
+      seat.folded = true;
+      seat.hand = seat.hand; // keep for reveal
+      actionLabels[seatIdx] = { type: 'fold', text: 'Fold' };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} fold`, 'info');
+      cgSound('click');
+    } else if (action === 'check') {
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: 'check', text: 'Check' };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} check`, 'info');
+      cgSound('chip');
+    } else if (action === 'call') {
+      const toCall = g.maxBet - seat.bet;
+      const pay = Math.min(toCall, seat.chips);
+      seat.chips -= pay; seat.bet += pay;
+      if (seat.chips === 0) seat.allIn = true;
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: 'call', text: `Call ${pay}` };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} call ${pay}`, 'info');
+      cgSound('chip');
+    } else if (action === 'raise' || action === 'bet') {
+      const raiseAmt = amount || BB;
+      const totalBet = g.maxBet + raiseAmt;
+      const pay = Math.min(totalBet - seat.bet, seat.chips);
+      seat.chips -= pay; seat.bet += pay;
+      if (seat.chips === 0) seat.allIn = true;
+      maxBet = seat.bet;
+      roundActed.fill(false);
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: action === 'bet' ? 'bet' : 'raise', text: `${action === 'bet' ? 'Bet' : 'Raise'} ${seat.bet}` };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} ${action === 'bet' ? 'bet' : 'raise'} ${seat.bet}`, 'info');
+      cgSound('chip'); cgHaptic(12);
+    } else if (action === 'allin') {
+      const pay = seat.chips;
+      seat.chips = 0; seat.bet += pay; seat.allIn = true;
+      if (seat.bet > maxBet) { maxBet = seat.bet; roundActed.fill(false); }
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: 'allin', text: `All-in ${seat.bet}` };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} go all-in ${seat.bet}`, 'info');
+      cgSound('chip'); cgHaptic([10, 20, 10]);
+    }
+
+    let newGs = { ...g, seats, maxBet, roundActed, actionLabels };
+
+    // Check if only 1 player remains (everyone else folded)
+    const stillIn = seats.filter(s => !s.folded);
+    if (stillIn.length === 1) {
+      // Award pot to last standing
+      const { seats: collectedSeats, pot } = collectBets(seats, g.pot);
+      collectedSeats[seats.indexOf(stillIn[0])].chips += pot;
+      const winner = stillIn[0];
+      addLog(`${winner.isPlayer ? 'You' : winner.name} win pot ${pot} (others folded)`, winner.isPlayer ? 'win' : 'lose');
+      setHandHistory(prev => [...prev, { num: g.handNum, result: `${winner.isPlayer ? 'You' : winner.name} won (fold)`, detail: `Pot: ${pot}` }]);
+      return { ...newGs, seats: collectedSeats, pot: 0, phase: 'handover', winnerIdxs: [seats.indexOf(stillIn[0])], actionLabels: new Array(seats.length).fill(null) };
+    }
+
+    // Check if betting round is complete
+    if (allBetsEqualCheck(newGs)) {
+      return advanceStreet(newGs);
+    }
+
+    // Advance to next active player
+    const nextIdx = nextActive(seats, seatIdx);
+    return { ...newGs, toActIdx: nextIdx };
+  };
+
+  const allBetsEqualCheck = (g) => {
+    const seats = g.seats;
+    const active = seats.filter(s => !s.folded && s.chips > 0);
+    if (active.length === 0) return true;
+    const maxB = g.maxBet;
+    // All active (non-all-in) players have matched maxBet and had a chance to act
+    return active.every((s, _, arr) => {
+      const idx = seats.indexOf(s);
+      return s.bet === maxB && g.roundActed[idx];
+    });
+  };
+
+  const startGame = (chipCount) => {
+    handsRef.current = 0;
+    doneRef.current = false;
+    const seats = buildSeats(chipCount, numBots);
+    const gs0 = dealNewHand(seats, 0);
+    handsRef.current = 1;
+    gs0.handNum = 1;
+    addLog('Game started', 'hand');
+    addLog(`Hand #1 dealt (Dealer: ${seats[0].isPlayer ? 'You' : seats[gs0.dealerIdx].name})`, 'hand');
+    setGs(gs0);
+    setPhase('playing');
+    cgSound('deal');
+  };
+
+  const handlePlayerAction = (action, amount) => {
+    if (!gs || gs.phase !== 'betting' || gs.toActIdx !== 0) return;
+    setRaiseOpen(false);
+    setGs(prev => applyAction(prev, 0, action, amount));
+  };
+
+  const handleNextHand = () => {
+    if (!gs) return;
+    const seats = gs.seats;
+    // Check end condition
+    const playerSeat = seats[0];
+    const activePlayers = seats.filter(s => s.chips > 0);
+    if (activePlayers.length <= 1) {
+      // Game over
+      const youWin = playerSeat.chips > 0;
+      doneRef.current = true;
+      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
+      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
+      // Save chips to server
+      api('/api/poker/chips', { method: 'POST', body: JSON.stringify({ chips: Math.max(playerSeat.chips, 0) }) }).catch(() => {});
+      const score = Math.max(0, playerSeat.chips);
+      if (youWin) {
+        onWin(score, handsRef.current, secsRef.current, { share: `Won Texas Hold 'Em in ${handsRef.current} hands with ${score} chips!` });
+      } else {
+        onLose(handsRef.current, secsRef.current, { share: `Busted out after ${handsRef.current} hands`, answer: 'Out of chips' });
+      }
+      return;
+    }
+    // Rotate dealer, remove busted players
+    const nextDealerIdx = (seats.findIndex((s, i) => i > gs.dealerIdx && s.chips > 0) + 1 || 1) % seats.length;
+    // Actually just rotate dealer among active seats
+    let newDealerIdx = gs.dealerIdx;
+    for (let i = 1; i <= seats.length; i++) {
+      const idx = (gs.dealerIdx + i) % seats.length;
+      if (seats[idx].chips > 0) { newDealerIdx = idx; break; }
+    }
+    handsRef.current++;
+    onStepChange && onStepChange(handsRef.current);
+    const newGs = dealNewHand(seats, newDealerIdx);
+    newGs.handNum = handsRef.current;
+    addLog(`Hand #${handsRef.current} dealt`, 'hand');
+    setGs(newGs);
+    cgSound('deal');
+  };
+
+  // Bot AI effect
+  useEffect(() => {
+    if (!gs || gs.phase !== 'betting' || !gs.seats[gs.toActIdx]) return;
+    if (gs.seats[gs.toActIdx].isPlayer) return;
+    if (gs.seats[gs.toActIdx].folded) return;
+    const delay = difficulty === 'Easy' ? 400 : difficulty === 'Hard' ? 1100 : 750;
+    const t = setTimeout(() => {
+      setGs(prev => {
+        if (!prev || prev.phase !== 'betting') return prev;
+        if (!prev.seats[prev.toActIdx] || prev.seats[prev.toActIdx].isPlayer) return prev;
+        return processBotTurn(prev);
+      });
+    }, delay);
+    return () => clearTimeout(t);
+  }, [gs && gs.toActIdx, gs && gs.phase, gs && gs.handNum]);
+
+  // Render
+  if (phase === 'setup') {
+    return (
+      <div className="poker-shell">
+        <div className="poker-top-bar">
+          <button className="poker-back-btn" onClick={onBack}>&#8592;</button>
+          <div className="poker-top-bar-title">Texas Hold 'Em</div>
+          <div className="poker-conn-dot" />
+        </div>
+        <PokerSetupScreen
+          onStart={startGame}
+          savedChips={savedChips}
+          numBots={numBots} setNumBots={setNumBots}
+          difficulty={difficulty} setDifficulty={setDifficulty}
+        />
+      </div>
+    );
+  }
+
+  if (!gs) return null;
+
+  const playerSeat = gs.seats[0];
+  const canAct = gs.phase === 'betting' && gs.toActIdx === 0 && !doneRef.current;
+  const toCall = canAct ? Math.max(0, gs.maxBet - playerSeat.bet) : 0;
+  const canCheck = canAct && toCall === 0;
+  const canCall = canAct && toCall > 0;
+  const minRaise = gs.maxBet + BB;
+  const maxRaise = playerSeat.chips;
+  const canRaise = canAct && playerSeat.chips > toCall;
+
+  return (
+    <div className="poker-shell">
+      <PokerTopBar handNum={gs.handNum} phase={gs.street} onBack={() => { setPhase('setup'); setGs(null); }} playerChips={playerSeat.chips} BB={BB} />
+      <div className="poker-main">
+        <div className="poker-oval-wrap">
+          <div className="poker-oval">
+            {gs.seats.map((seat, i) => {
+              const pos = pokerSeatPos(i, numBots);
+              const isWinner = gs.phase === 'handover' && gs.winnerIdxs && gs.winnerIdxs.includes(i);
+              return (
+                <div key={i} style={{ position: 'absolute', left: pos.x + '%', top: pos.y + '%', transform: 'translate(-50%,-50%)' }}>
+                  <PokerSeat
+                    seat={seat}
+                    isPlayer={seat.isPlayer}
+                    dealerIdx={gs.dealerIdx}
+                    sbIdx={gs.sbIdx}
+                    bbIdx={gs.bbIdx}
+                    isActive={gs.phase === 'betting' && gs.toActIdx === i && !seat.folded}
+                    isWinner={isWinner}
+                    actionLabel={gs.actionLabels && gs.actionLabels[i]}
+                    showCards={gs.phase === 'handover'}
+                    seatIdx={i}
+                  />
+                </div>
+              );
+            })}
+            <CommunityArea board={gs.board} pot={gs.pot + gs.seats.reduce((sum, s) => sum + (s.bet || 0), 0)} street={gs.street} />
+          </div>
+        </div>
+
+        {gs.phase === 'handover' && gs.winnerIdxs && (
+          <div style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.88rem', color: '#34D399', fontWeight: 600 }}>
+            {gs.winnerIdxs.includes(0) ? 'You win this hand!' : `${gs.seats[gs.winnerIdxs[0]].name} wins`}
           </div>
         )}
+
+        <FloatingMenu
+          onLeave={() => { setPhase('setup'); setGs(null); }}
+          onLog={() => setLogOpen(o => !o)}
+          onHistory={() => setHistoryOpen(o => !o)}
+          soundOn={soundOn}
+          onToggleSound={() => { const ns = !soundOn; setSoundOn(ns); cgSetPref('sound', ns); }}
+        />
+
+        <GameLogSidebar open={logOpen} onClose={() => setLogOpen(false)} log={gameLog} />
+        <HandHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} history={handHistory} />
+        {(logOpen || historyOpen) && (
+          <div className="poker-overlay-backdrop" style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={() => { setLogOpen(false); setHistoryOpen(false); }} />
+        )}
       </div>
-    </ClassicShell>
+
+      <div style={{ position: 'relative' }}>
+        {raiseOpen && canRaise && (
+          <RaisePanel
+            minRaise={Math.min(minRaise, maxRaise)}
+            maxRaise={maxRaise}
+            BB={BB}
+            onRaise={amt => handlePlayerAction('raise', amt - gs.maxBet)}
+            onClose={() => setRaiseOpen(false)}
+          />
+        )}
+        <div className="poker-action-bar">
+          {gs.phase === 'handover' ? (
+            <button className="poker-action-btn next" onClick={handleNextHand} style={{ flex: 2 }}>
+              Next hand &rarr;
+            </button>
+          ) : (
+            <>
+              <button className="poker-action-btn fold" disabled={!canAct} onClick={() => handlePlayerAction('fold')}>Fold</button>
+              {canCheck
+                ? <button className="poker-action-btn check" disabled={!canAct} onClick={() => handlePlayerAction('check')}>Check</button>
+                : <button className="poker-action-btn call" disabled={!canCall} onClick={() => handlePlayerAction('call')}>Call {toCall}</button>
+              }
+              <button className="poker-action-btn raise" disabled={!canRaise}
+                onClick={() => { if (canRaise) { setRaiseOpen(o => !o); cgSound('click'); } }}>
+                {toCall > 0 ? 'Raise' : 'Bet'}
+              </button>
+              <button className="poker-action-btn allin" disabled={!canAct} onClick={() => { handlePlayerAction('allin'); setRaiseOpen(false); }}>
+                All-in
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

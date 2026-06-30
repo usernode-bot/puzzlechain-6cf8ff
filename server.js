@@ -14,6 +14,65 @@ const IS_STAGING = process.env.USERNODE_ENV === 'staging';
 // App identity secrets (APP_PUBKEY, APP_SECRET_KEY) are declared in dapp.json
 // and available via process.env for cryptographic operations when needed.
 
+// ---- AI Background Themes — platform Claude proxy ---------------------------
+// The platform injects USERNODE_LLM_PROXY_URL/TOKEN into PRODUCTION containers
+// only; staging + standalone get neither (unreviewed PR code must not spend a
+// user's AI budget). Detect absence and degrade gracefully — the /generate
+// route returns 503 and the gallery (DB-backed) keeps working.
+const LLM_ENABLED = !!process.env.USERNODE_LLM_PROXY_TOKEN;
+const LLM_PROXY_URL = process.env.USERNODE_LLM_PROXY_URL;
+const LLM_PROXY_TOKEN = process.env.USERNODE_LLM_PROXY_TOKEN;
+// Modest model + token budget: a theme is a tiny JSON object.
+const THEME_MODEL = 'claude-haiku-4-5-20251001';
+const THEME_PROMPT_MAX = 240; // chars accepted from the client
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+// Clamp/validate an AI- or client-supplied theme into a safe, renderable shape.
+// Returns a normalized object on success, or null if it can't be coerced.
+function sanitizeThemeParams(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  let colors = Array.isArray(raw.colors) ? raw.colors.filter((c) => typeof c === 'string' && HEX_RE.test(c.trim())).map((c) => c.trim().toLowerCase()) : [];
+  if (colors.length < 2) return null;
+  if (colors.length > 4) colors = colors.slice(0, 4);
+  let angle = Number(raw.angle);
+  if (!Number.isFinite(angle)) angle = 135;
+  angle = Math.round(((angle % 360) + 360) % 360);
+  let accent = typeof raw.accent === 'string' && HEX_RE.test(raw.accent.trim()) ? raw.accent.trim().toLowerCase() : '#6366f1';
+  let overlay = Number(raw.overlayOpacity);
+  if (!Number.isFinite(overlay)) overlay = 0.55;
+  overlay = Math.min(0.75, Math.max(0.35, overlay));
+  let name = typeof raw.name === 'string' ? raw.name.trim().slice(0, 40) : '';
+  if (!name) name = 'Custom theme';
+  return { name, colors, angle, accent, overlayOpacity: Math.round(overlay * 100) / 100 };
+}
+
+// Deterministic fallback palette derived from a hash of the prompt, so theme
+// generation NEVER hard-fails even if the model returns garbage twice. Same
+// prompt → same colors. Produces a pleasant 3-stop gradient + accent.
+function fallbackThemeFromPrompt(prompt) {
+  const hash = crypto.createHash('sha256').update(String(prompt || 'puzzlechain')).digest();
+  const hsl = (h, s, l) => {
+    // minimal HSL→hex (s,l in 0..1)
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => {
+      const k = (n + h / 30) % 12;
+      const col = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+      return Math.round(255 * col).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  };
+  const baseHue = hash[0] / 255 * 360;
+  const colors = [
+    hsl(baseHue, 0.55, 0.32),
+    hsl((baseHue + 40) % 360, 0.5, 0.22),
+    hsl((baseHue + 200) % 360, 0.45, 0.14),
+  ];
+  const accent = hsl((baseHue + 20) % 360, 0.7, 0.6);
+  const angle = 90 + Math.round((hash[1] / 255) * 180);
+  return { name: 'Generated theme', colors, angle, accent, overlayOpacity: 0.55 };
+}
+
 // ---- PvP wager config -------------------------------------------------------
 
 const VALIDATOR_PRIVATE_KEY = process.env.VALIDATOR_PRIVATE_KEY;
@@ -1068,6 +1127,26 @@ async function migrate() {
       winner         TEXT,
       last_move_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // bg_themes is PUBLIC: a shared gallery of AI-generated background themes.
+  // Cosmetic only (gradient color params + the prompt + creator name) — no
+  // sensitive data, so it stays public (a stranger seeing every row is fine)
+  // and gets copied into staging with production rows. `params` is the
+  // validated theme shape { name, colors[], angle, accent, overlayOpacity }.
+  // creator_user_id references the public users table (a public table may not
+  // FK into a private one — users is public, so this is allowed).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bg_themes (
+      id               BIGSERIAL PRIMARY KEY,
+      creator_user_id  TEXT NOT NULL REFERENCES users(id),
+      creator_username TEXT,
+      prompt           TEXT,
+      name             TEXT NOT NULL,
+      params           JSONB NOT NULL,
+      apply_count      INTEGER NOT NULL DEFAULT 0,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
 
@@ -3025,6 +3104,39 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: populate the shared themes gallery with ~6
+    // obviously-fake community themes so the gallery grid, preview swatches,
+    // and the recent-vs-popular ordering are demonstrable WITHOUT the LLM proxy
+    // (which staging never receives). Idempotent (fixed ids), strict no-op in
+    // production. Each row needs a creator in the public users table because
+    // bg_themes FKs into it.
+    if (IS_STAGING && req.query.demo === 'themes') {
+      const demoThemes = [
+        { id: 990001, user: 'staging-demo-ada',  name: 'Neon Sunset',   prompt: 'sunset over neon city',   colors: ['#ff5f8f', '#7a3cff', '#1b1140'], angle: 135, accent: '#ff5f8f', overlay: 0.5,  applies: 142 },
+        { id: 990002, user: 'staging-demo-borg', name: 'Forest Morning', prompt: 'calm forest morning',     colors: ['#3fa34d', '#1f5e3a', '#0c2218'], angle: 120, accent: '#7fe0a0', overlay: 0.55, applies: 87 },
+        { id: 990003, user: 'staging-demo-cleo', name: 'Deep Ocean',     prompt: 'deep ocean trench',        colors: ['#1c6dd0', '#0a2e6e', '#04122e'], angle: 160, accent: '#4fc3f7', overlay: 0.6,  applies: 64 },
+        { id: 990004, user: 'staging-demo-dex',  name: 'Mono Slate',     prompt: 'minimal monochrome slate', colors: ['#3a3f4a', '#23262e', '#101218'], angle: 135, accent: '#9aa3b2', overlay: 0.5,  applies: 31 },
+        { id: 990005, user: 'staging-demo-eve',  name: 'Cyber Neon',     prompt: 'cyberpunk neon grid',      colors: ['#ff2bd6', '#5a18ff', '#0a0420'], angle: 145, accent: '#ff2bd6', overlay: 0.6,  applies: 12 },
+        { id: 990006, user: 'staging-demo-fin',  name: 'Candy Pop',      prompt: 'sweet candy pastel pop',   colors: ['#ff9ec7', '#b388ff', '#3a2a52'], angle: 110, accent: '#ffb3d9', overlay: 0.45, applies: 3 },
+      ];
+      for (const t of demoThemes) {
+        await pool.query(
+          `INSERT INTO users (id, username) VALUES ($1, $1) ON CONFLICT (id) DO NOTHING`,
+          [t.user]
+        );
+        await pool.query(
+          `INSERT INTO bg_themes (id, creator_user_id, creator_username, prompt, name, params, apply_count)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            t.id, t.user, `Staging demo ${t.user.split('-').pop()}`, t.prompt, t.name,
+            JSON.stringify({ name: t.name, colors: t.colors, angle: t.angle, accent: t.accent, overlayOpacity: t.overlay }),
+            t.applies,
+          ]
+        );
+      }
+    }
+
     // Staging-only demo seed: set up the Crypto Wordle paid-hint flow for the
     // viewer — top up MATCH so hints are affordable, drop them into a claimed,
     // unfinished cryptowordle attempt (lobby shows "In progress · resume"), and
@@ -3621,6 +3733,188 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
   } catch (err) {
     console.error('[daily] today champions failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ---- AI Background Themes API -------------------------------------------
+// POST /api/themes/generate — turn a free-text prompt into a validated theme
+// via the platform Claude proxy. Text-only proxy → we ask for a tiny JSON
+// object describing a gradient. Does NOT persist. Degrades gracefully when the
+// proxy is absent (staging/standalone → 503) and never hard-fails on bad model
+// output (one stricter retry, then a deterministic prompt-hash fallback).
+const THEME_SYSTEM = [
+  'You design color themes for a puzzle game background.',
+  'Given a short mood/scene prompt, respond with ONLY a JSON object — no prose, no markdown, no code fences.',
+  'Schema: {"name": string (<=40 chars), "colors": [2-4 hex strings like "#1a2b3c"], "angle": integer 0-360, "accent": hex string, "overlayOpacity": number 0.35-0.55}.',
+  'Pick colors that evoke the prompt and form a pleasing gradient from darker edges to a richer center; the UI overlays a dark scrim, so favor deep, saturated tones over pale ones. "accent" is a vivid highlight color used for buttons.',
+].join(' ');
+
+async function callThemeProxy(userPrompt, userToken, strict) {
+  const sys = strict
+    ? THEME_SYSTEM + ' IMPORTANT: your previous answer was invalid. Output ONLY the raw JSON object, nothing else, with exactly the keys named.'
+    : THEME_SYSTEM;
+  const resp = await fetch(`${LLM_PROXY_URL}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'x-usernode-app-token': LLM_PROXY_TOKEN,
+      'x-usernode-user-token': userToken || '',
+    },
+    body: JSON.stringify({
+      model: THEME_MODEL,
+      max_tokens: 300,
+      system: sys,
+      messages: [{ role: 'user', content: `Prompt: ${userPrompt}` }],
+    }),
+  });
+  return resp;
+}
+
+// Pull the first JSON object out of a model text response (tolerant of stray
+// prose or accidental code fences), then sanitize it. Returns null on failure.
+function parseThemeFromText(text) {
+  if (typeof text !== 'string') return null;
+  let s = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) return null;
+  let obj;
+  try { obj = JSON.parse(s.slice(start, end + 1)); } catch { return null; }
+  return sanitizeThemeParams(obj);
+}
+
+app.post('/api/themes/generate', async (req, res) => {
+  const prompt = String((req.body && req.body.prompt) || '').trim().slice(0, THEME_PROMPT_MAX);
+  if (!prompt) return res.status(400).json({ error: 'A prompt is required' });
+  if (!LLM_ENABLED) {
+    return res.status(503).json({
+      code: 'llm_unavailable',
+      error: 'AI theme generation is unavailable in this environment — try a gallery theme instead.',
+    });
+  }
+  const userToken = req.headers['x-usernode-token'];
+  try {
+    let resp = await callThemeProxy(prompt, userToken, false);
+    // Forward consent/quota errors so the client can react (request access / wait).
+    if (resp.status === 403) {
+      return res.status(403).json({ code: 'grant_required', error: 'AI access not granted for this app yet.' });
+    }
+    if (resp.status === 429) {
+      let code = 'budget_exceeded';
+      try { const j = await resp.json(); if (j && j.code) code = j.code; } catch {}
+      return res.status(429).json({ code, error: 'Daily AI limit reached — resets at midnight UTC.' });
+    }
+    let theme = null;
+    if (resp.ok) {
+      try {
+        const data = await resp.json();
+        const text = Array.isArray(data.content) ? data.content.map((b) => b && b.text ? b.text : '').join('') : '';
+        theme = parseThemeFromText(text);
+      } catch {}
+    }
+    // One stricter retry if the first answer didn't validate.
+    if (!theme) {
+      try {
+        const r2 = await callThemeProxy(prompt, userToken, true);
+        if (r2.ok) {
+          const d2 = await r2.json();
+          const t2 = Array.isArray(d2.content) ? d2.content.map((b) => b && b.text ? b.text : '').join('') : '';
+          theme = parseThemeFromText(t2);
+        }
+      } catch {}
+    }
+    // Never hard-fail: deterministic palette derived from the prompt.
+    if (!theme) theme = fallbackThemeFromPrompt(prompt);
+    res.json({ theme, prompt });
+  } catch (err) {
+    console.error('[themes] generate failed:', err.message);
+    // Even on a transport error, give the player something usable.
+    res.json({ theme: fallbackThemeFromPrompt(prompt), prompt, fallback: true });
+  }
+});
+
+// GET /api/themes — shared gallery. ?sort=popular ranks by apply_count.
+app.get('/api/themes', async (req, res) => {
+  const popular = req.query.sort === 'popular';
+  const order = popular
+    ? 'apply_count DESC, created_at DESC'
+    : 'created_at DESC';
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, creator_user_id, creator_username, prompt, name, params, apply_count, created_at
+         FROM bg_themes
+        ORDER BY ${order}
+        LIMIT 60`
+    );
+    const themes = rows.map((r) => ({
+      id: Number(r.id),
+      name: r.name,
+      prompt: r.prompt,
+      params: sanitizeThemeParams(r.params) || fallbackThemeFromPrompt(r.prompt || r.name),
+      creatorUsername: r.creator_username || 'anon',
+      isMine: r.creator_user_id === req.user.id,
+      applyCount: r.apply_count,
+      createdAt: r.created_at,
+    }));
+    res.json({ themes, total: themes.length });
+  } catch (err) {
+    console.error('[themes] list failed:', err.message);
+    res.status(500).json({ error: 'Failed to load themes' });
+  }
+});
+
+// POST /api/themes — publish a theme to the shared gallery. Re-validates params
+// server-side (never trust the client) and keys the row to req.user.
+app.post('/api/themes', async (req, res) => {
+  const body = req.body || {};
+  const params = sanitizeThemeParams(body.params);
+  if (!params) return res.status(400).json({ error: 'Invalid theme parameters' });
+  const prompt = String(body.prompt || '').trim().slice(0, THEME_PROMPT_MAX);
+  const name = (typeof body.name === 'string' && body.name.trim()) ? body.name.trim().slice(0, 40) : params.name;
+  params.name = name;
+  try {
+    await ensureUser(req.user.id, req.user.username, req.user.usernode_pubkey);
+    const { rows } = await pool.query(
+      `INSERT INTO bg_themes (creator_user_id, creator_username, prompt, name, params)
+       VALUES ($1, $2, $3, $4, $5::jsonb)
+       RETURNING id, creator_username, prompt, name, params, apply_count, created_at`,
+      [req.user.id, req.user.username || 'anon', prompt, name, JSON.stringify(params)]
+    );
+    const r = rows[0];
+    res.json({
+      theme: {
+        id: Number(r.id),
+        name: r.name,
+        prompt: r.prompt,
+        params: sanitizeThemeParams(r.params),
+        creatorUsername: r.creator_username || 'anon',
+        isMine: true,
+        applyCount: r.apply_count,
+        createdAt: r.created_at,
+      },
+    });
+  } catch (err) {
+    console.error('[themes] save failed:', err.message);
+    res.status(500).json({ error: 'Failed to save theme' });
+  }
+});
+
+// POST /api/themes/:id/apply — bump the popularity counter. Best-effort: the
+// client applies locally regardless, so a failure here is non-fatal.
+app.post('/api/themes/:id/apply', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad theme id' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE bg_themes SET apply_count = apply_count + 1 WHERE id = $1 RETURNING apply_count`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Theme not found' });
+    res.json({ applyCount: rows[0].apply_count });
+  } catch (err) {
+    console.error('[themes] apply failed:', err.message);
+    res.status(500).json({ error: 'Failed to record apply' });
   }
 });
 

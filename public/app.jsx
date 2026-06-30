@@ -4896,53 +4896,6 @@ function nextTierInfo(streak) {
   return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
 
-const BADGE_DEFS = [
-  {
-    id: 'first-light',
-    icon: '🕯️',
-    label: 'First Light',
-    desc: 'Solve any daily puzzle',
-    check: (streak, attempts) =>
-      Object.values(attempts).some(a => a.finishedAt && a.score > 0),
-  },
-  {
-    id: 'all-in',
-    icon: '🎯',
-    label: 'All In',
-    desc: 'Complete all 4 daily games in one day',
-    check: (streak, attempts) =>
-      GAMES.filter(g => g.category === 'daily')
-           .every(g => attempts[g.id] && attempts[g.id].finishedAt && attempts[g.id].score > 0),
-  },
-  {
-    id: 'flame-keeper',
-    icon: '🔥',
-    label: 'Flame Keeper',
-    desc: '3-day streak',
-    check: (streak) => streak >= 3,
-  },
-  {
-    id: 'weekly-warrior',
-    icon: '📅',
-    label: 'Weekly Warrior',
-    desc: '7-day streak',
-    check: (streak) => streak >= 7,
-  },
-  {
-    id: 'multiplied',
-    icon: '💫',
-    label: 'Multiplied',
-    desc: '10-day streak (×1.5 points)',
-    check: (streak) => streak >= 10,
-  },
-  {
-    id: 'streak-titan',
-    icon: '⚡',
-    label: 'Streak Titan',
-    desc: '30-day streak',
-    check: (streak) => streak >= 30,
-  },
-];
 
 /* ============================================================
    Streak badges — named milestones unlocked at consecutive-day
@@ -5617,7 +5570,12 @@ function TodayChampions({ onSelectUser }) {
    render dimmed so there's a visible collection to complete. Shared by
    the lobby and the profile screen.
    ============================================================ */
-function BadgeStrip({ badges, achievements }) {
+// Build the canonical badge-chip list (streak milestones + non-streak
+// achievements + lifetime solve milestones) with earned/locked state derived
+// from the server-backed `badges` (earned day thresholds) and `achievements`
+// ({ types, milestones }). Shared by the profile BadgeStrip and the lobby
+// BadgesSection so both render an identical, permanent collection.
+function badgeChips(badges, achievements) {
   const earnedDays = new Set(badges || []);
   const ach = achievements || { types: [], milestones: [] };
   const earnedTypes = new Set(ach.types || []);
@@ -5633,6 +5591,11 @@ function BadgeStrip({ badges, achievements }) {
   for (const b of SOLVE_MILESTONE_BADGES) {
     chips.push({ key: `m${b.count}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedMilestones.has(b.count) });
   }
+  return chips;
+}
+
+function BadgeStrip({ badges, achievements }) {
+  const chips = badgeChips(badges, achievements);
   const earnedCount = chips.filter(c => c.earned).length;
 
   return (
@@ -16384,19 +16347,32 @@ function PostDetail({ post, onBack }) {
 /* ============================================================
    Root app
    ============================================================ */
-function BadgesSection({ streak, attempts, open, onToggle }) {
-  const badges = BADGE_DEFS.map(b => ({ ...b, earned: b.check(streak, attempts) }));
+// Lobby Badges panel — renders the SAME permanent collection as the profile's
+// BadgeStrip (streak milestones + non-streak achievements + solve milestones),
+// fed by the server-backed `badges`/`achievements` state already loaded from
+// /api/daily. Earned badges stay lit forever (they come from persisted
+// user_achievements rows, not the live streak/today's attempts), so the lobby
+// and profile now show identical earned/locked states. The collapsible toggle
+// (mobile-collapsed) is preserved.
+function BadgesSection({ badges, achievements, open, onToggle }) {
+  const chips = badgeChips(badges, achievements);
+  const earnedCount = chips.filter(c => c.earned).length;
   return (
     <div className="badges-section">
       <button className="badges-toggle" onClick={onToggle}>
         Badges
+        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
         <span className="badges-toggle-arrow">{open ? '▾' : '▸'}</span>
       </button>
       <div className={'badges-grid' + (open ? ' open' : '')}>
-        {badges.map(b => (
-          <div key={b.id} className={'badge-chip' + (b.earned ? '' : ' dim')} title={b.desc}>
-            <span>{b.icon}</span>
-            <span>{b.label}</span>
+        {chips.map(c => (
+          <div
+            key={c.key}
+            className={'badge-chip' + (c.earned ? '' : ' dim')}
+            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
+          >
+            <span>{c.icon}</span>
+            <span>{c.name}</span>
           </div>
         ))}
       </div>
@@ -17239,12 +17215,6 @@ function App() {
                   new Date(nextResetUtc).getTime() - (Date.now() + offset))}
               </p>
             )}
-            {lobbyTab === 'daily' && authOk && (() => {
-              // Union of permanent earned streak badges and any the live streak
-              // now satisfies, so the strip is correct right after a win too.
-              const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
-              return <BadgeStrip badges={earnedDays} achievements={achievements} />;
-            })()}
           </div>
           <div className="lobby-tabs">
             <button
@@ -17307,14 +17277,23 @@ function App() {
             })}
           </div>
           )}
-          {authOk && (
-            <BadgesSection
-              streak={streak}
-              attempts={attempts}
-              open={badgesOpen}
-              onToggle={() => setBadgesOpen(b => !b)}
-            />
-          )}
+          {authOk && (() => {
+            // Single persistent, collapsible badge panel for the lobby (shown on
+            // both the Daily and Classic tabs). Feed it the union of permanently
+            // earned streak day-thresholds and any the LIVE streak now satisfies,
+            // so a freshly-won streak badge lights up immediately — before the
+            // server round-trip reconciles `badges`. Achievement/solve-milestone
+            // chips come straight from the server-backed `achievements` state.
+            const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
+            return (
+              <BadgesSection
+                badges={earnedDays}
+                achievements={achievements}
+                open={badgesOpen}
+                onToggle={() => setBadgesOpen(b => !b)}
+              />
+            );
+          })()}
           {lobbyTab === 'daily' && authOk && (
             <TodayChampions
               onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}

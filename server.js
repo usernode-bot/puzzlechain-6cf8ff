@@ -220,9 +220,14 @@ const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
 //   podium         — held rank #1 on a game's daily leaderboard at finish time.
 //   solve_milestone — lifetime finished+won solves crossed 10/50/100.
 const SPEED_DEMON_MAX_SECS = 60;
-// Per-game "no wasted moves" thresholds. Only the move-counted daily games
-// qualify; games without a meaningful step economy are omitted (no flawless).
-const FLAWLESS_STEP_THRESHOLDS = { sudoku: 18, wordhunt: 8 };
+// Per-game "no wasted moves" thresholds (the single balance knob for the
+// Flawless badge — tune here). Only the move-counted daily games qualify;
+// games without a meaningful step economy are omitted (no flawless).
+// wordhunt has an 8-word solve floor (every gesture, incl. a stray tap or a
+// non-matching drag, increments steps), so a threshold of 8 demanded a
+// literally perfect game; 10 leaves a 2-move slack so a clean solve still
+// earns it, loosely mirroring sudoku's ~4-of-14 tolerance.
+const FLAWLESS_STEP_THRESHOLDS = { sudoku: 18, wordhunt: 10 };
 const SOLVE_MILESTONES = [10, 50, 100];
 
 // The set of non-streak achievement badge `type`s a user has earned, plus the

@@ -3967,6 +3967,14 @@ body {
 .badges-toggle .badge-strip-count { color: ${C.text}; margin-left: 0.5rem; font-weight: 700; }
 /* Empty/early state + next-milestone progress hints (Bug C). */
 .badges-empty { font-size: 0.8rem; color: ${C.muted}; margin: 0.1rem 0 0.6rem; }
+.badges-retry-btn {
+  all: unset;
+  cursor: pointer;
+  color: ${C.accent};
+  font-weight: 700;
+  text-decoration: underline;
+}
+.badges-retry-btn:hover { color: ${C.text}; }
 .badge-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }
 .badge-progress-pill {
   font-size: 0.72rem; font-weight: 600; color: ${C.muted};
@@ -16537,6 +16545,31 @@ function BadgesSection({ badges, achievements, streak, solveCount, open, onToggl
   );
 }
 
+// Lightweight placeholder shown in the lobby badge slot when the real panel
+// can't load (signed out, or the backend was briefly unreachable). Keeps the
+// "Badges" header so the slot is recognizable, and explains the empty space
+// instead of leaving an unexplained blank gap. `state` is 'signedout' | 'error';
+// the 'error' case offers a retry that re-runs the daily load.
+function BadgesPlaceholder({ state, onRetry }) {
+  const isError = state === 'error';
+  return (
+    <div className="badges-section">
+      <div className="badges-toggle" style={{ cursor: 'default' }}>Badges</div>
+      <div className="badges-empty">
+        {isError
+          ? 'Couldn’t load your badges.'
+          : 'Sign in to track your badges.'}
+        {isError && onRetry && (
+          <>
+            {' '}
+            <button type="button" className="badges-retry-btn" onClick={onRetry}>Retry</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================
    AI Background Themes — helpers + screen
    ============================================================ */
@@ -16818,6 +16851,10 @@ function App() {
   // Lifetime won-solve count (server-computed), used to drive the
   // "X/Y solves → Solver" next-milestone progress hint.
   const [solveCount, setSolveCount] = useState(0);
+  // Outcome of the last /api/daily load, used to explain an empty badge slot:
+  // 'ok' (real panel renders), 'signedout' (401 — no/expired token), or
+  // 'error' (5xx / network — backend unreachable, offer retry).
+  const [badgeLoadState, setBadgeLoadState] = useState('ok');
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -16899,8 +16936,9 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, body } = await api(path);
+    const { ok, status, body } = await api(path);
     if (ok && body) {
+      setBadgeLoadState('ok');
       setAuthOk(true);
       setUser(body.user || null);
       setAttempts(body.attempts || {});
@@ -16918,6 +16956,9 @@ function App() {
     } else {
       // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
       // so persistence isn't guaranteed — reflect that in the nav.
+      // Distinguish "signed out" (401) from a transient backend failure so the
+      // badge slot can explain the empty space instead of rendering nothing.
+      setBadgeLoadState(status === 401 ? 'signedout' : 'error');
       setAuthOk(false);
       setUser(null);
       setStreak(0);
@@ -17756,6 +17797,13 @@ function App() {
               />
             );
           })()}
+          {!authOk && (lobbyTab === 'daily' || lobbyTab === 'classic') && (
+            // Signed-out / load-failure affordance: explain the empty badge slot
+            // instead of rendering nothing. Limited to Daily/Classic (Feed/PvP
+            // own their viewport). Retry re-runs the daily load and flips back
+            // to the real panel on success.
+            <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
+          )}
           {lobbyTab === 'pvp' ? (
             PVP_ENABLED
               ? <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />

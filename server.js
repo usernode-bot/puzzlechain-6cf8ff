@@ -2936,6 +2936,13 @@ app.post('/api/collab/sessions/:roomId/finish', async (req, res) => {
 // can drive a clock-skew-proof countdown.
 app.get('/api/daily', async (req, res) => {
   try {
+    // Staging-only fixture: force the "not authenticated" (401) response so the
+    // lobby's signed-out badge placeholder is reachable for a screenshot/check
+    // even though the staging preview carries a valid token. Returns the same
+    // shape the auth middleware uses; strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'signedout') {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     // Lazy init: ensure user and stats rows exist
     await ensureUser(req.user.id, req.user.username, req.user.usernode_pubkey);
     // Staging-only demo seed: gives the current viewer a finished attempt

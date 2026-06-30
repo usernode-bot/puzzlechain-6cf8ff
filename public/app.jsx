@@ -4868,7 +4868,7 @@ async function submitClassicScore(gameId, score, extra) {
 // Reusable global leaderboard for the score-based classic games. Lazily fetches
 // /api/classic/:gameId/leaderboard, highlights the caller, and pins their row
 // when outside the top N. `valueFmt` formats a row's headline number.
-function ClassicLeaderboard({ gameId, valueLabel = 'Score', valueFmt }) {
+function ClassicLeaderboard({ gameId, url, valueLabel = 'Score', valueFmt }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -4876,7 +4876,7 @@ function ClassicLeaderboard({ gameId, valueLabel = 'Score', valueFmt }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(false);
-    api(`/api/classic/${gameId}/leaderboard`).then(({ ok, body }) => {
+    api(url || `/api/classic/${gameId}/leaderboard`).then(({ ok, body }) => {
       if (cancelled) return;
       if (ok && body) setData(body); else setError(true);
       setLoading(false);
@@ -4919,7 +4919,7 @@ function ClassicLeaderboard({ gameId, valueLabel = 'Score', valueFmt }) {
 function cgLeaderboardSection(gameId, opts) {
   return {
     id: 'leaderboard', label: 'Leaderboard',
-    render: () => <ClassicLeaderboard gameId={gameId} valueLabel={(opts && opts.valueLabel) || 'Score'} valueFmt={opts && opts.valueFmt} />,
+    render: () => <ClassicLeaderboard gameId={gameId} url={opts && opts.url} valueLabel={(opts && opts.valueLabel) || 'Score'} valueFmt={opts && opts.valueFmt} />,
   };
 }
 
@@ -10016,6 +10016,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
     cgSound('lose'); cgHaptic([20, 40, 20]);
     const sc = st.current.eaten * 10;
     cgSaveHistory(SNAKE_KEY, { score: sc, len: st.current.snake.length, ts: Date.now() });
+    api('/api/snake/score', { method: 'POST', body: JSON.stringify({ score: sc, length: st.current.snake.length, timeSecs: secsRef.current }) }).catch(() => {});
     const hist = cgLoadHistory(SNAKE_KEY);
     const bestScore = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
     const longestSnake = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
@@ -10097,6 +10098,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
       { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
     ]),
+    cgLeaderboardSection('snake', { url: '/api/snake/leaderboard' }),
     cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
@@ -10605,6 +10607,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     doneRef.current = true; setDone(true);
     cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
     cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, bestCombo: bestComboRef.current, ts: Date.now() });
+    submitClassicScore('diamondrush', sc, { level: 1, movesUsed: START_MOVES - mv, targetReached: win ? 1 : 0 });
     setCombo(0);
     if (win) {
       if (bestCascadeRef.current >= 3) grantPowerUp('shuffle');
@@ -10699,6 +10702,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
       { val: bigC, lbl: 'Best cascade' }, { val: bestCombo, lbl: 'Best combo' },
     ]),
+    cgLeaderboardSection('diamondrush'),
     cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
@@ -10811,6 +10815,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   const doneRef = useRef(false);
   const handsRef = useRef(0);
   const bigPotRef = useRef(0);
+  const peakChipsRef = useRef(START);
   const secsRef = useRef(0);
   const [done, setDone] = useState(false);
   const secs = useElapsed(resetKey, !done);
@@ -10826,7 +10831,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   const stateRef = useRef(state);
   stateRef.current = state;
   useClassicSaveSource(!done && !!state, () => ({
-    th: stateRef.current, hands: handsRef.current, bigPot: bigPotRef.current,
+    th: stateRef.current, hands: handsRef.current, bigPot: bigPotRef.current, peakChips: peakChipsRef.current,
   }));
   useEffect(() => {
     if (resumeCheckedRef.current) return;
@@ -10835,7 +10840,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   }, []);
   const applyResume = () => {
     const s = resumeOffer; if (!s) return;
-    handsRef.current = s.hands || 0; bigPotRef.current = s.bigPot || 0;
+    handsRef.current = s.hands || 0; bigPotRef.current = s.bigPot || 0; peakChipsRef.current = s.peakChips || START;
     setState(s.th); setDone(false); doneRef.current = false;
     setResumeOffer(null);
   };
@@ -10859,7 +10864,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     };
   };
   const init = () => {
-    handsRef.current = 0; doneRef.current = false; setDone(false);
+    handsRef.current = 0; doneRef.current = false; setDone(false); peakChipsRef.current = START;
     setState(newHand(START, START, true));
     setBetOpen(false); setBetAmt(BB);
   };
@@ -10970,6 +10975,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   const checkMatch = (s) => {
     if (doneRef.current) return;
     handsRef.current++;
+    peakChipsRef.current = Math.max(peakChipsRef.current, s.pc);
     onStepChange && onStepChange(handsRef.current);
     if (s.pc <= 0 || s.ac <= 0) {
       doneRef.current = true; setDone(true);
@@ -10977,6 +10983,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       const youWin = s.pc > 0;
       cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
       cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
+      submitClassicScore('texas', peakChipsRef.current, { handsPlayed: handsRef.current, finalChips: youWin ? s.pc : 0 });
       if (youWin) onWin(s.pc, handsRef.current, secsRef.current, { winnerLabel: 'You win!', share: `🃏 Won heads-up poker in ${handsRef.current} hands` });
       else onLose(handsRef.current, secsRef.current, { share: `🃏 Busted after ${handsRef.current} hands`, answer: 'Opponent wins' });
     }
@@ -11003,6 +11010,7 @@ function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       { val: wins, lbl: 'Matches won' }, { val: hist.length, lbl: 'Matches' },
       { val: bigPotRef.current, lbl: 'Biggest pot' }, { val: handsRef.current, lbl: 'Hands (match)' },
     ]),
+    cgLeaderboardSection('texas', { valueLabel: 'Peak Stack' }),
     cgRulesSection(['Heads-up Texas Hold \'Em vs the computer.', 'Tap Check / Call / Fold to act.', 'Tap Bet/Raise to size a wager.', 'Win all the opponent\'s chips to take the match.']),
   ];
 
@@ -16351,6 +16359,8 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
   );
 }
 
+const CNL_STREAK_KEY = 'puzzlechain_cnl_streak';
+
 // Chutes & Ladders wrapper — picks a mode (2P / Versus Bot / Online) and
 // delegates. Honors the Game Menu's gameMode/gameModeOpts props.
 function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
@@ -16360,6 +16370,17 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   const [resumeState, setResumeState] = useState(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const { loadState, clearState } = useClassicSave('chutes-ladders');
+
+  // Intercept onWin to track win streak in localStorage and submit to the server.
+  // playerWon: meta.winner===1 for local/bot (player 1 = the human); score>0 for online.
+  const handleWin = (score, steps, secs, meta) => {
+    const playerWon = meta && meta.winner !== undefined ? meta.winner === 1 : score > 0;
+    const prevStreak = parseInt(localStorage.getItem(CNL_STREAK_KEY) || '0', 10);
+    const newStreak = playerWon ? prevStreak + 1 : 0;
+    try { localStorage.setItem(CNL_STREAK_KEY, String(newStreak)); } catch (e) {}
+    submitClassicScore('chutes-ladders', newStreak, { mode: mode || 'bot' });
+    onWin(score, steps, secs, meta);
+  };
 
   // Sync mode from the Game Menu's New Game selection.
   useEffect(() => {
@@ -16391,14 +16412,14 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
     }} />;
   }
   if (mode === 'online') {
-    return <ChutesLaddersOnlineGame onWin={onWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
+    return <ChutesLaddersOnlineGame onWin={handleWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
   }
   if (mode === 'bot' && !resumeChecked) {
     return <div style={{ textAlign: 'center', padding: '2rem', color: C.muted }}>Loading…</div>;
   }
   return (
     <ChutesLaddersLocalGame
-      onWin={onWin}
+      onWin={handleWin}
       onStepChange={onStepChange}
       resetKey={resetKey}
       vsBot={mode === 'bot'}
@@ -16768,6 +16789,8 @@ const GAMES = [
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
     menuModePicker: true,
+    leaderboard: true,
+    leaderboardOpts: { valueLabel: 'Best Streak' },
   },
   {
     id: '2048',
@@ -18121,14 +18144,18 @@ function App() {
             onModeChange={setClassicGameMode}
           />
         );
-      case 'classic':
+      case 'classic': {
         // In-frame classic game wrapped in the shared ClassicShell.
+        const classicSections = currentGame.leaderboard
+          ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
+          : [];
         return (
           <ClassicShell
             game={currentGame}
             onExit={() => backToLobby('classic')}
             onNewGame={() => setPlayAgainKey(k => k + 1)}
             menuConfig={classicMenuConfig}
+            sheetSections={classicSections}
           >
             <div className="cg-stage cg-scroll">
               <GameComponent
@@ -18145,6 +18172,7 @@ function App() {
             </div>
           </ClassicShell>
         );
+      }
       case 'daily':
       default:
         // Daily puzzle (and any back-header game-wrap game): resumable, locked.

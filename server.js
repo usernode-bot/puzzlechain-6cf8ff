@@ -261,7 +261,7 @@ const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
-const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush']);
+const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'texas', 'chutes-ladders']);
 
 // Classic games that support online "race" multiplayer (each player plays
 // their own board; highest final score wins) over classic_rooms.
@@ -3332,8 +3332,17 @@ app.get('/api/daily', async (req, res) => {
         ['staging-demo-borg', 'Staging demo Borg', 'knights-tour', 4100, 3],
         ['staging-demo-ada',  'Staging demo Ada',  'blockblast',  1240, 6],
         ['staging-demo-borg', 'Staging demo Borg', 'blockblast',   820, 4],
-        ['staging-demo-ada',  'Staging demo Ada',  'hashrush',    1450, 6],
-        ['staging-demo-borg', 'Staging demo Borg', 'hashrush',     930, 3],
+        ['staging-demo-ada',  'Staging demo Ada',  'hashrush',      1450,  6],
+        ['staging-demo-borg', 'Staging demo Borg', 'hashrush',       930,  3],
+        ['staging-demo-ada',  'Staging demo Ada',  'diamondrush',   2100,  8],
+        ['staging-demo-borg', 'Staging demo Borg', 'diamondrush',   1650,  5],
+        ['staging-demo-cal',  'Staging demo Cal',  'diamondrush',   1200,  3],
+        ['staging-demo-ada',  'Staging demo Ada',  'texas',          480,  4],
+        ['staging-demo-borg', 'Staging demo Borg', 'texas',          340,  6],
+        ['staging-demo-cal',  'Staging demo Cal',  'texas',          220,  2],
+        ['staging-demo-ada',  'Staging demo Ada',  'chutes-ladders',   5,  9],
+        ['staging-demo-borg', 'Staging demo Borg', 'chutes-ladders',   3,  7],
+        ['staging-demo-cal',  'Staging demo Cal',  'chutes-ladders',   2,  4],
       ];
       for (const [uid, uname, gid, score, played] of csSeed) {
         await pool.query(
@@ -3341,6 +3350,20 @@ app.get('/api/daily', async (req, res) => {
            VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (user_id, game_id) DO NOTHING`,
           [uid, uname, gid, score, played]
+        );
+      }
+      // Seed snake_scores with obviously-fake players
+      const snakeSeed = [
+        ['staging-demo-ada',  'Staging demo Ada',  350, 36, 42],
+        ['staging-demo-borg', 'Staging demo Borg', 230, 24, 31],
+        ['staging-demo-cal',  'Staging demo Cal',  110, 12, 18],
+      ];
+      for (const [uid, uname, score, len, timeSecs] of snakeSeed) {
+        await pool.query(
+          `INSERT INTO snake_scores (user_id, username, best_score, best_length, best_time_secs, games_played)
+           VALUES ($1, $2, $3, $4, $5, 3)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [uid, uname, score, len, timeSecs]
         );
       }
     }

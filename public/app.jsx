@@ -157,6 +157,23 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Badge accordion trigger — base styles, mobile activation via @media (max-width: 560px) */
+.badge-strip-trigger {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: none; border: none; padding: 0;
+  font: inherit; color: inherit; cursor: default; text-align: left;
+  font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; pointer-events: none;
+}
+.badge-strip-trigger .badge-strip-count { color: ${C.text}; }
+.badge-chevron {
+  display: none; /* hidden on desktop */
+  margin-left: 0.4rem; font-size: 0.85rem; color: ${C.muted};
+  transition: transform 280ms ease; flex-shrink: 0;
+}
+.badge-chevron.open { transform: rotate(180deg); }
+/* On desktop the body is always visible — transitions only activate at ≤560px */
+.badge-strip-body { display: block; }
 @media (max-width: 640px) {
   .badge-strip {
     display: grid;
@@ -305,20 +322,33 @@ body {
    Friends button and dApps chip live in the top bar instead. */
 @media (min-width: 561px) {
   .account-connections { display: none; }
+  /* Force badge accordion always-open on desktop/tablet regardless of JS state */
+  .badge-strip-body { max-height: none !important; opacity: 1 !important; overflow: visible !important; }
+  .badge-strip-trigger { cursor: default; pointer-events: none; }
+  .badge-chevron { display: none !important; }
 }
 
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
   .account-chip { padding: 0.35rem; }
   .nav-right { gap: 0.8rem; }
+  .nav-stats { gap: 1rem; }
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
-  /* Friends + dApps move into the Account screen's Connections section.
-     Scoped under .nav-right so they outrank the base chip rule defined
-     later in this stylesheet regardless of source order. */
+  /* Friends + dApps + MATCH chip + wallet chip move into the Account screen's
+     Connections section on mobile. Scoped under .nav-right so they outrank
+     the base chip rules defined later in this stylesheet regardless of source order. */
   .nav-right .nav-friends-btn { display: none; }
   .nav-right .nav-integration-chip { display: none; }
+  .nav-right .nav-match-chip { display: none; }
+  .nav-right .nav-wallet-chip { display: none; }
+  /* Badge accordion: trigger is interactive on mobile */
+  .badge-strip-body { overflow: hidden; transition: max-height 280ms ease, opacity 280ms ease; }
+  .badge-strip-body.closed { max-height: 0; opacity: 0; }
+  .badge-strip-body.open { max-height: 600px; opacity: 1; } /* 600px > any realistic badge grid height */
+  .badge-chevron { display: inline-block; }
+  .badge-strip-trigger { cursor: pointer; pointer-events: auto; }
 }
 
 /* ---- Lobby ---- */
@@ -2970,6 +3000,7 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .cg-sheet, .tm-grid .tm-tile, .dr-gem, .snake-cell { transition: none !important; }
+  .badge-strip-body, .badge-chevron { transition: none !important; }
 }
 
 /* ---- Idle Clicker ---- */
@@ -4677,7 +4708,7 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect, matchBalance, walletBalance }) {
   const [copied, setCopied] = React.useState(false);
   const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -4816,10 +4847,20 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
             )}
           </div>
 
-          {/* Connections — Friends + dApps, shown here only on narrow viewports
-              (hidden ≥561px via CSS, where they live in the top bar instead). */}
+          {/* Connections — Friends + dApps + balances, shown here only on narrow
+              viewports (hidden ≥561px via CSS, where they live in the top bar). */}
           <div className="wallet-card account-connections">
             <div className="wallet-card-title">Connections</div>
+            {matchBalance != null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
+                🪙 {matchBalance} MATCH
+              </div>
+            )}
+            {walletBalance && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.emerald, fontFamily: "'JetBrains Mono', monospace" }}>
+                🪙 {fmtUtgo(walletBalance)}
+              </div>
+            )}
             <button
               type="button"
               className="account-connection-row"
@@ -4984,11 +5025,12 @@ function TodayChampions({ onSelectUser }) {
    render dimmed so there's a visible collection to complete. Shared by
    the lobby and the profile screen.
    ============================================================ */
-function BadgeStrip({ badges, achievements }) {
+function BadgeStrip({ badges, achievements, collapsible }) {
   const earnedDays = new Set(badges || []);
   const ach = achievements || { types: [], milestones: [] };
   const earnedTypes = new Set(ach.types || []);
   const earnedMilestones = new Set(ach.milestones || []);
+  const [open, setOpen] = useState(false);
 
   const chips = [];
   for (const b of STREAK_BADGES) {
@@ -5002,24 +5044,47 @@ function BadgeStrip({ badges, achievements }) {
   }
   const earnedCount = chips.filter(c => c.earned).length;
 
+  const grid = (
+    <div className="badge-strip">
+      {chips.map(c => (
+        <div
+          key={c.key}
+          className={`badge-chip${c.earned ? ' active' : ' locked'}`}
+          title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
+        >
+          <span className="badge-chip-icon">{c.icon}</span>
+          <span className="badge-chip-name">{c.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="badge-strip-wrap">
-      <div className="badge-strip-head">
-        <span>Badges</span>
-        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
-      </div>
-      <div className="badge-strip">
-        {chips.map(c => (
-          <div
-            key={c.key}
-            className={`badge-chip${c.earned ? ' active' : ' locked'}`}
-            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
-          >
-            <span className="badge-chip-icon">{c.icon}</span>
-            <span className="badge-chip-name">{c.name}</span>
-          </div>
-        ))}
-      </div>
+      {collapsible ? (
+        <button
+          type="button"
+          className="badge-strip-trigger"
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+        >
+          <span>Badges</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
+            <span className={`badge-chevron${open ? ' open' : ''}`}>▾</span>
+          </span>
+        </button>
+      ) : (
+        <div className="badge-strip-head">
+          <span>Badges</span>
+          <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
+        </div>
+      )}
+      {collapsible ? (
+        <div className={`badge-strip-body${open ? ' open' : ' closed'}`}>
+          {grid}
+        </div>
+      ) : grid}
     </div>
   );
 }
@@ -15808,6 +15873,8 @@ function App() {
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
           onDisconnect={disconnectWallet}
+          matchBalance={matchBalance}
+          walletBalance={walletBalance}
         />
       )}
 
@@ -15848,7 +15915,7 @@ function App() {
               // Union of permanent earned streak badges and any the live streak
               // now satisfies, so the strip is correct right after a win too.
               const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
-              return <BadgeStrip badges={earnedDays} achievements={achievements} />;
+              return <BadgeStrip badges={earnedDays} achievements={achievements} collapsible={true} />;
             })()}
           </div>
           <div className="lobby-tabs">

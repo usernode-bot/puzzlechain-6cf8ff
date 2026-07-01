@@ -113,6 +113,8 @@
     { "name": "Themes screen renders", "path": "/?screen=themes", "expectText": "Create a theme" },
     { "name": "Themes nav button in lobby", "path": "/", "expectText": "Themes" },
     { "name": "Themes gallery shows seeded community theme", "path": "/?screen=themes&demo=themes", "expectText": "Neon Sunset" },
-    { "name": "Themes gallery shows seeded creator", "path": "/?screen=themes&demo=themes", "expectText": "Staging demo ada" }
+    { "name": "Themes gallery shows seeded creator", "path": "/?screen=themes&demo=themes", "expectText": "Staging demo ada" },
+    { "name": "Poker setup screen renders", "path": "/?game=texas", "expectText": "Start Game" },
+    { "name": "Poker setup has bot selector", "path": "/?game=texas", "expectText": "How many bots?" }
   ]
 }

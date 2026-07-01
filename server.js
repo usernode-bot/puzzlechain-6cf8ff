@@ -14,39 +14,6 @@ const IS_STAGING = process.env.USERNODE_ENV === 'staging';
 // App identity secrets (APP_PUBKEY, APP_SECRET_KEY) are declared in dapp.json
 // and available via process.env for cryptographic operations when needed.
 
-// ---- PvP wager config -------------------------------------------------------
-
-const VALIDATOR_PRIVATE_KEY = process.env.VALIDATOR_PRIVATE_KEY;
-const UTGO_CONTRACT_ADDRESS = process.env.UTGO_CONTRACT_ADDRESS;
-const TREASURY_WALLET       = process.env.TREASURY_WALLET;
-const UTGO_RPC_URL          = process.env.UTGO_RPC_URL || '';
-
-// Wager-feature identity is OPTIONAL and must degrade gracefully: a malformed
-// VALIDATOR_PRIVATE_KEY or UTGO_RPC_URL must DISABLE the wager feature, never
-// crash boot (mirrors the APP_SECRET_KEY pattern below). ethers' Wallet /
-// JsonRpcProvider constructors throw synchronously on bad input, so a
-// fat-fingered prod secret would otherwise kill the process at module load —
-// before listen() — and surface as a 502. We .trim() the key first so a
-// valid-but-untrimmed secret (e.g. a copy/paste trailing newline) still works
-// rather than disabling the feature.
-let validatorWallet = null;
-if (VALIDATOR_PRIVATE_KEY && VALIDATOR_PRIVATE_KEY.trim()) {
-  try {
-    validatorWallet = new ethers.Wallet(VALIDATOR_PRIVATE_KEY.trim());
-  } catch (e) {
-    console.warn('[wager] VALIDATOR_PRIVATE_KEY is invalid — wager signing disabled:', e.message);
-  }
-}
-
-let utgoProvider = null;
-if (UTGO_RPC_URL) {
-  try {
-    utgoProvider = new ethers.JsonRpcProvider(UTGO_RPC_URL);
-  } catch (e) {
-    console.warn('[wager] UTGO_RPC_URL is invalid — on-chain provider disabled:', e.message);
-  }
-}
-
 // ---- dApps-integration app identity ---------------------------------------
 // APP_PUBKEY / APP_SECRET_KEY identify this app to the dApps-integration
 // surface and sign integration payloads. The feature is OPTIONAL and must
@@ -69,12 +36,6 @@ function signIntegrationPayload(payload) {
   const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
   return crypto.createHmac('sha256', APP_SECRET_KEY).update(body).digest('hex');
 }
-
-const UTGO_ABI_BALANCE   = ['function balanceOf(address account) view returns (uint256)'];
-const WAGER_IFACE        = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
-const CANCEL_QUEUE_IFACE = new ethers.Interface(['function cancelQueue(bytes32)']);
-const TRANSFER_IFACE     = new ethers.Interface(['function transfer(address,uint256)']);
-const CLAIM_REWARDS_IFACE = new ethers.Interface(['function claimRewards(address,uint256,uint256,bytes)']);
 
 // Reward economics — single source of truth for balance/tuning.
 // 1 UTGO per 1000 final points; streak multiplier already baked into finalScore.
@@ -645,10 +606,10 @@ async function migrate() {
       ADD COLUMN IF NOT EXISTS bet_tier          INTEGER DEFAULT 10,
       ADD COLUMN IF NOT EXISTS p1_remaining      INTEGER,
       ADD COLUMN IF NOT EXISTS p2_remaining      INTEGER,
-      ADD COLUMN IF NOT EXISTS contract_tx       TEXT,
       ADD COLUMN IF NOT EXISTS started_at        TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS p1_last_seen_at   TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS p2_last_seen_at   TIMESTAMPTZ
+      ADD COLUMN IF NOT EXISTS p2_last_seen_at   TIMESTAMPTZ,
+      DROP COLUMN IF EXISTS contract_tx
   `);
   await pool.query(`
     ALTER TABLE pvp_moves
@@ -1522,7 +1483,7 @@ async function migrate() {
     for (const [userId, gameId, score, steps, timeSecs, caption] of posts) {
       await pool.query(
         `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, now() - interval '${Math.floor(Math.random() * 48)}' hours)
+         VALUES ($1, $2, $3, $4, $5, $6, now() - interval '${Math.floor(Math.random() * 48)} hours')
          ON CONFLICT DO NOTHING`,
         [userId, gameId, score, steps, timeSecs, caption || null]
       );
@@ -1551,7 +1512,7 @@ async function migrate() {
       for (const [postId, userId, text] of comments) {
         await pool.query(
           `INSERT INTO post_comments (post_id, user_id, text, created_at)
-           VALUES ($1, $2, $3, now() - interval '${Math.floor(Math.random() * 24)}' hours)
+           VALUES ($1, $2, $3, now() - interval '${Math.floor(Math.random() * 24)} hours')
            ON CONFLICT DO NOTHING`,
           [postId, userId, text]
         );
@@ -2364,12 +2325,21 @@ app.use(express.json());
 
 // Lazy init: ensure a user row exists, creating if needed.
 async function ensureUser(userId, username, usernode_pubkey) {
-  await pool.query(
-    `INSERT INTO users (id, username, usernode_pubkey)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (id) DO NOTHING`,
-    [userId, username, usernode_pubkey]
-  );
+  try {
+    await pool.query(
+      `INSERT INTO users (id, username, usernode_pubkey)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO NOTHING`,
+      [userId, username, usernode_pubkey]
+    );
+  } catch (err) {
+    // ON CONFLICT (id) only guards the id column — a brand-new id whose
+    // username collides with an existing row (e.g. concurrent first-time
+    // requests racing each other) still throws a unique_violation on
+    // users_username_key. Callers only key off user_id downstream, so
+    // swallow this one race instead of failing the whole request.
+    if (err.code !== '23505') throw err;
+  }
   // Also ensure stats row exists
   await pool.query(
     `INSERT INTO user_stats_snapshot (user_id, username)
@@ -5781,23 +5751,13 @@ function shapePvpMatch(r, requesterId, opts = {}) {
 }
 
 // GET /api/pvp/balance?addr=0x… — $UTGO balance check.
-// In staging (no real contract) returns a mock 10 UTGO balance.
+// $UTGO wager-escrow is retired; this always returns a mock balance.
 app.get('/api/pvp/balance', async (req, res) => {
   const addr = req.query.addr;
   if (!addr || !/^0x[0-9a-fA-F]{40}$/.test(addr)) {
     return res.status(400).json({ error: 'Valid EVM address required' });
   }
-  try {
-    if (IS_STAGING || !utgoProvider || !UTGO_CONTRACT_ADDRESS) {
-      return res.json({ balance: ethers.parseUnits('10', 18).toString(), mock: true });
-    }
-    const token = new ethers.Contract(UTGO_CONTRACT_ADDRESS, UTGO_ABI_BALANCE, utgoProvider);
-    const balance = await token.balanceOf(addr);
-    res.json({ balance: balance.toString() });
-  } catch (err) {
-    console.error('[pvp] balance check failed:', err.message);
-    res.status(500).json({ error: 'Failed to check balance' });
-  }
+  res.json({ balance: '0', mock: true });
 });
 
 // POST /api/pvp/join { betTier, playerAddr }
@@ -5983,44 +5943,19 @@ app.get('/api/pvp/match/:matchId', async (req, res) => {
           `, [matchId, winnerId]);
           if (forfeited.length) {
             m = forfeited[0];
-            let claimCalldata = null;
-            if (validatorWallet && winnerAddr && /^0x[0-9a-fA-F]{40}$/.test(winnerAddr)) {
-              try {
-                const matchId32 = pvpMatchBytes32(matchId);
-                const innerHash = ethers.keccak256(
-                  ethers.solidityPacked(['bytes32', 'address'], [matchId32, winnerAddr])
-                );
-                const sig = await validatorWallet.signMessage(ethers.getBytes(innerHash));
-                claimCalldata = WAGER_IFACE.encodeFunctionData('claimWin', [matchId32, winnerAddr, sig]);
-              } catch (sigErr) {
-                console.error('[pvp] inactivity forfeit signing failed:', sigErr.message);
-              }
-            }
+            const claimCalldata = null;
             return res.json({
               ...shapePvpMatch(m, req.user.id),
               forfeitedBy: forfeiteeId,
               claimCalldata,
-              contractAddr: UTGO_CONTRACT_ADDRESS || null,
+              contractAddr: null,
             });
           }
         }
       }
     }
 
-    // Compute cancelQueueCalldata for creator when match is waiting and 120s have elapsed
-    let cancelQueueCalldata = null;
-    const isCreator = req.user.id === m.player1_id;
-    if (isCreator && m.status === 'waiting' && UTGO_CONTRACT_ADDRESS) {
-      const ageMs = Date.now() - new Date(m.created_at).getTime();
-      if (ageMs > 120000) {
-        try {
-          const matchId32 = pvpMatchBytes32(matchId);
-          cancelQueueCalldata = CANCEL_QUEUE_IFACE.encodeFunctionData('cancelQueue', [matchId32]);
-        } catch (e) {
-          console.warn('[pvp] cancelQueueCalldata encode failed:', e.message);
-        }
-      }
-    }
+    const cancelQueueCalldata = null;
 
     res.json(shapePvpMatch(m, req.user.id, { cancelQueueCalldata }));
   } catch (err) {
@@ -6273,20 +6208,7 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
     }
 
     const final = finishedRows[0];
-    let claimCalldata = null;
-
-    if (validatorWallet && winnerAddr && /^0x[0-9a-fA-F]{40}$/.test(winnerAddr)) {
-      try {
-        const matchId32 = pvpMatchBytes32(matchId);
-        const innerHash = ethers.keccak256(
-          ethers.solidityPacked(['bytes32', 'address'], [matchId32, winnerAddr])
-        );
-        const sig = await validatorWallet.signMessage(ethers.getBytes(innerHash));
-        claimCalldata = WAGER_IFACE.encodeFunctionData('claimWin', [matchId32, winnerAddr, sig]);
-      } catch (sigErr) {
-        console.error('[pvp] signing failed:', sigErr.message);
-      }
-    }
+    const claimCalldata = null;
 
     const betTier   = final.bet_tier || 10;
     const pot       = betTier * 2;
@@ -6296,7 +6218,7 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
       match:        shapePvpMatch(final, req.user.id),
       isWinner:     req.user.id === winnerId,
       claimCalldata,
-      contractAddr: UTGO_CONTRACT_ADDRESS || null,
+      contractAddr: null,
       prize: {
         betTier,
         pot,
@@ -6342,25 +6264,13 @@ app.post('/api/pvp/match/:matchId/forfeit', async (req, res) => {
 
     if (rows.length === 0) return res.status(409).json({ error: 'Match already settled' });
 
-    let claimCalldata = null;
-    if (validatorWallet && opponentAddr && /^0x[0-9a-fA-F]{40}$/.test(opponentAddr)) {
-      try {
-        const matchId32 = pvpMatchBytes32(matchId);
-        const innerHash = ethers.keccak256(
-          ethers.solidityPacked(['bytes32', 'address'], [matchId32, opponentAddr])
-        );
-        const sig = await validatorWallet.signMessage(ethers.getBytes(innerHash));
-        claimCalldata = WAGER_IFACE.encodeFunctionData('claimWin', [matchId32, opponentAddr, sig]);
-      } catch (sigErr) {
-        console.error('[pvp] forfeit signing failed:', sigErr.message);
-      }
-    }
+    const claimCalldata = null;
 
     res.json({
       forfeited:    true,
       opponentId,
       claimCalldata,
-      contractAddr: UTGO_CONTRACT_ADDRESS || null,
+      contractAddr: null,
     });
   } catch (err) {
     console.error('[pvp] forfeit failed:', err.message);
@@ -6516,23 +6426,13 @@ app.get('/api/wallet', async (req, res) => {
 });
 
 // GET /api/wallet/balance?addr=0x…
-// On-chain balance for any address. Used by the nav balance chip.
+// $UTGO wager-escrow is retired; this always returns a mock balance.
 app.get('/api/wallet/balance', async (req, res) => {
   const addr = req.query.addr;
   if (!addr || !EVM_ADDR_RE.test(addr)) {
     return res.status(400).json({ error: 'Valid EVM address required' });
   }
-  try {
-    if (IS_STAGING || !utgoProvider || !UTGO_CONTRACT_ADDRESS) {
-      return res.json({ balance: ethers.parseUnits('10', 18).toString(), mock: true });
-    }
-    const token = new ethers.Contract(UTGO_CONTRACT_ADDRESS, UTGO_ABI_BALANCE, utgoProvider);
-    const balance = await token.balanceOf(addr);
-    res.json({ balance: balance.toString(), mock: false });
-  } catch (err) {
-    console.error('[wallet] balance check failed:', err.message);
-    res.status(500).json({ error: 'Failed to check balance' });
-  }
+  res.json({ balance: '0', mock: true });
 });
 
 // LEGACY tip/prepare + tip/confirm (on-chain $UTGO transfer) removed — tips now
@@ -6683,7 +6583,7 @@ app.post('/api/wallet/tip', async (req, res) => {
 app.post('/api/match/ledger/:eventId/anchor/confirm', async (req, res) => {
   const eventId = req.params.eventId;
   const txHash = typeof req.body.txHash === 'string' ? req.body.txHash : null;
-  const mock = !!req.body.mock || IS_STAGING || !UTGO_CONTRACT_ADDRESS || !txHash;
+  const mock = !!req.body.mock || IS_STAGING || !txHash;
   try {
     const { rows } = await pool.query(`SELECT user_id, anchor_status FROM match_ledger_events WHERE id = $1`, [eventId]);
     if (!rows.length) return res.status(404).json({ error: 'Ledger event not found' });
@@ -8039,7 +7939,7 @@ app.post('/api/dapp/sessions/:id/finish', async (req, res) => {
 app.post('/api/dapp/sessions/:id/anchor/confirm', async (req, res) => {
   const { id } = req.params;
   const txHash = typeof req.body.txHash === 'string' ? req.body.txHash : null;
-  const mock = !!req.body.mock || IS_STAGING || !UTGO_CONTRACT_ADDRESS;
+  const mock = !!req.body.mock || IS_STAGING || !txHash;
   try {
     const { rows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [id]);
     if (!rows.length) return res.status(404).json({ error: 'Session not found' });

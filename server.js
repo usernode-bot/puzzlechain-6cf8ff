@@ -131,6 +131,7 @@ function signIntegrationPayload(payload) {
 
 const UTGO_ABI_BALANCE   = ['function balanceOf(address account) view returns (uint256)'];
 const WAGER_IFACE        = new ethers.Interface(['function claimWin(bytes32,address,bytes)']);
+const DEPOSIT_IFACE      = new ethers.Interface(['function deposit(bytes32,uint256)']);
 const CANCEL_QUEUE_IFACE = new ethers.Interface(['function cancelQueue(bytes32)']);
 const TRANSFER_IFACE     = new ethers.Interface(['function transfer(address,uint256)']);
 const CLAIM_REWARDS_IFACE = new ethers.Interface(['function claimRewards(address,uint256,uint256,bytes)']);
@@ -173,6 +174,42 @@ function matchChainHash({ userId, kind, gameId, attemptDate, amount, eventId }) 
 // Server-authoritative; the client mirrors this only for display.
 const CW_HINT_BASE_COST = 1;
 const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
+
+// Server-authoritative daily hint cap. Mirrors app.jsx's cwDailyRounds: the
+// day's round count R is the FIRST draw off dailyRng(offset, 'cryptowordle'),
+// before any word is picked, so we can reproduce R without porting the whole
+// CW_WORDS list — only the round-count draw needs to match byte-for-byte.
+// Every CW_WORDS entry ships exactly CW_HINTS_PER_WORD hints today, so the
+// day's total purchasable clues is simply R * CW_HINTS_PER_WORD.
+const CW_MIN_ROWS = 4, CW_MAX_ROWS = 7;
+const CW_HINTS_PER_WORD = 2;
+function cwMulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function cwHashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function cwUtcDayNum() {
+  const d = new Date();
+  return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
+}
+function cwServerMaxHints() {
+  const dayNum = cwUtcDayNum();
+  const rng = cwMulberry32((dayNum + cwHashStr('cryptowordle')) >>> 0);
+  const rounds = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
+  return rounds * CW_HINTS_PER_WORD;
+}
 
 // EVM address regex (same as PvP validation throughout)
 const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -2838,16 +2875,19 @@ app.post('/api/collab/sessions/:roomId/move', async (req, res) => {
   }
   try {
     const { rows: sessionRows } = await pool.query(
-      `SELECT game_id, state FROM collab_sessions WHERE id = $1`,
+      `SELECT game_id, state, initiator_id, invitee_id FROM collab_sessions WHERE id = $1`,
       [req.params.roomId]
     );
     if (sessionRows.length === 0) {
       return res.status(404).json({ error: 'Session not found' });
     }
+    const session = sessionRows[0];
+    if (req.user.id !== session.initiator_id && req.user.id !== session.invitee_id) {
+      return res.status(403).json({ error: 'Not a participant in this session' });
+    }
 
     // For now, stub with success. In future: game-specific move validation.
     // Update state (placeholder: just track moves)
-    const session = sessionRows[0];
     const newState = session.state || { moves: [] };
     newState.moves = (newState.moves || []).concat([move]);
 
@@ -2894,10 +2934,13 @@ app.post('/api/collab/sessions/:roomId/finish', async (req, res) => {
       // Update stats if this is a win
       if (initiatorScore && initiatorScore > 0) {
         await pool.query(
-          `UPDATE user_stats_snapshot
-             SET total_score = total_score + $2, last_win_at = now(), updated_at = now()
-           WHERE user_id = $1`,
-          [session.initiator_id, initiatorScore]
+          `INSERT INTO user_stats_snapshot (user_id, username, total_score, last_win_at, updated_at)
+           VALUES ($1, $2, $3, now(), now())
+           ON CONFLICT (user_id) DO UPDATE SET
+             total_score = user_stats_snapshot.total_score + $3,
+             last_win_at = now(),
+             updated_at = now()`,
+          [session.initiator_id, req.user.username || null, initiatorScore]
         );
       }
     }
@@ -3231,17 +3274,16 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
-    // Staging-only demo seed: create a Diamond Rush attempt with power-up gems
-    // on the board so the power-up earning and usage UI is demonstrable.
-    // Claimed but unfinished, with a board containing power-up gems at specific positions.
+    // Staging-only demo seed: create a claimed-but-unfinished Word Hunt attempt
+    // with a couple of words already found, so the "in progress · resume" UI
+    // is demonstrable. game_id must be a real daily-category game (Diamond
+    // Rush is classic and never checked by the daily lock/resume machinery),
+    // and the progress blob must match Word Hunt's { dayNum, found } shape.
     if (IS_STAGING && req.query.demo === 'powerups') {
-      const demoBoard = new Array(64).fill(null);
-      for (let i = 0; i < 64; i++) demoBoard[i] = Math.floor(Math.random() * 6);
-      demoBoard[10] = 6; demoBoard[25] = 7; demoBoard[40] = 8;
       await pool.query(
         `INSERT INTO daily_attempts
            (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
-         VALUES ($1, $2, 'diamondrush', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         VALUES ($1, $2, 'wordhunt', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
          ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
            SET finished_at = NULL,
                score = NULL,
@@ -3254,7 +3296,7 @@ app.get('/api/daily', async (req, res) => {
           req.user.username || 'staging-demo-user',
           3,
           45,
-          JSON.stringify({ grid: demoBoard, powerUps: { hint: 1, shuffle: 1, extraTime: 0 } }),
+          JSON.stringify({ dayNum: cwUtcDayNum(), found: ['CODE', 'GEM'] }),
         ]
       );
     }
@@ -3343,47 +3385,57 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
   const steps = Number.isFinite(req.body.steps) ? Math.round(req.body.steps) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   try {
+    // Read the player's previous best for this game BEFORE today's finish is
+    // committed, so it naturally excludes the in-flight attempt (its
+    // finished_at is still NULL at this point). Querying this after the
+    // UPDATE below would always see today's own just-written score as the
+    // max, so personal_best could never fire.
+    const { rows: bestRows } = await pool.query(
+      `SELECT MAX(score) as max_score FROM daily_attempts
+       WHERE user_id = $1 AND game_id = $2 AND score IS NOT NULL
+         AND finished_at IS NOT NULL`,
+      [req.user.id, gameId]
+    );
+    const prevBest = bestRows.length > 0 ? bestRows[0].max_score : null;
+
     const { rows } = await pool.query(
       `UPDATE daily_attempts
          SET score = $3, steps = $4, time_secs = $5, finished_at = now()
        WHERE user_id = $1 AND game_id = $2
          AND attempt_date = (now() AT TIME ZONE 'utc')::date
+         AND finished_at IS NULL
        RETURNING *`,
       [req.user.id, gameId, score, steps, timeSecs]
     );
     if (rows.length === 0) {
-      // No claimed attempt today (client out of sync) — surface so it resyncs.
+      // No claimed, unfinished attempt today (client out of sync, or this
+      // attempt was already finished) — surface so it resyncs instead of
+      // silently overwriting an already-recorded score.
       return res.status(409).json({ error: 'No active attempt to finish' });
     }
 
     // Update stats snapshot if this is a win (score > 0)
     if (score && score > 0) {
       await pool.query(
-        `UPDATE user_stats_snapshot
-           SET total_score = total_score + $2,
-               last_win_at = now(),
-               updated_at = now()
-         WHERE user_id = $1`,
-        [req.user.id, score]
+        `INSERT INTO user_stats_snapshot (user_id, username, total_score, last_win_at, updated_at)
+         VALUES ($1, $2, $3, now(), now())
+         ON CONFLICT (user_id) DO UPDATE SET
+           total_score = user_stats_snapshot.total_score + $3,
+           last_win_at = now(),
+           updated_at = now()`,
+        [req.user.id, req.user.username || null, score]
       );
 
-      // Check if this is a personal best for this game and create achievement
-      const { rows: bestRows } = await pool.query(
-        `SELECT MAX(score) as max_score FROM daily_attempts
-         WHERE user_id = $1 AND game_id = $2 AND score IS NOT NULL
-           AND finished_at IS NOT NULL`,
-        [req.user.id, gameId]
-      );
-
-      if (bestRows.length > 0) {
-        const prevBest = bestRows[0].max_score;
-        if (!prevBest || score > prevBest) {
-          await pool.query(
-            `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
-             VALUES ($1, 'personal_best', $2, $3, $4)`,
-            [req.user.id, gameId, score, JSON.stringify({ previousBest: prevBest })]
-          );
-        }
+      // Personal best for this game — award once. No unique constraint
+      // backs user_achievements yet, but ON CONFLICT DO NOTHING is added
+      // defensively for when one lands (see deferred work).
+      if (!prevBest || score > prevBest) {
+        await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+           VALUES ($1, 'personal_best', $2, $3, $4)
+           ON CONFLICT DO NOTHING`,
+          [req.user.id, gameId, score, JSON.stringify({ previousBest: prevBest })]
+        );
       }
     }
 
@@ -4371,13 +4423,14 @@ app.post('/api/mancala/score/verify', async (req, res) => {
 
     // Update user stats snapshot
     await pool.query(
-      `UPDATE user_stats_snapshot
-         SET total_score = total_score + $2,
-             classics_played = classics_played + 1,
-             last_win_at = now(),
-             updated_at = now()
-       WHERE user_id = $1`,
-      [req.user.id, score]
+      `INSERT INTO user_stats_snapshot (user_id, username, total_score, classics_played, last_win_at, updated_at)
+       VALUES ($1, $2, $3, 1, now(), now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         total_score = user_stats_snapshot.total_score + $3,
+         classics_played = user_stats_snapshot.classics_played + 1,
+         last_win_at = now(),
+         updated_at = now()`,
+      [req.user.id, req.user.username || null, score]
     );
 
     // Achievement for personal best
@@ -4744,10 +4797,13 @@ app.post('/api/mancala/daily/finish', async (req, res) => {
     // Best-effort total-score snapshot bump (matches the AI-mode pattern).
     if (score > 0) {
       await pool.query(
-        `UPDATE user_stats_snapshot
-            SET total_score = total_score + $2, last_win_at = now(), updated_at = now()
-          WHERE user_id = $1`,
-        [req.user.id, score]
+        `INSERT INTO user_stats_snapshot (user_id, username, total_score, last_win_at, updated_at)
+         VALUES ($1, $2, $3, now(), now())
+         ON CONFLICT (user_id) DO UPDATE SET
+           total_score = user_stats_snapshot.total_score + $3,
+           last_win_at = now(),
+           updated_at = now()`,
+        [req.user.id, req.user.username || null, score]
       ).catch(() => {});
     }
 
@@ -5305,13 +5361,14 @@ app.post('/api/snake/score', async (req, res) => {
 
     // Update user stats snapshot
     await pool.query(
-      `UPDATE user_stats_snapshot
-         SET total_score = total_score + $2,
-             classics_played = classics_played + 1,
-             last_win_at = now(),
-             updated_at = now()
-       WHERE user_id = $1`,
-      [req.user.id, score]
+      `INSERT INTO user_stats_snapshot (user_id, username, total_score, classics_played, last_win_at, updated_at)
+       VALUES ($1, $2, $3, 1, now(), now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         total_score = user_stats_snapshot.total_score + $3,
+         classics_played = user_stats_snapshot.classics_played + 1,
+         last_win_at = now(),
+         updated_at = now()`,
+      [req.user.id, req.user.username || null, score]
     );
 
     // Create achievement if this is a personal best
@@ -5429,13 +5486,14 @@ app.post('/api/bounce/score', async (req, res) => {
 
     // Update user stats snapshot
     await pool.query(
-      `UPDATE user_stats_snapshot
-         SET total_score = total_score + $2,
-             classics_played = classics_played + 1,
-             last_win_at = now(),
-             updated_at = now()
-       WHERE user_id = $1`,
-      [req.user.id, score]
+      `INSERT INTO user_stats_snapshot (user_id, username, total_score, classics_played, last_win_at, updated_at)
+       VALUES ($1, $2, $3, 1, now(), now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         total_score = user_stats_snapshot.total_score + $3,
+         classics_played = user_stats_snapshot.classics_played + 1,
+         last_win_at = now(),
+         updated_at = now()`,
+      [req.user.id, req.user.username || null, score]
     );
 
     // Create achievement if this is a personal best
@@ -5546,13 +5604,14 @@ app.post('/api/zuma/score', async (req, res) => {
     const me = rows[0];
 
     await pool.query(
-      `UPDATE user_stats_snapshot
-         SET total_score = total_score + $2,
-             classics_played = classics_played + 1,
-             last_win_at = now(),
-             updated_at = now()
-       WHERE user_id = $1`,
-      [req.user.id, score]
+      `INSERT INTO user_stats_snapshot (user_id, username, total_score, classics_played, last_win_at, updated_at)
+       VALUES ($1, $2, $3, 1, now(), now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         total_score = user_stats_snapshot.total_score + $3,
+         classics_played = user_stats_snapshot.classics_played + 1,
+         last_win_at = now(),
+         updated_at = now()`,
+      [req.user.id, req.user.username || null, score]
     );
 
     if (!prevBest || score > prevBest) {
@@ -5645,6 +5704,7 @@ function shapePvpMatch(r, requesterId, opts = {}) {
     winnerId:             r.winner_id,
     boardSeed:            (isPlayer && r.status === 'active') ? r.board_seed : null,
     cancelQueueCalldata:  opts.cancelQueueCalldata || null,
+    depositCalldata:      opts.depositCalldata || null,
     startedAt:            r.started_at,
     createdAt:            r.created_at,
     updatedAt:            r.updated_at,
@@ -5893,7 +5953,20 @@ app.get('/api/pvp/match/:matchId', async (req, res) => {
       }
     }
 
-    res.json(shapePvpMatch(m, req.user.id, { cancelQueueCalldata }));
+    // Compute depositCalldata for a player who is active and hasn't deposited yet.
+    let depositCalldata = null;
+    const myDepositCol = isP1 ? m.p1_deposited : (isP2 ? m.p2_deposited : true);
+    if ((isP1 || isP2) && m.status === 'active' && !myDepositCol && UTGO_CONTRACT_ADDRESS) {
+      try {
+        const matchId32 = pvpMatchBytes32(matchId);
+        const wagerWei = ethers.parseUnits(String(m.bet_tier || 10), 18);
+        depositCalldata = DEPOSIT_IFACE.encodeFunctionData('deposit', [matchId32, wagerWei]);
+      } catch (e) {
+        console.warn('[pvp] depositCalldata encode failed:', e.message);
+      }
+    }
+
+    res.json(shapePvpMatch(m, req.user.id, { cancelQueueCalldata, depositCalldata }));
   } catch (err) {
     console.error('[pvp] get match failed:', err.message);
     res.status(500).json({ error: 'Failed to get match' });
@@ -5934,11 +6007,12 @@ app.post('/api/pvp/match/:matchId/deposit-confirmed', async (req, res) => {
     const isP2 = req.user.id === m.player2_id;
     if (!isP1 && !isP2) return res.status(403).json({ error: 'Not a player in this match' });
 
+    const txHash = typeof req.body.txHash === 'string' ? req.body.txHash : null;
     const col = isP1 ? 'p1_deposited' : 'p2_deposited';
     const { rows } = await pool.query(`
-      UPDATE pvp_matches SET ${col} = true, updated_at = now()
+      UPDATE pvp_matches SET ${col} = true, contract_tx = COALESCE($2, contract_tx), updated_at = now()
       WHERE id = $1 RETURNING *
-    `, [matchId]);
+    `, [matchId, txHash]);
     res.json(shapePvpMatch(rows[0], req.user.id));
   } catch (err) {
     console.error('[pvp] deposit-confirmed failed:', err.message);
@@ -5996,11 +6070,14 @@ app.post('/api/pvp/match/:matchId/finish', async (req, res) => {
       }
     }
 
-    // Anti-cheat validation against client timestamps
+    // Anti-cheat validation against client timestamps. tsClient arrives as a
+    // Date.now() epoch number from the live client, but normalize through
+    // Date so an ISO-string value (e.g. replayed/seeded telemetry) parses to
+    // the same millisecond number instead of silently failing Number.isFinite.
     let disputed = false;
     const clientTimes = telemetry
-      .filter(t => Number.isFinite(t.tsClient))
-      .map(t => t.tsClient)
+      .map(t => (t.tsClient != null ? new Date(t.tsClient).getTime() : NaN))
+      .filter(Number.isFinite)
       .sort((a, b) => a - b);
 
     if (clientTimes.length >= 2) {
@@ -6609,10 +6686,11 @@ app.get('/api/cryptowordle/hint', async (req, res) => {
 
 // POST /api/cryptowordle/hint — buy the next hint. Atomically bumps today's
 // counter and debits the doubling MATCH cost, mirroring the duel-join spend
-// pattern (SERIALIZABLE + FOR UPDATE). Body may carry { maxHints } (the day's
-// available clue count) so the server refuses to charge past the last clue.
+// pattern (SERIALIZABLE + FOR UPDATE). The day's available clue count is
+// computed server-side (cwServerMaxHints) — any { maxHints } in the body is
+// ignored so a client can't raise its own cap.
 app.post('/api/cryptowordle/hint', async (req, res) => {
-  const maxHints = Number.isFinite(req.body.maxHints) ? Math.max(0, Math.round(req.body.maxHints)) : null;
+  const maxHints = cwServerMaxHints();
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
@@ -7299,6 +7377,10 @@ app.post('/api/tilematch/duel/:duelId/finish', async (req, res) => {
           ? updated.player1_id : updated.player2_id;
       }
       const prize = Math.floor(updated.stake_tokens * 2 * 0.9);
+      // winnerId may be either player — not necessarily req.user — so use the
+      // winner's own stored name (player1_name/player2_name) rather than the
+      // requester's username, which would be wrong whenever the loser calls finish.
+      const winnerName = winnerId === updated.player1_id ? updated.player1_name : updated.player2_name;
       await client.query(
         `UPDATE tilematch_duels SET status = 'finished', winner_id = $1, updated_at = now() WHERE id = $2`,
         [winnerId, duelId]
@@ -7307,7 +7389,7 @@ app.post('/api/tilematch/duel/:duelId/finish', async (req, res) => {
         `INSERT INTO tilematch_tokens (user_id, username, balance)
          VALUES ($1, $2, $3)
          ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
-        [winnerId, req.user.username || null, prize]
+        [winnerId, winnerName || null, prize]
       );
       const { rows: balRows } = await client.query(
         `SELECT balance FROM tilematch_tokens WHERE user_id = $1`, [req.user.id]
@@ -7965,6 +8047,10 @@ app.post('/api/match3/finish/:puzzleId', async (req, res) => {
       const currentHighest = existing.length > 0 ? existing[0].highest_puzzle : 0;
       const newHighest = Math.max(currentHighest, puzzleId);
       const nextUnlocked = newHighest === puzzleId ? puzzleId + 1 : newHighest;
+      // EXCLUDED.highest_puzzle in the UPDATE below is just $3 (the value being
+      // inserted), so comparing it against $3 is always false — decide "is this
+      // a newly-completed puzzle" here in JS against the pre-write row instead.
+      const isNewCompletion = puzzleId > currentHighest;
 
       await pool.query(`
         INSERT INTO match3_progress (user_id, username, highest_puzzle, best_score, total_puzzles_completed, last_played_puzzle, updated_at)
@@ -7972,10 +8058,10 @@ app.post('/api/match3/finish/:puzzleId', async (req, res) => {
         ON CONFLICT (user_id) DO UPDATE SET
           highest_puzzle = GREATEST(match3_progress.highest_puzzle, $3),
           best_score = GREATEST(match3_progress.best_score, $4),
-          total_puzzles_completed = total_puzzles_completed + (CASE WHEN EXCLUDED.highest_puzzle < $3 THEN 1 ELSE 0 END),
+          total_puzzles_completed = total_puzzles_completed + (CASE WHEN $6 THEN 1 ELSE 0 END),
           last_played_puzzle = $5,
           updated_at = now()
-      `, [req.user.id, req.user.username || 'anon', newHighest, score, puzzleId + 1]);
+      `, [req.user.id, req.user.username || 'anon', newHighest, score, puzzleId + 1, isNewCompletion]);
 
       // Update per-puzzle best score
       await pool.query(`

@@ -2344,12 +2344,21 @@ app.use(express.json());
 
 // Lazy init: ensure a user row exists, creating if needed.
 async function ensureUser(userId, username, usernode_pubkey) {
-  await pool.query(
-    `INSERT INTO users (id, username, usernode_pubkey)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (id) DO NOTHING`,
-    [userId, username, usernode_pubkey]
-  );
+  try {
+    await pool.query(
+      `INSERT INTO users (id, username, usernode_pubkey)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO NOTHING`,
+      [userId, username, usernode_pubkey]
+    );
+  } catch (err) {
+    // ON CONFLICT (id) only guards the id column — a brand-new id whose
+    // username collides with an existing row (e.g. concurrent first-time
+    // requests racing each other) still throws a unique_violation on
+    // users_username_key. Callers only key off user_id downstream, so
+    // swallow this one race instead of failing the whole request.
+    if (err.code !== '23505') throw err;
+  }
   // Also ensure stats row exists
   await pool.query(
     `INSERT INTO user_stats_snapshot (user_id, username)

@@ -13238,10 +13238,6 @@ function PvpMatchmaking({ match, onCancel, onReclaim, cancelQueueCalldata }) {
   const handleReclaim = async () => {
     setReclaiming(true);
     try {
-      const cd = cancelQueueCalldata || (match && match.cancelQueueCalldata);
-      if (cd && UTGO_CONTRACT_ADDRESS && window.usernode && window.usernode.sendTransaction) {
-        await window.usernode.sendTransaction({ to: UTGO_CONTRACT_ADDRESS, data: cd });
-      }
       onReclaim && onReclaim();
     } catch (e) {
       console.error('[pvp] reclaim failed:', e && e.message);
@@ -13383,10 +13379,6 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
 
   const handleDeposit = async () => {
     setDepositing(true);
-    const isMock = !window.usernode || (window.usernode.isMockEnabled && window.usernode.isMockEnabled());
-    if (!isMock && window.usernode && UTGO_CONTRACT_ADDRESS) {
-      // Production: call on-chain deposit — skip for staging
-    }
     await api(`/api/pvp/match/${match.matchId}/deposit-confirmed`, {
       method: 'POST',
       body: JSON.stringify({ txHash: '0xstaging' }),
@@ -13727,20 +13719,9 @@ function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appW
   return null;
 }
 
-// UTGO_CONTRACT_ADDRESS exposed for PvpGameScreen (staging: undefined)
-const UTGO_CONTRACT_ADDRESS = null; // injected from env in production
-
 /* ============================================================
    Wallet helpers
    ============================================================ */
-function fmtUtgo(weiStr) {
-  if (!weiStr || weiStr === '0') return '0.00 UTGO';
-  try {
-    const n = Number(BigInt(weiStr)) / 1e18;
-    return n.toFixed(2) + ' UTGO';
-  } catch { return '0.00 UTGO'; }
-}
-
 // MATCH is the single in-app currency — an integer count, not wei.
 function fmtMatch(n) {
   const v = Number.isFinite(n) ? n : 0;

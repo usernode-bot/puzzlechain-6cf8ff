@@ -6,27 +6,6 @@
   },
   "secrets": [
     {
-      "key": "VALIDATOR_PRIVATE_KEY",
-      "description": "Optional ECDSA private key for the validator wallet that signs claimWin messages. If unset or malformed, wager-signing cleanly disables itself and the rest of the app runs normally — it never blocks the deploy or crashes boot. Staging default is Hardhat account #0.",
-      "required": false,
-      "private": true,
-      "staging_default": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-    },
-    {
-      "key": "UTGO_CONTRACT_ADDRESS",
-      "description": "Deployed WagerEscrow contract address on Usernode EVM chain. Staging uses a placeholder (no real contract).",
-      "required": false,
-      "private": false,
-      "staging_default": "0x0000000000000000000000000000000000000001"
-    },
-    {
-      "key": "TREASURY_WALLET",
-      "description": "EVM address receiving the 8% treasury cut of each wager pot.",
-      "required": false,
-      "private": false,
-      "staging_default": "0x0000000000000000000000000000000000000002"
-    },
-    {
       "key": "REDIS_URL",
       "description": "Optional Redis connection URL used only as a fast path for the PvP matchmaking queue and match timers. The app fully degrades to its built-in Postgres CAS queue when unset, so this is not required to deploy.",
       "required": false,
@@ -81,7 +60,6 @@
     { "name": "MATCH earn demo seeds cleanly", "path": "/?demo=earn", "expectText": "MATCH" },
     { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" },
     { "name": "Boots with dApps integration disabled (empty APP_SECRET_KEY)", "path": "/", "expectText": "PuzzleChain" },
-    { "name": "Boots and serves / even if VALIDATOR_PRIVATE_KEY is invalid (wager signing disabled, port still binds)", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Wallet shows Verified identity badge", "path": "/?screen=wallet&demo=1", "expectText": "Verified identity" },
     { "name": "Wallet shows Disconnect control", "path": "/?screen=wallet&demo=1", "expectText": "Disconnect" },
     { "name": "DApp session receipt renders", "path": "/?demo=dapp", "expectText": "Session Receipt" },

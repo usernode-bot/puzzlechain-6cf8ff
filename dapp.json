@@ -105,6 +105,11 @@
     { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
     { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
     { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },
+    { "name": "Mini Sudoku shows paid Hint bar", "path": "/?game=sudoku", "expectText": "Hint" },
+    { "name": "Word Hunt shows paid Hint bar", "path": "/?game=wordhunt", "expectText": "Hint" },
+    { "name": "Daily Tile Match shows paid Hint bar", "path": "/?game=tilematchingdaily", "expectText": "Hint" },
+    { "name": "Wallet MATCH activity section renders", "path": "/?screen=wallet&demo=match", "expectText": "MATCH activity" },
+    { "name": "MATCH activity shows View on explorer link", "path": "/?screen=wallet&demo=match", "expectText": "View on explorer" },
     { "name": "Mancala mode picker offers Daily Challenge", "path": "/?game=mancala", "expectText": "Daily Challenge" },
     { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" },
     { "name": "Chutes & Ladders mode select offers Versus Bot", "path": "/?game=chutes-ladders", "expectText": "Versus Bot" },
@@ -117,8 +122,8 @@
     { "name": "Snake leaderboard renders seeded scores", "path": "/?game=snake&demo=classic-scores", "expectText": "Staging demo Ada" },
     { "name": "Diamond Rush game screen loads", "path": "/?game=diamondrush", "expectText": "Score" },
     { "name": "Diamond Rush leaderboard renders seeded scores", "path": "/?game=diamondrush&demo=classic-scores", "expectText": "Staging demo Ada" },
-    { "name": "Texas Hold Em game screen loads", "path": "/?game=texas", "expectText": "Opponent" },
-    { "name": "Texas Hold Em leaderboard renders seeded scores", "path": "/?game=texas&demo=classic-scores", "expectText": "Staging demo Ada" },
-    { "name": "Chutes Ladders leaderboard renders seeded scores", "path": "/?game=chutes-ladders&demo=classic-scores", "expectText": "Staging demo Ada" }
+    { "name": "Chutes Ladders leaderboard renders seeded scores", "path": "/?game=chutes-ladders&demo=classic-scores", "expectText": "Staging demo Ada" },
+    { "name": "Poker setup screen renders", "path": "/?game=texas", "expectText": "Start Game" },
+    { "name": "Poker setup has bot selector", "path": "/?game=texas", "expectText": "How many bots?" }
   ]
 }

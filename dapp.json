@@ -1,9 +1,5 @@
 {
   "name": "PuzzleChain",
-  "llm": {
-    "purpose": "Turns a text prompt into a custom full-screen background theme",
-    "suggested_daily_cap_cents": 50
-  },
   "secrets": [
     {
       "key": "REDIS_URL",
@@ -50,6 +46,7 @@
     { "name": "Diamond Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Diamond Rush" },
     { "name": "Texas Hold Em card in Classic Games tab", "path": "/?tab=classic", "expectText": "Texas Hold 'Em" },
     { "name": "Bounce card in Classic Games tab", "path": "/?tab=classic", "expectText": "Bounce" },
+    { "name": "Bounce game screen renders audio controls", "path": "/?game=bounce", "expectText": "Sound On" },
     { "name": "Zuma card in Classic Games tab", "path": "/?tab=classic", "expectText": "Zuma" },
     { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" },
     { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
@@ -59,6 +56,11 @@
     { "name": "On-chain MATCH receipt badge in wallet", "path": "/?screen=wallet&demo=1", "expectText": "on-chain" },
     { "name": "MATCH earn demo seeds cleanly", "path": "/?demo=earn", "expectText": "MATCH" },
     { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" },
+    { "name": "Hash Rush game screen loads", "path": "/?game=hashrush", "expectText": "Start mining" },
+    { "name": "2048 mode modal offers Online Race", "path": "/?game=2048", "expectText": "Online Race" },
+    { "name": "Block Blast mode modal offers Online Race", "path": "/?game=blockblast", "expectText": "Online Race" },
+    { "name": "2048 mode modal shows seeded leaderboard player", "path": "/?game=2048&demo=classic-scores", "expectText": "Staging demo Ada" },
+    { "name": "Classic mode modal renders mode chooser", "path": "/?game=2048", "expectText": "Choose a mode" },
     { "name": "Boots with dApps integration disabled (empty APP_SECRET_KEY)", "path": "/", "expectText": "PuzzleChain" },
     { "name": "Wallet shows Verified identity badge", "path": "/?screen=wallet&demo=1", "expectText": "Verified identity" },
     { "name": "Wallet shows Disconnect control", "path": "/?screen=wallet&demo=1", "expectText": "Disconnect" },
@@ -75,6 +77,8 @@
     { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
     { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
     { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
+    { "name": "Badge next-milestone progress hint renders", "path": "/?demo=streak", "expectText": "days →" },
+    { "name": "Signed-out badge placeholder renders", "path": "/?demo=signedout", "expectText": "Sign in to track" },
     { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
     { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
     { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },
@@ -88,9 +92,11 @@
     { "name": "Chutes & Ladders mode select offers Versus Bot", "path": "/?game=chutes-ladders", "expectText": "Versus Bot" },
     { "name": "Chutes & Ladders mode select offers Online Multiplayer", "path": "/?game=chutes-ladders", "expectText": "Online Multiplayer" },
     { "name": "Minesweeper game screen renders (audio controls load cleanly)", "path": "/?game=minesweeper", "expectText": "Safe Revealed" },
-    { "name": "Themes screen renders", "path": "/?screen=themes", "expectText": "Create a theme" },
-    { "name": "Themes nav button in lobby", "path": "/", "expectText": "Themes" },
-    { "name": "Themes gallery shows seeded community theme", "path": "/?screen=themes&demo=themes", "expectText": "Neon Sunset" },
-    { "name": "Themes gallery shows seeded creator", "path": "/?screen=themes&demo=themes", "expectText": "Staging demo ada" }
+    { "name": "Snake leaderboard renders seeded scores", "path": "/?game=snake&demo=classic-scores", "expectText": "Staging demo Ada" },
+    { "name": "Diamond Rush game screen loads", "path": "/?game=diamondrush", "expectText": "Score" },
+    { "name": "Diamond Rush leaderboard renders seeded scores", "path": "/?game=diamondrush&demo=classic-scores", "expectText": "Staging demo Ada" },
+    { "name": "Chutes Ladders leaderboard renders seeded scores", "path": "/?game=chutes-ladders&demo=classic-scores", "expectText": "Staging demo Ada" },
+    { "name": "Poker setup screen renders", "path": "/?game=texas", "expectText": "Start Game" },
+    { "name": "Poker setup has bot selector", "path": "/?game=texas", "expectText": "How many bots?" }
   ]
 }

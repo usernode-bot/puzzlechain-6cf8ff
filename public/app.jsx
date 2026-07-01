@@ -37,79 +37,7 @@ body {
 
 #root { min-height: 100vh; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; position: relative; }
-
-/* ---- AI background themes ----
-   Two fixed full-screen layers behind everything: the gradient, then a dark
-   scrim that keeps surfaces/text legible over any theme. With no active theme
-   the gradient is transparent (body's ${C.bg} shows) and the scrim is 0. */
-.app-bg {
-  position: fixed; inset: 0; z-index: -2; pointer-events: none;
-  background: var(--bg-grad, transparent);
-  transition: background 0.4s ease;
-}
-.app-bg-scrim {
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: #0A0D14;
-  opacity: var(--bg-scrim, 0);
-  transition: opacity 0.4s ease;
-}
-
-/* Themes screen */
-.themes-wrap { max-width: 920px; margin: 0 auto; padding: 1.5rem 1.25rem; width: 100%; }
-.themes-create {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
-  padding: 1.1rem 1.1rem 1.25rem; margin-bottom: 1.5rem;
-}
-.themes-create h2 { font-size: 1.05rem; margin-bottom: 0.3rem; }
-.themes-create p.sub { color: ${C.muted}; font-size: 0.85rem; margin-bottom: 0.8rem; }
-.themes-prompt-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.themes-prompt-row input {
-  flex: 1; min-width: 200px; background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 9px; padding: 0.65rem 0.8rem; color: ${C.text}; font: inherit; font-size: 0.9rem;
-}
-.themes-prompt-row input:focus { outline: none; border-color: ${C.accent}; }
-.themes-msg { margin-top: 0.7rem; font-size: 0.85rem; padding: 0.55rem 0.7rem; border-radius: 8px; }
-.themes-msg.err { background: ${C.rose}1a; color: ${C.rose}; border: 1px solid ${C.rose}55; }
-.themes-msg.info { background: ${C.accent}14; color: ${C.text}; border: 1px solid ${C.border}; }
-.themes-preview {
-  margin-top: 0.9rem; border-radius: 12px; border: 1px solid ${C.border};
-  padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;
-}
-.themes-preview .swatch {
-  height: 110px; border-radius: 10px; border: 1px solid ${C.border};
-  display: flex; align-items: flex-end; padding: 0.6rem;
-}
-.themes-preview .swatch .pname {
-  font-weight: 600; font-size: 0.9rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-}
-.themes-preview .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.themes-gallery-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem; }
-.themes-gallery-head h2 { font-size: 1.05rem; }
-.themes-sort { display: flex; gap: 0.35rem; }
-.themes-sort button {
-  background: ${C.surface}; border: 1px solid ${C.border}; color: ${C.muted};
-  border-radius: 7px; padding: 0.3rem 0.7rem; font: inherit; font-size: 0.8rem; cursor: pointer;
-}
-.themes-sort button.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
-.themes-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.85rem;
-}
-.theme-card {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px; overflow: hidden;
-  display: flex; flex-direction: column;
-}
-.theme-card .tswatch { height: 90px; }
-.theme-card .tbody { padding: 0.6rem 0.7rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
-.theme-card .tname { font-weight: 600; font-size: 0.88rem; }
-.theme-card .tmeta { font-size: 0.72rem; color: ${C.muted}; display: flex; justify-content: space-between; gap: 0.4rem; }
-.theme-card .tapply {
-  margin-top: 0.2rem; background: var(--accent, ${C.accent}); border: none; color: #fff;
-  border-radius: 7px; padding: 0.4rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer;
-}
-.theme-card.active-theme { border-color: ${C.emerald}; }
-.theme-card .tapply.applied { background: ${C.emerald}; cursor: default; }
-.themes-empty { color: ${C.muted}; font-size: 0.9rem; text-align: center; padding: 2rem 1rem; }
+.app { min-height: 100vh; display: flex; flex-direction: column; }
 
 /* ---- Nav bar ---- */
 .nav {
@@ -229,6 +157,23 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Badge accordion trigger — base styles, mobile activation via @media (max-width: 560px) */
+.badge-strip-trigger {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: none; border: none; padding: 0;
+  font: inherit; color: inherit; cursor: default; text-align: left;
+  font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; pointer-events: none;
+}
+.badge-strip-trigger .badge-strip-count { color: ${C.text}; }
+.badge-chevron {
+  display: none; /* hidden on desktop */
+  margin-left: 0.4rem; font-size: 0.85rem; color: ${C.muted};
+  transition: transform 280ms ease; flex-shrink: 0;
+}
+.badge-chevron.open { transform: rotate(180deg); }
+/* On desktop the body is always visible — transitions only activate at ≤560px */
+.badge-strip-body { display: block; }
 @media (max-width: 640px) {
   .badge-strip {
     display: grid;
@@ -377,20 +322,33 @@ body {
    Friends button and dApps chip live in the top bar instead. */
 @media (min-width: 561px) {
   .account-connections { display: none; }
+  /* Force badge accordion always-open on desktop/tablet regardless of JS state */
+  .badge-strip-body { max-height: none !important; opacity: 1 !important; overflow: visible !important; }
+  .badge-strip-trigger { cursor: default; pointer-events: none; }
+  .badge-chevron { display: none !important; }
 }
 
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
   .account-chip { padding: 0.35rem; }
   .nav-right { gap: 0.8rem; }
+  .nav-stats { gap: 1rem; }
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
-  /* Friends + dApps move into the Account screen's Connections section.
-     Scoped under .nav-right so they outrank the base chip rule defined
-     later in this stylesheet regardless of source order. */
+  /* Friends + dApps + MATCH chip + wallet chip move into the Account screen's
+     Connections section on mobile. Scoped under .nav-right so they outrank
+     the base chip rules defined later in this stylesheet regardless of source order. */
   .nav-right .nav-friends-btn { display: none; }
   .nav-right .nav-integration-chip { display: none; }
+  .nav-right .nav-match-chip { display: none; }
+  .nav-right .nav-wallet-chip { display: none; }
+  /* Badge accordion: trigger is interactive on mobile */
+  .badge-strip-body { overflow: hidden; transition: max-height 280ms ease, opacity 280ms ease; }
+  .badge-strip-body.closed { max-height: 0; opacity: 0; }
+  .badge-strip-body.open { max-height: 600px; opacity: 1; } /* 600px > any realistic badge grid height */
+  .badge-chevron { display: inline-block; }
+  .badge-strip-trigger { cursor: pointer; pointer-events: auto; }
 }
 
 /* ---- Lobby ---- */
@@ -1935,165 +1893,9 @@ body {
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
 
-/* ---- Texas Hold 'Em ---- */
-.poker-wrap { max-width: 620px; margin: 0 auto; width: 100%; }
-.poker-mode-screen {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 1.25rem; padding: 1.5rem 1rem; text-align: center;
-}
-.poker-mode-title { font-size: 1.3rem; font-weight: 700; }
-.poker-mode-note { color: ${C.muted}; font-size: 0.88rem; font-family: 'JetBrains Mono', monospace; }
-.poker-diff-row { display: flex; gap: 0.6rem; }
-.poker-diff-btn {
-  padding: 0.55rem 1.1rem; border-radius: 10px; cursor: pointer; font-family: inherit;
-  font-size: 0.9rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.card}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
-}
-.poker-diff-btn:hover { border-color: ${C.accent}; }
-.poker-diff-btn.sel { background: ${C.accent}22; border-color: ${C.accent}; color: ${C.accent}; }
-.poker-deal-btn {
-  padding: 0.7rem 2rem; border-radius: 10px; cursor: pointer; font-family: inherit;
-  font-size: 1rem; font-weight: 700; border: none; background: ${C.accent}; color: #fff;
-  transition: opacity 0.12s;
-}
-.poker-deal-btn:hover { opacity: 0.88; }
-
-.poker-table { display: flex; flex-direction: column; gap: 0.9rem; padding: 0.5rem 0; }
-.poker-ai-row { display: flex; gap: 0.75rem; }
-.poker-ai-panel {
-  flex: 1; background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
-  padding: 0.7rem 0.85rem; display: flex; flex-direction: column; gap: 0.35rem;
-}
-.poker-ai-panel.dealer-btn { border-color: ${C.gold}; }
-.poker-ai-label {
-  font-size: 0.75rem; font-weight: 600; color: ${C.muted};
-  display: flex; align-items: center; gap: 0.4rem;
-}
-.poker-ai-stack { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: ${C.text}; }
-.poker-ai-cards { display: flex; gap: 0.35rem; }
-.poker-ai-badge {
-  font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 999px;
-  background: ${C.accent}22; color: ${C.accent}; border: 1px solid ${C.accent}44;
-  align-self: flex-start;
-}
-.poker-ai-badge.fold { background: ${C.rose}22; color: ${C.rose}; border-color: ${C.rose}44; }
-.poker-ai-badge.raise { background: ${C.gold}22; color: ${C.gold}; border-color: ${C.gold}44; }
-.poker-ai-badge.allin { background: ${C.violet}22; color: ${C.violet}; border-color: ${C.violet}44; }
-.poker-ai-thinking { font-size: 0.72rem; color: ${C.muted}; font-style: italic; }
-
-.poker-community {
-  background: #0d2a15; border: 1px solid #1a4a25; border-radius: 14px;
-  padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: center;
-}
-.poker-community-cards { display: flex; gap: 0.5rem; justify-content: center; }
-.poker-phase-row {
-  display: flex; gap: 1rem; font-size: 0.8rem;
-  font-family: 'JetBrains Mono', monospace;
-}
-.poker-phase-label { color: ${C.emerald}; font-weight: 600; }
-.poker-pot-label { color: ${C.gold}; }
-
-.poker-card {
-  width: 42px; height: 62px; border-radius: 7px; background: #fff; color: #111;
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 3px 4px; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.85rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.15);
-  position: relative; flex-shrink: 0; user-select: none;
-  animation: poker-card-deal 200ms ease both;
-}
-.poker-card.back {
-  background: ${C.accent}; border-color: ${C.accent}; color: transparent;
-  background-image: repeating-linear-gradient(
-    45deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 2px, transparent 2px, transparent 8px
-  );
-}
-.poker-card.empty {
-  background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.15);
-}
-.poker-card .cr { font-size: 0.7rem; line-height: 1; }
-.poker-card .cs { font-size: 0.8rem; line-height: 1; }
-.poker-card .cs-bot { transform: rotate(180deg); align-self: flex-end; }
-.poker-card.red .cr, .poker-card.red .cs { color: ${C.rose}; }
-.poker-card.black .cr, .poker-card.black .cs { color: #1a1a1a; }
-.poker-card.lg { width: 52px; height: 76px; border-radius: 9px; font-size: 1rem; }
-.poker-card.lg .cr { font-size: 0.82rem; }
-.poker-card.lg .cs { font-size: 1rem; }
-@keyframes poker-card-deal {
-  from { opacity: 0; transform: scale(0.7) translateY(-8px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.poker-player-panel {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
-  padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.7rem;
-}
-.poker-player-top {
-  display: flex; align-items: center; gap: 0.75rem;
-}
-.poker-player-info { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
-.poker-player-label { font-size: 0.75rem; font-weight: 600; color: ${C.muted}; }
-.poker-player-stack { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; }
-.poker-player-cards { display: flex; gap: 0.4rem; }
-.poker-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.poker-action-btn {
-  flex: 1; min-width: 70px; padding: 0.55rem 0.5rem; border-radius: 10px; cursor: pointer;
-  font-family: inherit; font-size: 0.88rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, opacity 0.12s;
-}
-.poker-action-btn:hover:not(:disabled) { border-color: ${C.accent}; }
-.poker-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.poker-action-btn.fold { border-color: ${C.rose}44; color: ${C.rose}; }
-.poker-action-btn.fold:hover { border-color: ${C.rose}; }
-.poker-action-btn.call { background: ${C.accent}; color: #fff; border-color: ${C.accent}; }
-.poker-action-btn.call:hover { opacity: 0.88; }
-.poker-action-btn.raise { background: ${C.gold}22; border-color: ${C.gold}44; color: ${C.gold}; }
-.poker-action-btn.raise:hover { border-color: ${C.gold}; }
-.poker-raise-picker {
-  background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 10px;
-  padding: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem;
-}
-.poker-raise-presets { display: flex; gap: 0.4rem; }
-.poker-raise-preset-btn {
-  flex: 1; padding: 0.4rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.78rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.card}; color: ${C.text}; transition: border-color 0.12s;
-}
-.poker-raise-preset-btn:hover { border-color: ${C.gold}; color: ${C.gold}; }
-.poker-raise-preset-btn.sel { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}15; }
-.poker-raise-confirm-btn {
-  padding: 0.45rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.88rem; font-weight: 700; border: none; background: ${C.gold}; color: #000;
-}
-.poker-hand-result {
-  border-radius: 12px; padding: 0.8rem 1rem; text-align: center;
-  font-weight: 700; font-size: 0.95rem; background: ${C.surface};
-  border: 1px solid ${C.border}; animation: poker-card-deal 200ms ease both;
-}
-.poker-hand-result.win { background: ${C.emerald}22; border-color: ${C.emerald}; color: ${C.emerald}; }
-.poker-hand-result.lose { background: ${C.rose}15; border-color: ${C.rose}44; color: ${C.muted}; }
-.poker-showdown-hands {
-  display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;
-}
-.poker-showdown-player {
-  display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem;
-}
-.poker-showdown-player .name { min-width: 5rem; color: ${C.muted}; }
-.poker-showdown-player .hand-name { font-weight: 600; }
-.poker-showdown-player.winner .hand-name { color: ${C.emerald}; }
-.poker-showdown-player.loser .hand-name { color: ${C.dim}; }
-.poker-ai-folded-label { font-size: 0.78rem; color: ${C.dim}; font-style: italic; }
-
 .poker-auth-notice {
   font-size: 0.75rem; color: ${C.muted}; text-align: center; padding: 0.4rem;
   border-radius: 8px; background: ${C.surface}; border: 1px solid ${C.border};
-}
-
-@media (max-width: 480px) {
-  .poker-ai-row { flex-direction: column; }
-  .poker-diff-row { flex-wrap: wrap; justify-content: center; }
-  .poker-actions { gap: 0.4rem; }
-  .poker-action-btn { min-width: 60px; font-size: 0.8rem; }
-  .poker-raise-presets { flex-direction: column; }
 }
 
 /* ---- Snake ---- */
@@ -2279,6 +2081,28 @@ body {
   white-space: nowrap;
 }
 .bounce-controls button:hover { border-color: ${C.accent}; }
+.bounce-audio-row {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 360px;
+  margin: 0.7rem auto 0;
+}
+.bounce-audio-row button {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.4rem 0.3rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: border-color 0.12s;
+  white-space: nowrap;
+}
+.bounce-audio-row button:hover:not(:disabled) { border-color: ${C.accent}; }
+.bounce-audio-row button:disabled { opacity: 0.4; cursor: default; }
 .bounce-dpad {
   display: grid;
   grid-template-columns: repeat(2, 72px);
@@ -3166,67 +2990,392 @@ body {
 }
 @keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
-/* ---- Texas Hold 'Em ---- */
-.th-felt {
-  width: var(--cg-board);
-  max-width: 94vw;
-  background: radial-gradient(ellipse at center, #155e3a, #0c3d26);
-  border: 2px solid ${C.gold}66;
-  border-radius: 18px;
-  padding: clamp(0.6rem, 2.5vw, 1.1rem);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: clamp(0.5rem, 2vh, 0.9rem);
+/* ---- Texas Hold 'Em (redesigned) ---- */
+.poker-shell {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  background: #050a0e; color: ${C.text}; font-family: 'Space Grotesk', system-ui, sans-serif;
+  overflow: hidden; z-index: 10;
 }
-.th-seat { text-align: center; }
-.th-seat .who { font-size: 0.72rem; color: #d6e8d6; letter-spacing: 0.04em; }
-.th-seat .chips { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: ${C.gold}; font-weight: 600; }
-.th-cards { display: flex; gap: 0.35rem; justify-content: center; }
-.th-card {
-  width: clamp(2rem, 9vw, 3rem);
-  height: clamp(2.8rem, 12.5vw, 4.2rem);
-  border-radius: 7px;
-  background: #fbfbfb;
-  color: #111;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: clamp(0.85rem, 4vw, 1.25rem);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-  line-height: 1;
+.poker-top-bar {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.5);
+  border-bottom: 1px solid ${C.border}44; flex-shrink: 0; min-height: 44px;
 }
-.th-card.red { color: ${C.rose}; }
-.th-card.back { background: repeating-linear-gradient(45deg, ${C.accent}, ${C.accent} 6px, ${C.border} 6px, ${C.border} 12px); color: transparent; }
-.th-pot { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; font-size: 0.95rem; }
-.th-msg { color: #d6e8d6; font-size: 0.82rem; min-height: 1.2rem; text-align: center; }
-.th-community { display: flex; gap: 0.3rem; min-height: clamp(2.8rem, 12.5vw, 4.2rem); align-items: center; }
-.th-actions {
-  display: flex;
-  gap: 0.5rem;
-  width: var(--cg-board);
-  max-width: 94vw;
+.poker-top-bar-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
+.poker-top-bar-info { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: ${C.muted}; }
+.poker-conn-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: ${C.emerald};
+  flex-shrink: 0;
 }
-.th-actions button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.7rem 0.3rem;
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
+.poker-conn-dot.slow { background: ${C.gold}; }
+.poker-back-btn {
+  background: none; border: none; color: ${C.muted}; cursor: pointer;
+  font-size: 1.1rem; padding: 0.2rem 0.4rem; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.12s, background 0.12s;
 }
-.th-actions button:hover:not(:disabled) { border-color: ${C.gold}; }
-.th-actions button:disabled { opacity: 0.35; cursor: not-allowed; }
-.th-actions button.bet { background: ${C.gold}; color: #000; border-color: ${C.gold}; }
-.th-betsizer { display: flex; align-items: center; gap: 0.5rem; width: var(--cg-board); max-width: 94vw; }
-.th-betsizer input { flex: 1; }
-.th-betsizer .amt { font-family: 'JetBrains Mono', monospace; color: ${C.gold}; font-weight: 600; min-width: 3rem; text-align: right; }
+.poker-back-btn:hover { color: ${C.text}; background: ${C.border}44; }
+.poker-main {
+  flex: 1; position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.poker-oval-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  position: relative; padding: 0.5rem;
+}
+.poker-oval {
+  position: relative;
+  width: min(90vw, 540px);
+  height: min(54vw, 320px);
+  background: radial-gradient(ellipse at center, #1a5c32 0%, #0d3a1e 55%, #071f10 100%);
+  border-radius: 50%;
+  border: 3px solid ${C.gold}55;
+  box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
+  overflow: visible;
+}
+.poker-seat {
+  position: absolute; transform: translate(-50%, -50%);
+  background: ${C.card}; border: 1px solid ${C.border};
+  border-radius: 12px; padding: 0.35rem 0.5rem;
+  min-width: 80px; max-width: 110px;
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  cursor: default; user-select: none; transition: border-color 0.2s, box-shadow 0.2s;
+  z-index: 2;
+}
+.poker-seat.active {
+  border-color: ${C.gold}; box-shadow: 0 0 12px ${C.gold}55;
+  animation: poker-pulse 1.2s ease-in-out infinite;
+}
+.poker-seat.winner { border-color: ${C.emerald}; box-shadow: 0 0 16px ${C.emerald}66; animation: poker-winner-glow 0.6s ease-in-out 3; }
+.poker-seat.folded { opacity: 0.45; }
+.poker-seat.eliminated { opacity: 0.25; border-style: dashed; }
+.poker-seat-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+}
+.poker-seat-name {
+  font-size: 0.68rem; font-weight: 600; color: ${C.text};
+  display: flex; align-items: center; gap: 0.25rem; white-space: nowrap;
+}
+.poker-seat-badge {
+  font-size: 0.55rem; font-weight: 700; padding: 0.08rem 0.3rem;
+  border-radius: 999px; background: ${C.border}; color: ${C.muted};
+}
+.poker-seat-badge.dealer { background: ${C.gold}33; color: ${C.gold}; }
+.poker-seat-badge.sb { background: ${C.accent}22; color: ${C.accent}; }
+.poker-seat-badge.bb { background: ${C.violet}22; color: ${C.violet}; }
+.poker-seat-chips {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+  color: ${C.gold}; font-weight: 600;
+}
+.poker-seat-cards { display: flex; gap: 0.18rem; justify-content: center; }
+.poker-seat-label {
+  font-size: 0.6rem; font-weight: 700; padding: 0.1rem 0.35rem;
+  border-radius: 999px; white-space: nowrap;
+}
+.poker-seat-label.fold { background: ${C.rose}22; color: ${C.rose}; }
+.poker-seat-label.check { background: ${C.border}; color: ${C.muted}; }
+.poker-seat-label.call { background: ${C.accent}22; color: ${C.accent}; }
+.poker-seat-label.raise { background: ${C.gold}22; color: ${C.gold}; }
+.poker-seat-label.allin { background: ${C.violet}22; color: ${C.violet}; }
+.poker-seat-label.bet { background: ${C.gold}22; color: ${C.gold}; }
+.poker-seat-timer {
+  width: 100%; height: 2px; background: ${C.border}; border-radius: 1px; overflow: hidden; margin-top: 0.1rem;
+}
+.poker-seat-timer-bar { height: 100%; background: ${C.gold}; transition: width 0.3s linear; border-radius: 1px; }
+.poker-community {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  pointer-events: none;
+}
+.poker-pot-row {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  color: ${C.gold}; font-weight: 600;
+  background: rgba(0,0,0,0.5); padding: 0.18rem 0.5rem; border-radius: 999px;
+}
+.poker-board { display: flex; gap: 0.28rem; }
+.poker-card-slot {
+  width: 34px; height: 50px; border-radius: 5px;
+  background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.18);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; overflow: hidden;
+}
+.poker-card {
+  width: 34px; height: 50px; border-radius: 5px; background: #fff; color: #111;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
+  flex-shrink: 0; user-select: none;
+}
+.poker-card.back {
+  background: ${C.accent}; border-color: ${C.accent}80;
+  background-image: repeating-linear-gradient(
+    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
+  );
+}
+.poker-card.red { color: ${C.rose}; }
+.poker-card.flip-in { animation: poker-flip-in 220ms ease both; }
+.poker-card-rank { font-size: 0.65rem; line-height: 1; }
+.poker-card-suit { font-size: 0.75rem; line-height: 1; align-self: center; }
+.poker-card-suit-bot { transform: rotate(180deg); align-self: flex-end; }
+.poker-card-lg {
+  width: 40px; height: 58px; border-radius: 6px; background: #fff; color: #111;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
+  flex-shrink: 0; user-select: none;
+}
+.poker-card-lg.back {
+  background: ${C.accent}; border-color: ${C.accent}80;
+  background-image: repeating-linear-gradient(
+    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
+  );
+}
+.poker-card-lg.red { color: ${C.rose}; }
+.poker-street {
+  font-size: 0.65rem; font-weight: 600; color: ${C.emerald};
+  letter-spacing: 0.07em; text-transform: uppercase;
+}
+.poker-action-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.55);
+  border-top: 1px solid ${C.border}44; flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.poker-action-btn {
+  flex: 1; min-width: 62px; padding: 0.55rem 0.4rem; border-radius: 10px; cursor: pointer;
+  font-family: inherit; font-size: 0.82rem; font-weight: 700; border: 1px solid transparent;
+  transition: opacity 0.12s, transform 0.08s; text-align: center;
+}
+.poker-action-btn:active:not(:disabled) { transform: scale(0.96); }
+.poker-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.poker-action-btn.fold { background: ${C.rose}22; border-color: ${C.rose}55; color: ${C.rose}; }
+.poker-action-btn.fold:hover:not(:disabled) { background: ${C.rose}33; }
+.poker-action-btn.check { background: ${C.border}; border-color: ${C.border}; color: ${C.text}; }
+.poker-action-btn.check:hover:not(:disabled) { background: ${C.dim}; }
+.poker-action-btn.call { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.poker-action-btn.call:hover:not(:disabled) { opacity: 0.88; }
+.poker-action-btn.raise { background: ${C.gold}22; border-color: ${C.gold}55; color: ${C.gold}; }
+.poker-action-btn.raise:hover:not(:disabled) { background: ${C.gold}33; }
+.poker-action-btn.allin { background: ${C.violet}22; border-color: ${C.violet}55; color: ${C.violet}; }
+.poker-action-btn.allin:hover:not(:disabled) { background: ${C.violet}33; }
+.poker-action-btn.next { background: ${C.emerald}22; border-color: ${C.emerald}55; color: ${C.emerald}; }
+.poker-action-btn.next:hover:not(:disabled) { background: ${C.emerald}33; }
+.poker-raise-panel {
+  position: absolute; bottom: 100%; left: 0; right: 0;
+  background: ${C.card}; border-top: 1px solid ${C.border};
+  padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;
+  animation: slideUp 0.18s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.poker-preset-row { display: flex; gap: 0.4rem; }
+.poker-preset-btn {
+  flex: 1; padding: 0.4rem; border-radius: 8px; cursor: pointer; font-family: inherit;
+  font-size: 0.75rem; font-weight: 600; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s;
+}
+.poker-preset-btn:hover { border-color: ${C.gold}; color: ${C.gold}; }
+.poker-preset-btn.sel { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}15; }
+.poker-raise-row { display: flex; align-items: center; gap: 0.5rem; }
+.poker-raise-slider { flex: 1; accent-color: ${C.gold}; }
+.poker-raise-input {
+  width: 60px; background: ${C.surface}; border: 1px solid ${C.border};
+  color: ${C.gold}; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+  border-radius: 6px; padding: 0.3rem 0.4rem; text-align: center;
+}
+.poker-raise-row-btns { display: flex; gap: 0.4rem; }
+.poker-raise-confirm { flex: 1; background: ${C.gold}; color: #000; border: none; border-radius: 8px; padding: 0.45rem; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
+.poker-raise-cancel { background: none; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
+.poker-float-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 20; }
+.poker-float-btn {
+  width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6);
+  border: 1px solid ${C.border}55; color: ${C.text}; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+  transition: background 0.12s;
+}
+.poker-float-btn:hover { background: rgba(0,0,0,0.8); }
+.poker-float-popover {
+  position: absolute; top: 100%; right: 0; margin-top: 0.4rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  padding: 0.4rem; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  display: flex; flex-direction: column; gap: 0.2rem;
+}
+.poker-float-item {
+  background: none; border: none; color: ${C.text}; cursor: pointer;
+  font-family: inherit; font-size: 0.85rem; padding: 0.5rem 0.75rem;
+  text-align: left; border-radius: 7px; transition: background 0.1s;
+}
+.poker-float-item:hover { background: ${C.border}44; }
+.poker-sidebar {
+  position: fixed; top: 0; bottom: 0; width: 280px; max-width: 85vw;
+  background: ${C.card}; border: 1px solid ${C.border};
+  display: flex; flex-direction: column; z-index: 30;
+  transition: transform 0.22s ease; overflow: hidden;
+}
+.poker-sidebar.left { left: 0; border-radius: 0 14px 14px 0; transform: translateX(-100%); }
+.poker-sidebar.left.open { transform: translateX(0); }
+.poker-sidebar.right { right: 0; border-radius: 14px 0 0 14px; transform: translateX(100%); }
+.poker-sidebar.right.open { transform: translateX(0); }
+.poker-sidebar-header {
+  display: flex; align-items: center; padding: 0.75rem 1rem;
+  border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; flex-shrink: 0;
+}
+.poker-sidebar-close {
+  margin-left: auto; background: none; border: none; color: ${C.muted};
+  cursor: pointer; font-size: 1.1rem; display: flex; align-items: center;
+}
+.poker-sidebar-close:hover { color: ${C.text}; }
+.poker-sidebar-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.poker-sidebar-section { border-bottom: 1px solid ${C.border}22; padding-bottom: 0.5rem; }
+.poker-sidebar-section-title { font-size: 0.72rem; font-weight: 700; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.4rem; }
+.poker-log-entry { font-size: 0.78rem; color: ${C.muted}; padding: 0.2rem 0; border-bottom: 1px solid ${C.border}22; }
+.poker-log-entry.win { color: ${C.emerald}; }
+.poker-log-entry.lose { color: ${C.rose}; }
+.poker-log-entry.hand { color: ${C.gold}; font-weight: 600; }
+.poker-chat-msg { font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid ${C.border}22; }
+.poker-chat-msg .who { font-weight: 600; }
+.poker-chat-msg .who.player { color: ${C.accent}; }
+.poker-chat-msg .who.bot { color: ${C.muted}; }
+.poker-chat-input-row { display: flex; gap: 0.4rem; padding-top: 0.5rem; flex-shrink: 0; }
+.poker-chat-input {
+  flex: 1; background: ${C.surface}; border: 1px solid ${C.border};
+  color: ${C.text}; border-radius: 8px; padding: 0.45rem 0.6rem;
+  font-family: inherit; font-size: 0.82rem;
+}
+.poker-chat-send {
+  background: ${C.accent}; border: none; color: #fff; border-radius: 8px;
+  padding: 0.45rem 0.75rem; cursor: pointer; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+}
+.poker-drawer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: ${C.card}; border-top: 1px solid ${C.border};
+  border-radius: 14px 14px 0 0; z-index: 30;
+  max-height: 60vh; display: flex; flex-direction: column;
+  transform: translateY(100%); transition: transform 0.22s ease;
+}
+.poker-drawer.open { transform: translateY(0); }
+.poker-drawer-handle { width: 36px; height: 4px; background: ${C.border}; border-radius: 2px; margin: 0.6rem auto 0; }
+.poker-drawer-header { display: flex; align-items: center; padding: 0.6rem 1rem; border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; }
+.poker-drawer-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.poker-setup {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.25rem; padding: 1.5rem 1.25rem; text-align: center; overflow-y: auto;
+}
+.poker-setup-title { font-size: 1.4rem; font-weight: 700; }
+.poker-setup-sub { font-size: 0.85rem; color: ${C.muted}; }
+.poker-setup-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
+  padding: 1.25rem; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 1rem;
+}
+.poker-setup-label { font-size: 0.78rem; font-weight: 600; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+.poker-setup-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.poker-bot-btn {
+  flex: 1; min-width: 44px; padding: 0.5rem; border-radius: 8px; cursor: pointer; font-family: inherit;
+  font-size: 0.88rem; font-weight: 600; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
+}
+.poker-bot-btn:hover { border-color: ${C.accent}; }
+.poker-bot-btn.sel { background: ${C.accent}22; border-color: ${C.accent}; color: ${C.accent}; }
+.poker-diff-btn {
+  flex: 1; padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer; font-family: inherit;
+  font-size: 0.82rem; font-weight: 600; border: 1px solid ${C.border};
+  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
+}
+.poker-diff-btn:hover { border-color: ${C.gold}; }
+.poker-diff-btn.sel { background: ${C.gold}15; border-color: ${C.gold}; color: ${C.gold}; }
+.poker-setup-chips { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: ${C.gold}; font-weight: 600; }
+.poker-start-btn {
+  width: 100%; padding: 0.75rem; border-radius: 10px; cursor: pointer; font-family: inherit;
+  font-size: 1rem; font-weight: 700; border: none; background: ${C.accent}; color: #fff;
+  transition: opacity 0.12s;
+}
+.poker-start-btn:hover { opacity: 0.88; }
+/* ---- Hand Strength Panel ---- */
+.poker-hand-panel {
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px;
+  padding: 0.28rem 0.38rem; margin-top: 0.28rem; font-size: 0.62rem; width: 100%;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.poker-hand-panel.improved {
+  animation: poker-hand-improve 0.55s ease;
+  border-color: ${C.gold}88;
+}
+@keyframes poker-hand-improve {
+  0%   { transform: scale(1); box-shadow: none; }
+  30%  { transform: scale(1.06); box-shadow: 0 0 10px ${C.gold}55; }
+  100% { transform: scale(1); box-shadow: none; }
+}
+.poker-hand-panel-rank {
+  display: flex; align-items: center; gap: 0.22rem; font-weight: 700; font-size: 0.65rem; line-height: 1.2;
+}
+.poker-hand-panel-name { color: ${C.gold}; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.poker-hand-panel-num { color: ${C.dim}; font-size: 0.58rem; font-family: 'JetBrains Mono', monospace; }
+.poker-hand-panel-desc { color: ${C.muted}; font-size: 0.58rem; margin: 0.12rem 0 0.18rem; line-height: 1.2; }
+.poker-hand-panel-cards { display: flex; gap: 0.12rem; flex-wrap: wrap; }
+.poker-hand-card {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; padding: 0.08rem 0.14rem;
+  border-radius: 3px; border: 1px solid transparent; background: rgba(255,255,255,0.05);
+  color: ${C.text}; letter-spacing: -0.02em;
+}
+.poker-hand-card.used {
+  border-color: ${C.gold}99; background: rgba(251,191,36,0.15); box-shadow: 0 0 5px ${C.gold}44;
+}
+.poker-hand-card.unused { opacity: 0.42; }
+.poker-hand-card.red { color: ${C.rose}; }
+/* ---- Seat card highlighting (hole cards) ---- */
+.poker-seat-card-hl { position: relative; display: inline-block; }
+.poker-seat-card-hl.hl-used .poker-card,
+.poker-seat-card-hl.hl-used .poker-card-lg { box-shadow: 0 0 7px ${C.gold}88; border-color: ${C.gold}; }
+.poker-seat-card-hl.hl-unused .poker-card,
+.poker-seat-card-hl.hl-unused .poker-card-lg { opacity: 0.45; }
+.poker-winner-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.75); z-index: 25;
+}
+.poker-winner-msg {
+  background: ${C.card}; border: 2px solid ${C.gold}; border-radius: 16px;
+  padding: 1.5rem 2rem; text-align: center; display: flex; flex-direction: column; gap: 0.6rem;
+  box-shadow: 0 0 30px ${C.gold}44;
+}
+.poker-winner-msg h2 { font-size: 1.4rem; font-weight: 700; color: ${C.gold}; }
+.poker-winner-msg .sub { font-size: 0.88rem; color: ${C.muted}; }
+.poker-hand-hist-item { background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.8rem; }
+.poker-hand-hist-title { font-weight: 600; color: ${C.text}; margin-bottom: 0.25rem; }
+.poker-hand-hist-detail { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+.poker-overlay-backdrop { position: fixed; inset: 0; z-index: 25; }
+@keyframes poker-pulse {
+  0%, 100% { box-shadow: 0 0 8px ${C.gold}44; }
+  50% { box-shadow: 0 0 18px ${C.gold}99, 0 0 32px ${C.gold}44; }
+}
+@keyframes poker-flip-in {
+  from { transform: rotateY(90deg) scale(0.8); opacity: 0; }
+  to { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+@keyframes poker-winner-glow {
+  0%, 100% { box-shadow: 0 0 8px ${C.emerald}44; }
+  50% { box-shadow: 0 0 24px ${C.emerald}88; }
+}
+@media (max-width: 768px) {
+  .poker-oval { width: min(95vw, 480px); height: min(57vw, 280px); }
+  .poker-seat { min-width: 70px; max-width: 95px; }
+  .poker-card { width: 28px; height: 42px; font-size: 0.6rem; }
+  .poker-card-slot { width: 28px; height: 42px; }
+  .poker-card-lg { width: 32px; height: 48px; }
+  .poker-action-btn { min-width: 52px; font-size: 0.75rem; padding: 0.45rem 0.3rem; }
+}
+@media (max-width: 480px) {
+  .poker-oval { width: 98vw; height: 58vw; }
+  .poker-seat { min-width: 62px; max-width: 82px; padding: 0.25rem 0.35rem; }
+  .poker-seat-avatar { width: 22px; height: 22px; font-size: 0.6rem; }
+  .poker-card { width: 22px; height: 34px; font-size: 0.5rem; }
+  .poker-card-slot { width: 22px; height: 34px; }
+  .poker-card-lg { width: 26px; height: 38px; }
+  .poker-card-rank { font-size: 0.5rem; }
+  .poker-card-suit { font-size: 0.6rem; }
+  .poker-action-btn { min-width: 44px; font-size: 0.7rem; padding: 0.4rem 0.2rem; }
+  .poker-action-bar { padding: 0.4rem 0.5rem; gap: 0.35rem; }
+}
 
 @media (orientation: landscape) and (max-height: 560px) {
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
@@ -3234,6 +3383,7 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .cg-sheet, .tm-grid .tm-tile, .dr-gem, .snake-cell { transition: none !important; }
+  .badge-strip-body, .badge-chevron { transition: none !important; }
 }
 
 /* ---- Idle Clicker ---- */
@@ -4019,6 +4169,29 @@ body {
   border-color: ${C.gold}55;
   background: ${C.gold}0d;
 }
+.badges-toggle .badge-strip-count { color: ${C.text}; margin-left: 0.5rem; font-weight: 700; }
+/* Empty/early state + next-milestone progress hints (Bug C). */
+.badges-empty { font-size: 0.8rem; color: ${C.muted}; margin: 0.1rem 0 0.6rem; }
+.badges-retry-btn {
+  all: unset;
+  cursor: pointer;
+  color: ${C.accent};
+  font-weight: 700;
+  text-decoration: underline;
+}
+.badges-retry-btn:hover { color: ${C.text}; }
+.badge-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }
+.badge-progress-pill {
+  font-size: 0.72rem; font-weight: 600; color: ${C.muted};
+  background: ${C.gold}0d; border: 1px solid ${C.gold}33;
+  border-radius: 999px; padding: 0.2rem 0.55rem;
+  display: inline-flex; gap: 0.3rem; align-items: center; white-space: nowrap;
+}
+/* Compact always-visible earned-badge row — mobile only (desktop shows the
+   full grid which already includes earned chips). */
+.badges-earned-row { display: none; }
+/* Win overlay next-milestone progress. */
+.win-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin: 0.6rem 0; }
 @media (max-width: 560px) {
   .badges-toggle {
     cursor: pointer;
@@ -4029,10 +4202,13 @@ body {
     padding: 0.4rem 0;
     margin-bottom: 0;
   }
+  .badges-toggle .badge-strip-count { margin-left: auto; }
   .badges-toggle:hover { color: ${C.text}; }
   .badges-toggle-arrow { font-size: 0.7rem; transition: transform 0.15s ease; }
   .badges-grid { display: none; }
   .badges-grid.open { display: flex; margin-top: 0.6rem; }
+  .badges-earned-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+  .badges-earned-row.hide { display: none; }
 }
 /* ---- Chutes & Ladders ---- */
 .cnl-banner {
@@ -4121,6 +4297,76 @@ body {
 }
 .cnl-roll-btn:active:not(:disabled) { transform: scale(0.98); }
 .cnl-roll-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- Pre-launch Game Mode Modal ---- */
+.gm-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(8, 10, 18, 0.72); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  animation: gmFade 0.18s ease-out;
+}
+@keyframes gmFade { from { opacity: 0; } to { opacity: 1; } }
+.gm-modal {
+  position: relative; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto;
+  background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.gm-modal-close {
+  position: absolute; top: 0.75rem; right: 0.75rem; width: 2rem; height: 2rem;
+  border: none; border-radius: 50%; background: ${C.bg}; color: ${C.muted};
+  font-size: 1rem; cursor: pointer;
+}
+.gm-modal-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem; }
+.gm-modal-icon { font-size: 2.4rem; }
+.gm-modal-title { font-size: 1.3rem; font-weight: 700; }
+.gm-modal-desc { font-size: 0.82rem; color: ${C.muted}; margin-top: 0.15rem; }
+.gm-modal-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: ${C.muted}; margin-bottom: 0.5rem; }
+.gm-modes { display: flex; flex-direction: column; gap: 0.6rem; }
+.gm-mode-btn {
+  display: flex; align-items: center; gap: 0.8rem; text-align: left;
+  padding: 0.8rem 0.9rem; border-radius: 12px; cursor: pointer;
+  background: ${C.bg}; border: 2px solid ${C.border}; color: ${C.text};
+  transition: border-color 0.15s, transform 0.1s;
+}
+.gm-mode-btn:active { transform: scale(0.99); }
+.gm-mode-btn.active { border-color: var(--accent, ${C.accent}); background: ${C.bg}; }
+.gm-mode-icon { font-size: 1.6rem; }
+.gm-mode-text { display: flex; flex-direction: column; }
+.gm-mode-name { font-weight: 700; font-size: 0.95rem; }
+.gm-mode-desc { font-size: 0.78rem; color: ${C.muted}; }
+.gm-online { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.gm-online-actions { display: flex; gap: 0.5rem; }
+.gm-online-hint { font-size: 0.76rem; color: ${C.muted}; }
+.gm-play-btn {
+  width: 100%; margin-top: 1rem; padding: 0.8rem; border: none; border-radius: 12px;
+  background: var(--accent, ${C.accent}); color: #fff; font-weight: 700; font-size: 1rem;
+  cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+}
+.gm-play-btn:disabled { opacity: 0.4; cursor: default; }
+.gm-link-btn { background: none; border: none; color: ${C.muted}; cursor: pointer; margin-top: 0.6rem; text-decoration: underline; font-size: 0.82rem; }
+.gm-modal-lb { margin-top: 1.1rem; border-top: 1px solid ${C.border}; padding-top: 0.8rem; }
+
+/* ---- Online race common ---- */
+.gm-race-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 2rem 1rem; min-height: 50vh; }
+.gm-race-title { font-size: 1.3rem; font-weight: 700; }
+.gm-race-sub { font-size: 0.9rem; color: ${C.muted}; }
+.gm-race-code { font-size: 0.85rem; color: ${C.text}; }
+.gm-countdown { font-size: 4rem; font-weight: 800; color: ${C.accent}; font-family: 'JetBrains Mono', monospace; }
+.gm-opp-chip { display: inline-block; margin: 0.4rem auto; padding: 0.35rem 0.7rem; background: ${C.bg}; border: 1px solid ${C.border}; border-radius: 999px; font-size: 0.82rem; }
+.gm-race-scores { display: flex; gap: 1.5rem; margin: 0.6rem 0; }
+.gm-race-scores > div { display: flex; flex-direction: column; gap: 0.2rem; }
+.gm-race-scores span { font-size: 0.75rem; color: ${C.muted}; }
+.gm-race-scores b { font-size: 1.6rem; font-family: 'JetBrains Mono', monospace; color: ${C.gold}; }
+.snake-lb { display: flex; flex-direction: column; gap: 0.2rem; }
+
+/* ---- Hash Rush ---- */
+.hr-wrap { position: relative; width: 100%; height: 62vh; max-height: 560px; border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, #0c1020, #131a30); border: 1px solid ${C.border}; }
+.hr-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hr-boost-badge { position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%); background: rgba(34,211,238,0.18); border: 1px solid #22d3ee; color: #67e8f9; padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+.hr-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,10,18,0.6); text-align: center; padding: 1rem; }
+.hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
+.hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
+.hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
 `;
 
 /* ============================================================
@@ -4157,15 +4403,23 @@ function cgAudio() {
 }
 // Short synthesized cues — no asset files needed.
 const CG_TONES = {
-  move:    { f: 320, d: 0.05, t: 'square',   g: 0.05 },
-  click:   { f: 440, d: 0.04, t: 'triangle', g: 0.05 },
-  merge:   { f: 540, d: 0.09, t: 'sine',     g: 0.07 },
-  clear:   { f: 660, d: 0.10, t: 'sine',     g: 0.08 },
-  capture: { f: 740, d: 0.12, t: 'triangle', g: 0.08 },
-  deal:    { f: 380, d: 0.05, t: 'square',   g: 0.05 },
-  chip:    { f: 500, d: 0.06, t: 'square',   g: 0.06 },
-  win:     { f: 784, d: 0.22, t: 'sine',     g: 0.09 },
-  lose:    { f: 150, d: 0.30, t: 'sawtooth', g: 0.08 },
+  move:      { f: 320, d: 0.05, t: 'square',   g: 0.05 },
+  click:     { f: 440, d: 0.04, t: 'triangle', g: 0.05 },
+  merge:     { f: 540, d: 0.09, t: 'sine',     g: 0.07 },
+  clear:     { f: 660, d: 0.10, t: 'sine',     g: 0.08 },
+  capture:   { f: 740, d: 0.12, t: 'triangle', g: 0.08 },
+  deal:      { f: 380, d: 0.05, t: 'square',   g: 0.05 },
+  chip:      { f: 500, d: 0.06, t: 'square',   g: 0.06 },
+  win:       { f: 784, d: 0.22, t: 'sine',     g: 0.09 },
+  lose:      { f: 150, d: 0.30, t: 'sawtooth', g: 0.08 },
+  // Bounce-specific cues
+  bwall:     { f: 290, d: 0.03, t: 'square',   g: 0.06 },
+  bpaddle:   { f: 360, d: 0.07, t: 'triangle', g: 0.07 },
+  bbrick:    { f: 580, d: 0.11, t: 'sine',     g: 0.09 },
+  blevel:    { f: 880, d: 0.28, t: 'sine',     g: 0.10 },
+  bpowerup:  { f: 720, d: 0.14, t: 'triangle', g: 0.08 },
+  bdie:      { f: 190, d: 0.35, t: 'sawtooth', g: 0.10 },
+  bgameover: { f: 140, d: 0.55, t: 'sawtooth', g: 0.11 },
 };
 function cgSound(name, pitch) {
   if (!cgPrefs.sound) return;
@@ -4500,9 +4754,10 @@ function useClassicRoom(gameId, roomId) {
 
 // Per-mode display metadata for the inline mode picker.
 const CLASSIC_MODE_META = {
+  solo:   { icon: '🎯', name: 'Classic Solo',      desc: 'Play solo and chase your best score' },
   bot:    { icon: '🤖', name: 'Versus Bot',        desc: 'Play against the computer' },
   '2p':   { icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
-  online: { icon: '🌐', name: 'Online Multiplayer', desc: 'Play a friend via room code' },
+  online: { icon: '🌐', name: 'Online Race',       desc: 'Race a friend via room code — highest score wins' },
 };
 
 // Inline mode picker shown by the Game Menu's "New Game" for games that route
@@ -4565,6 +4820,96 @@ function ClassicModePicker({ game, onPlay }) {
       )}
       {error && <div className="mnc-join-error">{error}</div>}
       {mode && <button className="mnc-mode-start-btn" onClick={handlePlay} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
+    </div>
+  );
+}
+
+// Unified pre-launch mode-selection modal for multi-mode classic games
+// (today: 2048 + Block Blast, modes ['solo','online']). Shows the game's
+// modes, an Online create/join sub-panel, and — for games with a global
+// leaderboard — a "Top players" preview. Calls onStart(mode, opts) to launch.
+function GameModeModal({ game, onStart, onClose }) {
+  const [mode, setMode] = useState(null);
+  const [onlineAction, setOnlineAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const modes = game.modes || [];
+
+  const handlePlay = async () => {
+    if (!mode || busy) return;
+    if (mode !== 'online') { onStart(mode, {}); return; }
+    if (onlineAction === 'create') {
+      setBusy(true);
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onStart('online', { roomAction: 'create', roomId: body.id });
+      else setError('Could not create room. Try again.');
+    } else if (onlineAction === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api(`/api/classic/${game.id}/rooms/${code}/join`, { method: 'POST' });
+      setBusy(false);
+      if (ok) onStart('online', { roomAction: 'join', roomId: code });
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  const canStart = mode && (mode !== 'online' || onlineAction === 'create' || (onlineAction === 'join' && joinCode.trim().length >= 4));
+
+  return (
+    <div className="gm-modal-backdrop" onClick={onClose}>
+      <div className="gm-modal" onClick={e => e.stopPropagation()} style={{ '--accent': game.tagColor || C.accent }}>
+        <button className="gm-modal-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="gm-modal-head">
+          <span className="gm-modal-icon">{game.icon}</span>
+          <div>
+            <div className="gm-modal-title">{game.name}</div>
+            <div className="gm-modal-desc">{game.desc}</div>
+          </div>
+        </div>
+        <div className="gm-modal-label">Choose a mode</div>
+        <div className="gm-modes">
+          {modes.map(m => {
+            const meta = CLASSIC_MODE_META[m] || { icon: '🎮', name: m, desc: '' };
+            return (
+              <button key={m} className={'gm-mode-btn' + (mode === m ? ' active' : '')}
+                onClick={() => { setMode(m); setOnlineAction(null); setError(''); }}>
+                <span className="gm-mode-icon">{meta.icon}</span>
+                <span className="gm-mode-text">
+                  <span className="gm-mode-name">{meta.name}</span>
+                  <span className="gm-mode-desc">{meta.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {mode === 'online' && (
+          <div className="gm-online">
+            <div className="gm-online-actions">
+              <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')} onClick={() => { setOnlineAction('create'); setError(''); }}>Create Room</button>
+              <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')} onClick={() => { setOnlineAction('join'); setError(''); }}>Join Room</button>
+            </div>
+            {onlineAction === 'join' && (
+              <input className="mnc-join-input" placeholder="Room code (e.g. AB3K7P)" value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
+            )}
+            {onlineAction === 'create' && (
+              <div className="gm-online-hint">A room code will be generated — share it with a friend, then they pick Join Room.</div>
+            )}
+          </div>
+        )}
+        {error && <div className="mnc-join-error">{error}</div>}
+        <button className="gm-play-btn" onClick={handlePlay} disabled={!canStart || busy}>
+          {busy ? 'Please wait…' : 'Play'}
+        </button>
+        {game.leaderboard && (
+          <div className="gm-modal-lb"><ClassicLeaderboard gameId={game.id} /></div>
+        )}
+      </div>
     </div>
   );
 }
@@ -4743,6 +5088,208 @@ function cgRulesSection(items) {
     id: 'rules', label: 'How to play',
     render: () => <div><h4>How to play</h4><ul className="cg-rules">{items.map((t, i) => <li key={i}>{t}</li>)}</ul></div>,
   };
+}
+
+// Submit a finished classic-game run to the global leaderboard. Best-effort:
+// a network failure never blocks gameplay. `extra` is optional game-specific
+// stats (e.g. { bestTimeSecs, bestLevel }). Returns the server's
+// { bestScore, rank, gamesPlayed } or null.
+async function submitClassicScore(gameId, score, extra) {
+  try {
+    const { ok, body } = await api(`/api/classic/${gameId}/score`, {
+      method: 'POST',
+      body: JSON.stringify({ score: Math.max(0, Math.round(score || 0)), extra: extra || undefined }),
+    });
+    return ok ? body : null;
+  } catch { return null; }
+}
+
+// Reusable global leaderboard for the score-based classic games. Lazily fetches
+// /api/classic/:gameId/leaderboard, highlights the caller, and pins their row
+// when outside the top N. `valueFmt` formats a row's headline number.
+function ClassicLeaderboard({ gameId, url, valueLabel = 'Score', valueFmt }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const fmt = valueFmt || ((r) => `${r.bestScore} pts`);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setError(false);
+    api(url || `/api/classic/${gameId}/leaderboard`).then(({ ok, body }) => {
+      if (cancelled) return;
+      if (ok && body) setData(body); else setError(true);
+      setLoading(false);
+    }).catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [gameId]);
+
+  if (loading) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Loading…</div></div>;
+  if (error) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Couldn't load leaderboard.</div></div>;
+  const entries = (data && data.entries) || [];
+  const me = data && data.me;
+  const meInTop = me && entries.some(e => e.rank === me.rank);
+  if (entries.length === 0) {
+    return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">No scores yet — play to rank!</div></div>;
+  }
+  return (
+    <div>
+      <h4>Leaderboard <span style={{ color: C.muted, fontWeight: 400, fontSize: '0.78rem' }}>· {valueLabel}</span></h4>
+      <div className="snake-lb">
+        {entries.map(r => (
+          <div key={r.rank} className={'snake-lb-row' + (me && r.rank === me.rank ? ' snake-lb-me' : '')}>
+            <div className="snake-lb-rank">#{r.rank}</div>
+            <div className="snake-lb-name">{r.username}{me && r.rank === me.rank ? ' (you)' : ''}</div>
+            <div className="snake-lb-score">{fmt(r)}</div>
+          </div>
+        ))}
+        {me && !meInTop && (
+          <div className="snake-lb-row snake-lb-me" style={{ marginTop: '0.4rem' }}>
+            <div className="snake-lb-rank">#{me.rank}</div>
+            <div className="snake-lb-name">{me.username || 'you'} (you)</div>
+            <div className="snake-lb-score">{fmt(me)}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Sheet-section builder so any ClassicShell game can add a Leaderboard tab.
+function cgLeaderboardSection(gameId, opts) {
+  return {
+    id: 'leaderboard', label: 'Leaderboard',
+    render: () => <ClassicLeaderboard gameId={gameId} url={opts && opts.url} valueLabel={(opts && opts.valueLabel) || 'Score'} valueFmt={opts && opts.valueFmt} />,
+  };
+}
+
+// Generic online-race host for score-based classic games (2048, Block Blast).
+// Each player plays their OWN board; whoever posts the higher final score wins.
+// Lifecycle: waiting → countdown → playing → submitted → result. `renderBoard`
+// is a render-prop that gets { onEnd(score) } and renders the solo board,
+// calling onEnd exactly once when that board's game ends.
+function ClassicRaceGame({ game, roomId, myPlayerNum, renderBoard, onExitLobby }) {
+  const { room, pollingError } = useClassicRoom(game.id, roomId);
+  const [phase, setPhase] = useState('waiting');
+  const [count, setCount] = useState(3);
+  const [myScore, setMyScore] = useState(null);
+  const [canClaim, setCanClaim] = useState(false);
+  const submittedRef = useRef(false);
+
+  const oppScore = room ? (myPlayerNum === 1 ? room.p2Score : room.p1Score) : null;
+  const oppName = room ? (myPlayerNum === 1 ? room.player2Name : room.player1Name) : null;
+
+  // Start the countdown once both players are present and the room is active.
+  useEffect(() => {
+    if (phase === 'waiting' && room && room.status === 'active' && room.player2Id) {
+      setPhase('countdown');
+    }
+    if (room && room.status === 'finished' && submittedRef.current && phase === 'submitted') {
+      setPhase('result');
+    }
+  }, [room && room.status, room && room.player2Id]);
+
+  // 3-2-1-Go countdown.
+  useEffect(() => {
+    if (phase !== 'countdown') return;
+    setCount(3);
+    let n = 3;
+    const id = setInterval(() => {
+      n -= 1;
+      if (n <= 0) { clearInterval(id); setPhase('playing'); }
+      else setCount(n);
+    }, 900);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  // Allow claiming the win if the opponent stalls 60s after I've finished.
+  useEffect(() => {
+    if (phase !== 'submitted') return;
+    const id = setTimeout(() => setCanClaim(true), 60000);
+    return () => clearTimeout(id);
+  }, [phase]);
+
+  const handleEnd = async (score) => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setMyScore(score);
+    setPhase('submitted');
+    submitClassicScore(game.id, score); // also count toward global leaderboard
+    try {
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms/${roomId}/score`, {
+        method: 'POST', body: JSON.stringify({ score }),
+      });
+      if (ok && body && body.status === 'finished') setPhase('result');
+    } catch {}
+  };
+
+  const claimWin = async () => {
+    await api(`/api/classic/${game.id}/rooms/${roomId}/finish`, {
+      method: 'POST', body: JSON.stringify({ winner: String(myPlayerNum) }),
+    }).catch(() => {});
+    setPhase('result');
+  };
+
+  if (pollingError === 'room_not_found') {
+    return <div className="cg-stage" style={{ textAlign: 'center', padding: '2rem', color: C.rose }}>Room not found.</div>;
+  }
+
+  if (phase === 'waiting') {
+    return (
+      <div className="cg-stage gm-race-center">
+        <div className="mnc-spinner" />
+        <div className="gm-race-title">Online Race</div>
+        <div className="gm-race-sub">Waiting for opponent to join…</div>
+        {room && (
+          <div className="gm-race-code">Room code: <b>{room.id}</b></div>
+        )}
+        <button className="gm-play-btn" style={{ maxWidth: 220 }} onClick={onExitLobby}>Cancel</button>
+      </div>
+    );
+  }
+  if (phase === 'countdown') {
+    return (
+      <div className="cg-stage gm-race-center">
+        <div className="gm-race-title">Get ready!</div>
+        <div className="gm-countdown">{count}</div>
+        <div className="gm-race-sub">Race to the highest score</div>
+      </div>
+    );
+  }
+  if (phase === 'playing') {
+    return (
+      <div className="cg-stage cg-scroll">
+        <div className="gm-opp-chip">🆚 {oppName || 'Opponent'}: <b>{oppScore != null ? oppScore : '…'}</b></div>
+        {renderBoard({ onEnd: handleEnd })}
+      </div>
+    );
+  }
+  if (phase === 'submitted') {
+    return (
+      <div className="cg-stage gm-race-center">
+        <div className="mnc-spinner" />
+        <div className="gm-race-title">Your score: {myScore}</div>
+        <div className="gm-race-sub">Waiting for {oppName || 'opponent'} to finish…</div>
+        <div className="gm-race-code">Their score so far: <b>{oppScore != null ? oppScore : '—'}</b></div>
+        {canClaim && <button className="gm-play-btn" style={{ maxWidth: 260 }} onClick={claimWin}>Opponent stalled — claim win</button>}
+        <button className="gm-link-btn" onClick={onExitLobby}>Leave race</button>
+      </div>
+    );
+  }
+  // result
+  const youWin = room && room.winner === String(myPlayerNum);
+  const mine = room ? (myPlayerNum === 1 ? room.p1Score : room.p2Score) : myScore;
+  const theirs = room ? (myPlayerNum === 1 ? room.p2Score : room.p1Score) : oppScore;
+  return (
+    <div className="cg-stage gm-race-center">
+      <div style={{ fontSize: '2.4rem' }}>{youWin ? '🏆' : '🤝'}</div>
+      <div className="gm-race-title">{youWin ? 'You win!' : (mine === theirs ? 'Draw' : 'Opponent wins')}</div>
+      <div className="gm-race-scores">
+        <div><span>You</span><b>{mine != null ? mine : '—'}</b></div>
+        <div><span>{oppName || 'Opponent'}</span><b>{theirs != null ? theirs : '—'}</b></div>
+      </div>
+      <button className="gm-play-btn" style={{ maxWidth: 220 }} onClick={onExitLobby}>Back to lobby</button>
+    </div>
+  );
 }
 
 /* ============================================================
@@ -5178,53 +5725,6 @@ function nextTierInfo(streak) {
   return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
 
-const BADGE_DEFS = [
-  {
-    id: 'first-light',
-    icon: '🕯️',
-    label: 'First Light',
-    desc: 'Solve any daily puzzle',
-    check: (streak, attempts) =>
-      Object.values(attempts).some(a => a.finishedAt && a.score > 0),
-  },
-  {
-    id: 'all-in',
-    icon: '🎯',
-    label: 'All In',
-    desc: 'Complete all 4 daily games in one day',
-    check: (streak, attempts) =>
-      GAMES.filter(g => g.category === 'daily')
-           .every(g => attempts[g.id] && attempts[g.id].finishedAt && attempts[g.id].score > 0),
-  },
-  {
-    id: 'flame-keeper',
-    icon: '🔥',
-    label: 'Flame Keeper',
-    desc: '3-day streak',
-    check: (streak) => streak >= 3,
-  },
-  {
-    id: 'weekly-warrior',
-    icon: '📅',
-    label: 'Weekly Warrior',
-    desc: '7-day streak',
-    check: (streak) => streak >= 7,
-  },
-  {
-    id: 'multiplied',
-    icon: '💫',
-    label: 'Multiplied',
-    desc: '10-day streak (×1.5 points)',
-    check: (streak) => streak >= 10,
-  },
-  {
-    id: 'streak-titan',
-    icon: '⚡',
-    label: 'Streak Titan',
-    desc: '30-day streak',
-    check: (streak) => streak >= 30,
-  },
-];
 
 /* ============================================================
    Streak badges — named milestones unlocked at consecutive-day
@@ -5266,6 +5766,21 @@ function justUnlockedBadge(streak) {
   return STREAK_BADGES.find(b => b.min === streak) || null;
 }
 
+// The nearest streak badge the player has NOT yet reached (lowest min > streak),
+// or null when every streak tier is already earned. Used for the "X/Y days →
+// Name" progress hint so a player who finished today sees concrete progress
+// even when no badge unlocked this run.
+function nextStreakBadge(streak) {
+  return STREAK_BADGES.find(b => b.min > streak) || null;
+}
+
+// The nearest lifetime-solve milestone the player has NOT yet reached
+// (lowest count > solveCount), or null when all are earned. Drives the
+// "X/Y solves → Name" progress hint.
+function nextSolveMilestone(solveCount) {
+  return SOLVE_MILESTONE_BADGES.find(b => b.count > (solveCount || 0)) || null;
+}
+
 /* ============================================================
    Achievement badges — non-streak milestones the server awards
    in /api/daily/:gameId/finish and persists in user_achievements.
@@ -5295,6 +5810,16 @@ function achievementBadgeFor(ach) {
   if (ach.type === 'solve_milestone') {
     const c = ach.metadata && ach.metadata.count;
     return SOLVE_MILESTONE_BADGES.find(b => b.count === c) || null;
+  }
+  // Server-confirmed streak milestones arrive in newAchievements as
+  // { type: 'streak_milestone', metadata: { streak: <days> } }; resolve to the
+  // STREAK_BADGES entry so the win overlay can celebrate it like any other
+  // badge. We normalise its shape to { name, icon } (STREAK_BADGES has no
+  // `desc`), so the overlay can render it uniformly.
+  if (ach.type === 'streak_milestone') {
+    const days = ach.metadata && +ach.metadata.streak;
+    const b = STREAK_BADGES.find(x => x.min === days);
+    return b ? { ...b, desc: `${b.min}-day streak` } : null;
   }
   return ACHIEVEMENT_BADGES.find(b => b.type === ach.type) || null;
 }
@@ -5659,7 +6184,7 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect, matchBalance, walletBalance }) {
   const [copied, setCopied] = React.useState(false);
   const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -5798,10 +6323,20 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
             )}
           </div>
 
-          {/* Connections — Friends + dApps, shown here only on narrow viewports
-              (hidden ≥561px via CSS, where they live in the top bar instead). */}
+          {/* Connections — Friends + dApps + balances, shown here only on narrow
+              viewports (hidden ≥561px via CSS, where they live in the top bar). */}
           <div className="wallet-card account-connections">
             <div className="wallet-card-title">Connections</div>
+            {matchBalance != null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
+                🪙 {matchBalance} MATCH
+              </div>
+            )}
+            {walletBalance && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.emerald, fontFamily: "'JetBrains Mono', monospace" }}>
+                🪙 {fmtUtgo(walletBalance)}
+              </div>
+            )}
             <button
               type="button"
               className="account-connection-row"
@@ -5966,7 +6501,12 @@ function TodayChampions({ onSelectUser }) {
    render dimmed so there's a visible collection to complete. Shared by
    the lobby and the profile screen.
    ============================================================ */
-function BadgeStrip({ badges, achievements }) {
+// Build the canonical badge-chip list (streak milestones + non-streak
+// achievements + lifetime solve milestones) with earned/locked state derived
+// from the server-backed `badges` (earned day thresholds) and `achievements`
+// ({ types, milestones }). Shared by the profile BadgeStrip and the lobby
+// BadgesSection so both render an identical, permanent collection.
+function badgeChips(badges, achievements) {
   const earnedDays = new Set(badges || []);
   const ach = achievements || { types: [], milestones: [] };
   const earnedTypes = new Set(ach.types || []);
@@ -5982,6 +6522,11 @@ function BadgeStrip({ badges, achievements }) {
   for (const b of SOLVE_MILESTONE_BADGES) {
     chips.push({ key: `m${b.count}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedMilestones.has(b.count) });
   }
+  return chips;
+}
+
+function BadgeStrip({ badges, achievements }) {
+  const chips = badgeChips(badges, achievements);
   const earnedCount = chips.filter(c => c.earned).length;
 
   return (
@@ -7000,6 +7545,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
       const shareText = `Minesweeper ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secs}s · +${baseScore} pts`;
+      submitClassicScore('minesweeper', baseScore, { safeRevealed: newSafeRevealed, timeSecs: secs });
       onWin(baseScore, newSteps, secs, { share: shareText, cashOut: false });
     }
   };
@@ -7019,6 +7565,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     msSaveEntry(entry);
     setGameHistory(msLoadHistory());
     const shareText = `Minesweeper ${dateStr} — 💰×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
+    submitClassicScore('minesweeper', finalScore, { safeRevealed, timeSecs: secs });
     onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
   };
 
@@ -7152,22 +7699,8 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       )}
 
       {activeTab === 'leaderboard' && (
-        <div>
-          {isMock && <div className="ms-dev-label">Local leaderboard — dev mode</div>}
-          {gameHistory.length === 0
-            ? <div className="ms-empty-state">No games recorded yet</div>
-            : gameHistory
-                .filter(h => h.outcome === 'win')
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 10)
-                .map((h, i) => (
-                  <div key={h.id} className="ms-leaderboard-row">
-                    <span className="ms-rank">#{i + 1}</span>
-                    <span style={{ flex: 1, fontWeight: 600 }}>You</span>
-                    <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
-                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtDate(h.date)}</span>
-                  </div>
-                ))}
+        <div style={{ padding: '0.25rem' }}>
+          <ClassicLeaderboard gameId="minesweeper" />
         </div>
       )}
 
@@ -9496,8 +10029,9 @@ function t2048SaveBest(v) {
 /* ============================================================
    T2048Game component
    ============================================================ */
-function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
-  const _saved = t2048LoadSavedBoard();
+function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
+  const raceMode = !!onRaceEnd;
+  const _saved = raceMode ? null : t2048LoadSavedBoard();
 
   const [grid, setGrid]               = useState(() => _saved ? _saved.grid : t2048_initGrid());
   const [score, setScore]             = useState(() => _saved ? _saved.score || 0 : 0);
@@ -9632,6 +10166,8 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
       };
       t2048SaveEntry(entry);
       t2048ClearBoard();
+      if (onRaceEnd) { onRaceEnd(newScore); return; }
+      submitClassicScore('2048', newScore, { highTile: maxT });
       onLose && onLose(newMoves, elapsedSecs, {
         share: t2048_toShareText(newScore, newMoves, elapsedSecs, maxT),
         answer: String(maxT),
@@ -9664,6 +10200,8 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
       highTile: maxT,
     });
     t2048ClearBoard();
+    if (onRaceEnd) { onRaceEnd(score); return; }
+    submitClassicScore('2048', score, { highTile: maxT });
     onWin && onWin(score, moves, elapsedSecs, {
       share: t2048_toShareText(score, moves, elapsedSecs, maxT),
     });
@@ -9783,6 +10321,12 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
+      {activeTab === 'leaderboard' && (
+        <div style={{ padding: '0.5rem 0.25rem' }}>
+          <ClassicLeaderboard gameId="2048" />
+        </div>
+      )}
+
       {activeTab === 'history' && (
         <div>
           <div className="t2048-history-list">
@@ -9842,19 +10386,40 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
-      <div className="t2048-bottom-nav">
-        {['game', 'history', 'stats'].map(tab => (
-          <button
-            key={tab}
-            className={'t2048-tab' + (activeTab === tab ? ' active' : '')}
-            onClick={() => { setActiveTab(tab); if (tab !== 'game') setHistory(t2048LoadHistory()); }}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
+      {!raceMode && (
+        <div className="t2048-bottom-nav">
+          {['game', 'leaderboard', 'history', 'stats'].map(tab => (
+            <button
+              key={tab}
+              className={'t2048-tab' + (activeTab === tab ? ' active' : '')}
+              onClick={() => { setActiveTab(tab); if (tab !== 'game') setHistory(t2048LoadHistory()); }}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+// 2048 entry: solo board, or the online-race host when launched via the mode
+// modal in Online Race mode.
+function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOpts, onBack }) {
+  if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
+    return (
+      <ClassicRaceGame
+        game={{ id: '2048', name: '2048', icon: '🔢', tagColor: C.emerald }}
+        roomId={gameModeOpts.roomId}
+        myPlayerNum={gameModeOpts.roomAction === 'join' ? 2 : 1}
+        onExitLobby={() => onBack && onBack()}
+        renderBoard={({ onEnd }) => (
+          <T2048Solo onRaceEnd={onEnd} onStepChange={onStepChange} resetKey={resetKey} />
+        )}
+      />
+    );
+  }
+  return <T2048Solo onWin={onWin} onLose={onLose} onStepChange={onStepChange} resetKey={resetKey} />;
 }
 
 /* ============================================================
@@ -9961,6 +10526,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
     cgSound('lose'); cgHaptic([20, 40, 20]);
     const sc = st.current.eaten * 10;
     cgSaveHistory(SNAKE_KEY, { score: sc, len: st.current.snake.length, ts: Date.now() });
+    api('/api/snake/score', { method: 'POST', body: JSON.stringify({ score: sc, length: st.current.snake.length, timeSecs: secsRef.current }) }).catch(() => {});
     const hist = cgLoadHistory(SNAKE_KEY);
     const bestScore = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
     const longestSnake = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
@@ -10042,6 +10608,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
       { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
     ]),
+    cgLeaderboardSection('snake', { url: '/api/snake/leaderboard' }),
     cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
@@ -10133,7 +10700,12 @@ function bbCanPlaceAny(grid, tray) {
   }
   return false;
 }
-function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
+// Block Blast board (no ClassicShell) — shared by solo + online race. On
+// game-over it calls onEnd(score, placed, secs); the parent decides what to do
+// (solo submits the global score + shows the overlay; the race host posts to
+// the room). The board itself never touches scoring endpoints.
+function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
+  const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
   const [tray, setTray] = useState(() => [bbRandPiece(), bbRandPiece(), bbRandPiece()]);
   const [score, setScore] = useState(0);
@@ -10206,7 +10778,7 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
         cgSound('lose'); cgHaptic([20, 40]);
         const sc = scoreRef.current;
         cgSaveHistory(BB_KEY, { score: sc, lines: linesRef.current, ts: Date.now() });
-        onWin(sc, placedRef.current, secsRef.current, { winnerLabel: 'Game Over', share: `🧱 Block Blast — ${sc} pts` });
+        onEndRef.current && onEndRef.current(sc, placedRef.current, secsRef.current);
       }
     }, 0);
   };
@@ -10243,46 +10815,34 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
       drag.cells.forEach(([r, c]) => { preview[(o.or + r) * 8 + (o.oc + c)] = ok ? 'preview' : 'invalid'; });
     }
   }
-  const hist = cgLoadHistory(BB_KEY);
-  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
-  const sheet = [
-    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.lines} lines</span></>),
-    cgStatsSection([
-      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
-      { val: linesRef.current, lbl: 'Lines (run)' }, { val: score, lbl: 'This run' },
-    ]),
-    cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
-  ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
-      <div className="cg-stage">
-        <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="bb-grid" ref={gridRef}>
-          {grid.map((cell, i) => {
-            const pv = preview && preview[i];
-            return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
-              style={cell ? { background: cell } : undefined} />;
-          })}
-        </div>
-        <div className="bb-tray">
-          {tray.map((p, idx) => (
-            <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
-              style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
-              onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
-              {p && (() => {
-                const maxR = Math.max(...p.cells.map(c => c[0]));
-                const maxC = Math.max(...p.cells.map(c => c[1]));
-                const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
-                const out = [];
-                for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
-                  const on = set.has(r * 10 + c);
-                  out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
-                }
-                return out;
-              })()}
-            </div>
-          ))}
-        </div>
+    <>
+      <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
+      <div className="bb-grid" ref={gridRef}>
+        {grid.map((cell, i) => {
+          const pv = preview && preview[i];
+          return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
+            style={cell ? { background: cell } : undefined} />;
+        })}
+      </div>
+      <div className="bb-tray">
+        {tray.map((p, idx) => (
+          <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
+            style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
+            onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
+            {p && (() => {
+              const maxR = Math.max(...p.cells.map(c => c[0]));
+              const maxC = Math.max(...p.cells.map(c => c[1]));
+              const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
+              const out = [];
+              for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
+                const on = set.has(r * 10 + c);
+                out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
+              }
+              return out;
+            })()}
+          </div>
+        ))}
       </div>
       {drag && (
         <div className="bb-drag-ghost" style={{
@@ -10303,6 +10863,52 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
           })()}
         </div>
       )}
+    </>
+  );
+}
+
+// Block Blast entry — solo (own board + leaderboard sheet) or the online-race
+// host. Both wrap the shared BlockBlastBoard in the standard ClassicShell.
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, gameMode, gameModeOpts }) {
+  const [nkey, setNkey] = useState(0);
+  const boardKey = `${resetKey || 0}:${nkey}`;
+  const hist = cgLoadHistory(BB_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const sheet = [
+    cgLeaderboardSection('blockblast'),
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.lines} lines</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
+    ]),
+    cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
+  ];
+
+  if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
+    return (
+      <ClassicShell game={game} onExit={onBack} sheetSections={[cgLeaderboardSection('blockblast')]} menuConfig={menuConfig}>
+        <ClassicRaceGame
+          game={game}
+          roomId={gameModeOpts.roomId}
+          myPlayerNum={gameModeOpts.roomAction === 'join' ? 2 : 1}
+          onExitLobby={() => onBack && onBack()}
+          renderBoard={({ onEnd }) => <BlockBlastBoard onStepChange={onStepChange} resetKey={boardKey} onEnd={(sc) => onEnd(sc)} />}
+        />
+      </ClassicShell>
+    );
+  }
+
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => setNkey(k => k + 1)} sheetSections={sheet} menuConfig={menuConfig}>
+      <div className="cg-stage">
+        <BlockBlastBoard
+          onStepChange={onStepChange}
+          resetKey={boardKey}
+          onEnd={(sc, placed, secs) => {
+            submitClassicScore('blockblast', sc);
+            onWin(sc, placed, secs, { winnerLabel: 'Game Over', share: `🧱 Block Blast — ${sc} pts` });
+          }}
+        />
+      </div>
     </ClassicShell>
   );
 }
@@ -10511,6 +11117,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     doneRef.current = true; setDone(true);
     cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
     cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, bestCombo: bestComboRef.current, ts: Date.now() });
+    submitClassicScore('diamondrush', sc, { level: 1, movesUsed: START_MOVES - mv, targetReached: win ? 1 : 0 });
     setCombo(0);
     if (win) {
       if (bestCascadeRef.current >= 3) grantPowerUp('shuffle');
@@ -10605,6 +11212,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
       { val: bigC, lbl: 'Best cascade' }, { val: bestCombo, lbl: 'Best combo' },
     ]),
+    cgLeaderboardSection('diamondrush'),
     cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
@@ -10644,7 +11252,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   );
 }
 
-/* ---------------- Texas Hold 'Em ---------------- */
+/* ---------------- Texas Hold 'Em (redesigned) ---------------- */
 const TH_SUITS = ['♠', '♥', '♦', '♣'];
 const TH_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 function thDeck() {
@@ -10709,262 +11317,943 @@ function thHandStrength(hole, board) {
   if (Math.abs(a.r - b.r) === 1) s += 0.05;
   return Math.min(0.95, s);
 }
-function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
-  const START = 200, BB = 10;
-  const [state, setState] = useState(null);
-  const [betOpen, setBetOpen] = useState(false);
-  const [betAmt, setBetAmt] = useState(BB);
-  const doneRef = useRef(false);
-  const handsRef = useRef(0);
-  const bigPotRef = useRef(0);
-  const secsRef = useRef(0);
-  const [done, setDone] = useState(false);
-  const secs = useElapsed(resetKey, !done);
-  secsRef.current = secs;
+/*
+ * CLIENT-SIDE ONLY — never send results via WebSocket, API, or any shared state.
+ * For UX display to the local player only. Winner determination is always
+ * server-authoritative. Bot hole cards must never be passed to these functions
+ * before showdown; the isPlayer guard in PokerSeat enforces this invariant.
+ */
+/* ---- Poker hand evaluator ---- */
+const POKER_HAND_INFO = [
+  null,
+  { rank: 1,  name: 'High Card',       emoji: '🃏', desc: 'Highest card plays'                  },
+  { rank: 2,  name: 'One Pair',        emoji: '1️⃣', desc: 'Two cards of the same rank'          },
+  { rank: 3,  name: 'Two Pair',        emoji: '2️⃣', desc: 'Two different pairs'                  },
+  { rank: 4,  name: 'Three of a Kind', emoji: '3️⃣', desc: 'Three cards of the same rank'        },
+  { rank: 5,  name: 'Straight',        emoji: '➡️', desc: 'Five consecutive cards'              },
+  { rank: 6,  name: 'Flush',           emoji: '💧', desc: 'Five cards of the same suit'         },
+  { rank: 7,  name: 'Full House',      emoji: '🏠', desc: 'Three of a kind plus a pair'         },
+  { rank: 8,  name: 'Four of a Kind',  emoji: '💥', desc: 'Four cards of the same rank'         },
+  { rank: 9,  name: 'Straight Flush',  emoji: '🔥', desc: 'Five consecutive cards, same suit'   },
+  { rank: 10, name: 'Royal Flush',     emoji: '👑', desc: 'A, K, Q, J, 10 of the same suit'    },
+];
 
-  // Texas is always a Versus-Bot game — report it so the menu shows Save.
-  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
-
-  // Game Menu Save/Resume.
-  const { loadState, clearState } = useClassicSave('texas');
-  const [resumeOffer, setResumeOffer] = useState(null);
-  const resumeCheckedRef = useRef(false);
-  const stateRef = useRef(state);
-  stateRef.current = state;
-  useClassicSaveSource(!done && !!state, () => ({
-    th: stateRef.current, hands: handsRef.current, bigPot: bigPotRef.current,
-  }));
-  useEffect(() => {
-    if (resumeCheckedRef.current) return;
-    resumeCheckedRef.current = true;
-    loadState().then(s => { if (s && s.th) setResumeOffer(s); });
-  }, []);
-  const applyResume = () => {
-    const s = resumeOffer; if (!s) return;
-    handsRef.current = s.hands || 0; bigPotRef.current = s.bigPot || 0;
-    setState(s.th); setDone(false); doneRef.current = false;
-    setResumeOffer(null);
-  };
-  const dismissResume = () => { setResumeOffer(null); clearState(); };
-
-  const newHand = (pc, ac, dealerIsPlayer) => {
-    const deck = thDeck();
-    const player = [deck.pop(), deck.pop()];
-    const ai = [deck.pop(), deck.pop()];
-    // simple blinds: dealer posts SB(BB/2), other posts BB
-    const sb = BB / 2;
-    let playerBet = dealerIsPlayer ? sb : BB;
-    let aiBet = dealerIsPlayer ? BB : sb;
-    playerBet = Math.min(playerBet, pc); aiBet = Math.min(aiBet, ac);
-    return {
-      deck, player, ai, board: [],
-      pot: 0, pc: pc - playerBet, ac: ac - aiBet,
-      playerBet, aiBet, street: 0,
-      toAct: dealerIsPlayer ? 'player' : 'ai', // dealer/SB acts first preflop
-      dealerIsPlayer, msg: 'Your move', reveal: false, phase: 'betting',
-    };
-  };
-  const init = () => {
-    handsRef.current = 0; doneRef.current = false; setDone(false);
-    setState(newHand(START, START, true));
-    setBetOpen(false); setBetAmt(BB);
-  };
-  useEffect(() => { init(); }, [resetKey]);
-
-  // AI acts when it's their turn
-  useEffect(() => {
-    if (!state || state.phase !== 'betting' || state.toAct !== 'ai' || done) return;
-    const t = setTimeout(() => aiAct(), 700);
-    return () => clearTimeout(t);
-  }, [state, done]);
-
-  const dealNext = (s) => {
-    const d = s.deck.slice();
-    const board = s.board.slice();
-    if (s.street === 0) { board.push(d.pop(), d.pop(), d.pop()); }
-    else { board.push(d.pop()); }
-    return { ...s, deck: d, board, street: s.street + 1 };
-  };
-  const showdown = (s) => {
-    const pv = thBest([...s.player, ...s.board]);
-    const av = thBest([...s.ai, ...s.board]);
-    let pc = s.pc, ac = s.ac, msg;
-    if (pv > av) { pc += s.pot; msg = `You win ${s.pot} with ${thCatName(pv)}`; cgSound('win'); }
-    else if (av > pv) { ac += s.pot; msg = `Opponent wins with ${thCatName(av)}`; cgSound('lose'); }
-    else { pc += Math.floor(s.pot / 2); ac += Math.ceil(s.pot / 2); msg = `Split pot (${thCatName(pv)})`; }
-    bigPotRef.current = Math.max(bigPotRef.current, s.pot);
-    return { ...s, pc, ac, msg, reveal: true, phase: 'handover' };
-  };
-  const advanceStreet = (s) => {
-    const pot = s.pot + s.playerBet + s.aiBet;
-    let ns = { ...s, pot, playerBet: 0, aiBet: 0, _pAct: false, _aAct: false };
-    if (s.street >= 4) return showdown(ns);
-    ns = dealNext(ns);
-    ns.toAct = ns.dealerIsPlayer ? 'ai' : 'player'; // non-dealer acts first post-flop
-    ns.msg = ns.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
-    return ns;
-  };
-  const endFold = (s, who) => {
-    const pot = s.pot + s.playerBet + s.aiBet;
-    let pc = s.pc, ac = s.ac, msg;
-    if (who === 'ai') { pc += pot; msg = `Opponent folds — you win ${pot}`; cgSound('chip'); }
-    else { ac += pot; msg = `You fold — opponent wins ${pot}`; }
-    bigPotRef.current = Math.max(bigPotRef.current, pot);
-    return { ...s, pc, ac, pot, playerBet: 0, aiBet: 0, msg, reveal: who !== 'player', phase: 'handover' };
-  };
-  // Unified heads-up round resolution: a betting round closes when bets are
-  // equal AND the other player has already acted since the last aggression.
-  const resolve = (s, actorIsPlayer) => {
-    const equal = s.playerBet === s.aiBet;
-    const otherActed = actorIsPlayer ? s._aAct : s._pAct;
-    if (equal && otherActed) return advanceStreet(s);
-    s.toAct = actorIsPlayer ? 'ai' : 'player';
-    s.msg = s.toAct === 'player' ? 'Your move' : 'Opponent thinking…';
-    return s;
-  };
-  const playerAction = (action, amount) => {
-    if (!state || state.toAct !== 'player' || state.phase !== 'betting') return;
-    let s = { ...state };
-    const toCall = s.aiBet - s.playerBet;
-    if (action === 'fold') { const ns = endFold(s, 'player'); setState(ns); setTimeout(() => checkMatch(ns), 0); return; }
-    if (action === 'check') {
-      if (toCall > 0) return;
-      s._pAct = true; cgSound('chip');
-      setState(resolve(s, true)); return;
-    }
-    if (action === 'call') {
-      const pay = Math.min(toCall, s.pc);
-      s.pc -= pay; s.playerBet += pay; s._pAct = true; cgSound('chip');
-      setState(resolve(s, true)); return;
-    }
-    if (action === 'bet') {
-      const minAdd = Math.min(toCall > 0 ? toCall + BB : BB, s.pc);
-      let add = Math.min(Math.max(amount || BB, minAdd), s.pc);
-      s.pc -= add; s.playerBet += add; s._pAct = true; s._aAct = false;
-      cgSound('chip'); cgHaptic(12); setBetOpen(false);
-      setState(resolve(s, true)); return;
-    }
-  };
-  const aiAct = () => {
-    setState(prev => {
-      if (!prev || prev.toAct !== 'ai' || prev.phase !== 'betting') return prev;
-      let s = { ...prev };
-      const toCall = s.playerBet - s.aiBet;
-      const strength = thHandStrength(s.ai, s.board);
-      const r = Math.random();
-      if (toCall > 0) {
-        const potOdds = toCall / (s.pot + s.playerBet + s.aiBet + toCall);
-        if (strength < 0.25 && potOdds > 0.18 && r > 0.2) { const ns = endFold(s, 'ai'); setTimeout(() => checkMatch(ns), 0); return ns; }
-        if (strength > 0.7 && s.ac > toCall + BB && r > 0.55) {
-          const add = Math.min(toCall + BB * 2, s.ac);
-          s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
-          return resolve(s, false);
-        }
-        const pay = Math.min(toCall, s.ac);
-        s.ac -= pay; s.aiBet += pay; s._aAct = true; cgSound('chip');
-        return resolve(s, false);
-      }
-      if (strength > 0.6 && r > 0.5 && s.ac > BB) {
-        const add = Math.min(BB * 2, s.ac);
-        s.ac -= add; s.aiBet += add; s._aAct = true; s._pAct = false; cgSound('chip');
-        return resolve(s, false);
-      }
-      s._aAct = true; cgSound('chip');
-      return resolve(s, false);
-    });
-  };
-  const checkMatch = (s) => {
-    if (doneRef.current) return;
-    handsRef.current++;
-    onStepChange && onStepChange(handsRef.current);
-    if (s.pc <= 0 || s.ac <= 0) {
-      doneRef.current = true; setDone(true);
-      clearState(); // match over — no save to resume
-      const youWin = s.pc > 0;
-      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
-      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
-      if (youWin) onWin(s.pc, handsRef.current, secsRef.current, { winnerLabel: 'You win!', share: `🃏 Won heads-up poker in ${handsRef.current} hands` });
-      else onLose(handsRef.current, secsRef.current, { share: `🃏 Busted after ${handsRef.current} hands`, answer: 'Opponent wins' });
-    }
-  };
-  const nextHand = () => {
-    if (!state || doneRef.current) return;
-    checkMatch(state);
-    if (doneRef.current) return;
-    setState(newHand(state.pc, state.ac, !state.dealerIsPlayer));
-    setBetAmt(BB);
-  };
-
-  const Card = ({ c, hidden }) => {
-    if (hidden) return <div className="th-card back">?</div>;
-    const red = c.s === 1 || c.s === 2;
-    return <div className={'th-card' + (red ? ' red' : '')}><span>{TH_RANKS[c.r - 2]}</span><span>{TH_SUITS[c.s]}</span></div>;
-  };
-
-  const hist = cgLoadHistory(TH_KEY);
-  const wins = hist.filter(r => r.win).length;
-  const sheet = [
-    cgHistorySection(hist, r => <><span>{r.win ? '🏆 Won match' : '💀 Lost match'}</span><span className="mono">{r.hands} hands</span></>),
-    cgStatsSection([
-      { val: wins, lbl: 'Matches won' }, { val: hist.length, lbl: 'Matches' },
-      { val: bigPotRef.current, lbl: 'Biggest pot' }, { val: handsRef.current, lbl: 'Hands (match)' },
-    ]),
-    cgRulesSection(['Heads-up Texas Hold \'Em vs the computer.', 'Tap Check / Call / Fold to act.', 'Tap Bet/Raise to size a wager.', 'Win all the opponent\'s chips to take the match.']),
+function pokerCombinations(arr, k) {
+  if (k === 0) return [[]];
+  if (arr.length < k) return [];
+  const [h, ...t] = arr;
+  return [
+    ...pokerCombinations(t, k - 1).map(c => [h, ...c]),
+    ...pokerCombinations(t, k),
   ];
+}
 
-  if (!state) return <ClassicShell game={game} onExit={onBack} sheetSections={sheet} menuConfig={menuConfig}><div className="cg-stage" /></ClassicShell>;
-  const s = state;
-  const toCall = Math.max(0, s.aiBet - s.playerBet);
-  const canAct = s.phase === 'betting' && s.toAct === 'player' && !done;
+function pokerScoreCat(score) {
+  let c = score;
+  for (let i = 0; i < 5; i++) c = Math.floor(c / 15);
+  return c; // 0=high card … 8=straight flush
+}
+
+function pokerDescHand(cards, cat, isRoyal) {
+  if (isRoyal) return 'A, K, Q, J, 10 — same suit';
+  const rg = {};
+  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
+  const rn = r => TH_RANKS[r - 2] || String(r);
+  switch (cat) {
+    case 0: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)} high`; }
+    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? `Pair of ${rn(p[0].r)}s` : ''; }
+    case 2: {
+      const ps = Object.values(rg).filter(g => g.length >= 2).sort((a, b) => b[0].r - a[0].r);
+      return ps.length >= 2 ? `${rn(ps[0][0].r)}s and ${rn(ps[1][0].r)}s` : '';
+    }
+    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? `Three ${rn(t[0].r)}s` : ''; }
+    case 4: { const rs = cards.map(c => c.r).sort((a, b) => b - a); return `${rn(rs[0])}-high straight`; }
+    case 5: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high flush`; }
+    case 6: {
+      const t = Object.values(rg).find(g => g.length >= 3);
+      const p = Object.values(rg).find(g => g.length >= 2 && t && g[0].r !== t[0].r);
+      return t && p ? `${rn(t[0].r)}s full of ${rn(p[0].r)}s` : '';
+    }
+    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? `Four ${rn(q[0].r)}s` : ''; }
+    case 8: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high straight flush`; }
+    default: return '';
+  }
+}
+
+function pokerHandCards(cards, cat) {
+  // Returns the subset of cards that form the hand pattern (excluding pure kickers)
+  const rg = {};
+  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
+  switch (cat) {
+    case 0: return [cards.reduce((m, c) => c.r > m.r ? c : m)];
+    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? p.slice(0, 2) : cards; }
+    case 2: { const ps = Object.values(rg).filter(g => g.length >= 2); return ps.flatMap(p => p.slice(0, 2)).slice(0, 4); }
+    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? t.slice(0, 3) : cards; }
+    case 4: return cards;  // straight: all 5 are key
+    case 5: return cards;  // flush: all 5 are key
+    case 6: return cards;  // full house: all 5 are key
+    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? q.slice(0, 4) : cards; }
+    case 8: return cards;  // straight flush: all 5 are key
+    default: return cards;
+  }
+}
+
+function evaluateBestHand(holeCards, boardCards) {
+  if (!holeCards || holeCards.length < 2) return null;
+  const all = [...holeCards, ...(boardCards || [])];
+  const combos = all.length >= 5 ? pokerCombinations(all, 5) : [all];
+
+  let bestScore = -1, bestCombo = null;
+  for (const combo of combos) {
+    const score = thScore5(combo);
+    if (score > bestScore) { bestScore = score; bestCombo = combo; }
+  }
+  if (!bestCombo) return null;
+
+  const cat = pokerScoreCat(bestScore);
+  // Royal Flush = straight flush containing A, K, Q, J, 10
+  const isRoyal = cat === 8 && [10, 11, 12, 13, 14].every(r => bestCombo.some(c => c.r === r));
+  const idx = isRoyal ? 10 : cat + 1;
+  const info = POKER_HAND_INFO[idx];
+
+  return {
+    rank: info.rank,
+    rankName: info.name,
+    emoji: info.emoji,
+    desc: pokerDescHand(bestCombo, cat, isRoyal),
+    bestFive: bestCombo,
+    handCards: isRoyal ? bestCombo : pokerHandCards(bestCombo, cat),
+    partial: all.length < 5,
+  };
+}
+
+/*
+ * CLIENT-SIDE ONLY — rendered exclusively for the local human player
+ * (isPlayer === true). Never serialised, broadcast, or sent to the server.
+ * The server evaluates hands independently at showdown for authoritative results.
+ */
+/* ---- HandStrengthPanel component ---- */
+function HandStrengthPanel({ holeCards, board, handNum }) {
+  const prevRankRef = useRef(0);
+  const timerRef = useRef(null);
+  const [improved, setImproved] = useState(false);
+
+  const result = evaluateBestHand(holeCards, board || []);
+  const currentRank = result ? result.rank : 0;
+
+  useEffect(() => {
+    if (currentRank > 0 && prevRankRef.current > 0 && currentRank > prevRankRef.current) {
+      setImproved(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setImproved(false), 600);
+    }
+    prevRankRef.current = currentRank;
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [currentRank]);
+
+  // Reset on new hand
+  useEffect(() => {
+    prevRankRef.current = 0;
+    setImproved(false);
+  }, [handNum]);
+
+  if (!result) return null;
+
+  const cardKey = (c) => `${c.r}.${c.s}`;
+  const usedKeys = new Set((result.handCards || []).map(cardKey));
+
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
-      <div className="cg-stage">
-        {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
-        <div className="th-felt">
-          <div className="th-seat">
-            <div className="who">Opponent</div>
-            <div className="chips">{s.ac} chips{s.aiBet ? ` · bet ${s.aiBet}` : ''}</div>
-          </div>
-          <div className="th-cards">
-            <Card c={s.ai[0]} hidden={!s.reveal} /><Card c={s.ai[1]} hidden={!s.reveal} />
-          </div>
-          <div className="th-pot">Pot {s.pot + s.playerBet + s.aiBet}</div>
-          <div className="th-community">
-            {s.board.length === 0 ? <span className="th-msg">— flop comes after betting —</span> : s.board.map((c, i) => <Card key={i} c={c} />)}
-          </div>
-          <div className="th-msg">{s.msg}</div>
-          <div className="th-cards">
-            <Card c={s.player[0]} /><Card c={s.player[1]} />
-          </div>
-          <div className="th-seat">
-            <div className="who">You{s.dealerIsPlayer ? ' (D)' : ''}</div>
-            <div className="chips">{s.pc} chips{s.playerBet ? ` · bet ${s.playerBet}` : ''}</div>
+    <div className={'poker-hand-panel' + (improved ? ' improved' : '')}>
+      <div className="poker-hand-panel-rank">
+        <span>{result.emoji}</span>
+        <span className="poker-hand-panel-name">{result.rankName}</span>
+        <span className="poker-hand-panel-num">#{result.rank}</span>
+      </div>
+      <div className="poker-hand-panel-desc">{result.desc}</div>
+      {result.bestFive && result.bestFive.length >= 2 && (
+        <div className="poker-hand-panel-cards">
+          {result.bestFive.map((card, i) => {
+            const used = usedKeys.has(cardKey(card));
+            const red = card.s === 1 || card.s === 2;
+            return (
+              <span key={i} className={'poker-hand-card' + (used ? ' used' : ' unused') + (red ? ' red' : '')}>
+                {TH_RANKS[card.r - 2]}{TH_SUITS[card.s]}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- Poker sub-components ---- */
+const POKER_BOT_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
+const POKER_SEAT_COLORS = ['#6366F1', '#FBBF24', '#34D399', '#FB7185', '#A78BFA', '#F97316'];
+
+function PokerCardFace({ card, hidden, lg }) {
+  if (!card) {
+    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
+    return <div className={cls} />;
+  }
+  if (hidden) {
+    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
+    return <div className={cls} />;
+  }
+  const red = card.s === 1 || card.s === 2;
+  const rank = TH_RANKS[card.r - 2];
+  const suit = TH_SUITS[card.s];
+  const cls = (lg ? 'poker-card-lg' : 'poker-card') + (red ? ' red flip-in' : ' flip-in');
+  return (
+    <div className={cls}>
+      <span className="poker-card-rank">{rank}</span>
+      <span className="poker-card-suit">{suit}</span>
+    </div>
+  );
+}
+
+function PokerSetupScreen({ onStart, savedChips, numBots, setNumBots, difficulty, setDifficulty }) {
+  const BB = 10;
+  const startChips = savedChips || 1000;
+  return (
+    <div className="poker-setup">
+      <div className="poker-setup-title">Texas Hold 'Em</div>
+      <div className="poker-setup-sub">Heads-up and multi-player poker vs bots</div>
+      <div className="poker-setup-card">
+        <div>
+          <div className="poker-setup-label">Your chips</div>
+          <div className="poker-setup-chips">{startChips} chips</div>
+        </div>
+        <div>
+          <div className="poker-setup-label">How many bots?</div>
+          <div className="poker-setup-row">
+            {[1, 2, 3, 4].map(n => (
+              <button key={n} className={'poker-bot-btn' + (numBots === n ? ' sel' : '')} onClick={() => setNumBots(n)}>{n}</button>
+            ))}
           </div>
         </div>
-        {s.phase === 'handover' ? (
-          <div className="th-actions"><button className="bet" onClick={nextHand}>Next hand →</button></div>
-        ) : betOpen ? (
-          <>
-            <div className="th-betsizer">
-              <input type="range" min={BB} max={Math.max(BB, s.pc)} step={BB} value={betAmt} onChange={e => setBetAmt(+e.target.value)} />
-              <span className="amt">{betAmt}</span>
-            </div>
-            <div className="th-actions">
-              <button onClick={() => setBetOpen(false)}>Cancel</button>
-              <button className="bet" disabled={!canAct} onClick={() => playerAction('bet', betAmt)}>{toCall > 0 ? 'Raise' : 'Bet'} {betAmt}</button>
-            </div>
-          </>
-        ) : (
-          <div className="th-actions">
-            <button disabled={!canAct} onClick={() => playerAction('fold')}>Fold</button>
-            {toCall > 0
-              ? <button disabled={!canAct} onClick={() => playerAction('call')}>Call {toCall}</button>
-              : <button disabled={!canAct} onClick={() => playerAction('check')}>Check</button>}
-            <button className="bet" disabled={!canAct || s.pc <= 0} onClick={() => { setBetAmt(Math.min(Math.max(BB, toCall + BB), s.pc)); setBetOpen(true); cgSound('click'); }}>{toCall > 0 ? 'Raise' : 'Bet'}</button>
+        <div>
+          <div className="poker-setup-label">Difficulty</div>
+          <div className="poker-setup-row">
+            {['Easy', 'Normal', 'Hard'].map(d => (
+              <button key={d} className={'poker-diff-btn' + (difficulty === d ? ' sel' : '')} onClick={() => setDifficulty(d)}>{d}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize: '0.78rem', color: '#8B95A8' }}>
+          Big blind: {BB} chips &middot; Starting stack: {startChips}
+        </div>
+        <button className="poker-start-btn" onClick={() => onStart(startChips)}>Start Game</button>
+      </div>
+    </div>
+  );
+}
+
+function PokerTopBar({ handNum, phase, onBack, playerChips, BB }) {
+  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
+  const streetName = streetNames[phase] || '';
+  return (
+    <div className="poker-top-bar">
+      <button className="poker-back-btn" onClick={onBack} title="Leave game">&#8592;</button>
+      <div className="poker-top-bar-title">Texas Hold 'Em</div>
+      <div className="poker-top-bar-info">{streetName} &middot; Hand #{handNum}</div>
+      <div className="poker-conn-dot" title="Connected" />
+    </div>
+  );
+}
+
+function pokerSeatPos(i, n) {
+  // Distribute seats around the oval. Player (seat 0) is always at the bottom.
+  // Angles in degrees: 0 = bottom, clockwise.
+  const angles = {
+    1: [180, 0],           // heads-up: opponent top, player bottom
+    2: [180, 300, 60],     // 3-way
+    3: [180, 270, 0, 90],  // 4-way
+    4: [180, 252, 324, 36, 108], // 5-way
+  };
+  const arr = angles[n] || angles[4];
+  const deg = arr[i] || (i * (360 / (n + 1)));
+  const rad = (deg - 90) * Math.PI / 180;
+  // Use oval proportions: rx=50, ry=50 (percentage), but oval is wider than tall
+  const rx = 46, ry = 42;
+  const x = 50 + rx * Math.cos(rad);
+  const y = 50 + ry * Math.sin(rad);
+  return { x, y };
+}
+
+function PokerSeat({ seat, isPlayer, dealerIdx, sbIdx, bbIdx, isActive, isWinner, actionLabel, showCards, seatIdx, board, handNum, gamePhase }) {
+  const color = POKER_SEAT_COLORS[seatIdx % POKER_SEAT_COLORS.length];
+  const cls = 'poker-seat' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '') +
+    (seat.folded ? ' folded' : '') + (seat.chips <= 0 && !isActive ? ' eliminated' : '');
+
+  // Compute hand eval for player seat (cheap: ≤21 combos)
+  const showPanel = isPlayer && seat.hand && seat.hand.length >= 2 && gamePhase === 'playing';
+  const handEval = showPanel ? evaluateBestHand(seat.hand, board || []) : null;
+
+  const cardKey = (c) => `${c.r}.${c.s}`;
+  const bestKeys = handEval ? new Set((handEval.bestFive || []).map(cardKey)) : null;
+  const usedKeys = handEval ? new Set((handEval.handCards || []).map(cardKey)) : null;
+
+  return (
+    <div className={cls}>
+      <div className="poker-seat-avatar" style={{ background: color + '33', border: `1.5px solid ${color}` }}>
+        {isPlayer ? 'You' : seat.name[0]}
+      </div>
+      <div className="poker-seat-name">
+        <span>{isPlayer ? 'You' : seat.name}</span>
+        {seatIdx === dealerIdx && <span className="poker-seat-badge dealer">D</span>}
+        {seatIdx === sbIdx && <span className="poker-seat-badge sb">SB</span>}
+        {seatIdx === bbIdx && <span className="poker-seat-badge bb">BB</span>}
+      </div>
+      <div className="poker-seat-chips">{seat.chips}</div>
+      {seat.bet > 0 && <div style={{ fontSize: '0.6rem', color: '#FBBF2488', fontFamily: 'monospace' }}>bet {seat.bet}</div>}
+      <div className="poker-seat-cards">
+        {seat.hand && seat.hand.map((card, ci) => {
+          const hidden = !showCards && !isPlayer && !seat.revealed;
+          if (isPlayer && bestKeys && !hidden) {
+            const k = cardKey(card);
+            const hlCls = usedKeys.has(k) ? 'hl-used' : bestKeys.has(k) ? '' : 'hl-unused';
+            return (
+              <div key={ci} className={'poker-seat-card-hl' + (hlCls ? ' ' + hlCls : '')}>
+                <PokerCardFace card={card} hidden={false} />
+              </div>
+            );
+          }
+          return <PokerCardFace key={ci} card={card} hidden={hidden} />;
+        })}
+      </div>
+      {showPanel && handEval && (
+        <HandStrengthPanel holeCards={seat.hand} board={board} handNum={handNum} />
+      )}
+      {actionLabel && <div className={'poker-seat-label ' + actionLabel.type}>{actionLabel.text}</div>}
+    </div>
+  );
+}
+
+function CommunityArea({ board, pot, street }) {
+  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
+  const slots = [0, 1, 2, 3, 4];
+  return (
+    <div className="poker-community">
+      {pot > 0 && <div className="poker-pot-row">Pot: {pot}</div>}
+      <div className="poker-board">
+        {slots.map(i => (
+          <div key={i} className="poker-card-slot">
+            {board[i] ? <PokerCardFace card={board[i]} /> : null}
+          </div>
+        ))}
+      </div>
+      {street > 0 && <div className="poker-street">{streetNames[street] || ''}</div>}
+    </div>
+  );
+}
+
+function RaisePanel({ minRaise, maxRaise, BB, onRaise, onClose }) {
+  const [amt, setAmt] = useState(minRaise);
+  const presets = [
+    { lbl: '0.5 pot', mult: 0.5 },
+    { lbl: 'Pot', mult: 1 },
+    { lbl: '2x', mult: 2 },
+    { lbl: 'All-in', mult: 999 },
+  ];
+  return (
+    <div className="poker-raise-panel">
+      <div className="poker-preset-row">
+        {presets.map(p => {
+          const v = p.mult >= 999 ? maxRaise : Math.min(maxRaise, Math.max(minRaise, Math.round(minRaise * p.mult)));
+          return (
+            <button key={p.lbl} className={'poker-preset-btn' + (amt === v ? ' sel' : '')}
+              onClick={() => setAmt(v)}>{p.lbl}</button>
+          );
+        })}
+      </div>
+      <div className="poker-raise-row">
+        <input type="range" className="poker-raise-slider"
+          min={minRaise} max={maxRaise} step={BB}
+          value={Math.min(amt, maxRaise)} onChange={e => setAmt(+e.target.value)} />
+        <input type="number" className="poker-raise-input"
+          min={minRaise} max={maxRaise} value={amt}
+          onChange={e => setAmt(Math.min(maxRaise, Math.max(minRaise, +e.target.value || minRaise)))} />
+      </div>
+      <div className="poker-raise-row-btns">
+        <button className="poker-raise-cancel" onClick={onClose}>Cancel</button>
+        <button className="poker-raise-confirm" onClick={() => { onRaise(Math.min(amt, maxRaise)); onClose(); }}>
+          Raise to {Math.min(amt, maxRaise)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FloatingMenu({ onLeave, onLog, onHistory, soundOn, onToggleSound }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="poker-float-menu">
+      <button className="poker-float-btn" onClick={() => setOpen(o => !o)}>&#9776;</button>
+      {open && (
+        <>
+          <div className="poker-overlay-backdrop" onClick={() => setOpen(false)} />
+          <div className="poker-float-popover">
+            <button className="poker-float-item" onClick={() => { onToggleSound(); setOpen(false); }}>
+              {soundOn ? 'Mute sounds' : 'Unmute sounds'}
+            </button>
+            <button className="poker-float-item" onClick={() => { onLog(); setOpen(false); }}>Game log</button>
+            <button className="poker-float-item" onClick={() => { onHistory(); setOpen(false); }}>Hand history</button>
+            <button className="poker-float-item" onClick={() => { onLeave(); setOpen(false); }}>Leave table</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function GameLogSidebar({ open, onClose, log }) {
+  return (
+    <div className={'poker-sidebar right' + (open ? ' open' : '')}>
+      <div className="poker-sidebar-header">
+        Game Log
+        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
+      </div>
+      <div className="poker-sidebar-body">
+        {log.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No events yet.</div>}
+        {log.slice().reverse().map((entry, i) => (
+          <div key={i} className={'poker-log-entry' + (entry.type === 'win' ? ' win' : entry.type === 'lose' ? ' lose' : entry.type === 'hand' ? ' hand' : '')}>
+            {entry.msg}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HandHistoryDrawer({ open, onClose, history }) {
+  return (
+    <div className={'poker-drawer' + (open ? ' open' : '')}>
+      <div className="poker-drawer-handle" />
+      <div className="poker-drawer-header">
+        Hand History
+        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
+      </div>
+      <div className="poker-drawer-body">
+        {history.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No completed hands yet.</div>}
+        {history.slice().reverse().map((h, i) => (
+          <div key={i} className="poker-hand-hist-item">
+            <div className="poker-hand-hist-title">Hand #{h.num}: {h.result}</div>
+            <div className="poker-hand-hist-detail">{h.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---- Texas Hold 'Em main component ---- */
+function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
+  const BB = 10;
+
+  // Setup state
+  const [phase, setPhase] = useState('setup'); // 'setup' | 'playing'
+  const [numBots, setNumBots] = useState(1);
+  const [difficulty, setDifficulty] = useState('Normal');
+  const [savedChips, setSavedChips] = useState(1000);
+
+  // Game state
+  const [gs, setGs] = useState(null);
+  const [raiseOpen, setRaiseOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  const [handHistory, setHandHistory] = useState([]);
+  const [gameLog, setGameLog] = useState([]);
+  const [soundOn, setSoundOn] = useState(cgPrefs.sound);
+
+  const doneRef = useRef(false);
+  const handsRef = useRef(0);
+  const secsRef = useRef(0);
+  const gsRef = useRef(gs);
+  gsRef.current = gs;
+
+  const secs = useElapsed(resetKey, phase === 'playing' && !doneRef.current);
+  secsRef.current = secs;
+
+  // Report bot mode
+  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
+
+  // Load saved chips from server on mount
+  useEffect(() => {
+    api('/api/poker/chips').then(r => {
+      if (r && typeof r.chips === 'number') setSavedChips(r.chips);
+    }).catch(() => {});
+  }, []);
+
+  const addLog = (msg, type) => {
+    setGameLog(prev => [...prev, { msg, type: type || 'info', ts: Date.now() }]);
+  };
+
+  // --- Game logic helpers ---
+  const buildSeats = (playerChips, n) => {
+    const seats = [];
+    seats.push({ name: 'You', chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: true });
+    for (let i = 0; i < n; i++) {
+      seats.push({ name: POKER_BOT_NAMES[i % POKER_BOT_NAMES.length], chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: false });
+    }
+    return seats;
+  };
+
+  const nextActive = (seats, from, dir) => {
+    const n = seats.length;
+    let idx = (from + (dir || 1) + n) % n;
+    let tries = 0;
+    while ((seats[idx].folded || seats[idx].chips <= 0) && tries < n) {
+      idx = (idx + (dir || 1) + n) % n;
+      tries++;
+    }
+    return tries < n ? idx : -1;
+  };
+
+  const activeSeatCount = (seats) => seats.filter(s => !s.folded && s.chips > 0).length;
+
+  const dealNewHand = (seats, dealerIdx) => {
+    const deck = thDeck();
+    const newSeats = seats.map(s => ({
+      ...s, hand: [], bet: 0, folded: s.chips <= 0,
+      allIn: false, revealed: false, lastAction: null,
+    }));
+
+    // Deal 2 cards to each active seat
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < newSeats.length; i++) {
+        if (!newSeats[i].folded) newSeats[i].hand.push(deck.pop());
+      }
+    }
+
+    const n = newSeats.length;
+    const activeCount = newSeats.filter(s => !s.folded).length;
+    let sbIdx, bbIdx, toActIdx;
+
+    if (activeCount === 2) {
+      // heads-up: dealer=SB acts first preflop
+      sbIdx = dealerIdx;
+      bbIdx = nextActive(newSeats, sbIdx);
+      toActIdx = sbIdx; // dealer/SB acts first preflop in heads-up
+    } else {
+      sbIdx = nextActive(newSeats, dealerIdx);
+      bbIdx = nextActive(newSeats, sbIdx);
+      toActIdx = nextActive(newSeats, bbIdx); // UTG acts first
+    }
+
+    // Post blinds
+    const postBlind = (seatArr, idx, amount) => {
+      const actual = Math.min(amount, seatArr[idx].chips);
+      seatArr[idx].chips -= actual;
+      seatArr[idx].bet = actual;
+      if (seatArr[idx].chips === 0) seatArr[idx].allIn = true;
+      return actual;
+    };
+    postBlind(newSeats, sbIdx, BB / 2);
+    postBlind(newSeats, bbIdx, BB);
+
+    const maxBet = Math.max(...newSeats.map(s => s.bet));
+
+    return {
+      seats: newSeats,
+      board: [],
+      deck,
+      pot: 0,
+      dealerIdx,
+      sbIdx,
+      bbIdx,
+      toActIdx,
+      street: 0, // 0=preflop,1=flop,2=turn,3=river,4=showdown
+      maxBet,
+      roundActed: new Array(newSeats.length).fill(false),
+      phase: 'betting',
+      handNum: handsRef.current + 1,
+      actionLabels: new Array(newSeats.length).fill(null),
+    };
+  };
+
+  const allBetsEqual = (gs) => {
+    const seats = gs.seats;
+    const active = seats.filter(s => !s.folded && !s.allIn);
+    if (active.length === 0) return true;
+    return active.every(s => s.bet === gs.maxBet) && gs.roundActed.every((a, i) => a || seats[i].folded || seats[i].allIn || seats[i].chips <= 0);
+  };
+
+  const collectBets = (seats, pot) => {
+    let newPot = pot;
+    const newSeats = seats.map(s => { newPot += s.bet; return { ...s, bet: 0 }; });
+    return { seats: newSeats, pot: newPot };
+  };
+
+  const advanceStreet = (g) => {
+    const { seats, pot } = collectBets(g.seats, g.pot);
+    const newRoundActed = new Array(seats.length).fill(false);
+    const actionLabels = new Array(seats.length).fill(null);
+
+    let newStreet = g.street + 1;
+    let board = g.board.slice();
+    const deck = g.deck.slice();
+
+    if (newStreet === 1) { board.push(deck.pop(), deck.pop(), deck.pop()); } // flop
+    else if (newStreet === 2 || newStreet === 3) { board.push(deck.pop()); } // turn/river
+    else if (newStreet >= 4) {
+      // Showdown
+      return doShowdown({ ...g, seats, pot, board, deck, street: 4, actionLabels });
+    }
+
+    // First to act post-flop: first active after dealer
+    const firstToAct = nextActive(seats, g.dealerIdx);
+    return {
+      ...g, seats, pot, board, deck, street: newStreet,
+      toActIdx: firstToAct, maxBet: 0, roundActed: newRoundActed,
+      phase: 'betting', actionLabels,
+    };
+  };
+
+  const doShowdown = (g) => {
+    const { seats, pot, board } = g;
+    // Reveal all non-folded hands
+    const newSeats = seats.map(s => ({ ...s, revealed: true }));
+    // Find best hand among active players
+    const active = newSeats.map((s, i) => ({ s, i, score: s.folded ? -1 : thBest([...s.hand, ...board]) })).filter(x => x.score >= 0);
+    const bestScore = Math.max(...active.map(x => x.score));
+    const winners = active.filter(x => x.score === bestScore);
+    const share = Math.floor(pot / winners.length);
+    winners.forEach(w => { newSeats[w.i].chips += share; });
+    // Leftover chips (rounding) go to first winner
+    const leftover = pot - share * winners.length;
+    if (leftover > 0 && winners.length > 0) newSeats[winners[0].i].chips += leftover;
+
+    const winnerNames = winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ');
+    const handName = winners[0] ? thCatName(bestScore) : '';
+    addLog(`Hand #${g.handNum}: ${winnerNames} win${winners.length > 1 ? '' : 's'} pot ${pot} (${handName})`, winners.some(w => w.s.isPlayer) ? 'win' : 'lose');
+
+    setHandHistory(prev => [...prev, {
+      num: g.handNum,
+      result: winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ') + ' won',
+      detail: `Pot: ${pot} · ${handName}`,
+    }]);
+
+    return {
+      ...g, seats: newSeats, pot: 0, phase: 'handover', street: 4,
+      winnerIdxs: winners.map(w => w.i), actionLabels: new Array(newSeats.length).fill(null),
+    };
+  };
+
+  const processBotTurn = (g) => {
+    if (!g || g.phase !== 'betting') return g;
+    const seat = g.seats[g.toActIdx];
+    if (!seat || seat.isPlayer || seat.folded) return g;
+
+    const toCall = g.maxBet - seat.bet;
+    const strength = thHandStrength(seat.hand, g.board);
+    const r = Math.random();
+    const diffMult = difficulty === 'Easy' ? 0.7 : difficulty === 'Hard' ? 1.3 : 1.0;
+
+    let action, amount;
+    if (toCall > 0) {
+      const potOdds = toCall / (g.pot + toCall);
+      if (strength * diffMult < 0.25 && potOdds > 0.2 && r > 0.25) {
+        action = 'fold';
+      } else if (strength * diffMult > 0.72 && seat.chips > toCall + BB && r > 0.5) {
+        action = 'raise';
+        amount = Math.min(seat.chips, toCall + BB * 2);
+      } else {
+        action = 'call';
+      }
+    } else {
+      if (strength * diffMult > 0.6 && r > 0.5 && seat.chips > BB) {
+        action = 'raise';
+        amount = Math.min(seat.chips, BB * 2);
+      } else {
+        action = 'check';
+      }
+    }
+
+    return applyAction(g, g.toActIdx, action, amount);
+  };
+
+  const applyAction = (g, seatIdx, action, amount) => {
+    const seats = g.seats.map(s => ({ ...s }));
+    const seat = seats[seatIdx];
+    const roundActed = [...g.roundActed];
+    const actionLabels = new Array(seats.length).fill(null);
+
+    let maxBet = g.maxBet;
+
+    if (action === 'fold') {
+      seat.folded = true;
+      seat.hand = seat.hand; // keep for reveal
+      actionLabels[seatIdx] = { type: 'fold', text: 'Fold' };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} fold`, 'info');
+      cgSound('click');
+    } else if (action === 'check') {
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: 'check', text: 'Check' };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} check`, 'info');
+      cgSound('chip');
+    } else if (action === 'call') {
+      const toCall = g.maxBet - seat.bet;
+      const pay = Math.min(toCall, seat.chips);
+      seat.chips -= pay; seat.bet += pay;
+      if (seat.chips === 0) seat.allIn = true;
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: 'call', text: `Call ${pay}` };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} call ${pay}`, 'info');
+      cgSound('chip');
+    } else if (action === 'raise' || action === 'bet') {
+      const raiseAmt = amount || BB;
+      const totalBet = g.maxBet + raiseAmt;
+      const pay = Math.min(totalBet - seat.bet, seat.chips);
+      seat.chips -= pay; seat.bet += pay;
+      if (seat.chips === 0) seat.allIn = true;
+      maxBet = seat.bet;
+      roundActed.fill(false);
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: action === 'bet' ? 'bet' : 'raise', text: `${action === 'bet' ? 'Bet' : 'Raise'} ${seat.bet}` };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} ${action === 'bet' ? 'bet' : 'raise'} ${seat.bet}`, 'info');
+      cgSound('chip'); cgHaptic(12);
+    } else if (action === 'allin') {
+      const pay = seat.chips;
+      seat.chips = 0; seat.bet += pay; seat.allIn = true;
+      if (seat.bet > maxBet) { maxBet = seat.bet; roundActed.fill(false); }
+      roundActed[seatIdx] = true;
+      actionLabels[seatIdx] = { type: 'allin', text: `All-in ${seat.bet}` };
+      addLog(`${seat.isPlayer ? 'You' : seat.name} go all-in ${seat.bet}`, 'info');
+      cgSound('chip'); cgHaptic([10, 20, 10]);
+    }
+
+    let newGs = { ...g, seats, maxBet, roundActed, actionLabels };
+
+    // Check if only 1 player remains (everyone else folded)
+    const stillIn = seats.filter(s => !s.folded);
+    if (stillIn.length === 1) {
+      // Award pot to last standing
+      const { seats: collectedSeats, pot } = collectBets(seats, g.pot);
+      collectedSeats[seats.indexOf(stillIn[0])].chips += pot;
+      const winner = stillIn[0];
+      addLog(`${winner.isPlayer ? 'You' : winner.name} win pot ${pot} (others folded)`, winner.isPlayer ? 'win' : 'lose');
+      setHandHistory(prev => [...prev, { num: g.handNum, result: `${winner.isPlayer ? 'You' : winner.name} won (fold)`, detail: `Pot: ${pot}` }]);
+      return { ...newGs, seats: collectedSeats, pot: 0, phase: 'handover', winnerIdxs: [seats.indexOf(stillIn[0])], actionLabels: new Array(seats.length).fill(null) };
+    }
+
+    // Check if betting round is complete
+    if (allBetsEqualCheck(newGs)) {
+      return advanceStreet(newGs);
+    }
+
+    // Advance to next active player
+    const nextIdx = nextActive(seats, seatIdx);
+    return { ...newGs, toActIdx: nextIdx };
+  };
+
+  const allBetsEqualCheck = (g) => {
+    const seats = g.seats;
+    const active = seats.filter(s => !s.folded && s.chips > 0);
+    if (active.length === 0) return true;
+    const maxB = g.maxBet;
+    // All active (non-all-in) players have matched maxBet and had a chance to act
+    return active.every((s, _, arr) => {
+      const idx = seats.indexOf(s);
+      return s.bet === maxB && g.roundActed[idx];
+    });
+  };
+
+  const startGame = (chipCount) => {
+    handsRef.current = 0;
+    doneRef.current = false;
+    const seats = buildSeats(chipCount, numBots);
+    const gs0 = dealNewHand(seats, 0);
+    handsRef.current = 1;
+    gs0.handNum = 1;
+    addLog('Game started', 'hand');
+    addLog(`Hand #1 dealt (Dealer: ${seats[0].isPlayer ? 'You' : seats[gs0.dealerIdx].name})`, 'hand');
+    setGs(gs0);
+    setPhase('playing');
+    cgSound('deal');
+  };
+
+  const handlePlayerAction = (action, amount) => {
+    if (!gs || gs.phase !== 'betting' || gs.toActIdx !== 0) return;
+    setRaiseOpen(false);
+    setGs(prev => applyAction(prev, 0, action, amount));
+  };
+
+  const handleNextHand = () => {
+    if (!gs) return;
+    const seats = gs.seats;
+    // Check end condition
+    const playerSeat = seats[0];
+    const activePlayers = seats.filter(s => s.chips > 0);
+    if (activePlayers.length <= 1) {
+      // Game over
+      const youWin = playerSeat.chips > 0;
+      doneRef.current = true;
+      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
+      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
+      // Save chips to server
+      api('/api/poker/chips', { method: 'POST', body: JSON.stringify({ chips: Math.max(playerSeat.chips, 0) }) }).catch(() => {});
+      const score = Math.max(0, playerSeat.chips);
+      if (youWin) {
+        onWin(score, handsRef.current, secsRef.current, { share: `Won Texas Hold 'Em in ${handsRef.current} hands with ${score} chips!` });
+      } else {
+        onLose(handsRef.current, secsRef.current, { share: `Busted out after ${handsRef.current} hands`, answer: 'Out of chips' });
+      }
+      return;
+    }
+    // Rotate dealer, remove busted players
+    const nextDealerIdx = (seats.findIndex((s, i) => i > gs.dealerIdx && s.chips > 0) + 1 || 1) % seats.length;
+    // Actually just rotate dealer among active seats
+    let newDealerIdx = gs.dealerIdx;
+    for (let i = 1; i <= seats.length; i++) {
+      const idx = (gs.dealerIdx + i) % seats.length;
+      if (seats[idx].chips > 0) { newDealerIdx = idx; break; }
+    }
+    handsRef.current++;
+    onStepChange && onStepChange(handsRef.current);
+    const newGs = dealNewHand(seats, newDealerIdx);
+    newGs.handNum = handsRef.current;
+    addLog(`Hand #${handsRef.current} dealt`, 'hand');
+    setGs(newGs);
+    cgSound('deal');
+  };
+
+  // Bot AI effect
+  useEffect(() => {
+    if (!gs || gs.phase !== 'betting' || !gs.seats[gs.toActIdx]) return;
+    if (gs.seats[gs.toActIdx].isPlayer) return;
+    if (gs.seats[gs.toActIdx].folded) return;
+    const delay = difficulty === 'Easy' ? 400 : difficulty === 'Hard' ? 1100 : 750;
+    const t = setTimeout(() => {
+      setGs(prev => {
+        if (!prev || prev.phase !== 'betting') return prev;
+        if (!prev.seats[prev.toActIdx] || prev.seats[prev.toActIdx].isPlayer) return prev;
+        return processBotTurn(prev);
+      });
+    }, delay);
+    return () => clearTimeout(t);
+  }, [gs && gs.toActIdx, gs && gs.phase, gs && gs.handNum]);
+
+  // Render
+  if (phase === 'setup') {
+    return (
+      <div className="poker-shell">
+        <div className="poker-top-bar">
+          <button className="poker-back-btn" onClick={onBack}>&#8592;</button>
+          <div className="poker-top-bar-title">Texas Hold 'Em</div>
+          <div className="poker-conn-dot" />
+        </div>
+        <PokerSetupScreen
+          onStart={startGame}
+          savedChips={savedChips}
+          numBots={numBots} setNumBots={setNumBots}
+          difficulty={difficulty} setDifficulty={setDifficulty}
+        />
+      </div>
+    );
+  }
+
+  if (!gs) return null;
+
+  const playerSeat = gs.seats[0];
+  const canAct = gs.phase === 'betting' && gs.toActIdx === 0 && !doneRef.current;
+  const toCall = canAct ? Math.max(0, gs.maxBet - playerSeat.bet) : 0;
+  const canCheck = canAct && toCall === 0;
+  const canCall = canAct && toCall > 0;
+  const minRaise = gs.maxBet + BB;
+  const maxRaise = playerSeat.chips;
+  const canRaise = canAct && playerSeat.chips > toCall;
+
+  return (
+    <div className="poker-shell">
+      <PokerTopBar handNum={gs.handNum} phase={gs.street} onBack={() => { setPhase('setup'); setGs(null); }} playerChips={playerSeat.chips} BB={BB} />
+      <div className="poker-main">
+        <div className="poker-oval-wrap">
+          <div className="poker-oval">
+            {gs.seats.map((seat, i) => {
+              const pos = pokerSeatPos(i, numBots);
+              const isWinner = gs.phase === 'handover' && gs.winnerIdxs && gs.winnerIdxs.includes(i);
+              return (
+                <div key={i} style={{ position: 'absolute', left: pos.x + '%', top: pos.y + '%', transform: 'translate(-50%,-50%)' }}>
+                  <PokerSeat
+                    seat={seat}
+                    isPlayer={seat.isPlayer}
+                    dealerIdx={gs.dealerIdx}
+                    sbIdx={gs.sbIdx}
+                    bbIdx={gs.bbIdx}
+                    isActive={gs.phase === 'betting' && gs.toActIdx === i && !seat.folded}
+                    isWinner={isWinner}
+                    actionLabel={gs.actionLabels && gs.actionLabels[i]}
+                    showCards={gs.phase === 'handover'}
+                    seatIdx={i}
+                    board={gs.board}
+                    handNum={gs.handNum}
+                    gamePhase={phase}
+                  />
+                </div>
+              );
+            })}
+            <CommunityArea board={gs.board} pot={gs.pot + gs.seats.reduce((sum, s) => sum + (s.bet || 0), 0)} street={gs.street} />
+          </div>
+        </div>
+
+        {gs.phase === 'handover' && gs.winnerIdxs && (
+          <div style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.88rem', color: '#34D399', fontWeight: 600 }}>
+            {gs.winnerIdxs.includes(0) ? 'You win this hand!' : `${gs.seats[gs.winnerIdxs[0]].name} wins`}
           </div>
         )}
+
+        <FloatingMenu
+          onLeave={() => { setPhase('setup'); setGs(null); }}
+          onLog={() => setLogOpen(o => !o)}
+          onHistory={() => setHistoryOpen(o => !o)}
+          soundOn={soundOn}
+          onToggleSound={() => { const ns = !soundOn; setSoundOn(ns); cgSetPref('sound', ns); }}
+        />
+
+        <GameLogSidebar open={logOpen} onClose={() => setLogOpen(false)} log={gameLog} />
+        <HandHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} history={handHistory} />
+        {(logOpen || historyOpen) && (
+          <div className="poker-overlay-backdrop" style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={() => { setLogOpen(false); setHistoryOpen(false); }} />
+        )}
       </div>
-    </ClassicShell>
+
+      <div style={{ position: 'relative' }}>
+        {raiseOpen && canRaise && (
+          <RaisePanel
+            minRaise={Math.min(minRaise, maxRaise)}
+            maxRaise={maxRaise}
+            BB={BB}
+            onRaise={amt => handlePlayerAction('raise', amt - gs.maxBet)}
+            onClose={() => setRaiseOpen(false)}
+          />
+        )}
+        <div className="poker-action-bar">
+          {gs.phase === 'handover' ? (
+            <button className="poker-action-btn next" onClick={handleNextHand} style={{ flex: 2 }}>
+              Next hand &rarr;
+            </button>
+          ) : (
+            <>
+              <button className="poker-action-btn fold" disabled={!canAct} onClick={() => handlePlayerAction('fold')}>Fold</button>
+              {canCheck
+                ? <button className="poker-action-btn check" disabled={!canAct} onClick={() => handlePlayerAction('check')}>Check</button>
+                : <button className="poker-action-btn call" disabled={!canCall} onClick={() => handlePlayerAction('call')}>Call {toCall}</button>
+              }
+              <button className="poker-action-btn raise" disabled={!canRaise}
+                onClick={() => { if (canRaise) { setRaiseOpen(o => !o); cgSound('click'); } }}>
+                {toCall > 0 ? 'Raise' : 'Bet'}
+              </button>
+              <button className="poker-action-btn allin" disabled={!canAct} onClick={() => { handlePlayerAction('allin'); setRaiseOpen(false); }}>
+                All-in
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -12656,6 +13945,7 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
       setLastWinId(entryId);
       setVisited(v); setCurrentPos(idx); setMoves(m); setUndoStack(newUndoStack); setDone(true);
       onStepChange(m);
+      submitClassicScore('knights-tour', score, { timeSecs: finalSecs, moves: m });
       onWin(score, 64, finalSecs);
     } else {
       setVisited(v); setCurrentPos(idx); setMoves(m); setUndoStack(newUndoStack);
@@ -12771,8 +14061,14 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
         </div>
       )}
 
+      {activeTab === 'leaderboard' && (
+        <div style={{ padding: '0.25rem' }}>
+          <ClassicLeaderboard gameId="knights-tour" valueFmt={(r) => `${r.bestScore} pts`} />
+        </div>
+      )}
+
       <div className="kt-bottom-nav">
-        {['game', 'history'].map(tab => (
+        {['game', 'leaderboard', 'history'].map(tab => (
           <button
             key={tab}
             className={'kt-tab' + (activeTab === tab ? ' active' : '')}
@@ -12898,6 +14194,8 @@ const BOUNCE_LEVEL_BONUS = 100;
 const BOUNCE_FIXED_DT = 1000 / 60;
 const BOUNCE_SUBSTEPS = 3;          // anti-tunneling integration substeps
 const BOUNCE_BEST_KEY = 'puzzlechain_bounce_best';
+// Looping background-music asset (served by express.static from public/audio).
+const BOUNCE_MUSIC_URL = '/audio/bounce-bg.mp3';
 
 // Points by row (top rows are harder to reach, so worth more); fallback 10.
 const BOUNCE_ROW_POINTS = [50, 50, 30, 30, 20, 10, 10, 10];
@@ -12995,6 +14293,11 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const [isMock, setIsMock] = useState(false);
   const [activePowerups, setActivePowerups] = useState([]);
+  // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
+  // both SFX and music); `musicPaused` is the player's in-game music pause
+  // that leaves SFX untouched.
+  const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
+  const [musicPaused, setMusicPaused] = useState(false);
 
   // Leaderboard tab state (mirrors Snake)
   const [lb, setLb]               = useState(null);
@@ -13054,6 +14357,28 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     return () => clearInterval(id);
   }, [timerRunning]);
 
+  // Background music: plays once the ball has been launched, sound is
+  // enabled, the player hasn't paused it, and the round isn't over. Starting
+  // only after `started` (the first launch) means it's triggered by a user
+  // gesture, satisfying browser autoplay policy. Stops if the player leaves
+  // the game tab for the leaderboard.
+  useEffect(() => {
+    const shouldPlay = started && !done && soundOn && !musicPaused && activeTab === 'game';
+    if (shouldPlay) startBackgroundMusic(BOUNCE_MUSIC_URL);
+    else stopBackgroundMusic();
+  }, [started, done, soundOn, musicPaused, activeTab]);
+
+  // Always silence the track when leaving the game (unmount → back to lobby).
+  useEffect(() => () => stopBackgroundMusic(), []);
+
+  // Toggle the shared sound master switch (persists to localStorage via
+  // cgPrefs) and mirror it into local state so the component re-renders.
+  const toggleSound = () => {
+    const next = !cgPrefs.sound;
+    cgSetPref('sound', next);
+    setSoundOn(next);
+  };
+
   const resetBallToPaddle = () => {
     ballsRef.current = [{ x: paddleRef.current, y: BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1, vx: 0, vy: 0 }];
   };
@@ -13083,6 +14408,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     resetBallToPaddle();
     setScore(0); setLives(BOUNCE_LIVES); setLevel(1);
     setStarted(false); setDone(false); setElapsedSecs(0); setActivePowerups([]);
+    setMusicPaused(false);
   };
 
   useEffect(() => {
@@ -13113,11 +14439,13 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     const ball = ballRef.current;
     ball.vx = speed * 0.4;
     ball.vy = -Math.sqrt(Math.max(0.01, speed * speed - ball.vx * ball.vx));
+    cgSound('deal', 1.2);
   };
   const launchRef = useRef(launch);
   launchRef.current = launch;
 
   const endGame = () => {
+    cgSound('bgameover');
     doneRef.current = true;
     setDone(true);
     const finalScore = scoreRef.current;
@@ -13130,6 +14458,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   };
 
   const nextLevel = () => {
+    cgSound('blevel');
     scoreRef.current += BOUNCE_LEVEL_BONUS;
     setScore(scoreRef.current);
     const lvl = levelRef.current + 1;
@@ -13142,6 +14471,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   };
 
   const loseLife = () => {
+    cgSound('bdie');
     const remaining = livesRef.current - 1;
     livesRef.current = remaining;
     setLives(remaining);
@@ -13161,9 +14491,9 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
       ball.x += ball.vx * scale;
       ball.y += ball.vy * scale;
 
-      if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); }
-      else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); }
-      if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); }
+      if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); cgSound('bwall'); }
+      else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); cgSound('bwall'); }
+      if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); cgSound('bwall'); }
 
       if (ball.vy > 0 &&
           ball.y + BOUNCE_BALL_R >= BOUNCE_PADDLE_Y &&
@@ -13176,6 +14506,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
         ball.vx = speed * Math.sin(angle);
         ball.vy = -Math.abs(speed * Math.cos(angle));
         ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
+        cgSound('bpaddle');
       }
 
       for (let i = 0; i < bricks.length; i++) {
@@ -13193,6 +14524,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
                 br.alive = false;
                 brokenRef.current += 1;
                 scoreRef.current += br.points;
+                cgSound('bbrick', 1.3);
               }
             }
             laserLoadedRef.current -= 1;
@@ -13200,6 +14532,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
             b.alive = false;
             brokenRef.current += 1;
             scoreRef.current += b.points;
+            cgSound('bbrick');
           }
           setScore(scoreRef.current);
           onStepRef.current && onStepRef.current(brokenRef.current);
@@ -13238,6 +14571,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
       if (!pu.caught && pu.y + pu.radius >= BOUNCE_PADDLE_Y && pu.x >= paddleRef.current - paddleW / 2 - 20 && pu.x <= paddleRef.current + paddleW / 2 + 20) {
         pu.caught = true;
+        cgSound('bpowerup');
         const existing = activePowerupsRef.current.find(p => p.type === pu.type);
         if (pu.type === 'multi-ball') {
           if (ballsRef.current.length > 0) {
@@ -13476,6 +14810,18 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
                 <div>Move to aim, then tap / press Space to launch</div>
               </div>
             )}
+          </div>
+
+          <div className="bounce-audio-row">
+            <button onClick={toggleSound}>
+              {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
+            </button>
+            <button
+              onClick={() => setMusicPaused(p => !p)}
+              disabled={!soundOn}
+            >
+              {!soundOn ? '🔇 Off' : musicPaused ? '▶ Resume' : '⏸ Pause'}
+            </button>
           </div>
 
           <div className="bounce-dpad">
@@ -16341,6 +17687,8 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
   );
 }
 
+const CNL_STREAK_KEY = 'puzzlechain_cnl_streak';
+
 // Chutes & Ladders wrapper — picks a mode (2P / Versus Bot / Online) and
 // delegates. Honors the Game Menu's gameMode/gameModeOpts props.
 function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
@@ -16350,6 +17698,17 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   const [resumeState, setResumeState] = useState(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const { loadState, clearState } = useClassicSave('chutes-ladders');
+
+  // Intercept onWin to track win streak in localStorage and submit to the server.
+  // playerWon: meta.winner===1 for local/bot (player 1 = the human); score>0 for online.
+  const handleWin = (score, steps, secs, meta) => {
+    const playerWon = meta && meta.winner !== undefined ? meta.winner === 1 : score > 0;
+    const prevStreak = parseInt(localStorage.getItem(CNL_STREAK_KEY) || '0', 10);
+    const newStreak = playerWon ? prevStreak + 1 : 0;
+    try { localStorage.setItem(CNL_STREAK_KEY, String(newStreak)); } catch (e) {}
+    submitClassicScore('chutes-ladders', newStreak, { mode: mode || 'bot' });
+    onWin(score, steps, secs, meta);
+  };
 
   // Sync mode from the Game Menu's New Game selection.
   useEffect(() => {
@@ -16381,14 +17740,14 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
     }} />;
   }
   if (mode === 'online') {
-    return <ChutesLaddersOnlineGame onWin={onWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
+    return <ChutesLaddersOnlineGame onWin={handleWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
   }
   if (mode === 'bot' && !resumeChecked) {
     return <div style={{ textAlign: 'center', padding: '2rem', color: C.muted }}>Loading…</div>;
   }
   return (
     <ChutesLaddersLocalGame
-      onWin={onWin}
+      onWin={handleWin}
       onStepChange={onStepChange}
       resetKey={resetKey}
       vsBot={mode === 'bot'}
@@ -16411,6 +17770,279 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
 //   daily — true only for category 'daily' games: the single gate for the
 //           per-day start/lock/finish/streak/resume machinery.
 //   category — lobby tab grouping (maps 1:1 to the tabs).
+
+/* ============================================================
+   Hash Rush — crypto-themed lane dodger (self-shell canvas game)
+   ============================================================ */
+const HR_HISTORY_KEY = 'puzzlechain_hashrush_history';
+const HR_LANES = 3;
+const HR_START_SPEED = 150;     // px/s downward
+const HR_SPEED_STEP = 28;       // +px/s every ramp
+const HR_RAMP_SECS = 30;        // ramp every N seconds
+const HR_MAX_SPEED = HR_START_SPEED * 3;
+const HR_TOKEN_SCORE = 10;
+const HR_BOOST_MULT = 2;
+const HR_BOOST_SECS = 5;
+const HR_LIVES = 3;
+
+function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
+  const [phase, setPhase] = useState('idle'); // idle | playing | dead
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(HR_LIVES);
+  const [mult, setMult] = useState(1);
+  const [boostLeft, setBoostLeft] = useState(0);
+  const [finalRank, setFinalRank] = useState(null);
+
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const lastTsRef = useRef(0);
+  const stateRef = useRef(null);
+  const submittedRef = useRef(false);
+  const onWinRef = useRef(onWin); onWinRef.current = onWin;
+  const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
+
+  const fresh = () => ({
+    lane: 1, objs: [], elapsed: 0, score: 0, lives: HR_LIVES, tokens: 0,
+    speed: HR_START_SPEED, boost: 0, spawnT: 0, spawnEvery: 0.85, dead: false,
+  });
+
+  const reset = () => {
+    stateRef.current = fresh();
+    setScore(0); setLives(HR_LIVES); setMult(1); setBoostLeft(0); setFinalRank(null);
+    submittedRef.current = false;
+  };
+
+  useEffect(() => { reset(); setPhase('idle'); }, [resetKey]);
+
+  // Lane shift (-1 left, +1 right).
+  const shift = (dir) => {
+    const s = stateRef.current; if (!s || s.dead) return;
+    s.lane = Math.max(0, Math.min(HR_LANES - 1, s.lane + dir));
+    cgSound('move');
+  };
+
+  // Input: tap halves, swipe, arrow keys.
+  useEffect(() => {
+    const el = canvasRef.current; if (!el) return;
+    const onPointer = (e) => {
+      if (phase === 'idle') { startGame(); return; }
+      const rect = el.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      shift(x < rect.width / 2 ? -1 : 1);
+    };
+    el.addEventListener('pointerdown', onPointer);
+    return () => el.removeEventListener('pointerdown', onPointer);
+  }, [phase]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); shift(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); shift(1); }
+      else if ((e.key === ' ' || e.key === 'Enter') && phase === 'idle') { e.preventDefault(); startGame(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase]);
+
+  const endGame = () => {
+    const s = stateRef.current; if (!s) return;
+    s.dead = true;
+    setPhase('dead');
+    cgSound('lose'); cgHaptic([20, 40, 20]);
+    const finalScore = Math.round(s.score);
+    cgSaveHistory(HR_HISTORY_KEY, { score: finalScore, tokens: s.tokens, secs: Math.round(s.elapsed), ts: Date.now() });
+    if (!submittedRef.current) {
+      submittedRef.current = true;
+      submitClassicScore('hashrush', finalScore, { tokens: s.tokens, timeSecs: Math.round(s.elapsed) })
+        .then(r => { if (r && r.rank) setFinalRank(r.rank); });
+      onWinRef.current(finalScore, s.tokens, Math.round(s.elapsed), {
+        winnerLabel: 'Game Over', share: `⛏️ Hash Rush — ${finalScore} pts, ${s.tokens} hashes mined`,
+      });
+    }
+  };
+
+  const startGame = () => {
+    reset();
+    setPhase('playing');
+    cgSound('click');
+  };
+
+  // Main loop.
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let running = true;
+    lastTsRef.current = 0;
+
+    const sizeCanvas = () => {
+      const wrap = wrapRef.current; if (!wrap) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = wrap.clientWidth, h = wrap.clientHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    sizeCanvas();
+    window.addEventListener('resize', sizeCanvas);
+
+    const spawn = (s, W) => {
+      const lane = Math.floor(Math.random() * HR_LANES);
+      const roll = Math.random();
+      let type = 'token';
+      if (roll < 0.30) type = 'block';
+      else if (roll < 0.42) type = 'boost';
+      s.objs.push({ lane, y: -30, type });
+    };
+
+    const step = (s, dt, W, H) => {
+      s.elapsed += dt;
+      s.speed = Math.min(HR_MAX_SPEED, HR_START_SPEED + Math.floor(s.elapsed / HR_RAMP_SECS) * HR_SPEED_STEP);
+      if (s.boost > 0) { s.boost = Math.max(0, s.boost - dt); }
+      s.spawnT += dt;
+      const every = Math.max(0.45, s.spawnEvery - s.elapsed * 0.004);
+      if (s.spawnT >= every) { s.spawnT = 0; spawn(s, W); }
+
+      const minerY = H * 0.82;
+      const laneW = W / HR_LANES;
+      for (const o of s.objs) {
+        o.y += s.speed * dt;
+        if (o.hit) continue;
+        // collision band around the miner
+        if (o.lane === s.lane && Math.abs(o.y - minerY) < 30) {
+          o.hit = true;
+          if (o.type === 'token') {
+            const m = s.boost > 0 ? HR_BOOST_MULT : 1;
+            s.score += HR_TOKEN_SCORE * m; s.tokens += 1;
+            cgSound('clear');
+          } else if (o.type === 'boost') {
+            s.boost = HR_BOOST_SECS; cgSound('clear');
+          } else if (o.type === 'block') {
+            s.lives -= 1; cgSound('lose'); cgHaptic(30);
+            if (s.lives <= 0) { s.dead = true; }
+          }
+        }
+      }
+      // Drop collected/offscreen objects.
+      s.objs = s.objs.filter(o => !o.hit && o.y < H + 40);
+
+      // sync HUD (throttled by React batching)
+      setScore(Math.round(s.score));
+      setLives(s.lives);
+      setMult(s.boost > 0 ? HR_BOOST_MULT : 1);
+      setBoostLeft(s.boost > 0 ? Math.ceil(s.boost) : 0);
+      if (onStepRef.current) onStepRef.current(s.tokens);
+    };
+
+    const draw = (s, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      // background lanes
+      const laneW = W / HR_LANES;
+      for (let i = 0; i < HR_LANES; i++) {
+        ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)';
+        ctx.fillRect(i * laneW, 0, laneW, H);
+      }
+      // objects
+      for (const o of s.objs) {
+        const cx = o.lane * laneW + laneW / 2;
+        ctx.font = '26px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (o.type === 'block') {
+          ctx.fillStyle = 'rgba(244,63,94,0.85)';
+          ctx.fillRect(cx - laneW * 0.4, o.y - 16, laneW * 0.8, 32);
+          ctx.fillStyle = '#fff'; ctx.fillText('🚫', cx, o.y);
+        } else {
+          ctx.fillText(o.type === 'boost' ? '⚡' : '⛏️', cx, o.y);
+        }
+      }
+      // miner
+      const minerY = H * 0.82;
+      const mx = s.lane * laneW + laneW / 2;
+      ctx.font = '34px serif';
+      if (s.boost > 0) {
+        ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 18;
+      }
+      ctx.fillText('⛏️', mx, minerY - 4);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(99,102,241,0.9)';
+      ctx.fillRect(mx - 18, minerY + 14, 36, 6);
+    };
+
+    const frame = (ts) => {
+      if (!running) return;
+      const s = stateRef.current;
+      const W = canvas.clientWidth, H = canvas.clientHeight;
+      if (!lastTsRef.current) lastTsRef.current = ts;
+      let dt = (ts - lastTsRef.current) / 1000;
+      lastTsRef.current = ts;
+      if (dt > 0.05) dt = 0.05;
+      step(s, dt, W, H);
+      draw(s, W, H);
+      if (s.dead) { endGame(); return; }
+      rafRef.current = requestAnimationFrame(frame);
+    };
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      running = false;
+      window.removeEventListener('resize', sizeCanvas);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [phase]);
+
+  const hist = cgLoadHistory(HR_HISTORY_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const sheet = [
+    cgLeaderboardSection('hashrush'),
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.tokens} ⛏️ · {r.secs}s</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Runs' },
+    ]),
+    cgRulesSection([
+      'Tap the left/right half of the screen (or ← → keys) to change lane.',
+      'Collect ⛏️ hash tokens to score — each is worth 10 points.',
+      'Grab ⚡ Compute Boost for 5 seconds of 2× scoring.',
+      'Dodge 🚫 invalid blocks — three hits and the run ends.',
+      'It speeds up the longer you survive. Chase a high score!',
+    ]),
+  ];
+
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => startGame()} sheetSections={sheet} menuConfig={menuConfig}>
+      <div className="cg-stage">
+        <CgStatus items={[
+          { l: 'Score', v: score },
+          { l: 'Lives', v: '❤️'.repeat(lives) || '—' },
+          { l: 'Mult', v: '×' + mult },
+        ]} />
+        <div className="hr-wrap" ref={wrapRef}>
+          <canvas ref={canvasRef} className="hr-canvas" />
+          {boostLeft > 0 && phase === 'playing' && (
+            <div className="hr-boost-badge">⚡ Boost {boostLeft}s</div>
+          )}
+          {phase === 'idle' && (
+            <div className="hr-overlay">
+              <div className="hr-overlay-title">⛏️ Hash Rush</div>
+              <div className="hr-overlay-sub">Mine hashes, dodge invalid blocks.</div>
+              <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Start mining</button>
+            </div>
+          )}
+          {phase === 'dead' && (
+            <div className="hr-overlay">
+              <div className="hr-overlay-title">Game Over</div>
+              <div className="hr-overlay-score">{score} pts</div>
+              {finalRank && <div className="hr-overlay-sub">Global rank #{finalRank}</div>}
+              <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Mine again</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </ClassicShell>
+  );
+}
+
 const GAMES = [
   {
     id: 'sudoku',
@@ -16485,6 +18117,8 @@ const GAMES = [
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
     menuModePicker: true,
+    leaderboard: true,
+    leaderboardOpts: { valueLabel: 'Best Streak' },
   },
   {
     id: '2048',
@@ -16496,6 +18130,9 @@ const GAMES = [
     tag: 'Numbers',
     tagColor: C.emerald,
     component: T2048Game,
+    modes: ['solo', 'online'],
+    preLaunchModal: true,
+    leaderboard: true,
   },
   {
     id: 'knights-tour',
@@ -16529,6 +18166,9 @@ const GAMES = [
     tag: 'Puzzle',
     tagColor: C.accent,
     component: BlockBlastGame,
+    modes: ['solo', 'online'],
+    preLaunchModal: true,
+    leaderboard: true,
   },
   {
     id: 'diamondrush',
@@ -16597,6 +18237,18 @@ const GAMES = [
     tag: 'Campaign',
     tagColor: C.gold,
     component: Match3Game,
+  },
+  {
+    id: 'hashrush',
+    name: 'Hash Rush',
+    icon: '⛏️',
+    category: 'classic',
+    shell: 'self',
+    desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
+    tag: 'Crypto',
+    tagColor: C.gold,
+    component: HashRushGame,
+    leaderboard: true,
   },
   {
     id: 'tilematchingdaily',
@@ -16875,19 +18527,74 @@ function PostDetail({ post, onBack }) {
 /* ============================================================
    Root app
    ============================================================ */
-function BadgesSection({ streak, attempts, open, onToggle }) {
-  const badges = BADGE_DEFS.map(b => ({ ...b, earned: b.check(streak, attempts) }));
+// Next-milestone progress hints so a player who finished today sees concrete
+// progress even when no badge unlocked this run (e.g. "🔥 2/3 days → On Fire",
+// "7/10 solves → Solver"). Each is the nearest UNEARNED milestone of its kind.
+function badgeProgressHints(streak, solveCount) {
+  const hints = [];
+  const ns = nextStreakBadge(streak);
+  if (ns) hints.push({ key: 'streak', icon: '🔥', text: `${streak}/${ns.min} days → ${ns.name}` });
+  const nm = nextSolveMilestone(solveCount);
+  if (nm) hints.push({ key: 'solve', icon: nm.icon, text: `${solveCount || 0}/${nm.count} solves → ${nm.name}` });
+  return hints;
+}
+
+// Lobby Badges panel — renders the SAME permanent collection as the profile's
+// BadgeStrip (streak milestones + non-streak achievements + solve milestones),
+// fed by the server-backed `badges`/`achievements` state already loaded from
+// /api/daily. Earned badges stay lit forever (they come from persisted
+// user_achievements rows, not the live streak/today's attempts), so the lobby
+// and profile now show identical earned/locked states.
+//
+// Discoverability: a header with the earned count is always visible; on mobile
+// a compact always-visible row of EARNED chips shows when collapsed (so a
+// player sees their badges without expanding), and the toggle reveals the full
+// dimmed collection. An empty-state line + next-milestone progress hints make
+// it clear how to earn the next one.
+function BadgesSection({ badges, achievements, streak, solveCount, open, onToggle }) {
+  const chips = badgeChips(badges, achievements);
+  const earnedCount = chips.filter(c => c.earned).length;
+  const earnedChips = chips.filter(c => c.earned);
+  const hints = badgeProgressHints(streak || 0, solveCount || 0);
   return (
     <div className="badges-section">
       <button className="badges-toggle" onClick={onToggle}>
         Badges
+        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
         <span className="badges-toggle-arrow">{open ? '▾' : '▸'}</span>
       </button>
+      {earnedCount === 0 && (
+        <div className="badges-empty">Solve a daily puzzle to earn your first badge.</div>
+      )}
+      {hints.length > 0 && (
+        <div className="badge-progress">
+          {hints.map(h => (
+            <span key={h.key} className="badge-progress-pill">
+              <span>{h.icon}</span> {h.text}
+            </span>
+          ))}
+        </div>
+      )}
+      {/* Mobile-only compact strip of earned badges, shown while collapsed. */}
+      {earnedCount > 0 && (
+        <div className={'badges-earned-row' + (open ? ' hide' : '')}>
+          {earnedChips.map(c => (
+            <div key={c.key} className="badge-chip" title={`${c.name} — ${c.sub}`}>
+              <span>{c.icon}</span>
+              <span>{c.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className={'badges-grid' + (open ? ' open' : '')}>
-        {badges.map(b => (
-          <div key={b.id} className={'badge-chip' + (b.earned ? '' : ' dim')} title={b.desc}>
-            <span>{b.icon}</span>
-            <span>{b.label}</span>
+        {chips.map(c => (
+          <div
+            key={c.key}
+            className={'badge-chip' + (c.earned ? '' : ' dim')}
+            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
+          >
+            <span>{c.icon}</span>
+            <span>{c.name}</span>
           </div>
         ))}
       </div>
@@ -16895,253 +18602,27 @@ function BadgesSection({ streak, attempts, open, onToggle }) {
   );
 }
 
-/* ============================================================
-   AI Background Themes — helpers + screen
-   ============================================================ */
-const THEME_STORAGE_KEY = 'puzzlechain.activeTheme.v1';
-
-// Build the CSS background string for a theme's params. A radial highlight on
-// top of a linear base reads as a richer "scene" than a flat linear gradient.
-function themeGradient(params) {
-  if (!params || !Array.isArray(params.colors) || params.colors.length < 2) return null;
-  const cols = params.colors;
-  const angle = Number.isFinite(params.angle) ? params.angle : 135;
-  const linear = `linear-gradient(${angle}deg, ${cols.join(', ')})`;
-  const highlight = `radial-gradient(circle at 30% 20%, ${cols[0]}88, transparent 60%)`;
-  return `${highlight}, ${linear}`;
-}
-
-// Read/write the active theme to localStorage (device-local persistence).
-function loadActiveTheme() {
-  try {
-    const raw = localStorage.getItem(THEME_STORAGE_KEY);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (obj && obj.params && Array.isArray(obj.params.colors)) return obj;
-  } catch {}
-  return null;
-}
-function persistActiveTheme(theme) {
-  try {
-    if (theme) localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
-    else localStorage.removeItem(THEME_STORAGE_KEY);
-  } catch {}
-}
-
-// A small inline gradient swatch (used in preview + gallery cards).
-function ThemeSwatch({ params, className, children }) {
-  const grad = themeGradient(params);
+// Lightweight placeholder shown in the lobby badge slot when the real panel
+// can't load (signed out, or the backend was briefly unreachable). Keeps the
+// "Badges" header so the slot is recognizable, and explains the empty space
+// instead of leaving an unexplained blank gap. `state` is 'signedout' | 'error';
+// the 'error' case offers a retry that re-runs the daily load.
+function BadgesPlaceholder({ state, onRetry }) {
+  const isError = state === 'error';
   return (
-    <div className={className} style={{ background: grad || C.bg }}>
-      {children}
-    </div>
-  );
-}
-
-function ThemesScreen({ user, authOk, activeTheme, onApply, onReset, onPreview, onBack }) {
-  const [prompt, setPrompt] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [draft, setDraft] = useState(null);     // { params, prompt } from generate
-  const [draftName, setDraftName] = useState('');
-  const [sharing, setSharing] = useState(false);
-  const [shared, setShared] = useState(false);
-  const [msg, setMsg] = useState(null);         // { kind, text }
-  const [gallery, setGallery] = useState(null); // null = loading
-  const [sort, setSort] = useState('recent');
-  const [applyingId, setApplyingId] = useState(null);
-
-  const loadGallery = React.useCallback(async (sortMode) => {
-    const q = sortMode === 'popular' ? '?sort=popular' : '';
-    const { ok, body } = await api('/api/themes' + q);
-    if (ok && body && Array.isArray(body.themes)) setGallery(body.themes);
-    else setGallery([]);
-  }, []);
-  useEffect(() => { loadGallery(sort); }, [loadGallery, sort]);
-
-  const doGenerate = async (retried) => {
-    const p = prompt.trim();
-    if (!p) { setMsg({ kind: 'err', text: 'Type a vibe to generate a theme.' }); return; }
-    setGenerating(true);
-    setMsg(null);
-    setShared(false);
-    const { ok, status, body } = await api('/api/themes/generate', {
-      method: 'POST',
-      body: JSON.stringify({ prompt: p }),
-    });
-    if (ok && body && body.params) {
-      setDraft({ params: body.params, prompt: p });
-      setDraftName(body.params.name || '');
-      onPreview(body.params); // live full-screen preview
-      setGenerating(false);
-      return;
-    }
-    // 403 grant_required → ask the platform shell for consent, then retry once.
-    if (status === 403 && !retried && window.usernode && typeof window.usernode.requestLlmAccess === 'function') {
-      try {
-        const r = await window.usernode.requestLlmAccess();
-        if (r && r.granted) { setGenerating(false); return doGenerate(true); }
-      } catch {}
-      setGenerating(false);
-      setMsg({ kind: 'err', text: 'AI access is needed to generate themes — try a gallery theme below.' });
-      return;
-    }
-    setGenerating(false);
-    if (status === 503) {
-      setMsg({ kind: 'info', text: 'Theme generation is unavailable here — browse and apply a community theme below instead.' });
-    } else if (status === 429) {
-      setMsg({ kind: 'err', text: 'Daily AI limit reached — resets at midnight UTC. Try a gallery theme below.' });
-    } else if (status === 403) {
-      setMsg({ kind: 'err', text: 'AI access not granted — try a gallery theme below.' });
-    } else {
-      setMsg({ kind: 'err', text: 'Theme generation is busy right now — try a gallery theme instead.' });
-    }
-  };
-
-  const applyDraft = () => {
-    if (!draft) return;
-    const params = { ...draft.params, name: (draftName || draft.params.name || 'Custom theme').slice(0, 40) };
-    onApply({ id: null, name: params.name, params, prompt: draft.prompt });
-    setMsg({ kind: 'info', text: 'Applied! This background now follows you across the app.' });
-  };
-
-  const shareDraft = async () => {
-    if (!draft || sharing) return;
-    setSharing(true);
-    const name = (draftName || draft.params.name || 'Custom theme').slice(0, 40);
-    const { ok, body } = await api('/api/themes', {
-      method: 'POST',
-      body: JSON.stringify({ params: { ...draft.params, name }, name, prompt: draft.prompt }),
-    });
-    setSharing(false);
-    if (ok && body && body.theme) {
-      setShared(true);
-      setMsg({ kind: 'info', text: 'Shared to the community gallery — everyone can apply it now.' });
-      // prepend so the creator sees it immediately in the recent view
-      setGallery(g => [body.theme, ...(g || [])]);
-    } else {
-      setMsg({ kind: 'err', text: 'Could not share that theme — please try again.' });
-    }
-  };
-
-  const applyGallery = async (t) => {
-    setApplyingId(t.id);
-    onApply({ id: t.id, name: t.name, params: t.params, prompt: t.prompt });
-    // best-effort popularity bump; non-fatal
-    try { await api(`/api/themes/${t.id}/apply`, { method: 'POST' }); } catch {}
-    setGallery(g => (g || []).map(x => x.id === t.id ? { ...x, applyCount: (x.applyCount || 0) + 1 } : x));
-    setApplyingId(null);
-  };
-
-  const canGenerate = authOk;
-  const draftGrad = draft ? themeGradient(draft.params) : null;
-
-  return (
-    <div className="themes-wrap">
-      <div className="game-head">
-        <button className="back-btn" onClick={() => { onPreview(null); onBack && onBack(); }}>← Back</button>
-        <div className="game-title"><span>🎨</span> Background Themes</div>
-      </div>
-
-      <div className="themes-create">
-        <h2>Create a theme</h2>
-        <p className="sub">Describe a vibe and AI turns it into a full-screen background.</p>
-        <div className="themes-prompt-row">
-          <input
-            type="text"
-            value={prompt}
-            maxLength={240}
-            placeholder="Describe a vibe… e.g. 'sunset over neon city', 'calm forest morning', 'deep space'"
-            onChange={e => setPrompt(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && canGenerate && !generating) doGenerate(false); }}
-            disabled={!canGenerate || generating}
-          />
-          <button
-            className="primary-btn"
-            style={{ minWidth: '120px' }}
-            disabled={!canGenerate || generating || !prompt.trim()}
-            onClick={() => doGenerate(false)}
-          >
-            {generating ? 'Generating…' : 'Generate'}
-          </button>
-        </div>
-        {!authOk && (
-          <div className="themes-msg info">Sign in to generate and share themes. You can still preview the gallery below.</div>
-        )}
-        {msg && <div className={`themes-msg ${msg.kind}`}>{msg.text}</div>}
-
-        {draft && (
-          <div className="themes-preview">
-            <div className="swatch" style={{ background: draftGrad || C.bg }}>
-              <span className="pname">{draftName || draft.params.name}</span>
-            </div>
-            <div className="themes-prompt-row">
-              <input
-                type="text"
-                value={draftName}
-                maxLength={40}
-                placeholder="Theme name"
-                onChange={e => setDraftName(e.target.value)}
-              />
-            </div>
-            <div className="actions">
-              <button className="primary-btn" onClick={applyDraft}>Apply</button>
-              <button
-                className="primary-btn"
-                style={{ background: C.violet }}
-                disabled={sharing || shared}
-                onClick={shareDraft}
-              >
-                {shared ? 'Shared ✓' : sharing ? 'Sharing…' : 'Share to gallery'}
-              </button>
-            </div>
-          </div>
+    <div className="badges-section">
+      <div className="badges-toggle" style={{ cursor: 'default' }}>Badges</div>
+      <div className="badges-empty">
+        {isError
+          ? 'Couldn’t load your badges.'
+          : 'Sign in to track your badges.'}
+        {isError && onRetry && (
+          <>
+            {' '}
+            <button type="button" className="badges-retry-btn" onClick={onRetry}>Retry</button>
+          </>
         )}
       </div>
-
-      <div className="themes-gallery-head">
-        <h2>Community gallery</h2>
-        <div className="themes-sort">
-          <button className={sort === 'recent' ? 'active' : ''} onClick={() => setSort('recent')}>Recent</button>
-          <button className={sort === 'popular' ? 'active' : ''} onClick={() => setSort('popular')}>Popular</button>
-        </div>
-      </div>
-
-      {activeTheme && (
-        <div style={{ marginBottom: '0.9rem' }}>
-          <button className="back-btn" onClick={() => { onReset && onReset(true); }}>Reset to default background</button>
-        </div>
-      )}
-
-      {gallery === null ? (
-        <div className="themes-empty">Loading themes…</div>
-      ) : gallery.length === 0 ? (
-        <div className="themes-empty">No community themes yet — generate one above and be the first to share!</div>
-      ) : (
-        <div className="themes-grid">
-          {gallery.map(t => {
-            const isActive = activeTheme && activeTheme.id === t.id;
-            return (
-              <div key={t.id} className={`theme-card${isActive ? ' active-theme' : ''}`} style={{ '--accent': (t.params && t.params.accent) || C.accent }}>
-                <ThemeSwatch params={t.params} className="tswatch" />
-                <div className="tbody">
-                  <span className="tname">{t.name}</span>
-                  <span className="tmeta">
-                    <span>by {t.creatorUsername}</span>
-                    <span>▶ {t.applyCount || 0}</span>
-                  </span>
-                  <button
-                    className={`tapply${isActive ? ' applied' : ''}`}
-                    disabled={isActive || applyingId === t.id}
-                    onClick={() => applyGallery(t)}
-                  >
-                    {isActive ? 'Applied ✓' : applyingId === t.id ? 'Applying…' : 'Apply'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -17153,10 +18634,9 @@ function App() {
     const s = params.get('screen');
     if (s === 'wallet') return 'wallet';
     if (s === 'account') return 'account';
-    if (s === 'themes') return 'themes';
     if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'themes' | 'wallet' | 'account' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
   const [receiptSessionId, setReceiptSessionId] = useState(() => {
@@ -17173,6 +18653,13 @@ function App() {
   const [badges, setBadges] = useState([]);
   // Non-streak achievement badges earned: { types: [...], milestones: [...] }.
   const [achievements, setAchievements] = useState({ types: [], milestones: [] });
+  // Lifetime won-solve count (server-computed), used to drive the
+  // "X/Y solves → Solver" next-milestone progress hint.
+  const [solveCount, setSolveCount] = useState(0);
+  // Outcome of the last /api/daily load, used to explain an empty badge slot:
+  // 'ok' (real panel renders), 'signedout' (401 — no/expired token), or
+  // 'error' (5xx / network — backend unreachable, offer retry).
+  const [badgeLoadState, setBadgeLoadState] = useState('ok');
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -17199,6 +18686,8 @@ function App() {
   const [classicGameMode, setClassicGameMode] = useState(null);
   const [classicGameModeOpts, setClassicGameModeOpts] = useState(null);
   const [classicLastResult, setClassicLastResult] = useState(null);
+  // Pre-launch game-mode modal (multi-mode classic games, e.g. 2048 / Block Blast)
+  const [preLaunchGame, setPreLaunchGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
   // Wallet state (app-level so PvP and nav share one source)
@@ -17215,38 +18704,11 @@ function App() {
   // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
   // gracefully alongside the server.
   const [integration, setIntegration] = useState({ enabled: false, pubkey: null });
-  // Active background theme (device-local, hydrated from localStorage before
-  // first paint) and a transient live preview that overrides it while the
-  // player auditions a generated/gallery theme on the Themes screen.
-  const [activeTheme, setActiveTheme] = useState(() => loadActiveTheme());
-  const [previewTheme, setPreviewTheme] = useState(null);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
-
-  // Apply (and persist) a chosen theme everywhere.
-  const handleApplyTheme = (theme) => {
-    setActiveTheme(theme);
-    setPreviewTheme(null);
-    persistActiveTheme(theme);
-  };
-  // Reset to the default dark background. `clearActive` true wipes the saved
-  // theme; false just drops the transient preview (used on Back).
-  const handleResetTheme = (clearActive) => {
-    setPreviewTheme(null);
-    if (clearActive) { setActiveTheme(null); persistActiveTheme(null); }
-  };
-  // The theme actually shown: a live preview (only while auditioning on the
-  // Themes screen) wins, else the saved active theme.
-  const effectivePreview = screen === 'themes' ? previewTheme : null;
-  const shownTheme = effectivePreview ? { params: effectivePreview } : activeTheme;
-  const shownGrad = shownTheme && shownTheme.params ? themeGradient(shownTheme.params) : null;
-  const shownScrim = shownTheme && shownTheme.params
-    ? (Number.isFinite(shownTheme.params.overlayOpacity) ? shownTheme.params.overlayOpacity : 0.55)
-    : 0;
-  const shownAccent = shownTheme && shownTheme.params && shownTheme.params.accent;
 
   // Hydrate today's locked/result state from the server on mount, and
   // recompute the score from finished attempts so it survives reloads.
@@ -17254,13 +18716,15 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, body } = await api(path);
+    const { ok, status, body } = await api(path);
     if (ok && body) {
+      setBadgeLoadState('ok');
       setAuthOk(true);
       setUser(body.user || null);
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setSolveCount(Number.isFinite(body.solveCount) ? body.solveCount : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
         ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
@@ -17272,9 +18736,13 @@ function App() {
     } else {
       // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
       // so persistence isn't guaranteed — reflect that in the nav.
+      // Distinguish "signed out" (401) from a transient backend failure so the
+      // badge slot can explain the empty space instead of rendering nothing.
+      setBadgeLoadState(status === 401 ? 'signedout' : 'error');
       setAuthOk(false);
       setUser(null);
       setStreak(0);
+      setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [] });
     }
@@ -17432,10 +18900,19 @@ function App() {
   const deepLinkedRef = useRef(false);
   useEffect(() => {
     if (loading || deepLinkedRef.current) return;
-    const gid = new URLSearchParams(window.location.search).get('game');
+    const params = new URLSearchParams(window.location.search);
+    const gid = params.get('game');
     if (!gid) return;
     const g = GAMES.find(x => x.id === gid);
-    if (g) { deepLinkedRef.current = true; launchGame(g); }
+    if (!g) return;
+    deepLinkedRef.current = true;
+    const mmode = params.get('mmode');
+    // Multi-mode classic games open the pre-launch modal unless a mode is
+    // pinned via ?mmode= (then launch straight into it).
+    if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
+    if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
+    if (g.shell === 'custom') { setCurrentGame(g); setScreen('game'); return; }
+    launchGame(g);
   }, [loading]);
 
   // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
@@ -17490,18 +18967,43 @@ function App() {
       // Reconcile against the server's authoritative streak + reward + new
       // achievement badges, and clear any prior sync-error flag.
       if (body && typeof body.streak === 'number') setStreak(body.streak);
+      if (body && Number.isFinite(body.solveCount)) setSolveCount(body.solveCount);
       const newAch = (body && Array.isArray(body.newAchievements)) ? body.newAchievements : [];
       if (newAch.length) {
         setAchievements(prev => mergeAchievements(prev, newAch));
+        // Reflect any server-confirmed streak milestones in the permanent
+        // `badges` state too (their day thresholds), so the lobby's streak
+        // chips light immediately even if the client's optimistic streak math
+        // missed the exact tier.
+        const streakDays = newAch
+          .filter(a => a && a.type === 'streak_milestone' && a.metadata && Number.isFinite(+a.metadata.streak))
+          .map(a => +a.metadata.streak);
+        if (streakDays.length) {
+          setBadges(prev => Array.from(new Set([...prev, ...streakDays])).sort((a, b) => a - b));
+        }
       }
-      setWinData(prev => prev ? {
-        ...prev,
-        syncError: false,
-        matchEarned: body && body.matchEarned,
-        matchReceipt: body && body.matchReceipt,
-        newAchievements: newAch,
-        justAchievement: newAch.length ? achievementBadgeFor(newAch[0]) : prev.justAchievement,
-      } : prev);
+      setWinData(prev => {
+        if (!prev) return prev;
+        // De-dup the win overlay: the client-side fast-path already shows
+        // `justBadge` for the streak tier this win landed on. Pick the first
+        // NEW achievement that isn't that same streak badge so we never show
+        // one badge twice. If the only new achievement IS the streak badge the
+        // fast-path missed (stale client streak), this surfaces it as the
+        // server backstop.
+        const shownMin = prev.justBadge && prev.justBadge.min;
+        const firstNew = newAch.find(a => {
+          if (a && a.type === 'streak_milestone') return +(a.metadata && a.metadata.streak) !== shownMin;
+          return true;
+        });
+        return {
+          ...prev,
+          syncError: false,
+          matchEarned: body && body.matchEarned,
+          matchReceipt: body && body.matchReceipt,
+          newAchievements: newAch,
+          justAchievement: firstNew ? achievementBadgeFor(firstNew) : prev.justAchievement,
+        };
+      });
       // Reflect the new MATCH balance in the nav chip immediately.
       if (body && body.matchReceipt && Number.isFinite(body.matchReceipt.balanceAfter)) {
         setMatchBalance(body.matchReceipt.balanceAfter);
@@ -17668,6 +19170,7 @@ function App() {
     setClassicGameMode(null);
     setClassicGameModeOpts(null);
     setClassicLastResult(null);
+    setPreLaunchGame(null);
     if (tab) setLobbyTab(tab);
   };
 
@@ -17808,14 +19311,18 @@ function App() {
             onModeChange={setClassicGameMode}
           />
         );
-      case 'classic':
+      case 'classic': {
         // In-frame classic game wrapped in the shared ClassicShell.
+        const classicSections = currentGame.leaderboard
+          ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
+          : [];
         return (
           <ClassicShell
             game={currentGame}
             onExit={() => backToLobby('classic')}
             onNewGame={() => setPlayAgainKey(k => k + 1)}
             menuConfig={classicMenuConfig}
+            sheetSections={classicSections}
           >
             <div className="cg-stage cg-scroll">
               <GameComponent
@@ -17827,10 +19334,12 @@ function App() {
                 gameMode={classicGameMode}
                 gameModeOpts={classicGameModeOpts}
                 onModeChange={setClassicGameMode}
+                onBack={() => backToLobby('classic')}
               />
             </div>
           </ClassicShell>
         );
+      }
       case 'daily':
       default:
         // Daily puzzle (and any back-header game-wrap game): resumable, locked.
@@ -17864,17 +19373,8 @@ function App() {
   const tierAhead = authOk && streak > 0 ? nextTierInfo(streak) : null;
 
   return (
-    <div
-      className={`app${shownGrad ? ' themed' : ''}`}
-      style={{
-        '--bg-grad': shownGrad || undefined,
-        '--bg-scrim': shownScrim || undefined,
-        ...(shownAccent ? { '--accent': shownAccent } : {}),
-      }}
-    >
+    <div className="app">
       <style>{css}</style>
-      <div className="app-bg" />
-      <div className="app-bg-scrim" />
 
       <nav className="nav">
         <div className="nav-brand"><span className="logo">⬢</span> PuzzleChain</div>
@@ -17908,22 +19408,6 @@ function App() {
               style={{ cursor: 'pointer', border: 'none' }}
             >
               🪙 {matchBalance == null ? '…' : matchBalance} MATCH
-            </button>
-          )}
-          {authOk && (
-            <button
-              className="primary-btn nav-themes-btn"
-              style={{
-                background: 'transparent',
-                border: `1px solid ${C.border}`,
-                padding: '0.4rem 0.8rem',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                borderRadius: '8px'
-              }}
-              onClick={() => setScreen('themes')}
-            >
-              🎨 Themes
             </button>
           )}
           {authOk && (
@@ -17975,18 +19459,6 @@ function App() {
         />
       )}
 
-      {screen === 'themes' && (
-        <ThemesScreen
-          user={user}
-          authOk={authOk}
-          activeTheme={activeTheme}
-          onApply={handleApplyTheme}
-          onReset={handleResetTheme}
-          onPreview={setPreviewTheme}
-          onBack={() => setScreen('lobby')}
-        />
-      )}
-
       {screen === 'wallet' && (
         <WalletScreen
           user={user}
@@ -18010,6 +19482,8 @@ function App() {
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
           onDisconnect={disconnectWallet}
+          matchBalance={matchBalance}
+          walletBalance={walletBalance}
         />
       )}
 
@@ -18046,12 +19520,6 @@ function App() {
                   new Date(nextResetUtc).getTime() - (Date.now() + offset))}
               </p>
             )}
-            {lobbyTab === 'daily' && authOk && (() => {
-              // Union of permanent earned streak badges and any the live streak
-              // now satisfies, so the strip is correct right after a win too.
-              const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
-              return <BadgeStrip badges={earnedDays} achievements={achievements} />;
-            })()}
           </div>
           <div className="lobby-tabs">
             <button
@@ -18069,6 +19537,34 @@ function App() {
               >Feed</button>
             )}
           </div>
+          {authOk && lobbyTab !== 'pvp' && lobbyTab !== 'feed' && (() => {
+            // Single persistent, collapsible badge panel — rendered directly
+            // under the header band (above the game grid) on the Daily and
+            // Classic tabs so players find their badges where they expect them.
+            // Feed it the union of permanently earned streak day-thresholds and
+            // any the LIVE streak now satisfies, so a freshly-won streak badge
+            // lights up immediately — before the server round-trip reconciles
+            // `badges`. Achievement/solve-milestone chips come straight from
+            // the server-backed `achievements` state.
+            const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
+            return (
+              <BadgesSection
+                badges={earnedDays}
+                achievements={achievements}
+                streak={streak}
+                solveCount={solveCount}
+                open={badgesOpen}
+                onToggle={() => setBadgesOpen(b => !b)}
+              />
+            );
+          })()}
+          {!authOk && (lobbyTab === 'daily' || lobbyTab === 'classic') && (
+            // Signed-out / load-failure affordance: explain the empty badge slot
+            // instead of rendering nothing. Limited to Daily/Classic (Feed/PvP
+            // own their viewport). Retry re-runs the daily load and flips back
+            // to the real panel on success.
+            <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
+          )}
           {lobbyTab === 'pvp' ? (
             PVP_ENABLED
               ? <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />
@@ -18087,7 +19583,12 @@ function App() {
                   key={g.id}
                   className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
                   style={{ '--accent': g.tagColor }}
-                  onClick={() => !loading && (g.shell === 'custom' ? setCurrentGame(g) : launchGame(g))}
+                  onClick={() => {
+                    if (loading) return;
+                    if (g.shell === 'custom') { setCurrentGame(g); return; }
+                    if (g.preLaunchModal) { setPreLaunchGame(g); return; }
+                    launchGame(g);
+                  }}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
@@ -18114,14 +19615,6 @@ function App() {
             })}
           </div>
           )}
-          {authOk && (
-            <BadgesSection
-              streak={streak}
-              attempts={attempts}
-              open={badgesOpen}
-              onToggle={() => setBadgesOpen(b => !b)}
-            />
-          )}
           {lobbyTab === 'daily' && authOk && (
             <TodayChampions
               onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
@@ -18147,6 +19640,20 @@ function App() {
             onBack={backToLobby}
           />
         </div>
+      )}
+
+      {preLaunchGame && (
+        <GameModeModal
+          game={preLaunchGame}
+          onClose={() => setPreLaunchGame(null)}
+          onStart={(mode, opts) => {
+            const g = preLaunchGame;
+            setPreLaunchGame(null);
+            setClassicGameMode(mode === 'solo' ? null : mode);
+            setClassicGameModeOpts(opts || null);
+            launchGame(g);
+          }}
+        />
       )}
 
       {screen === 'game' && currentGame && !winData && !loseData && renderGameBody()}
@@ -18249,6 +19756,22 @@ function App() {
                 <div className="bu-name">{winData.justAchievement.name}</div>
               </div>
             )}
+            {!winData.isClassic && (() => {
+              // Next-milestone progress so every solve shows forward motion even
+              // when nothing unlocked this run. Streak progress is based on the
+              // streak this win landed in; solve progress on the lifetime count.
+              const hints = badgeProgressHints(winData.effectiveStreak || 0, solveCount);
+              if (!hints.length) return null;
+              return (
+                <div className="win-progress">
+                  {hints.map(h => (
+                    <span key={h.key} className="badge-progress-pill">
+                      <span>{h.icon}</span> {h.text}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
             {!winData.isClassic && winData.syncError && (
               <div className="win-sync-note">
                 Couldn't sync your result — your puzzle is still locked for today.

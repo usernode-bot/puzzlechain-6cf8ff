@@ -129,11 +129,47 @@ function matchChainHash({ userId, kind, gameId, attemptDate, amount, eventId }) 
   }
 }
 
-// Crypto Wordle paid hints — cost of the Nth hint bought today (0-indexed) is
-// CW_HINT_BASE_COST * 2**N in MATCH tokens → 1, 2, 4, 8, … Resets per UTC day.
-// Server-authoritative; the client mirrors this only for display.
-const CW_HINT_BASE_COST = 1;
-const cwHintCost = (purchased) => CW_HINT_BASE_COST * Math.pow(2, purchased);
+// Daily paid hints — cost of the Nth hint bought today (0-indexed) is
+// DAILY_HINT_BASE_COST * 2**N in MATCH tokens → 1, 2, 4, 8, … Resets per UTC
+// day, per daily game. Server-authoritative; the client mirrors this only for
+// display. `cwHintCost` is kept as a back-compat alias for any old call sites.
+const DAILY_HINT_BASE_COST = 1;
+const dailyHintCost = (purchased) => DAILY_HINT_BASE_COST * Math.pow(2, purchased);
+const cwHintCost = dailyHintCost;
+
+// MATCH on-chain memo standard (link_wallet-style). Every MATCH balance change
+// is mirrored as a real, zero-value usernode-blockchain tx whose calldata holds
+// this single-line ASCII memo. The client hex-encodes it into the tx `data`
+// field and sends it via the bridge. Deterministic + auditable.
+//   umatch:1:<action>:<gameId>:<utcDay>:<amount>:<balanceAfter>:<ledgerId>
+function buildMatchMemo({ action, gameId, amount, balanceAfter, ledgerId }) {
+  const day = Math.floor(Date.now() / 86400000);
+  return ['umatch', '1', action, gameId || 'match', String(day),
+          String(amount), String(balanceAfter), String(ledgerId)].join(':');
+}
+
+// recordMatchLedger — insert a `pending` MATCH movement row inside the SAME
+// transaction/client that mutated tilematch_tokens.balance, and return
+// { ledgerId, memo } so the caller can hand the memo to the client to anchor
+// on-chain. Best-effort mirror: never throws the caller's path on a ledger
+// hiccup (the balance write is authoritative).
+async function recordMatchLedger(client, { userId, username, gameId, action, amount, balanceAfter }) {
+  try {
+    const { rows } = await client.query(
+      `INSERT INTO match_ledger (user_id, username, game_id, action, amount, balance_after, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+       RETURNING id`,
+      [userId, username || null, gameId || null, action, amount, balanceAfter]
+    );
+    const ledgerId = rows[0].id;
+    const memo = buildMatchMemo({ action, gameId, amount, balanceAfter, ledgerId });
+    await client.query(`UPDATE match_ledger SET memo = $2 WHERE id = $1`, [ledgerId, memo]);
+    return { ledgerId: String(ledgerId), memo };
+  } catch (e) {
+    console.error('[match] ledger record failed:', e.message);
+    return null;
+  }
+}
 
 // EVM address regex (same as PvP validation throughout)
 const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -912,6 +948,47 @@ async function migrate() {
       hints_purchased INTEGER NOT NULL DEFAULT 0,
       updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (user_id, hint_date)
+    )
+  `);
+
+  // daily_hints is PUBLIC: the game-keyed generalization of cryptowordle_hints.
+  // One row per (user, daily game, UTC day) tracking how many paid hints were
+  // bought that day — drives the doubling cost ramp (1,2,4,8…) per game, resets
+  // implicitly at midnight UTC. No sensitive data (a gameplay counter, same
+  // class as daily_attempts). Crypto Wordle now uses this table too (game_id
+  // 'cryptowordle'); the legacy cryptowordle_hints table is left in place but
+  // unused so older deploys migrate cleanly.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_hints (
+      user_id         TEXT NOT NULL,
+      username        TEXT,
+      game_id         TEXT NOT NULL,
+      hint_date       DATE NOT NULL,
+      hints_purchased INTEGER NOT NULL DEFAULT 0,
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id, hint_date)
+    )
+  `);
+
+  // match_ledger is PUBLIC: one row per MATCH token movement (spend/earn),
+  // mirrored on-chain via the bridge memo standard (see buildMatchMemo). Holds
+  // the structured memo + the on-chain tx_hash once the client anchors it.
+  // No sensitive data — same class as token_tips (which also stores tx_hash).
+  // The authoritative balance still lives in tilematch_tokens; this is an
+  // append-only, publicly-verifiable audit trail of balance changes.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS match_ledger (
+      id            BIGSERIAL PRIMARY KEY,
+      user_id       TEXT NOT NULL,
+      username      TEXT,
+      game_id       TEXT,
+      action        TEXT NOT NULL,
+      amount        INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      memo          TEXT,
+      tx_hash       TEXT,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
 
@@ -3134,13 +3211,20 @@ app.get('/api/daily', async (req, res) => {
           JSON.stringify({ hintsDemo: true }),
         ]
       );
-      await pool.query(
-        `INSERT INTO cryptowordle_hints (user_id, username, hint_date, hints_purchased)
-         VALUES ($1, $2, (now() AT TIME ZONE 'utc')::date, 2)
-         ON CONFLICT (user_id, hint_date) DO UPDATE
-           SET hints_purchased = 2, updated_at = now()`,
-        [req.user.id, req.user.username || 'staging-demo-user']
-      );
+      // Pre-buy 2 hints for every daily game so each game's "next cost" shows 4
+      // and resume/persistence is demonstrable. Game-keyed daily_hints table.
+      for (const gid of ['cryptowordle', 'sudoku', 'wordhunt', 'tilematchingdaily']) {
+        await pool.query(
+          `INSERT INTO daily_hints (user_id, username, game_id, hint_date, hints_purchased)
+           VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, 2)
+           ON CONFLICT (user_id, game_id, hint_date) DO UPDATE
+             SET hints_purchased = 2, updated_at = now()`,
+          [req.user.id, req.user.username || 'staging-demo-user', gid]
+        );
+      }
+      // Also seed a few MATCH ledger rows so the on-chain activity + explorer
+      // links are demonstrable straight from the hints demo.
+      await seedMatchLedgerDemo(req.user.id, req.user.username || 'staging-demo-user');
     }
 
     // Staging-only demo seed: a finished daily win that already earned MATCH and
@@ -6462,137 +6546,258 @@ app.post('/api/match/ledger/:eventId/anchor/confirm', async (req, res) => {
   }
 });
 
-// ---- Crypto Wordle paid hints --------------------------------------------
-// Per-UTC-day hint purchase counter with a doubling MATCH-token cost. The
-// count is server-authoritative (survives reload, can't be reset client-side)
-// and resets implicitly each UTC day. Hints never affect score/leaderboard.
+// ---- Daily paid hints (game-keyed) ---------------------------------------
+// Per-UTC-day, per-game hint purchase counter with a doubling MATCH-token cost.
+// The count is server-authoritative (survives reload, can't be reset
+// client-side) and resets implicitly each UTC day. Hints never affect
+// score/leaderboard. Generalized from the original Crypto Wordle flow so all
+// four daily puzzles share one code path (table daily_hints, keyed by game_id).
 
-// GET /api/cryptowordle/hint — today's { hintsPurchased, nextCost, balance }.
-app.get('/api/cryptowordle/hint', async (req, res) => {
+// Shared read: today's { hintsPurchased, nextCost, balance } for one game.
+async function readDailyHintState(userId, username, gameId, res, logTag) {
   try {
     // Lazy-init the MATCH wallet so a brand-new user reads a real 0 balance.
     await pool.query(
       `INSERT INTO tilematch_tokens (user_id, username, balance)
        VALUES ($1, $2, 0)
        ON CONFLICT (user_id) DO NOTHING`,
-      [req.user.id, req.user.username || null]
+      [userId, username || null]
     );
     const { rows: hRows } = await pool.query(
-      `SELECT hints_purchased FROM cryptowordle_hints
-        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date`,
-      [req.user.id]
+      `SELECT hints_purchased FROM daily_hints
+        WHERE user_id = $1 AND game_id = $2
+          AND hint_date = (now() AT TIME ZONE 'utc')::date`,
+      [userId, gameId]
     );
     const { rows: bRows } = await pool.query(
       `SELECT balance FROM tilematch_tokens WHERE user_id = $1`,
-      [req.user.id]
+      [userId]
     );
     const hintsPurchased = hRows.length ? hRows[0].hints_purchased : 0;
     res.json({
       hintsPurchased,
-      nextCost: cwHintCost(hintsPurchased),
+      nextCost: dailyHintCost(hintsPurchased),
       balance: bRows.length ? bRows[0].balance : 0,
     });
   } catch (err) {
-    console.error('[cryptowordle] hint read failed:', err.message);
+    console.error(`[${logTag}] hint read failed:`, err.message);
     res.status(500).json({ error: 'Failed to load hint state' });
   }
-});
+}
 
-// POST /api/cryptowordle/hint — buy the next hint. Atomically bumps today's
-// counter and debits the doubling MATCH cost, mirroring the duel-join spend
-// pattern (SERIALIZABLE + FOR UPDATE). Body may carry { maxHints } (the day's
-// available clue count) so the server refuses to charge past the last clue.
-app.post('/api/cryptowordle/hint', async (req, res) => {
-  const maxHints = Number.isFinite(req.body.maxHints) ? Math.max(0, Math.round(req.body.maxHints)) : null;
+// Shared buy: atomically bump today's per-game counter, debit the doubling
+// MATCH cost, and mirror the spend on-chain via the MATCH ledger. Mirrors the
+// duel-join spend pattern (SERIALIZABLE + FOR UPDATE). Body may carry
+// { maxHints } (the day's available clue/hint cap) so the server refuses to
+// charge past the last one. Returns { hintsPurchased, nextCost, balance,
+// ledgerId, memo } — the ledger fields let the client anchor the spend on-chain.
+async function buyDailyHint(userId, username, gameId, maxHints, res, logTag) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
 
     // Today's hint counter, locked. Upsert-then-lock so the row always exists.
     await client.query(
-      `INSERT INTO cryptowordle_hints (user_id, username, hint_date, hints_purchased)
-       VALUES ($1, $2, (now() AT TIME ZONE 'utc')::date, 0)
-       ON CONFLICT (user_id, hint_date) DO NOTHING`,
-      [req.user.id, req.user.username || null]
+      `INSERT INTO daily_hints (user_id, username, game_id, hint_date, hints_purchased)
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, 0)
+       ON CONFLICT (user_id, game_id, hint_date) DO NOTHING`,
+      [userId, username || null, gameId]
     );
     const { rows: hRows } = await client.query(
-      `SELECT hints_purchased FROM cryptowordle_hints
-        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date
+      `SELECT hints_purchased FROM daily_hints
+        WHERE user_id = $1 AND game_id = $2
+          AND hint_date = (now() AT TIME ZONE 'utc')::date
         FOR UPDATE`,
-      [req.user.id]
+      [userId, gameId]
     );
     const purchased = hRows.length ? hRows[0].hints_purchased : 0;
 
-    // No clues left to reveal (client-known cap) → don't charge.
+    // No hints left to reveal (client-known cap) → don't charge.
     if (maxHints != null && purchased >= maxHints) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ code: 'no_more_hints', error: 'No more clues' });
+      return res.status(409).json({ code: 'no_more_hints', error: 'No more hints' });
     }
 
-    const cost = cwHintCost(purchased);
+    const cost = dailyHintCost(purchased);
 
     // Check + deduct MATCH balance, locked.
     const { rows: balRows } = await client.query(
       `SELECT balance FROM tilematch_tokens WHERE user_id = $1 FOR UPDATE`,
-      [req.user.id]
+      [userId]
     );
     const balance = balRows.length ? balRows[0].balance : 0;
     if (balance < cost) {
       await client.query('ROLLBACK');
       return res.status(409).json({ code: 'insufficient_funds', error: 'Insufficient tokens', balance });
     }
+    const balanceAfter = balance - cost;
     await client.query(
       `INSERT INTO tilematch_tokens (user_id, username, balance)
        VALUES ($1, $2, 0)
        ON CONFLICT (user_id) DO UPDATE SET
          balance    = tilematch_tokens.balance - $3,
          updated_at = now()`,
-      [req.user.id, req.user.username || null, cost]
+      [userId, username || null, cost]
     );
     await client.query(
-      `UPDATE cryptowordle_hints
+      `UPDATE daily_hints
           SET hints_purchased = hints_purchased + 1, updated_at = now()
-        WHERE user_id = $1 AND hint_date = (now() AT TIME ZONE 'utc')::date`,
-      [req.user.id]
+        WHERE user_id = $1 AND game_id = $2
+          AND hint_date = (now() AT TIME ZONE 'utc')::date`,
+      [userId, gameId]
     );
 
-    // Record the spend in the unified MATCH ledger (idempotent per day+amount).
-    const balanceAfter = balance - cost;
-    let receipt = null;
-    try {
-      const { rows: evt } = await client.query(
-        `INSERT INTO match_ledger_events (user_id, kind, game_id, attempt_date, amount, balance_after, anchor_status)
-         VALUES ($1, 'spend_hint', 'cryptowordle', (now() AT TIME ZONE 'utc')::date, $2, $3, 'pending')
-         ON CONFLICT (user_id, attempt_date, amount, kind) WHERE kind = 'spend_hint' DO NOTHING
-         RETURNING id`,
-        [req.user.id, -cost, balanceAfter]
-      );
-      if (evt.length > 0) {
-        const eventId = evt[0].id;
-        const chainHash = matchChainHash({ userId: req.user.id, kind: 'spend_hint', gameId: 'cryptowordle', amount: -cost, eventId });
-        await client.query(`UPDATE match_ledger_events SET chain_hash = $2 WHERE id = $1`, [eventId, chainHash]);
-        receipt = { eventId, chainHash, amount: -cost, anchorStatus: 'pending', balanceAfter };
-      }
-    } catch (ledgerErr) {
-      console.warn('[cryptowordle] hint ledger write failed (non-fatal):', ledgerErr.message);
-    }
+    // Mirror this spend on-chain (best-effort): a pending ledger row + memo the
+    // client anchors via the bridge. Part of the same transaction.
+    const ledger = await recordMatchLedger(client, {
+      userId, username, gameId, action: 'spend', amount: cost, balanceAfter,
+    });
 
     await client.query('COMMIT');
     const hintsPurchased = purchased + 1;
     res.json({
       hintsPurchased,
-      nextCost: cwHintCost(hintsPurchased),
+      nextCost: dailyHintCost(hintsPurchased),
       balance: balanceAfter,
-      receipt,
+      ledgerId: ledger ? ledger.ledgerId : null,
+      memo: ledger ? ledger.memo : null,
     });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch {}
-    console.error('[cryptowordle] hint buy failed:', err.message);
+    console.error(`[${logTag}] hint buy failed:`, err.message);
     res.status(500).json({ error: 'Failed to buy hint' });
   } finally {
     client.release();
   }
+}
+
+// Generic game-keyed routes — the canonical hint API for all daily puzzles.
+app.get('/api/daily/:gameId/hint', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  return readDailyHintState(req.user.id, req.user.username, gameId, res, gameId);
 });
+
+app.post('/api/daily/:gameId/hint', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const maxHints = Number.isFinite(req.body.maxHints) ? Math.max(0, Math.round(req.body.maxHints)) : null;
+  return buyDailyHint(req.user.id, req.user.username, gameId, maxHints, res, gameId);
+});
+
+// Back-compat aliases — the original Crypto Wordle routes, now thin wrappers on
+// the generic game-keyed flow (game_id 'cryptowordle').
+app.get('/api/cryptowordle/hint', async (req, res) => {
+  return readDailyHintState(req.user.id, req.user.username, 'cryptowordle', res, 'cryptowordle');
+});
+app.post('/api/cryptowordle/hint', async (req, res) => {
+  const maxHints = Number.isFinite(req.body.maxHints) ? Math.max(0, Math.round(req.body.maxHints)) : null;
+  return buyDailyHint(req.user.id, req.user.username, 'cryptowordle', maxHints, res, 'cryptowordle');
+});
+
+// ---- MATCH on-chain ledger -----------------------------------------------
+// POST /api/match/ledger/:id/confirm { txHash, mock } — the client reports the
+// result of anchoring a MATCH movement on-chain via the bridge. Records the
+// tx_hash and flips status to 'onchain' (or 'mock'). Ownership-checked,
+// idempotent (no-op once the row is already non-pending), never re-credits.
+app.post('/api/match/ledger/:id/confirm', async (req, res) => {
+  const id = req.params.id;
+  if (!/^\d+$/.test(String(id))) return res.status(400).json({ error: 'Invalid ledger id' });
+  const txHash = typeof req.body.txHash === 'string' ? req.body.txHash : null;
+  const mock = !!req.body.mock || !txHash;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE match_ledger
+          SET tx_hash = $3, status = $4
+        WHERE id = $1 AND user_id = $2 AND status = 'pending'
+        RETURNING id, status, tx_hash`,
+      [id, req.user.id, mock ? null : txHash, mock ? 'mock' : 'onchain']
+    );
+    if (rows.length === 0) {
+      // Either not ours, or already confirmed — return current state idempotently.
+      const { rows: cur } = await pool.query(
+        `SELECT status, tx_hash FROM match_ledger WHERE id = $1 AND user_id = $2`,
+        [id, req.user.id]
+      );
+      if (cur.length === 0) return res.status(404).json({ error: 'No such ledger row' });
+      return res.json({ ok: true, status: cur[0].status, txHash: cur[0].tx_hash });
+    }
+    res.json({ ok: true, status: rows[0].status, txHash: rows[0].tx_hash });
+  } catch (err) {
+    console.error('[match] ledger confirm failed:', err.message);
+    res.status(500).json({ error: 'Failed to confirm ledger' });
+  }
+});
+
+// GET /api/match/ledger — recent MATCH movements for the signed-in user
+// (newest first, capped). Feeds the Wallet "MATCH activity" section.
+app.get('/api/match/ledger', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === 'match') {
+      await seedMatchLedgerDemo(req.user.id, req.user.username);
+    }
+    const { rows } = await pool.query(
+      `SELECT id, game_id, action, amount, balance_after, memo, tx_hash, status, created_at
+         FROM match_ledger
+        WHERE user_id = $1
+        ORDER BY created_at DESC, id DESC
+        LIMIT 20`,
+      [req.user.id]
+    );
+    res.json({
+      entries: rows.map(r => ({
+        id: String(r.id),
+        gameId: r.game_id,
+        action: r.action,
+        amount: r.amount,
+        balanceAfter: r.balance_after,
+        memo: r.memo,
+        txHash: r.tx_hash,
+        status: r.status,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('[match] ledger list failed:', err.message);
+    res.status(500).json({ error: 'Failed to load MATCH activity' });
+  }
+});
+
+// Staging-only: seed a handful of obviously-fake MATCH ledger rows for the
+// viewer so the "MATCH activity" list + explorer links are demonstrable on a
+// fresh staging DB. Idempotent (skips if the viewer already has demo rows).
+async function seedMatchLedgerDemo(userId, username) {
+  if (!IS_STAGING) return;
+  try {
+    const { rows: existing } = await pool.query(
+      `SELECT 1 FROM match_ledger WHERE user_id = $1 AND memo LIKE 'umatch:1:%:demo:%' LIMIT 1`,
+      [userId]
+    );
+    if (existing.length) return;
+    const demo = [
+      { game: 'cryptowordle',      action: 'spend', amount: 1,  bal: 499, status: 'onchain', tx: '0xstagingdemomatch0000000000000000000000000000000000000000000000a1' },
+      { game: 'sudoku',            action: 'spend', amount: 2,  bal: 497, status: 'onchain', tx: '0xstagingdemomatch0000000000000000000000000000000000000000000000b2' },
+      { game: 'tilematchingdaily', action: 'earn',  amount: 200, bal: 697, status: 'onchain', tx: '0xstagingdemomatch0000000000000000000000000000000000000000000000c3' },
+      { game: 'wordhunt',          action: 'spend', amount: 4,  bal: 693, status: 'mock',    tx: null },
+      { game: 'tilematch_pvp',     action: 'earn',  amount: 90, bal: 783, status: 'pending', tx: null },
+    ];
+    for (const d of demo) {
+      const { rows } = await pool.query(
+        `INSERT INTO match_ledger (user_id, username, game_id, action, amount, balance_after, status, tx_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id`,
+        [userId, username || 'staging-demo-user', d.game, d.action, d.amount, d.bal, d.status, d.tx]
+      );
+      const ledgerId = rows[0].id;
+      // Use a 'demo' day segment so the idempotency guard above can find them.
+      const memo = ['umatch', '1', d.action, 'demo', String(d.game),
+                    String(d.amount), String(d.bal), String(ledgerId)].join(':');
+      await pool.query(`UPDATE match_ledger SET memo = $2 WHERE id = $1`, [ledgerId, memo]);
+    }
+  } catch (e) {
+    console.error('[match] demo seed failed:', e.message);
+  }
+}
 
 // ---- dApps integration (app-identity signing) -----------------------------
 // Gated on APP_SECRET_KEY. When the secret is empty/missing (e.g. a staging
@@ -6893,8 +7098,18 @@ app.post('/api/tilematch/tasks/:taskId/claim', async (req, res) => {
        RETURNING balance`,
       [req.user.id, req.user.username || null, def.rewardTokens]
     );
+    // Mirror this earn on-chain (best-effort) so the task reward is auditable.
+    const ledger = await recordMatchLedger(client, {
+      userId: req.user.id, username: req.user.username, gameId: 'tilematching',
+      action: 'earn', amount: def.rewardTokens, balanceAfter: balRows[0].balance,
+    });
     await client.query('COMMIT');
-    res.json({ newBalance: balRows[0].balance, task: { id: taskId, claimed: true } });
+    res.json({
+      newBalance: balRows[0].balance,
+      task: { id: taskId, claimed: true },
+      ledgerId: ledger ? ledger.ledgerId : null,
+      memo: ledger ? ledger.memo : null,
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[tilematch] claim failed:', err.message);
@@ -7056,12 +7271,17 @@ app.get('/api/tilematch/duel/:duelId', async (req, res) => {
             `UPDATE tilematch_duels SET status = 'finished', winner_id = $1, updated_at = now() WHERE id = $2`,
             [winnerId, duelId]
           );
-          await client.query(
+          const { rows: wBal } = await client.query(
             `INSERT INTO tilematch_tokens (user_id, username, balance)
              VALUES ($1, $2, $3)
-             ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+             ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()
+             RETURNING balance`,
             [winnerId, req.user.username || null, prize]
           );
+          await recordMatchLedger(client, {
+            userId: winnerId, username: req.user.username, gameId: 'tilematch_pvp',
+            action: 'earn', amount: prize, balanceAfter: wBal[0].balance,
+          });
           const { rows: updated } = await client.query(`SELECT * FROM tilematch_duels WHERE id = $1`, [duelId]);
           await client.query('COMMIT');
           return res.json({ duel: shapeDuel(updated[0]), inactivityForfeit: true });
@@ -7078,12 +7298,17 @@ app.get('/api/tilematch/duel/:duelId', async (req, res) => {
           [duelId]
         );
         // Refund stake
-        await client.query(
+        const { rows: rBal } = await client.query(
           `INSERT INTO tilematch_tokens (user_id, username, balance)
            VALUES ($1, $2, $3)
-           ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+           ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()
+           RETURNING balance`,
           [req.user.id, req.user.username || null, d.stake_tokens]
         );
+        await recordMatchLedger(client, {
+          userId: req.user.id, username: req.user.username, gameId: 'tilematch_pvp',
+          action: 'earn', amount: d.stake_tokens, balanceAfter: rBal[0].balance,
+        });
         const { rows: updated } = await client.query(`SELECT * FROM tilematch_duels WHERE id = $1`, [duelId]);
         await client.query('COMMIT');
         return res.json({ duel: shapeDuel(updated[0]), timedOut: true });
@@ -7194,12 +7419,18 @@ app.post('/api/tilematch/duel/:duelId/finish', async (req, res) => {
         `UPDATE tilematch_duels SET status = 'finished', winner_id = $1, updated_at = now() WHERE id = $2`,
         [winnerId, duelId]
       );
-      await client.query(
+      const { rows: wBal } = await client.query(
         `INSERT INTO tilematch_tokens (user_id, username, balance)
          VALUES ($1, $2, $3)
-         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()`,
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $3, updated_at = now()
+         RETURNING balance`,
         [winnerId, req.user.username || null, prize]
       );
+      // Mirror the winner's payout on-chain (best-effort).
+      const winLedger = await recordMatchLedger(client, {
+        userId: winnerId, username: req.user.username, gameId: 'tilematch_pvp',
+        action: 'earn', amount: prize, balanceAfter: wBal[0].balance,
+      });
       const { rows: balRows } = await client.query(
         `SELECT balance FROM tilematch_tokens WHERE user_id = $1`, [req.user.id]
       );
@@ -7209,6 +7440,8 @@ app.post('/api/tilematch/duel/:duelId/finish', async (req, res) => {
         isWinner,
         newBalance: isWinner ? (balRows[0]?.balance ?? 0) : undefined,
         prize: { stakeTokens: updated.stake_tokens, pot: updated.stake_tokens * 2, winnerPayout: prize },
+        ledgerId: isWinner && winLedger ? winLedger.ledgerId : null,
+        memo: isWinner && winLedger ? winLedger.memo : null,
       });
     }
 
@@ -7251,24 +7484,35 @@ app.post('/api/tilematch/duel/:duelId/forfeit', async (req, res) => {
     // Credit opponent if there was one (and it's an active duel)
     if (opponentId && d.status === 'active') {
       const prize = Math.floor(d.stake_tokens * 2 * 0.9);
-      await client.query(
+      const { rows: oBal } = await client.query(
         `INSERT INTO tilematch_tokens (user_id, balance)
          VALUES ($1, $2)
-         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()`,
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()
+         RETURNING balance`,
         [opponentId, prize]
       );
+      // Opponent's client anchors this pending earn when it next loads activity.
+      await recordMatchLedger(client, {
+        userId: opponentId, username: null, gameId: 'tilematch_pvp',
+        action: 'earn', amount: prize, balanceAfter: oBal[0].balance,
+      });
     } else if (d.status === 'waiting') {
       // Refund creator if no opponent
       await client.query(
         `UPDATE tilematch_duels SET status = 'cancelled', winner_id = NULL, updated_at = now() WHERE id = $1`,
         [duelId]
       );
-      await client.query(
+      const { rows: rBal } = await client.query(
         `INSERT INTO tilematch_tokens (user_id, balance)
          VALUES ($1, $2)
-         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()`,
+         ON CONFLICT (user_id) DO UPDATE SET balance = tilematch_tokens.balance + $2, updated_at = now()
+         RETURNING balance`,
         [req.user.id, d.stake_tokens]
       );
+      await recordMatchLedger(client, {
+        userId: req.user.id, username: req.user.username, gameId: 'tilematch_pvp',
+        action: 'earn', amount: d.stake_tokens, balanceAfter: rBal[0].balance,
+      });
     }
 
     await client.query('COMMIT');

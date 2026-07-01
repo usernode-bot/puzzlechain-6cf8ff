@@ -4343,6 +4343,76 @@ body {
 }
 .cnl-roll-btn:active:not(:disabled) { transform: scale(0.98); }
 .cnl-roll-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- Pre-launch Game Mode Modal ---- */
+.gm-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(8, 10, 18, 0.72); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  animation: gmFade 0.18s ease-out;
+}
+@keyframes gmFade { from { opacity: 0; } to { opacity: 1; } }
+.gm-modal {
+  position: relative; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto;
+  background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.gm-modal-close {
+  position: absolute; top: 0.75rem; right: 0.75rem; width: 2rem; height: 2rem;
+  border: none; border-radius: 50%; background: ${C.bg}; color: ${C.muted};
+  font-size: 1rem; cursor: pointer;
+}
+.gm-modal-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem; }
+.gm-modal-icon { font-size: 2.4rem; }
+.gm-modal-title { font-size: 1.3rem; font-weight: 700; }
+.gm-modal-desc { font-size: 0.82rem; color: ${C.muted}; margin-top: 0.15rem; }
+.gm-modal-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: ${C.muted}; margin-bottom: 0.5rem; }
+.gm-modes { display: flex; flex-direction: column; gap: 0.6rem; }
+.gm-mode-btn {
+  display: flex; align-items: center; gap: 0.8rem; text-align: left;
+  padding: 0.8rem 0.9rem; border-radius: 12px; cursor: pointer;
+  background: ${C.bg}; border: 2px solid ${C.border}; color: ${C.text};
+  transition: border-color 0.15s, transform 0.1s;
+}
+.gm-mode-btn:active { transform: scale(0.99); }
+.gm-mode-btn.active { border-color: var(--accent, ${C.accent}); background: ${C.bg}; }
+.gm-mode-icon { font-size: 1.6rem; }
+.gm-mode-text { display: flex; flex-direction: column; }
+.gm-mode-name { font-weight: 700; font-size: 0.95rem; }
+.gm-mode-desc { font-size: 0.78rem; color: ${C.muted}; }
+.gm-online { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.gm-online-actions { display: flex; gap: 0.5rem; }
+.gm-online-hint { font-size: 0.76rem; color: ${C.muted}; }
+.gm-play-btn {
+  width: 100%; margin-top: 1rem; padding: 0.8rem; border: none; border-radius: 12px;
+  background: var(--accent, ${C.accent}); color: #fff; font-weight: 700; font-size: 1rem;
+  cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+}
+.gm-play-btn:disabled { opacity: 0.4; cursor: default; }
+.gm-link-btn { background: none; border: none; color: ${C.muted}; cursor: pointer; margin-top: 0.6rem; text-decoration: underline; font-size: 0.82rem; }
+.gm-modal-lb { margin-top: 1.1rem; border-top: 1px solid ${C.border}; padding-top: 0.8rem; }
+
+/* ---- Online race common ---- */
+.gm-race-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 2rem 1rem; min-height: 50vh; }
+.gm-race-title { font-size: 1.3rem; font-weight: 700; }
+.gm-race-sub { font-size: 0.9rem; color: ${C.muted}; }
+.gm-race-code { font-size: 0.85rem; color: ${C.text}; }
+.gm-countdown { font-size: 4rem; font-weight: 800; color: ${C.accent}; font-family: 'JetBrains Mono', monospace; }
+.gm-opp-chip { display: inline-block; margin: 0.4rem auto; padding: 0.35rem 0.7rem; background: ${C.bg}; border: 1px solid ${C.border}; border-radius: 999px; font-size: 0.82rem; }
+.gm-race-scores { display: flex; gap: 1.5rem; margin: 0.6rem 0; }
+.gm-race-scores > div { display: flex; flex-direction: column; gap: 0.2rem; }
+.gm-race-scores span { font-size: 0.75rem; color: ${C.muted}; }
+.gm-race-scores b { font-size: 1.6rem; font-family: 'JetBrains Mono', monospace; color: ${C.gold}; }
+.snake-lb { display: flex; flex-direction: column; gap: 0.2rem; }
+
+/* ---- Hash Rush ---- */
+.hr-wrap { position: relative; width: 100%; height: 62vh; max-height: 560px; border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, #0c1020, #131a30); border: 1px solid ${C.border}; }
+.hr-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hr-boost-badge { position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%); background: rgba(34,211,238,0.18); border: 1px solid #22d3ee; color: #67e8f9; padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+.hr-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,10,18,0.6); text-align: center; padding: 1rem; }
+.hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
+.hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
+.hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
 `;
 
 /* ============================================================
@@ -4730,9 +4800,10 @@ function useClassicRoom(gameId, roomId) {
 
 // Per-mode display metadata for the inline mode picker.
 const CLASSIC_MODE_META = {
+  solo:   { icon: '🎯', name: 'Classic Solo',      desc: 'Play solo and chase your best score' },
   bot:    { icon: '🤖', name: 'Versus Bot',        desc: 'Play against the computer' },
   '2p':   { icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
-  online: { icon: '🌐', name: 'Online Multiplayer', desc: 'Play a friend via room code' },
+  online: { icon: '🌐', name: 'Online Race',       desc: 'Race a friend via room code — highest score wins' },
 };
 
 // Inline mode picker shown by the Game Menu's "New Game" for games that route
@@ -4795,6 +4866,96 @@ function ClassicModePicker({ game, onPlay }) {
       )}
       {error && <div className="mnc-join-error">{error}</div>}
       {mode && <button className="mnc-mode-start-btn" onClick={handlePlay} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
+    </div>
+  );
+}
+
+// Unified pre-launch mode-selection modal for multi-mode classic games
+// (today: 2048 + Block Blast, modes ['solo','online']). Shows the game's
+// modes, an Online create/join sub-panel, and — for games with a global
+// leaderboard — a "Top players" preview. Calls onStart(mode, opts) to launch.
+function GameModeModal({ game, onStart, onClose }) {
+  const [mode, setMode] = useState(null);
+  const [onlineAction, setOnlineAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const modes = game.modes || [];
+
+  const handlePlay = async () => {
+    if (!mode || busy) return;
+    if (mode !== 'online') { onStart(mode, {}); return; }
+    if (onlineAction === 'create') {
+      setBusy(true);
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onStart('online', { roomAction: 'create', roomId: body.id });
+      else setError('Could not create room. Try again.');
+    } else if (onlineAction === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api(`/api/classic/${game.id}/rooms/${code}/join`, { method: 'POST' });
+      setBusy(false);
+      if (ok) onStart('online', { roomAction: 'join', roomId: code });
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  const canStart = mode && (mode !== 'online' || onlineAction === 'create' || (onlineAction === 'join' && joinCode.trim().length >= 4));
+
+  return (
+    <div className="gm-modal-backdrop" onClick={onClose}>
+      <div className="gm-modal" onClick={e => e.stopPropagation()} style={{ '--accent': game.tagColor || C.accent }}>
+        <button className="gm-modal-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="gm-modal-head">
+          <span className="gm-modal-icon">{game.icon}</span>
+          <div>
+            <div className="gm-modal-title">{game.name}</div>
+            <div className="gm-modal-desc">{game.desc}</div>
+          </div>
+        </div>
+        <div className="gm-modal-label">Choose a mode</div>
+        <div className="gm-modes">
+          {modes.map(m => {
+            const meta = CLASSIC_MODE_META[m] || { icon: '🎮', name: m, desc: '' };
+            return (
+              <button key={m} className={'gm-mode-btn' + (mode === m ? ' active' : '')}
+                onClick={() => { setMode(m); setOnlineAction(null); setError(''); }}>
+                <span className="gm-mode-icon">{meta.icon}</span>
+                <span className="gm-mode-text">
+                  <span className="gm-mode-name">{meta.name}</span>
+                  <span className="gm-mode-desc">{meta.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {mode === 'online' && (
+          <div className="gm-online">
+            <div className="gm-online-actions">
+              <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')} onClick={() => { setOnlineAction('create'); setError(''); }}>Create Room</button>
+              <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')} onClick={() => { setOnlineAction('join'); setError(''); }}>Join Room</button>
+            </div>
+            {onlineAction === 'join' && (
+              <input className="mnc-join-input" placeholder="Room code (e.g. AB3K7P)" value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
+            )}
+            {onlineAction === 'create' && (
+              <div className="gm-online-hint">A room code will be generated — share it with a friend, then they pick Join Room.</div>
+            )}
+          </div>
+        )}
+        {error && <div className="mnc-join-error">{error}</div>}
+        <button className="gm-play-btn" onClick={handlePlay} disabled={!canStart || busy}>
+          {busy ? 'Please wait…' : 'Play'}
+        </button>
+        {game.leaderboard && (
+          <div className="gm-modal-lb"><ClassicLeaderboard gameId={game.id} /></div>
+        )}
+      </div>
     </div>
   );
 }
@@ -4973,6 +5134,208 @@ function cgRulesSection(items) {
     id: 'rules', label: 'How to play',
     render: () => <div><h4>How to play</h4><ul className="cg-rules">{items.map((t, i) => <li key={i}>{t}</li>)}</ul></div>,
   };
+}
+
+// Submit a finished classic-game run to the global leaderboard. Best-effort:
+// a network failure never blocks gameplay. `extra` is optional game-specific
+// stats (e.g. { bestTimeSecs, bestLevel }). Returns the server's
+// { bestScore, rank, gamesPlayed } or null.
+async function submitClassicScore(gameId, score, extra) {
+  try {
+    const { ok, body } = await api(`/api/classic/${gameId}/score`, {
+      method: 'POST',
+      body: JSON.stringify({ score: Math.max(0, Math.round(score || 0)), extra: extra || undefined }),
+    });
+    return ok ? body : null;
+  } catch { return null; }
+}
+
+// Reusable global leaderboard for the score-based classic games. Lazily fetches
+// /api/classic/:gameId/leaderboard, highlights the caller, and pins their row
+// when outside the top N. `valueFmt` formats a row's headline number.
+function ClassicLeaderboard({ gameId, url, valueLabel = 'Score', valueFmt }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const fmt = valueFmt || ((r) => `${r.bestScore} pts`);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setError(false);
+    api(url || `/api/classic/${gameId}/leaderboard`).then(({ ok, body }) => {
+      if (cancelled) return;
+      if (ok && body) setData(body); else setError(true);
+      setLoading(false);
+    }).catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [gameId]);
+
+  if (loading) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Loading…</div></div>;
+  if (error) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Couldn't load leaderboard.</div></div>;
+  const entries = (data && data.entries) || [];
+  const me = data && data.me;
+  const meInTop = me && entries.some(e => e.rank === me.rank);
+  if (entries.length === 0) {
+    return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">No scores yet — play to rank!</div></div>;
+  }
+  return (
+    <div>
+      <h4>Leaderboard <span style={{ color: C.muted, fontWeight: 400, fontSize: '0.78rem' }}>· {valueLabel}</span></h4>
+      <div className="snake-lb">
+        {entries.map(r => (
+          <div key={r.rank} className={'snake-lb-row' + (me && r.rank === me.rank ? ' snake-lb-me' : '')}>
+            <div className="snake-lb-rank">#{r.rank}</div>
+            <div className="snake-lb-name">{r.username}{me && r.rank === me.rank ? ' (you)' : ''}</div>
+            <div className="snake-lb-score">{fmt(r)}</div>
+          </div>
+        ))}
+        {me && !meInTop && (
+          <div className="snake-lb-row snake-lb-me" style={{ marginTop: '0.4rem' }}>
+            <div className="snake-lb-rank">#{me.rank}</div>
+            <div className="snake-lb-name">{me.username || 'you'} (you)</div>
+            <div className="snake-lb-score">{fmt(me)}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Sheet-section builder so any ClassicShell game can add a Leaderboard tab.
+function cgLeaderboardSection(gameId, opts) {
+  return {
+    id: 'leaderboard', label: 'Leaderboard',
+    render: () => <ClassicLeaderboard gameId={gameId} url={opts && opts.url} valueLabel={(opts && opts.valueLabel) || 'Score'} valueFmt={opts && opts.valueFmt} />,
+  };
+}
+
+// Generic online-race host for score-based classic games (2048, Block Blast).
+// Each player plays their OWN board; whoever posts the higher final score wins.
+// Lifecycle: waiting → countdown → playing → submitted → result. `renderBoard`
+// is a render-prop that gets { onEnd(score) } and renders the solo board,
+// calling onEnd exactly once when that board's game ends.
+function ClassicRaceGame({ game, roomId, myPlayerNum, renderBoard, onExitLobby }) {
+  const { room, pollingError } = useClassicRoom(game.id, roomId);
+  const [phase, setPhase] = useState('waiting');
+  const [count, setCount] = useState(3);
+  const [myScore, setMyScore] = useState(null);
+  const [canClaim, setCanClaim] = useState(false);
+  const submittedRef = useRef(false);
+
+  const oppScore = room ? (myPlayerNum === 1 ? room.p2Score : room.p1Score) : null;
+  const oppName = room ? (myPlayerNum === 1 ? room.player2Name : room.player1Name) : null;
+
+  // Start the countdown once both players are present and the room is active.
+  useEffect(() => {
+    if (phase === 'waiting' && room && room.status === 'active' && room.player2Id) {
+      setPhase('countdown');
+    }
+    if (room && room.status === 'finished' && submittedRef.current && phase === 'submitted') {
+      setPhase('result');
+    }
+  }, [room && room.status, room && room.player2Id]);
+
+  // 3-2-1-Go countdown.
+  useEffect(() => {
+    if (phase !== 'countdown') return;
+    setCount(3);
+    let n = 3;
+    const id = setInterval(() => {
+      n -= 1;
+      if (n <= 0) { clearInterval(id); setPhase('playing'); }
+      else setCount(n);
+    }, 900);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  // Allow claiming the win if the opponent stalls 60s after I've finished.
+  useEffect(() => {
+    if (phase !== 'submitted') return;
+    const id = setTimeout(() => setCanClaim(true), 60000);
+    return () => clearTimeout(id);
+  }, [phase]);
+
+  const handleEnd = async (score) => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setMyScore(score);
+    setPhase('submitted');
+    submitClassicScore(game.id, score); // also count toward global leaderboard
+    try {
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms/${roomId}/score`, {
+        method: 'POST', body: JSON.stringify({ score }),
+      });
+      if (ok && body && body.status === 'finished') setPhase('result');
+    } catch {}
+  };
+
+  const claimWin = async () => {
+    await api(`/api/classic/${game.id}/rooms/${roomId}/finish`, {
+      method: 'POST', body: JSON.stringify({ winner: String(myPlayerNum) }),
+    }).catch(() => {});
+    setPhase('result');
+  };
+
+  if (pollingError === 'room_not_found') {
+    return <div className="cg-stage" style={{ textAlign: 'center', padding: '2rem', color: C.rose }}>Room not found.</div>;
+  }
+
+  if (phase === 'waiting') {
+    return (
+      <div className="cg-stage gm-race-center">
+        <div className="mnc-spinner" />
+        <div className="gm-race-title">Online Race</div>
+        <div className="gm-race-sub">Waiting for opponent to join…</div>
+        {room && (
+          <div className="gm-race-code">Room code: <b>{room.id}</b></div>
+        )}
+        <button className="gm-play-btn" style={{ maxWidth: 220 }} onClick={onExitLobby}>Cancel</button>
+      </div>
+    );
+  }
+  if (phase === 'countdown') {
+    return (
+      <div className="cg-stage gm-race-center">
+        <div className="gm-race-title">Get ready!</div>
+        <div className="gm-countdown">{count}</div>
+        <div className="gm-race-sub">Race to the highest score</div>
+      </div>
+    );
+  }
+  if (phase === 'playing') {
+    return (
+      <div className="cg-stage cg-scroll">
+        <div className="gm-opp-chip">🆚 {oppName || 'Opponent'}: <b>{oppScore != null ? oppScore : '…'}</b></div>
+        {renderBoard({ onEnd: handleEnd })}
+      </div>
+    );
+  }
+  if (phase === 'submitted') {
+    return (
+      <div className="cg-stage gm-race-center">
+        <div className="mnc-spinner" />
+        <div className="gm-race-title">Your score: {myScore}</div>
+        <div className="gm-race-sub">Waiting for {oppName || 'opponent'} to finish…</div>
+        <div className="gm-race-code">Their score so far: <b>{oppScore != null ? oppScore : '—'}</b></div>
+        {canClaim && <button className="gm-play-btn" style={{ maxWidth: 260 }} onClick={claimWin}>Opponent stalled — claim win</button>}
+        <button className="gm-link-btn" onClick={onExitLobby}>Leave race</button>
+      </div>
+    );
+  }
+  // result
+  const youWin = room && room.winner === String(myPlayerNum);
+  const mine = room ? (myPlayerNum === 1 ? room.p1Score : room.p2Score) : myScore;
+  const theirs = room ? (myPlayerNum === 1 ? room.p2Score : room.p1Score) : oppScore;
+  return (
+    <div className="cg-stage gm-race-center">
+      <div style={{ fontSize: '2.4rem' }}>{youWin ? '🏆' : '🤝'}</div>
+      <div className="gm-race-title">{youWin ? 'You win!' : (mine === theirs ? 'Draw' : 'Opponent wins')}</div>
+      <div className="gm-race-scores">
+        <div><span>You</span><b>{mine != null ? mine : '—'}</b></div>
+        <div><span>{oppName || 'Opponent'}</span><b>{theirs != null ? theirs : '—'}</b></div>
+      </div>
+      <button className="gm-play-btn" style={{ maxWidth: 220 }} onClick={onExitLobby}>Back to lobby</button>
+    </div>
+  );
 }
 
 /* ============================================================
@@ -7264,6 +7627,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
       const shareText = `Minesweeper ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secs}s · +${baseScore} pts`;
+      submitClassicScore('minesweeper', baseScore, { safeRevealed: newSafeRevealed, timeSecs: secs });
       onWin(baseScore, newSteps, secs, { share: shareText, cashOut: false });
     }
   };
@@ -7283,6 +7647,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     msSaveEntry(entry);
     setGameHistory(msLoadHistory());
     const shareText = `Minesweeper ${dateStr} — 💰×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
+    submitClassicScore('minesweeper', finalScore, { safeRevealed, timeSecs: secs });
     onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
   };
 
@@ -7416,22 +7781,8 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       )}
 
       {activeTab === 'leaderboard' && (
-        <div>
-          {isMock && <div className="ms-dev-label">Local leaderboard — dev mode</div>}
-          {gameHistory.length === 0
-            ? <div className="ms-empty-state">No games recorded yet</div>
-            : gameHistory
-                .filter(h => h.outcome === 'win')
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 10)
-                .map((h, i) => (
-                  <div key={h.id} className="ms-leaderboard-row">
-                    <span className="ms-rank">#{i + 1}</span>
-                    <span style={{ flex: 1, fontWeight: 600 }}>You</span>
-                    <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
-                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtDate(h.date)}</span>
-                  </div>
-                ))}
+        <div style={{ padding: '0.25rem' }}>
+          <ClassicLeaderboard gameId="minesweeper" />
         </div>
       )}
 
@@ -9760,8 +10111,9 @@ function t2048SaveBest(v) {
 /* ============================================================
    T2048Game component
    ============================================================ */
-function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
-  const _saved = t2048LoadSavedBoard();
+function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
+  const raceMode = !!onRaceEnd;
+  const _saved = raceMode ? null : t2048LoadSavedBoard();
 
   const [grid, setGrid]               = useState(() => _saved ? _saved.grid : t2048_initGrid());
   const [score, setScore]             = useState(() => _saved ? _saved.score || 0 : 0);
@@ -9896,6 +10248,8 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
       };
       t2048SaveEntry(entry);
       t2048ClearBoard();
+      if (onRaceEnd) { onRaceEnd(newScore); return; }
+      submitClassicScore('2048', newScore, { highTile: maxT });
       onLose && onLose(newMoves, elapsedSecs, {
         share: t2048_toShareText(newScore, newMoves, elapsedSecs, maxT),
         answer: String(maxT),
@@ -9928,6 +10282,8 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
       highTile: maxT,
     });
     t2048ClearBoard();
+    if (onRaceEnd) { onRaceEnd(score); return; }
+    submitClassicScore('2048', score, { highTile: maxT });
     onWin && onWin(score, moves, elapsedSecs, {
       share: t2048_toShareText(score, moves, elapsedSecs, maxT),
     });
@@ -10047,6 +10403,12 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
+      {activeTab === 'leaderboard' && (
+        <div style={{ padding: '0.5rem 0.25rem' }}>
+          <ClassicLeaderboard gameId="2048" />
+        </div>
+      )}
+
       {activeTab === 'history' && (
         <div>
           <div className="t2048-history-list">
@@ -10106,19 +10468,40 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
-      <div className="t2048-bottom-nav">
-        {['game', 'history', 'stats'].map(tab => (
-          <button
-            key={tab}
-            className={'t2048-tab' + (activeTab === tab ? ' active' : '')}
-            onClick={() => { setActiveTab(tab); if (tab !== 'game') setHistory(t2048LoadHistory()); }}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
+      {!raceMode && (
+        <div className="t2048-bottom-nav">
+          {['game', 'leaderboard', 'history', 'stats'].map(tab => (
+            <button
+              key={tab}
+              className={'t2048-tab' + (activeTab === tab ? ' active' : '')}
+              onClick={() => { setActiveTab(tab); if (tab !== 'game') setHistory(t2048LoadHistory()); }}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+// 2048 entry: solo board, or the online-race host when launched via the mode
+// modal in Online Race mode.
+function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOpts, onBack }) {
+  if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
+    return (
+      <ClassicRaceGame
+        game={{ id: '2048', name: '2048', icon: '🔢', tagColor: C.emerald }}
+        roomId={gameModeOpts.roomId}
+        myPlayerNum={gameModeOpts.roomAction === 'join' ? 2 : 1}
+        onExitLobby={() => onBack && onBack()}
+        renderBoard={({ onEnd }) => (
+          <T2048Solo onRaceEnd={onEnd} onStepChange={onStepChange} resetKey={resetKey} />
+        )}
+      />
+    );
+  }
+  return <T2048Solo onWin={onWin} onLose={onLose} onStepChange={onStepChange} resetKey={resetKey} />;
 }
 
 /* ============================================================
@@ -10225,6 +10608,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
     cgSound('lose'); cgHaptic([20, 40, 20]);
     const sc = st.current.eaten * 10;
     cgSaveHistory(SNAKE_KEY, { score: sc, len: st.current.snake.length, ts: Date.now() });
+    api('/api/snake/score', { method: 'POST', body: JSON.stringify({ score: sc, length: st.current.snake.length, timeSecs: secsRef.current }) }).catch(() => {});
     const hist = cgLoadHistory(SNAKE_KEY);
     const bestScore = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
     const longestSnake = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
@@ -10306,6 +10690,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
       { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
     ]),
+    cgLeaderboardSection('snake', { url: '/api/snake/leaderboard' }),
     cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
@@ -10397,7 +10782,12 @@ function bbCanPlaceAny(grid, tray) {
   }
   return false;
 }
-function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
+// Block Blast board (no ClassicShell) — shared by solo + online race. On
+// game-over it calls onEnd(score, placed, secs); the parent decides what to do
+// (solo submits the global score + shows the overlay; the race host posts to
+// the room). The board itself never touches scoring endpoints.
+function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
+  const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
   const [tray, setTray] = useState(() => [bbRandPiece(), bbRandPiece(), bbRandPiece()]);
   const [score, setScore] = useState(0);
@@ -10470,7 +10860,7 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
         cgSound('lose'); cgHaptic([20, 40]);
         const sc = scoreRef.current;
         cgSaveHistory(BB_KEY, { score: sc, lines: linesRef.current, ts: Date.now() });
-        onWin(sc, placedRef.current, secsRef.current, { winnerLabel: 'Game Over', share: `🧱 Block Blast — ${sc} pts` });
+        onEndRef.current && onEndRef.current(sc, placedRef.current, secsRef.current);
       }
     }, 0);
   };
@@ -10507,46 +10897,34 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
       drag.cells.forEach(([r, c]) => { preview[(o.or + r) * 8 + (o.oc + c)] = ok ? 'preview' : 'invalid'; });
     }
   }
-  const hist = cgLoadHistory(BB_KEY);
-  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
-  const sheet = [
-    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.lines} lines</span></>),
-    cgStatsSection([
-      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
-      { val: linesRef.current, lbl: 'Lines (run)' }, { val: score, lbl: 'This run' },
-    ]),
-    cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
-  ];
   return (
-    <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
-      <div className="cg-stage">
-        <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="bb-grid" ref={gridRef}>
-          {grid.map((cell, i) => {
-            const pv = preview && preview[i];
-            return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
-              style={cell ? { background: cell } : undefined} />;
-          })}
-        </div>
-        <div className="bb-tray">
-          {tray.map((p, idx) => (
-            <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
-              style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
-              onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
-              {p && (() => {
-                const maxR = Math.max(...p.cells.map(c => c[0]));
-                const maxC = Math.max(...p.cells.map(c => c[1]));
-                const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
-                const out = [];
-                for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
-                  const on = set.has(r * 10 + c);
-                  out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
-                }
-                return out;
-              })()}
-            </div>
-          ))}
-        </div>
+    <>
+      <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
+      <div className="bb-grid" ref={gridRef}>
+        {grid.map((cell, i) => {
+          const pv = preview && preview[i];
+          return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
+            style={cell ? { background: cell } : undefined} />;
+        })}
+      </div>
+      <div className="bb-tray">
+        {tray.map((p, idx) => (
+          <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
+            style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
+            onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
+            {p && (() => {
+              const maxR = Math.max(...p.cells.map(c => c[0]));
+              const maxC = Math.max(...p.cells.map(c => c[1]));
+              const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
+              const out = [];
+              for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
+                const on = set.has(r * 10 + c);
+                out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
+              }
+              return out;
+            })()}
+          </div>
+        ))}
       </div>
       {drag && (
         <div className="bb-drag-ghost" style={{
@@ -10567,6 +10945,52 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
           })()}
         </div>
       )}
+    </>
+  );
+}
+
+// Block Blast entry — solo (own board + leaderboard sheet) or the online-race
+// host. Both wrap the shared BlockBlastBoard in the standard ClassicShell.
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, gameMode, gameModeOpts }) {
+  const [nkey, setNkey] = useState(0);
+  const boardKey = `${resetKey || 0}:${nkey}`;
+  const hist = cgLoadHistory(BB_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const sheet = [
+    cgLeaderboardSection('blockblast'),
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.lines} lines</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Games' },
+    ]),
+    cgRulesSection(['Drag a block from the tray onto the grid.', 'Fill a full row or column to clear it and score.', 'Clear several lines at once for bonus points.', 'Game ends when none of the three pieces fit.']),
+  ];
+
+  if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
+    return (
+      <ClassicShell game={game} onExit={onBack} sheetSections={[cgLeaderboardSection('blockblast')]} menuConfig={menuConfig}>
+        <ClassicRaceGame
+          game={game}
+          roomId={gameModeOpts.roomId}
+          myPlayerNum={gameModeOpts.roomAction === 'join' ? 2 : 1}
+          onExitLobby={() => onBack && onBack()}
+          renderBoard={({ onEnd }) => <BlockBlastBoard onStepChange={onStepChange} resetKey={boardKey} onEnd={(sc) => onEnd(sc)} />}
+        />
+      </ClassicShell>
+    );
+  }
+
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => setNkey(k => k + 1)} sheetSections={sheet} menuConfig={menuConfig}>
+      <div className="cg-stage">
+        <BlockBlastBoard
+          onStepChange={onStepChange}
+          resetKey={boardKey}
+          onEnd={(sc, placed, secs) => {
+            submitClassicScore('blockblast', sc);
+            onWin(sc, placed, secs, { winnerLabel: 'Game Over', share: `🧱 Block Blast — ${sc} pts` });
+          }}
+        />
+      </div>
     </ClassicShell>
   );
 }
@@ -10775,6 +11199,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     doneRef.current = true; setDone(true);
     cgSound(win ? 'win' : 'lose'); cgHaptic(win ? [15, 30, 15] : [20, 40]);
     cgSaveHistory(DR_KEY, { score: sc, win, cascade: bestCascadeRef.current, bestCombo: bestComboRef.current, ts: Date.now() });
+    submitClassicScore('diamondrush', sc, { level: 1, movesUsed: START_MOVES - mv, targetReached: win ? 1 : 0 });
     setCombo(0);
     if (win) {
       if (bestCascadeRef.current >= 3) grantPowerUp('shuffle');
@@ -10869,6 +11294,7 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Rounds won' },
       { val: bigC, lbl: 'Best cascade' }, { val: bestCombo, lbl: 'Best combo' },
     ]),
+    cgLeaderboardSection('diamondrush'),
     cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
@@ -13601,6 +14027,7 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
       setLastWinId(entryId);
       setVisited(v); setCurrentPos(idx); setMoves(m); setUndoStack(newUndoStack); setDone(true);
       onStepChange(m);
+      submitClassicScore('knights-tour', score, { timeSecs: finalSecs, moves: m });
       onWin(score, 64, finalSecs);
     } else {
       setVisited(v); setCurrentPos(idx); setMoves(m); setUndoStack(newUndoStack);
@@ -13716,8 +14143,14 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
         </div>
       )}
 
+      {activeTab === 'leaderboard' && (
+        <div style={{ padding: '0.25rem' }}>
+          <ClassicLeaderboard gameId="knights-tour" valueFmt={(r) => `${r.bestScore} pts`} />
+        </div>
+      )}
+
       <div className="kt-bottom-nav">
-        {['game', 'history'].map(tab => (
+        {['game', 'leaderboard', 'history'].map(tab => (
           <button
             key={tab}
             className={'kt-tab' + (activeTab === tab ? ' active' : '')}
@@ -17355,6 +17788,8 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
   );
 }
 
+const CNL_STREAK_KEY = 'puzzlechain_cnl_streak';
+
 // Chutes & Ladders wrapper — picks a mode (2P / Versus Bot / Online) and
 // delegates. Honors the Game Menu's gameMode/gameModeOpts props.
 function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
@@ -17364,6 +17799,17 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   const [resumeState, setResumeState] = useState(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const { loadState, clearState } = useClassicSave('chutes-ladders');
+
+  // Intercept onWin to track win streak in localStorage and submit to the server.
+  // playerWon: meta.winner===1 for local/bot (player 1 = the human); score>0 for online.
+  const handleWin = (score, steps, secs, meta) => {
+    const playerWon = meta && meta.winner !== undefined ? meta.winner === 1 : score > 0;
+    const prevStreak = parseInt(localStorage.getItem(CNL_STREAK_KEY) || '0', 10);
+    const newStreak = playerWon ? prevStreak + 1 : 0;
+    try { localStorage.setItem(CNL_STREAK_KEY, String(newStreak)); } catch (e) {}
+    submitClassicScore('chutes-ladders', newStreak, { mode: mode || 'bot' });
+    onWin(score, steps, secs, meta);
+  };
 
   // Sync mode from the Game Menu's New Game selection.
   useEffect(() => {
@@ -17395,14 +17841,14 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
     }} />;
   }
   if (mode === 'online') {
-    return <ChutesLaddersOnlineGame onWin={onWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
+    return <ChutesLaddersOnlineGame onWin={handleWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
   }
   if (mode === 'bot' && !resumeChecked) {
     return <div style={{ textAlign: 'center', padding: '2rem', color: C.muted }}>Loading…</div>;
   }
   return (
     <ChutesLaddersLocalGame
-      onWin={onWin}
+      onWin={handleWin}
       onStepChange={onStepChange}
       resetKey={resetKey}
       vsBot={mode === 'bot'}
@@ -17425,6 +17871,279 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
 //   daily — true only for category 'daily' games: the single gate for the
 //           per-day start/lock/finish/streak/resume machinery.
 //   category — lobby tab grouping (maps 1:1 to the tabs).
+
+/* ============================================================
+   Hash Rush — crypto-themed lane dodger (self-shell canvas game)
+   ============================================================ */
+const HR_HISTORY_KEY = 'puzzlechain_hashrush_history';
+const HR_LANES = 3;
+const HR_START_SPEED = 150;     // px/s downward
+const HR_SPEED_STEP = 28;       // +px/s every ramp
+const HR_RAMP_SECS = 30;        // ramp every N seconds
+const HR_MAX_SPEED = HR_START_SPEED * 3;
+const HR_TOKEN_SCORE = 10;
+const HR_BOOST_MULT = 2;
+const HR_BOOST_SECS = 5;
+const HR_LIVES = 3;
+
+function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
+  const [phase, setPhase] = useState('idle'); // idle | playing | dead
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(HR_LIVES);
+  const [mult, setMult] = useState(1);
+  const [boostLeft, setBoostLeft] = useState(0);
+  const [finalRank, setFinalRank] = useState(null);
+
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const lastTsRef = useRef(0);
+  const stateRef = useRef(null);
+  const submittedRef = useRef(false);
+  const onWinRef = useRef(onWin); onWinRef.current = onWin;
+  const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
+
+  const fresh = () => ({
+    lane: 1, objs: [], elapsed: 0, score: 0, lives: HR_LIVES, tokens: 0,
+    speed: HR_START_SPEED, boost: 0, spawnT: 0, spawnEvery: 0.85, dead: false,
+  });
+
+  const reset = () => {
+    stateRef.current = fresh();
+    setScore(0); setLives(HR_LIVES); setMult(1); setBoostLeft(0); setFinalRank(null);
+    submittedRef.current = false;
+  };
+
+  useEffect(() => { reset(); setPhase('idle'); }, [resetKey]);
+
+  // Lane shift (-1 left, +1 right).
+  const shift = (dir) => {
+    const s = stateRef.current; if (!s || s.dead) return;
+    s.lane = Math.max(0, Math.min(HR_LANES - 1, s.lane + dir));
+    cgSound('move');
+  };
+
+  // Input: tap halves, swipe, arrow keys.
+  useEffect(() => {
+    const el = canvasRef.current; if (!el) return;
+    const onPointer = (e) => {
+      if (phase === 'idle') { startGame(); return; }
+      const rect = el.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      shift(x < rect.width / 2 ? -1 : 1);
+    };
+    el.addEventListener('pointerdown', onPointer);
+    return () => el.removeEventListener('pointerdown', onPointer);
+  }, [phase]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); shift(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); shift(1); }
+      else if ((e.key === ' ' || e.key === 'Enter') && phase === 'idle') { e.preventDefault(); startGame(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase]);
+
+  const endGame = () => {
+    const s = stateRef.current; if (!s) return;
+    s.dead = true;
+    setPhase('dead');
+    cgSound('lose'); cgHaptic([20, 40, 20]);
+    const finalScore = Math.round(s.score);
+    cgSaveHistory(HR_HISTORY_KEY, { score: finalScore, tokens: s.tokens, secs: Math.round(s.elapsed), ts: Date.now() });
+    if (!submittedRef.current) {
+      submittedRef.current = true;
+      submitClassicScore('hashrush', finalScore, { tokens: s.tokens, timeSecs: Math.round(s.elapsed) })
+        .then(r => { if (r && r.rank) setFinalRank(r.rank); });
+      onWinRef.current(finalScore, s.tokens, Math.round(s.elapsed), {
+        winnerLabel: 'Game Over', share: `⛏️ Hash Rush — ${finalScore} pts, ${s.tokens} hashes mined`,
+      });
+    }
+  };
+
+  const startGame = () => {
+    reset();
+    setPhase('playing');
+    cgSound('click');
+  };
+
+  // Main loop.
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let running = true;
+    lastTsRef.current = 0;
+
+    const sizeCanvas = () => {
+      const wrap = wrapRef.current; if (!wrap) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = wrap.clientWidth, h = wrap.clientHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    sizeCanvas();
+    window.addEventListener('resize', sizeCanvas);
+
+    const spawn = (s, W) => {
+      const lane = Math.floor(Math.random() * HR_LANES);
+      const roll = Math.random();
+      let type = 'token';
+      if (roll < 0.30) type = 'block';
+      else if (roll < 0.42) type = 'boost';
+      s.objs.push({ lane, y: -30, type });
+    };
+
+    const step = (s, dt, W, H) => {
+      s.elapsed += dt;
+      s.speed = Math.min(HR_MAX_SPEED, HR_START_SPEED + Math.floor(s.elapsed / HR_RAMP_SECS) * HR_SPEED_STEP);
+      if (s.boost > 0) { s.boost = Math.max(0, s.boost - dt); }
+      s.spawnT += dt;
+      const every = Math.max(0.45, s.spawnEvery - s.elapsed * 0.004);
+      if (s.spawnT >= every) { s.spawnT = 0; spawn(s, W); }
+
+      const minerY = H * 0.82;
+      const laneW = W / HR_LANES;
+      for (const o of s.objs) {
+        o.y += s.speed * dt;
+        if (o.hit) continue;
+        // collision band around the miner
+        if (o.lane === s.lane && Math.abs(o.y - minerY) < 30) {
+          o.hit = true;
+          if (o.type === 'token') {
+            const m = s.boost > 0 ? HR_BOOST_MULT : 1;
+            s.score += HR_TOKEN_SCORE * m; s.tokens += 1;
+            cgSound('clear');
+          } else if (o.type === 'boost') {
+            s.boost = HR_BOOST_SECS; cgSound('clear');
+          } else if (o.type === 'block') {
+            s.lives -= 1; cgSound('lose'); cgHaptic(30);
+            if (s.lives <= 0) { s.dead = true; }
+          }
+        }
+      }
+      // Drop collected/offscreen objects.
+      s.objs = s.objs.filter(o => !o.hit && o.y < H + 40);
+
+      // sync HUD (throttled by React batching)
+      setScore(Math.round(s.score));
+      setLives(s.lives);
+      setMult(s.boost > 0 ? HR_BOOST_MULT : 1);
+      setBoostLeft(s.boost > 0 ? Math.ceil(s.boost) : 0);
+      if (onStepRef.current) onStepRef.current(s.tokens);
+    };
+
+    const draw = (s, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      // background lanes
+      const laneW = W / HR_LANES;
+      for (let i = 0; i < HR_LANES; i++) {
+        ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)';
+        ctx.fillRect(i * laneW, 0, laneW, H);
+      }
+      // objects
+      for (const o of s.objs) {
+        const cx = o.lane * laneW + laneW / 2;
+        ctx.font = '26px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (o.type === 'block') {
+          ctx.fillStyle = 'rgba(244,63,94,0.85)';
+          ctx.fillRect(cx - laneW * 0.4, o.y - 16, laneW * 0.8, 32);
+          ctx.fillStyle = '#fff'; ctx.fillText('🚫', cx, o.y);
+        } else {
+          ctx.fillText(o.type === 'boost' ? '⚡' : '⛏️', cx, o.y);
+        }
+      }
+      // miner
+      const minerY = H * 0.82;
+      const mx = s.lane * laneW + laneW / 2;
+      ctx.font = '34px serif';
+      if (s.boost > 0) {
+        ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 18;
+      }
+      ctx.fillText('⛏️', mx, minerY - 4);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(99,102,241,0.9)';
+      ctx.fillRect(mx - 18, minerY + 14, 36, 6);
+    };
+
+    const frame = (ts) => {
+      if (!running) return;
+      const s = stateRef.current;
+      const W = canvas.clientWidth, H = canvas.clientHeight;
+      if (!lastTsRef.current) lastTsRef.current = ts;
+      let dt = (ts - lastTsRef.current) / 1000;
+      lastTsRef.current = ts;
+      if (dt > 0.05) dt = 0.05;
+      step(s, dt, W, H);
+      draw(s, W, H);
+      if (s.dead) { endGame(); return; }
+      rafRef.current = requestAnimationFrame(frame);
+    };
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      running = false;
+      window.removeEventListener('resize', sizeCanvas);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [phase]);
+
+  const hist = cgLoadHistory(HR_HISTORY_KEY);
+  const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
+  const sheet = [
+    cgLeaderboardSection('hashrush'),
+    cgHistorySection(hist, r => <><span>{r.score} pts</span><span className="mono">{r.tokens} ⛏️ · {r.secs}s</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Runs' },
+    ]),
+    cgRulesSection([
+      'Tap the left/right half of the screen (or ← → keys) to change lane.',
+      'Collect ⛏️ hash tokens to score — each is worth 10 points.',
+      'Grab ⚡ Compute Boost for 5 seconds of 2× scoring.',
+      'Dodge 🚫 invalid blocks — three hits and the run ends.',
+      'It speeds up the longer you survive. Chase a high score!',
+    ]),
+  ];
+
+  return (
+    <ClassicShell game={game} onExit={onBack} onNewGame={() => startGame()} sheetSections={sheet} menuConfig={menuConfig}>
+      <div className="cg-stage">
+        <CgStatus items={[
+          { l: 'Score', v: score },
+          { l: 'Lives', v: '❤️'.repeat(lives) || '—' },
+          { l: 'Mult', v: '×' + mult },
+        ]} />
+        <div className="hr-wrap" ref={wrapRef}>
+          <canvas ref={canvasRef} className="hr-canvas" />
+          {boostLeft > 0 && phase === 'playing' && (
+            <div className="hr-boost-badge">⚡ Boost {boostLeft}s</div>
+          )}
+          {phase === 'idle' && (
+            <div className="hr-overlay">
+              <div className="hr-overlay-title">⛏️ Hash Rush</div>
+              <div className="hr-overlay-sub">Mine hashes, dodge invalid blocks.</div>
+              <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Start mining</button>
+            </div>
+          )}
+          {phase === 'dead' && (
+            <div className="hr-overlay">
+              <div className="hr-overlay-title">Game Over</div>
+              <div className="hr-overlay-score">{score} pts</div>
+              {finalRank && <div className="hr-overlay-sub">Global rank #{finalRank}</div>}
+              <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Mine again</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </ClassicShell>
+  );
+}
+
 const GAMES = [
   {
     id: 'sudoku',
@@ -17499,6 +18218,8 @@ const GAMES = [
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
     menuModePicker: true,
+    leaderboard: true,
+    leaderboardOpts: { valueLabel: 'Best Streak' },
   },
   {
     id: '2048',
@@ -17510,6 +18231,9 @@ const GAMES = [
     tag: 'Numbers',
     tagColor: C.emerald,
     component: T2048Game,
+    modes: ['solo', 'online'],
+    preLaunchModal: true,
+    leaderboard: true,
   },
   {
     id: 'knights-tour',
@@ -17543,6 +18267,9 @@ const GAMES = [
     tag: 'Puzzle',
     tagColor: C.accent,
     component: BlockBlastGame,
+    modes: ['solo', 'online'],
+    preLaunchModal: true,
+    leaderboard: true,
   },
   {
     id: 'diamondrush',
@@ -17611,6 +18338,18 @@ const GAMES = [
     tag: 'Campaign',
     tagColor: C.gold,
     component: Match3Game,
+  },
+  {
+    id: 'hashrush',
+    name: 'Hash Rush',
+    icon: '⛏️',
+    category: 'classic',
+    shell: 'self',
+    desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
+    tag: 'Crypto',
+    tagColor: C.gold,
+    component: HashRushGame,
+    leaderboard: true,
   },
   {
     id: 'tilematchingdaily',
@@ -18213,6 +18952,8 @@ function App() {
   const [classicGameMode, setClassicGameMode] = useState(null);
   const [classicGameModeOpts, setClassicGameModeOpts] = useState(null);
   const [classicLastResult, setClassicLastResult] = useState(null);
+  // Pre-launch game-mode modal (multi-mode classic games, e.g. 2048 / Block Blast)
+  const [preLaunchGame, setPreLaunchGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
   // Wallet state (app-level so PvP and nav share one source)
@@ -18446,10 +19187,19 @@ function App() {
   const deepLinkedRef = useRef(false);
   useEffect(() => {
     if (loading || deepLinkedRef.current) return;
-    const gid = new URLSearchParams(window.location.search).get('game');
+    const params = new URLSearchParams(window.location.search);
+    const gid = params.get('game');
     if (!gid) return;
     const g = GAMES.find(x => x.id === gid);
-    if (g) { deepLinkedRef.current = true; launchGame(g); }
+    if (!g) return;
+    deepLinkedRef.current = true;
+    const mmode = params.get('mmode');
+    // Multi-mode classic games open the pre-launch modal unless a mode is
+    // pinned via ?mmode= (then launch straight into it).
+    if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
+    if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
+    if (g.shell === 'custom') { setCurrentGame(g); setScreen('game'); return; }
+    launchGame(g);
   }, [loading]);
 
   // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
@@ -18682,6 +19432,7 @@ function App() {
     setClassicGameMode(null);
     setClassicGameModeOpts(null);
     setClassicLastResult(null);
+    setPreLaunchGame(null);
     if (tab) setLobbyTab(tab);
   };
 
@@ -18822,14 +19573,18 @@ function App() {
             onModeChange={setClassicGameMode}
           />
         );
-      case 'classic':
+      case 'classic': {
         // In-frame classic game wrapped in the shared ClassicShell.
+        const classicSections = currentGame.leaderboard
+          ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
+          : [];
         return (
           <ClassicShell
             game={currentGame}
             onExit={() => backToLobby('classic')}
             onNewGame={() => setPlayAgainKey(k => k + 1)}
             menuConfig={classicMenuConfig}
+            sheetSections={classicSections}
           >
             <div className="cg-stage cg-scroll">
               <GameComponent
@@ -18841,10 +19596,12 @@ function App() {
                 gameMode={classicGameMode}
                 gameModeOpts={classicGameModeOpts}
                 onModeChange={setClassicGameMode}
+                onBack={() => backToLobby('classic')}
               />
             </div>
           </ClassicShell>
         );
+      }
       case 'daily':
       default:
         // Daily puzzle (and any back-header game-wrap game): resumable, locked.
@@ -19103,7 +19860,12 @@ function App() {
                   key={g.id}
                   className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
                   style={{ '--accent': g.tagColor }}
-                  onClick={() => !loading && (g.shell === 'custom' ? setCurrentGame(g) : launchGame(g))}
+                  onClick={() => {
+                    if (loading) return;
+                    if (g.shell === 'custom') { setCurrentGame(g); return; }
+                    if (g.preLaunchModal) { setPreLaunchGame(g); return; }
+                    launchGame(g);
+                  }}
                 >
                   <div className="card-icon">{g.icon}</div>
                   <div className="card-name">{g.name}</div>
@@ -19163,6 +19925,20 @@ function App() {
             onBack={backToLobby}
           />
         </div>
+      )}
+
+      {preLaunchGame && (
+        <GameModeModal
+          game={preLaunchGame}
+          onClose={() => setPreLaunchGame(null)}
+          onStart={(mode, opts) => {
+            const g = preLaunchGame;
+            setPreLaunchGame(null);
+            setClassicGameMode(mode === 'solo' ? null : mode);
+            setClassicGameModeOpts(opts || null);
+            launchGame(g);
+          }}
+        />
       )}
 
       {screen === 'game' && currentGame && !winData && !loseData && renderGameBody()}

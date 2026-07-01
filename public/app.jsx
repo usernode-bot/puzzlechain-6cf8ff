@@ -4241,6 +4241,29 @@ body {
   border-color: ${C.gold}55;
   background: ${C.gold}0d;
 }
+.badges-toggle .badge-strip-count { color: ${C.text}; margin-left: 0.5rem; font-weight: 700; }
+/* Empty/early state + next-milestone progress hints (Bug C). */
+.badges-empty { font-size: 0.8rem; color: ${C.muted}; margin: 0.1rem 0 0.6rem; }
+.badges-retry-btn {
+  all: unset;
+  cursor: pointer;
+  color: ${C.accent};
+  font-weight: 700;
+  text-decoration: underline;
+}
+.badges-retry-btn:hover { color: ${C.text}; }
+.badge-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }
+.badge-progress-pill {
+  font-size: 0.72rem; font-weight: 600; color: ${C.muted};
+  background: ${C.gold}0d; border: 1px solid ${C.gold}33;
+  border-radius: 999px; padding: 0.2rem 0.55rem;
+  display: inline-flex; gap: 0.3rem; align-items: center; white-space: nowrap;
+}
+/* Compact always-visible earned-badge row — mobile only (desktop shows the
+   full grid which already includes earned chips). */
+.badges-earned-row { display: none; }
+/* Win overlay next-milestone progress. */
+.win-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin: 0.6rem 0; }
 @media (max-width: 560px) {
   .badges-toggle {
     cursor: pointer;
@@ -4251,10 +4274,13 @@ body {
     padding: 0.4rem 0;
     margin-bottom: 0;
   }
+  .badges-toggle .badge-strip-count { margin-left: auto; }
   .badges-toggle:hover { color: ${C.text}; }
   .badges-toggle-arrow { font-size: 0.7rem; transition: transform 0.15s ease; }
   .badges-grid { display: none; }
   .badges-grid.open { display: flex; margin-top: 0.6rem; }
+  .badges-earned-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+  .badges-earned-row.hide { display: none; }
 }
 /* ---- Chutes & Ladders ---- */
 .cnl-banner {
@@ -5771,53 +5797,6 @@ function nextTierInfo(streak) {
   return { daysAway: above[0].min - streak, mult: above[0].mult };
 }
 
-const BADGE_DEFS = [
-  {
-    id: 'first-light',
-    icon: '🕯️',
-    label: 'First Light',
-    desc: 'Solve any daily puzzle',
-    check: (streak, attempts) =>
-      Object.values(attempts).some(a => a.finishedAt && a.score > 0),
-  },
-  {
-    id: 'all-in',
-    icon: '🎯',
-    label: 'All In',
-    desc: 'Complete all 4 daily games in one day',
-    check: (streak, attempts) =>
-      GAMES.filter(g => g.category === 'daily')
-           .every(g => attempts[g.id] && attempts[g.id].finishedAt && attempts[g.id].score > 0),
-  },
-  {
-    id: 'flame-keeper',
-    icon: '🔥',
-    label: 'Flame Keeper',
-    desc: '3-day streak',
-    check: (streak) => streak >= 3,
-  },
-  {
-    id: 'weekly-warrior',
-    icon: '📅',
-    label: 'Weekly Warrior',
-    desc: '7-day streak',
-    check: (streak) => streak >= 7,
-  },
-  {
-    id: 'multiplied',
-    icon: '💫',
-    label: 'Multiplied',
-    desc: '10-day streak (×1.5 points)',
-    check: (streak) => streak >= 10,
-  },
-  {
-    id: 'streak-titan',
-    icon: '⚡',
-    label: 'Streak Titan',
-    desc: '30-day streak',
-    check: (streak) => streak >= 30,
-  },
-];
 
 /* ============================================================
    Streak badges — named milestones unlocked at consecutive-day
@@ -5859,6 +5838,21 @@ function justUnlockedBadge(streak) {
   return STREAK_BADGES.find(b => b.min === streak) || null;
 }
 
+// The nearest streak badge the player has NOT yet reached (lowest min > streak),
+// or null when every streak tier is already earned. Used for the "X/Y days →
+// Name" progress hint so a player who finished today sees concrete progress
+// even when no badge unlocked this run.
+function nextStreakBadge(streak) {
+  return STREAK_BADGES.find(b => b.min > streak) || null;
+}
+
+// The nearest lifetime-solve milestone the player has NOT yet reached
+// (lowest count > solveCount), or null when all are earned. Drives the
+// "X/Y solves → Name" progress hint.
+function nextSolveMilestone(solveCount) {
+  return SOLVE_MILESTONE_BADGES.find(b => b.count > (solveCount || 0)) || null;
+}
+
 /* ============================================================
    Achievement badges — non-streak milestones the server awards
    in /api/daily/:gameId/finish and persists in user_achievements.
@@ -5888,6 +5882,16 @@ function achievementBadgeFor(ach) {
   if (ach.type === 'solve_milestone') {
     const c = ach.metadata && ach.metadata.count;
     return SOLVE_MILESTONE_BADGES.find(b => b.count === c) || null;
+  }
+  // Server-confirmed streak milestones arrive in newAchievements as
+  // { type: 'streak_milestone', metadata: { streak: <days> } }; resolve to the
+  // STREAK_BADGES entry so the win overlay can celebrate it like any other
+  // badge. We normalise its shape to { name, icon } (STREAK_BADGES has no
+  // `desc`), so the overlay can render it uniformly.
+  if (ach.type === 'streak_milestone') {
+    const days = ach.metadata && +ach.metadata.streak;
+    const b = STREAK_BADGES.find(x => x.min === days);
+    return b ? { ...b, desc: `${b.min}-day streak` } : null;
   }
   return ACHIEVEMENT_BADGES.find(b => b.type === ach.type) || null;
 }
@@ -6569,12 +6573,16 @@ function TodayChampions({ onSelectUser }) {
    render dimmed so there's a visible collection to complete. Shared by
    the lobby and the profile screen.
    ============================================================ */
-function BadgeStrip({ badges, achievements, collapsible }) {
+// Build the canonical badge-chip list (streak milestones + non-streak
+// achievements + lifetime solve milestones) with earned/locked state derived
+// from the server-backed `badges` (earned day thresholds) and `achievements`
+// ({ types, milestones }). Shared by the profile BadgeStrip and the lobby
+// BadgesSection so both render an identical, permanent collection.
+function badgeChips(badges, achievements) {
   const earnedDays = new Set(badges || []);
   const ach = achievements || { types: [], milestones: [] };
   const earnedTypes = new Set(ach.types || []);
   const earnedMilestones = new Set(ach.milestones || []);
-  const [open, setOpen] = useState(false);
 
   const chips = [];
   for (const b of STREAK_BADGES) {
@@ -6586,49 +6594,31 @@ function BadgeStrip({ badges, achievements, collapsible }) {
   for (const b of SOLVE_MILESTONE_BADGES) {
     chips.push({ key: `m${b.count}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedMilestones.has(b.count) });
   }
-  const earnedCount = chips.filter(c => c.earned).length;
+  return chips;
+}
 
-  const grid = (
-    <div className="badge-strip">
-      {chips.map(c => (
-        <div
-          key={c.key}
-          className={`badge-chip${c.earned ? ' active' : ' locked'}`}
-          title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
-        >
-          <span className="badge-chip-icon">{c.icon}</span>
-          <span className="badge-chip-name">{c.name}</span>
-        </div>
-      ))}
-    </div>
-  );
+function BadgeStrip({ badges, achievements }) {
+  const chips = badgeChips(badges, achievements);
+  const earnedCount = chips.filter(c => c.earned).length;
 
   return (
     <div className="badge-strip-wrap">
-      {collapsible ? (
-        <button
-          type="button"
-          className="badge-strip-trigger"
-          onClick={() => setOpen(o => !o)}
-          aria-expanded={open}
-        >
-          <span>Badges</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
-            <span className={`badge-chevron${open ? ' open' : ''}`}>▾</span>
-          </span>
-        </button>
-      ) : (
-        <div className="badge-strip-head">
-          <span>Badges</span>
-          <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
-        </div>
-      )}
-      {collapsible ? (
-        <div className={`badge-strip-body${open ? ' open' : ' closed'}`}>
-          {grid}
-        </div>
-      ) : grid}
+      <div className="badge-strip-head">
+        <span>Badges</span>
+        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
+      </div>
+      <div className="badge-strip">
+        {chips.map(c => (
+          <div
+            key={c.key}
+            className={`badge-chip${c.earned ? ' active' : ' locked'}`}
+            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
+          >
+            <span className="badge-chip-icon">{c.icon}</span>
+            <span className="badge-chip-name">{c.name}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -18628,21 +18618,101 @@ function PostDetail({ post, onBack }) {
 /* ============================================================
    Root app
    ============================================================ */
-function BadgesSection({ streak, attempts, open, onToggle }) {
-  const badges = BADGE_DEFS.map(b => ({ ...b, earned: b.check(streak, attempts) }));
+// Next-milestone progress hints so a player who finished today sees concrete
+// progress even when no badge unlocked this run (e.g. "🔥 2/3 days → On Fire",
+// "7/10 solves → Solver"). Each is the nearest UNEARNED milestone of its kind.
+function badgeProgressHints(streak, solveCount) {
+  const hints = [];
+  const ns = nextStreakBadge(streak);
+  if (ns) hints.push({ key: 'streak', icon: '🔥', text: `${streak}/${ns.min} days → ${ns.name}` });
+  const nm = nextSolveMilestone(solveCount);
+  if (nm) hints.push({ key: 'solve', icon: nm.icon, text: `${solveCount || 0}/${nm.count} solves → ${nm.name}` });
+  return hints;
+}
+
+// Lobby Badges panel — renders the SAME permanent collection as the profile's
+// BadgeStrip (streak milestones + non-streak achievements + solve milestones),
+// fed by the server-backed `badges`/`achievements` state already loaded from
+// /api/daily. Earned badges stay lit forever (they come from persisted
+// user_achievements rows, not the live streak/today's attempts), so the lobby
+// and profile now show identical earned/locked states.
+//
+// Discoverability: a header with the earned count is always visible; on mobile
+// a compact always-visible row of EARNED chips shows when collapsed (so a
+// player sees their badges without expanding), and the toggle reveals the full
+// dimmed collection. An empty-state line + next-milestone progress hints make
+// it clear how to earn the next one.
+function BadgesSection({ badges, achievements, streak, solveCount, open, onToggle }) {
+  const chips = badgeChips(badges, achievements);
+  const earnedCount = chips.filter(c => c.earned).length;
+  const earnedChips = chips.filter(c => c.earned);
+  const hints = badgeProgressHints(streak || 0, solveCount || 0);
   return (
     <div className="badges-section">
       <button className="badges-toggle" onClick={onToggle}>
         Badges
+        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
         <span className="badges-toggle-arrow">{open ? '▾' : '▸'}</span>
       </button>
+      {earnedCount === 0 && (
+        <div className="badges-empty">Solve a daily puzzle to earn your first badge.</div>
+      )}
+      {hints.length > 0 && (
+        <div className="badge-progress">
+          {hints.map(h => (
+            <span key={h.key} className="badge-progress-pill">
+              <span>{h.icon}</span> {h.text}
+            </span>
+          ))}
+        </div>
+      )}
+      {/* Mobile-only compact strip of earned badges, shown while collapsed. */}
+      {earnedCount > 0 && (
+        <div className={'badges-earned-row' + (open ? ' hide' : '')}>
+          {earnedChips.map(c => (
+            <div key={c.key} className="badge-chip" title={`${c.name} — ${c.sub}`}>
+              <span>{c.icon}</span>
+              <span>{c.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className={'badges-grid' + (open ? ' open' : '')}>
-        {badges.map(b => (
-          <div key={b.id} className={'badge-chip' + (b.earned ? '' : ' dim')} title={b.desc}>
-            <span>{b.icon}</span>
-            <span>{b.label}</span>
+        {chips.map(c => (
+          <div
+            key={c.key}
+            className={'badge-chip' + (c.earned ? '' : ' dim')}
+            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
+          >
+            <span>{c.icon}</span>
+            <span>{c.name}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Lightweight placeholder shown in the lobby badge slot when the real panel
+// can't load (signed out, or the backend was briefly unreachable). Keeps the
+// "Badges" header so the slot is recognizable, and explains the empty space
+// instead of leaving an unexplained blank gap. `state` is 'signedout' | 'error';
+// the 'error' case offers a retry that re-runs the daily load.
+function BadgesPlaceholder({ state, onRetry }) {
+  const isError = state === 'error';
+  return (
+    <div className="badges-section">
+      <div className="badges-toggle" style={{ cursor: 'default' }}>Badges</div>
+      <div className="badges-empty">
+        {isError
+          ? 'Couldn’t load your badges.'
+          : 'Sign in to track your badges.'}
+        {isError && onRetry && (
+          <>
+            {' '}
+            <button type="button" className="badges-retry-btn" onClick={onRetry}>Retry</button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -18926,6 +18996,13 @@ function App() {
   const [badges, setBadges] = useState([]);
   // Non-streak achievement badges earned: { types: [...], milestones: [...] }.
   const [achievements, setAchievements] = useState({ types: [], milestones: [] });
+  // Lifetime won-solve count (server-computed), used to drive the
+  // "X/Y solves → Solver" next-milestone progress hint.
+  const [solveCount, setSolveCount] = useState(0);
+  // Outcome of the last /api/daily load, used to explain an empty badge slot:
+  // 'ok' (real panel renders), 'signedout' (401 — no/expired token), or
+  // 'error' (5xx / network — backend unreachable, offer retry).
+  const [badgeLoadState, setBadgeLoadState] = useState('ok');
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -19009,13 +19086,15 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, body } = await api(path);
+    const { ok, status, body } = await api(path);
     if (ok && body) {
+      setBadgeLoadState('ok');
       setAuthOk(true);
       setUser(body.user || null);
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setSolveCount(Number.isFinite(body.solveCount) ? body.solveCount : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
         ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
@@ -19027,9 +19106,13 @@ function App() {
     } else {
       // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
       // so persistence isn't guaranteed — reflect that in the nav.
+      // Distinguish "signed out" (401) from a transient backend failure so the
+      // badge slot can explain the empty space instead of rendering nothing.
+      setBadgeLoadState(status === 401 ? 'signedout' : 'error');
       setAuthOk(false);
       setUser(null);
       setStreak(0);
+      setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [] });
     }
@@ -19254,18 +19337,43 @@ function App() {
       // Reconcile against the server's authoritative streak + reward + new
       // achievement badges, and clear any prior sync-error flag.
       if (body && typeof body.streak === 'number') setStreak(body.streak);
+      if (body && Number.isFinite(body.solveCount)) setSolveCount(body.solveCount);
       const newAch = (body && Array.isArray(body.newAchievements)) ? body.newAchievements : [];
       if (newAch.length) {
         setAchievements(prev => mergeAchievements(prev, newAch));
+        // Reflect any server-confirmed streak milestones in the permanent
+        // `badges` state too (their day thresholds), so the lobby's streak
+        // chips light immediately even if the client's optimistic streak math
+        // missed the exact tier.
+        const streakDays = newAch
+          .filter(a => a && a.type === 'streak_milestone' && a.metadata && Number.isFinite(+a.metadata.streak))
+          .map(a => +a.metadata.streak);
+        if (streakDays.length) {
+          setBadges(prev => Array.from(new Set([...prev, ...streakDays])).sort((a, b) => a - b));
+        }
       }
-      setWinData(prev => prev ? {
-        ...prev,
-        syncError: false,
-        matchEarned: body && body.matchEarned,
-        matchReceipt: body && body.matchReceipt,
-        newAchievements: newAch,
-        justAchievement: newAch.length ? achievementBadgeFor(newAch[0]) : prev.justAchievement,
-      } : prev);
+      setWinData(prev => {
+        if (!prev) return prev;
+        // De-dup the win overlay: the client-side fast-path already shows
+        // `justBadge` for the streak tier this win landed on. Pick the first
+        // NEW achievement that isn't that same streak badge so we never show
+        // one badge twice. If the only new achievement IS the streak badge the
+        // fast-path missed (stale client streak), this surfaces it as the
+        // server backstop.
+        const shownMin = prev.justBadge && prev.justBadge.min;
+        const firstNew = newAch.find(a => {
+          if (a && a.type === 'streak_milestone') return +(a.metadata && a.metadata.streak) !== shownMin;
+          return true;
+        });
+        return {
+          ...prev,
+          syncError: false,
+          matchEarned: body && body.matchEarned,
+          matchReceipt: body && body.matchReceipt,
+          newAchievements: newAch,
+          justAchievement: firstNew ? achievementBadgeFor(firstNew) : prev.justAchievement,
+        };
+      });
       // Reflect the new MATCH balance in the nav chip immediately.
       if (body && body.matchReceipt && Number.isFinite(body.matchReceipt.balanceAfter)) {
         setMatchBalance(body.matchReceipt.balanceAfter);
@@ -19819,12 +19927,6 @@ function App() {
                   new Date(nextResetUtc).getTime() - (Date.now() + offset))}
               </p>
             )}
-            {lobbyTab === 'daily' && authOk && (() => {
-              // Union of permanent earned streak badges and any the live streak
-              // now satisfies, so the strip is correct right after a win too.
-              const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
-              return <BadgeStrip badges={earnedDays} achievements={achievements} collapsible={true} />;
-            })()}
           </div>
           <div className="lobby-tabs">
             <button
@@ -19842,6 +19944,34 @@ function App() {
               >Feed</button>
             )}
           </div>
+          {authOk && lobbyTab !== 'pvp' && lobbyTab !== 'feed' && (() => {
+            // Single persistent, collapsible badge panel — rendered directly
+            // under the header band (above the game grid) on the Daily and
+            // Classic tabs so players find their badges where they expect them.
+            // Feed it the union of permanently earned streak day-thresholds and
+            // any the LIVE streak now satisfies, so a freshly-won streak badge
+            // lights up immediately — before the server round-trip reconciles
+            // `badges`. Achievement/solve-milestone chips come straight from
+            // the server-backed `achievements` state.
+            const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
+            return (
+              <BadgesSection
+                badges={earnedDays}
+                achievements={achievements}
+                streak={streak}
+                solveCount={solveCount}
+                open={badgesOpen}
+                onToggle={() => setBadgesOpen(b => !b)}
+              />
+            );
+          })()}
+          {!authOk && (lobbyTab === 'daily' || lobbyTab === 'classic') && (
+            // Signed-out / load-failure affordance: explain the empty badge slot
+            // instead of rendering nothing. Limited to Daily/Classic (Feed/PvP
+            // own their viewport). Retry re-runs the daily load and flips back
+            // to the real panel on success.
+            <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
+          )}
           {lobbyTab === 'pvp' ? (
             PVP_ENABLED
               ? <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />
@@ -19891,14 +20021,6 @@ function App() {
               );
             })}
           </div>
-          )}
-          {authOk && (
-            <BadgesSection
-              streak={streak}
-              attempts={attempts}
-              open={badgesOpen}
-              onToggle={() => setBadgesOpen(b => !b)}
-            />
           )}
           {lobbyTab === 'daily' && authOk && (
             <TodayChampions
@@ -20041,6 +20163,22 @@ function App() {
                 <div className="bu-name">{winData.justAchievement.name}</div>
               </div>
             )}
+            {!winData.isClassic && (() => {
+              // Next-milestone progress so every solve shows forward motion even
+              // when nothing unlocked this run. Streak progress is based on the
+              // streak this win landed in; solve progress on the lifetime count.
+              const hints = badgeProgressHints(winData.effectiveStreak || 0, solveCount);
+              if (!hints.length) return null;
+              return (
+                <div className="win-progress">
+                  {hints.map(h => (
+                    <span key={h.key} className="badge-progress-pill">
+                      <span>{h.icon}</span> {h.text}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
             {!winData.isClassic && winData.syncError && (
               <div className="win-sync-note">
                 Couldn't sync your result — your puzzle is still locked for today.

@@ -2153,6 +2153,28 @@ body {
   white-space: nowrap;
 }
 .bounce-controls button:hover { border-color: ${C.accent}; }
+.bounce-audio-row {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 360px;
+  margin: 0.7rem auto 0;
+}
+.bounce-audio-row button {
+  flex: 1;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  color: ${C.text};
+  border-radius: 10px;
+  padding: 0.4rem 0.3rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: border-color 0.12s;
+  white-space: nowrap;
+}
+.bounce-audio-row button:hover:not(:disabled) { border-color: ${C.accent}; }
+.bounce-audio-row button:disabled { opacity: 0.4; cursor: default; }
 .bounce-dpad {
   display: grid;
   grid-template-columns: repeat(2, 72px);
@@ -4357,15 +4379,23 @@ function cgAudio() {
 }
 // Short synthesized cues — no asset files needed.
 const CG_TONES = {
-  move:    { f: 320, d: 0.05, t: 'square',   g: 0.05 },
-  click:   { f: 440, d: 0.04, t: 'triangle', g: 0.05 },
-  merge:   { f: 540, d: 0.09, t: 'sine',     g: 0.07 },
-  clear:   { f: 660, d: 0.10, t: 'sine',     g: 0.08 },
-  capture: { f: 740, d: 0.12, t: 'triangle', g: 0.08 },
-  deal:    { f: 380, d: 0.05, t: 'square',   g: 0.05 },
-  chip:    { f: 500, d: 0.06, t: 'square',   g: 0.06 },
-  win:     { f: 784, d: 0.22, t: 'sine',     g: 0.09 },
-  lose:    { f: 150, d: 0.30, t: 'sawtooth', g: 0.08 },
+  move:      { f: 320, d: 0.05, t: 'square',   g: 0.05 },
+  click:     { f: 440, d: 0.04, t: 'triangle', g: 0.05 },
+  merge:     { f: 540, d: 0.09, t: 'sine',     g: 0.07 },
+  clear:     { f: 660, d: 0.10, t: 'sine',     g: 0.08 },
+  capture:   { f: 740, d: 0.12, t: 'triangle', g: 0.08 },
+  deal:      { f: 380, d: 0.05, t: 'square',   g: 0.05 },
+  chip:      { f: 500, d: 0.06, t: 'square',   g: 0.06 },
+  win:       { f: 784, d: 0.22, t: 'sine',     g: 0.09 },
+  lose:      { f: 150, d: 0.30, t: 'sawtooth', g: 0.08 },
+  // Bounce-specific cues
+  bwall:     { f: 290, d: 0.03, t: 'square',   g: 0.06 },
+  bpaddle:   { f: 360, d: 0.07, t: 'triangle', g: 0.07 },
+  bbrick:    { f: 580, d: 0.11, t: 'sine',     g: 0.09 },
+  blevel:    { f: 880, d: 0.28, t: 'sine',     g: 0.10 },
+  bpowerup:  { f: 720, d: 0.14, t: 'triangle', g: 0.08 },
+  bdie:      { f: 190, d: 0.35, t: 'sawtooth', g: 0.10 },
+  bgameover: { f: 140, d: 0.55, t: 'sawtooth', g: 0.11 },
 };
 function cgSound(name, pitch) {
   if (!cgPrefs.sound) return;
@@ -13813,6 +13843,8 @@ const BOUNCE_LEVEL_BONUS = 100;
 const BOUNCE_FIXED_DT = 1000 / 60;
 const BOUNCE_SUBSTEPS = 3;          // anti-tunneling integration substeps
 const BOUNCE_BEST_KEY = 'puzzlechain_bounce_best';
+// Looping background-music asset (served by express.static from public/audio).
+const BOUNCE_MUSIC_URL = '/audio/bounce-bg.mp3';
 
 // Points by row (top rows are harder to reach, so worth more); fallback 10.
 const BOUNCE_ROW_POINTS = [50, 50, 30, 30, 20, 10, 10, 10];
@@ -13910,6 +13942,11 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const [isMock, setIsMock] = useState(false);
   const [activePowerups, setActivePowerups] = useState([]);
+  // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
+  // both SFX and music); `musicPaused` is the player's in-game music pause
+  // that leaves SFX untouched.
+  const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
+  const [musicPaused, setMusicPaused] = useState(false);
 
   // Leaderboard tab state (mirrors Snake)
   const [lb, setLb]               = useState(null);
@@ -13969,6 +14006,28 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     return () => clearInterval(id);
   }, [timerRunning]);
 
+  // Background music: plays once the ball has been launched, sound is
+  // enabled, the player hasn't paused it, and the round isn't over. Starting
+  // only after `started` (the first launch) means it's triggered by a user
+  // gesture, satisfying browser autoplay policy. Stops if the player leaves
+  // the game tab for the leaderboard.
+  useEffect(() => {
+    const shouldPlay = started && !done && soundOn && !musicPaused && activeTab === 'game';
+    if (shouldPlay) startBackgroundMusic(BOUNCE_MUSIC_URL);
+    else stopBackgroundMusic();
+  }, [started, done, soundOn, musicPaused, activeTab]);
+
+  // Always silence the track when leaving the game (unmount → back to lobby).
+  useEffect(() => () => stopBackgroundMusic(), []);
+
+  // Toggle the shared sound master switch (persists to localStorage via
+  // cgPrefs) and mirror it into local state so the component re-renders.
+  const toggleSound = () => {
+    const next = !cgPrefs.sound;
+    cgSetPref('sound', next);
+    setSoundOn(next);
+  };
+
   const resetBallToPaddle = () => {
     ballsRef.current = [{ x: paddleRef.current, y: BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1, vx: 0, vy: 0 }];
   };
@@ -13998,6 +14057,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     resetBallToPaddle();
     setScore(0); setLives(BOUNCE_LIVES); setLevel(1);
     setStarted(false); setDone(false); setElapsedSecs(0); setActivePowerups([]);
+    setMusicPaused(false);
   };
 
   useEffect(() => {
@@ -14028,11 +14088,13 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     const ball = ballRef.current;
     ball.vx = speed * 0.4;
     ball.vy = -Math.sqrt(Math.max(0.01, speed * speed - ball.vx * ball.vx));
+    cgSound('deal', 1.2);
   };
   const launchRef = useRef(launch);
   launchRef.current = launch;
 
   const endGame = () => {
+    cgSound('bgameover');
     doneRef.current = true;
     setDone(true);
     const finalScore = scoreRef.current;
@@ -14045,6 +14107,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   };
 
   const nextLevel = () => {
+    cgSound('blevel');
     scoreRef.current += BOUNCE_LEVEL_BONUS;
     setScore(scoreRef.current);
     const lvl = levelRef.current + 1;
@@ -14057,6 +14120,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   };
 
   const loseLife = () => {
+    cgSound('bdie');
     const remaining = livesRef.current - 1;
     livesRef.current = remaining;
     setLives(remaining);
@@ -14076,9 +14140,9 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
       ball.x += ball.vx * scale;
       ball.y += ball.vy * scale;
 
-      if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); }
-      else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); }
-      if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); }
+      if (ball.x - BOUNCE_BALL_R < 0) { ball.x = BOUNCE_BALL_R; ball.vx = Math.abs(ball.vx); cgSound('bwall'); }
+      else if (ball.x + BOUNCE_BALL_R > BOUNCE_W) { ball.x = BOUNCE_W - BOUNCE_BALL_R; ball.vx = -Math.abs(ball.vx); cgSound('bwall'); }
+      if (ball.y - BOUNCE_BALL_R < 0) { ball.y = BOUNCE_BALL_R; ball.vy = Math.abs(ball.vy); cgSound('bwall'); }
 
       if (ball.vy > 0 &&
           ball.y + BOUNCE_BALL_R >= BOUNCE_PADDLE_Y &&
@@ -14091,6 +14155,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
         ball.vx = speed * Math.sin(angle);
         ball.vy = -Math.abs(speed * Math.cos(angle));
         ball.y = BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1;
+        cgSound('bpaddle');
       }
 
       for (let i = 0; i < bricks.length; i++) {
@@ -14108,6 +14173,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
                 br.alive = false;
                 brokenRef.current += 1;
                 scoreRef.current += br.points;
+                cgSound('bbrick', 1.3);
               }
             }
             laserLoadedRef.current -= 1;
@@ -14115,6 +14181,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
             b.alive = false;
             brokenRef.current += 1;
             scoreRef.current += b.points;
+            cgSound('bbrick');
           }
           setScore(scoreRef.current);
           onStepRef.current && onStepRef.current(brokenRef.current);
@@ -14153,6 +14220,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
       if (!pu.caught && pu.y + pu.radius >= BOUNCE_PADDLE_Y && pu.x >= paddleRef.current - paddleW / 2 - 20 && pu.x <= paddleRef.current + paddleW / 2 + 20) {
         pu.caught = true;
+        cgSound('bpowerup');
         const existing = activePowerupsRef.current.find(p => p.type === pu.type);
         if (pu.type === 'multi-ball') {
           if (ballsRef.current.length > 0) {
@@ -14391,6 +14459,18 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
                 <div>Move to aim, then tap / press Space to launch</div>
               </div>
             )}
+          </div>
+
+          <div className="bounce-audio-row">
+            <button onClick={toggleSound}>
+              {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
+            </button>
+            <button
+              onClick={() => setMusicPaused(p => !p)}
+              disabled={!soundOn}
+            >
+              {!soundOn ? '🔇 Off' : musicPaused ? '▶ Resume' : '⏸ Pause'}
+            </button>
           </div>
 
           <div className="bounce-dpad">

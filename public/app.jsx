@@ -4469,6 +4469,12 @@ let _bgMusicLoading = false;
 // True once the caller has asked to stop/pause — guards the async decode from
 // auto-starting playback after a stop that raced the fetch.
 let _bgMusicStopped = true;
+// Bumped on every fetch/decode kicked off — lets a superseded in-flight
+// request (e.g. a second startBackgroundMusic(url) call for a different
+// track before the first one finished decoding) recognize it's stale and
+// skip starting a source, instead of both requests racing to call
+// _bgStartSource() and briefly double-firing playback.
+let _bgMusicToken = 0;
 
 function bgAudioContext() {
   if (_bgAudioCtx) return _bgAudioCtx;
@@ -4517,6 +4523,7 @@ function startBackgroundMusic(url) {
   _bgMusicLoading = true;
   _bgMusicUrl = url;
   _bgMusicBuffer = null;
+  const token = ++_bgMusicToken;
   fetch(url)
     .then(r => r.arrayBuffer())
     .then(buf => new Promise((resolve, reject) => {
@@ -4526,12 +4533,15 @@ function startBackgroundMusic(url) {
       if (p && typeof p.then === 'function') p.then(resolve, reject);
     }))
     .then(decoded => {
+      // A newer startBackgroundMusic() call superseded this one while we were
+      // decoding — drop the stale result instead of racing it into _bgStartSource().
+      if (token !== _bgMusicToken) return;
       _bgMusicLoading = false;
       _bgMusicBuffer = decoded;
       // Only begin if no stop/pause arrived while we were decoding.
       if (!_bgMusicStopped) _bgStartSource();
     })
-    .catch(() => { _bgMusicLoading = false; });
+    .catch(() => { if (token === _bgMusicToken) _bgMusicLoading = false; });
 }
 
 // Stop playback (used as pause too — resume restarts the loop from its start).
@@ -7363,6 +7373,9 @@ const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
 const MS_HISTORY_MAX = 50;
 // Looping background-music asset (served by express.static from public/audio).
 const MS_MUSIC_URL = '/audio/minesweeper-bg.mp3';
+// Tab ids stay stable (drive activeTab state + history reload); only the
+// displayed label changed ("History" -> "My Best Runs").
+const MS_TAB_LABELS = { game: 'Game', history: 'My Best Runs', leaderboard: 'Leaderboard', settings: 'Settings' };
 
 function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
 function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
@@ -7767,7 +7780,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
             className={'ms-tab' + (activeTab === tab ? ' active' : '')}
             onClick={() => { setActiveTab(tab); if (tab !== 'game') setGameHistory(msLoadHistory()); }}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {MS_TAB_LABELS[tab]}
           </button>
         ))}
       </div>
@@ -8734,6 +8747,7 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
   const [becameRecord, setBecameRecord] = useState(false);
   const [lbKey, setLbKey]               = useState(0);
   const [resumeSecs, setResumeSecs]     = useState(0);
+  const [refreshTick, setRefreshTick]   = useState(0);
 
   const animatingRef = useRef(false);
   const soundOnRef   = useRef(soundOn);
@@ -8753,9 +8767,15 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
   const secsRef = useRef(0);
   secsRef.current = secs;
 
-  const countdown = useCountdown(nextReset, offset, null);
+  // Midnight UTC reached while the locked screen is showing — re-hydrate so
+  // the Daily Challenge unlocks without requiring a manual page reload.
+  const countdown = useCountdown(nextReset, offset, () => {
+    setPhase('loading');
+    setRefreshTick(t => t + 1);
+  });
 
-  // Hydrate state on mount: derive board, learn record/streak/lock, and (if
+  // Hydrate state on mount (and again whenever refreshTick bumps, i.e. after
+  // the daily reset fires): derive board, learn record/streak/lock, and (if
   // playable) claim today's attempt + mint the ZK session.
   useEffect(() => {
     let alive = true;
@@ -8804,7 +8824,7 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
       setPhase('play');
     })();
     return () => { alive = false; };
-  }, []);
+  }, [refreshTick]);
 
   // Autosave elapsed time + move count for resume (board re-derives from seed).
   useAutosave(
@@ -14904,20 +14924,20 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
    PvP Arena components
    ============================================================ */
 const PVP_TIERS = [
-  { label: '10 UTGO',  value: 10,  color: C.emerald, payout: '18 UTGO' },
-  { label: '50 UTGO',  value: 50,  color: C.gold,    payout: '90 UTGO' },
-  { label: '100 UTGO', value: 100, color: C.rose,    payout: '180 UTGO' },
+  { label: '10 MATCH',  value: 10,  color: C.emerald, payout: '18 MATCH' },
+  { label: '50 MATCH',  value: 50,  color: C.gold,    payout: '90 MATCH' },
+  { label: '100 MATCH', value: 100, color: C.rose,    payout: '180 MATCH' },
 ];
 
 function PvpLobby({ user, balance, onJoin, joining }) {
   const balFmt = balance != null
-    ? (Number(BigInt(balance)) / 1e18).toFixed(2) + ' UTGO'
+    ? (Number(BigInt(balance)) / 1e18).toFixed(2) + ' MATCH'
     : '…';
   return (
     <div className="pvp-lobby">
       <div className="pvp-header">
         <div className="pvp-title">⚔️ PvP Arena</div>
-        <div className="pvp-subtitle">Stake $UTGO and battle for the best tile-match score</div>
+        <div className="pvp-subtitle">Stake MATCH and battle for the best tile-match score</div>
         <div className="pvp-balance">Balance: {balFmt}</div>
       </div>
       <div className="pvp-how">
@@ -14986,7 +15006,7 @@ function PvpMatchmaking({ match, onCancel, onReclaim, cancelQueueCalldata }) {
       <div className="pvp-mm-hint">
         {canReclaim
           ? 'Queue timed out — reclaim your deposit below'
-          : `Waiting for a ${match && match.betTier ? match.betTier + ' UTGO' : ''} opponent`}
+          : `Waiting for a ${match && match.betTier ? match.betTier + ' MATCH' : ''} opponent`}
       </div>
       <div className="pvp-mm-btns">
         {canReclaim && (
@@ -15004,7 +15024,7 @@ function PvpDepositScreen({ match, playerIsP1, onDeposit, depositing }) {
   const alreadyDeposited = playerIsP1 ? match.p1Deposited : match.p2Deposited;
   const oppDeposited = playerIsP1 ? match.p2Deposited : match.p1Deposited;
   const wagerFmt = match.wagerUtgo
-    ? (Number(BigInt(match.wagerUtgo)) / 1e18).toFixed(2) + ' UTGO'
+    ? (Number(BigInt(match.wagerUtgo)) / 1e18).toFixed(2) + ' MATCH'
     : '?';
   return (
     <div className="pvp-deposit">
@@ -15108,9 +15128,23 @@ function PvpGameScreen({ match, playerIsP1, onResult }) {
 
   const handleDeposit = async () => {
     setDepositing(true);
+    let txHash = '0xstaging';
+    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
+      ? !(await window.usernode.isMockEnabled())
+      : false;
+    if (bridgeMockOff && window.usernode.sendTransaction && UTGO_CONTRACT_ADDRESS && match.depositCalldata) {
+      try {
+        const tx = await window.usernode.sendTransaction({ to: UTGO_CONTRACT_ADDRESS, data: match.depositCalldata });
+        txHash = (tx && tx.hash) || txHash;
+      } catch (e) {
+        console.error('[pvp] deposit tx failed:', e && e.message);
+        setDepositing(false);
+        return;
+      }
+    }
     await api(`/api/pvp/match/${match.matchId}/deposit-confirmed`, {
       method: 'POST',
-      body: JSON.stringify({ txHash: '0xstaging' }),
+      body: JSON.stringify({ txHash }),
     });
     setDeposited(true);
     setDepositing(false);
@@ -15304,13 +15338,13 @@ function PvpResult({ result, onBack, onOpenReceipt }) {
         <div className="pvp-prize-anim">
           <div className="pvp-prize-title">Prize Distribution</div>
           <div className="pvp-prize-row pvp-prize-winner">
-            <span>You (90%)</span><span className="mono">+{prize.winnerPrize} UTGO</span>
+            <span>You (90%)</span><span className="mono">+{prize.winnerPrize} MATCH</span>
           </div>
           <div className="pvp-prize-row">
-            <span>Treasury (8%)</span><span className="mono">{prize.treasuryFee} UTGO</span>
+            <span>Treasury (8%)</span><span className="mono">{prize.treasuryFee} MATCH</span>
           </div>
           <div className="pvp-prize-row">
-            <span>Burned (2%)</span><span className="mono">{prize.burned} UTGO 🔥</span>
+            <span>Burned (2%)</span><span className="mono">{prize.burned} MATCH 🔥</span>
           </div>
         </div>
       )}
@@ -15451,6 +15485,14 @@ function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appW
 /* ============================================================
    Wallet helpers
    ============================================================ */
+function fmtUtgo(weiStr) {
+  if (!weiStr || weiStr === '0') return '0.00 MATCH';
+  try {
+    const n = Number(BigInt(weiStr)) / 1e18;
+    return n.toFixed(2) + ' MATCH';
+  } catch { return '0.00 MATCH'; }
+}
+
 // MATCH is the single in-app currency — an integer count, not wei.
 function fmtMatch(n) {
   const v = Number.isFinite(n) ? n : 0;
@@ -15887,7 +15929,7 @@ function VerifiedBadge({ session, onOpenReceipt }) {
 }
 
 // Full session receipt / audit view. Reads GET /api/dapp/sessions/:id.
-function SessionReceipt({ sessionId, onBack }) {
+function SessionReceipt({ sessionId, onBack, onOpenReceipt }) {
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const sid = sessionId || new URLSearchParams(window.location.search).get('sid') || 'DAPPDEMOOK';
@@ -15968,7 +16010,7 @@ function SessionReceipt({ sessionId, onBack }) {
         </div>
       )}
 
-      {s.gameId && <VerifiedLeaderboard gameId={s.gameId} onOpenReceipt={onBack && ((sid2) => { window.location.search = `?screen=session&sid=${sid2}`; })} />}
+      {s.gameId && <VerifiedLeaderboard gameId={s.gameId} onOpenReceipt={onOpenReceipt} />}
     </div>
   );
 }
@@ -16997,10 +17039,6 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
             api(`/api/match3/finish/${selectedPuzzle}`, {
               method: 'POST',
               body: JSON.stringify({ score: newScore, timeSecs: secsRef.current, moves: newMoves })
-            }).then(({ ok }) => {
-              if (ok) {
-                api('/api/match3/abandon/' + selectedPuzzle, { method: 'POST' });
-              }
             });
           }
           return;
@@ -17099,7 +17137,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
                     transition: 'all 0.2s',
                   },
                   onMouseEnter: (e) => { if (isSolved) e.target.style.background = C.border; },
-                  onMouseLeave: (e) => { e.target.style.background = C.card; }
+                  onMouseLeave: (e) => { e.target.style.background = isSolved ? C.card : C.surface; }
                 },
                 React.createElement('div', { style: { fontWeight: 700 } }, isSolved ? '✓' : p.id),
                 React.createElement('div', { style: { fontSize: '0.75rem', marginTop: '0.25rem' } }, p.name)
@@ -18279,7 +18317,7 @@ const GAMES = [
     icon: '⚔️',
     category: 'classic',
     shell: 'custom',
-    desc: 'Stake $UTGO and compete head-to-head. Winner takes 90% of the pot.',
+    desc: 'Stake MATCH and compete head-to-head. Winner takes 90% of the pot.',
     tag: 'Wager',
     tagColor: C.rose,
     component: () => null,
@@ -18302,9 +18340,12 @@ function FeedScreen({ user, setScreen }) {
       setLoading(false);
     };
     loadFeed();
+    // Pause background polling while a post is open — no reason to refetch
+    // the whole feed list behind a detail view the user is actively reading.
+    if (selectedPostId) return;
     const id = setInterval(loadFeed, 10000);
     return () => clearInterval(id);
-  }, []);
+  }, [selectedPostId]);
 
   if (selectedPostId) {
     const post = posts.find(p => p.id === selectedPostId);
@@ -19491,6 +19532,7 @@ function App() {
         <SessionReceipt
           sessionId={receiptSessionId}
           onBack={() => setScreen('lobby')}
+          onOpenReceipt={openReceipt}
         />
       )}
 
@@ -19852,60 +19894,74 @@ function App() {
       {shareModal.show && (
         <div className="win-overlay">
           <div className="win-card">
-            <h2>Share to Feed</h2>
-            <div style={{ marginBottom: '1rem' }}>
-              <textarea
-                placeholder="Add a caption (optional, max 280 chars)"
-                value={shareModal.caption}
-                onChange={(e) => setShareModal(prev => ({ ...prev, caption: e.target.value.slice(0, 280) }))}
-                style={{
-                  width: '100%',
-                  padding: '0.8rem',
-                  background: C.card,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: '10px',
-                  color: C.text,
-                  fontFamily: 'inherit',
-                  fontSize: '0.9rem',
-                  minHeight: '80px',
-                  resize: 'vertical',
-                  outline: 'none',
-                }}
-              />
-              <div style={{ fontSize: '0.75rem', color: C.muted, marginTop: '0.4rem', textAlign: 'right' }}>
-                {shareModal.caption.length}/280
-              </div>
-            </div>
-            <button
-              className="primary-btn"
-              onClick={async () => {
-                const { ok } = await api('/api/posts', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    gameId: shareModal.gameId,
-                    score: shareModal.score,
-                    steps: shareModal.steps,
-                    timeSecs: shareModal.timeSecs,
-                    caption: shareModal.caption || null,
-                  }),
-                });
-                if (ok) {
-                  setShareModal({ show: false, caption: '' });
-                  // Show brief success message
-                  setTimeout(() => backToLobby(), 1500);
-                }
-              }}
-              style={{ marginBottom: '0.6rem' }}
-            >
-              ✓ Post to Feed
-            </button>
-            <button
-              className="primary-btn"
-              style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-              onClick={() => setShareModal({ show: false, caption: '' })}
-            >
-              Cancel
-            </button>
+            {shareModal.posted ? (
+              <>
+                <div className="trophy">✅</div>
+                <h2>Shared!</h2>
+                <div className="sub">Your result is live in the Community Feed.</div>
+                <button
+                  className="primary-btn"
+                  onClick={() => { setShareModal({ show: false, caption: '' }); backToLobby(); }}
+                >
+                  Done
+                </button>
+              </>
+            ) : (
+              <>
+                <h2>Share to Feed</h2>
+                <div style={{ marginBottom: '1rem' }}>
+                  <textarea
+                    placeholder="Add a caption (optional, max 280 chars)"
+                    value={shareModal.caption}
+                    onChange={(e) => setShareModal(prev => ({ ...prev, caption: e.target.value.slice(0, 280) }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.8rem',
+                      background: C.card,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: '10px',
+                      color: C.text,
+                      fontFamily: 'inherit',
+                      fontSize: '0.9rem',
+                      minHeight: '80px',
+                      resize: 'vertical',
+                      outline: 'none',
+                    }}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: C.muted, marginTop: '0.4rem', textAlign: 'right' }}>
+                    {shareModal.caption.length}/280
+                  </div>
+                </div>
+                <button
+                  className="primary-btn"
+                  onClick={async () => {
+                    const { ok } = await api('/api/posts', {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        gameId: shareModal.gameId,
+                        score: shareModal.score,
+                        steps: shareModal.steps,
+                        timeSecs: shareModal.timeSecs,
+                        caption: shareModal.caption || null,
+                      }),
+                    });
+                    // Land on a "Shared!" confirmation the player dismisses themselves,
+                    // instead of silently closing the modal and auto-navigating away.
+                    if (ok) setShareModal(prev => ({ ...prev, posted: true }));
+                  }}
+                  style={{ marginBottom: '0.6rem' }}
+                >
+                  ✓ Post to Feed
+                </button>
+                <button
+                  className="primary-btn"
+                  style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
+                  onClick={() => setShareModal({ show: false, caption: '' })}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

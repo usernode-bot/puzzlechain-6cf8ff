@@ -103,7 +103,13 @@
     { "name": "Diamond Rush game screen loads", "path": "/?game=diamondrush", "expectText": "Score" },
     { "name": "Diamond Rush leaderboard renders seeded scores", "path": "/?game=diamondrush&demo=classic-scores", "expectText": "Staging demo Ada" },
     { "name": "Chutes Ladders leaderboard renders seeded scores", "path": "/?game=chutes-ladders&demo=classic-scores", "expectText": "Staging demo Ada" },
-    { "name": "Poker setup screen renders", "path": "/?game=texas", "expectText": "Start Game" },
-    { "name": "Poker setup has bot selector", "path": "/?game=texas", "expectText": "How many bots?" }
+    { "name": "Poker mode chooser renders", "path": "/?game=texas", "expectText": "How do you want to play?" },
+    { "name": "Poker chooser offers Multiplayer table", "path": "/?game=texas", "expectText": "Multiplayer table" },
+    { "name": "Poker solo setup screen renders", "path": "/?game=texas&mmode=bot", "expectText": "Start Game" },
+    { "name": "Poker solo setup has bot selector", "path": "/?game=texas&mmode=bot", "expectText": "How many bots?" },
+    { "name": "Poker multiplayer lobby renders", "path": "/?game=texas&mmode=online&demo=1", "expectText": "Poker lobby" },
+    { "name": "Poker lobby shows bankroll", "path": "/?game=texas&mmode=online&demo=1", "expectText": "Your bankroll" },
+    { "name": "Poker lobby lists open demo table", "path": "/?game=texas&mmode=online&demo=1", "expectText": "Open tables" },
+    { "name": "Poker lobby shows incoming invite banner", "path": "/?game=texas&mmode=online&demo=1", "expectText": "invited you to a poker table" }
   ]
 }

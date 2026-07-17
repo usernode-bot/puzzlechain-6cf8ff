@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const ethers = require('ethers');
 const dapp = require('./lib/dapp');
+const poker = require('./lib/poker-engine');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -442,6 +443,100 @@ async function migrate() {
       ON CONFLICT (user_id) DO NOTHING
     `);
   }
+
+  // ---- Multiplayer Texas Hold'em (6-max) --------------------------------
+  //
+  // poker_tables is PRIVATE (staging:private): its `state` JSONB holds the
+  // shuffled deck and every seated player's live hole cards. A stranger
+  // reading rows must never see unrevealed cards, so the table is copied
+  // schema-only into staging and seeded there explicitly.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS poker_tables (
+      id             TEXT PRIMARY KEY,
+      host_id        TEXT NOT NULL,
+      host_name      TEXT,
+      status         TEXT NOT NULL DEFAULT 'waiting',  -- waiting|active|finished
+      small_blind    INTEGER NOT NULL DEFAULT 5,
+      big_blind      INTEGER NOT NULL DEFAULT 10,
+      max_seats      INTEGER NOT NULL DEFAULT 6,
+      hand_no        INTEGER NOT NULL DEFAULT 0,
+      button_seat    INTEGER NOT NULL DEFAULT 0,
+      state          JSONB NOT NULL DEFAULT '{}',
+      move_seq       INTEGER NOT NULL DEFAULT 0,
+      last_action_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_tick_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE poker_tables IS 'staging:private'`);
+
+  // poker_seats is PUBLIC — roster + non-secret per-seat display state (who is
+  // sitting where, stack, current bet). NO hole cards live here (they stay in
+  // poker_tables.state), so this table can stay public without a foreign key
+  // into the private table. One row per occupied seat.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS poker_seats (
+      table_id     TEXT NOT NULL,
+      seat_idx     INTEGER NOT NULL,
+      user_id      TEXT,
+      display_name TEXT,
+      is_bot       BOOLEAN NOT NULL DEFAULT false,
+      stack        INTEGER NOT NULL DEFAULT 0,
+      in_hand      BOOLEAN NOT NULL DEFAULT false,
+      bet          INTEGER NOT NULL DEFAULT 0,
+      last_action  TEXT,
+      sitting_out  BOOLEAN NOT NULL DEFAULT false,
+      joined_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (table_id, seat_idx)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_poker_seats_user ON poker_seats(user_id)`);
+
+  // poker_invites is PRIVATE — invitations are personal notification data
+  // (who invited whom to which table). Copied schema-only into staging.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS poker_invites (
+      id           TEXT PRIMARY KEY,
+      table_id     TEXT NOT NULL,
+      inviter_id   TEXT NOT NULL,
+      inviter_name TEXT,
+      invitee_id   TEXT NOT NULL,
+      invitee_name TEXT,
+      status       TEXT NOT NULL DEFAULT 'pending',  -- pending|accepted|declined|expired
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE poker_invites IS 'staging:private'`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_poker_invites_invitee ON poker_invites(invitee_id, status)`);
+
+  // poker_hands is PUBLIC — finished-hand results (revealed post-showdown data
+  // only) for the win banner / hand history / a future leaderboard.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS poker_hands (
+      id          SERIAL PRIMARY KEY,
+      table_id    TEXT NOT NULL,
+      hand_no     INTEGER NOT NULL,
+      board       JSONB,
+      winners     JSONB,
+      pot         INTEGER NOT NULL DEFAULT 0,
+      finished_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // Stale-table cleanup — mirror classic_rooms. Prune abandoned waiting tables
+  // and long-finished ones so they don't accumulate (idempotent, cheap).
+  await pool.query(
+    `DELETE FROM poker_seats WHERE table_id IN (
+       SELECT id FROM poker_tables
+        WHERE (status = 'waiting'  AND created_at     < now() - interval '24 hours')
+           OR (status IN ('active','finished') AND last_action_at < now() - interval '12 hours'))`
+  );
+  await pool.query(
+    `DELETE FROM poker_tables
+      WHERE (status = 'waiting'  AND created_at     < now() - interval '24 hours')
+         OR (status IN ('active','finished') AND last_action_at < now() - interval '12 hours')`
+  );
+  await pool.query(`DELETE FROM poker_invites WHERE created_at < now() - interval '24 hours'`);
 
   // idle_game_state is PUBLIC: game state, no sensitive data.
   // One row per user; tracks currency, prestige, units owned, upgrades.
@@ -1707,6 +1802,78 @@ async function migrate() {
         [uid, uname, best, lvl, secs]
       );
     }
+
+    // ---- Multiplayer poker staging seeds ---------------------------------
+    // poker_tables and poker_invites are staging:private (schema-only copy),
+    // so they start EMPTY in staging and must be seeded here for the lobby,
+    // table list, invite picker, and (request-time) invite banner to render.
+    // Idempotent; strict no-op in production.
+
+    // Directory users for the invite search ("Staging demo …").
+    const pokerDemoUsers = [
+      ['staging-demo-ada', 'Staging demo Ada'],
+      ['staging-demo-borg', 'Staging demo Borg'],
+      ['staging-demo-cy', 'Staging demo Cy'],
+      ['staging-demo-dot', 'Staging demo Dot'],
+      ['staging-demo-evi', 'Staging demo Evi'],
+    ];
+    for (const [id, uname] of pokerDemoUsers) {
+      await pool.query(
+        `INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+        [id, uname]
+      );
+      await pool.query(
+        `INSERT INTO poker_chips (user_id, chips) VALUES ($1, 1500) ON CONFLICT (user_id) DO NOTHING`,
+        [id]
+      );
+    }
+
+    // One open demo table hosted by "Staging demo Ada" with two seated bots and
+    // three open seats, so "Play now" / join-by-code and the table list are
+    // demonstrable. phase 'idle' → a hand deals as soon as anyone polls it.
+    const demoState = poker.newTableState({ maxSeats: 6, smallBlind: 5, bigBlind: 10 });
+    demoState.seats[0] = { userId: 'staging-demo-ada', name: 'Staging demo Ada', isBot: false, stack: 980, sittingOut: false };
+    demoState.seats[1] = { userId: null, name: 'Bob', isBot: true, stack: 1000, sittingOut: false };
+    demoState.seats[2] = { userId: null, name: 'Carol', isBot: true, stack: 1000, sittingOut: false };
+    await pool.query(
+      `INSERT INTO poker_tables (id, host_id, host_name, status, small_blind, big_blind, max_seats, state)
+       VALUES ('DEMO01', 'staging-demo-ada', 'Staging demo Ada', 'waiting', 5, 10, 6, $1::jsonb)
+       ON CONFLICT (id) DO NOTHING`,
+      [JSON.stringify(demoState)]
+    );
+    const demoSeatRows = [
+      ['DEMO01', 0, 'staging-demo-ada', 'Staging demo Ada', false, 980],
+      ['DEMO01', 1, null, 'Bob', true, 1000],
+      ['DEMO01', 2, null, 'Carol', true, 1000],
+    ];
+    for (const [tid, idx, uid, name, bot, stack] of demoSeatRows) {
+      await pool.query(
+        `INSERT INTO poker_seats (table_id, seat_idx, user_id, display_name, is_bot, stack)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (table_id, seat_idx) DO NOTHING`,
+        [tid, idx, uid, name, bot, stack]
+      );
+    }
+
+    // A pending invite from Ada to the canonical demo user, so the invite list
+    // has at least one row even before the request-time (viewer-targeted)
+    // injection on GET /api/poker/invites?demo=1 fires.
+    await pool.query(
+      `INSERT INTO poker_invites (id, table_id, inviter_id, inviter_name, invitee_id, invitee_name, status)
+       VALUES ('PKINV1', 'DEMO01', 'staging-demo-ada', 'Staging demo Ada', 'staging-demo-user', 'staging-demo-user', 'pending')
+       ON CONFLICT (id) DO NOTHING`
+    );
+
+    // One finished hand so the hand-history view has content.
+    await pool.query(
+      `INSERT INTO poker_hands (table_id, hand_no, board, winners, pot)
+       SELECT 'DEMO01', 1, $1::jsonb, $2::jsonb, 120
+       WHERE NOT EXISTS (SELECT 1 FROM poker_hands WHERE table_id = 'DEMO01' AND hand_no = 1)`,
+      [
+        JSON.stringify([{ r: 14, s: 0 }, { r: 13, s: 0 }, { r: 5, s: 1 }, { r: 9, s: 2 }, { r: 2, s: 3 }]),
+        JSON.stringify([{ seatIdx: 0, name: 'Staging demo Ada', amount: 120, handName: 'Pair' }]),
+      ]
+    );
   }
 
   // Tilematch Puzzle staging seeds: populate leaderboard, wallet, tasks, duels,
@@ -5072,6 +5239,492 @@ app.post('/api/poker/chips', async (req, res) => {
     res.status(500).json({ error: 'Failed to save chips' });
   }
 });
+
+// ---- Multiplayer Texas Hold'em API ------------------------------------------
+// Server-authoritative: poker_tables.state (PRIVATE) holds the deck + every
+// player's hole cards; clients only ever receive the per-viewer redacted view
+// from poker.viewFor(). The hand advances lazily on any request that touches
+// the table (poker.runTicks), serialized by a move_seq CAS like classic_rooms.
+
+const POKER_BUYIN = poker.DEFAULT_BUYIN; // 1000
+const POKER_FREE_RELOAD = 1000;
+const POKER_TICK_THROTTLE_MS = 400;      // don't re-tick faster than this on polls
+
+// Read a user's bankroll (defaults to 1000 for a brand-new player).
+async function pokerBankroll(userId) {
+  const { rows } = await pool.query('SELECT chips FROM poker_chips WHERE user_id = $1', [userId]);
+  return rows.length ? rows[0].chips : 1000;
+}
+async function pokerSetBankroll(userId, chips) {
+  await pool.query(
+    `INSERT INTO poker_chips (user_id, chips) VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET chips = EXCLUDED.chips, updated_at = now()`,
+    [userId, Math.max(0, Math.round(chips))]
+  );
+}
+
+// Persist the engine state + a mirror of the roster into poker_seats. Uses a
+// move_seq CAS so concurrent ticks/actions can't clobber each other; returns
+// true when the write landed.
+async function pokerPersist(tableId, state, expectedSeq, statusOverride) {
+  const status = statusOverride
+    || (state.phase === 'idle' && poker.occupiedCount(state) <= 1 ? 'waiting' : 'active');
+  const { rows } = await pool.query(
+    `UPDATE poker_tables
+        SET state = $1::jsonb, move_seq = move_seq + 1, status = $2,
+            hand_no = $3, button_seat = $4, last_action_at = now(), last_tick_at = now()
+      WHERE id = $5 AND move_seq = $6
+      RETURNING move_seq`,
+    [JSON.stringify(state), status, state.handNo, state.button, tableId, expectedSeq]
+  );
+  if (rows.length === 0) return false;
+  // Mirror the roster into poker_seats for the lobby list / join lookups.
+  await pool.query('DELETE FROM poker_seats WHERE table_id = $1', [tableId]);
+  for (let i = 0; i < state.seats.length; i++) {
+    const s = state.seats[i];
+    if (!s) continue;
+    const p = state.players && state.players[i];
+    await pool.query(
+      `INSERT INTO poker_seats
+         (table_id, seat_idx, user_id, display_name, is_bot, stack, in_hand, bet, last_action, sitting_out)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [tableId, i, s.userId, s.name, s.isBot, s.stack, !!p, p ? p.bet : 0,
+       p && p.lastAction ? p.lastAction.type : null, s.sittingOut]
+    );
+  }
+  return true;
+}
+
+// Record finished hands into poker_hands (idempotent per hand_no).
+async function pokerRecordHand(tableId, state) {
+  const r = state.lastResult;
+  if (!r) return;
+  const pot = (r.winners || []).reduce((a, w) => a + (w.amount || 0), 0);
+  await pool.query(
+    `INSERT INTO poker_hands (table_id, hand_no, board, winners, pot)
+     SELECT $1, $2, $3::jsonb, $4::jsonb, $5
+      WHERE NOT EXISTS (SELECT 1 FROM poker_hands WHERE table_id = $1 AND hand_no = $2)`,
+    [tableId, r.handNo, JSON.stringify(r.board || []), JSON.stringify(r.winners || []), pot]
+  );
+}
+
+// Load a table row, run the lazy tick, and persist if anything changed. Retries
+// the CAS a few times under contention. Returns the fresh state object.
+async function pokerLoadAndTick(tableId, { force } = {}) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { rows } = await pool.query('SELECT * FROM poker_tables WHERE id = $1', [tableId]);
+    if (rows.length === 0) return null;
+    const row = rows[0];
+    const state = row.state || poker.newTableState();
+    if (!state.seats) return state; // malformed — leave as-is
+    // Throttle GET-driven ticks so 6 pollers don't thrash the row.
+    const sinceTick = Date.now() - new Date(row.last_tick_at).getTime();
+    if (!force && sinceTick < POKER_TICK_THROTTLE_MS) return state;
+    const prevHandNo = state.handNo;
+    const changed = poker.runTicks(state, Date.now());
+    if (!changed) {
+      // Still bump last_tick_at so the throttle window resets (best-effort).
+      await pool.query('UPDATE poker_tables SET last_tick_at = now() WHERE id = $1', [tableId]).catch(() => {});
+      return state;
+    }
+    const ok = await pokerPersist(tableId, state, row.move_seq);
+    if (ok) {
+      // A hand may have finished during this tick run — record it.
+      if (state.lastResult && state.lastResult.handNo !== prevHandNo) {
+        await pokerRecordHand(tableId, state).catch(() => {});
+      }
+      return state;
+    }
+    // Lost the CAS — someone else advanced it; loop and re-read.
+  }
+  const { rows } = await pool.query('SELECT state FROM poker_tables WHERE id = $1', [tableId]);
+  return rows.length ? rows[0].state : null;
+}
+
+function pokerTableSummaryRow(row, seatRows) {
+  const seats = seatRows.filter(s => s.table_id === row.id);
+  const humans = seats.filter(s => !s.is_bot && s.user_id);
+  const occupied = seats.length;
+  return {
+    id: row.id,
+    hostName: row.host_name,
+    status: row.status,
+    smallBlind: row.small_blind,
+    bigBlind: row.big_blind,
+    maxSeats: row.max_seats,
+    handNo: row.hand_no,
+    occupied,
+    humans: humans.length,
+    openSeats: Math.max(0, row.max_seats - occupied),
+    players: seats.sort((a, b) => a.seat_idx - b.seat_idx).map(s => ({
+      seatIdx: s.seat_idx, name: s.display_name, isBot: s.is_bot,
+    })),
+  };
+}
+
+// GET /api/poker/tables — joinable open tables + the caller's seated tables.
+app.get('/api/poker/tables', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === '1') await pokerEnsureDemo(req.user.id);
+    const { rows: tables } = await pool.query(
+      `SELECT * FROM poker_tables WHERE status IN ('waiting','active')
+        ORDER BY last_action_at DESC LIMIT 40`
+    );
+    const ids = tables.map(t => t.id);
+    let seatRows = [];
+    if (ids.length) {
+      seatRows = (await pool.query(
+        `SELECT * FROM poker_seats WHERE table_id = ANY($1)`, [ids]
+      )).rows;
+    }
+    const mineIds = new Set(seatRows.filter(s => s.user_id === req.user.id).map(s => s.table_id));
+    const summaries = tables.map(t => ({ ...pokerTableSummaryRow(t, seatRows), seated: mineIds.has(t.id) }));
+    const open = summaries.filter(t => t.openSeats > 0 && !t.seated);
+    const mine = summaries.filter(t => t.seated);
+    const chips = await pokerBankroll(req.user.id);
+    res.json({ open, mine, chips });
+  } catch (err) {
+    console.error('[poker] list tables failed:', err.message);
+    res.status(500).json({ error: 'Failed to list tables' });
+  }
+});
+
+// POST /api/poker/tables { smallBlind?, bigBlind? } — create a table, seat the
+// caller at seat 0, fill the rest with bots so a hand can start immediately.
+app.post('/api/poker/tables', async (req, res) => {
+  try {
+    let sb = Math.round(Number(req.body.smallBlind));
+    let bb = Math.round(Number(req.body.bigBlind));
+    if (!Number.isFinite(sb) || sb < 1) sb = 5;
+    if (!Number.isFinite(bb) || bb <= sb) bb = sb * 2;
+
+    const bankroll = await pokerBankroll(req.user.id);
+    if (bankroll <= 0) return res.status(409).json({ error: 'no_chips', message: 'Reload chips to sit down' });
+    const buyIn = Math.min(bankroll, POKER_BUYIN);
+
+    const state = poker.newTableState({ maxSeats: 6, smallBlind: sb, bigBlind: bb });
+    state.seats[0] = { userId: req.user.id, name: req.user.username || 'You', isBot: false, stack: buyIn, sittingOut: false };
+    poker.fillBots(state, POKER_BUYIN);
+
+    let tableId = generateRoomId();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        await pool.query(
+          `INSERT INTO poker_tables (id, host_id, host_name, small_blind, big_blind, max_seats, state, status)
+           VALUES ($1,$2,$3,$4,$5,6,$6::jsonb,'waiting')`,
+          [tableId, req.user.id, req.user.username || null, sb, bb, JSON.stringify(state)]
+        );
+        break;
+      } catch (err) {
+        if (err.code === '23505') { tableId = generateRoomId(); continue; }
+        throw err;
+      }
+    }
+    // Debit the buy-in from the bankroll and mirror seats.
+    await pokerSetBankroll(req.user.id, bankroll - buyIn);
+    await pokerSeatMirror(tableId, state);
+    res.json({ id: tableId, view: poker.viewFor(state, req.user.id, Date.now()) });
+  } catch (err) {
+    console.error('[poker] create table failed:', err.message);
+    res.status(500).json({ error: 'Failed to create table' });
+  }
+});
+
+// Mirror the roster into poker_seats without a CAS (used right after create).
+async function pokerSeatMirror(tableId, state) {
+  await pool.query('DELETE FROM poker_seats WHERE table_id = $1', [tableId]);
+  for (let i = 0; i < state.seats.length; i++) {
+    const s = state.seats[i];
+    if (!s) continue;
+    await pool.query(
+      `INSERT INTO poker_seats (table_id, seat_idx, user_id, display_name, is_bot, stack, sitting_out)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [tableId, i, s.userId, s.name, s.isBot, s.stack, s.sittingOut]
+    );
+  }
+}
+
+// POST /api/poker/tables/:id/join { seatIdx? } — take an open or bot seat.
+app.post('/api/poker/tables/:id/join', async (req, res) => {
+  const { id } = req.params;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { rows } = await pool.query('SELECT * FROM poker_tables WHERE id = $1', [id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Table not found' });
+      const row = rows[0];
+      const state = row.state || poker.newTableState();
+      if (!state.seats) return res.status(409).json({ error: 'Table unavailable' });
+
+      // Already seated? Just return the view.
+      const existing = state.seats.findIndex(s => s && s.userId === req.user.id);
+      if (existing >= 0) {
+        return res.json({ id, seatIdx: existing, view: poker.viewFor(state, req.user.id, Date.now()) });
+      }
+
+      // Choose a seat: requested one if free/bot, else the first bot seat, else
+      // the first empty seat.
+      let target = -1;
+      const want = Number.isInteger(req.body.seatIdx) ? req.body.seatIdx : null;
+      const seatFree = (i) => i >= 0 && i < state.seats.length && (!state.seats[i] || state.seats[i].isBot);
+      if (want != null && seatFree(want)) target = want;
+      if (target < 0) target = state.seats.findIndex(s => s && s.isBot);
+      if (target < 0) target = poker.firstEmptySeat(state);
+      if (target < 0) return res.status(409).json({ error: 'Table is full' });
+
+      const bankroll = await pokerBankroll(req.user.id);
+      if (bankroll <= 0) return res.status(409).json({ error: 'no_chips', message: 'Reload chips to sit down' });
+      const buyIn = Math.min(bankroll, POKER_BUYIN);
+
+      // Replacing a bot mid-hand: fold the bot's live hand so it can't act, and
+      // take the seat starting next hand (fresh stack from the buy-in).
+      if (state.players && state.players[target]) {
+        state.players[target].folded = true;
+      }
+      state.seats[target] = { userId: req.user.id, name: req.user.username || 'You', isBot: false, stack: buyIn, sittingOut: false };
+
+      const ok = await pokerPersist(id, state, row.move_seq, 'active');
+      if (!ok) continue; // lost CAS — retry
+      await pokerSetBankroll(req.user.id, bankroll - buyIn);
+      // Accept any pending invite to this user for this table.
+      await pool.query(
+        `UPDATE poker_invites SET status = 'accepted'
+          WHERE table_id = $1 AND invitee_id = $2 AND status = 'pending'`,
+        [id, req.user.id]
+      );
+      return res.json({ id, seatIdx: target, view: poker.viewFor(state, req.user.id, Date.now()) });
+    }
+    res.status(409).json({ error: 'Could not join — try again' });
+  } catch (err) {
+    console.error('[poker] join failed:', err.message);
+    res.status(500).json({ error: 'Failed to join table' });
+  }
+});
+
+// POST /api/poker/tables/:id/leave — vacate; bank the remaining stack and
+// convert the seat to a bot so the hand continues.
+app.post('/api/poker/tables/:id/leave', async (req, res) => {
+  const { id } = req.params;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { rows } = await pool.query('SELECT * FROM poker_tables WHERE id = $1', [id]);
+      if (rows.length === 0) return res.json({ ok: true });
+      const row = rows[0];
+      const state = row.state || poker.newTableState();
+      const seatIdx = state.seats.findIndex(s => s && s.userId === req.user.id);
+      if (seatIdx < 0) return res.json({ ok: true });
+
+      const remaining = Math.max(0, state.seats[seatIdx].stack);
+      // Fold any live hand and hand the seat to a bot (keeps the game going).
+      if (state.players && state.players[seatIdx]) state.players[seatIdx].folded = true;
+      state.seats[seatIdx] = {
+        userId: null, name: poker.BOT_NAMES[seatIdx % poker.BOT_NAMES.length],
+        isBot: true, stack: remaining > 0 ? remaining : POKER_BUYIN, sittingOut: false,
+      };
+
+      // If no humans remain, mark the table finished so it gets cleaned up.
+      const humansLeft = state.seats.some(s => s && !s.isBot);
+      const status = humansLeft ? undefined : 'finished';
+      const ok = await pokerPersist(id, state, row.move_seq, status);
+      if (!ok) continue;
+      const bankroll = await pokerBankroll(req.user.id);
+      await pokerSetBankroll(req.user.id, bankroll + remaining);
+      return res.json({ ok: true, banked: remaining });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[poker] leave failed:', err.message);
+    res.status(500).json({ error: 'Failed to leave table' });
+  }
+});
+
+// GET /api/poker/tables/:id — poll (runs a lazy tick, returns redacted view).
+app.get('/api/poker/tables/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const state = await pokerLoadAndTick(id);
+    if (!state) return res.status(404).json({ error: 'Table not found' });
+    res.json({ id, view: poker.viewFor(state, req.user.id, Date.now()) });
+  } catch (err) {
+    console.error('[poker] poll failed:', err.message);
+    res.status(500).json({ error: 'Failed to load table' });
+  }
+});
+
+// POST /api/poker/tables/:id/action { action, amount? } — apply the caller's
+// action, then auto-resolve consecutive bot turns.
+app.post('/api/poker/tables/:id/action', async (req, res) => {
+  const { id } = req.params;
+  const { action, amount } = req.body || {};
+  const VALID = ['fold', 'check', 'call', 'raise', 'bet', 'allin'];
+  if (!VALID.includes(action)) return res.status(400).json({ error: 'Invalid action' });
+  try {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { rows } = await pool.query('SELECT * FROM poker_tables WHERE id = $1', [id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Table not found' });
+      const row = rows[0];
+      const state = row.state || poker.newTableState();
+      const seatIdx = state.seats.findIndex(s => s && s.userId === req.user.id);
+      if (seatIdx < 0) return res.status(403).json({ error: 'Not seated at this table' });
+
+      const now = Date.now();
+      const result = poker.applyAction(state, seatIdx, action, amount, now);
+      if (!result.ok) return res.status(409).json({ error: result.error, serverMoveSeq: row.move_seq });
+      const prevHandNo = state.lastResult ? state.lastResult.handNo : -1;
+      // Resolve any bots now on the clock.
+      poker.runTicks(state, now);
+
+      const ok = await pokerPersist(id, state, row.move_seq, 'active');
+      if (!ok) continue; // lost CAS — re-read and re-validate
+      if (state.lastResult && state.lastResult.handNo !== prevHandNo) {
+        await pokerRecordHand(id, state).catch(() => {});
+      }
+      return res.json({ id, view: poker.viewFor(state, req.user.id, now) });
+    }
+    res.status(409).json({ error: 'Table busy — try again' });
+  } catch (err) {
+    console.error('[poker] action failed:', err.message);
+    res.status(500).json({ error: 'Failed to apply action' });
+  }
+});
+
+// POST /api/poker/tables/:id/rebuy — top a busted seat back up from the
+// bankroll (or grant a free reload when the bankroll is empty too).
+app.post('/api/poker/tables/:id/rebuy', async (req, res) => {
+  const { id } = req.params;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { rows } = await pool.query('SELECT * FROM poker_tables WHERE id = $1', [id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Table not found' });
+      const row = rows[0];
+      const state = row.state || poker.newTableState();
+      const seatIdx = state.seats.findIndex(s => s && s.userId === req.user.id);
+      if (seatIdx < 0) return res.status(403).json({ error: 'Not seated at this table' });
+      const seat = state.seats[seatIdx];
+
+      let bankroll = await pokerBankroll(req.user.id);
+      if (bankroll <= 0) { bankroll = POKER_FREE_RELOAD; } // free play-money reload
+      const topUp = Math.min(bankroll, POKER_BUYIN - seat.stack);
+      if (topUp <= 0) return res.json({ id, view: poker.viewFor(state, req.user.id, Date.now()) });
+      seat.stack += topUp;
+      seat.sittingOut = false;
+
+      const ok = await pokerPersist(id, state, row.move_seq, 'active');
+      if (!ok) continue;
+      await pokerSetBankroll(req.user.id, bankroll - topUp);
+      return res.json({ id, view: poker.viewFor(state, req.user.id, Date.now()) });
+    }
+    res.status(409).json({ error: 'Table busy — try again' });
+  } catch (err) {
+    console.error('[poker] rebuy failed:', err.message);
+    res.status(500).json({ error: 'Failed to rebuy' });
+  }
+});
+
+// GET /api/poker/invites — pending invites for the caller (drives the banner).
+app.get('/api/poker/invites', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === '1') await pokerEnsureDemo(req.user.id);
+    const { rows } = await pool.query(
+      `SELECT pi.id, pi.table_id, pi.inviter_name, pi.created_at, pt.status AS table_status
+         FROM poker_invites pi
+         LEFT JOIN poker_tables pt ON pt.id = pi.table_id
+        WHERE pi.invitee_id = $1 AND pi.status = 'pending'
+        ORDER BY pi.created_at DESC LIMIT 20`,
+      [req.user.id]
+    );
+    // Hide invites whose table is gone/finished.
+    const invites = rows
+      .filter(r => r.table_status === 'waiting' || r.table_status === 'active')
+      .map(r => ({ id: r.id, tableId: r.table_id, inviterName: r.inviter_name, createdAt: r.created_at }));
+    res.json({ invites });
+  } catch (err) {
+    console.error('[poker] invites failed:', err.message);
+    res.status(500).json({ error: 'Failed to load invites' });
+  }
+});
+
+// POST /api/poker/invites { tableId, inviteeId } — invite a user to a table.
+app.post('/api/poker/invites', async (req, res) => {
+  const { tableId, inviteeId } = req.body || {};
+  if (!tableId || !inviteeId) return res.status(400).json({ error: 'tableId and inviteeId are required' });
+  if (inviteeId === req.user.id) return res.status(409).json({ error: 'Cannot invite yourself' });
+  try {
+    const { rows: t } = await pool.query('SELECT id FROM poker_tables WHERE id = $1', [tableId]);
+    if (t.length === 0) return res.status(404).json({ error: 'Table not found' });
+    const { rows: u } = await pool.query('SELECT username FROM users WHERE id = $1', [inviteeId]);
+    if (u.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    // De-dupe an existing pending invite for the same (table, invitee).
+    const { rows: dup } = await pool.query(
+      `SELECT id FROM poker_invites WHERE table_id = $1 AND invitee_id = $2 AND status = 'pending'`,
+      [tableId, inviteeId]
+    );
+    if (dup.length) return res.json({ id: dup[0].id, ok: true });
+
+    const inviteId = generateRoomId() + generateRoomId().slice(0, 4);
+    await pool.query(
+      `INSERT INTO poker_invites (id, table_id, inviter_id, inviter_name, invitee_id, invitee_name, status)
+       VALUES ($1,$2,$3,$4,$5,$6,'pending')`,
+      [inviteId, tableId, req.user.id, req.user.username || null, inviteeId, u[0].username]
+    );
+    res.json({ id: inviteId, ok: true });
+  } catch (err) {
+    console.error('[poker] create invite failed:', err.message);
+    res.status(500).json({ error: 'Failed to send invite' });
+  }
+});
+
+// POST /api/poker/invites/:id/decline — dismiss an invite.
+app.post('/api/poker/invites/:id/decline', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE poker_invites SET status = 'declined' WHERE id = $1 AND invitee_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[poker] decline invite failed:', err.message);
+    res.status(500).json({ error: 'Failed to decline invite' });
+  }
+});
+
+// GET /api/poker/users?q= — username search for the invite picker. Friends
+// (followees) float to the top, then alphabetical.
+app.get('/api/poker/users', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 1) return res.json({ users: [] });
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id, u.username,
+              CASE WHEN f.followee_id IS NOT NULL THEN 1 ELSE 0 END AS is_friend
+         FROM users u
+         LEFT JOIN user_follows f ON f.followee_id = u.id AND f.follower_id = $2
+        WHERE u.username ILIKE $1 AND u.id != $2
+        ORDER BY is_friend DESC, u.username ASC
+        LIMIT 12`,
+      ['%' + q + '%', req.user.id]
+    );
+    res.json({ users: rows.map(r => ({ id: r.id, username: r.username, friend: r.is_friend === 1 })) });
+  } catch (err) {
+    console.error('[poker] user search failed:', err.message);
+    res.status(500).json({ error: 'Failed to search users' });
+  }
+});
+
+// Staging-only: ensure a pending invite exists for the current viewer so the
+// invite banner is demonstrable. Idempotent; only ever called under IS_STAGING.
+async function pokerEnsureDemo(viewerId) {
+  try {
+    const inviteId = 'PKV' + crypto.createHash('md5').update(String(viewerId)).digest('hex').slice(0, 10);
+    await pool.query(
+      `INSERT INTO poker_invites (id, table_id, inviter_id, inviter_name, invitee_id, invitee_name, status)
+       SELECT $2, 'DEMO01', 'staging-demo-ada', 'Staging demo Ada', $1, 'you', 'pending'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM poker_invites WHERE invitee_id = $1 AND table_id = 'DEMO01' AND status = 'pending')`,
+      [viewerId, inviteId]
+    );
+  } catch (e) { /* best-effort */ }
+}
 
 // ---- Idle clicker API -------------------------------------------------------
 

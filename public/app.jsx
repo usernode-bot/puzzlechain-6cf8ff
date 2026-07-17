@@ -4367,6 +4367,86 @@ body {
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
 .hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
+
+/* ---- Multiplayer Poker (mode chooser / lobby / table) ---- */
+.pk-chooser { display: flex; flex-direction: column; gap: 0.9rem; padding: 1.4rem 1.1rem; max-width: 460px; margin: 0 auto; }
+.pk-chooser-title { font-size: 1.35rem; font-weight: 800; text-align: center; }
+.pk-chooser-sub { font-size: 0.85rem; color: ${C.muted}; text-align: center; margin-bottom: 0.4rem; }
+.pk-choice {
+  display: flex; align-items: center; gap: 0.9rem; text-align: left;
+  padding: 1rem; border-radius: 14px; border: 1px solid ${C.border};
+  background: ${C.border}22; cursor: pointer; transition: border-color 0.15s, transform 0.1s;
+}
+.pk-choice:hover { border-color: ${C.gold}; }
+.pk-choice:active { transform: scale(0.99); }
+.pk-choice-icon { font-size: 1.9rem; }
+.pk-choice-name { font-weight: 700; font-size: 1.05rem; }
+.pk-choice-desc { font-size: 0.82rem; color: ${C.muted}; }
+
+.pk-lobby { display: flex; flex-direction: column; gap: 1rem; padding: 1.1rem; max-width: 560px; margin: 0 auto; }
+.pk-lobby-head { display: flex; align-items: center; gap: 0.6rem; }
+.pk-lobby-back { background: none; border: none; color: ${C.muted}; font-size: 1.2rem; cursor: pointer; padding: 0.2rem 0.4rem; }
+.pk-lobby-title { font-size: 1.2rem; font-weight: 800; flex: 1; }
+.pk-bankroll {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 1rem; border-radius: 14px; border: 1px solid ${C.gold}55;
+  background: linear-gradient(135deg, ${C.gold}18, ${C.border}22);
+}
+.pk-bankroll-label { font-size: 0.8rem; color: ${C.muted}; }
+.pk-bankroll-value { font-size: 1.5rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
+.pk-reload-btn { background: ${C.gold}; color: #1a1204; border: none; border-radius: 10px; padding: 0.5rem 0.9rem; font-weight: 700; cursor: pointer; }
+.pk-card { border: 1px solid ${C.border}; border-radius: 14px; padding: 1rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.pk-card-title { font-weight: 700; font-size: 0.95rem; }
+.pk-blind-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.pk-blind-btn { flex: 1; min-width: 70px; padding: 0.5rem; border-radius: 10px; border: 1px solid ${C.border}; background: ${C.border}22; color: ${C.text}; cursor: pointer; font-size: 0.82rem; }
+.pk-blind-btn.sel { border-color: ${C.gold}; background: ${C.gold}22; color: ${C.gold}; font-weight: 700; }
+.pk-primary-btn { background: ${C.accent}; color: #fff; border: none; border-radius: 12px; padding: 0.8rem; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+.pk-primary-btn:disabled { opacity: 0.5; cursor: default; }
+.pk-join-row { display: flex; gap: 0.5rem; }
+.pk-join-input { flex: 1; padding: 0.7rem; border-radius: 10px; border: 1px solid ${C.border}; background: ${C.border}22; color: ${C.text}; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; }
+.pk-ghost-btn { background: ${C.border}44; color: ${C.text}; border: 1px solid ${C.border}; border-radius: 10px; padding: 0.7rem 1rem; font-weight: 700; cursor: pointer; }
+.pk-table-item {
+  display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.8rem;
+  border-radius: 12px; border: 1px solid ${C.border}; background: ${C.border}18;
+}
+.pk-table-item-main { flex: 1; }
+.pk-table-item-name { font-weight: 700; font-size: 0.9rem; }
+.pk-table-item-meta { font-size: 0.76rem; color: ${C.muted}; font-family: 'JetBrains Mono', monospace; }
+.pk-table-item-btn { background: ${C.emerald}; color: #05271a; border: none; border-radius: 9px; padding: 0.45rem 0.8rem; font-weight: 700; cursor: pointer; }
+.pk-empty { color: ${C.muted}; font-size: 0.82rem; text-align: center; padding: 0.6rem; }
+.pk-err { color: ${C.rose}; font-size: 0.8rem; }
+
+.pk-invite-banner {
+  display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0;
+  padding: 0.7rem 0.9rem; border-radius: 12px;
+  border: 1px solid ${C.violet}66; background: ${C.violet}18;
+}
+.pk-invite-banner-text { flex: 1; font-size: 0.85rem; }
+.pk-invite-banner-text b { color: ${C.violet}; }
+.pk-invite-accept { background: ${C.violet}; color: #fff; border: none; border-radius: 9px; padding: 0.4rem 0.8rem; font-weight: 700; cursor: pointer; }
+.pk-invite-dismiss { background: none; border: none; color: ${C.muted}; cursor: pointer; font-size: 1rem; }
+
+.pk-invite-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+.pk-invite-modal { width: 100%; max-width: 420px; background: #12172a; border: 1px solid ${C.border}; border-radius: 16px; padding: 1.1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.pk-invite-modal-title { font-weight: 800; font-size: 1.05rem; }
+.pk-code-box { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px dashed ${C.gold}66; background: ${C.gold}12; }
+.pk-code-val { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; letter-spacing: 3px; color: ${C.gold}; font-weight: 800; }
+.pk-user-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.7rem; border-radius: 10px; border: 1px solid ${C.border}; background: ${C.border}18; cursor: pointer; }
+.pk-user-result:hover { border-color: ${C.accent}; }
+.pk-user-friend { font-size: 0.68rem; color: ${C.emerald}; border: 1px solid ${C.emerald}66; border-radius: 999px; padding: 0.05rem 0.4rem; }
+.pk-user-invited { margin-left: auto; font-size: 0.72rem; color: ${C.emerald}; }
+
+/* Multiplayer table body (reuses .poker-* seat/card styling) */
+.pk-mp-actions { display: flex; gap: 0.5rem; padding: 0.7rem; }
+.pk-act-btn { flex: 1; padding: 0.85rem 0.4rem; border-radius: 12px; border: none; font-weight: 800; font-size: 0.95rem; cursor: pointer; }
+.pk-act-fold { background: ${C.rose}; color: #fff; }
+.pk-act-check { background: ${C.border}66; color: ${C.text}; }
+.pk-act-call { background: ${C.accent}; color: #fff; }
+.pk-act-raise { background: ${C.gold}; color: #1a1204; }
+.pk-act-btn:disabled { opacity: 0.4; cursor: default; }
+.pk-waiting { text-align: center; color: ${C.muted}; font-size: 0.85rem; padding: 0.6rem; }
+.pk-seat-you { outline: 2px solid ${C.gold}; }
+.pk-mp-banner { text-align: center; font-weight: 700; font-size: 0.9rem; color: ${C.emerald}; padding: 0.5rem; min-height: 1.6rem; }
 `;
 
 /* ============================================================
@@ -11767,7 +11847,583 @@ function HandHistoryDrawer({ open, onClose, history }) {
   );
 }
 
-/* ---- Texas Hold 'Em main component ---- */
+/* ============================================================
+   Multiplayer Texas Hold'em — 6-max, server-authoritative.
+   The mode chooser routes to the solo game (unchanged) or the
+   multiplayer flow (lobby → table). All game state comes from the
+   server via poll; the client only renders and posts actions.
+   ============================================================ */
+
+const POKER_DEMO = (() => {
+  try { return new URLSearchParams(window.location.search).get('demo') === '1'; }
+  catch { return false; }
+})();
+const pokerDemoQ = POKER_DEMO ? '?demo=1' : '';
+const POKER_TURN_SECS = 25;
+
+// Poll a multiplayer table (~1.5s) and expose an action submitter.
+function usePokerTable(tableId) {
+  const [view, setView] = useState(null);
+  const [error, setError] = useState(null);
+  const [slow, setSlow] = useState(false);
+  const errCount = useRef(0);
+  const timer = useRef(null);
+
+  const fetchTable = async () => {
+    try {
+      const { ok, status, body } = await api(`/api/poker/tables/${tableId}`);
+      if (ok && body && body.view) {
+        setView(body.view); setError(null); setSlow(false); errCount.current = 0;
+      } else if (status === 404) {
+        setError('table_gone');
+      } else {
+        errCount.current++; if (errCount.current >= 3) setSlow(true);
+      }
+    } catch {
+      errCount.current++; if (errCount.current >= 3) setSlow(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!tableId) return;
+    fetchTable();
+    timer.current = setInterval(fetchTable, 1500);
+    return () => clearInterval(timer.current);
+  }, [tableId]);
+
+  const submitAction = async (action, amount) => {
+    const { ok, body } = await api(`/api/poker/tables/${tableId}/action`, {
+      method: 'POST', body: JSON.stringify({ action, amount }),
+    });
+    if (ok && body && body.view) { setView(body.view); return { ok: true }; }
+    // Re-sync on conflict so the UI reflects the true state.
+    fetchTable();
+    return { ok: false, error: body && body.error };
+  };
+
+  return { view, error, slow, submitAction, refresh: fetchTable, setView };
+}
+
+// "How do you want to play?" — the pre-launch chooser.
+function PokerModeChooser({ onSolo, onMulti, onBack }) {
+  return (
+    <div className="poker-shell">
+      <div className="poker-top-bar">
+        <button className="poker-back-btn" onClick={onBack} title="Back to games">&#8592;</button>
+        <div className="poker-top-bar-title">Texas Hold 'Em</div>
+        <div style={{ width: 24 }} />
+      </div>
+      <div className="pk-chooser">
+        <div className="pk-chooser-title">How do you want to play?</div>
+        <div className="pk-chooser-sub">Play money · no real stakes</div>
+        <button className="pk-choice" onClick={onSolo}>
+          <span className="pk-choice-icon">🤖</span>
+          <span>
+            <div className="pk-choice-name">Solo vs bots</div>
+            <div className="pk-choice-desc">Heads-up or multi-way against the computer.</div>
+          </span>
+        </button>
+        <button className="pk-choice" onClick={onMulti}>
+          <span className="pk-choice-icon">🌐</span>
+          <span>
+            <div className="pk-choice-name">Multiplayer table</div>
+            <div className="pk-choice-desc">Play live against other players. Invite anyone; bots fill empty seats.</div>
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal: invite by username search + shareable table code.
+function PokerInviteModal({ tableId, onClose }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [invited, setInvited] = useState({});
+  const [copied, setCopied] = useState(false);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    if (searchRef.current) clearTimeout(searchRef.current);
+    if (q.trim().length < 1) { setResults([]); return; }
+    searchRef.current = setTimeout(async () => {
+      const { ok, body } = await api(`/api/poker/users?q=${encodeURIComponent(q.trim())}`);
+      if (ok && body) setResults(body.users || []);
+    }, 250);
+  }, [q]);
+
+  const invite = async (u) => {
+    const { ok } = await api('/api/poker/invites', {
+      method: 'POST', body: JSON.stringify({ tableId, inviteeId: u.id }),
+    });
+    if (ok) setInvited(prev => ({ ...prev, [u.id]: true }));
+  };
+
+  const copyCode = () => {
+    try { navigator.clipboard.writeText(tableId); } catch {}
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="pk-invite-modal-backdrop" onClick={onClose}>
+      <div className="pk-invite-modal" onClick={e => e.stopPropagation()}>
+        <div className="pk-invite-modal-title">Invite players</div>
+        <div>
+          <div className="pk-bankroll-label" style={{ marginBottom: '0.3rem' }}>Share this table code</div>
+          <div className="pk-code-box">
+            <span className="pk-code-val">{tableId}</span>
+            <button className="pk-ghost-btn" onClick={copyCode}>{copied ? 'Copied!' : 'Copy'}</button>
+          </div>
+        </div>
+        <div>
+          <div className="pk-bankroll-label" style={{ marginBottom: '0.3rem' }}>Or invite by username</div>
+          <input className="pk-join-input" style={{ textTransform: 'none', letterSpacing: 0 }}
+            placeholder="Search users…" value={q} onChange={e => setQ(e.target.value)} autoFocus />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '40vh', overflowY: 'auto' }}>
+          {results.map(u => (
+            <div key={u.id} className="pk-user-result" onClick={() => !invited[u.id] && invite(u)}>
+              <span style={{ fontWeight: 600 }}>{u.username}</span>
+              {u.friend && <span className="pk-user-friend">friend</span>}
+              {invited[u.id] ? <span className="pk-user-invited">Invited ✓</span>
+                : <span className="pk-user-invited" style={{ color: C.accent }}>Invite</span>}
+            </div>
+          ))}
+          {q.trim() && results.length === 0 && <div className="pk-empty">No users found.</div>}
+        </div>
+        <button className="pk-ghost-btn" onClick={onClose}>Done</button>
+      </div>
+    </div>
+  );
+}
+
+// Lobby: bankroll, create table, join, open tables, incoming invites.
+function PokerLobby({ onOpenTable, onBack }) {
+  const [chips, setChips] = useState(null);
+  const [open, setOpen] = useState([]);
+  const [mine, setMine] = useState([]);
+  const [invites, setInvites] = useState([]);
+  const [sb, setSb] = useState(5);
+  const [joinCode, setJoinCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = async () => {
+    const { ok, body } = await api(`/api/poker/tables${pokerDemoQ}`);
+    if (ok && body) { setChips(body.chips); setOpen(body.open || []); setMine(body.mine || []); }
+    const inv = await api(`/api/poker/invites${pokerDemoQ}`);
+    if (inv.ok && inv.body) setInvites(inv.body.invites || []);
+  };
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  const blindPresets = [
+    { sb: 5, label: '5 / 10' },
+    { sb: 10, label: '10 / 20' },
+    { sb: 25, label: '25 / 50' },
+  ];
+
+  const createTable = async () => {
+    setBusy(true); setErr('');
+    const { ok, body, status } = await api('/api/poker/tables', {
+      method: 'POST', body: JSON.stringify({ smallBlind: sb, bigBlind: sb * 2 }),
+    });
+    setBusy(false);
+    if (ok && body) onOpenTable(body.id);
+    else if (status === 409 && body && body.error === 'no_chips') setErr('You have no chips — reload first.');
+    else setErr('Could not create table.');
+  };
+
+  const joinByCode = async () => {
+    const code = joinCode.trim().toUpperCase();
+    if (code.length < 4) { setErr('Enter a valid table code.'); return; }
+    setBusy(true); setErr('');
+    const { ok, status, body } = await api(`/api/poker/tables/${code}/join`, { method: 'POST' });
+    setBusy(false);
+    if (ok) onOpenTable(code);
+    else if (status === 404) setErr('Table not found. Check the code.');
+    else if (body && body.error === 'no_chips') setErr('You have no chips — reload first.');
+    else setErr(body && body.message || 'Could not join that table.');
+  };
+
+  const joinListed = async (id) => {
+    setBusy(true); setErr('');
+    const { ok, body } = await api(`/api/poker/tables/${id}/join`, { method: 'POST' });
+    setBusy(false);
+    if (ok) onOpenTable(id);
+    else setErr(body && body.message || 'Could not join.');
+  };
+
+  const reload = async () => {
+    await api('/api/poker/chips', { method: 'POST', body: JSON.stringify({ chips: 1000 }) });
+    load();
+  };
+
+  const acceptInvite = async (inv) => { onOpenTable(inv.tableId); };
+  const dismissInvite = async (inv) => {
+    setInvites(prev => prev.filter(i => i.id !== inv.id));
+    await api(`/api/poker/invites/${inv.id}/decline`, { method: 'POST' });
+  };
+
+  return (
+    <div className="poker-shell">
+      <div className="pk-lobby">
+        <div className="pk-lobby-head">
+          <button className="pk-lobby-back" onClick={onBack}>&#8592;</button>
+          <div className="pk-lobby-title">Poker lobby</div>
+        </div>
+
+        <div className="pk-bankroll">
+          <div>
+            <div className="pk-bankroll-label">Your bankroll</div>
+            <div className="pk-bankroll-value">{chips == null ? '…' : chips} chips</div>
+          </div>
+          {chips === 0 && <button className="pk-reload-btn" onClick={reload}>Reload 1,000 free chips</button>}
+        </div>
+
+        {invites.map(inv => (
+          <div key={inv.id} className="pk-invite-banner">
+            <span style={{ fontSize: '1.2rem' }}>🃏</span>
+            <div className="pk-invite-banner-text"><b>{inv.inviterName || 'Someone'}</b> invited you to a poker table</div>
+            <button className="pk-invite-accept" onClick={() => acceptInvite(inv)}>Join</button>
+            <button className="pk-invite-dismiss" onClick={() => dismissInvite(inv)}>✕</button>
+          </div>
+        ))}
+
+        <div className="pk-card">
+          <div className="pk-card-title">Create a table</div>
+          <div className="pk-blind-row">
+            {blindPresets.map(p => (
+              <button key={p.sb} className={'pk-blind-btn' + (sb === p.sb ? ' sel' : '')} onClick={() => setSb(p.sb)}>
+                Blinds {p.label}
+              </button>
+            ))}
+          </div>
+          <button className="pk-primary-btn" onClick={createTable} disabled={busy}>
+            {busy ? 'Please wait…' : 'Create 6-max table'}
+          </button>
+        </div>
+
+        <div className="pk-card">
+          <div className="pk-card-title">Join with a code</div>
+          <div className="pk-join-row">
+            <input className="pk-join-input" placeholder="CODE" maxLength={6}
+              value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} />
+            <button className="pk-ghost-btn" onClick={joinByCode} disabled={busy}>Join</button>
+          </div>
+        </div>
+
+        {err && <div className="pk-err">{err}</div>}
+
+        {mine.length > 0 && (
+          <div className="pk-card">
+            <div className="pk-card-title">Your tables</div>
+            {mine.map(t => (
+              <div key={t.id} className="pk-table-item">
+                <div className="pk-table-item-main">
+                  <div className="pk-table-item-name">Table {t.id}</div>
+                  <div className="pk-table-item-meta">{t.humans} human · {t.occupied}/{t.maxSeats} seats · {t.smallBlind}/{t.bigBlind}</div>
+                </div>
+                <button className="pk-table-item-btn" onClick={() => onOpenTable(t.id)}>Resume</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="pk-card">
+          <div className="pk-card-title">Open tables</div>
+          {open.length === 0 && <div className="pk-empty">No open tables — create one above!</div>}
+          {open.map(t => (
+            <div key={t.id} className="pk-table-item">
+              <div className="pk-table-item-main">
+                <div className="pk-table-item-name">{t.hostName || 'Table'} · {t.id}</div>
+                <div className="pk-table-item-meta">{t.humans} human · {t.openSeats} open · {t.smallBlind}/{t.bigBlind}</div>
+              </div>
+              <button className="pk-table-item-btn" onClick={() => joinListed(t.id)} disabled={busy}>Play now</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Position 6 seats around the oval with the viewer at the bottom.
+function pokerMpSeatPos(seatIdx, mySeat, maxSeats) {
+  const angles = [90, 150, 210, 270, 330, 30];
+  const base = mySeat >= 0 ? mySeat : 0;
+  const slot = ((seatIdx - base) % maxSeats + maxSeats) % maxSeats;
+  const deg = angles[slot] != null ? angles[slot] : (slot * (360 / maxSeats) + 90);
+  const rad = deg * Math.PI / 180;
+  const rx = 44, ry = 40;
+  return { x: 50 + rx * Math.cos(rad), y: 50 + ry * Math.sin(rad) };
+}
+
+function PokerMpSeat({ seat, view, now }) {
+  if (seat.empty) {
+    return (
+      <div className="poker-seat" style={{ opacity: 0.5 }}>
+        <div className="poker-seat-avatar" style={{ borderStyle: 'dashed' }}>+</div>
+        <div className="poker-seat-name"><span>Open</span></div>
+      </div>
+    );
+  }
+  const isMe = seat.seatIdx === view.mySeat;
+  const isActive = view.toAct === seat.seatIdx && view.phase === 'betting';
+  const isWinner = view.lastResult && (view.lastResult.winners || []).some(w => w.seatIdx === seat.seatIdx);
+  const cls = 'poker-seat' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '') +
+    (seat.folded ? ' folded' : '') + (isMe ? ' pk-seat-you' : '');
+  const color = POKER_SEAT_COLORS[seat.seatIdx % POKER_SEAT_COLORS.length];
+
+  let timerPct = 0;
+  if (isActive && view.actionDeadlineMs) {
+    const remain = view.actionDeadlineMs - now;
+    timerPct = Math.max(0, Math.min(1, remain / (POKER_TURN_SECS * 1000)));
+  }
+
+  return (
+    <div className={cls}>
+      <div className="poker-seat-avatar" style={{ background: color + '33', border: `1.5px solid ${color}` }}>
+        {isMe ? 'You' : (seat.name || '?')[0]}
+      </div>
+      <div className="poker-seat-name">
+        <span>{isMe ? 'You' : seat.name}{seat.isBot ? ' 🤖' : ''}</span>
+        {seat.seatIdx === view.button && <span className="poker-seat-badge dealer">D</span>}
+        {seat.seatIdx === view.sb && <span className="poker-seat-badge sb">SB</span>}
+        {seat.seatIdx === view.bb && <span className="poker-seat-badge bb">BB</span>}
+      </div>
+      <div className="poker-seat-chips">{seat.stack}{seat.sittingOut ? ' · out' : ''}</div>
+      {seat.bet > 0 && <div style={{ fontSize: '0.6rem', color: '#FBBF2488', fontFamily: 'monospace' }}>bet {seat.bet}</div>}
+      <div className="poker-seat-cards">
+        {seat.inHand && seat.hand && seat.hand.map((card, ci) => (
+          <PokerCardFace key={ci} card={card} hidden={!card} />
+        ))}
+      </div>
+      {isActive && (
+        <div className="poker-seat-timer"><div className="poker-seat-timer-bar" style={{ width: (timerPct * 100) + '%' }} /></div>
+      )}
+      {seat.lastAction && <div className={'poker-seat-label ' + seat.lastAction.type}>{seat.lastAction.text}</div>}
+    </div>
+  );
+}
+
+// Raise control for the multiplayer table (sends raise-TO totals).
+function PokerRaiseBar({ legal, onRaise, onClose }) {
+  const [amt, setAmt] = useState(legal.minRaiseTo);
+  const clamp = (v) => Math.max(legal.minRaiseTo, Math.min(legal.maxRaiseTo, v));
+  return (
+    <div className="poker-raise-panel">
+      <div className="poker-preset-row">
+        {[{ l: 'Min', v: legal.minRaiseTo }, { l: '½', v: clamp(Math.round(legal.minRaiseTo * 1.5)) },
+          { l: '2×', v: clamp(legal.minRaiseTo * 2) }, { l: 'All-in', v: legal.maxRaiseTo }].map(p => (
+          <button key={p.l} className={'poker-preset-btn' + (amt === p.v ? ' sel' : '')} onClick={() => setAmt(p.v)}>{p.l}</button>
+        ))}
+      </div>
+      <div className="poker-raise-row">
+        <input type="range" className="poker-raise-slider" min={legal.minRaiseTo} max={legal.maxRaiseTo} step={1}
+          value={amt} onChange={e => setAmt(clamp(+e.target.value))} />
+        <input type="number" className="poker-raise-input" min={legal.minRaiseTo} max={legal.maxRaiseTo}
+          value={amt} onChange={e => setAmt(clamp(+e.target.value || legal.minRaiseTo))} />
+      </div>
+      <div className="poker-raise-row-btns">
+        <button className="poker-raise-cancel" onClick={onClose}>Cancel</button>
+        <button className="poker-raise-confirm" onClick={() => { onRaise(amt); onClose(); }}>
+          {amt >= legal.maxRaiseTo ? `All-in ${amt}` : `Raise to ${amt}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// The live multiplayer table view.
+function PokerMpTable({ tableId, onBack }) {
+  const { view, error, slow, submitAction } = usePokerTable(tableId);
+  const [now, setNow] = useState(Date.now());
+  const [offset, setOffset] = useState(0);
+  const [raiseOpen, setRaiseOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [banner, setBanner] = useState('');
+
+  // Local clock offset from the server so timer bars are skew-proof.
+  useEffect(() => {
+    if (view && view.serverNowMs) setOffset(view.serverNowMs - Date.now());
+  }, [view && view.serverNowMs]);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now() + offset), 250);
+    return () => clearInterval(id);
+  }, [offset]);
+
+  // Announce hand results briefly.
+  useEffect(() => {
+    if (view && view.lastResult && view.phase === 'showdown') {
+      const w = view.lastResult.winners || [];
+      const txt = w.map(x => `${x.name} wins ${x.amount}${x.handName ? ' · ' + x.handName : ''}`).join(' · ');
+      setBanner(txt);
+    } else if (view && view.phase === 'betting') {
+      setBanner('');
+    }
+  }, [view && view.lastResult && view.lastResult.handNo, view && view.phase]);
+
+  const leave = async () => {
+    await api(`/api/poker/tables/${tableId}/leave`, { method: 'POST' });
+    onBack();
+  };
+
+  if (error === 'table_gone') {
+    return (
+      <div className="poker-shell">
+        <div className="poker-top-bar">
+          <button className="poker-back-btn" onClick={onBack}>&#8592;</button>
+          <div className="poker-top-bar-title">Table closed</div>
+          <div style={{ width: 24 }} />
+        </div>
+        <div className="pk-waiting" style={{ padding: '2rem' }}>This table is no longer available.</div>
+      </div>
+    );
+  }
+
+  if (!view) {
+    return (
+      <div className="poker-shell">
+        <div className="poker-top-bar">
+          <button className="poker-back-btn" onClick={onBack}>&#8592;</button>
+          <div className="poker-top-bar-title">Table {tableId}</div>
+          <div style={{ width: 24 }} />
+        </div>
+        <div className="pk-waiting" style={{ padding: '2rem' }}>Connecting to table…</div>
+      </div>
+    );
+  }
+
+  const mySeat = view.mySeat >= 0 ? view.seats[view.mySeat] : null;
+  const legal = view.legal;
+  const myTurn = legal && view.toAct === view.mySeat;
+  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
+  const needRebuy = mySeat && !mySeat.empty && mySeat.stack <= 0;
+
+  const act = (action, amount) => submitAction(action, amount);
+
+  return (
+    <div className="poker-shell">
+      <div className="poker-top-bar">
+        <button className="poker-back-btn" onClick={leave} title="Leave table">&#8592;</button>
+        <div className="poker-top-bar-title">Table {tableId}</div>
+        <div className="poker-top-bar-info">{streetNames[view.street] || ''} · #{view.handNo}</div>
+        <button className="pk-ghost-btn" style={{ padding: '0.3rem 0.6rem', marginLeft: '0.4rem' }} onClick={() => setInviteOpen(true)}>Invite</button>
+        <div className={'poker-conn-dot' + (slow ? ' slow' : '')} title={slow ? 'Reconnecting…' : 'Connected'} />
+      </div>
+
+      <div className="poker-main">
+        <div className="poker-oval-wrap">
+          <div className="poker-oval">
+            <CommunityArea board={view.board || []} pot={view.pot} street={view.street} />
+            {view.seats.map(seat => {
+              const pos = pokerMpSeatPos(seat.seatIdx, view.mySeat, view.maxSeats);
+              return (
+                <div key={seat.seatIdx} style={{ position: 'absolute', left: pos.x + '%', top: pos.y + '%', transform: 'translate(-50%, -50%)' }}>
+                  <PokerMpSeat seat={seat} view={view} now={now} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="pk-mp-banner">{banner}</div>
+
+      {view.phase === 'idle' && <div className="pk-waiting">Waiting for players to sit down…</div>}
+
+      {needRebuy && (
+        <div className="pk-mp-actions">
+          <button className="pk-act-btn pk-act-raise" style={{ flex: 1 }}
+            onClick={async () => { await api(`/api/poker/tables/${tableId}/rebuy`, { method: 'POST' }); }}>
+            Rebuy chips
+          </button>
+        </div>
+      )}
+
+      {myTurn && !raiseOpen && (
+        <div className="pk-mp-actions">
+          <button className="pk-act-btn pk-act-fold" onClick={() => act('fold')}>Fold</button>
+          {legal.canCheck
+            ? <button className="pk-act-btn pk-act-check" onClick={() => act('check')}>Check</button>
+            : <button className="pk-act-btn pk-act-call" onClick={() => act('call')}>Call {legal.toCall}</button>}
+          {legal.canRaise
+            ? <button className="pk-act-btn pk-act-raise" onClick={() => setRaiseOpen(true)}>Raise</button>
+            : <button className="pk-act-btn pk-act-raise" disabled>Raise</button>}
+        </div>
+      )}
+
+      {myTurn && raiseOpen && (
+        <PokerRaiseBar legal={legal} onClose={() => setRaiseOpen(false)}
+          onRaise={(amt) => act(amt >= legal.maxRaiseTo ? 'allin' : 'raise', amt)} />
+      )}
+
+      {!myTurn && view.phase === 'betting' && !needRebuy && (
+        <div className="pk-waiting">Waiting for {view.toAct != null && view.seats[view.toAct] ? (view.toAct === view.mySeat ? 'you' : view.seats[view.toAct].name) : 'players'}…</div>
+      )}
+
+      {inviteOpen && <PokerInviteModal tableId={tableId} onClose={() => setInviteOpen(false)} />}
+    </div>
+  );
+}
+
+// Multiplayer flow: lobby ⇄ table.
+function PokerMultiplayerFlow({ onBack }) {
+  const [tableId, setTableId] = useState(null);
+  if (tableId) return <PokerMpTable tableId={tableId} onBack={() => setTableId(null)} />;
+  return <PokerLobby onOpenTable={setTableId} onBack={onBack} />;
+}
+
+// Home-lobby incoming-invite banner (polls every ~10s).
+function PokerInviteBanner({ onOpen }) {
+  const [invites, setInvites] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const { ok, body } = await api(`/api/poker/invites${pokerDemoQ}`);
+      if (alive && ok && body) setInvites(body.invites || []);
+    };
+    load();
+    const id = setInterval(load, 10000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  const dismiss = async (inv) => {
+    setInvites(prev => prev.filter(i => i.id !== inv.id));
+    await api(`/api/poker/invites/${inv.id}/decline`, { method: 'POST' });
+  };
+  if (invites.length === 0) return null;
+  const inv = invites[0];
+  return (
+    <div className="pk-invite-banner">
+      <span style={{ fontSize: '1.2rem' }}>🃏</span>
+      <div className="pk-invite-banner-text"><b>{inv.inviterName || 'Someone'}</b> invited you to a poker table</div>
+      <button className="pk-invite-accept" onClick={() => onOpen && onOpen()}>Open</button>
+      <button className="pk-invite-dismiss" onClick={() => dismiss(inv)}>✕</button>
+    </div>
+  );
+}
+
+// Wrapper registered as the "texas" game: shows the chooser, then routes to
+// the solo game (below, unchanged) or the multiplayer flow.
+function TexasHoldemMode(props) {
+  const [mode, setMode] = useState(props.gameMode === 'online' ? 'multi' : props.gameMode === 'bot' ? 'solo' : null);
+  if (mode === null) {
+    return <PokerModeChooser
+      onSolo={() => setMode('solo')}
+      onMulti={() => setMode('multi')}
+      onBack={props.onBack} />;
+  }
+  if (mode === 'multi') {
+    return <PokerMultiplayerFlow onBack={() => setMode(null)} />;
+  }
+  return <TexasHoldemGame {...props} />;
+}
+
+/* ---- Texas Hold 'Em main component (solo vs bots — unchanged) ---- */
 function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
   const BB = 10;
 
@@ -18225,11 +18881,11 @@ const GAMES = [
     icon: '🃏',
     category: 'classic',
     shell: 'self',
-    desc: 'Heads-up poker vs the computer. Bet smart and take all the chips.',
+    desc: 'Play solo vs bots or join a live 6-max table. Invite anyone; bots fill empty seats.',
     tag: 'Cards',
     tagColor: C.gold,
-    component: TexasHoldemGame,
-    modes: ['bot'],
+    component: TexasHoldemMode,
+    modes: ['bot', 'online'],
     supportsSave: true,
   },
   {
@@ -18951,7 +19607,7 @@ function App() {
     // Multi-mode classic games open the pre-launch modal unless a mode is
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
-    if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
+    if (mmode && (g.preLaunchModal || g.id === 'texas')) { setClassicGameMode(mmode); }
     if (g.shell === 'custom') { setCurrentGame(g); setScreen('game'); return; }
     launchGame(g);
   }, [loading]);
@@ -19579,6 +20235,12 @@ function App() {
               >Feed</button>
             )}
           </div>
+          {authOk && (
+            <PokerInviteBanner onOpen={() => {
+              const g = GAMES.find(x => x.id === 'texas');
+              if (g) { setClassicGameMode('online'); setClassicGameModeOpts(null); launchGame(g); }
+            }} />
+          )}
           {authOk && lobbyTab !== 'pvp' && lobbyTab !== 'feed' && (() => {
             // Single persistent, collapsible badge panel — rendered directly
             // under the header band (above the game grid) on the Daily and

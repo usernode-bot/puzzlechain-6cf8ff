@@ -253,6 +253,86 @@ async function ensureDailySeeds() {
   return out;
 }
 
+// ---- Rating ladder (phase 4) ------------------------------------------------
+// Head-to-head games whose online matches feed the Elo ladder: turn-based
+// rooms (Mancala, Chutes & Ladders) and score races (2048, Block Blast).
+const H2H_GAME_IDS = new Set(['mancala', 'chutes-ladders', '2048', 'blockblast']);
+const ELO_K = 32;
+const ELO_START = 1000;
+
+// Monday of the current UTC week, as a YYYY-MM-DD string (the "weekly movers"
+// window boundary).
+function utcWeekStart() {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dow = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+// Settle Elo for one finished head-to-head match. `winner` is '1' | '2' |
+// 'draw' (the rooms' stored convention). Best-effort at every call site —
+// a rating failure never blocks the match result. Idempotency is the CALLER's
+// contract: call only from code paths that transition a room to finished
+// exactly once (CAS-guarded moves, both-scores-in races, guarded forfeits).
+async function applyMatchRating(gameId, p1, p2, winner) {
+  if (!H2H_GAME_IDS.has(gameId)) return;
+  if (!p1 || !p2 || !p1.id || !p2.id || p1.id === p2.id) return;
+  if (winner !== '1' && winner !== '2' && winner !== 'draw') return;
+  const weekStart = utcWeekStart();
+
+  const loadRow = async (p) => {
+    await pool.query(
+      `INSERT INTO game_ratings (user_id, username, game_id, elo, week_start_elo, week_start_date)
+       VALUES ($1, $2, $3, $4, $4, $5)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [p.id, p.name || null, gameId, ELO_START, weekStart]
+    );
+    const { rows } = await pool.query(
+      `SELECT * FROM game_ratings WHERE user_id = $1 AND game_id = $2`,
+      [p.id, gameId]
+    );
+    return rows[0];
+  };
+  const r1 = await loadRow(p1);
+  const r2 = await loadRow(p2);
+
+  // Standard Elo with K=32. Scores: win 1, loss 0, draw 0.5.
+  const s1 = winner === '1' ? 1 : winner === '2' ? 0 : 0.5;
+  const s2 = 1 - s1;
+  const e1 = 1 / (1 + Math.pow(10, (r2.elo - r1.elo) / 400));
+  const e2 = 1 - e1;
+
+  const save = async (row, p, score, expected) => {
+    // Roll the weekly snapshot forward BEFORE applying this match's delta, so
+    // weekly_delta measures movement within the current week only.
+    const weekStartElo = (!row.week_start_date ||
+      row.week_start_date.toISOString().slice(0, 10) < weekStart)
+      ? row.elo : row.week_start_elo;
+    const newElo = Math.round(row.elo + ELO_K * (score - expected));
+    const newStreak = score === 1 ? row.win_streak + 1 : 0;
+    await pool.query(
+      `UPDATE game_ratings
+          SET elo = $3, win_streak = $4, best_streak = GREATEST(best_streak, $4),
+              wins = wins + $5, losses = losses + $6, draws = draws + $7,
+              week_start_elo = $8, week_start_date = $9,
+              username = COALESCE($10, username), updated_at = now()
+        WHERE user_id = $1 AND game_id = $2`,
+      [p.id, gameId, newElo, newStreak,
+       score === 1 ? 1 : 0, score === 0 ? 1 : 0, score === 0.5 ? 1 : 0,
+       weekStartElo, weekStart, p.name || null]
+    );
+  };
+  await save(r1, p1, s1, e1);
+  await save(r2, p2, s2, e2);
+}
+
+// Fire-and-forget wrapper for the finish handlers.
+function rateMatch(gameId, p1, p2, winner) {
+  applyMatchRating(gameId, p1, p2, winner)
+    .catch((e) => console.warn(`[ladder] rating update failed (${gameId}, non-fatal):`, e.message));
+}
+
 // Consecutive-day streak milestones that unlock a named badge. Kept in sync
 // with STREAK_BADGES in public/app.jsx (the client owns the icon/name copy;
 // the server only persists the day thresholds as streak_milestone achievements
@@ -400,6 +480,29 @@ async function migrate() {
   // re-derived from the deterministic daily seed, so only player moves live here.
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
+
+  // game_ratings is PUBLIC (leaderboard data): one Elo rating row per
+  // (user, head-to-head game), updated in the room/match finish handlers
+  // (phase 4 ladder). `week_start_elo`/`week_start_date` snapshot the rating
+  // at the player's first rated game of the current ISO week, so "weekly
+  // movers" (elo − week_start_elo) needs no history table.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_ratings (
+      user_id         TEXT NOT NULL,
+      username        TEXT,
+      game_id         TEXT NOT NULL,
+      elo             INTEGER NOT NULL DEFAULT 1000,
+      win_streak      INTEGER NOT NULL DEFAULT 0,
+      best_streak     INTEGER NOT NULL DEFAULT 0,
+      wins            INTEGER NOT NULL DEFAULT 0,
+      losses          INTEGER NOT NULL DEFAULT 0,
+      draws           INTEGER NOT NULL DEFAULT 0,
+      week_start_elo  INTEGER NOT NULL DEFAULT 1000,
+      week_start_date DATE,
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
 
   // daily_seeds is PUBLIC: one server-issued board seed per (daily game, UTC
   // day). The seed everyone's board derives from — by definition shared data
@@ -2154,6 +2257,7 @@ const PUBLIC_API_GET = [
   /^\/api\/daily\/[A-Za-z0-9_-]+\/leaderboard$/,
   /^\/api\/daily\/leaderboard\/today$/,
   /^\/api\/classic\/[A-Za-z0-9_-]+\/leaderboard$/,
+  /^\/api\/ladder\/[A-Za-z0-9_-]+$/,      // rating ladder (null-guards req.user)
 ];
 
 // Simple in-memory per-IP sliding window over the public GET surface — the
@@ -3069,6 +3173,96 @@ app.get('/api/daily', async (req, res) => {
     // ClassicLeaderboard (in-game tab + mode-modal "Top players" preview) and
     // its ranking are demonstrable on a fresh staging DB. Idempotent (fixed
     // user ids + ON CONFLICT), obviously fake names, strict no-op in prod.
+    // Staging-only demo seed (phase 4): fake users the VIEWER follows, each
+    // with finished daily attempts today and all-time classic scores, so the
+    // Friends leaderboard tabs show rows distinct from Global. Idempotent,
+    // obviously fake, strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'friends-lb') {
+      const friends = [
+        ['staging-demo-friend-1', 'Staging friend Nia',   118, 26],
+        ['staging-demo-friend-2', 'Staging friend Otto',  149, 31],
+        ['staging-demo-friend-3', 'Staging friend Pia',   201, 38],
+        ['staging-demo-friend-4', 'Staging friend Quinn', 260, 45],
+      ];
+      for (const [uid, name, time, steps] of friends) {
+        await pool.query(
+          `INSERT INTO user_follows (follower_id, followee_id)
+           VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [req.user.id, uid]
+        );
+        for (const g of ['sudoku', 'wordhunt']) {
+          await pool.query(
+            `INSERT INTO daily_attempts
+               (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+             VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+            [uid, name, g, 1000 - time, steps, time]
+          );
+        }
+        await pool.query(
+          `INSERT INTO classic_scores (user_id, username, game_id, best_score, games_played)
+           VALUES ($1, $2, 'chutes-ladders', $3, 5)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [uid, name, Math.round((1000 - time) / 100)]
+        );
+      }
+    }
+
+    // Staging-only demo seed (phase 4): populated rating ladder — 8 fake
+    // rivals across two head-to-head games with varied Elo, win streaks, and
+    // this-week deltas (weekly movers), plus a rating row for the viewer and
+    // a few finished classic_rooms matches backing the ratings. Idempotent,
+    // obviously fake, strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'ladder') {
+      const weekStart = utcWeekStart();
+      const rivals = [
+        // [id, name, elo, winStreak, wins, losses, weeklyDelta]
+        ['staging-demo-rival-1', 'Staging rival Kas',   1310, 6, 14,  4,  62],
+        ['staging-demo-rival-2', 'Staging rival Lum',   1264, 2, 11,  6,  35],
+        ['staging-demo-rival-3', 'Staging rival Mox',   1201, 0,  9,  7, -18],
+        ['staging-demo-rival-4', 'Staging rival Nyx',   1150, 3,  8,  6,  21],
+        ['staging-demo-rival-5', 'Staging rival Orin',  1098, 0,  6,  8, -44],
+        ['staging-demo-rival-6', 'Staging rival Prax',  1042, 1,  5,  9,  12],
+        ['staging-demo-rival-7', 'Staging rival Quill',  987, 0,  4, 11,   0],
+        ['staging-demo-rival-8', 'Staging rival Rho',    934, 0,  3, 12, -27],
+      ];
+      for (const g of ['chutes-ladders', '2048']) {
+        for (const [uid, name, elo, streak, wins, losses, delta] of rivals) {
+          await pool.query(
+            `INSERT INTO game_ratings
+               (user_id, username, game_id, elo, win_streak, best_streak, wins, losses,
+                week_start_elo, week_start_date)
+             VALUES ($1, $2, $3, $4, $5, GREATEST($5, 4), $6, $7, $8, $9)
+             ON CONFLICT (user_id, game_id) DO NOTHING`,
+            [uid, name, g, elo, streak, wins, losses, elo - delta, delta === 0 ? null : weekStart]
+          );
+        }
+        // The viewer gets a mid-table rating so the pinned "me" row renders.
+        await pool.query(
+          `INSERT INTO game_ratings
+             (user_id, username, game_id, elo, win_streak, best_streak, wins, losses,
+              week_start_elo, week_start_date)
+           VALUES ($1, $2, $3, 1105, 2, 3, 7, 5, 1089, $4)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'you', g, weekStart]
+        );
+      }
+      // A few finished matches backing the ratings' narrative.
+      const backing = [
+        ['staging-demo-room-l1', 'chutes-ladders', 'staging-demo-rival-1', 'Staging rival Kas', 'staging-demo-rival-3', 'Staging rival Mox', '1'],
+        ['staging-demo-room-l2', 'chutes-ladders', 'staging-demo-rival-4', 'Staging rival Nyx', 'staging-demo-rival-5', 'Staging rival Orin', '1'],
+        ['staging-demo-room-l3', '2048',           'staging-demo-rival-2', 'Staging rival Lum', 'staging-demo-rival-8', 'Staging rival Rho', '1'],
+      ];
+      for (const [rid, gid, p1, n1, p2, n2, winner] of backing) {
+        await pool.query(
+          `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, player2_id, player2_name, status, winner)
+           VALUES ($1, $2, $3, $4, $5, $6, 'finished', $7)
+           ON CONFLICT (id) DO NOTHING`,
+          [rid, gid, p1, n1, p2, n2, winner]
+        );
+      }
+    }
+
     if (IS_STAGING && req.query.demo === 'classic-scores') {
       const csUsers = [
         { id: 'staging-demo-ada',  name: 'Staging demo Ada' },
@@ -3637,6 +3831,11 @@ const LEADERBOARD_LIMIT = 20;
 app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   const { gameId } = req.params;
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // ?scope=friends (phase 4): same board, filtered to the caller + the people
+  // they follow (user_follows). Ranks are recomputed within the filtered set.
+  // Anonymous callers have no follow graph — return an empty board.
+  const friendsScope = req.query.scope === 'friends';
+  if (friendsScope && !req.user) return res.json({ entries: [], me: null, total: 0 });
   try {
     const { rows } = await pool.query(
       `SELECT user_id, username, score, steps, time_secs,
@@ -3647,8 +3846,11 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
         WHERE game_id = $1
           AND attempt_date = (now() AT TIME ZONE 'utc')::date
           AND finished_at IS NOT NULL
-          AND score IS NOT NULL AND score > 0`,
-      [gameId]
+          AND score IS NOT NULL AND score > 0
+          AND ($2::text IS NULL
+               OR user_id = $2
+               OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))`,
+      [gameId, friendsScope ? req.user.id : null]
     );
     const total = rows.length;
     // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
@@ -3677,6 +3879,11 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
 // Returns { entries: top-N, me, total, gameCount } mirroring the per-game shape
 // so the client can reuse the same row rendering. Auth-gated under /api/.
 app.get('/api/daily/leaderboard/today', async (req, res) => {
+  // ?scope=friends (phase 4): see the per-game handler above.
+  const friendsScope = req.query.scope === 'friends';
+  if (friendsScope && !req.user) {
+    return res.json({ entries: [], me: null, total: 0, gameCount: GAME_IDS.size });
+  }
   try {
     const { rows } = await pool.query(
       `SELECT user_id,
@@ -3693,8 +3900,11 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
         WHERE attempt_date = (now() AT TIME ZONE 'utc')::date
           AND finished_at IS NOT NULL
           AND score IS NOT NULL AND score > 0
+          AND ($1::text IS NULL
+               OR user_id = $1
+               OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1))
         GROUP BY user_id`,
-      []
+      [friendsScope ? req.user.id : null]
     );
     const total = rows.length;
     // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
@@ -3820,6 +4030,12 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
       [JSON.stringify(finalPits), nextPlayer, newStatus, winner, moveSeq, roomId, moveSeq - 1]
     );
     if (updated.length === 0) return res.status(409).json({ error: 'Concurrent update conflict' });
+    // Ladder: the CAS above guarantees this game-over transition fires once.
+    if (gameOver && r.player2_id) {
+      rateMatch('mancala',
+        { id: r.player1_id, name: r.player1_name },
+        { id: r.player2_id, name: r.player2_name }, winner);
+    }
     res.json(shapeRoom(updated[0]));
   } catch (err) {
     console.error('[mancala] move failed:', err.message);
@@ -3977,6 +4193,12 @@ app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
       [JSON.stringify(newState), newStatus, winner, moveSeq, roomId, moveSeq - 1]
     );
     if (updated.length === 0) return res.status(409).json({ error: 'Concurrent update conflict' });
+    // Ladder: the CAS above guarantees this game-over transition fires once.
+    if (gameOver && r.player2_id) {
+      rateMatch(gameId,
+        { id: r.player1_id, name: r.player1_name },
+        { id: r.player2_id, name: r.player2_name }, winner);
+    }
     res.json(shapeClassicRoom(updated[0]));
   } catch (err) {
     console.error('[classic] move failed:', err.message);
@@ -3990,15 +4212,29 @@ app.post('/api/classic/:gameId/rooms/:roomId/finish', async (req, res) => {
   const { winner } = req.body || {};
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   try {
-    const { rows } = await pool.query(
+    // Rate the forfeit only on the actual active→finished transition (the
+    // endpoint stays idempotent for repeat calls, which just echo the room).
+    const { rows: transitioned } = await pool.query(
       `UPDATE classic_rooms
          SET status = 'finished', winner = COALESCE(winner, $3), last_move_at = now()
-       WHERE id = $1 AND game_id = $2
+       WHERE id = $1 AND game_id = $2 AND status <> 'finished'
        RETURNING *`,
       [roomId, gameId, winner != null ? String(winner) : null]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
-    res.json(shapeClassicRoom(rows[0]));
+    let room = transitioned[0];
+    if (room && room.status === 'finished' && room.winner && room.player2_id) {
+      rateMatch(gameId,
+        { id: room.player1_id, name: room.player1_name },
+        { id: room.player2_id, name: room.player2_name }, room.winner);
+    }
+    if (!room) {
+      const { rows } = await pool.query(
+        `SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2`, [roomId, gameId]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+      room = rows[0];
+    }
+    res.json(shapeClassicRoom(room));
   } catch (err) {
     console.error('[classic] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to finish room' });
@@ -4056,6 +4292,13 @@ app.post('/api/classic/:gameId/rooms/:roomId/score', async (req, res) => {
         [p1Score, p2Score, p1Fin, p2Fin, winner, status, roomId, gameId, r.move_seq]
       );
       if (updated.length === 0) continue; // concurrent write — retry
+      // Ladder: rate exactly when this write flipped the race to finished
+      // (bothIn is only reachable once thanks to the move_seq CAS).
+      if (bothIn && r.status !== 'finished' && r.player2_id) {
+        rateMatch(gameId,
+          { id: r.player1_id, name: r.player1_name },
+          { id: r.player2_id, name: r.player2_name }, winner);
+      }
       return res.json(shapeClassicRoom(updated[0]));
     }
     res.status(409).json({ error: 'Concurrent update conflict' });
@@ -4141,18 +4384,28 @@ app.post('/api/classic/:gameId/score', async (req, res) => {
 app.get('/api/classic/:gameId/leaderboard', async (req, res) => {
   const { gameId } = req.params;
   if (!CLASSIC_SCORE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // ?scope=friends (phase 4): all-time board filtered to the caller + the
+  // people they follow; ranks recomputed within the filtered set. Anonymous
+  // callers have no follow graph — empty board.
+  const friendsScope = req.query.scope === 'friends';
+  if (friendsScope && !req.user) return res.json({ entries: [], me: null, total: 0 });
+  const scopeUid = friendsScope ? req.user.id : null;
+  const scopeSql = `AND ($2::text IS NULL
+                         OR user_id = $2
+                         OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))`;
   try {
     const { rows: top } = await pool.query(
       `SELECT user_id, username, best_score, extra,
               ROW_NUMBER() OVER (ORDER BY best_score DESC, updated_at ASC) AS rank
          FROM classic_scores
-        WHERE game_id = $1
+        WHERE game_id = $1 ${scopeSql}
         ORDER BY best_score DESC, updated_at ASC
-        LIMIT $2`,
-      [gameId, CLASSIC_LB_LIMIT]
+        LIMIT $3`,
+      [gameId, scopeUid, CLASSIC_LB_LIMIT]
     );
     const { rows: totalRows } = await pool.query(
-      `SELECT COUNT(*)::int AS n FROM classic_scores WHERE game_id = $1`, [gameId]
+      `SELECT COUNT(*)::int AS n FROM classic_scores WHERE game_id = $1 ${scopeSql}`,
+      [gameId, scopeUid]
     );
 
     // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
@@ -4167,8 +4420,9 @@ app.get('/api/classic/:gameId/leaderboard', async (req, res) => {
       const row = mine[0];
       const { rows: rankRows } = await pool.query(
         `SELECT COUNT(*) + 1 AS rank FROM classic_scores
-          WHERE game_id = $1 AND (best_score > $2 OR (best_score = $2 AND updated_at < $3))`,
-        [gameId, row.best_score, row.updated_at]
+          WHERE game_id = $1 ${scopeSql}
+            AND (best_score > $3 OR (best_score = $3 AND updated_at < $4))`,
+        [gameId, scopeUid, row.best_score, row.updated_at]
       );
       me = { rank: Number(rankRows[0].rank), username: row.username || 'you', bestScore: Number(row.best_score), extra: row.extra || null };
     }
@@ -4177,6 +4431,52 @@ app.get('/api/classic/:gameId/leaderboard', async (req, res) => {
   } catch (err) {
     console.error('[classic] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ---- Rating ladder (phase 4) ----------------------------------------------
+// Elo ladder for the head-to-head games, fed by the room/match finish
+// handlers via applyMatchRating. `weeklyDelta` is elo − week_start_elo when
+// the player has played this ISO week (0 otherwise); `movers` is the top of
+// this week's biggest climbers. Public via PUBLIC_API_GET (null-guards
+// req.user).
+const LADDER_LIMIT = 20;
+app.get('/api/ladder/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!H2H_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown ladder game' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, username, elo, win_streak, best_streak, wins, losses, draws,
+              CASE WHEN week_start_date >= $2::date THEN elo - week_start_elo ELSE 0 END AS weekly_delta,
+              ROW_NUMBER() OVER (ORDER BY elo DESC, win_streak DESC, updated_at ASC) AS rank
+         FROM game_ratings
+        WHERE game_id = $1
+        ORDER BY elo DESC, win_streak DESC, updated_at ASC`,
+      [gameId, utcWeekStart()]
+    );
+    const uid = req.user ? req.user.id : null;
+    const shape = (r) => ({
+      rank: Number(r.rank),
+      username: r.username || 'anon',
+      elo: r.elo,
+      winStreak: r.win_streak,
+      bestStreak: r.best_streak,
+      wins: r.wins,
+      losses: r.losses,
+      draws: r.draws,
+      weeklyDelta: Number(r.weekly_delta),
+      isCurrentUser: uid != null && r.user_id === uid,
+    });
+    const entries = rows.slice(0, LADDER_LIMIT).map(shape);
+    const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
+    const movers = rows.map(shape)
+      .filter((e) => e.weeklyDelta > 0)
+      .sort((a, b) => b.weeklyDelta - a.weeklyDelta)
+      .slice(0, 3);
+    res.json({ entries, me: mineRow ? shape(mineRow) : null, total: rows.length, movers });
+  } catch (err) {
+    console.error('[ladder] load failed:', err.message);
+    res.status(500).json({ error: 'Failed to load ladder' });
   }
 });
 

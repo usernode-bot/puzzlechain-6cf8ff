@@ -743,6 +743,33 @@ body {
   gap: 0.4rem;
 }
 
+/* ---- Leaderboard scope tabs + rating ladder (phase 4) ---- */
+.lb-scope-tabs { display: flex; gap: 0.35rem; margin: 0.5rem 0 0.6rem; flex-wrap: wrap; }
+.lb-scope-tab {
+  padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.75rem;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted};
+  transition: border-color 0.12s, color 0.12s;
+}
+.lb-scope-tab:not(.active):hover { border-color: ${C.accent}; color: ${C.text}; }
+.lb-scope-tab.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.lboard.ladder { max-width: 640px; margin: 0.5rem auto; }
+/* Ladder rows carry five cells (rank, name, streak, elo, delta) — the base
+   .lrow grid is four columns, so widen it here. */
+.lboard.ladder .lrow { grid-template-columns: 2.4rem 1fr auto auto auto; }
+.ladder-games { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.ladder-note { font-size: 0.78rem; color: ${C.muted}; margin-bottom: 0.8rem; line-height: 1.45; }
+.ladder-movers {
+  font-size: 0.8rem; color: ${C.text}; background: ${C.emerald}14;
+  border: 1px solid ${C.emerald}44; border-radius: 8px;
+  padding: 0.45rem 0.7rem; margin-bottom: 0.7rem;
+}
+.ladder-streak { min-width: 2.6rem; text-align: right; color: ${C.gold}; font-size: 0.8rem; }
+.ladder-delta { min-width: 2.8rem; text-align: right; font-size: 0.8rem; }
+.ladder-delta.up { color: ${C.emerald}; }
+.ladder-delta.down { color: ${C.rose}; }
+.ladder-delta.flat { color: ${C.muted}; }
+
 /* ---- Daily leaderboard ---- */
 .lboard {
   margin: 1rem 0 0.25rem;
@@ -4356,33 +4383,72 @@ async function submitClassicScore(gameId, score, extra) {
 // Reusable global leaderboard for the score-based classic games. Lazily fetches
 // /api/classic/:gameId/leaderboard, highlights the caller, and pins their row
 // when outside the top N. `valueFmt` formats a row's headline number.
+/* ---- Leaderboard scope tabs (phase 4) --------------------------------------
+   Global | Friends pills shared by every board. `?lbscope=friends` in the URL
+   preselects the Friends view (used by proposal tests and deep links). */
+function lbInitialScope() {
+  try {
+    return new URLSearchParams(window.location.search).get('lbscope') === 'friends'
+      ? 'friends' : 'global';
+  } catch { return 'global'; }
+}
+function LbScopeTabs({ scope, onChange }) {
+  return (
+    <div className="lb-scope-tabs">
+      <button
+        className={'lb-scope-tab' + (scope === 'global' ? ' active' : '')}
+        onClick={() => onChange('global')}
+      >🌍 Global</button>
+      <button
+        className={'lb-scope-tab' + (scope === 'friends' ? ' active' : '')}
+        onClick={() => onChange('friends')}
+      >👥 Friends</button>
+    </div>
+  );
+}
+const LB_FRIENDS_EMPTY = 'No friends on this board yet — follow players from their profiles.';
+
 function ClassicLeaderboard({ gameId, url, valueLabel = 'Score', valueFmt }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Friends scope only exists on the generic classic endpoint — boards with a
+  // custom `url` (snake, breakout, …) stay single-scope.
+  const [scope, setScope] = useState(url ? 'global' : lbInitialScope());
   const fmt = valueFmt || ((r) => `${r.bestScore} pts`);
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(false);
-    api(url || `/api/classic/${gameId}/leaderboard`).then(({ ok, body }) => {
+    const path = url || `/api/classic/${gameId}/leaderboard${scope === 'friends' ? '?scope=friends' : ''}`;
+    api(path).then(({ ok, body }) => {
       if (cancelled) return;
       if (ok && body) setData(body); else setError(true);
       setLoading(false);
     }).catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [gameId]);
+  }, [gameId, scope]);
 
-  if (loading) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Loading…</div></div>;
-  if (error) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Couldn't load leaderboard.</div></div>;
+  const scopeTabs = !url && <LbScopeTabs scope={scope} onChange={setScope} />;
+  if (loading) return <div><h4>Leaderboard</h4>{scopeTabs}<div className="cg-sheet-empty">Loading…</div></div>;
+  if (error) return <div><h4>Leaderboard</h4>{scopeTabs}<div className="cg-sheet-empty">Couldn't load leaderboard.</div></div>;
   const entries = (data && data.entries) || [];
   const me = data && data.me;
   const meInTop = me && entries.some(e => e.rank === me.rank);
   if (entries.length === 0) {
-    return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">No scores yet — play to rank!</div></div>;
+    return (
+      <div>
+        <h4>Leaderboard</h4>
+        {scopeTabs}
+        <div className="cg-sheet-empty">
+          {scope === 'friends' ? LB_FRIENDS_EMPTY : 'No scores yet — play to rank!'}
+        </div>
+      </div>
+    );
   }
   return (
     <div>
       <h4>Leaderboard <span style={{ color: C.muted, fontWeight: 400, fontSize: '0.78rem' }}>· {valueLabel}</span></h4>
+      {scopeTabs}
       <div className="snake-lb">
         {entries.map(r => (
           <div key={r.rank} className={'snake-lb-row' + (me && r.rank === me.rank ? ' snake-lb-me' : '')}>
@@ -5524,20 +5590,22 @@ const lbFmtTime = s =>
 
 function Leaderboard({ gameId, solved }) {
   const [state, setState] = useState({ loading: true });
+  const [scope, setScope] = useState(lbInitialScope);
 
   useEffect(() => {
     let alive = true;
+    setState({ loading: true });
     (async () => {
-      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard`);
+      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard${scope === 'friends' ? '?scope=friends' : ''}`);
       if (!alive) return;
       if (ok && body) setState({ loading: false, ...body });
       else setState({ loading: false, entries: [], me: null, total: 0, error: true });
     })();
     return () => { alive = false; };
-  }, [gameId]);
+  }, [gameId, scope]);
 
   if (state.loading) {
-    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><div className="lboard-empty">Loading…</div></div>;
+    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
   }
 
   const entries = state.entries || [];
@@ -5550,8 +5618,11 @@ function Leaderboard({ gameId, solved }) {
         Today's leaderboard
         {state.total > 0 && <span className="lboard-count">{state.total} solved</span>}
       </div>
+      <LbScopeTabs scope={scope} onChange={setScope} />
       {entries.length === 0 ? (
-        <div className="lboard-empty">Be the first to solve today's puzzle.</div>
+        <div className="lboard-empty">
+          {scope === 'friends' ? LB_FRIENDS_EMPTY : "Be the first to solve today's puzzle."}
+        </div>
       ) : (
         <div className="lboard-rows">
           {entries.map(e => (
@@ -5587,20 +5658,22 @@ function Leaderboard({ gameId, solved }) {
    ============================================================ */
 function TodayChampions({ onSelectUser }) {
   const [state, setState] = useState({ loading: true });
+  const [scope, setScope] = useState(lbInitialScope);
 
   useEffect(() => {
     let alive = true;
+    setState({ loading: true });
     (async () => {
-      const { ok, body } = await api('/api/daily/leaderboard/today');
+      const { ok, body } = await api(`/api/daily/leaderboard/today${scope === 'friends' ? '?scope=friends' : ''}`);
       if (!alive) return;
       if (ok && body) setState({ loading: false, ...body });
       else setState({ loading: false, entries: [], me: null, total: 0, error: true });
     })();
     return () => { alive = false; };
-  }, []);
+  }, [scope]);
 
   if (state.loading) {
-    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><div className="lboard-empty">Loading…</div></div>;
+    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
   }
 
   const entries = state.entries || [];
@@ -5626,13 +5699,97 @@ function TodayChampions({ onSelectUser }) {
         Today's Champions
         {state.total > 0 && <span className="lboard-count">{state.total} playing</span>}
       </div>
+      <LbScopeTabs scope={scope} onChange={setScope} />
       {entries.length === 0 ? (
-        <div className="lboard-empty">No one has solved today's puzzles yet — be the first!</div>
+        <div className="lboard-empty">
+          {scope === 'friends' ? LB_FRIENDS_EMPTY : "No one has solved today's puzzles yet — be the first!"}
+        </div>
       ) : (
         <div className="lboard-rows">
           {entries.map(e => row(e, false))}
           {me && !meVisible && row(me, true)}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Rating ladder (phase 4) — Elo standings for the head-to-head
+   games, fed by online room/match results. Shows rating, current
+   win streak, and this week's movement per player.
+   ============================================================ */
+const LADDER_GAMES = ['chutes-ladders', 'mancala', '2048', 'blockblast'];
+
+function LadderScreen() {
+  const [gameId, setGameId] = useState(LADDER_GAMES[0]);
+  const [state, setState] = useState({ loading: true });
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true });
+    api(`/api/ladder/${gameId}`).then(({ ok, body }) => {
+      if (!alive) return;
+      setState(ok && body
+        ? { loading: false, ...body }
+        : { loading: false, entries: [], me: null, movers: [], error: true });
+    }).catch(() => { if (alive) setState({ loading: false, entries: [], me: null, movers: [] }); });
+    return () => { alive = false; };
+  }, [gameId]);
+
+  const games = GAMES.filter(g => LADDER_GAMES.includes(g.id));
+  const entries = state.entries || [];
+  const me = state.me || null;
+  const meVisible = me && entries.some(e => e.isCurrentUser);
+  const delta = (d) => d > 0
+    ? <span className="ladder-delta up mono">▲{d}</span>
+    : d < 0
+    ? <span className="ladder-delta down mono">▼{-d}</span>
+    : <span className="ladder-delta flat mono">—</span>;
+  const row = (e, pinned) => (
+    <div key={pinned ? 'me-pinned' : e.rank} className={`lrow${e.isCurrentUser ? ' me' : ''}${pinned ? ' pinned' : ''}`}>
+      <span className="lrank mono">#{e.rank}</span>
+      <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+      <span className="ladder-streak mono" title="Current win streak">{e.winStreak > 0 ? `🔥${e.winStreak}` : '·'}</span>
+      <span className="ltime mono" title="Elo rating">{e.elo}</span>
+      {delta(e.weeklyDelta)}
+    </div>
+  );
+
+  return (
+    <div className="lboard ladder">
+      <div className="ladder-games">
+        {games.map(g => (
+          <button
+            key={g.id}
+            className={'lb-scope-tab' + (gameId === g.id ? ' active' : '')}
+            onClick={() => setGameId(g.id)}
+          >{g.icon} {g.name}</button>
+        ))}
+      </div>
+      <p className="ladder-note">
+        Everyone starts at 1000 — win online matches to climb. 🔥 is the current
+        win streak; ▲▼ show this week's rating movement.
+      </p>
+      {state.loading ? (
+        <div className="lboard-empty">Loading…</div>
+      ) : entries.length === 0 ? (
+        <div className="lboard-empty">
+          No rated matches yet — play someone online (room code) to start this ladder.
+        </div>
+      ) : (
+        <>
+          {(state.movers || []).length > 0 && (
+            <div className="ladder-movers">
+              📈 <strong>Weekly movers:</strong>{' '}
+              {state.movers.map(m => `${m.username} +${m.weeklyDelta}`).join(' · ')}
+            </div>
+          )}
+          <div className="lboard-rows">
+            {entries.map(e => row(e, false))}
+            {me && !meVisible && row(me, true)}
+          </div>
+        </>
       )}
     </div>
   );
@@ -15413,7 +15570,7 @@ function App() {
   // Lobby tab: 'daily', 'classic', or 'feed' — initialized from ?tab= URL param
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'feed' ? 'feed' : 'daily';
+    return t === 'classic' ? 'classic' : t === 'feed' ? 'feed' : t === 'ladder' ? 'ladder' : 'daily';
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
@@ -16250,13 +16407,18 @@ function App() {
         <div className="lobby">
           <div className="lobby-head">
             <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : 'Community Feed'}
+              {lobbyTab === 'daily' ? 'Daily Puzzles'
+                : lobbyTab === 'classic' ? 'Classic Games'
+                : lobbyTab === 'ladder' ? 'Rating Ladder'
+                : 'Community Feed'}
             </h1>
             <p>
               {lobbyTab === 'daily'
                 ? 'One attempt each, per day. Resets at midnight UTC.'
                 : lobbyTab === 'classic'
                 ? 'Play anytime — track your best scores.'
+                : lobbyTab === 'ladder'
+                ? 'Head-to-head Elo — win online matches to climb.'
                 : 'See what your friends have been playing'}
             </p>
             {lobbyTab === 'daily' && authOk && streak > 0 && (
@@ -16282,6 +16444,10 @@ function App() {
               className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
               onClick={() => setLobbyTab('classic')}
             >Classic Games</button>
+            <button
+              className={'lobby-tab' + (lobbyTab === 'ladder' ? ' active' : '')}
+              onClick={() => setLobbyTab('ladder')}
+            >Ladder</button>
             {authOk && (
               <button
                 className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
@@ -16289,7 +16455,7 @@ function App() {
               >Feed</button>
             )}
           </div>
-          {authOk && lobbyTab !== 'feed' && (() => {
+          {authOk && lobbyTab !== 'feed' && lobbyTab !== 'ladder' && (() => {
             // Single persistent, collapsible badge panel — rendered directly
             // under the header band (above the game grid) on the Daily and
             // Classic tabs so players find their badges where they expect them.
@@ -16319,6 +16485,10 @@ function App() {
           )}
           {lobbyTab === 'feed' ? (
             <FeedScreen user={user} setScreen={setScreen} />
+          ) : lobbyTab === 'ladder' ? (
+            // Gated on !loading so a ?demo=ladder fixture (seeded inside
+            // loadDaily's /api/daily call) lands before the ladder fetches.
+            !loading && <LadderScreen />
           ) : (
           <div className="grid">
             {GAMES.filter(g => g.category === lobbyTab).map(g => {
@@ -16362,7 +16532,7 @@ function App() {
             })}
           </div>
           )}
-          {lobbyTab === 'daily' && authOk && (
+          {lobbyTab === 'daily' && authOk && !loading && (
             <TodayChampions
               onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
             />

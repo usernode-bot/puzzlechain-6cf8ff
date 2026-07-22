@@ -353,6 +353,41 @@ pieces (all in `public/app.jsx`):
   auto-show for now — extending the "?" affordance into their headers
   is the remaining game-by-game work.
 
+## Game Corner phase 4 — leaderboard upgrades
+
+- **Friends scope.** The daily per-game leaderboard, the cross-game
+  "Today's Champions" board, and the classic all-time leaderboard all
+  accept `?scope=friends`: same query filtered to the caller + the
+  people they follow (`user_follows`), ranks recomputed within the
+  filtered set. Anonymous callers get an empty board (no follow
+  graph). Client-side every board renders shared `LbScopeTabs`
+  (Global | Friends); `?lbscope=friends` in the URL preselects the
+  Friends view (proposal tests use it). Boards with a custom `url`
+  (snake, breakout) stay single-scope.
+- **Rating ladder.** New PUBLIC `game_ratings` table (one row per
+  user × head-to-head game: elo, win_streak, best_streak, W/L/D, and
+  a `week_start_elo`/`week_start_date` snapshot so "weekly movers" =
+  `elo − week_start_elo` needs no history table). `applyMatchRating`
+  (K=32, start 1000, draw=0.5) settles both players; it's called from
+  the four finish paths that transition a match to finished exactly
+  once — Mancala move (CAS), Chutes & Ladders move (CAS), race
+  both-scores-in (CAS), and the forfeit endpoint (now guarded on the
+  active→finished transition; still idempotent for repeat calls).
+  `H2H_GAME_IDS` = mancala, chutes-ladders, 2048, blockblast.
+  `GET /api/ladder/:gameId` (public, null-guarded, in
+  `PUBLIC_API_GET`) returns entries ranked elo → win_streak →
+  earliest-updated, plus `movers` (top weekly climbers) and the
+  pinned `me` row. The client's **Ladder lobby tab** (`?tab=ladder`)
+  renders it with a game picker.
+- **Staging fixtures:** `demo=friends-lb` (fake "Staging friend …"
+  users the viewer follows, with today's attempts + classic scores)
+  and `demo=ladder` (8 "Staging rival …" ratings across
+  chutes-ladders/2048 with varied streaks and week deltas, a viewer
+  row, and backing finished `classic_rooms`). Both idempotent,
+  IS_STAGING-gated, seeded via `GET /api/daily?demo=…`; the ladder
+  tab renders only after `loadDaily` settles so the fixture lands
+  before the ladder fetch.
+
 ## Retired features (Game Corner phase 1 — do not resurrect)
 
 As of the "Game Corner" evolution's phase-1 subtraction, the following

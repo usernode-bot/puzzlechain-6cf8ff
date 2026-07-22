@@ -356,6 +356,26 @@
       "name": "Daily leaderboard readable without auth (null-guarded)",
       "path": "/api/daily/sudoku/leaderboard",
       "expectText": "entries"
+    },
+    {
+      "name": "Friends leaderboard tab shows followed players",
+      "path": "/?demo=friends-lb&lbscope=friends",
+      "expectText": "Staging friend Nia"
+    },
+    {
+      "name": "Ladder tab shows seeded ratings and movers",
+      "path": "/?tab=ladder&demo=ladder",
+      "expectText": "Staging rival Kas"
+    },
+    {
+      "name": "Ladder shows weekly movers strip",
+      "path": "/?tab=ladder&demo=ladder",
+      "expectText": "Weekly movers"
+    },
+    {
+      "name": "Ladder endpoint readable without auth",
+      "path": "/api/ladder/chutes-ladders",
+      "expectText": "entries"
     }
   ]
 }

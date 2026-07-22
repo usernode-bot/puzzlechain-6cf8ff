@@ -281,8 +281,8 @@ mind when touching the daily flow:
   `{ scoreDirection, tieBreak, sessionLength, input, undo }` — the
   machine-relevant fields **must match by id across the two files**.
   The client entries additionally carry `howToPlay` card copy
-  (`[{ title, body }, …]`), consumed by phase 3's shell-owned pre-game
-  chrome; until then it's declarative. `tieBreak` is the symbolic rule
+  (`[{ title, body }, …]`), consumed by phase 3's shell-owned chrome
+  (see below). `tieBreak` is the symbolic rule
   the leaderboard SQL implements (`'time-then-steps'` for dailies,
   `'first-to-score'` for classic all-time boards) — parameterize the
   SQL off it when the daily pool widens beyond fastest-solve games.
@@ -317,6 +317,41 @@ mind when touching the daily flow:
   token-bearing traffic is not limited. Everything mutating stays
   deny-by-default — add new public reads to `PUBLIC_API_GET`
   consciously, with the same null-guard discipline.
+
+## Game Corner phase 3 — shell-owned chrome
+
+Phase 3 gave the daily flow standard, shell-owned furniture. Key
+pieces (all in `public/app.jsx`):
+
+- **Pre-game screen (`PreGameScreen`).** Opening a daily game now lands
+  on `screen === 'pregame'` — game identity, manifest chips
+  (session length / input / undo), personal best, streak, the reset
+  countdown, and the "everyone plays this exact deal today" line.
+  **Consume-on-start moved to the Play button**: `launchGame` only
+  navigates; `startDailyRun` does the `/start` claim (or resume), so
+  browsing the pre-game screen never burns the day's attempt. Personal
+  bests come from `GET /api/daily`'s new `bests` map
+  (`{ gameId: { score, timeSecs } }`, all-time, server-computed).
+- **How-to-Play modal (`HowToPlayModal`).** Renders the manifest's
+  `howToPlay` cards. Auto-opens on a player's **first-ever open** of
+  each game (tracked per-browser in localStorage `pc_howto_seen_v1` —
+  deliberately device-local onboarding state, not server state) and is
+  always reachable from a "?" in the daily in-game header and the
+  ClassicShell topbar (`onHowTo` prop). **Timed dailies can't tick
+  under the auto-show**: it appears on the pre-game screen, and the
+  game (with its timer) only mounts after Play.
+- **End screen.** The existing shell-owned win overlay is the standard
+  end screen (score breakdown: base → streak bonus → earned; share
+  CTA; leaderboard; Verified badge). Phase 3 added the personal-best
+  row ("🏅 New personal best!" when beaten, sourced from `bests`).
+- **`?play=1` deep-link param** skips the pre-game screen (and the
+  first-open auto-show) and claims/mounts immediately — the
+  pre-phase-3 behaviour. Proposal tests that assert on in-game UI use
+  it; plain `?game=` deep links land on the pre-game screen.
+- Classic `shell: 'self'` games (Snake, Block Blast, Diamond Rush,
+  Hash Rush) render their own shell and only get the first-open
+  auto-show for now — extending the "?" affordance into their headers
+  is the remaining game-by-game work.
 
 ## Retired features (Game Corner phase 1 — do not resurrect)
 

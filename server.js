@@ -3139,6 +3139,21 @@ app.get('/api/daily', async (req, res) => {
     let seeds = {};
     try { seeds = await ensureDailySeeds(); }
     catch (e) { console.warn('[daily] seed issue failed (client falls back):', e.message); }
+
+    // All-time personal bests per daily game (phase 3 pre-game screen): best
+    // score and fastest winning solve across every past attempt_date.
+    const bests = {};
+    try {
+      const { rows: bestRows } = await pool.query(
+        `SELECT game_id, MAX(score)::int AS best_score, MIN(time_secs)::int AS best_time
+           FROM daily_attempts
+          WHERE user_id = $1 AND finished_at IS NOT NULL
+            AND score IS NOT NULL AND score > 0
+          GROUP BY game_id`,
+        [req.user.id]
+      );
+      for (const r of bestRows) bests[r.game_id] = { score: r.best_score, timeSecs: r.best_time };
+    } catch (e) { console.warn('[daily] bests query failed (non-fatal):', e.message); }
     // Lifetime won-solve count for the "X/Y solves → milestone" progress hint.
     let solveCount = 0;
     try {
@@ -3174,6 +3189,8 @@ app.get('/api/daily', async (req, res) => {
       attempts,
       // Today's server-issued per-game board seeds ({ gameId: seed }).
       seeds,
+      // All-time personal bests per daily game ({ gameId: { score, timeSecs } }).
+      bests,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);

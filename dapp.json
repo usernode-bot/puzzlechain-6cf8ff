@@ -259,18 +259,33 @@
     },
     {
       "name": "Mini Sudoku shows Hint bar",
-      "path": "/?game=sudoku",
+      "path": "/?game=sudoku&play=1",
       "expectText": "Hint"
     },
     {
       "name": "Word Hunt shows Hint bar",
-      "path": "/?game=wordhunt",
+      "path": "/?game=wordhunt&play=1",
       "expectText": "Hint"
     },
     {
       "name": "Daily Tile Match shows Hint bar",
-      "path": "/?game=tilematchingdaily",
+      "path": "/?game=tilematchingdaily&play=1",
       "expectText": "Hint"
+    },
+    {
+      "name": "Pre-game screen shows daily deal context",
+      "path": "/?game=wordhunt",
+      "expectText": "exact deal"
+    },
+    {
+      "name": "Pre-game screen shows personal best stat",
+      "path": "/?game=wordhunt",
+      "expectText": "Personal best"
+    },
+    {
+      "name": "How-to-Play cards auto-open on first visit",
+      "path": "/?game=tilematchingdaily",
+      "expectText": "How to play Daily Tile Match"
     },
     {
       "name": "Mancala mode picker offers Daily Challenge",

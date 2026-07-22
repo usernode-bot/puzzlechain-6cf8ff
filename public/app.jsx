@@ -638,6 +638,88 @@ body {
 .locked-result .k { color: ${C.muted}; }
 .locked-result .v { color: ${C.gold}; }
 
+/* ---- Pre-game screen (shell-owned chrome, phase 3) ---- */
+.pregame-card {
+  max-width: 440px; margin: 1.5rem auto; padding: 2rem 1.5rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 18px;
+  text-align: center;
+}
+.pregame-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+.pregame-card h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.3rem; }
+.pregame-card .sub { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1rem; }
+.pregame-chips {
+  display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.pregame-chip {
+  font-size: 0.72rem; padding: 0.25rem 0.6rem; border-radius: 999px;
+  background: ${C.surface}; border: 1px solid ${C.border}; color: ${C.muted};
+  white-space: nowrap;
+}
+.pregame-stats {
+  display: flex; gap: 0.6rem; justify-content: center; margin-bottom: 1rem;
+}
+.pregame-stat {
+  flex: 1; max-width: 130px; background: ${C.surface};
+  border: 1px solid ${C.border}; border-radius: 12px; padding: 0.6rem 0.4rem;
+}
+.pregame-stat .l {
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: ${C.muted}; margin-bottom: 0.2rem;
+}
+.pregame-stat .v { font-weight: 700; font-size: 1rem; }
+.pregame-deal {
+  font-size: 0.82rem; color: ${C.text}; background: ${C.accent}14;
+  border: 1px solid ${C.accent}44; border-radius: 10px;
+  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
+}
+.pregame-resume-note {
+  font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.8rem;
+}
+.pregame-play { width: 100%; }
+.pregame-play:disabled { opacity: 0.5; cursor: default; }
+.pregame-signedout { font-size: 0.78rem; color: ${C.muted}; margin-top: 0.6rem; }
+.pregame-howto-btn {
+  margin-top: 0.8rem; background: none; border: none; color: ${C.accent};
+  font-family: inherit; font-size: 0.85rem; cursor: pointer; padding: 0.3rem;
+}
+.pregame-howto-btn:hover { text-decoration: underline; }
+
+/* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
+.howto-overlay {
+  position: fixed; inset: 0; background: #000000b3; z-index: 220;
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.howto-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
+  padding: 1.4rem 1.3rem; width: min(95vw, 420px); max-height: 85dvh;
+  overflow-y: auto;
+}
+.howto-head {
+  display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;
+}
+.howto-icon { font-size: 1.6rem; }
+.howto-head h3 { font-size: 1.05rem; font-weight: 700; }
+.howto-list { display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 1.2rem; }
+.howto-step { display: flex; gap: 0.7rem; align-items: flex-start; }
+.howto-step-num {
+  flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  background: ${C.accent}22; color: ${C.accent}; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+}
+.howto-step-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.15rem; }
+.howto-step-body { font-size: 0.82rem; color: ${C.muted}; line-height: 1.45; }
+
+/* "?" help button in the in-game headers */
+.help-btn {
+  margin-left: auto; background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 50%; width: 1.9rem; height: 1.9rem; color: ${C.muted};
+  font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.12s, color 0.12s;
+}
+.help-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
+
 /* ---- Locked lobby card ---- */
 .card.locked { cursor: default; }
 .card.locked:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
@@ -4163,7 +4245,7 @@ function ClassicResumeBanner({ onResume, onDismiss }) {
 
 // game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
 // menuConfig (optional): wires the first "Menu" tab — New Game / Save / Post to Feed.
-function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig }) {
+function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig, onHowTo }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [, force] = useState(0);
   const sections = [
@@ -4191,6 +4273,7 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
           {modePill && <span className="cg-mode-pill">{modePill.icon} {menuConfig.gameMode === '2p' ? '2P' : menuConfig.gameMode === 'online' ? 'Online' : 'Bot'}</span>}
         </div>
         {onNewGame && !hideQuickReset && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
+        {onHowTo && <button className="cg-btn" onClick={() => { cgSound('click'); onHowTo(); }} title="How to play" aria-label="How to play">?</button>}
         <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
         <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
       </div>
@@ -5614,6 +5697,117 @@ function BadgeStrip({ badges, achievements }) {
 /* ============================================================
    Locked screen — shown when today's attempt is already used
    ============================================================ */
+/* ============================================================
+   Shell-owned game chrome (phase 3) — How-to-Play + pre-game screen
+   ============================================================ */
+
+// First-open tracking for the auto-shown How-to-Play cards, persisted per
+// browser in localStorage (deliberately per-device: the how-to is an
+// onboarding aid, not server state).
+const HOWTO_SEEN_KEY = 'pc_howto_seen_v1';
+function howtoSeen(gameId) {
+  try { return !!(JSON.parse(localStorage.getItem(HOWTO_SEEN_KEY) || '{}'))[gameId]; }
+  catch { return false; }
+}
+function markHowtoSeen(gameId) {
+  try {
+    const seen = JSON.parse(localStorage.getItem(HOWTO_SEEN_KEY) || '{}');
+    seen[gameId] = true;
+    localStorage.setItem(HOWTO_SEEN_KEY, JSON.stringify(seen));
+  } catch {}
+}
+
+// How-to-Play modal, rendered from the game's manifest `howToPlay` cards.
+// Shell-owned: auto-shown on a player's first-ever open of each game and
+// always reachable from the "?" in the in-game header. Timed dailies can't
+// tick under the auto-show — it appears on the PRE-GAME screen, and the game
+// (with its timer) only mounts after Play.
+function HowToPlayModal({ game, onClose }) {
+  const cards = game.howToPlay || [];
+  return (
+    <div className="howto-overlay" onClick={onClose}>
+      <div className="howto-card" onClick={(e) => e.stopPropagation()}>
+        <div className="howto-head">
+          <span className="howto-icon">{game.icon}</span>
+          <h3>How to play {game.name}</h3>
+        </div>
+        <div className="howto-list">
+          {cards.map((c, i) => (
+            <div className="howto-step" key={i}>
+              <div className="howto-step-num mono">{i + 1}</div>
+              <div>
+                <div className="howto-step-title">{c.title}</div>
+                <div className="howto-step-body">{c.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button className="primary-btn" onClick={onClose}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
+// Manifest chip copy for the pre-game screen.
+const SESSION_LENGTH_LABEL = { short: '≈ 1–3 min', medium: '≈ 3–10 min', long: '10+ min' };
+const INPUT_LABEL = { tap: '👆 Tap', drag: '✋ Drag', swipe: '👉 Swipe', keyboard: '⌨️ Type' };
+
+// Standard pre-game screen (shell-owned chrome, phase 3): game identity,
+// manifest chips, personal best, streak, and the daily-challenge context
+// (countdown + same-deal-for-everyone). Consume-on-start only fires when the
+// player hits Play — peeking at this screen never burns the day's attempt.
+function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo }) {
+  const countdown = useCountdown(nextResetUtc, offset, onReset);
+  const resuming = !!(attempt && !attempt.finishedAt);
+  const m = game.manifest || {};
+  return (
+    <div className="pregame-card">
+      <div className="pregame-icon">{game.icon}</div>
+      <h2>{game.name}</h2>
+      <div className="sub">{game.desc}</div>
+      <div className="pregame-chips">
+        {m.sessionLength && SESSION_LENGTH_LABEL[m.sessionLength] && (
+          <span className="pregame-chip">⏱ {SESSION_LENGTH_LABEL[m.sessionLength]}</span>
+        )}
+        {m.input && INPUT_LABEL[m.input] && <span className="pregame-chip">{INPUT_LABEL[m.input]}</span>}
+        {m.undo === 'free' && <span className="pregame-chip">↩︎ Undo allowed</span>}
+        {m.undo === 'booster' && <span className="pregame-chip">↩︎ Limited boosters</span>}
+      </div>
+      <div className="pregame-stats">
+        <div className="pregame-stat">
+          <div className="l">Personal best</div>
+          <div className="v mono">{best && best.score != null ? `+${best.score}` : '—'}</div>
+        </div>
+        <div className="pregame-stat">
+          <div className="l">Streak</div>
+          <div className="v mono">{authOk ? `${streak}d` : '—'}</div>
+        </div>
+        {game.daily && nextResetUtc && (
+          <div className="pregame-stat">
+            <div className="l">New deal in</div>
+            <div className="v mono">{countdown}</div>
+          </div>
+        )}
+      </div>
+      {game.daily && (
+        <div className="pregame-deal">
+          🌍 Everyone plays this <strong>exact deal</strong> today — one attempt, same board for all.
+        </div>
+      )}
+      {resuming && (
+        <div className="pregame-resume-note">▶ You have a run in progress — jump back in where you left off.</div>
+      )}
+      <button className="primary-btn pregame-play" onClick={onPlay} disabled={game.daily && !authOk}>
+        {resuming ? '▶ Resume' : 'Play'}
+      </button>
+      {game.daily && !authOk && (
+        <div className="pregame-signedout">Signed out — open PuzzleChain inside Usernode to play today's deal.</div>
+      )}
+      <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+    </div>
+  );
+}
+
 function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const hasResult = attempt && attempt.score != null;
@@ -15232,6 +15426,11 @@ function App() {
   const [classicLastResult, setClassicLastResult] = useState(null);
   // Pre-launch game-mode modal (multi-mode classic games, e.g. 2048 / Block Blast)
   const [preLaunchGame, setPreLaunchGame] = useState(null);
+  // Shell-owned chrome (phase 3): all-time personal bests per daily game
+  // (from /api/daily), and the game whose How-to-Play modal is open (null =
+  // closed). The modal renders above every screen/shell.
+  const [bests, setBests] = useState({});
+  const [howToGame, setHowToGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
   // Wallet identity state (linked/verified address shown on the Account screen)
@@ -15289,6 +15488,7 @@ function App() {
       // Server-issued daily seeds — must land before any daily game mounts
       // (they do: games launch from the lobby, which renders after loading).
       SERVER_DAILY_SEEDS = body.seeds || {};
+      setBests(body.bests || {});
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -15397,20 +15597,44 @@ function App() {
     loadDaily();
   };
 
-  const launchGame = async (game) => {
-    // Non-daily (classic) games skip the per-day start/lock system.
+  // Opening a game lands on the shell-owned PRE-GAME screen (phase 3) — the
+  // day's attempt is only claimed when the player hits Play (startDailyRun),
+  // so browsing the pre-game screen never burns the attempt. The How-to-Play
+  // cards auto-open on a player's first-ever open of each game; because timed
+  // dailies only mount (and start their clock) after Play, the auto-shown
+  // how-to can never eat into the timer.
+  const launchGame = (game) => {
     if (!game.daily) {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
       setLoseData(null);
       setScreen('game');
+      // Classic games mount immediately, so the first-open how-to overlays
+      // the running game (none of the in-scope classics are hard-timed).
+      if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
       return;
     }
     const existing = attempts[game.id];
+    if (existing && existing.finishedAt) {
+      // Finished today — straight to the locked screen.
+      setCurrentGame(game);
+      setScreen('locked');
+      return;
+    }
+    setCurrentGame(game);
+    setWinData(null);
+    setLoseData(null);
+    setScreen('pregame');
+    if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
+  };
+
+  // Claim (or resume) the day's single attempt and mount the game. Extracted
+  // from launchGame so the pre-game screen's Play button owns consume-on-start.
+  const startDailyRun = async (game) => {
+    const existing = attempts[game.id];
     if (existing) {
       if (existing.finishedAt) {
-        // Finished today — straight to the locked screen.
         setCurrentGame(game);
         setScreen('locked');
       } else {
@@ -15467,6 +15691,15 @@ function App() {
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
     if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
+    // ?play=1 skips the pre-game screen (and the first-open how-to) and
+    // claims/mounts immediately — used by proposal tests that assert on
+    // in-game UI, and by "jump straight in" share links.
+    if (params.get('play') === '1') {
+      if (g.daily) { startDailyRun(g); return; }
+      launchGame(g);
+      setHowToGame(null); // suppress the classic first-open auto-show too
+      return;
+    }
     launchGame(g);
   }, [loading]);
 
@@ -15622,6 +15855,19 @@ function App() {
       const finalScore = Math.round(score * multiplier);
       const bonus = finalScore - score;
       setStreak(effectiveStreak);
+      // Personal-best comparison for the end screen (phase 3), captured BEFORE
+      // merging this win into the bests map.
+      const prevBest = bests[gameId] && Number.isFinite(bests[gameId].score) ? bests[gameId].score : null;
+      setBests(prev => {
+        const cur = prev[gameId] || {};
+        return {
+          ...prev,
+          [gameId]: {
+            score: cur.score != null ? Math.max(cur.score, finalScore) : finalScore,
+            timeSecs: cur.timeSecs != null && timeSecs != null ? Math.min(cur.timeSecs, timeSecs) : (cur.timeSecs != null ? cur.timeSecs : timeSecs),
+          },
+        };
+      });
       // A badge unlocked the moment this win's streak lands exactly on a tier.
       const unlocked = justUnlockedBadge(effectiveStreak);
       if (unlocked) {
@@ -15631,6 +15877,7 @@ function App() {
       // call below, so the player always gets a clear "Solved!" confirmation.
       setWinData({
         score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+        prevBest,
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
         share: meta && meta.share,
@@ -15833,6 +16080,8 @@ function App() {
             onNewGame={() => setPlayAgainKey(k => k + 1)}
             menuConfig={classicMenuConfig}
             sheetSections={classicSections}
+            onHowTo={currentGame.howToPlay && currentGame.howToPlay.length > 0
+              ? () => setHowToGame(currentGame) : undefined}
           >
             <div className="cg-stage cg-scroll">
               <GameComponent
@@ -15865,6 +16114,14 @@ function App() {
               <div className="game-title">
                 <span>{currentGame.icon}</span> {currentGame.name}
               </div>
+              {currentGame.howToPlay && currentGame.howToPlay.length > 0 && (
+                <button
+                  className="help-btn"
+                  title="How to play"
+                  aria-label="How to play"
+                  onClick={() => setHowToGame(currentGame)}
+                >?</button>
+              )}
             </div>
             <GameComponent
               onWin={handleWin}
@@ -16113,6 +16370,29 @@ function App() {
         </div>
       )}
 
+      {screen === 'pregame' && currentGame && (
+        <div className="game-wrap">
+          <div className="game-head">
+            <button className="back-btn" onClick={backToLobby}>← Back</button>
+            <div className="game-title">
+              <span>{currentGame.icon}</span> {currentGame.name}
+            </div>
+          </div>
+          <PreGameScreen
+            game={currentGame}
+            attempt={attempts[currentGame.id]}
+            best={bests[currentGame.id]}
+            streak={streak}
+            authOk={authOk}
+            nextResetUtc={nextResetUtc}
+            offset={offset}
+            onReset={onReset}
+            onPlay={() => startDailyRun(currentGame)}
+            onHowTo={() => setHowToGame(currentGame)}
+          />
+        </div>
+      )}
+
       {screen === 'locked' && currentGame && (
         <div className="game-wrap">
           <div className="game-head">
@@ -16191,6 +16471,19 @@ function App() {
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
+              {!winData.isClassic && winData.prevBest !== undefined && (
+                winData.prevBest == null || winData.finalScore > winData.prevBest ? (
+                  <div className="score-row bonus">
+                    <span className="k">🏅 New personal best!</span>
+                    <span className="v mono">+{winData.finalScore}</span>
+                  </div>
+                ) : (
+                  <div className="score-row">
+                    <span className="k">Personal best</span>
+                    <span className="v mono">+{winData.prevBest}</span>
+                  </div>
+                )
+              )}
               {winData.isClassic && winData.bestScore !== undefined && (
                 <div className="score-row">
                   <span className="k">Best score</span>
@@ -16390,6 +16683,13 @@ function App() {
             )}
           </div>
         </div>
+      )}
+
+      {howToGame && (
+        <HowToPlayModal
+          game={howToGame}
+          onClose={() => { markHowtoSeen(howToGame.id); setHowToGame(null); }}
+        />
       )}
     </div>
   );

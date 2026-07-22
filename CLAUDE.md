@@ -99,13 +99,10 @@ purpose.
       (the standard in-frame classic layout).
     - `'self'` — the component renders its **own** `ClassicShell`
       (full-screen, gesture-first; it gets `game` + `onBack` too).
-    - `'custom'` — `App` renders a bespoke screen instead of
-      `component` (today only PvP Arena); clicking the card sets
-      `currentGame` directly rather than going through `launchGame`.
   - **`daily: true`** marks the four daily games and is the **single
     gate** for the per-day start/lock/finish/streak/resume machinery —
     `launchGame`, `handleWin`, and `handleLose` all branch on
-    `!game.daily`. Omit it (falsy) for classic/idle/PvP games.
+    `!game.daily`. Omit it (falsy) for classic games.
   - The client `GAMES` array and the server `GAME_REGISTRY`
     (`server.js`) are two separate objects (one needs React
     components, the other DApp tiers) that must be kept **in sync** by
@@ -265,3 +262,32 @@ The streak multiplies points via **tiers**, defined once in
   multiplier in `finish` instead of trusting the client `finalScore`)
   matters only if a leaderboard ships; the displayed multi-day streak
   has **no** grace-day/freeze — a missed UTC day resets it to 0.
+
+## Retired features (Game Corner phase 1 — do not resurrect)
+
+As of the "Game Corner" evolution's phase-1 subtraction, the following
+were **deliberately removed** and should not be re-added piecemeal:
+
+- **The MATCH in-app currency** and everything that moved it: earn on
+  daily wins, paid hints, streak freezes, tips, the Wallet screen, the
+  nav balance chip, the MATCH on-chain ledger/memo anchoring, and the
+  Tile Match wallet/daily-tasks/duels surfaces. **Hints are now free**
+  — still capped per day and counted server-side (`daily_hints`), just
+  no cost. Points, streaks, and badges are the only rewards.
+- **Texas Hold 'Em**, **Idle Empire**, and the **PvP staking arena**
+  (games and their routes/registry entries).
+- Their **database tables remain in the schema** (`poker_chips`,
+  `idle_game_state`, `pvp_matches`/`pvp_moves`, `tilematch_tokens`,
+  `match_ledger*`, `token_*`, `tilematch_duels`,
+  `tilematch_daily_tasks`) — the migrations are intentionally
+  non-destructive; no code path touches them anymore.
+- `REDIS_URL`/ioredis (only ever the PvP matchmaking fast path) and the
+  UTGO wager contract/ABIs are gone. `ethers` stays solely for
+  `verifyMessage` in the wallet ownership proof (Account screen's
+  "On-chain login" identity — which is kept; it's identity, not
+  currency).
+
+The DApp-Mode verification framework (`lib/dapp.js`, `game_sessions` /
+`session_states`, session receipts, the Verified leaderboard) is NOT
+part of the retirement — it stays and is the seed of Game Corner's
+anti-cheat harness.

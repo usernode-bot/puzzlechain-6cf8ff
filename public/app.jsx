@@ -336,13 +336,11 @@ body {
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
-  /* Friends + dApps + MATCH chip + wallet chip move into the Account screen's
-     Connections section on mobile. Scoped under .nav-right so they outrank
-     the base chip rules defined later in this stylesheet regardless of source order. */
+  /* Friends + dApps chips move into the Account screen's Connections section
+     on mobile. Scoped under .nav-right so they outrank the base chip rules
+     defined later in this stylesheet regardless of source order. */
   .nav-right .nav-friends-btn { display: none; }
   .nav-right .nav-integration-chip { display: none; }
-  .nav-right .nav-match-chip { display: none; }
-  .nav-right .nav-wallet-chip { display: none; }
   /* Badge accordion: trigger is interactive on mobile */
   .badge-strip-body { overflow: hidden; transition: max-height 280ms ease, opacity 280ms ease; }
   .badge-strip-body.closed { max-height: 0; opacity: 0; }
@@ -868,20 +866,6 @@ body {
   font-weight: 600;
   color: ${C.rose};
 }
-/* MATCH on-chain explorer affordances (shared across games + wallet) */
-.match-explorer-link {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: ${C.accent};
-  text-decoration: none;
-  white-space: nowrap;
-}
-.match-explorer-link:hover { text-decoration: underline; }
-.match-explorer-mock, .match-explorer-pending {
-  font-size: 0.7rem;
-  color: ${C.muted};
-  white-space: nowrap;
-}
 /* Hinted reveals in the daily puzzles */
 .scell.hinted {
   color: ${C.gold};
@@ -904,25 +888,6 @@ body {
   0%, 100% { box-shadow: 0 0 6px ${C.gold}; }
   50% { box-shadow: 0 0 16px ${C.gold}; }
 }
-/* Wallet — MATCH activity list */
-.match-activity-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.match-activity-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.55rem 0.7rem;
-  background: ${C.panel2 || C.panel};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-}
-.match-activity-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.match-activity-what { font-size: 0.82rem; font-weight: 600; }
-.match-activity-sub { font-size: 0.7rem; color: ${C.muted}; }
-.match-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; }
-.match-activity-amt.earn { color: ${C.mint || C.accent}; }
-.match-activity-amt.spend { color: ${C.rose}; }
-.match-activity-empty { font-size: 0.8rem; color: ${C.muted}; text-align: center; padding: 0.5rem; }
 .cw-board {
   display: grid;
   gap: 0.4rem;
@@ -1892,11 +1857,6 @@ body {
 .t2048-keep-btn:hover   { opacity: 0.88; }
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
-
-.poker-auth-notice {
-  font-size: 0.75rem; color: ${C.muted}; text-align: center; padding: 0.4rem;
-  border-radius: 8px; background: ${C.surface}; border: 1px solid ${C.border};
-}
 
 /* ---- Snake ---- */
 .snake-board-wrap {
@@ -2990,393 +2950,6 @@ body {
 }
 @keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
-/* ---- Texas Hold 'Em (redesigned) ---- */
-.poker-shell {
-  position: fixed; inset: 0; display: flex; flex-direction: column;
-  background: #050a0e; color: ${C.text}; font-family: 'Space Grotesk', system-ui, sans-serif;
-  overflow: hidden; z-index: 10;
-}
-.poker-top-bar {
-  display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.5);
-  border-bottom: 1px solid ${C.border}44; flex-shrink: 0; min-height: 44px;
-}
-.poker-top-bar-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
-.poker-top-bar-info { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: ${C.muted}; }
-.poker-conn-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: ${C.emerald};
-  flex-shrink: 0;
-}
-.poker-conn-dot.slow { background: ${C.gold}; }
-.poker-back-btn {
-  background: none; border: none; color: ${C.muted}; cursor: pointer;
-  font-size: 1.1rem; padding: 0.2rem 0.4rem; border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  transition: color 0.12s, background 0.12s;
-}
-.poker-back-btn:hover { color: ${C.text}; background: ${C.border}44; }
-.poker-main {
-  flex: 1; position: relative; overflow: hidden;
-  display: flex; flex-direction: column;
-}
-.poker-oval-wrap {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  position: relative; padding: 0.5rem;
-}
-.poker-oval {
-  position: relative;
-  width: min(90vw, 540px);
-  height: min(54vw, 320px);
-  background: radial-gradient(ellipse at center, #1a5c32 0%, #0d3a1e 55%, #071f10 100%);
-  border-radius: 50%;
-  border: 3px solid ${C.gold}55;
-  box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
-  overflow: visible;
-}
-.poker-seat {
-  position: absolute; transform: translate(-50%, -50%);
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 12px; padding: 0.35rem 0.5rem;
-  min-width: 80px; max-width: 110px;
-  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
-  cursor: default; user-select: none; transition: border-color 0.2s, box-shadow 0.2s;
-  z-index: 2;
-}
-.poker-seat.active {
-  border-color: ${C.gold}; box-shadow: 0 0 12px ${C.gold}55;
-  animation: poker-pulse 1.2s ease-in-out infinite;
-}
-.poker-seat.winner { border-color: ${C.emerald}; box-shadow: 0 0 16px ${C.emerald}66; animation: poker-winner-glow 0.6s ease-in-out 3; }
-.poker-seat.folded { opacity: 0.45; }
-.poker-seat.eliminated { opacity: 0.25; border-style: dashed; }
-.poker-seat-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
-}
-.poker-seat-name {
-  font-size: 0.68rem; font-weight: 600; color: ${C.text};
-  display: flex; align-items: center; gap: 0.25rem; white-space: nowrap;
-}
-.poker-seat-badge {
-  font-size: 0.55rem; font-weight: 700; padding: 0.08rem 0.3rem;
-  border-radius: 999px; background: ${C.border}; color: ${C.muted};
-}
-.poker-seat-badge.dealer { background: ${C.gold}33; color: ${C.gold}; }
-.poker-seat-badge.sb { background: ${C.accent}22; color: ${C.accent}; }
-.poker-seat-badge.bb { background: ${C.violet}22; color: ${C.violet}; }
-.poker-seat-chips {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
-  color: ${C.gold}; font-weight: 600;
-}
-.poker-seat-cards { display: flex; gap: 0.18rem; justify-content: center; }
-.poker-seat-label {
-  font-size: 0.6rem; font-weight: 700; padding: 0.1rem 0.35rem;
-  border-radius: 999px; white-space: nowrap;
-}
-.poker-seat-label.fold { background: ${C.rose}22; color: ${C.rose}; }
-.poker-seat-label.check { background: ${C.border}; color: ${C.muted}; }
-.poker-seat-label.call { background: ${C.accent}22; color: ${C.accent}; }
-.poker-seat-label.raise { background: ${C.gold}22; color: ${C.gold}; }
-.poker-seat-label.allin { background: ${C.violet}22; color: ${C.violet}; }
-.poker-seat-label.bet { background: ${C.gold}22; color: ${C.gold}; }
-.poker-seat-timer {
-  width: 100%; height: 2px; background: ${C.border}; border-radius: 1px; overflow: hidden; margin-top: 0.1rem;
-}
-.poker-seat-timer-bar { height: 100%; background: ${C.gold}; transition: width 0.3s linear; border-radius: 1px; }
-.poker-community {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
-  pointer-events: none;
-}
-.poker-pot-row {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
-  color: ${C.gold}; font-weight: 600;
-  background: rgba(0,0,0,0.5); padding: 0.18rem 0.5rem; border-radius: 999px;
-}
-.poker-board { display: flex; gap: 0.28rem; }
-.poker-card-slot {
-  width: 34px; height: 50px; border-radius: 5px;
-  background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.18);
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; overflow: hidden;
-}
-.poker-card {
-  width: 34px; height: 50px; border-radius: 5px; background: #fff; color: #111;
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
-  flex-shrink: 0; user-select: none;
-}
-.poker-card.back {
-  background: ${C.accent}; border-color: ${C.accent}80;
-  background-image: repeating-linear-gradient(
-    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
-  );
-}
-.poker-card.red { color: ${C.rose}; }
-.poker-card.flip-in { animation: poker-flip-in 220ms ease both; }
-.poker-card-rank { font-size: 0.65rem; line-height: 1; }
-.poker-card-suit { font-size: 0.75rem; line-height: 1; align-self: center; }
-.poker-card-suit-bot { transform: rotate(180deg); align-self: flex-end; }
-.poker-card-lg {
-  width: 40px; height: 58px; border-radius: 6px; background: #fff; color: #111;
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
-  flex-shrink: 0; user-select: none;
-}
-.poker-card-lg.back {
-  background: ${C.accent}; border-color: ${C.accent}80;
-  background-image: repeating-linear-gradient(
-    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
-  );
-}
-.poker-card-lg.red { color: ${C.rose}; }
-.poker-street {
-  font-size: 0.65rem; font-weight: 600; color: ${C.emerald};
-  letter-spacing: 0.07em; text-transform: uppercase;
-}
-.poker-action-bar {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.55);
-  border-top: 1px solid ${C.border}44; flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.poker-action-btn {
-  flex: 1; min-width: 62px; padding: 0.55rem 0.4rem; border-radius: 10px; cursor: pointer;
-  font-family: inherit; font-size: 0.82rem; font-weight: 700; border: 1px solid transparent;
-  transition: opacity 0.12s, transform 0.08s; text-align: center;
-}
-.poker-action-btn:active:not(:disabled) { transform: scale(0.96); }
-.poker-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.poker-action-btn.fold { background: ${C.rose}22; border-color: ${C.rose}55; color: ${C.rose}; }
-.poker-action-btn.fold:hover:not(:disabled) { background: ${C.rose}33; }
-.poker-action-btn.check { background: ${C.border}; border-color: ${C.border}; color: ${C.text}; }
-.poker-action-btn.check:hover:not(:disabled) { background: ${C.dim}; }
-.poker-action-btn.call { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
-.poker-action-btn.call:hover:not(:disabled) { opacity: 0.88; }
-.poker-action-btn.raise { background: ${C.gold}22; border-color: ${C.gold}55; color: ${C.gold}; }
-.poker-action-btn.raise:hover:not(:disabled) { background: ${C.gold}33; }
-.poker-action-btn.allin { background: ${C.violet}22; border-color: ${C.violet}55; color: ${C.violet}; }
-.poker-action-btn.allin:hover:not(:disabled) { background: ${C.violet}33; }
-.poker-action-btn.next { background: ${C.emerald}22; border-color: ${C.emerald}55; color: ${C.emerald}; }
-.poker-action-btn.next:hover:not(:disabled) { background: ${C.emerald}33; }
-.poker-raise-panel {
-  position: absolute; bottom: 100%; left: 0; right: 0;
-  background: ${C.card}; border-top: 1px solid ${C.border};
-  padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;
-  animation: slideUp 0.18s ease;
-}
-@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.poker-preset-row { display: flex; gap: 0.4rem; }
-.poker-preset-btn {
-  flex: 1; padding: 0.4rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.75rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s;
-}
-.poker-preset-btn:hover { border-color: ${C.gold}; color: ${C.gold}; }
-.poker-preset-btn.sel { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}15; }
-.poker-raise-row { display: flex; align-items: center; gap: 0.5rem; }
-.poker-raise-slider { flex: 1; accent-color: ${C.gold}; }
-.poker-raise-input {
-  width: 60px; background: ${C.surface}; border: 1px solid ${C.border};
-  color: ${C.gold}; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
-  border-radius: 6px; padding: 0.3rem 0.4rem; text-align: center;
-}
-.poker-raise-row-btns { display: flex; gap: 0.4rem; }
-.poker-raise-confirm { flex: 1; background: ${C.gold}; color: #000; border: none; border-radius: 8px; padding: 0.45rem; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
-.poker-raise-cancel { background: none; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
-.poker-float-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 20; }
-.poker-float-btn {
-  width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6);
-  border: 1px solid ${C.border}55; color: ${C.text}; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
-  transition: background 0.12s;
-}
-.poker-float-btn:hover { background: rgba(0,0,0,0.8); }
-.poker-float-popover {
-  position: absolute; top: 100%; right: 0; margin-top: 0.4rem;
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
-  padding: 0.4rem; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  display: flex; flex-direction: column; gap: 0.2rem;
-}
-.poker-float-item {
-  background: none; border: none; color: ${C.text}; cursor: pointer;
-  font-family: inherit; font-size: 0.85rem; padding: 0.5rem 0.75rem;
-  text-align: left; border-radius: 7px; transition: background 0.1s;
-}
-.poker-float-item:hover { background: ${C.border}44; }
-.poker-sidebar {
-  position: fixed; top: 0; bottom: 0; width: 280px; max-width: 85vw;
-  background: ${C.card}; border: 1px solid ${C.border};
-  display: flex; flex-direction: column; z-index: 30;
-  transition: transform 0.22s ease; overflow: hidden;
-}
-.poker-sidebar.left { left: 0; border-radius: 0 14px 14px 0; transform: translateX(-100%); }
-.poker-sidebar.left.open { transform: translateX(0); }
-.poker-sidebar.right { right: 0; border-radius: 14px 0 0 14px; transform: translateX(100%); }
-.poker-sidebar.right.open { transform: translateX(0); }
-.poker-sidebar-header {
-  display: flex; align-items: center; padding: 0.75rem 1rem;
-  border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; flex-shrink: 0;
-}
-.poker-sidebar-close {
-  margin-left: auto; background: none; border: none; color: ${C.muted};
-  cursor: pointer; font-size: 1.1rem; display: flex; align-items: center;
-}
-.poker-sidebar-close:hover { color: ${C.text}; }
-.poker-sidebar-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.poker-sidebar-section { border-bottom: 1px solid ${C.border}22; padding-bottom: 0.5rem; }
-.poker-sidebar-section-title { font-size: 0.72rem; font-weight: 700; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.4rem; }
-.poker-log-entry { font-size: 0.78rem; color: ${C.muted}; padding: 0.2rem 0; border-bottom: 1px solid ${C.border}22; }
-.poker-log-entry.win { color: ${C.emerald}; }
-.poker-log-entry.lose { color: ${C.rose}; }
-.poker-log-entry.hand { color: ${C.gold}; font-weight: 600; }
-.poker-chat-msg { font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid ${C.border}22; }
-.poker-chat-msg .who { font-weight: 600; }
-.poker-chat-msg .who.player { color: ${C.accent}; }
-.poker-chat-msg .who.bot { color: ${C.muted}; }
-.poker-chat-input-row { display: flex; gap: 0.4rem; padding-top: 0.5rem; flex-shrink: 0; }
-.poker-chat-input {
-  flex: 1; background: ${C.surface}; border: 1px solid ${C.border};
-  color: ${C.text}; border-radius: 8px; padding: 0.45rem 0.6rem;
-  font-family: inherit; font-size: 0.82rem;
-}
-.poker-chat-send {
-  background: ${C.accent}; border: none; color: #fff; border-radius: 8px;
-  padding: 0.45rem 0.75rem; cursor: pointer; font-family: inherit; font-size: 0.82rem; font-weight: 600;
-}
-.poker-drawer {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: ${C.card}; border-top: 1px solid ${C.border};
-  border-radius: 14px 14px 0 0; z-index: 30;
-  max-height: 60vh; display: flex; flex-direction: column;
-  transform: translateY(100%); transition: transform 0.22s ease;
-}
-.poker-drawer.open { transform: translateY(0); }
-.poker-drawer-handle { width: 36px; height: 4px; background: ${C.border}; border-radius: 2px; margin: 0.6rem auto 0; }
-.poker-drawer-header { display: flex; align-items: center; padding: 0.6rem 1rem; border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; }
-.poker-drawer-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.poker-setup {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1.25rem; padding: 1.5rem 1.25rem; text-align: center; overflow-y: auto;
-}
-.poker-setup-title { font-size: 1.4rem; font-weight: 700; }
-.poker-setup-sub { font-size: 0.85rem; color: ${C.muted}; }
-.poker-setup-card {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
-  padding: 1.25rem; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 1rem;
-}
-.poker-setup-label { font-size: 0.78rem; font-weight: 600; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
-.poker-setup-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.poker-bot-btn {
-  flex: 1; min-width: 44px; padding: 0.5rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.88rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
-}
-.poker-bot-btn:hover { border-color: ${C.accent}; }
-.poker-bot-btn.sel { background: ${C.accent}22; border-color: ${C.accent}; color: ${C.accent}; }
-.poker-diff-btn {
-  flex: 1; padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.82rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
-}
-.poker-diff-btn:hover { border-color: ${C.gold}; }
-.poker-diff-btn.sel { background: ${C.gold}15; border-color: ${C.gold}; color: ${C.gold}; }
-.poker-setup-chips { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: ${C.gold}; font-weight: 600; }
-.poker-start-btn {
-  width: 100%; padding: 0.75rem; border-radius: 10px; cursor: pointer; font-family: inherit;
-  font-size: 1rem; font-weight: 700; border: none; background: ${C.accent}; color: #fff;
-  transition: opacity 0.12s;
-}
-.poker-start-btn:hover { opacity: 0.88; }
-/* ---- Hand Strength Panel ---- */
-.poker-hand-panel {
-  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px;
-  padding: 0.28rem 0.38rem; margin-top: 0.28rem; font-size: 0.62rem; width: 100%;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-.poker-hand-panel.improved {
-  animation: poker-hand-improve 0.55s ease;
-  border-color: ${C.gold}88;
-}
-@keyframes poker-hand-improve {
-  0%   { transform: scale(1); box-shadow: none; }
-  30%  { transform: scale(1.06); box-shadow: 0 0 10px ${C.gold}55; }
-  100% { transform: scale(1); box-shadow: none; }
-}
-.poker-hand-panel-rank {
-  display: flex; align-items: center; gap: 0.22rem; font-weight: 700; font-size: 0.65rem; line-height: 1.2;
-}
-.poker-hand-panel-name { color: ${C.gold}; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.poker-hand-panel-num { color: ${C.dim}; font-size: 0.58rem; font-family: 'JetBrains Mono', monospace; }
-.poker-hand-panel-desc { color: ${C.muted}; font-size: 0.58rem; margin: 0.12rem 0 0.18rem; line-height: 1.2; }
-.poker-hand-panel-cards { display: flex; gap: 0.12rem; flex-wrap: wrap; }
-.poker-hand-card {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; padding: 0.08rem 0.14rem;
-  border-radius: 3px; border: 1px solid transparent; background: rgba(255,255,255,0.05);
-  color: ${C.text}; letter-spacing: -0.02em;
-}
-.poker-hand-card.used {
-  border-color: ${C.gold}99; background: rgba(251,191,36,0.15); box-shadow: 0 0 5px ${C.gold}44;
-}
-.poker-hand-card.unused { opacity: 0.42; }
-.poker-hand-card.red { color: ${C.rose}; }
-/* ---- Seat card highlighting (hole cards) ---- */
-.poker-seat-card-hl { position: relative; display: inline-block; }
-.poker-seat-card-hl.hl-used .poker-card,
-.poker-seat-card-hl.hl-used .poker-card-lg { box-shadow: 0 0 7px ${C.gold}88; border-color: ${C.gold}; }
-.poker-seat-card-hl.hl-unused .poker-card,
-.poker-seat-card-hl.hl-unused .poker-card-lg { opacity: 0.45; }
-.poker-winner-overlay {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.75); z-index: 25;
-}
-.poker-winner-msg {
-  background: ${C.card}; border: 2px solid ${C.gold}; border-radius: 16px;
-  padding: 1.5rem 2rem; text-align: center; display: flex; flex-direction: column; gap: 0.6rem;
-  box-shadow: 0 0 30px ${C.gold}44;
-}
-.poker-winner-msg h2 { font-size: 1.4rem; font-weight: 700; color: ${C.gold}; }
-.poker-winner-msg .sub { font-size: 0.88rem; color: ${C.muted}; }
-.poker-hand-hist-item { background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.8rem; }
-.poker-hand-hist-title { font-weight: 600; color: ${C.text}; margin-bottom: 0.25rem; }
-.poker-hand-hist-detail { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
-.poker-overlay-backdrop { position: fixed; inset: 0; z-index: 25; }
-@keyframes poker-pulse {
-  0%, 100% { box-shadow: 0 0 8px ${C.gold}44; }
-  50% { box-shadow: 0 0 18px ${C.gold}99, 0 0 32px ${C.gold}44; }
-}
-@keyframes poker-flip-in {
-  from { transform: rotateY(90deg) scale(0.8); opacity: 0; }
-  to { transform: rotateY(0deg) scale(1); opacity: 1; }
-}
-@keyframes poker-winner-glow {
-  0%, 100% { box-shadow: 0 0 8px ${C.emerald}44; }
-  50% { box-shadow: 0 0 24px ${C.emerald}88; }
-}
-@media (max-width: 768px) {
-  .poker-oval { width: min(95vw, 480px); height: min(57vw, 280px); }
-  .poker-seat { min-width: 70px; max-width: 95px; }
-  .poker-card { width: 28px; height: 42px; font-size: 0.6rem; }
-  .poker-card-slot { width: 28px; height: 42px; }
-  .poker-card-lg { width: 32px; height: 48px; }
-  .poker-action-btn { min-width: 52px; font-size: 0.75rem; padding: 0.45rem 0.3rem; }
-}
-@media (max-width: 480px) {
-  .poker-oval { width: 98vw; height: 58vw; }
-  .poker-seat { min-width: 62px; max-width: 82px; padding: 0.25rem 0.35rem; }
-  .poker-seat-avatar { width: 22px; height: 22px; font-size: 0.6rem; }
-  .poker-card { width: 22px; height: 34px; font-size: 0.5rem; }
-  .poker-card-slot { width: 22px; height: 34px; }
-  .poker-card-lg { width: 26px; height: 38px; }
-  .poker-card-rank { font-size: 0.5rem; }
-  .poker-card-suit { font-size: 0.6rem; }
-  .poker-action-btn { min-width: 44px; font-size: 0.7rem; padding: 0.4rem 0.2rem; }
-  .poker-action-bar { padding: 0.4rem 0.5rem; gap: 0.35rem; }
-}
-
 @media (orientation: landscape) and (max-height: 560px) {
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
@@ -3385,175 +2958,6 @@ body {
   .cg-sheet, .tm-grid .tm-tile, .dr-gem, .snake-cell { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
 }
-
-/* ---- Idle Clicker ---- */
-.idle-container { display: flex; flex-direction: column; height: 100%; }
-.idle-main { flex: 1; padding: 1.5rem 1.25rem; max-width: 800px; margin: 0 auto; width: 100%; }
-.idle-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; }
-.idle-stat-box {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  padding: 0.8rem;
-  text-align: center;
-}
-.idle-stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
-.idle-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1.2rem; margin-top: 0.2rem; }
-.idle-stat-value.currency { color: ${C.gold}; }
-.idle-stat-value.prestige { color: ${C.accent}; }
-.idle-stat-value.income { color: ${C.emerald}; }
-
-.idle-tap-section { text-align: center; margin-bottom: 2rem; }
-.idle-tap-btn {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, ${C.gold}, ${C.accent});
-  border: 3px solid ${C.border};
-  color: white;
-  font-size: 2.5rem;
-  cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-  font-weight: 700;
-}
-.idle-tap-btn:active { transform: scale(0.95); box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-.idle-tap-label { font-size: 0.85rem; color: ${C.muted}; margin-top: 0.5rem; }
-
-.idle-shop { margin-top: 1rem; }
-.idle-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid ${C.border};
-}
-.idle-tab {
-  padding: 0.75rem 1.25rem;
-  background: none;
-  border: none;
-  color: ${C.muted};
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 600;
-  position: relative;
-  transition: color 0.12s ease;
-}
-.idle-tab.active {
-  color: ${C.accent};
-  font-weight: 700;
-}
-.idle-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: ${C.accent};
-}
-
-.idle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
-.idle-card {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 12px;
-  padding: 1rem;
-  cursor: pointer;
-  transition: border-color 0.12s ease, transform 0.12s ease;
-}
-.idle-card:hover { border-color: ${C.accent}; transform: translateY(-2px); }
-.idle-card-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-.idle-card-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.3rem; }
-.idle-card-desc { font-size: 0.75rem; color: ${C.muted}; margin-bottom: 0.5rem; }
-.idle-card-stats { font-size: 0.7rem; color: ${C.muted}; margin-bottom: 0.5rem; }
-.idle-card-btn {
-  width: 100%;
-  padding: 0.5rem;
-  background: ${C.accent};
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-.idle-card-btn:hover { background: #4F52D9; }
-.idle-card-btn:disabled { background: ${C.muted}; cursor: not-allowed; }
-
-.idle-coin-popup {
-  position: fixed;
-  pointer-events: none;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
-  color: ${C.gold};
-  font-size: 1.2rem;
-  animation: float-up 1s ease-out forwards;
-}
-@keyframes float-up {
-  0% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-40px); }
-}
-
-.prestige-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 14, 26, 0.85);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 1.25rem;
-}
-.prestige-card {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 18px;
-  padding: 2rem;
-  text-align: center;
-  max-width: 380px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-.prestige-card h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
-.prestige-card .sub { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1.25rem; }
-.prestige-rows {
-  text-align: left;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.9rem;
-  border-top: 1px solid ${C.border};
-  border-bottom: 1px solid ${C.border};
-  padding: 1rem 0;
-  margin-bottom: 1.25rem;
-}
-.prestige-row { display: flex; justify-content: space-between; padding: 0.3rem 0; }
-.prestige-row .k { color: ${C.muted}; }
-.prestige-row .v { color: ${C.gold}; font-weight: 600; }
-.prestige-buttons { display: flex; gap: 0.8rem; }
-.prestige-confirm {
-  flex: 1;
-  padding: 0.8rem;
-  background: ${C.accent};
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-.prestige-confirm:hover { background: #4F52D9; }
-.prestige-cancel {
-  flex: 1;
-  padding: 0.8rem;
-  background: ${C.surface};
-  color: ${C.text};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-}
-.prestige-cancel:hover { border-color: ${C.accent}; }
 
 /* ---- Knight's Tour ---- */
 .kt-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
@@ -3729,161 +3133,6 @@ body {
 .dr-end-btns { display: flex; flex-direction: column; gap: 0.55rem; width: 100%; margin-top: 0.5rem; }
 .dr-hint { color: ${C.muted}; font-size: 0.8rem; }
 
-/* ---- PvP Arena ---- */
-.pvp-lobby { max-width: 680px; margin: 0 auto; padding: 0.25rem 0; }
-.pvp-header { margin-bottom: 1.5rem; text-align: center; }
-.pvp-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.25rem; }
-.pvp-subtitle { color: ${C.muted}; font-size: 0.9rem; }
-.pvp-balance {
-  margin-top: 0.7rem; display: inline-block;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.9rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
-  color: ${C.gold};
-}
-.pvp-how {
-  display: flex; flex-direction: column; gap: 0.4rem;
-  background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 1.5rem;
-}
-.pvp-how-step { font-size: 0.85rem; color: ${C.muted}; }
-.pvp-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.9rem; }
-.pvp-tier-card {
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 14px; padding: 1.1rem;
-  display: flex; flex-direction: column; gap: 0.4rem;
-  transition: border-color 0.12s, box-shadow 0.12s;
-}
-.pvp-tier-card:hover { border-color: var(--pvp-color); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
-.pvp-tier-label { font-size: 1.15rem; font-weight: 700; color: var(--pvp-color); }
-.pvp-tier-desc { font-size: 0.82rem; color: ${C.muted}; }
-.pvp-tier-payout { font-size: 0.78rem; color: ${C.text}; font-family: 'JetBrains Mono', monospace; }
-.pvp-tier-btn {
-  margin-top: 0.5rem; border: none; border-radius: 10px; color: #fff;
-  font-family: inherit; font-size: 0.9rem; font-weight: 600;
-  padding: 0.65rem; cursor: pointer; transition: opacity 0.12s;
-}
-.pvp-tier-btn:disabled { opacity: 0.5; cursor: default; }
-.pvp-tier-btn:not(:disabled):hover { opacity: 0.85; }
-.pvp-matchmaking {
-  max-width: 400px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
-}
-.pvp-mm-icon { font-size: 3rem; }
-.pvp-mm-title { font-size: 1.25rem; font-weight: 700; }
-.pvp-mm-code {
-  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 10px; padding: 0.5rem 1.2rem; color: ${C.accent};
-  letter-spacing: 0.08em;
-}
-.pvp-mm-hint { color: ${C.muted}; font-size: 0.85rem; }
-.pvp-cancel-btn {
-  margin-top: 0.5rem; background: transparent; border: 1px solid ${C.border};
-  color: ${C.muted}; border-radius: 10px; padding: 0.5rem 1.2rem;
-  font-family: inherit; font-size: 0.875rem; cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
-}
-.pvp-cancel-btn:hover { border-color: ${C.rose}; color: ${C.rose}; }
-.pvp-mm-pulse {
-  width: 2.5rem; height: 2.5rem; border-radius: 50%;
-  border: 3px solid ${C.accent}; border-top-color: transparent;
-  animation: pvp-spin 0.8s linear infinite;
-}
-@keyframes pvp-spin { to { transform: rotate(360deg); } }
-.pvp-deposit {
-  max-width: 360px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; gap: 0.75rem; align-items: center;
-}
-.pvp-deposit-title { font-size: 1.2rem; font-weight: 700; }
-.pvp-deposit-amount {
-  font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; font-weight: 700;
-  color: ${C.gold};
-}
-.pvp-deposit-hint { color: ${C.muted}; font-size: 0.82rem; }
-.pvp-waiting {
-  max-width: 360px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem;
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
-}
-.pvp-waiting-title { font-size: 1.1rem; font-weight: 600; }
-.pvp-waiting-hint { color: ${C.muted}; font-size: 0.85rem; }
-.pvp-game-wrap .pvp-vs-bar {
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 12px; padding: 0.55rem 1rem; margin-bottom: 0.75rem;
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 0.85rem;
-}
-.pvp-vs-bar .pvp-vs-opp { color: ${C.muted}; }
-.pvp-vs-bar .pvp-vs-label {
-  font-weight: 700; font-size: 0.75rem; letter-spacing: 0.08em;
-  color: ${C.rose}; text-transform: uppercase;
-}
-.pvp-vs-bar .pvp-forfeit-btn {
-  background: transparent; border: 1px solid ${C.border}; color: ${C.muted};
-  border-radius: 8px; padding: 0.3rem 0.65rem; font-size: 0.78rem;
-  font-family: inherit; cursor: pointer; transition: border-color 0.12s, color 0.12s;
-}
-.pvp-vs-bar .pvp-forfeit-btn:hover { border-color: ${C.rose}; color: ${C.rose}; }
-.pvp-result {
-  max-width: 360px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem;
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
-}
-.pvp-result-emoji { font-size: 3rem; }
-.pvp-result-title { font-size: 1.4rem; font-weight: 700; }
-.pvp-result .pvp-result-btns { width: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
-.pvp-auth-msg {
-  text-align: center; color: ${C.muted}; padding: 2rem;
-  font-size: 0.95rem;
-}
-.pvp-mm-countdown {
-  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
-  color: ${C.accent}; letter-spacing: 0.06em;
-}
-.pvp-mm-countdown-expired { color: ${C.rose}; }
-.pvp-mm-btns { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
-.pvp-reclaim-btn {
-  background: ${C.rose}; border: none; border-radius: 10px; color: #fff;
-  font-family: inherit; font-size: 0.9rem; font-weight: 600;
-  padding: 0.6rem 1.4rem; cursor: pointer; transition: opacity 0.12s;
-}
-.pvp-reclaim-btn:disabled { opacity: 0.55; cursor: default; }
-.pvp-reclaim-btn:not(:disabled):hover { opacity: 0.85; }
-.pvp-opp-bar { flex: 1; margin: 0 0.75rem; }
-.pvp-opp-bar-label { font-size: 0.72rem; color: ${C.muted}; margin-bottom: 0.2rem; }
-.pvp-opp-bar-track {
-  height: 6px; background: ${C.surface}; border-radius: 99px; overflow: hidden;
-}
-.pvp-opp-bar-fill {
-  height: 100%; background: ${C.violet}; border-radius: 99px;
-  transition: width 0.5s ease;
-}
-.pvp-telem-summary {
-  width: 100%; background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 10px; padding: 0.65rem 0.9rem;
-  display: flex; flex-direction: column; gap: 0.3rem;
-}
-.pvp-telem-row {
-  display: flex; justify-content: space-between; font-size: 0.82rem; color: ${C.muted};
-}
-.pvp-telem-row .mono { color: ${C.text}; }
-.pvp-prize-anim {
-  width: 100%; background: ${C.surface}; border: 1px solid ${C.emerald};
-  border-radius: 10px; padding: 0.65rem 0.9rem;
-  display: flex; flex-direction: column; gap: 0.35rem;
-  animation: pvp-prize-fade 0.5s ease;
-}
-@keyframes pvp-prize-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.pvp-prize-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: ${C.emerald}; margin-bottom: 0.15rem; }
-.pvp-prize-row {
-  display: flex; justify-content: space-between; font-size: 0.82rem; color: ${C.muted};
-}
-.pvp-prize-row .mono { color: ${C.text}; }
-.pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
-.pvp-prize-winner .mono { color: ${C.emerald}; }
-
 /* ---- Tile Match Puzzle menu & competitive tabs ---- */
 .tm-menu { display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; width: 100%; }
 .tm-menu-header {
@@ -3891,13 +3140,6 @@ body {
   padding: 0.5rem 0 0.6rem; gap: 0.5rem;
 }
 .tm-menu-header h2 { font-size: 1rem; font-weight: 700; margin: 0; flex: 1; }
-.tm-wallet-chip {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 20px; padding: 0.25rem 0.65rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
-  font-weight: 600; color: ${C.gold}; white-space: nowrap;
-}
 .tm-menu-tabs {
   display: flex; gap: 0.15rem;
   border-bottom: 1px solid ${C.border};
@@ -4023,54 +3265,11 @@ body {
 .wallet-addr-row {
   display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
 }
-.wallet-balance-big {
-  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
-  color: ${C.emerald};
-}
-.wallet-balance-sub { font-size: 0.8rem; color: ${C.muted}; margin-top: 0.2rem; }
-.wallet-pending-big {
-  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
-  color: ${C.gold};
-}
-.wallet-mock-badge {
-  display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px;
-  background: ${C.dim}; border: 1px solid ${C.border};
-  font-size: 0.68rem; color: ${C.muted}; margin-bottom: 1rem;
-}
-.wallet-activity-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.45rem 0; border-bottom: 1px solid ${C.border}40;
-  font-size: 0.83rem;
-}
-.wallet-activity-row:last-child { border-bottom: none; }
-.wallet-activity-kind { color: ${C.muted}; }
-.wallet-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
-.wallet-activity-earned { color: ${C.emerald}; }
-.wallet-activity-tip-recv { color: ${C.gold}; }
-.wallet-activity-tip-sent { color: ${C.rose}; }
 .wallet-no-wallet {
   text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
 }
 .wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
-.wallet-freeze-info {
-  font-size: 0.8rem; color: ${C.muted}; margin-top: 0.35rem;
-}
-/* ---- Nav wallet chip ---- */
-.nav-wallet-chip {
-  display: flex; align-items: center; gap: 0.35rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.7rem;
-  cursor: pointer; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
-  color: ${C.emerald}; transition: border-color 0.15s;
-}
-.nav-wallet-chip:hover { border-color: ${C.emerald}; }
-.nav-match-chip {
-  display: flex; align-items: center; gap: 0.35rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.7rem;
-  font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
-  color: ${C.gold}; white-space: nowrap;
-}
+/* ---- Nav integration chip ---- */
 .nav-integration-chip {
   display: inline-flex; align-items: center; gap: 0.3rem;
   background: ${C.card}; border: 1px solid ${C.border};
@@ -4078,38 +3277,6 @@ body {
   font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
   color: ${C.accent};
 }
-/* ---- Tip modal ---- */
-.tip-modal-backdrop {
-  position: fixed; inset: 0; background: #00000099; z-index: 50;
-  display: flex; align-items: center; justify-content: center;
-}
-.tip-modal {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
-  padding: 1.5rem; width: min(95vw, 380px);
-}
-.tip-modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
-.tip-presets { display: flex; gap: 0.5rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
-.tip-preset-btn {
-  padding: 0.35rem 0.8rem; border-radius: 8px; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.85rem; cursor: pointer; transition: border-color 0.12s;
-}
-.tip-preset-btn.active { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
-.tip-input {
-  width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px;
-  border: 1px solid ${C.border}; background: ${C.surface}; color: ${C.text};
-  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
-  margin-bottom: 0.85rem;
-}
-.tip-input:focus { outline: none; border-color: ${C.accent}; }
-/* ---- Win overlay reward line ---- */
-.win-reward-row {
-  display: flex; justify-content: space-between; padding: 0.4rem 0;
-  border-top: 1px solid ${C.border}40; margin-top: 0.4rem;
-}
-.win-reward-row .k { color: ${C.muted}; font-size: 0.88rem; }
-.win-reward-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; }
-
 /* ---- DApp Mode ---- */
 .dapp-badge {
   display: inline-flex; align-items: center; gap: 0.4rem; width: 100%;
@@ -4696,7 +3863,7 @@ function useClassicSave(gameId) {
   const loadState = async () => {
     const { ok, body } = await api(`/api/state/${gameId}`);
     if (ok && body && body.state && body.state.mode === 'bot') {
-      return { ...body.state, __anchorTxHash: body.anchorTxHash || null };
+      return { ...body.state };
     }
     return null;
   };
@@ -4928,7 +4095,7 @@ function GameModeModal({ game, onStart, onClose }) {
 // only), and Post to Feed (after a result).
 function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onPostToFeed, onClose }) {
   const [picking, setPicking] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain' | 'onchain'
+  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain'
   const modes = game.modes || [];
   const usePicker = !!game.menuModePicker && modes.length > 0;
   // Default new-game mode for games without an inline picker.
@@ -4939,8 +4106,7 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
     setSaveStatus('saving');
     const result = await onSaveGame();
     if (result && result.ok) {
-      const next = result.anchored ? 'onchain' : 'plain';
-      setSaveStatus(next);
+      setSaveStatus('plain');
       setTimeout(() => setSaveStatus(null), 1500);
     } else {
       setSaveStatus(null);
@@ -4948,7 +4114,6 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
   };
 
   const saveLabel = saveStatus === 'saving' ? 'Saving…'
-    : saveStatus === 'onchain' ? 'Saved on-chain ✓'
     : saveStatus === 'plain' ? 'Saved ✓'
     : '💾 Save Game';
 
@@ -4982,20 +4147,11 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
 }
 
 // A small in-stage banner offering to resume a saved Versus-Bot game.
-// anchorTxHash — when present, shows an ⛓ On-chain badge linking to the explorer.
-function ClassicResumeBanner({ onResume, onDismiss, anchorTxHash }) {
+function ClassicResumeBanner({ onResume, onDismiss }) {
   return (
     <div className="cg-resume-banner">
       <span>
         💾 You have a saved game.
-        {anchorTxHash && (
-          <a
-            href={`https://social-vibecoding.usernodelabs.org/explorer/tx/${anchorTxHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="cg-onchain-badge"
-          >⛓ On-chain</a>
-        )}
       </span>
       <div className="cg-resume-actions">
         <button onClick={onResume}>Resume</button>
@@ -5502,138 +4658,39 @@ async function dappAnchor(session) {
   return session;
 }
 
-/* ============================================================
-   MATCH on-chain ledger — bridge-memo anchoring + explorer links
-   Every MATCH spend/earn is mirrored as a real, zero-value usernode
-   transaction whose calldata carries the structured memo the server
-   built. Mirrors dappAnchor's best-effort, degrade-to-mock pattern.
-   ============================================================ */
 
-// Public block-explorer link for a tx hash (via the platform's public proxy).
-function explorerTxUrl(txHash) {
-  return `/explorer-api/tx/${encodeURIComponent(txHash)}`;
-}
-
-// Anchor a pending MATCH ledger row on-chain: hex-encode the memo into a
-// zero-value tx to the node address, send via the bridge, then confirm with the
-// server. Best-effort — degrades to a 'mock' record when the bridge is absent
-// or in mock mode, and never throws. Returns { txHash, status } (status is
-// 'onchain' | 'mock'); returns null when there's nothing to anchor.
-async function anchorMatchLedger(ledgerId, memo) {
-  if (ledgerId == null || !memo) return null;
-  let txHash = null;
-  let mock = true;
-  try {
-    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-      ? !(await window.usernode.isMockEnabled())
-      : false;
-    if (window.usernode && window.usernode.sendTransaction && window.usernode.getNodeAddress && bridgeMockOff) {
-      const addr = await window.usernode.getNodeAddress();
-      if (addr) {
-        // Hex-encode the ASCII memo into the tx data field.
-        let hex = '0x';
-        for (let i = 0; i < memo.length; i++) hex += memo.charCodeAt(i).toString(16).padStart(2, '0');
-        const tx = await window.usernode.sendTransaction({ to: addr, data: hex, value: 0 });
-        txHash = tx && tx.hash ? tx.hash : null;
-        mock = !txHash;
-      }
-    }
-  } catch (e) { /* fall through to mock record */ }
-  try {
-    const { ok, body } = await api(`/api/match/ledger/${ledgerId}/confirm`, {
-      method: 'POST', body: JSON.stringify({ txHash, mock }),
-    });
-    if (ok && body) return { txHash: body.txHash || txHash, status: body.status || (mock ? 'mock' : 'onchain') };
-  } catch (e) {}
-  return { txHash, status: mock ? 'mock' : 'onchain' };
-}
-
-// Anchor a MATCH ledger movement (earn / spend / tip) on-chain via the bridge,
-// then confirm with the server. Best-effort and modeled on dappAnchor: degrades
-// to a 'mock' anchor when the bridge/wallet is unavailable (staging) and never
-// throws. `receipt` is { eventId, chainHash, ... }; returns the updated receipt.
-async function matchAnchor(receipt) {
-  if (!receipt || !receipt.eventId || !receipt.chainHash) return receipt;
-  let txHash = null;
-  let mock = true;
-  try {
-    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-      ? !(await window.usernode.isMockEnabled())
-      : false;
-    if (window.usernode && window.usernode.sendTransaction && window.usernode.getNodeAddress && bridgeMockOff) {
-      const addr = await window.usernode.getNodeAddress();
-      if (addr) {
-        const tx = await window.usernode.sendTransaction({ to: addr, data: '0x' + receipt.chainHash, value: 0 });
-        txHash = tx && tx.hash ? tx.hash : null;
-        mock = false;
-      }
-    }
-  } catch (e) { /* fall through to mock anchor */ }
-  try {
-    const { ok, body } = await api(`/api/match/ledger/${receipt.eventId}/anchor/confirm`, {
-      method: 'POST', body: JSON.stringify({ txHash, mock }),
-    });
-    if (ok && body) return { ...receipt, anchorStatus: body.anchorStatus, anchorTxHash: body.anchorTxHash };
-  } catch (e) {}
-  return { ...receipt, anchorStatus: 'mock' };
-}
-
-// Small inline "View on explorer" affordance for a confirmed MATCH movement.
-// Renders a link only for a real on-chain tx; otherwise a muted local marker.
-function MatchExplorerLink({ txHash, status, compact }) {
-  if (status === 'onchain' && txHash) {
-    return (
-      <a className="match-explorer-link" href={explorerTxUrl(txHash)} target="_blank" rel="noopener noreferrer"
-         title={txHash}>
-        🔗 View on explorer
-      </a>
-    );
-  }
-  if (status === 'pending') {
-    return <span className="match-explorer-pending">⏳ recording on-chain…</span>;
-  }
-  return <span className="match-explorer-mock">{compact ? '· local' : '· local record'}</span>;
-}
-
-// Shared hint bar for every daily puzzle. Renders the "💡 Hint · cost 🪙"
-// button, the live MATCH balance, an optional message, and the explorer link
-// for the most recent purchase. Behaviour-free: the parent owns the hint state
-// and passes a `buy` handler (kept identical across all four daily games so the
-// control looks and feels the same everywhere).
-function HintBar({ nextCost, balance, canAfford, exhausted, buying, onBuy, msg, lastTx, label }) {
+// Shared hint bar for every daily puzzle. Hints are FREE (the MATCH currency
+// is retired) but capped per day and counted server-side. Behaviour-free: the
+// parent owns the hint state and passes a `buy` handler (kept identical across
+// all four daily games so the control looks and feels the same everywhere).
+function HintBar({ hintsLeft, exhausted, buying, onBuy, msg, label }) {
   return (
     <div className="cw-hint-bar">
       <button
         className="cw-hint-btn"
         onClick={onBuy}
-        disabled={buying || exhausted || !canAfford}
+        disabled={buying || exhausted}
       >
         {exhausted
           ? `💡 ${label || 'No more hints'}`
-          : <>💡 Hint · {nextCost} 🪙</>}
+          : <>💡 Hint{Number.isFinite(hintsLeft) ? ` · ${hintsLeft} left` : ''}</>}
       </button>
-      <span className="cw-hint-balance">
-        Balance: {balance == null ? '…' : balance} 🪙 MATCH
-      </span>
       {msg && <span className="cw-hint-msg">{msg}</span>}
-      {lastTx && <MatchExplorerLink txHash={lastTx.txHash} status={lastTx.status} compact />}
     </div>
   );
 }
 
-// Shared hint state hook for the daily games that buy a generic "reveal" (Sudoku
-// cell, Word Hunt start, Tile Match nudge). Reads today's server-authoritative
-// count, exposes the doubling next cost, and performs the atomic buy + on-chain
-// anchor. `onReveal(purchasedIndex)` applies the game-specific reveal and should
-// return false to abort (e.g. nothing left to reveal) — the purchase only fires
-// when a reveal is actually available. Crypto Wordle keeps its own bespoke
-// per-round logic and does not use this hook.
-function useDailyHints({ gameId, maxHints, matchBalance, onMatchBalanceChange }) {
+// Shared hint state hook for the daily games that use a generic "reveal"
+// (Sudoku cell, Word Hunt start, Tile Match nudge). Reads today's
+// server-authoritative count and performs the atomic capped use — free, no
+// currency involved. `onReveal(usedIndex)` applies the game-specific reveal
+// and should return false to abort (e.g. nothing left to reveal). Crypto
+// Wordle keeps its own bespoke per-round logic and does not use this hook.
+function useDailyHints({ gameId, maxHints }) {
   const { useState, useEffect } = React;
   const [hintsPurchased, setHintsPurchased] = useState(0);
   const [buying, setBuying] = useState(false);
   const [msg, setMsg] = useState('');
-  const [lastTx, setLastTx] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -5641,22 +4698,20 @@ function useDailyHints({ gameId, maxHints, matchBalance, onMatchBalanceChange })
       const { ok, body } = await api(`/api/daily/${gameId}/hint`);
       if (!alive || !ok || !body) return;
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
     })();
     return () => { alive = false; };
   }, []);
 
-  const nextCost = DAILY_HINT_BASE_COST * Math.pow(2, hintsPurchased);
-  const canAfford = matchBalance != null && matchBalance >= nextCost;
   const exhausted = maxHints != null && hintsPurchased >= maxHints;
+  const hintsLeft = maxHints != null ? Math.max(0, maxHints - hintsPurchased) : null;
 
   // onReveal(index) must apply the reveal and return true; returning false
-  // aborts before charging.
+  // aborts (the server counter has already advanced, which only means one
+  // fewer free hint today — never a lost purchase).
   const buy = async (onReveal) => {
     if (buying || exhausted) return;
     setBuying(true);
     setMsg('');
-    setLastTx(null);
     const { ok, status, body } = await api(`/api/daily/${gameId}/hint`, {
       method: 'POST', body: JSON.stringify({ maxHints }),
     });
@@ -5664,27 +4719,18 @@ function useDailyHints({ gameId, maxHints, matchBalance, onMatchBalanceChange })
     if (ok && body) {
       const idx = (Number.isFinite(body.hintsPurchased) ? body.hintsPurchased : hintsPurchased + 1) - 1;
       const applied = onReveal ? onReveal(idx) : true;
-      if (applied === false) return; // shouldn't happen — server already charged
+      if (applied === false) return;
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
-      // Anchor the spend on-chain in the background, then surface the link.
-      if (body.ledgerId) {
-        setLastTx({ status: 'pending', txHash: null });
-        anchorMatchLedger(body.ledgerId, body.memo).then(r => { if (r) setLastTx(r); });
-      }
       return;
     }
-    if (status === 409 && body && body.code === 'insufficient_funds') {
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
-      setMsg('Not enough MATCH');
-    } else if (status === 409 && body && body.code === 'no_more_hints') {
+    if (status === 409 && body && body.code === 'no_more_hints') {
       setMsg('No more hints');
     } else {
-      setMsg('Could not buy hint');
+      setMsg('Could not use hint');
     }
   };
 
-  return { hintsPurchased, nextCost, canAfford, exhausted, buying, msg, lastTx, buy };
+  return { hintsPurchased, hintsLeft, exhausted, buying, msg, buy };
 }
 
 // HH:MM:SS for a millisecond remainder.
@@ -5953,7 +4999,7 @@ function sudokuSolved(grid) {
   return sudokuConflicts(grid).size === 0;
 }
 
-function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
   const init = useRef(generateSudoku6(dailyRng(offset, 'sudoku'))).current;
   const { puzzle, solution } = init;
   const dayNum = useRef(utcDayNum(offset)).current;
@@ -5984,7 +5030,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
 
   // Paid hints: total empty cells in the puzzle is the per-day cap.
   const totalEmpty = useRef(puzzle.flat().filter(v => v === 0).length).current;
-  const hints = useDailyHints({ gameId: 'sudoku', maxHints: totalEmpty, matchBalance, onMatchBalanceChange });
+  const hints = useDailyHints({ gameId: 'sudoku', maxHints: totalEmpty });
   const emptyCells = () => {
     const out = [];
     for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) if (grid[r][c] === 0) out.push([r, c]);
@@ -6119,14 +5165,11 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
 
       {!done && (
         <HintBar
-          nextCost={hints.nextCost}
-          balance={matchBalance}
-          canAfford={hints.canAfford}
+          hintsLeft={hints.hintsLeft}
           exhausted={hints.exhausted || noEmpty}
           buying={hints.buying}
           onBuy={buyHint}
           msg={hints.msg}
-          lastTx={hints.lastTx}
           label={noEmpty ? 'Board full' : 'No more hints'}
         />
       )}
@@ -6194,7 +5237,7 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect, matchBalance, walletBalance }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect }) {
   const [copied, setCopied] = React.useState(false);
   const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -6244,7 +5287,7 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
     setMsg(null);
     try {
       await onDisconnect();
-      setMsg({ ok: true, text: 'Disconnected. Your public link is kept so received tips still resolve.' });
+      setMsg({ ok: true, text: 'Disconnected. Your public wallet link is kept on your account.' });
     } catch {
       setMsg({ ok: false, text: 'Could not disconnect.' });
     }
@@ -6337,16 +5380,6 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
               viewports (hidden ≥561px via CSS, where they live in the top bar). */}
           <div className="wallet-card account-connections">
             <div className="wallet-card-title">Connections</div>
-            {matchBalance != null && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
-                🪙 {matchBalance} MATCH
-              </div>
-            )}
-            {walletBalance && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.emerald, fontFamily: "'JetBrains Mono', monospace" }}>
-                🪙 {fmtUtgo(walletBalance)}
-              </div>
-            )}
             <button
               type="button"
               className="account-connection-row"
@@ -6680,7 +5713,7 @@ function locateWord(letters, word) {
   return null;
 }
 
-function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
   const board = useRef(generateWordSearch(dailyRng(offset, 'wordhunt'))).current;
   const { theme, words, letters } = board;
   const total = words.length;
@@ -6738,7 +5771,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   );
 
   // Paid hint: highlight the first cell of one random not-yet-found word.
-  const hints = useDailyHints({ gameId: 'wordhunt', maxHints: total, matchBalance, onMatchBalanceChange });
+  const hints = useDailyHints({ gameId: 'wordhunt', maxHints: total });
   const buyHint = () => {
     if (done) return;
     hints.buy(() => {
@@ -6875,14 +5908,11 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
       {!done && (
         <HintBar
-          nextCost={hints.nextCost}
-          balance={matchBalance}
-          canAfford={hints.canAfford}
+          hintsLeft={hints.hintsLeft}
           exhausted={hints.exhausted || hintsExhausted}
           buying={hints.buying}
           onBuy={buyHint}
           msg={hints.msg}
-          lastTx={hints.lastTx}
           label="No more hints"
         />
       )}
@@ -6959,12 +5989,6 @@ const CW_WORDS = [
   { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement',       hints: ['Self-executing code on a chain', 'Smart ones run on Ethereum'] },
 ];
 
-// Hint pricing — single tuning knob. Cost of the Nth hint purchased today
-// (0-indexed) is CW_HINT_BASE_COST * 2**N → 1, 2, 4, 8, … in MATCH tokens.
-// The server is authoritative; this client copy is for display only.
-const DAILY_HINT_BASE_COST = 1;
-const CW_HINT_BASE_COST = DAILY_HINT_BASE_COST;
-const cwHintCost = (purchased) => DAILY_HINT_BASE_COST * Math.pow(2, purchased);
 
 // Guesses allowed for a given word length: one more than the length, so a
 // 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
@@ -7029,7 +6053,7 @@ function cwDailyRounds(offset) {
   return picked;
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
   // The day's stack of independent word rounds (stable for the render lifetime).
   const roundsDef = useRef(cwDailyRounds(offset)).current;
@@ -7098,13 +6122,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     !done
   );
 
-  // Paid-hint state. hintsPurchased is the server-authoritative DAILY count that
-  // drives the doubling cost ramp; the MATCH balance is the global nav balance
-  // passed in via props. Both are read on mount and reconciled from purchases.
+  // Hint state. Hints are FREE (the MATCH currency is retired) but
+  // hintsPurchased stays a server-authoritative DAILY count so a reload can't
+  // reset it and the server-side cap still applies.
   const [hintsPurchased, setHintsPurchased] = useState(0);
   const [buying, setBuying] = useState(false);
   const [hintMsg, setHintMsg] = useState('');
-  const [lastHintTx, setLastHintTx] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -7112,7 +6135,6 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
       const { ok, body } = await api('/api/cryptowordle/hint');
       if (!alive || !ok || !body) return;
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
     })();
     return () => { alive = false; };
   }, []);
@@ -7124,16 +6146,13 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const activeHintsApplied = active ? (hintsByRound[activeIdx] || 0) : 0;
   const revealedExtra = active ? Math.min(activeWrong + activeHintsApplied, activeHints.length) : 0;
   const cluesLeft = activeHints.length - revealedExtra;
-  const nextCost = cwHintCost(hintsPurchased);
-  const canAffordHint = matchBalance != null && matchBalance >= nextCost;
-  // Daily cap sent to the server: total clues purchasable across all rounds.
+  // Daily cap sent to the server: total clues available across all rounds.
   const dailyClueTotal = roundsDef.reduce((a, rd) => a + (rd.hints ? rd.hints.length : 0), 0);
 
   const buyHint = async () => {
     if (buying || done || !active || cluesLeft <= 0) return;
     setBuying(true);
     setHintMsg('');
-    setLastHintTx(null);
     const { ok, status, body } = await api('/api/cryptowordle/hint', {
       method: 'POST',
       body: JSON.stringify({ maxHints: dailyClueTotal }),
@@ -7141,26 +6160,17 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     setBuying(false);
     if (ok && body) {
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
       // Apply the revealed clue to the active round and persist immediately so a
-      // reload can't lose a paid reveal while the server counter already advanced.
+      // reload can't lose a reveal while the server counter already advanced.
       const nextHbr = hintsByRound.map((n, i) => (i === activeIdx ? (n || 0) + 1 : n));
       setHintsByRound(nextHbr);
       onSaveProgress && onSaveProgress(buildProgress(roundGuesses, nextHbr), totalSteps, secs);
-      // Mirror the spend on-chain (best-effort) and surface the explorer link.
-      if (body.ledgerId) {
-        setLastHintTx({ status: 'pending', txHash: null });
-        anchorMatchLedger(body.ledgerId, body.memo).then(r => { if (r) setLastHintTx(r); });
-      }
       return;
     }
-    if (status === 409 && body && body.code === 'insufficient_funds') {
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
-      setHintMsg('Not enough MATCH');
-    } else if (status === 409 && body && body.code === 'no_more_hints') {
+    if (status === 409 && body && body.code === 'no_more_hints') {
       setHintMsg('No more clues');
     } else {
-      setHintMsg('Could not buy hint');
+      setHintMsg('Could not use hint');
     }
   };
 
@@ -7299,14 +6309,11 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
 
           {activeHints.length > 0 && (
             <HintBar
-              nextCost={nextCost}
-              balance={matchBalance}
-              canAfford={canAffordHint}
+              hintsLeft={cluesLeft}
               exhausted={cluesLeft <= 0}
               buying={buying}
               onBuy={buyHint}
               msg={hintMsg}
-              lastTx={lastHintTx}
               label="No more clues"
             />
           )}
@@ -9478,7 +8485,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   return (
     <div>
-      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
+      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
@@ -11272,1011 +10279,6 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   );
 }
 
-/* ---------------- Texas Hold 'Em (redesigned) ---------------- */
-const TH_SUITS = ['♠', '♥', '♦', '♣'];
-const TH_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-function thDeck() {
-  const d = [];
-  for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) d.push({ r: r + 2, s });
-  for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
-  return d;
-}
-function thScore5(cards) {
-  const ranks = cards.map(c => c.r).sort((a, b) => b - a);
-  const suits = cards.map(c => c.s);
-  const flush = suits.every(s => s === suits[0]);
-  const uniq = [...new Set(ranks)];
-  let straightHigh = 0;
-  if (uniq.length === 5) {
-    if (uniq[0] - uniq[4] === 4) straightHigh = uniq[0];
-    else if (uniq[0] === 14 && uniq[1] === 5 && uniq[4] === 2) straightHigh = 5; // wheel
-  }
-  const counts = {};
-  ranks.forEach(r => { counts[r] = (counts[r] || 0) + 1; });
-  const groups = Object.entries(counts).map(([r, n]) => [n, +r]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
-  const kick = groups.map(g => g[1]);
-  let cat;
-  if (straightHigh && flush) cat = 8;
-  else if (groups[0][0] === 4) cat = 7;
-  else if (groups[0][0] === 3 && groups[1][0] === 2) cat = 6;
-  else if (flush) cat = 5;
-  else if (straightHigh) cat = 4;
-  else if (groups[0][0] === 3) cat = 3;
-  else if (groups[0][0] === 2 && groups[1][0] === 2) cat = 2;
-  else if (groups[0][0] === 2) cat = 1;
-  else cat = 0;
-  const order = (cat === 4 || cat === 8) ? [straightHigh, 0, 0, 0, 0] : kick;
-  let v = cat;
-  for (let i = 0; i < 5; i++) v = v * 15 + (order[i] || 0);
-  return v;
-}
-function thBest(cards) {
-  if (cards.length < 5) return 0;
-  let best = 0;
-  const n = cards.length;
-  for (let a = 0; a < n - 4; a++) for (let b = a + 1; b < n - 3; b++) for (let c = b + 1; c < n - 2; c++)
-    for (let d = c + 1; d < n - 1; d++) for (let e = d + 1; e < n; e++) {
-      const v = thScore5([cards[a], cards[b], cards[c], cards[d], cards[e]]);
-      if (v > best) best = v;
-    }
-  return best;
-}
-const TH_CATS = ['High card', 'Pair', 'Two pair', 'Three of a kind', 'Straight', 'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
-function thCatName(v) { let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15); return TH_CATS[cat] || ''; }
-function thHandStrength(hole, board) {
-  if (board.length >= 3) {
-    const v = thBest([...hole, ...board]);
-    let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15);
-    return Math.min(1, cat / 6 + (hole[0].r + hole[1].r) / 200);
-  }
-  // preflop heuristic
-  const [a, b] = hole;
-  let s = (a.r + b.r) / 40;
-  if (a.r === b.r) s += 0.35;
-  if (a.s === b.s) s += 0.08;
-  if (Math.abs(a.r - b.r) === 1) s += 0.05;
-  return Math.min(0.95, s);
-}
-/*
- * CLIENT-SIDE ONLY — never send results via WebSocket, API, or any shared state.
- * For UX display to the local player only. Winner determination is always
- * server-authoritative. Bot hole cards must never be passed to these functions
- * before showdown; the isPlayer guard in PokerSeat enforces this invariant.
- */
-/* ---- Poker hand evaluator ---- */
-const POKER_HAND_INFO = [
-  null,
-  { rank: 1,  name: 'High Card',       emoji: '🃏', desc: 'Highest card plays'                  },
-  { rank: 2,  name: 'One Pair',        emoji: '1️⃣', desc: 'Two cards of the same rank'          },
-  { rank: 3,  name: 'Two Pair',        emoji: '2️⃣', desc: 'Two different pairs'                  },
-  { rank: 4,  name: 'Three of a Kind', emoji: '3️⃣', desc: 'Three cards of the same rank'        },
-  { rank: 5,  name: 'Straight',        emoji: '➡️', desc: 'Five consecutive cards'              },
-  { rank: 6,  name: 'Flush',           emoji: '💧', desc: 'Five cards of the same suit'         },
-  { rank: 7,  name: 'Full House',      emoji: '🏠', desc: 'Three of a kind plus a pair'         },
-  { rank: 8,  name: 'Four of a Kind',  emoji: '💥', desc: 'Four cards of the same rank'         },
-  { rank: 9,  name: 'Straight Flush',  emoji: '🔥', desc: 'Five consecutive cards, same suit'   },
-  { rank: 10, name: 'Royal Flush',     emoji: '👑', desc: 'A, K, Q, J, 10 of the same suit'    },
-];
-
-function pokerCombinations(arr, k) {
-  if (k === 0) return [[]];
-  if (arr.length < k) return [];
-  const [h, ...t] = arr;
-  return [
-    ...pokerCombinations(t, k - 1).map(c => [h, ...c]),
-    ...pokerCombinations(t, k),
-  ];
-}
-
-function pokerScoreCat(score) {
-  let c = score;
-  for (let i = 0; i < 5; i++) c = Math.floor(c / 15);
-  return c; // 0=high card … 8=straight flush
-}
-
-function pokerDescHand(cards, cat, isRoyal) {
-  if (isRoyal) return 'A, K, Q, J, 10 — same suit';
-  const rg = {};
-  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
-  const rn = r => TH_RANKS[r - 2] || String(r);
-  switch (cat) {
-    case 0: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)} high`; }
-    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? `Pair of ${rn(p[0].r)}s` : ''; }
-    case 2: {
-      const ps = Object.values(rg).filter(g => g.length >= 2).sort((a, b) => b[0].r - a[0].r);
-      return ps.length >= 2 ? `${rn(ps[0][0].r)}s and ${rn(ps[1][0].r)}s` : '';
-    }
-    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? `Three ${rn(t[0].r)}s` : ''; }
-    case 4: { const rs = cards.map(c => c.r).sort((a, b) => b - a); return `${rn(rs[0])}-high straight`; }
-    case 5: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high flush`; }
-    case 6: {
-      const t = Object.values(rg).find(g => g.length >= 3);
-      const p = Object.values(rg).find(g => g.length >= 2 && t && g[0].r !== t[0].r);
-      return t && p ? `${rn(t[0].r)}s full of ${rn(p[0].r)}s` : '';
-    }
-    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? `Four ${rn(q[0].r)}s` : ''; }
-    case 8: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high straight flush`; }
-    default: return '';
-  }
-}
-
-function pokerHandCards(cards, cat) {
-  // Returns the subset of cards that form the hand pattern (excluding pure kickers)
-  const rg = {};
-  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
-  switch (cat) {
-    case 0: return [cards.reduce((m, c) => c.r > m.r ? c : m)];
-    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? p.slice(0, 2) : cards; }
-    case 2: { const ps = Object.values(rg).filter(g => g.length >= 2); return ps.flatMap(p => p.slice(0, 2)).slice(0, 4); }
-    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? t.slice(0, 3) : cards; }
-    case 4: return cards;  // straight: all 5 are key
-    case 5: return cards;  // flush: all 5 are key
-    case 6: return cards;  // full house: all 5 are key
-    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? q.slice(0, 4) : cards; }
-    case 8: return cards;  // straight flush: all 5 are key
-    default: return cards;
-  }
-}
-
-function evaluateBestHand(holeCards, boardCards) {
-  if (!holeCards || holeCards.length < 2) return null;
-  const all = [...holeCards, ...(boardCards || [])];
-  const combos = all.length >= 5 ? pokerCombinations(all, 5) : [all];
-
-  let bestScore = -1, bestCombo = null;
-  for (const combo of combos) {
-    const score = thScore5(combo);
-    if (score > bestScore) { bestScore = score; bestCombo = combo; }
-  }
-  if (!bestCombo) return null;
-
-  const cat = pokerScoreCat(bestScore);
-  // Royal Flush = straight flush containing A, K, Q, J, 10
-  const isRoyal = cat === 8 && [10, 11, 12, 13, 14].every(r => bestCombo.some(c => c.r === r));
-  const idx = isRoyal ? 10 : cat + 1;
-  const info = POKER_HAND_INFO[idx];
-
-  return {
-    rank: info.rank,
-    rankName: info.name,
-    emoji: info.emoji,
-    desc: pokerDescHand(bestCombo, cat, isRoyal),
-    bestFive: bestCombo,
-    handCards: isRoyal ? bestCombo : pokerHandCards(bestCombo, cat),
-    partial: all.length < 5,
-  };
-}
-
-/*
- * CLIENT-SIDE ONLY — rendered exclusively for the local human player
- * (isPlayer === true). Never serialised, broadcast, or sent to the server.
- * The server evaluates hands independently at showdown for authoritative results.
- */
-/* ---- HandStrengthPanel component ---- */
-function HandStrengthPanel({ holeCards, board, handNum }) {
-  const prevRankRef = useRef(0);
-  const timerRef = useRef(null);
-  const [improved, setImproved] = useState(false);
-
-  const result = evaluateBestHand(holeCards, board || []);
-  const currentRank = result ? result.rank : 0;
-
-  useEffect(() => {
-    if (currentRank > 0 && prevRankRef.current > 0 && currentRank > prevRankRef.current) {
-      setImproved(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setImproved(false), 600);
-    }
-    prevRankRef.current = currentRank;
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [currentRank]);
-
-  // Reset on new hand
-  useEffect(() => {
-    prevRankRef.current = 0;
-    setImproved(false);
-  }, [handNum]);
-
-  if (!result) return null;
-
-  const cardKey = (c) => `${c.r}.${c.s}`;
-  const usedKeys = new Set((result.handCards || []).map(cardKey));
-
-  return (
-    <div className={'poker-hand-panel' + (improved ? ' improved' : '')}>
-      <div className="poker-hand-panel-rank">
-        <span>{result.emoji}</span>
-        <span className="poker-hand-panel-name">{result.rankName}</span>
-        <span className="poker-hand-panel-num">#{result.rank}</span>
-      </div>
-      <div className="poker-hand-panel-desc">{result.desc}</div>
-      {result.bestFive && result.bestFive.length >= 2 && (
-        <div className="poker-hand-panel-cards">
-          {result.bestFive.map((card, i) => {
-            const used = usedKeys.has(cardKey(card));
-            const red = card.s === 1 || card.s === 2;
-            return (
-              <span key={i} className={'poker-hand-card' + (used ? ' used' : ' unused') + (red ? ' red' : '')}>
-                {TH_RANKS[card.r - 2]}{TH_SUITS[card.s]}
-              </span>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ---- Poker sub-components ---- */
-const POKER_BOT_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
-const POKER_SEAT_COLORS = ['#6366F1', '#FBBF24', '#34D399', '#FB7185', '#A78BFA', '#F97316'];
-
-function PokerCardFace({ card, hidden, lg }) {
-  if (!card) {
-    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
-    return <div className={cls} />;
-  }
-  if (hidden) {
-    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
-    return <div className={cls} />;
-  }
-  const red = card.s === 1 || card.s === 2;
-  const rank = TH_RANKS[card.r - 2];
-  const suit = TH_SUITS[card.s];
-  const cls = (lg ? 'poker-card-lg' : 'poker-card') + (red ? ' red flip-in' : ' flip-in');
-  return (
-    <div className={cls}>
-      <span className="poker-card-rank">{rank}</span>
-      <span className="poker-card-suit">{suit}</span>
-    </div>
-  );
-}
-
-function PokerSetupScreen({ onStart, savedChips, numBots, setNumBots, difficulty, setDifficulty }) {
-  const BB = 10;
-  const startChips = savedChips || 1000;
-  return (
-    <div className="poker-setup">
-      <div className="poker-setup-title">Texas Hold 'Em</div>
-      <div className="poker-setup-sub">Heads-up and multi-player poker vs bots</div>
-      <div className="poker-setup-card">
-        <div>
-          <div className="poker-setup-label">Your chips</div>
-          <div className="poker-setup-chips">{startChips} chips</div>
-        </div>
-        <div>
-          <div className="poker-setup-label">How many bots?</div>
-          <div className="poker-setup-row">
-            {[1, 2, 3, 4].map(n => (
-              <button key={n} className={'poker-bot-btn' + (numBots === n ? ' sel' : '')} onClick={() => setNumBots(n)}>{n}</button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="poker-setup-label">Difficulty</div>
-          <div className="poker-setup-row">
-            {['Easy', 'Normal', 'Hard'].map(d => (
-              <button key={d} className={'poker-diff-btn' + (difficulty === d ? ' sel' : '')} onClick={() => setDifficulty(d)}>{d}</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ fontSize: '0.78rem', color: '#8B95A8' }}>
-          Big blind: {BB} chips &middot; Starting stack: {startChips}
-        </div>
-        <button className="poker-start-btn" onClick={() => onStart(startChips)}>Start Game</button>
-      </div>
-    </div>
-  );
-}
-
-function PokerTopBar({ handNum, phase, onBack, playerChips, BB }) {
-  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
-  const streetName = streetNames[phase] || '';
-  return (
-    <div className="poker-top-bar">
-      <button className="poker-back-btn" onClick={onBack} title="Leave game">&#8592;</button>
-      <div className="poker-top-bar-title">Texas Hold 'Em</div>
-      <div className="poker-top-bar-info">{streetName} &middot; Hand #{handNum}</div>
-      <div className="poker-conn-dot" title="Connected" />
-    </div>
-  );
-}
-
-function pokerSeatPos(i, n) {
-  // Distribute seats around the oval. Player (seat 0) is always at the bottom.
-  // Angles in degrees: 0 = bottom, clockwise.
-  const angles = {
-    1: [180, 0],           // heads-up: opponent top, player bottom
-    2: [180, 300, 60],     // 3-way
-    3: [180, 270, 0, 90],  // 4-way
-    4: [180, 252, 324, 36, 108], // 5-way
-  };
-  const arr = angles[n] || angles[4];
-  const deg = arr[i] || (i * (360 / (n + 1)));
-  const rad = (deg - 90) * Math.PI / 180;
-  // Use oval proportions: rx=50, ry=50 (percentage), but oval is wider than tall
-  const rx = 46, ry = 42;
-  const x = 50 + rx * Math.cos(rad);
-  const y = 50 + ry * Math.sin(rad);
-  return { x, y };
-}
-
-function PokerSeat({ seat, isPlayer, dealerIdx, sbIdx, bbIdx, isActive, isWinner, actionLabel, showCards, seatIdx, board, handNum, gamePhase }) {
-  const color = POKER_SEAT_COLORS[seatIdx % POKER_SEAT_COLORS.length];
-  const cls = 'poker-seat' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '') +
-    (seat.folded ? ' folded' : '') + (seat.chips <= 0 && !isActive ? ' eliminated' : '');
-
-  // Compute hand eval for player seat (cheap: ≤21 combos)
-  const showPanel = isPlayer && seat.hand && seat.hand.length >= 2 && gamePhase === 'playing';
-  const handEval = showPanel ? evaluateBestHand(seat.hand, board || []) : null;
-
-  const cardKey = (c) => `${c.r}.${c.s}`;
-  const bestKeys = handEval ? new Set((handEval.bestFive || []).map(cardKey)) : null;
-  const usedKeys = handEval ? new Set((handEval.handCards || []).map(cardKey)) : null;
-
-  return (
-    <div className={cls}>
-      <div className="poker-seat-avatar" style={{ background: color + '33', border: `1.5px solid ${color}` }}>
-        {isPlayer ? 'You' : seat.name[0]}
-      </div>
-      <div className="poker-seat-name">
-        <span>{isPlayer ? 'You' : seat.name}</span>
-        {seatIdx === dealerIdx && <span className="poker-seat-badge dealer">D</span>}
-        {seatIdx === sbIdx && <span className="poker-seat-badge sb">SB</span>}
-        {seatIdx === bbIdx && <span className="poker-seat-badge bb">BB</span>}
-      </div>
-      <div className="poker-seat-chips">{seat.chips}</div>
-      {seat.bet > 0 && <div style={{ fontSize: '0.6rem', color: '#FBBF2488', fontFamily: 'monospace' }}>bet {seat.bet}</div>}
-      <div className="poker-seat-cards">
-        {seat.hand && seat.hand.map((card, ci) => {
-          const hidden = !showCards && !isPlayer && !seat.revealed;
-          if (isPlayer && bestKeys && !hidden) {
-            const k = cardKey(card);
-            const hlCls = usedKeys.has(k) ? 'hl-used' : bestKeys.has(k) ? '' : 'hl-unused';
-            return (
-              <div key={ci} className={'poker-seat-card-hl' + (hlCls ? ' ' + hlCls : '')}>
-                <PokerCardFace card={card} hidden={false} />
-              </div>
-            );
-          }
-          return <PokerCardFace key={ci} card={card} hidden={hidden} />;
-        })}
-      </div>
-      {showPanel && handEval && (
-        <HandStrengthPanel holeCards={seat.hand} board={board} handNum={handNum} />
-      )}
-      {actionLabel && <div className={'poker-seat-label ' + actionLabel.type}>{actionLabel.text}</div>}
-    </div>
-  );
-}
-
-function CommunityArea({ board, pot, street }) {
-  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
-  const slots = [0, 1, 2, 3, 4];
-  return (
-    <div className="poker-community">
-      {pot > 0 && <div className="poker-pot-row">Pot: {pot}</div>}
-      <div className="poker-board">
-        {slots.map(i => (
-          <div key={i} className="poker-card-slot">
-            {board[i] ? <PokerCardFace card={board[i]} /> : null}
-          </div>
-        ))}
-      </div>
-      {street > 0 && <div className="poker-street">{streetNames[street] || ''}</div>}
-    </div>
-  );
-}
-
-function RaisePanel({ minRaise, maxRaise, BB, onRaise, onClose }) {
-  const [amt, setAmt] = useState(minRaise);
-  const presets = [
-    { lbl: '0.5 pot', mult: 0.5 },
-    { lbl: 'Pot', mult: 1 },
-    { lbl: '2x', mult: 2 },
-    { lbl: 'All-in', mult: 999 },
-  ];
-  return (
-    <div className="poker-raise-panel">
-      <div className="poker-preset-row">
-        {presets.map(p => {
-          const v = p.mult >= 999 ? maxRaise : Math.min(maxRaise, Math.max(minRaise, Math.round(minRaise * p.mult)));
-          return (
-            <button key={p.lbl} className={'poker-preset-btn' + (amt === v ? ' sel' : '')}
-              onClick={() => setAmt(v)}>{p.lbl}</button>
-          );
-        })}
-      </div>
-      <div className="poker-raise-row">
-        <input type="range" className="poker-raise-slider"
-          min={minRaise} max={maxRaise} step={BB}
-          value={Math.min(amt, maxRaise)} onChange={e => setAmt(+e.target.value)} />
-        <input type="number" className="poker-raise-input"
-          min={minRaise} max={maxRaise} value={amt}
-          onChange={e => setAmt(Math.min(maxRaise, Math.max(minRaise, +e.target.value || minRaise)))} />
-      </div>
-      <div className="poker-raise-row-btns">
-        <button className="poker-raise-cancel" onClick={onClose}>Cancel</button>
-        <button className="poker-raise-confirm" onClick={() => { onRaise(Math.min(amt, maxRaise)); onClose(); }}>
-          Raise to {Math.min(amt, maxRaise)}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FloatingMenu({ onLeave, onLog, onHistory, soundOn, onToggleSound }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="poker-float-menu">
-      <button className="poker-float-btn" onClick={() => setOpen(o => !o)}>&#9776;</button>
-      {open && (
-        <>
-          <div className="poker-overlay-backdrop" onClick={() => setOpen(false)} />
-          <div className="poker-float-popover">
-            <button className="poker-float-item" onClick={() => { onToggleSound(); setOpen(false); }}>
-              {soundOn ? 'Mute sounds' : 'Unmute sounds'}
-            </button>
-            <button className="poker-float-item" onClick={() => { onLog(); setOpen(false); }}>Game log</button>
-            <button className="poker-float-item" onClick={() => { onHistory(); setOpen(false); }}>Hand history</button>
-            <button className="poker-float-item" onClick={() => { onLeave(); setOpen(false); }}>Leave table</button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function GameLogSidebar({ open, onClose, log }) {
-  return (
-    <div className={'poker-sidebar right' + (open ? ' open' : '')}>
-      <div className="poker-sidebar-header">
-        Game Log
-        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
-      </div>
-      <div className="poker-sidebar-body">
-        {log.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No events yet.</div>}
-        {log.slice().reverse().map((entry, i) => (
-          <div key={i} className={'poker-log-entry' + (entry.type === 'win' ? ' win' : entry.type === 'lose' ? ' lose' : entry.type === 'hand' ? ' hand' : '')}>
-            {entry.msg}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HandHistoryDrawer({ open, onClose, history }) {
-  return (
-    <div className={'poker-drawer' + (open ? ' open' : '')}>
-      <div className="poker-drawer-handle" />
-      <div className="poker-drawer-header">
-        Hand History
-        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
-      </div>
-      <div className="poker-drawer-body">
-        {history.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No completed hands yet.</div>}
-        {history.slice().reverse().map((h, i) => (
-          <div key={i} className="poker-hand-hist-item">
-            <div className="poker-hand-hist-title">Hand #{h.num}: {h.result}</div>
-            <div className="poker-hand-hist-detail">{h.detail}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ---- Texas Hold 'Em main component ---- */
-function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
-  const BB = 10;
-
-  // Setup state
-  const [phase, setPhase] = useState('setup'); // 'setup' | 'playing'
-  const [numBots, setNumBots] = useState(1);
-  const [difficulty, setDifficulty] = useState('Normal');
-  const [savedChips, setSavedChips] = useState(1000);
-
-  // Game state
-  const [gs, setGs] = useState(null);
-  const [raiseOpen, setRaiseOpen] = useState(false);
-  const [logOpen, setLogOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
-  const [handHistory, setHandHistory] = useState([]);
-  const [gameLog, setGameLog] = useState([]);
-  const [soundOn, setSoundOn] = useState(cgPrefs.sound);
-
-  const doneRef = useRef(false);
-  const handsRef = useRef(0);
-  const secsRef = useRef(0);
-  const gsRef = useRef(gs);
-  gsRef.current = gs;
-
-  const secs = useElapsed(resetKey, phase === 'playing' && !doneRef.current);
-  secsRef.current = secs;
-
-  // Report bot mode
-  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
-
-  // Load saved chips from server on mount
-  useEffect(() => {
-    api('/api/poker/chips').then(r => {
-      if (r && typeof r.chips === 'number') setSavedChips(r.chips);
-    }).catch(() => {});
-  }, []);
-
-  const addLog = (msg, type) => {
-    setGameLog(prev => [...prev, { msg, type: type || 'info', ts: Date.now() }]);
-  };
-
-  // --- Game logic helpers ---
-  const buildSeats = (playerChips, n) => {
-    const seats = [];
-    seats.push({ name: 'You', chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: true });
-    for (let i = 0; i < n; i++) {
-      seats.push({ name: POKER_BOT_NAMES[i % POKER_BOT_NAMES.length], chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: false });
-    }
-    return seats;
-  };
-
-  const nextActive = (seats, from, dir) => {
-    const n = seats.length;
-    let idx = (from + (dir || 1) + n) % n;
-    let tries = 0;
-    while ((seats[idx].folded || seats[idx].chips <= 0) && tries < n) {
-      idx = (idx + (dir || 1) + n) % n;
-      tries++;
-    }
-    return tries < n ? idx : -1;
-  };
-
-  const activeSeatCount = (seats) => seats.filter(s => !s.folded && s.chips > 0).length;
-
-  const dealNewHand = (seats, dealerIdx) => {
-    const deck = thDeck();
-    const newSeats = seats.map(s => ({
-      ...s, hand: [], bet: 0, folded: s.chips <= 0,
-      allIn: false, revealed: false, lastAction: null,
-    }));
-
-    // Deal 2 cards to each active seat
-    for (let round = 0; round < 2; round++) {
-      for (let i = 0; i < newSeats.length; i++) {
-        if (!newSeats[i].folded) newSeats[i].hand.push(deck.pop());
-      }
-    }
-
-    const n = newSeats.length;
-    const activeCount = newSeats.filter(s => !s.folded).length;
-    let sbIdx, bbIdx, toActIdx;
-
-    if (activeCount === 2) {
-      // heads-up: dealer=SB acts first preflop
-      sbIdx = dealerIdx;
-      bbIdx = nextActive(newSeats, sbIdx);
-      toActIdx = sbIdx; // dealer/SB acts first preflop in heads-up
-    } else {
-      sbIdx = nextActive(newSeats, dealerIdx);
-      bbIdx = nextActive(newSeats, sbIdx);
-      toActIdx = nextActive(newSeats, bbIdx); // UTG acts first
-    }
-
-    // Post blinds
-    const postBlind = (seatArr, idx, amount) => {
-      const actual = Math.min(amount, seatArr[idx].chips);
-      seatArr[idx].chips -= actual;
-      seatArr[idx].bet = actual;
-      if (seatArr[idx].chips === 0) seatArr[idx].allIn = true;
-      return actual;
-    };
-    postBlind(newSeats, sbIdx, BB / 2);
-    postBlind(newSeats, bbIdx, BB);
-
-    const maxBet = Math.max(...newSeats.map(s => s.bet));
-
-    return {
-      seats: newSeats,
-      board: [],
-      deck,
-      pot: 0,
-      dealerIdx,
-      sbIdx,
-      bbIdx,
-      toActIdx,
-      street: 0, // 0=preflop,1=flop,2=turn,3=river,4=showdown
-      maxBet,
-      roundActed: new Array(newSeats.length).fill(false),
-      phase: 'betting',
-      handNum: handsRef.current + 1,
-      actionLabels: new Array(newSeats.length).fill(null),
-    };
-  };
-
-  const allBetsEqual = (gs) => {
-    const seats = gs.seats;
-    const active = seats.filter(s => !s.folded && !s.allIn);
-    if (active.length === 0) return true;
-    return active.every(s => s.bet === gs.maxBet) && gs.roundActed.every((a, i) => a || seats[i].folded || seats[i].allIn || seats[i].chips <= 0);
-  };
-
-  const collectBets = (seats, pot) => {
-    let newPot = pot;
-    const newSeats = seats.map(s => { newPot += s.bet; return { ...s, bet: 0 }; });
-    return { seats: newSeats, pot: newPot };
-  };
-
-  const advanceStreet = (g) => {
-    const { seats, pot } = collectBets(g.seats, g.pot);
-    const newRoundActed = new Array(seats.length).fill(false);
-    const actionLabels = new Array(seats.length).fill(null);
-
-    let newStreet = g.street + 1;
-    let board = g.board.slice();
-    const deck = g.deck.slice();
-
-    if (newStreet === 1) { board.push(deck.pop(), deck.pop(), deck.pop()); } // flop
-    else if (newStreet === 2 || newStreet === 3) { board.push(deck.pop()); } // turn/river
-    else if (newStreet >= 4) {
-      // Showdown
-      return doShowdown({ ...g, seats, pot, board, deck, street: 4, actionLabels });
-    }
-
-    // First to act post-flop: first active after dealer
-    const firstToAct = nextActive(seats, g.dealerIdx);
-    return {
-      ...g, seats, pot, board, deck, street: newStreet,
-      toActIdx: firstToAct, maxBet: 0, roundActed: newRoundActed,
-      phase: 'betting', actionLabels,
-    };
-  };
-
-  const doShowdown = (g) => {
-    const { seats, pot, board } = g;
-    // Reveal all non-folded hands
-    const newSeats = seats.map(s => ({ ...s, revealed: true }));
-    // Find best hand among active players
-    const active = newSeats.map((s, i) => ({ s, i, score: s.folded ? -1 : thBest([...s.hand, ...board]) })).filter(x => x.score >= 0);
-    const bestScore = Math.max(...active.map(x => x.score));
-    const winners = active.filter(x => x.score === bestScore);
-    const share = Math.floor(pot / winners.length);
-    winners.forEach(w => { newSeats[w.i].chips += share; });
-    // Leftover chips (rounding) go to first winner
-    const leftover = pot - share * winners.length;
-    if (leftover > 0 && winners.length > 0) newSeats[winners[0].i].chips += leftover;
-
-    const winnerNames = winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ');
-    const handName = winners[0] ? thCatName(bestScore) : '';
-    addLog(`Hand #${g.handNum}: ${winnerNames} win${winners.length > 1 ? '' : 's'} pot ${pot} (${handName})`, winners.some(w => w.s.isPlayer) ? 'win' : 'lose');
-
-    setHandHistory(prev => [...prev, {
-      num: g.handNum,
-      result: winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ') + ' won',
-      detail: `Pot: ${pot} · ${handName}`,
-    }]);
-
-    return {
-      ...g, seats: newSeats, pot: 0, phase: 'handover', street: 4,
-      winnerIdxs: winners.map(w => w.i), actionLabels: new Array(newSeats.length).fill(null),
-    };
-  };
-
-  const processBotTurn = (g) => {
-    if (!g || g.phase !== 'betting') return g;
-    const seat = g.seats[g.toActIdx];
-    if (!seat || seat.isPlayer || seat.folded) return g;
-
-    const toCall = g.maxBet - seat.bet;
-    const strength = thHandStrength(seat.hand, g.board);
-    const r = Math.random();
-    const diffMult = difficulty === 'Easy' ? 0.7 : difficulty === 'Hard' ? 1.3 : 1.0;
-
-    let action, amount;
-    if (toCall > 0) {
-      const potOdds = toCall / (g.pot + toCall);
-      if (strength * diffMult < 0.25 && potOdds > 0.2 && r > 0.25) {
-        action = 'fold';
-      } else if (strength * diffMult > 0.72 && seat.chips > toCall + BB && r > 0.5) {
-        action = 'raise';
-        amount = Math.min(seat.chips, toCall + BB * 2);
-      } else {
-        action = 'call';
-      }
-    } else {
-      if (strength * diffMult > 0.6 && r > 0.5 && seat.chips > BB) {
-        action = 'raise';
-        amount = Math.min(seat.chips, BB * 2);
-      } else {
-        action = 'check';
-      }
-    }
-
-    return applyAction(g, g.toActIdx, action, amount);
-  };
-
-  const applyAction = (g, seatIdx, action, amount) => {
-    const seats = g.seats.map(s => ({ ...s }));
-    const seat = seats[seatIdx];
-    const roundActed = [...g.roundActed];
-    const actionLabels = new Array(seats.length).fill(null);
-
-    let maxBet = g.maxBet;
-
-    if (action === 'fold') {
-      seat.folded = true;
-      seat.hand = seat.hand; // keep for reveal
-      actionLabels[seatIdx] = { type: 'fold', text: 'Fold' };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} fold`, 'info');
-      cgSound('click');
-    } else if (action === 'check') {
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: 'check', text: 'Check' };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} check`, 'info');
-      cgSound('chip');
-    } else if (action === 'call') {
-      const toCall = g.maxBet - seat.bet;
-      const pay = Math.min(toCall, seat.chips);
-      seat.chips -= pay; seat.bet += pay;
-      if (seat.chips === 0) seat.allIn = true;
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: 'call', text: `Call ${pay}` };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} call ${pay}`, 'info');
-      cgSound('chip');
-    } else if (action === 'raise' || action === 'bet') {
-      const raiseAmt = amount || BB;
-      const totalBet = g.maxBet + raiseAmt;
-      const pay = Math.min(totalBet - seat.bet, seat.chips);
-      seat.chips -= pay; seat.bet += pay;
-      if (seat.chips === 0) seat.allIn = true;
-      maxBet = seat.bet;
-      roundActed.fill(false);
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: action === 'bet' ? 'bet' : 'raise', text: `${action === 'bet' ? 'Bet' : 'Raise'} ${seat.bet}` };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} ${action === 'bet' ? 'bet' : 'raise'} ${seat.bet}`, 'info');
-      cgSound('chip'); cgHaptic(12);
-    } else if (action === 'allin') {
-      const pay = seat.chips;
-      seat.chips = 0; seat.bet += pay; seat.allIn = true;
-      if (seat.bet > maxBet) { maxBet = seat.bet; roundActed.fill(false); }
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: 'allin', text: `All-in ${seat.bet}` };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} go all-in ${seat.bet}`, 'info');
-      cgSound('chip'); cgHaptic([10, 20, 10]);
-    }
-
-    let newGs = { ...g, seats, maxBet, roundActed, actionLabels };
-
-    // Check if only 1 player remains (everyone else folded)
-    const stillIn = seats.filter(s => !s.folded);
-    if (stillIn.length === 1) {
-      // Award pot to last standing
-      const { seats: collectedSeats, pot } = collectBets(seats, g.pot);
-      collectedSeats[seats.indexOf(stillIn[0])].chips += pot;
-      const winner = stillIn[0];
-      addLog(`${winner.isPlayer ? 'You' : winner.name} win pot ${pot} (others folded)`, winner.isPlayer ? 'win' : 'lose');
-      setHandHistory(prev => [...prev, { num: g.handNum, result: `${winner.isPlayer ? 'You' : winner.name} won (fold)`, detail: `Pot: ${pot}` }]);
-      return { ...newGs, seats: collectedSeats, pot: 0, phase: 'handover', winnerIdxs: [seats.indexOf(stillIn[0])], actionLabels: new Array(seats.length).fill(null) };
-    }
-
-    // Check if betting round is complete
-    if (allBetsEqualCheck(newGs)) {
-      return advanceStreet(newGs);
-    }
-
-    // Advance to next active player
-    const nextIdx = nextActive(seats, seatIdx);
-    return { ...newGs, toActIdx: nextIdx };
-  };
-
-  const allBetsEqualCheck = (g) => {
-    const seats = g.seats;
-    const active = seats.filter(s => !s.folded && s.chips > 0);
-    if (active.length === 0) return true;
-    const maxB = g.maxBet;
-    // All active (non-all-in) players have matched maxBet and had a chance to act
-    return active.every((s, _, arr) => {
-      const idx = seats.indexOf(s);
-      return s.bet === maxB && g.roundActed[idx];
-    });
-  };
-
-  const startGame = (chipCount) => {
-    handsRef.current = 0;
-    doneRef.current = false;
-    const seats = buildSeats(chipCount, numBots);
-    const gs0 = dealNewHand(seats, 0);
-    handsRef.current = 1;
-    gs0.handNum = 1;
-    addLog('Game started', 'hand');
-    addLog(`Hand #1 dealt (Dealer: ${seats[0].isPlayer ? 'You' : seats[gs0.dealerIdx].name})`, 'hand');
-    setGs(gs0);
-    setPhase('playing');
-    cgSound('deal');
-  };
-
-  const handlePlayerAction = (action, amount) => {
-    if (!gs || gs.phase !== 'betting' || gs.toActIdx !== 0) return;
-    setRaiseOpen(false);
-    setGs(prev => applyAction(prev, 0, action, amount));
-  };
-
-  const handleNextHand = () => {
-    if (!gs) return;
-    const seats = gs.seats;
-    // Check end condition
-    const playerSeat = seats[0];
-    const activePlayers = seats.filter(s => s.chips > 0);
-    if (activePlayers.length <= 1) {
-      // Game over
-      const youWin = playerSeat.chips > 0;
-      doneRef.current = true;
-      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
-      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
-      // Save chips to server
-      api('/api/poker/chips', { method: 'POST', body: JSON.stringify({ chips: Math.max(playerSeat.chips, 0) }) }).catch(() => {});
-      const score = Math.max(0, playerSeat.chips);
-      if (youWin) {
-        onWin(score, handsRef.current, secsRef.current, { share: `Won Texas Hold 'Em in ${handsRef.current} hands with ${score} chips!` });
-      } else {
-        onLose(handsRef.current, secsRef.current, { share: `Busted out after ${handsRef.current} hands`, answer: 'Out of chips' });
-      }
-      return;
-    }
-    // Rotate dealer, remove busted players
-    const nextDealerIdx = (seats.findIndex((s, i) => i > gs.dealerIdx && s.chips > 0) + 1 || 1) % seats.length;
-    // Actually just rotate dealer among active seats
-    let newDealerIdx = gs.dealerIdx;
-    for (let i = 1; i <= seats.length; i++) {
-      const idx = (gs.dealerIdx + i) % seats.length;
-      if (seats[idx].chips > 0) { newDealerIdx = idx; break; }
-    }
-    handsRef.current++;
-    onStepChange && onStepChange(handsRef.current);
-    const newGs = dealNewHand(seats, newDealerIdx);
-    newGs.handNum = handsRef.current;
-    addLog(`Hand #${handsRef.current} dealt`, 'hand');
-    setGs(newGs);
-    cgSound('deal');
-  };
-
-  // Bot AI effect
-  useEffect(() => {
-    if (!gs || gs.phase !== 'betting' || !gs.seats[gs.toActIdx]) return;
-    if (gs.seats[gs.toActIdx].isPlayer) return;
-    if (gs.seats[gs.toActIdx].folded) return;
-    const delay = difficulty === 'Easy' ? 400 : difficulty === 'Hard' ? 1100 : 750;
-    const t = setTimeout(() => {
-      setGs(prev => {
-        if (!prev || prev.phase !== 'betting') return prev;
-        if (!prev.seats[prev.toActIdx] || prev.seats[prev.toActIdx].isPlayer) return prev;
-        return processBotTurn(prev);
-      });
-    }, delay);
-    return () => clearTimeout(t);
-  }, [gs && gs.toActIdx, gs && gs.phase, gs && gs.handNum]);
-
-  // Render
-  if (phase === 'setup') {
-    return (
-      <div className="poker-shell">
-        <div className="poker-top-bar">
-          <button className="poker-back-btn" onClick={onBack}>&#8592;</button>
-          <div className="poker-top-bar-title">Texas Hold 'Em</div>
-          <div className="poker-conn-dot" />
-        </div>
-        <PokerSetupScreen
-          onStart={startGame}
-          savedChips={savedChips}
-          numBots={numBots} setNumBots={setNumBots}
-          difficulty={difficulty} setDifficulty={setDifficulty}
-        />
-      </div>
-    );
-  }
-
-  if (!gs) return null;
-
-  const playerSeat = gs.seats[0];
-  const canAct = gs.phase === 'betting' && gs.toActIdx === 0 && !doneRef.current;
-  const toCall = canAct ? Math.max(0, gs.maxBet - playerSeat.bet) : 0;
-  const canCheck = canAct && toCall === 0;
-  const canCall = canAct && toCall > 0;
-  const minRaise = gs.maxBet + BB;
-  const maxRaise = playerSeat.chips;
-  const canRaise = canAct && playerSeat.chips > toCall;
-
-  return (
-    <div className="poker-shell">
-      <PokerTopBar handNum={gs.handNum} phase={gs.street} onBack={() => { setPhase('setup'); setGs(null); }} playerChips={playerSeat.chips} BB={BB} />
-      <div className="poker-main">
-        <div className="poker-oval-wrap">
-          <div className="poker-oval">
-            {gs.seats.map((seat, i) => {
-              const pos = pokerSeatPos(i, numBots);
-              const isWinner = gs.phase === 'handover' && gs.winnerIdxs && gs.winnerIdxs.includes(i);
-              return (
-                <div key={i} style={{ position: 'absolute', left: pos.x + '%', top: pos.y + '%', transform: 'translate(-50%,-50%)' }}>
-                  <PokerSeat
-                    seat={seat}
-                    isPlayer={seat.isPlayer}
-                    dealerIdx={gs.dealerIdx}
-                    sbIdx={gs.sbIdx}
-                    bbIdx={gs.bbIdx}
-                    isActive={gs.phase === 'betting' && gs.toActIdx === i && !seat.folded}
-                    isWinner={isWinner}
-                    actionLabel={gs.actionLabels && gs.actionLabels[i]}
-                    showCards={gs.phase === 'handover'}
-                    seatIdx={i}
-                    board={gs.board}
-                    handNum={gs.handNum}
-                    gamePhase={phase}
-                  />
-                </div>
-              );
-            })}
-            <CommunityArea board={gs.board} pot={gs.pot + gs.seats.reduce((sum, s) => sum + (s.bet || 0), 0)} street={gs.street} />
-          </div>
-        </div>
-
-        {gs.phase === 'handover' && gs.winnerIdxs && (
-          <div style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.88rem', color: '#34D399', fontWeight: 600 }}>
-            {gs.winnerIdxs.includes(0) ? 'You win this hand!' : `${gs.seats[gs.winnerIdxs[0]].name} wins`}
-          </div>
-        )}
-
-        <FloatingMenu
-          onLeave={() => { setPhase('setup'); setGs(null); }}
-          onLog={() => setLogOpen(o => !o)}
-          onHistory={() => setHistoryOpen(o => !o)}
-          soundOn={soundOn}
-          onToggleSound={() => { const ns = !soundOn; setSoundOn(ns); cgSetPref('sound', ns); }}
-        />
-
-        <GameLogSidebar open={logOpen} onClose={() => setLogOpen(false)} log={gameLog} />
-        <HandHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} history={handHistory} />
-        {(logOpen || historyOpen) && (
-          <div className="poker-overlay-backdrop" style={{ background: 'rgba(0,0,0,0.4)' }}
-            onClick={() => { setLogOpen(false); setHistoryOpen(false); }} />
-        )}
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        {raiseOpen && canRaise && (
-          <RaisePanel
-            minRaise={Math.min(minRaise, maxRaise)}
-            maxRaise={maxRaise}
-            BB={BB}
-            onRaise={amt => handlePlayerAction('raise', amt - gs.maxBet)}
-            onClose={() => setRaiseOpen(false)}
-          />
-        )}
-        <div className="poker-action-bar">
-          {gs.phase === 'handover' ? (
-            <button className="poker-action-btn next" onClick={handleNextHand} style={{ flex: 2 }}>
-              Next hand &rarr;
-            </button>
-          ) : (
-            <>
-              <button className="poker-action-btn fold" disabled={!canAct} onClick={() => handlePlayerAction('fold')}>Fold</button>
-              {canCheck
-                ? <button className="poker-action-btn check" disabled={!canAct} onClick={() => handlePlayerAction('check')}>Check</button>
-                : <button className="poker-action-btn call" disabled={!canCall} onClick={() => handlePlayerAction('call')}>Call {toCall}</button>
-              }
-              <button className="poker-action-btn raise" disabled={!canRaise}
-                onClick={() => { if (canRaise) { setRaiseOpen(o => !o); cgSound('click'); } }}>
-                {toCall > 0 ? 'Raise' : 'Bet'}
-              </button>
-              <button className="poker-action-btn allin" disabled={!canAct} onClick={() => { handlePlayerAction('allin'); setRaiseOpen(false); }}>
-                All-in
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 /* ============================================================
    Game 7 — Tile Match (3-Tiles style)
@@ -12406,14 +10408,6 @@ function tmSortBar(bar, tilesMap) {
    Tile Match Puzzle — competitive sub-components
    ============================================================ */
 
-function TileMatchWalletChip({ balance }) {
-  return (
-    <div className="tm-wallet-chip">
-      🪙 {balance != null ? balance : '—'} MATCH
-    </div>
-  );
-}
-
 function TileMatchLeaderboard({ user }) {
   const [sub, setSub] = useState('global');
   const [data, setData] = useState(null);
@@ -12476,226 +10470,6 @@ function TileMatchLeaderboard({ user }) {
   );
 }
 
-function TileMatchDuelArena({ user, balance, onBalanceChange }) {
-  const [duelPhase, setDuelPhase] = useState('lobby'); // lobby|matchmaking|game|result
-  const [duelId, setDuelId] = useState(null);
-  const [duelData, setDuelData] = useState(null);
-  const [resultData, setResultData] = useState(null);
-  const [mmCountdown, setMmCountdown] = useState(120);
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState(null);
-  const pollRef = useRef(null);
-  const mmRef = useRef(null);
-
-  const authHeader = { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' };
-
-  const stopPolling = () => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    if (mmRef.current) { clearInterval(mmRef.current); mmRef.current = null; }
-  };
-
-  useEffect(() => () => stopPolling(), []);
-
-  const startMatchmaking = async (stakeTokens) => {
-    setError(null);
-    setJoining(true);
-    try {
-      const r = await fetch('/api/tilematch/duel/join', {
-        method: 'POST', headers: authHeader,
-        body: JSON.stringify({ stakeTokens }),
-      });
-      const d = await r.json();
-      if (!r.ok) { setError(d.error || 'Failed to join'); setJoining(false); return; }
-      if (d.status === 'active') {
-        setDuelId(d.duelId); setDuelData(d.duel); setDuelPhase('game');
-        if (onBalanceChange) onBalanceChange(b => b - stakeTokens);
-      } else {
-        setDuelId(d.duelId); setDuelPhase('matchmaking');
-        setMmCountdown(120);
-        if (onBalanceChange) onBalanceChange(b => b - stakeTokens);
-        let c = 120;
-        mmRef.current = setInterval(() => { c--; setMmCountdown(c); }, 1000);
-        pollRef.current = setInterval(async () => {
-          try {
-            const pr = await fetch(`/api/tilematch/duel/${d.duelId}`, { headers: { 'x-usernode-token': window._unToken || '' } });
-            const pd = await pr.json();
-            if (pd.duel && pd.duel.status === 'active') {
-              stopPolling();
-              setDuelData(pd.duel); setDuelPhase('game');
-            } else if (pd.timedOut || (pd.duel && pd.duel.status === 'cancelled')) {
-              stopPolling();
-              setError('No opponent found — your tokens have been returned.');
-              if (onBalanceChange) onBalanceChange(b => b + stakeTokens);
-              setDuelPhase('lobby');
-            }
-          } catch {}
-        }, 2000);
-      }
-    } catch (e) {
-      setError('Connection error. Please try again.');
-    }
-    setJoining(false);
-  };
-
-  const handleForfeit = async () => {
-    if (!duelId) return;
-    await fetch(`/api/tilematch/duel/${duelId}/forfeit`, {
-      method: 'POST', headers: authHeader, body: '{}',
-    }).catch(() => {});
-    stopPolling();
-    setResultData({ isWinner: false, forfeited: true });
-    setDuelPhase('result');
-  };
-
-  const handleDuelWin = async (score, steps, timeSecs) => {
-    if (!duelId || !duelData) return;
-    stopPolling();
-    try {
-      const r = await fetch(`/api/tilematch/duel/${duelId}/finish`, {
-        method: 'POST', headers: authHeader,
-        body: JSON.stringify({ score, steps, timeSecs, remainingTiles: 0, telemetry: [] }),
-      });
-      const d = await r.json();
-      if (d.waiting) {
-        // Poll for opponent
-        pollRef.current = setInterval(async () => {
-          try {
-            const pr = await fetch(`/api/tilematch/duel/${duelId}`, { headers: { 'x-usernode-token': window._unToken || '' } });
-            const pd = await pr.json();
-            if (pd.duel && pd.duel.status === 'finished') {
-              stopPolling();
-              const won = pd.duel.winner_id === user.id;
-              const prize = pd.duel ? Math.floor(pd.duel.stakeTokens * 2 * 0.9) : 0;
-              setResultData({ isWinner: won, prize: { winnerPayout: prize, stakeTokens: pd.duel?.stakeTokens } });
-              if (won && onBalanceChange) onBalanceChange(b => b + prize);
-              setDuelPhase('result');
-            }
-          } catch {}
-        }, 2000);
-      } else {
-        if (d.isWinner && onBalanceChange && d.newBalance != null) onBalanceChange(() => d.newBalance);
-        setResultData(d);
-        setDuelPhase('result');
-      }
-    } catch {}
-  };
-
-  const handleDuelLose = async (steps, timeSecs) => {
-    await handleDuelWin(0, steps, timeSecs);
-  };
-
-  const TIERS = [10, 50, 100];
-
-  if (duelPhase === 'lobby') return (
-    <div>
-      {error && <div style={{ background: '#ef444420', border: '1px solid #ef4444', borderRadius: 8, padding: '0.5rem 0.75rem', marginBottom: '0.75rem', fontSize: '0.84rem', color: '#ef4444' }}>{error}</div>}
-      <p style={{ fontSize: '0.84rem', color: 'var(--c-muted,#888)', marginBottom: '0.75rem' }}>
-        Stake MATCH tokens and race the same board as your opponent. Winner takes 90% of the pot.
-      </p>
-      <div className="tm-duel-tiers">
-        {TIERS.map(stake => {
-          const payout = Math.floor(stake * 2 * 0.9);
-          const canAfford = (balance || 0) >= stake;
-          return (
-            <div key={stake} className="tm-duel-tier-card">
-              <div className="tm-duel-stake">🪙 {stake}</div>
-              <div className="tm-duel-payout">Stake {stake} MATCH → win <strong>{payout} MATCH</strong></div>
-              <button className="tm-duel-find-btn" disabled={!canAfford || joining} onClick={() => startMatchmaking(stake)}>
-                {joining ? '…' : 'Find Match'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      {(balance || 0) < 10 && (
-        <p style={{ fontSize: '0.8rem', color: 'var(--c-muted,#888)', textAlign: 'center', marginTop: '0.5rem' }}>
-          Complete daily tasks to earn MATCH tokens.
-        </p>
-      )}
-    </div>
-  );
-
-  if (duelPhase === 'matchmaking') return (
-    <div className="tm-duel-matchmaking">
-      <div className="tm-duel-pulse" />
-      <div style={{ fontSize: '0.9rem', color: 'var(--c-text,#e4e4e7)', fontWeight: 600 }}>Finding opponent…</div>
-      <div className="tm-duel-timer">{String(Math.floor(mmCountdown / 60)).padStart(2,'0')}:{String(mmCountdown % 60).padStart(2,'0')}</div>
-      <button className="tm-duel-back-btn" onClick={handleForfeit}>Cancel</button>
-    </div>
-  );
-
-  if (duelPhase === 'game' && duelData) return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
-        <button className="tm-duel-back-btn" onClick={handleForfeit}>Forfeit</button>
-      </div>
-      <TileMatchingDailyGame
-        onWin={(score, steps, secs) => handleDuelWin(score, steps, secs)}
-        onLose={(steps, secs) => handleDuelLose(steps, secs)}
-        onStepChange={() => {}}
-        resetKey={duelId}
-        boardSeedOverride={duelData.boardSeed}
-      />
-    </div>
-  );
-
-  if (duelPhase === 'result') return (
-    <div className="tm-duel-result">
-      <div className="tm-duel-outcome">{resultData?.isWinner ? '🏆' : resultData?.forfeited ? '🏳' : '😤'}</div>
-      <h3>{resultData?.isWinner ? 'You won!' : resultData?.forfeited ? 'You forfeited' : 'Better luck next time!'}</h3>
-      {resultData?.prize && <div className="tm-duel-balance">Prize: 🪙 {resultData.prize.winnerPayout} MATCH</div>}
-      {resultData?.newBalance != null && <div className="tm-duel-balance">Balance: 🪙 {resultData.newBalance} MATCH</div>}
-      <button className="tm-duel-back-btn" onClick={() => { setDuelPhase('lobby'); setResultData(null); setDuelId(null); setError(null); }}>
-        Back to Duel Lobby
-      </button>
-    </div>
-  );
-
-  return null;
-}
-
-function TileMatchDailyTasks({ tasks, onClaim }) {
-  const allDone = tasks.length > 0 && tasks.every(t => t.claimed);
-  if (allDone) return (
-    <div className="tm-tasks-all-done">
-      <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>🎉</div>
-      All tasks done — come back tomorrow!
-    </div>
-  );
-  return (
-    <div>
-      {tasks.map(task => {
-        const pct = Math.min(100, Math.round((task.progress / task.target) * 100));
-        return (
-          <div key={task.id} className="tm-task-card">
-            <div className="tm-task-header">
-              <span className="tm-task-label">{task.label}</span>
-              <span className="tm-task-reward">+{task.rewardTokens} 🪙</span>
-            </div>
-            <div className="tm-task-desc">{task.description}</div>
-            <div className="tm-task-bar-wrap">
-              <div className="tm-task-bar-fill" style={{ width: pct + '%' }} />
-            </div>
-            <div className="tm-task-footer">
-              <span className="tm-task-progress-lbl">{task.progress} / {task.target}</span>
-              {task.claimed ? (
-                <span className="tm-task-claimed">Claimed ✓</span>
-              ) : (
-                <button
-                  className="tm-task-claim-btn"
-                  disabled={!task.completable}
-                  onClick={() => onClaim(task.id)}
-                >
-                  Claim
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
@@ -12715,10 +10489,8 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const [flashIds, setFlashIds] = useState(new Set());
   const [levelScore, setLevelScore] = useState(0);
   const [timeLimit, setTimeLimit] = useState(0);
-  // Competitive menu state
+  // Menu state ('play' | 'leaderboard')
   const [tmMenuTab, setTmMenuTab] = useState('play');
-  const [tmBalance, setTmBalance] = useState(null);
-  const [tmTasks, setTmTasks] = useState([]);
   const { secs } = useTimer(!done && phase === 'playing');
   const secsRef = useRef(0);
   const totalSecsRef = useRef(0);
@@ -12927,27 +10699,6 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     setBarFull(false);
   };
 
-  // Load wallet + tasks when the select screen is shown for the first time
-  useEffect(() => {
-    const token = window._unToken || '';
-    const headers = { 'x-usernode-token': token };
-    Promise.all([
-      fetch('/api/tilematch/wallet', { headers }).then(r => r.json()).catch(() => null),
-      fetch('/api/tilematch/tasks', { headers }).then(r => r.json()).catch(() => null),
-    ]).then(([walletData, tasksData]) => {
-      if (walletData && walletData.balance != null) setTmBalance(walletData.balance);
-      if (tasksData && tasksData.tasks) setTmTasks(tasksData.tasks);
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const reportProgress = (lvlCleared, tileTaps) => {
-    fetch('/api/tilematch/tasks/report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
-      body: JSON.stringify({ levelsCleared: lvlCleared || 0, tileTaps: tileTaps || 0 }),
-    }).then(r => r.json()).then(d => { if (d.tasks) setTmTasks(d.tasks); }).catch(() => {});
-  };
-
   const submitScore = (highestLevel, totalCleared, sessionScore) => {
     fetch('/api/tilematch/scores/submit', {
       method: 'POST',
@@ -12960,8 +10711,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     const ns = sessionScore + levelScore;
     setSessionScore(ns);
     setCompletedLevels(prev => new Set([...prev, selectedLevel]));
-    // Fire-and-forget: report task progress + submit score
-    reportProgress(1, moves);
+    // Fire-and-forget: submit score
     submitScore(selectedLevel, completedLevels.size + 1, ns);
     const nextLvl = selectedLevel < 1000 ? selectedLevel + 1 : null;
     if (nextLvl) {
@@ -12975,34 +10725,15 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     const totalS = totalSecsRef.current;
     const newTotalMoves = totalMoves + moves;
     const share = `Tile Match ⬢ L${completedLevels.size + 1} cleared | ${ns} pts 🀄✨`;
-    // Fire-and-forget: report task progress + submit score
-    reportProgress(1, moves);
+    // Fire-and-forget: submit score
     submitScore(selectedLevel, completedLevels.size + 1, ns);
     onWin(ns, newTotalMoves, totalS, { share });
-  };
-
-  const handleTaskClaim = (taskId) => {
-    fetch(`/api/tilematch/tasks/${taskId}/claim`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
-      body: '{}',
-    }).then(r => r.json()).then(d => {
-      if (d.newBalance != null) setTmBalance(d.newBalance);
-      if (d.task) setTmTasks(prev => prev.map(t => t.id === taskId ? { ...t, claimed: true, completable: false } : t));
-    }).catch(() => {});
   };
 
   // ---- Level selector screen ----
   if (phase === 'select') {
     const menuContent = () => {
       if (tmMenuTab === 'leaderboard') return <TileMatchLeaderboard />;
-      if (tmMenuTab === 'duel') return (
-        <TileMatchDuelArena
-          balance={tmBalance}
-          onBalanceChange={(fn) => setTmBalance(b => typeof fn === 'function' ? fn(b || 0) : fn)}
-        />
-      );
-      if (tmMenuTab === 'tasks') return <TileMatchDailyTasks tasks={tmTasks} onClaim={handleTaskClaim} />;
       // 'play' tab — existing level selector
       if (tierPage === null) return (
         <div>
@@ -13055,10 +10786,9 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
       <div className="tm-menu">
         <div className="tm-menu-header">
           <h2>Tile Match Puzzle</h2>
-          <TileMatchWalletChip balance={tmBalance} />
         </div>
         <div className="tm-menu-tabs">
-          {['play', 'leaderboard', 'duel', 'tasks'].map(tab => (
+          {['play', 'leaderboard'].map(tab => (
             <button key={tab} className={'tm-menu-tab' + (tmMenuTab === tab ? ' active' : '')} onClick={() => setTmMenuTab(tab)}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -13216,7 +10946,7 @@ const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
 
 const TM_DAILY_HINT_CAP = 5; // paid hints per day for the Daily Tile Match
 
-function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile, matchBalance, onMatchBalanceChange }) {
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile }) {
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -13319,7 +11049,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   // Paid hint: highlight a recommended next tile. Prefer a free tile whose type
   // already has ≥2 copies in the bar (completes a triple), else any free tile
   // whose type has another free copy on the board, else any free tile.
-  const tmHints = useDailyHints({ gameId: 'tilematchingdaily', maxHints: TM_DAILY_HINT_CAP, matchBalance, onMatchBalanceChange });
+  const tmHints = useDailyHints({ gameId: 'tilematchingdaily', maxHints: TM_DAILY_HINT_CAP });
   const recommendTile = () => {
     const free = tiles.filter(t => !t.removed && !t.inBar && !tmIsLocked(t, tiles));
     if (!free.length) return null;
@@ -13554,14 +11284,11 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
 
       {!done && (
         <HintBar
-          nextCost={tmHints.nextCost}
-          balance={matchBalance}
-          canAfford={tmHints.canAfford}
+          hintsLeft={tmHints.hintsLeft}
           exhausted={tmHints.exhausted || boardTiles.length === 0}
           buying={tmHints.buying}
           onBuy={buyTmHint}
           msg={tmHints.msg}
-          lastTx={tmHints.lastTx}
           label="No more hints"
         />
       )}
@@ -13569,300 +11296,6 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   );
 }
 
-
-/* ============================================================
-   Idle clicker game constants & helpers
-   ============================================================ */
-const IDLE_UNITS = [
-  { id: 'worker', name: 'Worker Hamster', icon: '🐹', baseCost: 10, incomePerSec: 0.1 },
-  { id: 'coinpress', name: 'Coin Press', icon: '🏭', baseCost: 100, incomePerSec: 1 },
-  { id: 'goldenwheel', name: 'Golden Wheel', icon: '✨', baseCost: 1000, incomePerSec: 10 },
-  { id: 'vault', name: 'Treasure Vault', icon: '💰', baseCost: 10000, incomePerSec: 100 },
-];
-
-const IDLE_UPGRADES = [
-  { id: 'iron_paws', name: 'Iron Paws', baseCost: 50, maxLevel: 10, effect: 'tap', multiplier: 1.1, desc: 'Boost tap power' },
-  { id: 'worker_motivation', name: 'Worker Motivation', baseCost: 150, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'worker', desc: 'Worker +25%' },
-  { id: 'coinpress_boost', name: 'Press Power', baseCost: 500, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'coinpress', desc: 'Press +25%' },
-  { id: 'goldenwheel_boost', name: 'Wheel Speed', baseCost: 5000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'goldenwheel', desc: 'Wheel +25%' },
-  { id: 'vault_boost', name: 'Vault Depth', baseCost: 50000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'vault', desc: 'Vault +25%' },
-];
-
-function idleUnitCost(unit, count) {
-  return Math.ceil(unit.baseCost * Math.pow(1.15, count));
-}
-
-function idleUpgradeCost(upgrade, level) {
-  return Math.ceil(upgrade.baseCost * Math.pow(1.1, level));
-}
-
-function computePassiveIncome(unitsOwned, upgrades) {
-  let income = 0;
-  for (const unit of IDLE_UNITS) {
-    const count = unitsOwned[unit.id] || 0;
-    let unitIncome = unit.incomePerSec * count;
-    // Apply unit-specific upgrades (5 levels of 1.25x each = 3.05x at max)
-    for (const upgrade of IDLE_UPGRADES) {
-      if (upgrade.unitId === unit.id && upgrades[upgrade.id]) {
-        unitIncome *= Math.pow(upgrade.multiplier, upgrades[upgrade.id]);
-      }
-    }
-    income += unitIncome;
-  }
-  return income;
-}
-
-function computePrestigeMultiplier(prestigePoints) {
-  return 1 + 0.05 * prestigePoints;
-}
-
-function IdleGame() {
-  const [state, setState] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('units');
-  const [pendingPrestige, setPendingPrestige] = useState(null);
-  const [popups, setPopups] = useState([]);
-  const [offlineAccum, setOfflineAccum] = useState(0);
-  const tapPowerRef = useRef(1);
-
-  const loadState = async () => {
-    const { ok, body } = await api('/api/idle/state');
-    if (ok && body) {
-      setState(body);
-      tapPowerRef.current = parseFloat(body.tapPower) || 1;
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadState();
-  }, []);
-
-  // Passive income accumulation loop
-  useEffect(() => {
-    if (!state) return;
-    const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
-    const multiplier = computePrestigeMultiplier(state.prestigePoints);
-    const id = setInterval(() => {
-      setState(prev => {
-        const newCur = prev.currency + passiveIncome * multiplier;
-        const newPeak = Math.max(prev.peakCurrency, newCur);
-        return { ...prev, currency: newCur, peakCurrency: newPeak };
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [state]);
-
-  // Sync offline accumulation periodically
-  useEffect(() => {
-    if (offlineAccum <= 0 || !state) return;
-    const timer = setTimeout(async () => {
-      const { ok } = await api('/api/idle/tap', { method: 'POST', body: JSON.stringify({ tapCount: offlineAccum }) });
-      if (ok) setOfflineAccum(0);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [offlineAccum, state]);
-
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
-  if (!state) return <div style={{ padding: '2rem', textAlign: 'center' }}>Failed to load game</div>;
-
-  const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
-  const multiplier = computePrestigeMultiplier(state.prestigePoints);
-  const displayCurrency = Math.floor(state.currency);
-
-  const handleTap = async () => {
-    const tapPower = tapPowerRef.current;
-    const tapValue = tapPower * multiplier;
-    const newCur = state.currency + tapValue;
-    const newPeak = Math.max(state.peakCurrency, newCur);
-    setState(prev => ({ ...prev, currency: newCur, peakCurrency: newPeak }));
-    setOfflineAccum(offlineAccum + 1);
-
-    // Coin popup
-    const popupId = Math.random();
-    const x = Math.random() * 100 - 50;
-    const y = Math.random() * 50;
-    setPopups(prev => [...prev, { id: popupId, value: '+' + Math.ceil(tapValue), x, y }]);
-    setTimeout(() => setPopups(prev => prev.filter(p => p.id !== popupId)), 1000);
-  };
-
-  const handleBuyUnit = async (unit) => {
-    const count = state.unitsOwned[unit.id] || 0;
-    const cost = idleUnitCost(unit, count);
-    if (state.currency < cost) return alert('Insufficient currency');
-
-    const { ok, status } = await api('/api/idle/buy-unit', {
-      method: 'POST',
-      body: JSON.stringify({ unitId: unit.id })
-    });
-    if (ok) loadState();
-    else if (status === 409) alert('Insufficient currency');
-  };
-
-  const handleUpgrade = async (upgrade) => {
-    const level = state.upgrades[upgrade.id] || 0;
-    if (level >= upgrade.maxLevel) return alert('Already maxed');
-    const cost = idleUpgradeCost(upgrade, level);
-    if (state.currency < cost) return alert('Insufficient currency');
-
-    const { ok, status } = await api('/api/idle/upgrade', {
-      method: 'POST',
-      body: JSON.stringify({ upgradeId: upgrade.id })
-    });
-    if (ok) loadState();
-    else if (status === 409) alert('Insufficient currency');
-  };
-
-  const handlePrestige = async () => {
-    const bonus = Math.floor(Math.sqrt(state.peakCurrency / 1000));
-    const newPrestigePoints = state.prestigePoints + bonus;
-    const multiplierGain = (0.05 * bonus).toFixed(1);
-    setPendingPrestige({ bonus, newPoints: newPrestigePoints, multiplierGain });
-  };
-
-  const confirmPrestige = async () => {
-    const { ok } = await api('/api/idle/prestige', { method: 'POST' });
-    if (ok) {
-      setPendingPrestige(null);
-      loadState();
-    }
-  };
-
-  return (
-    <div className="idle-container">
-      <div className="idle-main">
-        <div className="idle-stats">
-          <div className="idle-stat-box">
-            <div className="idle-stat-label">Coins</div>
-            <div className="idle-stat-value currency">{displayCurrency.toLocaleString()}</div>
-          </div>
-          <div className="idle-stat-box">
-            <div className="idle-stat-label">Per Second</div>
-            <div className="idle-stat-value income">{(passiveIncome * multiplier).toFixed(2)}</div>
-          </div>
-          <div className="idle-stat-box">
-            <div className="idle-stat-label">Prestige Bonus</div>
-            <div className="idle-stat-value prestige">+{Math.round(state.prestigePoints * 5)}%</div>
-          </div>
-        </div>
-
-        <div className="idle-tap-section">
-          <button className="idle-tap-btn" onClick={handleTap}>TAP</button>
-          <div className="idle-tap-label">Tap Power: {tapPowerRef.current.toFixed(2)}×</div>
-        </div>
-
-        <div className="idle-shop">
-          <div className="idle-tabs">
-            <button
-              className={`idle-tab ${activeTab === 'units' ? 'active' : ''}`}
-              onClick={() => setActiveTab('units')}
-            >
-              Units ({Object.values(state.unitsOwned).reduce((a, b) => a + b, 0)})
-            </button>
-            <button
-              className={`idle-tab ${activeTab === 'upgrades' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upgrades')}
-            >
-              Upgrades
-            </button>
-          </div>
-
-          <div className="idle-grid">
-            {activeTab === 'units' && IDLE_UNITS.map(unit => {
-              const count = state.unitsOwned[unit.id] || 0;
-              const cost = idleUnitCost(unit, count);
-              const canAfford = state.currency >= cost;
-              return (
-                <div key={unit.id} className="idle-card">
-                  <div className="idle-card-icon">{unit.icon}</div>
-                  <div className="idle-card-name">{unit.name}</div>
-                  <div className="idle-card-stats">Income: {unit.incomePerSec.toFixed(2)}/s</div>
-                  <div className="idle-card-stats">Own: {count}</div>
-                  <button
-                    className="idle-card-btn"
-                    disabled={!canAfford}
-                    onClick={() => handleBuyUnit(unit)}
-                  >
-                    {cost.toLocaleString()}
-                  </button>
-                </div>
-              );
-            })}
-
-            {activeTab === 'upgrades' && IDLE_UPGRADES.map(upgrade => {
-              const level = state.upgrades[upgrade.id] || 0;
-              const cost = idleUpgradeCost(upgrade, level);
-              const canAfford = state.currency >= cost && level < upgrade.maxLevel;
-              return (
-                <div key={upgrade.id} className="idle-card">
-                  <div className="idle-card-icon">⚡</div>
-                  <div className="idle-card-name">{upgrade.name}</div>
-                  <div className="idle-card-desc">{upgrade.desc}</div>
-                  <div className="idle-card-stats">Level: {level}/{upgrade.maxLevel}</div>
-                  <button
-                    className="idle-card-btn"
-                    disabled={!canAfford}
-                    onClick={() => handleUpgrade(upgrade)}
-                  >
-                    {level >= upgrade.maxLevel ? 'MAXED' : cost.toLocaleString()}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {popups.map(p => (
-        <div
-          key={p.id}
-          className="idle-coin-popup"
-          style={{
-            left: 'calc(50% + ' + p.x + 'px)',
-            top: 'calc(50% + ' + p.y + 'px)',
-          }}
-        >
-          {p.value}
-        </div>
-      ))}
-
-      {pendingPrestige && (
-        <div className="prestige-modal">
-          <div className="prestige-card">
-            <h2>✨ Prestige</h2>
-            <div className="sub">Reset your progress and earn prestige points!</div>
-            <div className="prestige-rows">
-              <div className="prestige-row">
-                <span className="k">Peak Currency:</span>
-                <span className="v">{Math.floor(state.peakCurrency).toLocaleString()}</span>
-              </div>
-              <div className="prestige-row">
-                <span className="k">Bonus Points:</span>
-                <span className="v">+{pendingPrestige.bonus}</span>
-              </div>
-              <div className="prestige-row">
-                <span className="k">New Total:</span>
-                <span className="v">{pendingPrestige.newPoints}</span>
-              </div>
-              <div className="prestige-row">
-                <span className="k">Multiplier Gain:</span>
-                <span className="v">+{pendingPrestige.multiplierGain}%</span>
-              </div>
-            </div>
-            <div className="prestige-buttons">
-              <button className="prestige-confirm" onClick={confirmPrestige}>
-                Prestige
-              </button>
-              <button className="prestige-cancel" onClick={() => setPendingPrestige(null)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ============================================================
    Game — Knight's Tour (8×8, visit every square exactly once)
@@ -14921,980 +12354,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 }
 
 /* ============================================================
-   PvP Arena components
-   ============================================================ */
-const PVP_TIERS = [
-  { label: '10 MATCH',  value: 10,  color: C.emerald, payout: '18 MATCH' },
-  { label: '50 MATCH',  value: 50,  color: C.gold,    payout: '90 MATCH' },
-  { label: '100 MATCH', value: 100, color: C.rose,    payout: '180 MATCH' },
-];
-
-function PvpLobby({ user, balance, onJoin, joining }) {
-  const balFmt = balance != null
-    ? (Number(BigInt(balance)) / 1e18).toFixed(2) + ' MATCH'
-    : '…';
-  return (
-    <div className="pvp-lobby">
-      <div className="pvp-header">
-        <div className="pvp-title">⚔️ PvP Arena</div>
-        <div className="pvp-subtitle">Stake MATCH and battle for the best tile-match score</div>
-        <div className="pvp-balance">Balance: {balFmt}</div>
-      </div>
-      <div className="pvp-how">
-        <div className="pvp-how-step">1. Choose a wager tier and get matched with an opponent</div>
-        <div className="pvp-how-step">2. Both players clear the same seeded board — highest score wins, fastest time breaks ties</div>
-        <div className="pvp-how-step">3. Winner claims 90% of the pot · 8% treasury · 2% burned 🔥</div>
-      </div>
-      <div className="pvp-tiers">
-        {PVP_TIERS.map(t => (
-          <div key={t.value} className="pvp-tier-card" style={{ '--pvp-color': t.color }}>
-            <div className="pvp-tier-label">{t.label}</div>
-            <div className="pvp-tier-payout">Win → {t.payout}</div>
-            <button
-              className="pvp-tier-btn"
-              style={{ background: t.color }}
-              disabled={joining !== null}
-              onClick={() => onJoin(t.value)}
-            >
-              {joining === t.value ? 'Finding…' : 'Find Match'}
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PvpMatchmaking({ match, onCancel, onReclaim, cancelQueueCalldata }) {
-  const { useState: useS, useEffect: useE } = React;
-  const [secsLeft, setSecsLeft] = useS(() => {
-    if (!match || !match.createdAt) return 120;
-    const elapsed = Math.floor((Date.now() - new Date(match.createdAt).getTime()) / 1000);
-    return Math.max(0, 120 - elapsed);
-  });
-  const [reclaiming, setReclaiming] = useS(false);
-
-  useE(() => {
-    if (secsLeft <= 0) return;
-    const id = setInterval(() => setSecsLeft(s => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(id);
-  }, [secsLeft > 0]);
-
-  const canReclaim = secsLeft === 0;
-  const mm = String(Math.floor(secsLeft / 60)).padStart(2, '0');
-  const ss = String(secsLeft % 60).padStart(2, '0');
-
-  const handleReclaim = async () => {
-    setReclaiming(true);
-    try {
-      onReclaim && onReclaim();
-    } catch (e) {
-      console.error('[pvp] reclaim failed:', e && e.message);
-      onReclaim && onReclaim(); // fall back to cancel even if tx fails
-    } finally {
-      setReclaiming(false);
-    }
-  };
-
-  return (
-    <div className="pvp-matchmaking">
-      <div className="pvp-mm-icon">⚔️</div>
-      <div className="pvp-mm-pulse" />
-      <div className="pvp-mm-title">Finding opponent…</div>
-      <div className="pvp-mm-code">Room · {match && match.matchId}</div>
-      <div className={`pvp-mm-countdown${canReclaim ? ' pvp-mm-countdown-expired' : ''}`}>{mm}:{ss}</div>
-      <div className="pvp-mm-hint">
-        {canReclaim
-          ? 'Queue timed out — reclaim your deposit below'
-          : `Waiting for a ${match && match.betTier ? match.betTier + ' MATCH' : ''} opponent`}
-      </div>
-      <div className="pvp-mm-btns">
-        {canReclaim && (
-          <button className="pvp-reclaim-btn" onClick={handleReclaim} disabled={reclaiming}>
-            {reclaiming ? 'Reclaiming…' : 'Reclaim Deposit'}
-          </button>
-        )}
-        <button className="pvp-cancel-btn" onClick={onCancel}>Cancel</button>
-      </div>
-    </div>
-  );
-}
-
-function PvpDepositScreen({ match, playerIsP1, onDeposit, depositing }) {
-  const alreadyDeposited = playerIsP1 ? match.p1Deposited : match.p2Deposited;
-  const oppDeposited = playerIsP1 ? match.p2Deposited : match.p1Deposited;
-  const wagerFmt = match.wagerUtgo
-    ? (Number(BigInt(match.wagerUtgo)) / 1e18).toFixed(2) + ' MATCH'
-    : '?';
-  return (
-    <div className="pvp-deposit">
-      <div className="pvp-deposit-title">Deposit Wager</div>
-      <div className="pvp-deposit-amount">{wagerFmt}</div>
-      <div className="pvp-deposit-hint">
-        {alreadyDeposited
-          ? (oppDeposited ? 'Both deposited — starting!' : 'Waiting for opponent to deposit…')
-          : 'Deposit your wager to lock in the match'}
-      </div>
-      {!alreadyDeposited && (
-        <button className="primary-btn" disabled={depositing} onClick={onDeposit}>
-          {depositing ? 'Depositing…' : 'Deposit & Play'}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function PvpGameScreen({ match, playerIsP1, onResult }) {
-  const [depositing, setDepositing] = useState(false);
-  const [deposited, setDeposited] = useState(
-    playerIsP1 ? match.p1Deposited : match.p2Deposited
-  );
-  const [oppDeposited, setOppDeposited] = useState(
-    playerIsP1 ? match.p2Deposited : match.p1Deposited
-  );
-  const [playing, setPlaying] = useState(deposited && oppDeposited);
-  const [waiting, setWaiting] = useState(false);
-  const [oppPct, setOppPct] = useState(null); // opponent tile-clear %, rounded to 10
-  const [myRemaining, setMyRemaining] = useState(72);
-  const pollRef = useRef(null);
-  const resultPollRef = useRef(null);
-  // Accumulate telemetry locally — useRef avoids stale closures in handleWin/handleLose
-  const telemetryRef = useRef([]);
-
-  // Poll for opponent deposit
-  useEffect(() => {
-    if (playing || !deposited) return;
-    const poll = async () => {
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
-      if (!ok) return;
-      const oppNow = playerIsP1 ? body.p2Deposited : body.p1Deposited;
-      if (oppNow) {
-        setOppDeposited(true);
-        setPlaying(true);
-        clearInterval(pollRef.current);
-      }
-    };
-    pollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(pollRef.current);
-  }, [deposited, playing]);
-
-  // During play: poll every 2s for opponent progress + inactivity forfeit
-  useEffect(() => {
-    if (!playing || waiting) return;
-    const poll = async () => {
-      const rem = myRemaining;
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}?remaining=${rem}`);
-      if (!ok) return;
-      if (body.forfeitedBy) {
-        clearInterval(resultPollRef.current);
-        onResult({
-          match: body,
-          isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id),
-          claimCalldata: body.claimCalldata,
-          contractAddr: body.contractAddr,
-        });
-        return;
-      }
-      if (body.status === 'finished' || body.status === 'disputed') {
-        clearInterval(resultPollRef.current);
-        onResult({ match: body, isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id) });
-        return;
-      }
-      // Update opponent progress bar (rounded to nearest 10%)
-      const oppRem = playerIsP1 ? body.p2Remaining : body.p1Remaining;
-      if (oppRem != null) {
-        const cleared = 72 - oppRem;
-        setOppPct(Math.round(cleared / 72 * 10) * 10);
-      }
-    };
-    resultPollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(resultPollRef.current);
-  }, [playing, waiting]);
-
-  // Poll for opponent finish result while waiting
-  useEffect(() => {
-    if (!waiting) return;
-    const poll = async () => {
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
-      if (!ok) return;
-      if (body.status === 'finished' || body.status === 'disputed') {
-        clearInterval(pollRef.current);
-        onResult({ match: body, isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id) });
-      }
-    };
-    pollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(pollRef.current);
-  }, [waiting]);
-
-  const handleDeposit = async () => {
-    setDepositing(true);
-    let txHash = '0xstaging';
-    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-      ? !(await window.usernode.isMockEnabled())
-      : false;
-    if (bridgeMockOff && window.usernode.sendTransaction && UTGO_CONTRACT_ADDRESS && match.depositCalldata) {
-      try {
-        const tx = await window.usernode.sendTransaction({ to: UTGO_CONTRACT_ADDRESS, data: match.depositCalldata });
-        txHash = (tx && tx.hash) || txHash;
-      } catch (e) {
-        console.error('[pvp] deposit tx failed:', e && e.message);
-        setDepositing(false);
-        return;
-      }
-    }
-    await api(`/api/pvp/match/${match.matchId}/deposit-confirmed`, {
-      method: 'POST',
-      body: JSON.stringify({ txHash }),
-    });
-    setDeposited(true);
-    setDepositing(false);
-  };
-
-  // Accumulate tile moves locally — no per-move API call
-  const handleMoveTile = ({ tileType, moveSeq, tsClient }) => {
-    telemetryRef.current.push({ tileType, moveSeq, tsClient });
-  };
-
-  const handleWin = async (score, steps, secs) => {
-    clearInterval(resultPollRef.current);
-    const { ok, body } = await api(`/api/pvp/match/${match.matchId}/finish`, {
-      method: 'POST',
-      body: JSON.stringify({
-        score, steps, timeSecs: secs, remainingTiles: 0,
-        telemetry: telemetryRef.current,
-      }),
-    });
-    if (!ok) return;
-    if (body.waiting) {
-      setWaiting(true);
-    } else {
-      onResult({
-        match: body.match,
-        isWinner: body.isWinner,
-        claimCalldata: body.claimCalldata,
-        contractAddr: body.contractAddr,
-        prize: body.prize,
-        telemetrySummary: body.telemetrySummary,
-        dapp: body.dapp,
-      });
-    }
-  };
-
-  const handleLose = async (steps, secs, meta) => {
-    clearInterval(resultPollRef.current);
-    if (meta && meta.isTimeUp) {
-      // Time expired — submit finish with score 0
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}/finish`, {
-        method: 'POST',
-        body: JSON.stringify({
-          score: 0, steps, timeSecs: secs,
-          remainingTiles: meta.remainingTiles || 0,
-          telemetry: telemetryRef.current,
-        }),
-      });
-      if (ok && body) {
-        if (body.waiting) { setWaiting(true); return; }
-        onResult({
-          match: body.match,
-          isWinner: body.isWinner,
-          claimCalldata: body.claimCalldata,
-          contractAddr: body.contractAddr,
-          prize: body.prize,
-          telemetrySummary: body.telemetrySummary,
-          dapp: body.dapp,
-        });
-      }
-    } else {
-      // Bar full / manual forfeit
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}/forfeit`, { method: 'POST' });
-      onResult({ isWinner: false, match: ok && body ? body : null });
-    }
-  };
-
-  const handleStepChange = (n) => {
-    setMyRemaining(Math.max(0, 72 - n));
-  };
-
-  const oppName = playerIsP1 ? (match.player2Name || 'Opponent') : (match.player1Name || 'Opponent');
-
-  if (!deposited || !oppDeposited) {
-    return (
-      <PvpDepositScreen
-        match={match}
-        playerIsP1={playerIsP1}
-        onDeposit={handleDeposit}
-        depositing={depositing}
-      />
-    );
-  }
-
-  if (waiting) {
-    return (
-      <div className="pvp-waiting">
-        <div className="pvp-mm-pulse" />
-        <div className="pvp-waiting-title">Waiting for {oppName}…</div>
-        <div className="pvp-waiting-hint">Your result has been submitted</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pvp-game-wrap game-wrap">
-      <div className="pvp-vs-bar">
-        <span>vs <span style={{ color: C.violet }}>{oppName}</span></span>
-        <div className="pvp-opp-bar">
-          <div className="pvp-opp-bar-label">{oppName} {oppPct !== null ? `${oppPct}%` : '—'}</div>
-          <div className="pvp-opp-bar-track">
-            <div className="pvp-opp-bar-fill" style={{ width: `${oppPct || 0}%` }} />
-          </div>
-        </div>
-        <button className="pvp-forfeit-btn" onClick={() => handleLose(0, 0, {})}>Forfeit</button>
-      </div>
-      <TileMatchingDailyGame
-        boardSeedOverride={match.boardSeed}
-        onWin={handleWin}
-        onLose={handleLose}
-        onStepChange={handleStepChange}
-        onMoveTile={handleMoveTile}
-        resetKey={match.matchId}
-        offset={0}
-      />
-    </div>
-  );
-}
-
-function PvpResult({ result, onBack, onOpenReceipt }) {
-  const { isWinner, match, claimCalldata, contractAddr, prize, telemetrySummary } = result || {};
-  const [claiming, setClaiming] = useState(false);
-  const [claimed, setClaimed] = useState(false);
-  const [claimErr, setClaimErr] = useState(null);
-  const [txHash, setTxHash] = useState(null);
-  // DApp Mode: surface + anchor the verified session minted from this match's
-  // telemetry (server already replayed it).
-  const [dappSession, setDappSession] = useState(result && result.dapp);
-  useEffect(() => {
-    if (result && result.dapp) {
-      setDappSession(result.dapp);
-      dappAnchor(result.dapp).then(setDappSession);
-    }
-  }, [result && result.dapp && result.dapp.sessionId]);
-
-  const handleClaim = async () => {
-    if (!claimCalldata || !contractAddr) return;
-    setClaiming(true);
-    setClaimErr(null);
-    try {
-      const tx = await window.usernode.sendTransaction({ to: contractAddr, data: claimCalldata });
-      setTxHash(tx && tx.hash ? tx.hash : null);
-      setClaimed(true);
-    } catch (e) {
-      setClaimErr(e && e.message ? e.message : 'Transaction failed');
-    }
-    setClaiming(false);
-  };
-
-  const myScore = match && (result.playerIsP1 !== false
-    ? (match.p1Score != null ? match.p1Score : match.p2Score)
-    : (match.p2Score != null ? match.p2Score : match.p1Score));
-  const oppScore = match && (result.playerIsP1 !== false
-    ? match.p2Score
-    : match.p1Score);
-
-  return (
-    <div className="pvp-result">
-      <div className="pvp-result-emoji">{isWinner ? '🏆' : '💀'}</div>
-      <div className="pvp-result-title">{isWinner ? 'You Won!' : 'You Lost'}</div>
-
-      {dappSession && <VerifiedBadge session={dappSession} onOpenReceipt={onOpenReceipt} />}
-
-      {telemetrySummary && (
-        <div className="pvp-telem-summary">
-          <div className="pvp-telem-row">
-            <span>Moves</span><span className="mono">{telemetrySummary.moveCount}</span>
-          </div>
-          <div className="pvp-telem-row">
-            <span>Time</span><span className="mono">{telemetrySummary.timeTaken}s</span>
-          </div>
-          <div className="pvp-telem-row">
-            <span>Tiles cleared</span><span className="mono">{telemetrySummary.tilesCleared}/72</span>
-          </div>
-        </div>
-      )}
-
-      {match && (
-        <div className="score-rows" style={{ width: '100%', textAlign: 'left' }}>
-          <div className="score-row">
-            <span className="k">Your score</span>
-            <span className="v mono">{myScore != null ? myScore : '—'}</span>
-          </div>
-          <div className="score-row">
-            <span className="k">Opponent</span>
-            <span className="v mono">{oppScore != null ? oppScore : '—'}</span>
-          </div>
-        </div>
-      )}
-
-      {isWinner && prize && (
-        <div className="pvp-prize-anim">
-          <div className="pvp-prize-title">Prize Distribution</div>
-          <div className="pvp-prize-row pvp-prize-winner">
-            <span>You (90%)</span><span className="mono">+{prize.winnerPrize} MATCH</span>
-          </div>
-          <div className="pvp-prize-row">
-            <span>Treasury (8%)</span><span className="mono">{prize.treasuryFee} MATCH</span>
-          </div>
-          <div className="pvp-prize-row">
-            <span>Burned (2%)</span><span className="mono">{prize.burned} MATCH 🔥</span>
-          </div>
-        </div>
-      )}
-
-      {claiming && (
-        <div style={{ color: C.text, fontSize: '0.85rem', margin: '0.5rem 0' }}>
-          Funds are being sent to your wallet…
-        </div>
-      )}
-      {claimed && txHash && (
-        <div style={{ color: C.emerald, fontSize: '0.8rem', wordBreak: 'break-all', margin: '0.25rem 0' }}>
-          Tx: {txHash}
-        </div>
-      )}
-      {claimErr && <div style={{ color: C.rose, fontSize: '0.8rem', margin: '0.25rem 0' }}>{claimErr}</div>}
-
-      <div className="pvp-result-btns">
-        {isWinner && claimCalldata && !claimed && (
-          <button className="primary-btn" onClick={handleClaim} disabled={claiming}>
-            {claiming ? 'Claiming…' : 'Claim Winnings'}
-          </button>
-        )}
-        {claimed && <div style={{ color: C.emerald, fontWeight: 600 }}>Winnings claimed!</div>}
-        <button
-          className="primary-btn"
-          style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-          onClick={onBack}
-        >
-          Back to Arena
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appWalletBalance, onOpenReceipt }) {
-  const [phase, setPhase] = useState('lobby'); // lobby | matchmaking | game | result
-  const [match, setMatch] = useState(null);
-  const [joining, setJoining] = useState(null);
-  const [pvpResult, setPvpResult] = useState(null);
-  // Use app-level wallet addr/balance when available; fall back to own fetch
-  const [localAddr, setLocalAddr] = useState(null);
-  const [localBalance, setLocalBalance] = useState(null);
-  const playerAddr = appWalletAddr || localAddr;
-  const balance = appWalletBalance || localBalance;
-  const pollRef = useRef(null);
-
-  useEffect(() => {
-    if (appWalletAddr) return; // already have it from app level
-    if (!window.usernode || !window.usernode.getNodeAddress) return;
-    window.usernode.getNodeAddress().then(addr => {
-      if (!addr) return;
-      setLocalAddr(addr);
-      api(`/api/pvp/balance?addr=${encodeURIComponent(addr)}`)
-        .then(({ ok, body }) => { if (ok && body) setLocalBalance(body.balance); })
-        .catch(() => {});
-    }).catch(() => {});
-  }, [appWalletAddr]);
-
-  // Poll for opponent joining while in matchmaking; also refresh cancelQueueCalldata
-  useEffect(() => {
-    if (phase !== 'matchmaking' || !match) return;
-    const poll = async () => {
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
-      if (!ok) return;
-      if (body.status === 'active') {
-        clearInterval(pollRef.current);
-        setMatch(body);
-        setPhase('game');
-      } else {
-        // Refresh cancelQueueCalldata when it becomes available after 120s
-        setMatch(prev => prev ? { ...prev, cancelQueueCalldata: body.cancelQueueCalldata || prev.cancelQueueCalldata } : prev);
-      }
-    };
-    pollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(pollRef.current);
-  }, [phase, match && match.matchId]);
-
-  const handleJoin = async (betTier) => {
-    if (!playerAddr) return;
-    setJoining(betTier);
-    const { ok, body } = await api('/api/pvp/join', {
-      method: 'POST',
-      body: JSON.stringify({ betTier, playerAddr }),
-    });
-    setJoining(null);
-    if (!ok || !body) return;
-    setMatch(body);
-    setPhase(body.status === 'active' ? 'game' : 'matchmaking');
-  };
-
-  const handleCancel = async () => {
-    if (match) {
-      await api(`/api/pvp/match/${match.matchId}/cancel`, { method: 'DELETE' });
-    }
-    clearInterval(pollRef.current);
-    setMatch(null);
-    setPhase('lobby');
-  };
-
-  const handleReclaim = () => {
-    clearInterval(pollRef.current);
-    setMatch(null);
-    setPhase('lobby');
-  };
-
-  const handleResult = (result) => {
-    setPvpResult(result);
-    setPhase('result');
-  };
-
-  if (!authOk) {
-    return <div className="pvp-auth-msg">Sign in to play PvP matches.</div>;
-  }
-
-  const playerIsP1 = match && user && match.player1Id === user.id;
-
-  if (phase === 'lobby') {
-    return <PvpLobby user={user} balance={balance} onJoin={handleJoin} joining={joining} />;
-  }
-  if (phase === 'matchmaking') {
-    return <PvpMatchmaking
-      match={match}
-      onCancel={handleCancel}
-      onReclaim={handleReclaim}
-      cancelQueueCalldata={match && match.cancelQueueCalldata}
-    />;
-  }
-  if (phase === 'game' && match) {
-    return <PvpGameScreen match={match} playerIsP1={playerIsP1} onResult={handleResult} />;
-  }
-  if (phase === 'result') {
-    return <PvpResult result={pvpResult} onBack={() => { setMatch(null); setPhase('lobby'); }} onOpenReceipt={onOpenReceipt} />;
-  }
-  return null;
-}
-
-/* ============================================================
-   Wallet helpers
-   ============================================================ */
-function fmtUtgo(weiStr) {
-  if (!weiStr || weiStr === '0') return '0.00 MATCH';
-  try {
-    const n = Number(BigInt(weiStr)) / 1e18;
-    return n.toFixed(2) + ' MATCH';
-  } catch { return '0.00 MATCH'; }
-}
-
-// MATCH is the single in-app currency — an integer count, not wei.
-function fmtMatch(n) {
-  const v = Number.isFinite(n) ? n : 0;
-  return `${v} MATCH`;
-}
-
-// Feature flag: the $UTGO-staked PvP Arena is hidden while the app runs a single
-// in-app currency (MATCH). Flip to true once PvP is relaunched on MATCH stakes.
-const PVP_ENABLED = false;
-
-// The "returning soon on MATCH" placeholder shown where the $UTGO PvP Arena used
-// to render.
-function PvpReturningSoon() {
-  return (
-    <div className="pvp-arena" style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
-      <div style={{ fontSize: '2.4rem', marginBottom: '0.75rem' }}>⚔️</div>
-      <div className="pvp-title" style={{ marginBottom: '0.5rem' }}>PvP Arena</div>
-      <p style={{ color: C.muted, maxWidth: '28rem', margin: '0 auto' }}>
-        PvP is being rebuilt to wager <strong style={{ color: C.gold }}>MATCH</strong>, PuzzleChain's
-        single in-app currency. It's <strong>returning soon on MATCH</strong> — meanwhile, duel for
-        MATCH in the Tile Match Puzzle arena.
-      </p>
-    </div>
-  );
-}
-
-function shortAddr(addr) {
-  if (!addr) return '';
-  return addr.slice(0, 6) + '…' + addr.slice(-4);
-}
-
-/* ============================================================
-   TipModal — send MATCH (the single in-app currency) to another user
-   ============================================================ */
-function TipModal({ toUser, onClose, onSuccess }) {
-  const TIP_PRESETS = ['1', '5', '10'];
-  const [amount, setAmount] = React.useState('1');
-  const [customAmount, setCustomAmount] = React.useState('');
-  const [sending, setSending] = React.useState(false);
-  const [err, setErr] = React.useState(null);
-  const [done, setDone] = React.useState(null);
-
-  const selectedAmount = customAmount || amount;
-
-  const handleSend = async () => {
-    const amountInt = Math.round(parseFloat(selectedAmount));
-    if (!amountInt || amountInt <= 0) {
-      setErr('Enter a valid amount');
-      return;
-    }
-    setSending(true);
-    setErr(null);
-    try {
-      const { ok, body } = await api('/api/wallet/tip', {
-        method: 'POST',
-        body: JSON.stringify({ toUserId: toUser.id, amount: amountInt }),
-      });
-      if (!ok) {
-        setErr(body && body.error ? body.error : 'Failed to send tip');
-        setSending(false);
-        return;
-      }
-      // Anchor the MATCH transfer on-chain (best-effort).
-      if (body.receipt && body.receipt.eventId) { matchAnchor(body.receipt).catch(() => {}); }
-      setDone({ amount: `${amountInt} MATCH` });
-    } catch (e) {
-      setErr(e && e.message ? e.message : 'Failed to send tip');
-    }
-    setSending(false);
-  };
-
-  return (
-    <div className="tip-modal-backdrop" onClick={onClose}>
-      <div className="tip-modal" onClick={e => e.stopPropagation()}>
-        <h3>Tip {toUser.username}</h3>
-        {done ? (
-          <div>
-            <div style={{ color: C.emerald, fontWeight: 600, marginBottom: '0.5rem' }}>
-              Sent {done.amount}! 🪙
-            </div>
-            <div style={{ fontSize: '0.72rem', color: C.muted, marginBottom: '0.75rem' }}>
-              Recorded on the Usernode chain.
-            </div>
-            <button className="primary-btn" onClick={() => { onSuccess && onSuccess(); onClose(); }}>Done</button>
-          </div>
-        ) : (
-          <div>
-            <div style={{ fontSize: '0.82rem', color: C.muted, marginBottom: '0.75rem' }}>
-              Quick amounts (MATCH):
-            </div>
-            <div className="tip-presets">
-              {TIP_PRESETS.map(p => (
-                <button
-                  key={p}
-                  className={'tip-preset-btn' + (amount === p && !customAmount ? ' active' : '')}
-                  onClick={() => { setAmount(p); setCustomAmount(''); }}
-                >{p}</button>
-              ))}
-            </div>
-            <input
-              className="tip-input"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="Custom amount"
-              value={customAmount}
-              onChange={e => { setCustomAmount(e.target.value); setAmount(''); }}
-            />
-            {err && <div style={{ color: C.rose, fontSize: '0.82rem', marginBottom: '0.5rem' }}>{err}</div>}
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button className="primary-btn" disabled={sending} onClick={handleSend} style={{ flex: 1 }}>
-                {sending ? 'Sending…' : `Send ${selectedAmount || '?'} MATCH`}
-              </button>
-              <button
-                className="primary-btn"
-                style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-                onClick={onClose}
-              >Cancel</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   WalletScreen — the full wallet management view
-   ============================================================ */
-function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh, onOpenReceipt }) {
-  const [walletData, setWalletData] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  const [buyingFreeze, setBuyingFreeze] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
-  const [freezeMsg, setFreezeMsg] = React.useState(null);
-  const [matchLedger, setMatchLedger] = React.useState(null);
-
-  const loadWallet = async () => {
-    const demo = new URLSearchParams(window.location.search).get('demo');
-    const path = '/api/wallet' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, body } = await api(path);
-    if (ok && body) setWalletData(body);
-    setLoading(false);
-  };
-
-  const loadMatchLedger = async () => {
-    const demo = new URLSearchParams(window.location.search).get('demo');
-    const path = '/api/match/ledger' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, body } = await api(path);
-    if (ok && body && Array.isArray(body.entries)) {
-      // Opportunistically anchor any still-pending rows (e.g. a duel payout
-      // credited server-side) so their explorer links appear on next refresh.
-      const pending = body.entries.filter(e => e.status === 'pending');
-      if (pending.length) {
-        Promise.all(pending.map(e => anchorMatchLedger(e.id, e.memo))).then(() => {
-          api(path).then(r => { if (r.ok && r.body && Array.isArray(r.body.entries)) setMatchLedger(r.body.entries); });
-        });
-      }
-      setMatchLedger(body.entries);
-    }
-  };
-
-  React.useEffect(() => { loadWallet(); loadMatchLedger(); }, []);
-
-  const handleCopy = async () => {
-    if (!walletData || !walletData.addr) return;
-    try {
-      await navigator.clipboard.writeText(walletData.addr);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
-
-  const handleBuyFreeze = async () => {
-    setBuyingFreeze(true);
-    setFreezeMsg(null);
-    const { ok, body } = await api('/api/wallet/spend/streak-freeze', { method: 'POST' });
-    if (ok && body) {
-      setFreezeMsg(`Freeze purchased! You now have ${body.streakFreezes} freeze${body.streakFreezes === 1 ? '' : 's'}.`);
-      if (body.receipt && body.receipt.eventId) { matchAnchor(body.receipt).catch(() => {}); }
-      await loadWallet();
-      onBalanceRefresh && onBalanceRefresh(body.balance);
-    } else {
-      setFreezeMsg((body && body.error) || 'Insufficient MATCH');
-    }
-    setBuyingFreeze(false);
-  };
-
-  // DApp Mode: prove wallet ownership (challenge → signMessage → verify) and
-  // disconnect (clear the proof). Connect itself happens automatically at app
-  // load; this button (re)runs the cryptographic proof on demand.
-  const [proving, setProving] = React.useState(false);
-  const handleProve = async () => {
-    setProving(true);
-    try {
-      const addr = (walletData && walletData.addr) || walletAddr;
-      if (!addr) { setProving(false); return; }
-      if (!window.usernode || !window.usernode.signMessage) {
-        setFreezeMsg('This wallet cannot sign — identity stays linked (unproven).');
-        setProving(false);
-        return;
-      }
-      const { ok, body } = await api('/api/wallet/challenge');
-      if (ok && body && body.message) {
-        const sig = await window.usernode.signMessage(body.message);
-        if (sig) {
-          await api('/api/wallet/prove', { method: 'POST', body: JSON.stringify({ addr, nonce: body.nonce, signature: sig }) });
-          await loadWallet();
-        }
-      }
-    } catch (e) {}
-    setProving(false);
-  };
-  const handleDisconnect = async () => {
-    await api('/api/wallet/disconnect', { method: 'POST' }).catch(() => {});
-    await loadWallet();
-  };
-
-  if (!authOk) {
-    return (
-      <div className="wallet-screen">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <div className="wallet-no-wallet" style={{ marginTop: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔐</div>
-          <div>Sign in to PuzzleChain to access your wallet.</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="wallet-screen">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <p style={{ color: C.muted, marginTop: '1rem' }}>Loading wallet…</p>
-      </div>
-    );
-  }
-
-  if (!walletData) {
-    return (
-      <div className="wallet-screen">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <h2>My Wallet</h2>
-        <div className="wallet-no-wallet">
-          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🪙</div>
-          <div>Couldn't load your wallet right now.</div>
-        </div>
-      </div>
-    );
-  }
-
-  const d = walletData;
-  const balance = Number.isFinite(d.balance) ? d.balance : 0;
-  const freezePrice = Number.isFinite(d.streakFreezePrice) ? d.streakFreezePrice : 50;
-  const canAffordFreeze = balance >= freezePrice;
-
-  return (
-    <div className="wallet-screen">
-      <button className="back-btn" onClick={onBack}>← Back</button>
-      <h2>My Wallet</h2>
-
-      {/* MATCH balance — the single in-app currency */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">MATCH Balance</div>
-        <div className="wallet-balance-big">🪙 {balance} MATCH</div>
-        <div className="wallet-balance-sub">
-          {d.lifetimeEarned || 0} earned · {d.lifetimeSpent || 0} spent (lifetime)
-        </div>
-        <div className="wallet-freeze-info" style={{ marginTop: '0.5rem' }}>
-          Earn MATCH by solving daily puzzles. Spend it on hints, streak freezes, and tips —
-          every move is anchored on the Usernode chain.
-        </div>
-      </div>
-
-      {/* Identity / linked wallet (optional — MATCH itself is in-app) */}
-      {d.addr && (
-        <div className="wallet-card">
-          <div className="wallet-card-title">
-            Connected Wallet
-            {d.identityVerified
-              ? <span className="dapp-identity-badge">✓ Verified identity</span>
-              : <span className="dapp-identity-badge unproven">Linked (unproven)</span>}
-          </div>
-          <div className="wallet-addr-row">
-            <span className="wallet-addr mono">{d.addr}</span>
-            <button
-              className="primary-btn"
-              style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
-              onClick={handleCopy}
-            >{copied ? 'Copied!' : 'Copy'}</button>
-          </div>
-          <div className="dapp-wallet-btns">
-            {!d.identityVerified && (
-              <button className="primary-btn" disabled={proving}
-                style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem' }}
-                onClick={handleProve}>
-                {proving ? 'Signing…' : 'Prove ownership'}
-              </button>
-            )}
-            <button className="primary-btn"
-              style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-              onClick={handleDisconnect}>
-              Disconnect
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Streak freeze — now priced in MATCH */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">Streak Freeze</div>
-        <div style={{ fontSize: '0.88rem', marginBottom: '0.6rem' }}>
-          You have <strong style={{ color: C.gold }}>{d.streakFreezes}</strong> freeze{d.streakFreezes === 1 ? '' : 's'} banked.
-          A freeze protects your streak against one missed day.
-        </div>
-        {freezeMsg && (
-          <div style={{ fontSize: '0.82rem', color: C.emerald, marginBottom: '0.5rem' }}>{freezeMsg}</div>
-        )}
-        <button
-          className="primary-btn"
-          disabled={buyingFreeze || !canAffordFreeze}
-          onClick={handleBuyFreeze}
-          style={!canAffordFreeze ? { opacity: 0.45, cursor: 'not-allowed' } : { background: C.gold + 'cc' }}
-        >
-          {buyingFreeze ? 'Purchasing…' : `Buy Freeze (${freezePrice} MATCH)`}
-        </button>
-        {!canAffordFreeze && <div className="wallet-freeze-info">Earn more MATCH by solving daily puzzles first.</div>}
-      </div>
-
-      {/* Recent activity */}
-      {d.recent && d.recent.length > 0 && (
-        <div className="wallet-card">
-          <div className="wallet-card-title">Recent Activity</div>
-          {d.recent.map((ev, i) => {
-            const positive = ev.amount > 0;
-            const labels = {
-              earn: '🪙 Daily win',
-              spend_hint: '💡 Hint',
-              spend_freeze: '🧊 Streak freeze',
-              tip_received: '💰 Tip received',
-              tip_sent: '→ Tip sent',
-              migration: '↪ Converted from $UTGO',
-            };
-            const label = labels[ev.kind] || ev.kind;
-            const amtClass = positive ? 'wallet-activity-earned' : 'wallet-activity-tip-sent';
-            const anchorTag = ev.anchor_status === 'anchored'
-              ? <span style={{ fontSize: '0.66rem', color: C.emerald, marginLeft: '0.4rem' }} title={ev.anchor_tx_hash || ''}>⛓️ on-chain ✓</span>
-              : ev.anchor_status === 'migration'
-                ? null
-                : <span style={{ fontSize: '0.66rem', color: C.muted, marginLeft: '0.4rem' }}>⛓️ demo</span>;
-            return (
-              <div className="wallet-activity-row" key={i}>
-                <span className="wallet-activity-kind">{label}{anchorTag}</span>
-                <span className={`wallet-activity-amt ${amtClass}`}>{positive ? '+' : ''}{ev.amount} MATCH</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* MATCH on-chain activity */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">MATCH activity</div>
-        {matchLedger == null ? (
-          <div className="match-activity-empty">Loading…</div>
-        ) : matchLedger.length === 0 ? (
-          <div className="match-activity-empty">No MATCH movements yet — buy a hint or win a duel to see on-chain activity here.</div>
-        ) : (
-          <div className="match-activity-list">
-            {matchLedger.map(e => (
-              <div className="match-activity-row" key={e.id}>
-                <div className="match-activity-main">
-                  <span className="match-activity-what">{matchLedgerLabel(e)}</span>
-                  <span className="match-activity-sub">
-                    <MatchExplorerLink txHash={e.txHash} status={e.status} />
-                  </span>
-                </div>
-                <span className={`match-activity-amt ${e.action}`}>
-                  {e.action === 'earn' ? '+' : '−'}{e.amount} 🪙
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Human label for a MATCH ledger row.
-function matchLedgerLabel(e) {
-  const names = {
-    cryptowordle: 'Crypto Wordle', sudoku: 'Mini Sudoku', wordhunt: 'Word Hunt',
-    tilematchingdaily: 'Daily Tile Match', tilematching: 'Tile Match task',
-    tilematch_pvp: 'Tile Match duel', match: 'MATCH',
-  };
-  const where = names[e.gameId] || e.gameId || 'MATCH';
-  return e.action === 'earn' ? `Earned · ${where}` : `Hint · ${where}`;
-}
-
-/* ============================================================
    DApp Mode — Verified badge, session receipt, verified leaderboard
    ============================================================ */
 function shortHash(h) {
@@ -16060,7 +12519,6 @@ function VerifiedLeaderboard({ gameId, onOpenReceipt }) {
 function ProfileScreen({ userId, user: loggedInUser, onBack }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showTip, setShowTip] = useState(false);
 
   const loadProfile = async () => {
     const { ok, body } = await api(`/api/social/profile/${userId}`);
@@ -16139,23 +12597,6 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
               >
                 {profile.following ? 'Unfollow' : 'Follow'}
               </button>
-              <button
-                className="primary-btn"
-                disabled={!profile.walletLinked}
-                title={!profile.walletLinked ? "This user hasn't set up a wallet yet" : `Tip ${profile.user.username}`}
-                style={{
-                  padding: '0.4rem 0.9rem',
-                  background: profile.walletLinked ? C.gold + 'cc' : C.surface,
-                  border: `1px solid ${profile.walletLinked ? C.gold : C.border}`,
-                  color: profile.walletLinked ? C.bg : C.muted,
-                  cursor: profile.walletLinked ? 'pointer' : 'not-allowed',
-                  fontSize: '0.85rem',
-                  opacity: profile.walletLinked ? 1 : 0.5,
-                }}
-                onClick={() => profile.walletLinked && setShowTip(true)}
-              >
-                🪙 Tip
-              </button>
             </div>
           )}
         </div>
@@ -16196,33 +12637,8 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
             <span style={{ color: C.muted }}>Following:</span>{' '}
             <span style={{ fontWeight: 600, color: C.accent }}>{profile.followingCount}</span>
           </p>
-          {profile.tipsReceivedMatch > 0 && (
-            <p style={{ margin: '0.5rem 0' }}>
-              <span style={{ color: C.muted }}>Tips received:</span>{' '}
-              <span style={{ fontWeight: 600, color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
-                {profile.tipsReceivedMatch} MATCH
-              </span>
-            </p>
-          )}
-          {profile.recentTippers && profile.recentTippers.length > 0 && (
-            <div style={{ marginTop: '0.5rem' }}>
-              <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: '0.25rem' }}>Recent tips:</div>
-              {profile.recentTippers.slice(0, 3).map((t, i) => (
-                <div key={i} style={{ fontSize: '0.82rem', color: C.text }}>
-                  {t.fromUserId} → <span style={{ color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>{t.amount} MATCH</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
-      {showTip && (
-        <TipModal
-          toUser={profile.user}
-          onClose={() => setShowTip(false)}
-          onSuccess={loadProfile}
-        />
-      )}
     </div>
   );
 }
@@ -17470,7 +13886,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   return (
     <div>
       {resumeOffer && (
-        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />
+        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
       )}
       <div className="status-bar">
         <div className="pill">
@@ -18113,7 +14529,7 @@ const GAMES = [
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Solve a daily stack of crypto words — clues unlock as you go, or buy a hint.',
+    desc: 'Solve a daily stack of crypto words — clues unlock as you go, or use a free hint.',
     tag: 'Web3',
     tagColor: C.emerald,
     component: CryptoWordleGame,
@@ -18220,19 +14636,6 @@ const GAMES = [
     component: DiamondRushGame,
   },
   {
-    id: 'texas',
-    name: "Texas Hold 'Em",
-    icon: '🃏',
-    category: 'classic',
-    shell: 'self',
-    desc: 'Heads-up poker vs the computer. Bet smart and take all the chips.',
-    tag: 'Cards',
-    tagColor: C.gold,
-    component: TexasHoldemGame,
-    modes: ['bot'],
-    supportsSave: true,
-  },
-  {
     id: 'tilematching',
     name: 'Tile Match Puzzle',
     icon: '🀄',
@@ -18299,28 +14702,6 @@ const GAMES = [
     tag: 'Puzzle',
     tagColor: C.accent,
     component: TileMatchingDailyGame,
-  },
-  {
-    id: 'idle',
-    name: 'Idle Empire',
-    icon: '🐹',
-    category: 'classic',
-    shell: 'classic',
-    desc: 'Tap, upgrade, and build your hamster empire with prestige rewards.',
-    tag: 'Idle',
-    tagColor: C.gold,
-    component: IdleGame,
-  },
-  {
-    id: 'pvp-arena',
-    name: 'PvP Arena',
-    icon: '⚔️',
-    category: 'classic',
-    shell: 'custom',
-    desc: 'Stake MATCH and compete head-to-head. Winner takes 90% of the pot.',
-    tag: 'Wager',
-    tagColor: C.rose,
-    component: () => null,
   },
 ];
 
@@ -18670,14 +15051,13 @@ function BadgesPlaceholder({ state, onRetry }) {
 
 function App() {
   const [screen, setScreen] = useState(() => {
-    // Support ?screen=wallet / ?screen=session deep links for testing
+    // Support ?screen=account / ?screen=session deep links for testing
     const params = new URLSearchParams(window.location.search);
     const s = params.get('screen');
-    if (s === 'wallet') return 'wallet';
     if (s === 'account') return 'account';
     if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'account' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
   const [receiptSessionId, setReceiptSessionId] = useState(() => {
@@ -18713,10 +15093,10 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
-  // Lobby tab: 'daily', 'classic', 'idle', 'pvp', or 'feed' — initialized from ?tab= URL param
+  // Lobby tab: 'daily', 'classic', or 'feed' — initialized from ?tab= URL param
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : t === 'feed' ? 'feed' : 'daily';
+    return t === 'classic' ? 'classic' : t === 'feed' ? 'feed' : 'daily';
   });
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
@@ -18731,12 +15111,8 @@ function App() {
   const [preLaunchGame, setPreLaunchGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
-  // Wallet state (app-level so PvP and nav share one source)
+  // Wallet identity state (linked/verified address shown on the Account screen)
   const [walletAddr, setWalletAddr] = useState(null);
-  const [walletBalance, setWalletBalance] = useState(null); // wei string
-  const [walletMock, setWalletMock] = useState(true);
-  // Global off-chain MATCH token balance, shown in the nav and spent on hints.
-  const [matchBalance, setMatchBalance] = useState(null); // integer, null = loading
   // Share modal for posting wins to feed
   const [shareModal, setShareModal] = useState({ show: false, caption: '' });
   // Badges section toggle (mobile: collapsed by default)
@@ -18792,14 +15168,6 @@ function App() {
 
   useEffect(() => { loadDaily(); }, []);
 
-  // Global MATCH token balance for the nav chip + hint spending. Re-fetchable so
-  // the chip refreshes when returning to the lobby after a Tile Match earn/spend.
-  const loadMatchBalance = React.useCallback(async () => {
-    const { ok, body } = await api('/api/tilematch/wallet');
-    if (ok && body && Number.isFinite(body.balance)) setMatchBalance(body.balance);
-  }, []);
-  useEffect(() => { loadMatchBalance(); }, [loadMatchBalance]);
-
   // dApps-integration status. Degrades gracefully: a failed/absent response
   // leaves the feature disabled (chip stays hidden) rather than erroring.
   useEffect(() => {
@@ -18844,12 +15212,6 @@ function App() {
       } catch {}
     }
 
-    // Fetch on-chain balance.
-    try {
-      const { ok, body } = await api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`);
-      if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
-    } catch {}
-
     return { ok: true, addr, verified };
   }, []);
 
@@ -18872,15 +15234,6 @@ function App() {
     connectAndVerifyWallet();
   }, [connectAndVerifyWallet]);
 
-  // Refresh balance on demand (called after claim/tip)
-  const refreshWalletBalance = () => {
-    if (!walletAddr) return;
-    api(`/api/wallet/balance?addr=${encodeURIComponent(walletAddr)}`)
-      .then(({ ok, body }) => {
-        if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
-      }).catch(() => {});
-  };
-
   // Midnight UTC reached — reload state so everything unlocks.
   const onReset = () => {
     setScreen('lobby');
@@ -18891,7 +15244,7 @@ function App() {
   };
 
   const launchGame = async (game) => {
-    // Non-daily games (classic, idle, PvP) skip the per-day start/lock system.
+    // Non-daily (classic) games skip the per-day start/lock system.
     if (!game.daily) {
       setCurrentGame(game);
       setStepCount(0);
@@ -18952,7 +15305,6 @@ function App() {
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
     if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
-    if (g.shell === 'custom') { setCurrentGame(g); setScreen('game'); return; }
     launchGame(g);
   }, [loading]);
 
@@ -19039,22 +15391,10 @@ function App() {
         return {
           ...prev,
           syncError: false,
-          matchEarned: body && body.matchEarned,
-          matchReceipt: body && body.matchReceipt,
           newAchievements: newAch,
           justAchievement: firstNew ? achievementBadgeFor(firstNew) : prev.justAchievement,
         };
       });
-      // Reflect the new MATCH balance in the nav chip immediately.
-      if (body && body.matchReceipt && Number.isFinite(body.matchReceipt.balanceAfter)) {
-        setMatchBalance(body.matchReceipt.balanceAfter);
-      }
-      // Anchor the MATCH earn on-chain (best-effort), then update the receipt badge.
-      if (body && body.matchReceipt && body.matchReceipt.eventId) {
-        matchAnchor(body.matchReceipt).then(updated => {
-          setWinData(prev => prev ? { ...prev, matchReceipt: updated } : prev);
-        }).catch(() => {});
-      }
       // DApp Mode: surface the Verified badge, then anchor on-chain (best-effort).
       if (body && body.dapp) {
         setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
@@ -19236,46 +15576,16 @@ function App() {
   };
 
   // Game Menu "Save Game": persist the active Versus-Bot game's snapshot via
-  // the generic user_game_state store, then attempt an on-chain hash anchor.
-  // Returns { ok, anchored } — the on-chain step is fire-and-continue; a tx
-  // failure still returns ok:true as long as the server save succeeded.
+  // the generic user_game_state store.
   const handleSaveGame = async () => {
-    if (!currentGame) return { ok: false, anchored: false };
+    if (!currentGame) return { ok: false };
     const snap = ClassicBridge.getSnapshot ? ClassicBridge.getSnapshot() : null;
-    if (!snap) return { ok: false, anchored: false };
-    const { ok, body } = await api(`/api/state/${currentGame.id}`, {
+    if (!snap) return { ok: false };
+    const { ok } = await api(`/api/state/${currentGame.id}`, {
       method: 'PUT',
       body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...snap } }),
-    }).catch(() => ({ ok: false, body: null }));
-    if (!ok) return { ok: false, anchored: false };
-
-    // Attempt on-chain anchor: send 0-value tx with the save hash as calldata,
-    // mirroring the dappAnchor pattern. Silently skipped in mock/no-wallet mode.
-    let anchored = false;
-    try {
-      const saveHash = body && body.saveHash;
-      const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-        ? !(await window.usernode.isMockEnabled())
-        : false;
-      if (saveHash && window.usernode && window.usernode.sendTransaction && bridgeMockOff) {
-        const userAddr = window.usernode.getNodeAddress
-          ? await window.usernode.getNodeAddress()
-          : null;
-        if (userAddr) {
-          const tx = await window.usernode.sendTransaction({ to: userAddr, data: '0x' + saveHash, value: 0 });
-          const txHash = tx && tx.hash ? tx.hash : null;
-          if (txHash) {
-            await api(`/api/state/${currentGame.id}/anchor/confirm`, {
-              method: 'POST',
-              body: JSON.stringify({ txHash }),
-            }).catch(() => {});
-            anchored = true;
-          }
-        }
-      }
-    } catch (_e) { /* on-chain step is optional — save already succeeded */ }
-
-    return { ok: true, anchored };
+    }).catch(() => ({ ok: false }));
+    return { ok: !!ok };
   };
 
   // Build the menu config passed into ClassicShell for classic games.
@@ -19322,19 +15632,6 @@ function App() {
   const renderGameBody = () => {
     if (!currentGame) return null;
     switch (currentGame.shell) {
-      case 'custom':
-        // Bespoke screen (e.g. PvP Arena) — App owns the layout, not `component`.
-        return (
-          <div className="game-wrap">
-            <div className="game-head">
-              <button className="back-btn" onClick={backToLobby}>← Back</button>
-              <div className="game-title">
-                <span>{currentGame.icon}</span> {currentGame.name}
-              </div>
-            </div>
-            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
-          </div>
-        );
       case 'self':
         // Full-screen, gesture-first game that renders its own ClassicShell.
         return (
@@ -19399,8 +15696,6 @@ function App() {
               offset={offset}
               savedProgress={progressFor(attempts[currentGame.id])}
               onSaveProgress={handleSaveProgress}
-              matchBalance={matchBalance}
-              onMatchBalanceChange={setMatchBalance}
               resetKey={playAgainKey}
             />
           </div>
@@ -19441,16 +15736,6 @@ function App() {
               </div>
             </div>
           </div>
-          {authOk && (
-            <button
-              className="nav-match-chip"
-              title="MATCH — your in-app currency. Earned from daily wins, spent on hints, freezes & tips. Tap to open your wallet."
-              onClick={() => setScreen('wallet')}
-              style={{ cursor: 'pointer', border: 'none' }}
-            >
-              🪙 {matchBalance == null ? '…' : matchBalance} MATCH
-            </button>
-          )}
           {authOk && (
             <button
               className="primary-btn nav-friends-btn"
@@ -19500,18 +15785,6 @@ function App() {
         />
       )}
 
-      {screen === 'wallet' && (
-        <WalletScreen
-          user={user}
-          authOk={authOk}
-          walletAddr={walletAddr}
-          walletMock={walletMock}
-          onBack={() => setScreen('lobby')}
-          onBalanceRefresh={refreshWalletBalance}
-          onOpenReceipt={openReceipt}
-        />
-      )}
-
       {screen === 'account' && (
         <AccountScreen
           user={user}
@@ -19523,8 +15796,6 @@ function App() {
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
           onDisconnect={disconnectWallet}
-          matchBalance={matchBalance}
-          walletBalance={walletBalance}
         />
       )}
 
@@ -19579,7 +15850,7 @@ function App() {
               >Feed</button>
             )}
           </div>
-          {authOk && lobbyTab !== 'pvp' && lobbyTab !== 'feed' && (() => {
+          {authOk && lobbyTab !== 'feed' && (() => {
             // Single persistent, collapsible badge panel — rendered directly
             // under the header band (above the game grid) on the Daily and
             // Classic tabs so players find their badges where they expect them.
@@ -19607,11 +15878,7 @@ function App() {
             // to the real panel on success.
             <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
           )}
-          {lobbyTab === 'pvp' ? (
-            PVP_ENABLED
-              ? <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />
-              : <PvpReturningSoon />
-          ) : lobbyTab === 'feed' ? (
+          {lobbyTab === 'feed' ? (
             <FeedScreen user={user} setScreen={setScreen} />
           ) : (
           <div className="grid">
@@ -19627,7 +15894,6 @@ function App() {
                   style={{ '--accent': g.tagColor }}
                   onClick={() => {
                     if (loading) return;
-                    if (g.shell === 'custom') { setCurrentGame(g); return; }
                     if (g.preLaunchModal) { setPreLaunchGame(g); return; }
                     launchGame(g);
                   }}
@@ -19743,28 +16009,6 @@ function App() {
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
-              {winData.matchEarned > 0 && !winData.isClassic && (
-                <div className="win-reward-row">
-                  <span className="k">🪙 MATCH earned</span>
-                  <span className="v">+{winData.matchEarned} MATCH</span>
-                </div>
-              )}
-              {winData.matchReceipt && !winData.isClassic && (
-                <div className="win-reward-row" style={{ fontSize: '0.74rem' }}>
-                  <span className="k">
-                    {winData.matchReceipt.anchorStatus === 'anchored'
-                      ? '⛓️ On-chain ✓'
-                      : winData.matchReceipt.anchorStatus === 'pending'
-                        ? '⛓️ Anchoring…'
-                        : '⛓️ Demo — not anchored'}
-                  </span>
-                  <span className="v mono">
-                    {winData.matchReceipt.anchorTxHash
-                      ? shortHash(winData.matchReceipt.anchorTxHash)
-                      : (winData.matchReceipt.chainHash ? shortHash(winData.matchReceipt.chainHash) : '—')}
-                  </span>
-                </div>
-              )}
               {winData.isClassic && winData.bestScore !== undefined && (
                 <div className="score-row">
                   <span className="k">Best score</span>

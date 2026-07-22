@@ -4511,10 +4511,27 @@ function hashStr(s) {
   return h >>> 0;
 }
 
+// Server-issued daily seeds (phase 2), keyed by gameId. Populated by loadDaily
+// from GET /api/daily (or GET /api/public/daily when signed out) BEFORE any
+// game can mount, and refreshed from the /start response so a client that sat
+// on the lobby across the UTC reset still mounts the new day's board. When a
+// seed is missing (partial deploy, network hiccup) the legacy day-number
+// derivation below keeps the board renderable — and because the server's
+// generation policy currently issues that same legacy value, both paths agree.
+let SERVER_DAILY_SEEDS = {};
+function serverDailySeed(gameId) {
+  const s = SERVER_DAILY_SEEDS[gameId];
+  return Number.isFinite(s) ? s : null;
+}
+
 // A fresh seeded RNG for (today, gameId). Everyone on the same UTC day gets the
 // identical board for each game — the precondition for a fair leaderboard.
+// Prefers the server-issued seed; mulberry32 stays the downstream generator
+// either way, so game code is untouched by the server-seed flip.
 function dailyRng(offset, gameId) {
-  return mulberry32((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+  const srv = serverDailySeed(gameId);
+  const seed = srv != null ? srv : ((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+  return mulberry32(seed >>> 0);
 }
 
 // Mancala Daily Challenge opening board, derived from the server-anchored UTC
@@ -10993,7 +11010,10 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   // present so a resumed attempt restores the exact tiles/bar/moves/boosters
   // and continues the timer from where it stopped.
   useEffect(() => {
-    const seed = boardSeedOverride != null ? boardSeedOverride : (dayNum * 31 + 7);
+    // Server-issued seed first (phase 2); legacy dayNum derivation as fallback.
+    const srvSeed = serverDailySeed('tilematchingdaily');
+    const seed = boardSeedOverride != null ? boardSeedOverride
+      : (srvSeed != null ? srvSeed : (dayNum * 31 + 7));
     const freshTiles = tmGenerateLevel(TM_DAILY_CONFIG, seed);
     const resume = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.tiles)
       ? savedProgress
@@ -11005,6 +11025,9 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
       setSecs(Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0);
       setBoosters(resume.boosters ? { ...resume.boosters } : { ...TM_DAILY_CONFIG.boosters });
       setHintsApplied(Number.isFinite(resume.hintsApplied) ? resume.hintsApplied : 0);
+      // A resumed run's earlier taps predate this mount — the move log is
+      // incomplete, so the finish can't be replay-validated (tier B instead).
+      if (onMoveTile) onMoveTile({ replayBreak: 'resume', tsClient: Date.now() });
     } else {
       setTiles(freshTiles);
       setBar([]);
@@ -11159,6 +11182,9 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     setLastBarEntry(null);
     setBoosters(b => ({ ...b, undo: b.undo - 1 }));
     setBarFull(false);
+    // Boosters aren't modeled by the server replay engine — mark the run
+    // replay-ineligible (finish falls back to tier-B heuristics).
+    if (onMoveTile) onMoveTile({ replayBreak: 'undo', tsClient: Date.now() });
   };
 
   const doShuffle = () => {
@@ -11178,6 +11204,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     });
     setTiles(tilesCopy);
     setBoosters(b => ({ ...b, shuffle: b.shuffle - 1 }));
+    if (onMoveTile) onMoveTile({ replayBreak: 'shuffle', tsClient: Date.now() });
   };
 
   const doClearMode = () => {
@@ -11199,6 +11226,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     setBoosters(b => ({ ...b, clear: b.clear - 1 }));
     setClearSlotMode(false);
     setBarFull(false);
+    if (onMoveTile) onMoveTile({ replayBreak: 'clear-slot', tsClient: Date.now() });
   };
 
   const cfg = TM_DAILY_CONFIG;
@@ -14497,6 +14525,12 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
   );
 }
 
+// Each entry also carries the Game Corner harness `manifest` (phase 2),
+// mirrored by id in server.js's GAME_REGISTRY — machine-relevant fields
+// (scoreDirection / tieBreak / sessionLength / input / undo) must match the
+// server; `howToPlay` card copy lives ONLY here (display strings are the
+// client's). Phase 3's shell-owned pre-game chrome renders these cards; until
+// then they're declarative metadata.
 const GAMES = [
   {
     id: 'sudoku',
@@ -14508,6 +14542,12 @@ const GAMES = [
     desc: 'Fill the 6×6 grid so every row, column, and box has 1–6.',
     tag: 'Logic',
     tagColor: C.accent,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Fill the grid', body: 'Tap a cell, then pick a number 1–6. Every row, column, and 2×3 box must contain each number exactly once.' },
+      { title: 'Change your mind freely', body: 'Tap a filled cell to overwrite it — wrong entries cost steps, not the game.' },
+      { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone gets the same board today.' },
+    ],
     component: SudokuGame,
   },
   {
@@ -14520,6 +14560,12 @@ const GAMES = [
     desc: 'Find every hidden word in the letter grid.',
     tag: 'Word',
     tagColor: C.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag', undo: 'none' },
+    howToPlay: [
+      { title: 'Find the words', body: 'Drag across the letter grid to select a word — horizontally, vertically, or diagonally, forwards or backwards.' },
+      { title: 'Clear the list', body: 'Find every listed word to solve the puzzle. Stray drags count as steps, so aim carefully.' },
+      { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone hunts the same grid today.' },
+    ],
     component: WordHuntGame,
   },
   {
@@ -14532,6 +14578,12 @@ const GAMES = [
     desc: 'Solve a daily stack of crypto words — clues unlock as you go, or use a free hint.',
     tag: 'Web3',
     tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
+    howToPlay: [
+      { title: 'Guess the word', body: 'Type a guess and submit. Green = right letter, right spot; gold = right letter, wrong spot.' },
+      { title: 'Work the stack', body: "Today's puzzle is a stack of crypto words — solve one to unlock the next. Clues unlock as you go, and free hints are capped per day." },
+      { title: 'Careful', body: 'Run out of guesses on any word and the day is lost — the board locks until the next UTC reset.' },
+    ],
     component: CryptoWordleGame,
   },
   {
@@ -14543,6 +14595,11 @@ const GAMES = [
     desc: 'Clear the 8×8 grid of mines. Cash Out early to lock in a risk multiplier.',
     tag: 'Risk',
     tagColor: C.rose,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Clear the field', body: 'Tap to reveal a cell; numbers tell you how many mines touch it. Long-press to flag suspected mines.' },
+      { title: 'Cash out or push on', body: 'Cash Out early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
+    ],
     component: MinesweeperGame,
   },
   {
@@ -14554,6 +14611,11 @@ const GAMES = [
     desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
     tag: 'Strategy',
     tagColor: C.gold,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Sow your stones', body: 'Tap one of your pits to scoop its stones and drop them one-by-one counter-clockwise. Landing in your store banks a stone and earns another turn.' },
+      { title: 'Capture', body: 'Land your last stone in an empty pit on your side to capture it plus everything opposite. Most stones banked when a side empties wins.' },
+    ],
     component: MancalaGame,
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
@@ -14567,6 +14629,11 @@ const GAMES = [
     desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
     tag: 'Board',
     tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; chutes drop you back.' },
+      { title: 'First to 100 wins', body: 'Play the bot, a hotseat friend, or online via room code. Win streaks climb the leaderboard.' },
+    ],
     component: ChutesLaddersGame,
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
@@ -14583,6 +14650,11 @@ const GAMES = [
     desc: 'Slide tiles to merge numbers and reach 2048.',
     tag: 'Numbers',
     tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'swipe', undo: 'none' },
+    howToPlay: [
+      { title: 'Slide and merge', body: 'Swipe to slide every tile. Two matching tiles merge into their sum — chase 2048 and beyond.' },
+      { title: "Don't jam the board", body: 'A new tile appears after every move. The run ends when no merges are left.' },
+    ],
     component: T2048Game,
     modes: ['solo', 'online'],
     preLaunchModal: true,
@@ -14597,6 +14669,11 @@ const GAMES = [
     desc: "Move a chess knight to visit all 64 squares exactly once.",
     tag: 'Puzzle',
     tagColor: C.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Tour the board', body: 'Move the knight in its L-shape to squares it has never visited. Visit all 64 exactly once for a full tour.' },
+      { title: 'Undo freely', body: 'Stuck? Step back with Undo and try a different route — longer tours score higher.' },
+    ],
     component: KnightsTourGame,
   },
   {
@@ -14608,6 +14685,11 @@ const GAMES = [
     desc: 'Swipe to steer, eat to grow, and chase a high score without crashing.',
     tag: 'Arcade',
     tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    howToPlay: [
+      { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. Eat food to grow and score.' },
+      { title: 'Stay alive', body: 'Hitting a wall or your own tail ends the run. Longer snakes and faster modes score more.' },
+    ],
     component: SnakeGame,
   },
   {
@@ -14619,6 +14701,11 @@ const GAMES = [
     desc: 'Drag blocks onto the grid and clear full lines. How long can you last?',
     tag: 'Puzzle',
     tagColor: C.accent,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'drag', undo: 'none' },
+    howToPlay: [
+      { title: 'Place the pieces', body: 'Drag each offered block onto the grid anywhere it fits. Fill a full row or column to clear it.' },
+      { title: 'Keep space open', body: 'The run ends when no offered piece fits. Multi-line clears and combos score big.' },
+    ],
     component: BlockBlastGame,
     modes: ['solo', 'online'],
     preLaunchModal: true,
@@ -14633,6 +14720,11 @@ const GAMES = [
     desc: 'Swap gems to line up 3+ and cascade your way to the target score.',
     tag: 'Match',
     tagColor: C.rose,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Swap to match', body: 'Tap two adjacent gems to swap them. Line up 3 or more of a kind to clear them.' },
+      { title: 'Chase cascades', body: 'Cleared gems drop new ones — chains cascade for bonus points. Hit the target score before time runs out.' },
+    ],
     component: DiamondRushGame,
   },
   {
@@ -14644,6 +14736,11 @@ const GAMES = [
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
     tagColor: C.accent,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'booster' },
+    howToPlay: [
+      { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind in the bar clear automatically.' },
+      { title: 'Mind the bar', body: 'If the bar fills with no match, the round is lost. Undo, shuffle, and clear-slot boosters are limited — spend them wisely.' },
+    ],
     component: TileMatchingGame,
   },
   {
@@ -14655,6 +14752,11 @@ const GAMES = [
     desc: "Smash every brick with a bouncing ball. Don't let it fall — climb the leaderboard.",
     tag: 'Arcade',
     tagColor: C.rose,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'drag', undo: 'none' },
+    howToPlay: [
+      { title: 'Keep it up', body: 'Drag the paddle to keep the ball in play and smash every brick.' },
+      { title: 'Clear the wall', body: 'Some bricks take multiple hits. Lose the ball and the run ends — full clears score best.' },
+    ],
     component: BounceGame,
   },
   {
@@ -14666,6 +14768,11 @@ const GAMES = [
     desc: 'Shoot colored balls to match 3 in a row before the chain reaches the skull.',
     tag: 'Arcade',
     tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Shoot to match', body: 'Aim and tap to fire a colored ball into the moving chain. Three or more of a color clear.' },
+      { title: 'Beat the chain', body: 'Clear the whole chain before it reaches the skull. Gaps and combos multiply your score.' },
+    ],
     component: ZumaGame,
   },
   {
@@ -14677,6 +14784,11 @@ const GAMES = [
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
     tagColor: C.gold,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Swap to match', body: 'Tap two adjacent pieces to swap. Match 3+ to clear them and rack up points.' },
+      { title: 'Beat each level', body: 'Every level has a target score under move and time limits. 50 levels — progress saves as you go.' },
+    ],
     component: Match3Game,
   },
   {
@@ -14688,6 +14800,11 @@ const GAMES = [
     desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
     tag: 'Crypto',
     tagColor: C.gold,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    howToPlay: [
+      { title: 'Dodge and collect', body: 'Steer your miner between lanes — grab hash tokens, dodge the invalid blocks.' },
+      { title: 'Survive', body: 'The chain speeds up the longer you last. One collision ends the run.' },
+    ],
     component: HashRushGame,
     leaderboard: true,
   },
@@ -14701,6 +14818,12 @@ const GAMES = [
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',
     tag: 'Puzzle',
     tagColor: C.accent,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'booster' },
+    howToPlay: [
+      { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind clear automatically.' },
+      { title: 'Beat the clock', body: 'Clear the whole layered board in 3 minutes. A full bar with no match loses the day.' },
+      { title: 'Boosters', body: 'Undo, shuffle, and clear-slot are limited per day — everyone plays the same board, so spend them wisely.' },
+    ],
     component: TileMatchingDailyGame,
   },
 ];
@@ -15127,6 +15250,23 @@ function App() {
     return () => clearInterval(id);
   }, []);
 
+  // Per-run daily move log (phase 2). Every daily game feeds move events with
+  // client timestamps into this ref — the Daily Tile Match via its native
+  // onMoveTile (engine-shaped { tileType } moves, replay-eligible), the other
+  // dailies via their onStepChange calls (timestamp-only events for the
+  // server's tier-B timing heuristics). `replayOk` goes false when the run
+  // can't be fully replayed server-side: a resume (earlier moves predate this
+  // mount) or a booster (not modeled by the replay engine). Submitted with
+  // /finish; reset by launchGame so a retry re-sends the same log.
+  const dailyRunLog = useRef({ moves: [], replayOk: true });
+  const recordDailyMove = (m) => {
+    const log = dailyRunLog.current;
+    if (m && m.replayBreak) log.replayOk = false;
+    if (log.moves.length < 800) {
+      log.moves.push({ ...m, tsClient: m && m.tsClient != null ? m.tsClient : Date.now() });
+    }
+  };
+
   // Hydrate today's locked/result state from the server on mount, and
   // recompute the score from finished attempts so it survives reloads.
   const loadDaily = async () => {
@@ -15146,6 +15286,9 @@ function App() {
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
         ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
         : { types: [], milestones: [] });
+      // Server-issued daily seeds — must land before any daily game mounts
+      // (they do: games launch from the lobby, which renders after loading).
+      SERVER_DAILY_SEEDS = body.seeds || {};
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -15162,6 +15305,17 @@ function App() {
       setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [] });
+      // Signed-out (or backend hiccup): the public read surface still supplies
+      // server time, the reset countdown, and today's board seeds, so the
+      // signed-out lobby stays anchored to server time.
+      try {
+        const pub = await api('/api/public/daily');
+        if (pub.ok && pub.body) {
+          SERVER_DAILY_SEEDS = pub.body.seeds || {};
+          if (pub.body.nextResetUtc) setNextResetUtc(pub.body.nextResetUtc);
+          if (pub.body.serverNowUtc) setOffset(new Date(pub.body.serverNowUtc).getTime() - Date.now());
+        }
+      } catch {}
     }
     setLoading(false);
   };
@@ -15261,7 +15415,10 @@ function App() {
         setScreen('locked');
       } else {
         // Claimed but unfinished — resume into the saved board state. The row
-        // is already claimed, so do NOT call /start again.
+        // is already claimed, so do NOT call /start again. A resumed run's
+        // earlier moves predate this page load, so its finish can't be
+        // replay-validated (server falls back to tier-B heuristics).
+        dailyRunLog.current = { moves: [], replayOk: false };
         setCurrentGame(game);
         setStepCount(existing.steps || 0);
         setWinData(null);
@@ -15271,8 +15428,12 @@ function App() {
       return;
     }
     const { ok, status, body } = await api(`/api/daily/${game.id}/start`, { method: 'POST' });
+    // Merge the seed issued with the claim — covers a client that sat on the
+    // lobby across the UTC reset, whose mount-time seeds are yesterday's.
+    if (body && Number.isFinite(body.seed)) SERVER_DAILY_SEEDS[game.id] = body.seed;
     if (ok) {
       if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
+      dailyRunLog.current = { moves: [], replayOk: true };
       setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
       setCurrentGame(game);
       setStepCount(0);
@@ -15283,6 +15444,7 @@ function App() {
       // Lost the race / already locked — show the locked screen.
       if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
       if (body && body.attempt) setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
+      dailyRunLog.current = { moves: [], replayOk: false };
       setCurrentGame(game);
       setScreen(body && body.attempt && !body.attempt.finishedAt ? 'game' : 'locked');
     }
@@ -15342,9 +15504,19 @@ function App() {
   const submitDailyFinish = async (gameId, finalScore, steps, timeSecs) => {
     let ok = false, body = null;
     try {
+      // Attach the per-run move log (phase 2): engine-shaped moves make the
+      // finish replay-validatable (tier A); timestamp-only events feed the
+      // server's tier-B timing heuristics. The ref survives until the next
+      // launchGame, so the overlay's retry re-sends the identical log.
+      const log = dailyRunLog.current;
+      const moves = log.moves.slice(0, 800);
       const res = await api(`/api/daily/${gameId}/finish`, {
         method: 'POST',
-        body: JSON.stringify({ score: finalScore, steps, timeSecs }),
+        body: JSON.stringify({
+          score: finalScore, steps, timeSecs,
+          moves,
+          replay: log.replayOk && moves.some(m => Number.isInteger(m.tileType)),
+        }),
       });
       ok = res.ok; body = res.body;
     } catch (e) {
@@ -15679,8 +15851,13 @@ function App() {
         );
       }
       case 'daily':
-      default:
+      default: {
         // Daily puzzle (and any back-header game-wrap game): resumable, locked.
+        // The Daily Tile Match reports its own engine-shaped moves through
+        // onMoveTile; the other dailies get their onStepChange calls recorded
+        // as timestamp-only events (recording BOTH for the tile match would
+        // double every tap in the log and skew the timing heuristics).
+        const logsOwnMoves = currentGame.id === 'tilematchingdaily';
         return (
           <div className="game-wrap">
             <div className="game-head">
@@ -15692,7 +15869,11 @@ function App() {
             <GameComponent
               onWin={handleWin}
               onLose={handleLose}
-              onStepChange={setStepCount}
+              onStepChange={logsOwnMoves ? setStepCount : (n) => {
+                recordDailyMove({ k: 'step' });
+                setStepCount(n);
+              }}
+              onMoveTile={logsOwnMoves ? recordDailyMove : undefined}
               offset={offset}
               savedProgress={progressFor(attempts[currentGame.id])}
               onSaveProgress={handleSaveProgress}
@@ -15700,6 +15881,7 @@ function App() {
             />
           </div>
         );
+      }
     }
   };
 

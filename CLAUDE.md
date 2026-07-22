@@ -69,12 +69,20 @@ purpose.
   from `initialSecs` and returns `{ secs, fmt }`. Pass `!done` so it
   stops when the round ends; pass a saved elapsed value as `initialSecs`
   to **resume** the timer where a player left off.
-- **Deterministic daily boards:** all daily games derive their board
-  from a **seeded PRNG keyed on the server-anchored UTC day** so every
-  player gets the same puzzle (the precondition for a fair leaderboard).
-  Use `dailyRng(offset, gameId)` (built on `mulberry32` + `utcDayNum`)
-  and thread it through your generator instead of `Math.random()`. Never
-  seed from raw `Date.now()` — always the `offset`-corrected day.
+- **Deterministic daily boards — server-issued seeds (phase 2):** all
+  daily games derive their board from **today's server-issued seed**
+  (the `daily_seeds` table, one row per game per UTC day, created
+  lazily on first request and returned by `GET /api/daily`, `/start`,
+  and the public `GET /api/public/daily`). Use `dailyRng(offset,
+  gameId)` (server seed → `mulberry32`; falls back to the legacy
+  UTC-day derivation when no seed arrived, so a partial deploy can't
+  blank the dailies) and thread it through your generator instead of
+  `Math.random()`. Never seed from raw `Date.now()`. NOTE: the
+  server's seed **generation policy currently issues the
+  legacy-derivation value** (`legacyDailySeed` in `server.js`) so both
+  paths agree byte-for-byte; switching to unpredictable per-day seeds
+  is a server-side knob for the Game-of-the-Day phase — flip it only
+  at a UTC boundary.
 - **Adding a game** (the extension point): write an
   `XxxGame({ onWin, onStepChange })` component that
   - renders a `.status-bar` of `.pill`s for its live stats,
@@ -262,6 +270,53 @@ The streak multiplies points via **tiers**, defined once in
   multiplier in `finish` instead of trusting the client `finalScore`)
   matters only if a leaderboard ships; the displayed multi-day streak
   has **no** grace-day/freeze — a missed UTC day resets it to 0.
+
+## Game Corner phase 2 — harness formalization
+
+Phase 2 of the Game Corner evolution added four things; keep them in
+mind when touching the daily flow:
+
+- **Registry manifest metadata.** Both `GAME_REGISTRY` (`server.js`)
+  and `GAMES` (`public/app.jsx`) now carry a per-game `manifest`:
+  `{ scoreDirection, tieBreak, sessionLength, input, undo }` — the
+  machine-relevant fields **must match by id across the two files**.
+  The client entries additionally carry `howToPlay` card copy
+  (`[{ title, body }, …]`), consumed by phase 3's shell-owned pre-game
+  chrome; until then it's declarative. `tieBreak` is the symbolic rule
+  the leaderboard SQL implements (`'time-then-steps'` for dailies,
+  `'first-to-score'` for classic all-time boards) — parameterize the
+  SQL off it when the daily pool widens beyond fastest-solve games.
+- **Server-issued daily seeds.** See "Deterministic daily boards"
+  above. `daily_seeds` is PUBLIC (shared-by-definition data); rows are
+  lazily upserted via `ensureDailySeed`, per-process cached per day.
+- **Daily finishes route through `game_sessions` + `validateSession`.**
+  `POST /api/daily/:gameId/finish` accepts optional `moves`
+  (`[{ …, tsClient }]`, capped at 800) and `replay: bool`, collected
+  client-side by App's shared `dailyRunLog` (the Daily Tile Match
+  reports engine-shaped `{ tileType }` moves via `onMoveTile`; other
+  dailies get their `onStepChange` calls logged as timestamp events).
+  `settleDailySession` then runs **tier A** (full server-side replay
+  re-simulation through `lib/dapp.js`'s engine + hash-chain ledger)
+  when an engine exists and the run is replay-eligible, else **tier B**
+  (snapshot chain + `antiCheat` timing heuristics + a wall-clock
+  plausibility check). Replay eligibility breaks on resume and on
+  boosters (`replayBreak` events) — those runs settle as tier B. A
+  `disputed` verdict never blocks the attempt; it only withholds the
+  win overlay's Verified badge. Sessions are bound to the server
+  daily seed — the anchor phase 8's anonymous-commit check verifies
+  against.
+- **Public read allowlist.** `PUBLIC_API_GET` (regex list next to
+  `PUBLIC_API_PATHS`) opens four GET routes to anonymous callers:
+  `GET /api/public/daily` (server time, reset, seeds, game directory —
+  the signed-out substitute for `GET /api/daily`; the client falls
+  back to it on 401 so the signed-out lobby stays server-anchored),
+  plus the two daily leaderboards and the classic leaderboard (all
+  null-guard `req.user`: anonymous ⇒ `me: null`,
+  `isCurrentUser: false`). Anonymous hits go through a simple
+  in-memory per-IP sliding window (60/min, `publicRateLimited`);
+  token-bearing traffic is not limited. Everything mutating stays
+  deny-by-default — add new public reads to `PUBLIC_API_GET`
+  consciously, with the same null-guard discipline.
 
 ## Retired features (Game Corner phase 1 — do not resurrect)
 

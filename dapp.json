@@ -331,6 +331,16 @@
       "name": "Chutes Ladders leaderboard renders seeded scores",
       "path": "/?game=chutes-ladders&demo=classic-scores",
       "expectText": "Staging demo Ada"
+    },
+    {
+      "name": "Public daily endpoint issues seeds and directory",
+      "path": "/api/public/daily",
+      "expectText": "seeds"
+    },
+    {
+      "name": "Daily leaderboard readable without auth (null-guarded)",
+      "path": "/api/daily/sudoku/leaderboard",
+      "expectText": "entries"
     }
   ]
 }

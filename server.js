@@ -111,25 +111,54 @@ let migrationsReady = false;
 // GAME_IDS is now DERIVED from this registry's daily-category games (the set the
 // per-day attempt routes validate against), and DApp validation keys off the
 // registry too.
+//
+// `manifest` is the Game Corner harness metadata (phase 2), mirrored by id on
+// the client GAMES entries (which additionally carry the How-to-Play card copy
+// — display strings live client-side, machine-relevant fields live here):
+//   scoreDirection — 'higher' | 'lower': which way the leaderboard sorts score.
+//   tieBreak       — symbolic tie-break rule the leaderboard SQL implements:
+//                    'time-then-steps' (daily: time_secs ASC, steps ASC,
+//                    finished_at ASC) or 'first-to-score' (classic all-time:
+//                    best_score, then earliest updated_at wins ties).
+//   sessionLength  — 'short' (<~3 min) | 'medium' (~3–10 min) | 'long' (10+).
+//   input          — primary input paradigm: 'tap' | 'drag' | 'swipe' | 'keyboard'.
+//   undo           — undo policy: 'none' | 'free' (unlimited take-backs) |
+//                    'booster' (limited, counted uses).
 const GAME_REGISTRY = {
-  sudoku:            { category: 'daily',   tier: 'A' },
-  wordhunt:          { category: 'daily',   tier: 'A' },
-  cryptowordle:      { category: 'daily',   tier: 'A' },
-  tilematchingdaily: { category: 'daily',   tier: 'A' },
-  minesweeper:       { category: 'classic', tier: 'A' },
-  mancala:           { category: 'classic', tier: 'A' },
-  'chutes-ladders':  { category: 'classic', tier: 'A' },
-  '2048':            { category: 'classic', tier: 'A' },
-  'knights-tour':    { category: 'classic', tier: 'A' },
-  snake:             { category: 'classic', tier: 'B' },
-  blockblast:        { category: 'classic', tier: 'A' },
-  diamondrush:       { category: 'classic', tier: 'A' },
-  texas:             { category: 'classic', tier: 'C' },
-  tilematching:      { category: 'classic', tier: 'A' },
-  bounce:            { category: 'classic', tier: 'B' },
-  zuma:              { category: 'classic', tier: 'B' },
-  hashrush:          { category: 'classic', tier: 'A' },
-  match3:            { category: 'classic', tier: 'A' },
+  sudoku:            { name: 'Mini Sudoku',       category: 'daily',   tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+  wordhunt:          { name: 'Word Hunt',         category: 'daily',   tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag',     undo: 'none' } },
+  cryptowordle:      { name: 'Crypto Wordle',     category: 'daily',   tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' } },
+  tilematchingdaily: { name: 'Daily Tile Match Puzzle', category: 'daily', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'booster' } },
+  minesweeper:       { name: 'Minesweeper',       category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  mancala:           { name: 'Mancala',           category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+  'chutes-ladders':  { name: 'Chutes & Ladders',  category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+  '2048':            { name: '2048',              category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'swipe',    undo: 'none' } },
+  'knights-tour':    { name: "Knight's Tour",     category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+  snake:             { name: 'Snake',             category: 'classic', tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+  blockblast:        { name: 'Block Blast',       category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'drag',     undo: 'none' } },
+  diamondrush:       { name: 'Diamond Rush',      category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  tilematching:      { name: 'Tile Match Puzzle', category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
+  bounce:            { name: 'Bounce',            category: 'classic', tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
+  zuma:              { name: 'Zuma',              category: 'classic', tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  hashrush:          { name: 'Hash Rush',         category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+  match3:            { name: 'Match-3 Puzzle',    category: 'classic', tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
 };
 // Retired games (Texas Hold 'Em, Idle Empire, the PvP staking arena's
 // tilematch_pvp pseudo-game) are deliberately absent: their routes and lobby
@@ -154,6 +183,75 @@ const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', '
 // their own board; highest final score wins) over classic_rooms.
 const CLASSIC_RACE_GAME_IDS = new Set(['2048', 'blockblast']);
 const CLASSIC_LB_LIMIT = 20;
+
+// ---- Server-issued daily seeds (phase 2 harness) ---------------------------
+// One seed row per (daily game, UTC day) in daily_seeds, created lazily on the
+// first request of the day and returned from GET /api/daily, /start, and the
+// public GET /api/public/daily. The client keeps mulberry32(seed) downstream
+// and falls back to its legacy day-number derivation if no seed arrives, so a
+// partial deploy can never blank the dailies.
+//
+// GENERATION POLICY: the seed VALUE is (for now) the same one the client's
+// legacy derivation produces for that game/day. This makes the server-issued
+// flip a pure seam change — the board is identical before/after deploy even
+// mid-UTC-day, resumed attempts re-derive the same board, and the fallback
+// path agrees byte-for-byte. When Game of the Day ships (phase 7) this becomes
+// the knob to switch to unpredictable per-day seeds — change it only at a UTC
+// boundary.
+
+// FNV-1a string hash — byte-for-byte mirror of hashStr in public/app.jsx.
+function srvHashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// The client's legacy per-game daily seed for a UTC day number. Two formulas
+// exist historically: the Daily Tile Match seeded tmGenerateLevel with
+// dayNum*31+7; the other dailies seed mulberry32 with (dayNum + hashStr(id)).
+function legacyDailySeed(gameId, dayNum) {
+  if (gameId === 'tilematchingdaily') return (dayNum * 31 + 7) >>> 0;
+  return (dayNum + srvHashStr(gameId)) >>> 0;
+}
+
+// Per-process cache so the seed upsert runs once per game per day, not on
+// every /api/daily hit. Keyed by the server's UTC date string.
+let dailySeedCache = { date: null, seeds: {} };
+
+async function ensureDailySeed(gameId) {
+  const { rows: dRows } = await pool.query(
+    `SELECT (now() AT TIME ZONE 'utc')::date AS d`
+  );
+  const d = dRows[0].d; // JS Date at UTC midnight of today's date
+  const dateKey = d.toISOString().slice(0, 10);
+  if (dailySeedCache.date !== dateKey) dailySeedCache = { date: dateKey, seeds: {} };
+  if (Number.isFinite(dailySeedCache.seeds[gameId])) return dailySeedCache.seeds[gameId];
+
+  const dayNum = Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
+  const value = legacyDailySeed(gameId, dayNum);
+  // Upsert-read in one statement: the no-op DO UPDATE makes RETURNING yield
+  // the existing row when another request already claimed the day.
+  const { rows } = await pool.query(
+    `INSERT INTO daily_seeds (game_id, seed_date, seed)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (game_id, seed_date) DO UPDATE SET seed = daily_seeds.seed
+     RETURNING seed`,
+    [gameId, dateKey, value]
+  );
+  const seed = Number(rows[0].seed);
+  dailySeedCache.seeds[gameId] = seed;
+  return seed;
+}
+
+// Today's seeds for every daily game, as { gameId: seed }.
+async function ensureDailySeeds() {
+  const out = {};
+  for (const gameId of GAME_IDS) out[gameId] = await ensureDailySeed(gameId);
+  return out;
+}
 
 // Consecutive-day streak milestones that unlock a named badge. Kept in sync
 // with STREAK_BADGES in public/app.jsx (the client owns the icon/name copy;
@@ -302,6 +400,21 @@ async function migrate() {
   // re-derived from the deterministic daily seed, so only player moves live here.
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
+
+  // daily_seeds is PUBLIC: one server-issued board seed per (daily game, UTC
+  // day). The seed everyone's board derives from — by definition shared data
+  // (every player gets the same deal). Rows are created lazily on the first
+  // request of the day (ensureDailySeed); BIGINT because seeds are unsigned
+  // 32-bit values (up to 2^32−1, past INTEGER's 2^31−1 max).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_seeds (
+      game_id    TEXT NOT NULL,
+      seed_date  DATE NOT NULL,
+      seed       BIGINT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (game_id, seed_date)
+    )
+  `);
 
   // mancala_rooms is PUBLIC — game results contain no sensitive data.
   // One row per multiplayer room; rooms persist until cleaned up.
@@ -2031,6 +2144,45 @@ async function ensureUser(userId, username, usernode_pubkey) {
 const PUBLIC_API_PATHS = new Set(['/health']);
 const PUBLIC_PREFIXES = ['/explorer-api/'];
 
+// GET-only public read allowlist (phase 2 / spec §6.10): the anonymous-play
+// surface. Path PATTERNS (not exact paths) because two of them carry a
+// :gameId segment. Only reads — everything mutating stays behind the gate.
+// Handlers matched here must null-guard req.user (anonymous ⇒ me: null,
+// isCurrentUser: false).
+const PUBLIC_API_GET = [
+  /^\/api\/public\/daily$/,               // anonymous daily state (seeds, directory, server time)
+  /^\/api\/daily\/[A-Za-z0-9_-]+\/leaderboard$/,
+  /^\/api\/daily\/leaderboard\/today$/,
+  /^\/api\/classic\/[A-Za-z0-9_-]+\/leaderboard$/,
+];
+
+// Simple in-memory per-IP sliding window over the public GET surface — the
+// spec's §6.7 rate limit applied exactly where the auth gate no longer
+// protects. Only ANONYMOUS hits count against the window (token-bearing
+// iframe traffic keeps its historical unlimited behaviour). Single-process
+// app, so in-memory suffices; the map is swept when it grows past a bound.
+const PUBLIC_RL_WINDOW_MS = 60_000;
+const PUBLIC_RL_MAX = 60;
+const publicRlBuckets = new Map(); // ip -> [hit timestamps, ascending]
+function publicRateLimited(ip) {
+  const now = Date.now();
+  let hits = publicRlBuckets.get(ip);
+  if (!hits) { hits = []; publicRlBuckets.set(ip, hits); }
+  while (hits.length && now - hits[0] > PUBLIC_RL_WINDOW_MS) hits.shift();
+  if (hits.length >= PUBLIC_RL_MAX) return true;
+  hits.push(now);
+  if (publicRlBuckets.size > 10_000) {
+    for (const [k, v] of publicRlBuckets) {
+      if (!v.length || now - v[v.length - 1] > PUBLIC_RL_WINDOW_MS) publicRlBuckets.delete(k);
+    }
+  }
+  return false;
+}
+function clientIp(req) {
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return fwd || req.ip || 'unknown';
+}
+
 app.use((req, res, next) => {
   const token = req.query.token || req.headers['x-usernode-token'];
   if (token && JWT_SECRET) {
@@ -2043,6 +2195,12 @@ app.use((req, res, next) => {
   if (req.method !== 'GET' || req.path.startsWith('/api/')) {
     if (PUBLIC_API_PATHS.has(req.path)) return next();
     if (PUBLIC_PREFIXES.some((p) => req.path.startsWith(p))) return next();
+    if (req.method === 'GET' && PUBLIC_API_GET.some((re) => re.test(req.path))) {
+      if (!req.user && publicRateLimited(clientIp(req))) {
+        return res.status(429).json({ error: 'Too many requests' });
+      }
+      return next();
+    }
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
   }
   next();
@@ -2615,6 +2773,33 @@ app.post('/api/collab/sessions/:roomId/finish', async (req, res) => {
 // Current UTC-day state for the signed-in user: which games are locked
 // today (with their results), plus server time + next reset so the client
 // can drive a clock-skew-proof countdown.
+// Anonymous substitute for GET /api/daily (public via PUBLIC_API_GET): server
+// time, next reset, today's server-issued seeds, and the game directory from
+// the registry manifest. No user-specific data — a signed-out visitor gets
+// everything needed to render today's boards and browse the directory, per
+// spec §6.10. Side-effect-free beyond the lazy daily_seeds upsert.
+app.get('/api/public/daily', async (_req, res) => {
+  try {
+    const seeds = await ensureDailySeeds();
+    res.json({
+      serverNowUtc: new Date().toISOString(),
+      nextResetUtc: nextResetUtc(),
+      seeds,
+      games: Object.keys(GAME_REGISTRY).map((id) => ({
+        id,
+        name: GAME_REGISTRY[id].name,
+        category: GAME_REGISTRY[id].category,
+        tier: GAME_REGISTRY[id].tier,
+        manifest: GAME_REGISTRY[id].manifest,
+        daily: GAME_REGISTRY[id].category === 'daily',
+      })),
+    });
+  } catch (err) {
+    console.error('[public] daily failed:', err.message);
+    res.status(500).json({ error: 'Failed to load public daily state' });
+  }
+});
+
 app.get('/api/daily', async (req, res) => {
   try {
     // Staging-only fixture: force the "not authenticated" (401) response so the
@@ -2948,6 +3133,12 @@ app.get('/api/daily', async (req, res) => {
     const streak = await computeStreak(req.user.id);
     const badges = await earnedStreakBadges(req.user.id);
     const achievements = await earnedAchievementBadges(req.user.id);
+    // Server-issued daily seeds (phase 2): today's per-game board seeds. The
+    // client derives every daily board from these (mulberry32 downstream),
+    // falling back to its legacy day-number derivation if absent.
+    let seeds = {};
+    try { seeds = await ensureDailySeeds(); }
+    catch (e) { console.warn('[daily] seed issue failed (client falls back):', e.message); }
     // Lifetime won-solve count for the "X/Y solves → milestone" progress hint.
     let solveCount = 0;
     try {
@@ -2981,6 +3172,8 @@ app.get('/api/daily', async (req, res) => {
       // Lifetime won-solve count, drives the solve-milestone progress hint.
       solveCount,
       attempts,
+      // Today's server-issued per-game board seeds ({ gameId: seed }).
+      seeds,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);
@@ -2995,6 +3188,11 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
   const { gameId } = req.params;
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   try {
+    // Issue (or read) today's board seed alongside the claim, so a client that
+    // sat on the lobby across the UTC reset still mounts the new day's board.
+    let seed = null;
+    try { seed = await ensureDailySeed(gameId); }
+    catch (e) { console.warn('[daily] start seed issue failed (client falls back):', e.message); }
     const { rows } = await pool.query(
       `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date)
        VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date)
@@ -3016,14 +3214,136 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
         locked: true,
         nextResetUtc: nextResetUtc(),
         attempt: existing.rows[0] ? shapeAttempt(existing.rows[0]) : null,
+        seed,
       });
     }
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc() });
+    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), seed });
   } catch (err) {
     console.error('[daily] start failed:', err.message);
     res.status(500).json({ error: 'Failed to start attempt' });
   }
 });
+
+// ---- Daily finish → game_sessions + validateSession (phase 2) --------------
+// Routes every daily WIN through the DApp verification pipeline instead of the
+// old unconditional snapshot mint:
+//   Tier A — the game has a registered engine (lib/dapp.js gameEngines) AND
+//     the client submitted a replay-eligible per-move log (`replay: true`,
+//     moves carrying engine-shaped fields): the server RE-SIMULATES the run
+//     (buildLedger replays every move; illegal moves throw), persists the
+//     resulting hash-chain ledger to session_states, and settles via
+//     validateSession — steps must match the engine recompute, timing goes
+//     through the generalized anti-cheat. The multiplied daily score is
+//     deliberately NOT passed as a score claim: the streak multiplier is
+//     applied on top of the engine's base score, so an equality check there
+//     would dispute every legitimate multiplied win.
+//   Tier B — no engine (sudoku / wordhunt / cryptowordle today), or the run
+//     wasn't replay-eligible (resumed mid-run, boosters used, no log): records
+//     the same single-link snapshot chain as before, but the submitted move
+//     TIMESTAMPS now feed dapp.antiCheat heuristics plus a wall-clock
+//     plausibility check (move span vs claimed active time).
+// Sessions are bound to the server-issued daily seed (genesis hash), which is
+// what phase 8's anonymous-commit endpoint will verify against. Never blocks
+// the attempt: a 'disputed' verdict just means no Verified badge.
+async function settleDailySession({ user, gameId, score, steps, timeSecs, moves, replay }) {
+  const seed = await ensureDailySeed(gameId);
+  const sid = newSessionId();
+  await pool.query(
+    `INSERT INTO game_sessions (id, user_id, username, usernode_pubkey, game_id, seed, status)
+     VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
+    [sid, user.id, user.username || null, user.usernode_pubkey || null, gameId, seed]
+  );
+  const session = { id: sid, game_id: gameId, seed, usernode_pubkey: user.usernode_pubkey || null };
+  const engine = dapp.getEngine(gameId);
+  // Replay-eligible moves are the engine-shaped ones (the client's shared move
+  // log also carries plain timestamp events from other games' step hooks).
+  const replayMoves = engine && replay
+    ? moves.filter((m) => m && Number.isInteger(m.tileType))
+    : [];
+
+  if (engine && replay && replayMoves.length > 0) {
+    // Tier A: full server-side replay re-simulation.
+    let verdict; let entries = [];
+    try {
+      const ledger = dapp.buildLedger(
+        session,
+        replayMoves.map((m) => ({ tileType: m.tileType, tsClient: m.tsClient != null ? m.tsClient : null }))
+      );
+      entries = ledger.entries;
+      verdict = dapp.validateSession(session, entries, { steps, chainHash: ledger.finalChainHash });
+    } catch (err) {
+      verdict = { status: 'disputed', reason: 'illegal_move:' + err.message, finalChainHash: null };
+    }
+    for (const e of entries) {
+      await pool.query(
+        `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (session_id, sequence) DO NOTHING`,
+        [sid, e.sequence, JSON.stringify(e.move), e.stateHash, e.prevHash, e.chainHash,
+         e.tsClient != null ? new Date(e.tsClient).toISOString() : null]
+      );
+    }
+    if (verdict.status === 'verified') {
+      await pool.query(
+        `UPDATE game_sessions SET status='verified', final_score=$2, final_steps=$3,
+                final_time_secs=$4, final_chain_hash=$5, finished_at=now() WHERE id=$1`,
+        [sid, score, steps, timeSecs, verdict.finalChainHash]
+      );
+    } else {
+      console.warn(`[daily] tier-A replay disputed (${gameId}): ${verdict.reason}`);
+      await pool.query(
+        `UPDATE game_sessions SET status='disputed', dispute_reason=$2, final_chain_hash=$3, finished_at=now()
+          WHERE id=$1`,
+        [sid, verdict.reason, verdict.finalChainHash]
+      );
+    }
+  } else {
+    // Tier B: snapshot chain + timing heuristics over the submitted move log.
+    const tsEntries = (moves || []).map((m, i) => ({
+      sequence: i + 1, move: m, tsClient: m && m.tsClient != null ? m.tsClient : null,
+    }));
+    // Loose thresholds on purpose: this is a solo puzzle and a false dispute
+    // costs a legitimate player their Verified badge. This catches
+    // machine-paced scripted runs, not fast humans.
+    const ac = dapp.antiCheat(tsEntries, null, null, {
+      fastIntervalMs: 120, fastRatioLimit: 0.5, maxMovesPerSec: 6,
+    });
+    let disputeReason = ac.ok ? null : 'anti_cheat:' + ac.reason;
+    // Wall-clock plausibility: the observed move span can't exceed the claimed
+    // active play time by more than a generous idle/paused allowance.
+    if (!disputeReason && Number.isFinite(timeSecs)) {
+      const times = tsEntries.map((e) => e.tsClient).filter((v) => Number.isFinite(v));
+      if (times.length >= 2) {
+        const spanMs = Math.max(...times) - Math.min(...times);
+        if (spanMs > (timeSecs + 300) * 1000) disputeReason = 'span_exceeds_claimed_time';
+      }
+    }
+
+    const genesis = dapp.genesisHash({ gameId, seed, pubkey: user.usernode_pubkey, sessionId: sid });
+    const stateHash = dapp.sha256Hex(dapp.canonicalize({ score, steps: steps || 0, terminal: 1 }));
+    const chainHash = dapp.chainStep(genesis, stateHash, 1);
+    await pool.query(
+      `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
+       VALUES ($1, 1, $2, $3, $4, $5, now()) ON CONFLICT (session_id, sequence) DO NOTHING`,
+      [sid, JSON.stringify({ snapshot: true, score, moveCount: tsEntries.length }), stateHash, genesis, chainHash]
+    );
+    if (!disputeReason) {
+      await pool.query(
+        `UPDATE game_sessions SET status='verified', final_score=$2, final_steps=$3,
+                final_time_secs=$4, final_chain_hash=$5, finished_at=now() WHERE id=$1`,
+        [sid, score, steps, timeSecs, chainHash]
+      );
+    } else {
+      console.warn(`[daily] tier-B heuristics disputed (${gameId}): ${disputeReason}`);
+      await pool.query(
+        `UPDATE game_sessions SET status='disputed', dispute_reason=$2, final_chain_hash=$3, finished_at=now()
+          WHERE id=$1`,
+        [sid, disputeReason, chainHash]
+      );
+    }
+  }
+  const { rows: sRows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [sid]);
+  return shapeSession(sRows[0]);
+}
 
 // Record the result of today's attempt (score/steps/time). Only touches
 // today's already-claimed row. Also updates user stats and creates achievements.
@@ -3231,43 +3551,23 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
     }
 
 
-    // ---- DApp Mode: mint a verified session for EVERY daily win ------------
-    // Every category:'daily' completion (the 6×6 Mini Sudoku included) now gets
-    // an on-chain-anchorable receipt — not just the tilematchingdaily pilot.
-    // The daily finish endpoint doesn't carry a per-tap log, so the daily path
-    // records a session-level snapshot (a single-link hash chain bound to
-    // identity + the deterministic daily seed). The PvP path does full per-move
-    // replay. Either way the result gets a Verified badge the client anchors via
-    // the existing dappAnchor flow (wallet sendTransaction → anchor/confirm).
-    // gameId is already validated against GAME_IDS (all category:'daily'), so a
-    // positive score is the only additional gate.
+    // ---- DApp Mode: settle a session for EVERY daily win --------------------
+    // Phase 2: every daily win routes through the game_sessions +
+    // validateSession pipeline (settleDailySession below) — tier A full replay
+    // re-simulation where an engine exists and the client sent a
+    // replay-eligible move log, tier B snapshot + timing heuristics otherwise.
+    // Best-effort: a pipeline failure never blocks the recorded attempt, and a
+    // 'disputed' verdict just means no Verified badge on the win overlay.
     let dappSession = null;
     if (score && score > 0) {
       try {
-        const seed = Math.floor(Date.now() / 86400000); // UTC day number (deterministic per day)
-        const sid = newSessionId();
-        await pool.query(
-          `INSERT INTO game_sessions (id, user_id, username, usernode_pubkey, game_id, seed, status)
-           VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
-          [sid, req.user.id, req.user.username || null, req.user.usernode_pubkey || null, gameId, seed]
-        );
-        const genesis = dapp.genesisHash({ gameId, seed, pubkey: req.user.usernode_pubkey, sessionId: sid });
-        const stateHash = dapp.sha256Hex(dapp.canonicalize({ score, steps: steps || 0, terminal: 1 }));
-        const chainHash = dapp.chainStep(genesis, stateHash, 1);
-        await pool.query(
-          `INSERT INTO session_states (session_id, sequence, move, state_hash, prev_hash, chain_hash, ts_client)
-           VALUES ($1, 1, $2, $3, $4, $5, now()) ON CONFLICT (session_id, sequence) DO NOTHING`,
-          [sid, JSON.stringify({ snapshot: true, score }), stateHash, genesis, chainHash]
-        );
-        await pool.query(
-          `UPDATE game_sessions SET status='verified', final_score=$2, final_steps=$3,
-                  final_time_secs=$4, final_chain_hash=$5, finished_at=now() WHERE id=$1`,
-          [sid, score, steps, timeSecs, chainHash]
-        );
-        const { rows: sRows } = await pool.query('SELECT * FROM game_sessions WHERE id = $1', [sid]);
-        dappSession = shapeSession(sRows[0]);
+        dappSession = await settleDailySession({
+          user: req.user, gameId, score, steps, timeSecs,
+          moves: Array.isArray(req.body.moves) ? req.body.moves.slice(0, 800) : [],
+          replay: req.body.replay === true,
+        });
       } catch (dappErr) {
-        console.error('[daily] dapp session mint failed (non-fatal):', dappErr.message);
+        console.error('[daily] dapp session settle failed (non-fatal):', dappErr.message);
       }
     }
 
@@ -3334,16 +3634,18 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
       [gameId]
     );
     const total = rows.length;
+    // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
+    const uid = req.user ? req.user.id : null;
     const shape = (r) => ({
       rank: Number(r.rank),
       username: r.username || 'anon',
       timeSecs: r.time_secs,
       steps: r.steps,
       score: r.score,
-      isCurrentUser: r.user_id === req.user.id,
+      isCurrentUser: uid != null && r.user_id === uid,
     });
     const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
-    const mineRow = rows.find((r) => r.user_id === req.user.id);
+    const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
     const me = mineRow ? shape(mineRow) : null;
     res.json({ entries, me, total });
   } catch (err) {
@@ -3378,16 +3680,18 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
       []
     );
     const total = rows.length;
+    // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
+    const uid = req.user ? req.user.id : null;
     const shape = (r) => ({
       rank: Number(r.rank),
       username: r.username || 'anon',
       totalPoints: r.total_points,
       gamesSolved: r.games_solved,
       userId: r.user_id,
-      isCurrentUser: r.user_id === req.user.id,
+      isCurrentUser: uid != null && r.user_id === uid,
     });
     const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
-    const mineRow = rows.find((r) => r.user_id === req.user.id);
+    const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
     const me = mineRow ? shape(mineRow) : null;
     res.json({ entries, me, total, gameCount: GAME_IDS.size });
   } catch (err) {
@@ -3834,11 +4138,14 @@ app.get('/api/classic/:gameId/leaderboard', async (req, res) => {
       `SELECT COUNT(*)::int AS n FROM classic_scores WHERE game_id = $1`, [gameId]
     );
 
+    // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
     let me = null;
-    const { rows: mine } = await pool.query(
-      `SELECT username, best_score, extra, updated_at FROM classic_scores WHERE user_id = $1 AND game_id = $2`,
-      [req.user.id, gameId]
-    );
+    const { rows: mine } = req.user
+      ? await pool.query(
+          `SELECT username, best_score, extra, updated_at FROM classic_scores WHERE user_id = $1 AND game_id = $2`,
+          [req.user.id, gameId]
+        )
+      : { rows: [] };
     if (mine.length) {
       const row = mine[0];
       const { rows: rankRows } = await pool.query(

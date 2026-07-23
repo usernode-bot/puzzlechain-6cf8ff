@@ -1,109 +1,521 @@
 {
-  "name": "PuzzleChain",
+  "name": "Game Corner",
   "secrets": [
     {
-      "key": "REDIS_URL",
-      "description": "Optional Redis connection URL used only as a fast path for the PvP matchmaking queue and match timers. The app fully degrades to its built-in Postgres CAS queue when unset, so this is not required to deploy.",
-      "required": false,
-      "private": false,
-      "staging_default": "redis://localhost:6379"
-    },
-    {
       "key": "APP_PUBKEY",
-      "description": "Public app-identity key that identifies PuzzleChain to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
+      "description": "Public app-identity key that identifies Game Corner to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
       "required": true,
       "private": false,
       "staging_default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     },
     {
       "key": "APP_SECRET_KEY",
-      "description": "Secret app-identity key used to HMAC-sign payloads PuzzleChain sends to the Usernode dApps-integration surface; an empty value disables the integration gracefully. Treated as an opaque HMAC key (any format works). Set the production value in Settings → Secrets. Staging uses a dummy (Hardhat account #1 key).",
+      "description": "Secret app-identity key used to HMAC-sign payloads Game Corner sends to the Usernode dApps-integration surface; an empty value disables the integration gracefully. Treated as an opaque HMAC key (any format works). Set the production value in Settings → Secrets. Staging uses a dummy (Hardhat account #1 key).",
       "required": true,
       "private": true,
       "staging_default": "0x2a871d0798f97d308287f1bd8254e4e96cecc5f0cfa1d93fcff5fb3f87f81947"
     }
   ],
   "tests": [
-    { "name": "Main screen loads with no console errors", "path": "/", "expectText": "PuzzleChain" },
-    { "name": "Lobby renders", "path": "/", "expectText": "PuzzleChain" },
-    { "name": "Locked card after daily attempt", "path": "/?demo=locked", "expectText": "resets in" },
-    { "name": "Word Hunt card in lobby", "path": "/", "expectText": "Word Hunt" },
-    { "name": "Crypto Wordle card in lobby", "path": "/", "expectText": "Crypto Wordle" },
-    { "name": "Lobby shows live reset countdown", "path": "/", "expectText": "Next puzzle in" },
-    { "name": "Streak multiplier hint in lobby", "path": "/?demo=streak", "expectText": "day streak" },
-    { "name": "Leaderboard seed boots cleanly", "path": "/?demo=leaderboard", "expectText": "Daily Puzzles" },
-    { "name": "In-progress resume card in lobby", "path": "/?demo=resume", "expectText": "In progress" },
-    { "name": "Power-up demo seeds successfully", "path": "/?demo=powerup", "expectText": "PuzzleChain" },
-    { "name": "Minesweeper card in Classic Games tab", "path": "/?tab=classic", "expectText": "Minesweeper" },
-    { "name": "Mancala card in Classic Games tab", "path": "/?tab=classic", "expectText": "Mancala" },
-    { "name": "Chutes & Ladders card in Classic Games tab", "path": "/?tab=classic", "expectText": "Chutes & Ladders" },
-    { "name": "2048 card in Classic Games tab", "path": "/?tab=classic", "expectText": "2048" },
-    { "name": "Knight's Tour card in Classic Games tab", "path": "/?tab=classic", "expectText": "Knight's Tour" },
-    { "name": "Snake card in Classic Games tab", "path": "/?tab=classic", "expectText": "Snake" },
-    { "name": "Block Blast card in Classic Games tab", "path": "/?tab=classic", "expectText": "Block Blast" },
-    { "name": "Tile Match Puzzle card in Classic Games tab", "path": "/?tab=classic", "expectText": "Tile Match Puzzle" },
-    { "name": "Match-3 Puzzle card in Classic Games tab", "path": "/?tab=classic", "expectText": "Match-3 Puzzle" },
-    { "name": "Diamond Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Diamond Rush" },
-    { "name": "Texas Hold Em card in Classic Games tab", "path": "/?tab=classic", "expectText": "Texas Hold 'Em" },
-    { "name": "Bounce card in Classic Games tab", "path": "/?tab=classic", "expectText": "Bounce" },
-    { "name": "Bounce game screen renders audio controls", "path": "/?game=bounce", "expectText": "Sound On" },
-    { "name": "Zuma card in Classic Games tab", "path": "/?tab=classic", "expectText": "Zuma" },
-    { "name": "Daily Tile Match Puzzle card in lobby", "path": "/", "expectText": "Daily Tile Match Puzzle" },
-    { "name": "Idle Empire in Idle Empire tab", "path": "/?tab=idle", "expectText": "Idle Empire" },
-    { "name": "Idle game loads with demo data", "path": "/?tab=idle&demo=progress", "expectText": "Coins" },
-    { "name": "PvP Arena returning soon on MATCH", "path": "/?tab=pvp", "expectText": "returning soon on MATCH" },
-    { "name": "MATCH wallet renders", "path": "/?screen=wallet&demo=1", "expectText": "MATCH Balance" },
-    { "name": "On-chain MATCH receipt badge in wallet", "path": "/?screen=wallet&demo=1", "expectText": "on-chain" },
-    { "name": "MATCH earn demo seeds cleanly", "path": "/?demo=earn", "expectText": "MATCH" },
-    { "name": "Hash Rush card in Classic Games tab", "path": "/?tab=classic", "expectText": "Hash Rush" },
-    { "name": "Hash Rush game screen loads", "path": "/?game=hashrush", "expectText": "Start mining" },
-    { "name": "2048 mode modal offers Online Race", "path": "/?game=2048", "expectText": "Online Race" },
-    { "name": "Block Blast mode modal offers Online Race", "path": "/?game=blockblast", "expectText": "Online Race" },
-    { "name": "2048 mode modal shows seeded leaderboard player", "path": "/?game=2048&demo=classic-scores", "expectText": "Staging demo Ada" },
-    { "name": "Classic mode modal renders mode chooser", "path": "/?game=2048", "expectText": "Choose a mode" },
-    { "name": "Boots with dApps integration disabled (empty APP_SECRET_KEY)", "path": "/", "expectText": "PuzzleChain" },
-    { "name": "Wallet shows Verified identity badge", "path": "/?screen=wallet&demo=1", "expectText": "Verified identity" },
-    { "name": "Wallet shows Disconnect control", "path": "/?screen=wallet&demo=1", "expectText": "Disconnect" },
-    { "name": "DApp session receipt renders", "path": "/?demo=dapp", "expectText": "Session Receipt" },
-    { "name": "DApp receipt shows chain hash", "path": "/?demo=dapp", "expectText": "Chain hash" },
-    { "name": "Verified leaderboard renders demo rows", "path": "/?demo=dapp", "expectText": "Staging demo Ada" },
-    { "name": "Disputed session shows rejection copy", "path": "/?screen=session&sid=DAPPDEMOBAD", "expectText": "could not be verified" },
-    { "name": "Account screen opens from chip", "path": "/?screen=account", "expectText": "On-chain login" },
-    { "name": "Account screen shows account heading", "path": "/?screen=account", "expectText": "Account" },
-    { "name": "Streak badge ladder renders earned badges", "path": "/?demo=badges", "expectText": "Centurion" },
-    { "name": "Anchored daily sudoku receipt renders", "path": "/?demo=anchor", "expectText": "anchored" },
-    { "name": "Today's Champions board renders in daily lobby", "path": "/?demo=leaderboard", "expectText": "Today's Champions" },
-    { "name": "Today's Champions lists a seeded solver", "path": "/?demo=leaderboard", "expectText": "Staging demo Ada" },
-    { "name": "Badge collection strip renders", "path": "/?demo=badges", "expectText": "Badges" },
-    { "name": "Achievement badge Speed Demon renders", "path": "/?demo=badges", "expectText": "Speed Demon" },
-    { "name": "Achievement badge Daily Sweep renders", "path": "/?demo=badges", "expectText": "Daily Sweep" },
-    { "name": "Badge next-milestone progress hint renders", "path": "/?demo=streak", "expectText": "days →" },
-    { "name": "Signed-out badge placeholder renders", "path": "/?demo=signedout", "expectText": "Sign in to track" },
-    { "name": "Community Feed tab renders (Share to Feed target)", "path": "/?tab=feed", "expectText": "Community Feed" },
-    { "name": "Crypto Wordle hint demo seeds cleanly", "path": "/?demo=hints", "expectText": "Crypto Wordle" },
-    { "name": "Global MATCH balance chip in nav", "path": "/?demo=hints", "expectText": "MATCH" },
-    { "name": "Mini Sudoku shows paid Hint bar", "path": "/?game=sudoku", "expectText": "Hint" },
-    { "name": "Word Hunt shows paid Hint bar", "path": "/?game=wordhunt", "expectText": "Hint" },
-    { "name": "Daily Tile Match shows paid Hint bar", "path": "/?game=tilematchingdaily", "expectText": "Hint" },
-    { "name": "Wallet MATCH activity section renders", "path": "/?screen=wallet&demo=match", "expectText": "MATCH activity" },
-    { "name": "MATCH activity shows View on explorer link", "path": "/?screen=wallet&demo=match", "expectText": "View on explorer" },
-    { "name": "Mancala mode picker offers Daily Challenge", "path": "/?game=mancala", "expectText": "Daily Challenge" },
-    { "name": "Mancala Daily Challenge screen loads", "path": "/?game=mancala&mmode=daily&demo=mancaladaily", "expectText": "Daily Challenge" },
-    { "name": "Chutes & Ladders mode select offers Versus Bot", "path": "/?game=chutes-ladders", "expectText": "Versus Bot" },
-    { "name": "Chutes & Ladders mode select offers Online Multiplayer", "path": "/?game=chutes-ladders", "expectText": "Online Multiplayer" },
-    { "name": "Minesweeper game screen renders (audio controls load cleanly)", "path": "/?game=minesweeper", "expectText": "Safe Revealed" },
-    { "name": "Minesweeper history tab renamed to My Best Runs", "path": "/?game=minesweeper", "expectText": "My Best Runs" },
-    { "name": "Match-3 campaign screen renders", "path": "/?game=match3", "expectText": "Match-3 Campaign" },
-    { "name": "Match-3 campaign lists Getting Started puzzle", "path": "/?game=match3", "expectText": "Getting Started" },
-    { "name": "Themes screen renders", "path": "/?screen=themes", "expectText": "Create a theme" },
-    { "name": "Themes nav button in lobby", "path": "/", "expectText": "Themes" },
-    { "name": "Themes gallery shows seeded community theme", "path": "/?screen=themes&demo=themes", "expectText": "Neon Sunset" },
-    { "name": "Themes gallery shows seeded creator", "path": "/?screen=themes&demo=themes", "expectText": "Staging demo ada" },
-    { "name": "Snake leaderboard renders seeded scores", "path": "/?game=snake&demo=classic-scores", "expectText": "Staging demo Ada" },
-    { "name": "Diamond Rush game screen loads", "path": "/?game=diamondrush", "expectText": "Score" },
-    { "name": "Diamond Rush leaderboard renders seeded scores", "path": "/?game=diamondrush&demo=classic-scores", "expectText": "Staging demo Ada" },
-    { "name": "Chutes Ladders leaderboard renders seeded scores", "path": "/?game=chutes-ladders&demo=classic-scores", "expectText": "Staging demo Ada" },
-    { "name": "Poker setup screen renders", "path": "/?game=texas", "expectText": "Start Game" },
-    { "name": "Poker setup has bot selector", "path": "/?game=texas", "expectText": "How many bots?" }
+    {
+      "name": "Main screen loads with no console errors",
+      "path": "/",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "Lobby renders",
+      "path": "/",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "Locked card after daily attempt",
+      "path": "/?demo=locked",
+      "expectText": "resets in"
+    },
+    {
+      "name": "Word Hunt card in lobby",
+      "path": "/",
+      "expectText": "Word Hunt"
+    },
+    {
+      "name": "Daily Cipher card in lobby",
+      "path": "/",
+      "expectText": "Daily Cipher"
+    },
+    {
+      "name": "Lobby shows live reset countdown",
+      "path": "/",
+      "expectText": "Next puzzle in"
+    },
+    {
+      "name": "Streak multiplier hint in lobby",
+      "path": "/?demo=streak",
+      "expectText": "day streak"
+    },
+    {
+      "name": "Leaderboard seed boots cleanly",
+      "path": "/?demo=leaderboard",
+      "expectText": "Daily Puzzles"
+    },
+    {
+      "name": "In-progress resume card in lobby",
+      "path": "/?demo=resume",
+      "expectText": "In progress"
+    },
+    {
+      "name": "Power-up demo seeds successfully",
+      "path": "/?demo=powerup",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "Minesweeper card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Minesweeper"
+    },
+    {
+      "name": "Mancala card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Mancala"
+    },
+    {
+      "name": "Chutes & Ladders card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Chutes & Ladders"
+    },
+    {
+      "name": "2048 card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "2048"
+    },
+    {
+      "name": "Knight's Tour card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Knight's Tour"
+    },
+    {
+      "name": "Snake card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Snake"
+    },
+    {
+      "name": "Block Blast card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Block Blast"
+    },
+    {
+      "name": "Tile Match Puzzle card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Tile Match Puzzle"
+    },
+    {
+      "name": "Match-3 Puzzle card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Match-3 Puzzle"
+    },
+    {
+      "name": "Diamond Rush card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Diamond Rush"
+    },
+    {
+      "name": "Bounce card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Bounce"
+    },
+    {
+      "name": "Bounce game screen renders audio controls",
+      "path": "/?game=bounce",
+      "expectText": "Sound On"
+    },
+    {
+      "name": "Marble Loop card in home grid",
+      "path": "/?tab=classic",
+      "expectText": "Marble Loop"
+    },
+    {
+      "name": "Daily Tile Match Puzzle card in lobby",
+      "path": "/",
+      "expectText": "Daily Tile Match Puzzle"
+    },
+    {
+      "name": "Hash Rush card in Classic Games tab",
+      "path": "/?tab=classic",
+      "expectText": "Hash Rush"
+    },
+    {
+      "name": "Hash Rush game screen loads",
+      "path": "/?game=hashrush",
+      "expectText": "Start mining"
+    },
+    {
+      "name": "2048 mode modal offers Online Race",
+      "path": "/?game=2048",
+      "expectText": "Online Race"
+    },
+    {
+      "name": "Block Blast mode modal offers Online Race",
+      "path": "/?game=blockblast",
+      "expectText": "Online Race"
+    },
+    {
+      "name": "2048 mode modal shows seeded leaderboard player",
+      "path": "/?game=2048&demo=classic-scores",
+      "expectText": "Staging demo Ada"
+    },
+    {
+      "name": "Classic mode modal renders mode chooser",
+      "path": "/?game=2048",
+      "expectText": "Choose a mode"
+    },
+    {
+      "name": "Boots with integration secret empty (no dApps chrome)",
+      "path": "/",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "DApp session receipt renders",
+      "path": "/?demo=dapp",
+      "expectText": "Session Receipt"
+    },
+    {
+      "name": "DApp receipt shows chain hash",
+      "path": "/?demo=dapp",
+      "expectText": "Chain hash"
+    },
+    {
+      "name": "Verified leaderboard renders demo rows",
+      "path": "/?demo=dapp",
+      "expectText": "Staging demo Ada"
+    },
+    {
+      "name": "Disputed session shows rejection copy",
+      "path": "/?screen=session&sid=DAPPDEMOBAD",
+      "expectText": "could not be verified"
+    },
+    {
+      "name": "Account screen opens from chip",
+      "path": "/?screen=account",
+      "expectText": "On-chain login"
+    },
+    {
+      "name": "Account screen shows account heading",
+      "path": "/?screen=account",
+      "expectText": "Account"
+    },
+    {
+      "name": "Streak badge ladder renders earned badges",
+      "path": "/?demo=badges",
+      "expectText": "Centurion"
+    },
+    {
+      "name": "Anchored daily sudoku receipt renders",
+      "path": "/?demo=anchor",
+      "expectText": "anchored"
+    },
+    {
+      "name": "Today's Champions board renders in daily lobby",
+      "path": "/?demo=leaderboard",
+      "expectText": "Today's Champions"
+    },
+    {
+      "name": "Today's Champions lists a seeded solver",
+      "path": "/?demo=leaderboard",
+      "expectText": "Staging demo Ada"
+    },
+    {
+      "name": "Badge collection strip renders",
+      "path": "/?demo=badges",
+      "expectText": "Badges"
+    },
+    {
+      "name": "Achievement badge Speed Demon renders",
+      "path": "/?demo=badges",
+      "expectText": "Speed Demon"
+    },
+    {
+      "name": "Achievement badge Daily Sweep renders",
+      "path": "/?demo=badges",
+      "expectText": "Daily Sweep"
+    },
+    {
+      "name": "Badge next-milestone progress hint renders",
+      "path": "/?demo=streak",
+      "expectText": "days →"
+    },
+    {
+      "name": "Signed-out badge placeholder renders",
+      "path": "/?demo=signedout",
+      "expectText": "Sign in to track"
+    },
+    {
+      "name": "What’s-new strip renders on Home",
+      "path": "/",
+      "expectText": "New this week"
+    },
+    {
+      "name": "Daily Cipher hint demo seeds cleanly",
+      "path": "/?demo=hints",
+      "expectText": "Daily Cipher"
+    },
+    {
+      "name": "Mini Sudoku shows Hint bar",
+      "path": "/?game=sudoku&play=1",
+      "expectText": "Hint"
+    },
+    {
+      "name": "Word Hunt shows Hint bar",
+      "path": "/?game=wordhunt&play=1",
+      "expectText": "Hint"
+    },
+    {
+      "name": "Daily Tile Match shows Hint bar",
+      "path": "/?game=tilematchingdaily&play=1",
+      "expectText": "Hint"
+    },
+    {
+      "name": "Pre-game screen shows daily deal context",
+      "path": "/?game=wordhunt",
+      "expectText": "exact deal"
+    },
+    {
+      "name": "Pre-game screen shows personal best stat",
+      "path": "/?game=wordhunt",
+      "expectText": "Personal best"
+    },
+    {
+      "name": "How-to-Play cards auto-open on first visit",
+      "path": "/?game=tilematchingdaily",
+      "expectText": "How to play Daily Tile Match"
+    },
+    {
+      "name": "Mancala mode picker offers Daily Challenge",
+      "path": "/?game=mancala",
+      "expectText": "Daily Challenge"
+    },
+    {
+      "name": "Mancala Daily Challenge screen loads",
+      "path": "/?game=mancala&mmode=daily&demo=mancaladaily",
+      "expectText": "Daily Challenge"
+    },
+    {
+      "name": "Chutes & Ladders mode select offers Versus Bot",
+      "path": "/?game=chutes-ladders",
+      "expectText": "Versus Bot"
+    },
+    {
+      "name": "Chutes & Ladders mode select offers Online Multiplayer",
+      "path": "/?game=chutes-ladders",
+      "expectText": "Online Multiplayer"
+    },
+    {
+      "name": "Minesweeper game screen renders (audio controls load cleanly)",
+      "path": "/?game=minesweeper",
+      "expectText": "Safe Revealed"
+    },
+    {
+      "name": "Minesweeper history tab renamed to My Best Runs",
+      "path": "/?game=minesweeper",
+      "expectText": "My Best Runs"
+    },
+    {
+      "name": "Match-3 campaign screen renders",
+      "path": "/?game=match3",
+      "expectText": "Match-3 Campaign"
+    },
+    {
+      "name": "Match-3 campaign lists Getting Started puzzle",
+      "path": "/?game=match3",
+      "expectText": "Getting Started"
+    },
+    {
+      "name": "Snake leaderboard renders seeded scores",
+      "path": "/?game=snake&demo=classic-scores",
+      "expectText": "Staging demo Ada"
+    },
+    {
+      "name": "Diamond Rush game screen loads",
+      "path": "/?game=diamondrush",
+      "expectText": "Score"
+    },
+    {
+      "name": "Diamond Rush leaderboard renders seeded scores",
+      "path": "/?game=diamondrush&demo=classic-scores",
+      "expectText": "Staging demo Ada"
+    },
+    {
+      "name": "Chutes Ladders leaderboard renders seeded scores",
+      "path": "/?game=chutes-ladders&demo=classic-scores",
+      "expectText": "Staging demo Ada"
+    },
+    {
+      "name": "Public daily endpoint issues seeds and directory",
+      "path": "/api/public/daily",
+      "expectText": "seeds"
+    },
+    {
+      "name": "Daily leaderboard readable without auth (null-guarded)",
+      "path": "/api/daily/sudoku/leaderboard",
+      "expectText": "entries"
+    },
+    {
+      "name": "Friends leaderboard tab shows followed players",
+      "path": "/?demo=friends-lb&lbscope=friends",
+      "expectText": "Staging friend Nia"
+    },
+    {
+      "name": "Ladder tab shows seeded ratings and movers",
+      "path": "/?tab=ladder&demo=ladder",
+      "expectText": "Staging rival Kas"
+    },
+    {
+      "name": "Ladder shows weekly movers strip",
+      "path": "/?tab=ladder&demo=ladder",
+      "expectText": "Weekly movers"
+    },
+    {
+      "name": "Ladder endpoint readable without auth",
+      "path": "/api/ladder/chutes-ladders",
+      "expectText": "entries"
+    },
+    {
+      "name": "Checkers screen offers online room setup",
+      "path": "/?game=checkers&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Reversi screen offers online room setup",
+      "path": "/?game=reversi&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Four in a Row screen offers online room setup",
+      "path": "/?game=fourinarow&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Gomoku screen offers online room setup",
+      "path": "/?game=gomoku&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Ludo screen offers online room setup",
+      "path": "/?game=ludo&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Ladder picker includes Checkers with seeded ratings",
+      "path": "/?tab=ladder&demo=ladder",
+      "expectText": "Checkers"
+    },
+    {
+      "name": "Klondike Solitaire pre-game screen",
+      "path": "/?game=klondike",
+      "expectText": "Klondike Solitaire"
+    },
+    {
+      "name": "Spider Solitaire pre-game screen",
+      "path": "/?game=spider",
+      "expectText": "Spider Solitaire"
+    },
+    {
+      "name": "Mahjong Solitaire pre-game screen",
+      "path": "/?game=mahjongsol",
+      "expectText": "Mahjong Solitaire"
+    },
+    {
+      "name": "Mine Finder pre-game screen",
+      "path": "/?game=minefinder",
+      "expectText": "Mine Finder"
+    },
+    {
+      "name": "Anagram Sprint pre-game screen",
+      "path": "/?game=anagrams",
+      "expectText": "Anagram Sprint"
+    },
+    {
+      "name": "Crate Push pre-game screen",
+      "path": "/?game=cratepush",
+      "expectText": "Crate Push"
+    },
+    {
+      "name": "Nonogram board renders in-game",
+      "path": "/?game=nonogram&play=1",
+      "expectSelector": ".ng-grid"
+    },
+    {
+      "name": "Drop Stack well renders in-game",
+      "path": "/?game=dropstack&play=1",
+      "expectSelector": ".ds-grid"
+    },
+    {
+      "name": "New dailies get server-issued seeds",
+      "path": "/api/public/daily",
+      "expectText": "klondike"
+    },
+    {
+      "name": "Game of the Day hero renders on home",
+      "path": "/",
+      "expectText": "GAME OF THE DAY"
+    },
+    {
+      "name": "Home shows the all-games sections",
+      "path": "/",
+      "expectText": "Classic Games"
+    },
+    {
+      "name": "GotD hero leaderboard preview with seeded solvers",
+      "path": "/?demo=gotd",
+      "expectText": "Today's fastest"
+    },
+    {
+      "name": "Your-turn match card on home",
+      "path": "/?demo=yourturn",
+      "expectText": "Your turn"
+    },
+    {
+      "name": "Chat room shows seeded messages",
+      "path": "/?demo=chat&chat=checkers",
+      "expectText": "Staging demo Otto"
+    },
+    {
+      "name": "Chat moderation tombstone renders",
+      "path": "/?demo=chat&chat=checkers",
+      "expectText": "Hidden by community reports"
+    },
+    {
+      "name": "Featured game exposed on the public read surface",
+      "path": "/api/public/daily",
+      "expectText": "featured"
+    },
+    {
+      "name": "Anonymous end screen renders (make it count)",
+      "path": "/?demo=makeitcount",
+      "expectText": "Make it count"
+    },
+    {
+      "name": "Anonymous end screen shows the would-be board line",
+      "path": "/?demo=makeitcount",
+      "expectText": "today's board"
+    },
+    {
+      "name": "Rank preview endpoint readable without auth",
+      "path": "/api/public/daily/sudoku/rank-preview?timeSecs=95&steps=21",
+      "expectText": "rank"
+    },
+    {
+      "name": "What’s-new sheet content present in changelog",
+      "path": "/",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "Turn-timer expiry line on your-turn cards",
+      "path": "/?demo=yourturn",
+      "expectText": "expires in"
+    },
+    {
+      "name": "GotD streak demo seeds featured-game days",
+      "path": "/?demo=streak",
+      "expectText": "streak"
+    }
   ]
 }

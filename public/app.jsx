@@ -2,27 +2,46 @@ const { useState, useEffect, useRef } = React;
 
 /* ============================================================
    Design system — color palette
+   "The Daily Page, Warmed" (Game Corner spec, Appendix A): an
+   editorial daily-newspaper look. Ivory paper, ink-navy text, warm
+   hairlines, white card surfaces, and brass reserved for streaks /
+   wins / medals. Same token names as before so every ${C.*} in the
+   stylesheet re-themes in place.
    ============================================================ */
 const C = {
-  bg:      '#0A0D14',
-  surface: '#12161F',
-  card:    '#181D29',
-  border:  '#2A3342',
-  accent:  '#6366F1',
-  gold:    '#FBBF24',
-  emerald: '#34D399',
-  violet:  '#A78BFA',
-  rose:    '#FB7185',
-  text:    '#ECEFF6',
-  muted:   '#8B95A8',
-  dim:     '#39424F',
+  bg:      '#FAF6EE', // ivory paper
+  surface: '#F3EDDF', // deeper paper — nav, wells, sheets
+  card:    '#FFFFFF', // card-weight white surfaces
+  border:  '#E7DFCC', // warm hairline
+  accent:  '#2D5FAE', // editorial ink-blue — shell links/buttons/tabs
+  gold:    '#C9A227', // brass — reserved for streaks, wins, medals
+  emerald: '#1E8F63', // deep green (success, live states)
+  violet:  '#7B5CD6',
+  rose:    '#CD4B3A', // warm coral-red (errors, danger)
+  text:    '#1F2B47', // ink navy
+  muted:   '#5E6A87', // muted ink
+  dim:     '#A9A38F', // faded newsprint — faint text, dashed rules
+};
+
+/* One bright accent per game (Appendix A: coral / sky / lime / violet /
+   teal family). Assigned to each GAMES entry's tagColor, which already
+   flows into the lobby card's --accent top rule, tag pill, GotD hero and
+   game modal — so a single hue recolors all of a game's chrome. */
+const GA = {
+  coral:  '#E4604E',
+  sky:    '#3D87C9',
+  lime:   '#71A122',
+  violet: '#7B5CD6',
+  teal:   '#1D9E8F',
+  plum:   '#B14A82',
+  amber:  '#D97E23',
 };
 
 /* ============================================================
    Global stylesheet (injected via <style>)
    ============================================================ */
 const css = `
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -312,14 +331,8 @@ body {
 }
 .account-connection-row:hover { border-color: ${C.accent}; }
 .account-connection-row .chev { margin-left: auto; color: ${C.muted}; }
-.account-dapps-row { margin-top: 1rem; }
-.account-dapps-pubkey {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
-  color: ${C.text}; word-break: break-all; flex: 1;
-}
-
 /* The Connections section is only shown at narrow widths — above 560px the
-   Friends button and dApps chip live in the top bar instead. */
+   Friends button lives in the top bar instead. */
 @media (min-width: 561px) {
   .account-connections { display: none; }
   /* Force badge accordion always-open on desktop/tablet regardless of JS state */
@@ -336,13 +349,10 @@ body {
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
-  /* Friends + dApps + MATCH chip + wallet chip move into the Account screen's
-     Connections section on mobile. Scoped under .nav-right so they outrank
-     the base chip rules defined later in this stylesheet regardless of source order. */
+  /* The Friends chip moves into the Account screen's Connections section
+     on mobile. Scoped under .nav-right so it outranks the base chip rules
+     defined later in this stylesheet regardless of source order. */
   .nav-right .nav-friends-btn { display: none; }
-  .nav-right .nav-integration-chip { display: none; }
-  .nav-right .nav-match-chip { display: none; }
-  .nav-right .nav-wallet-chip { display: none; }
   /* Badge accordion: trigger is interactive on mobile */
   .badge-strip-body { overflow: hidden; transition: max-height 280ms ease, opacity 280ms ease; }
   .badge-strip-body.closed { max-height: 0; opacity: 0; }
@@ -402,7 +412,7 @@ body {
 .card:hover {
   transform: translateY(-3px);
   border-color: var(--accent, ${C.accent});
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  box-shadow: 0 10px 26px rgba(63,51,24,0.14);
 }
 .card.done {
   opacity: 0.55;
@@ -542,7 +552,7 @@ body {
 .win-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10,14,26,0.85);
+  background: rgba(38,33,18,0.52);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
@@ -558,7 +568,7 @@ body {
   text-align: center;
   max-width: 360px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  box-shadow: 0 20px 50px rgba(63,51,24,0.22);
 }
 .win-card .trophy { font-size: 2.6rem; }
 .win-card h2 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
@@ -591,7 +601,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.primary-btn:hover { background: #4F52D9; }
+.primary-btn:hover { background: #234C8E; }
 
 /* ---- Locked screen ---- */
 .locked-card {
@@ -602,7 +612,7 @@ body {
   text-align: center;
   max-width: 420px;
   margin: 1rem auto 0;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  box-shadow: 0 12px 34px rgba(63,51,24,0.18);
 }
 .locked-card .lock-icon { font-size: 2.6rem; }
 .locked-card h2 { font-size: 1.4rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
@@ -640,6 +650,88 @@ body {
 .locked-result .k { color: ${C.muted}; }
 .locked-result .v { color: ${C.gold}; }
 
+/* ---- Pre-game screen (shell-owned chrome, phase 3) ---- */
+.pregame-card {
+  max-width: 440px; margin: 1.5rem auto; padding: 2rem 1.5rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 18px;
+  text-align: center;
+}
+.pregame-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+.pregame-card h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.3rem; }
+.pregame-card .sub { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1rem; }
+.pregame-chips {
+  display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.pregame-chip {
+  font-size: 0.72rem; padding: 0.25rem 0.6rem; border-radius: 999px;
+  background: ${C.surface}; border: 1px solid ${C.border}; color: ${C.muted};
+  white-space: nowrap;
+}
+.pregame-stats {
+  display: flex; gap: 0.6rem; justify-content: center; margin-bottom: 1rem;
+}
+.pregame-stat {
+  flex: 1; max-width: 130px; background: ${C.surface};
+  border: 1px solid ${C.border}; border-radius: 12px; padding: 0.6rem 0.4rem;
+}
+.pregame-stat .l {
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: ${C.muted}; margin-bottom: 0.2rem;
+}
+.pregame-stat .v { font-weight: 700; font-size: 1rem; }
+.pregame-deal {
+  font-size: 0.82rem; color: ${C.text}; background: ${C.accent}14;
+  border: 1px solid ${C.accent}44; border-radius: 10px;
+  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
+}
+.pregame-resume-note {
+  font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.8rem;
+}
+.pregame-play { width: 100%; }
+.pregame-play:disabled { opacity: 0.5; cursor: default; }
+.pregame-signedout { font-size: 0.78rem; color: ${C.muted}; margin-top: 0.6rem; }
+.pregame-howto-btn {
+  margin-top: 0.8rem; background: none; border: none; color: ${C.accent};
+  font-family: inherit; font-size: 0.85rem; cursor: pointer; padding: 0.3rem;
+}
+.pregame-howto-btn:hover { text-decoration: underline; }
+
+/* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
+.howto-overlay {
+  position: fixed; inset: 0; background: rgba(38,33,18,0.55); z-index: 220;
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.howto-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
+  padding: 1.4rem 1.3rem; width: min(95vw, 420px); max-height: 85dvh;
+  overflow-y: auto;
+}
+.howto-head {
+  display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;
+}
+.howto-icon { font-size: 1.6rem; }
+.howto-head h3 { font-size: 1.05rem; font-weight: 700; }
+.howto-list { display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 1.2rem; }
+.howto-step { display: flex; gap: 0.7rem; align-items: flex-start; }
+.howto-step-num {
+  flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  background: ${C.accent}22; color: ${C.accent}; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+}
+.howto-step-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.15rem; }
+.howto-step-body { font-size: 0.82rem; color: ${C.muted}; line-height: 1.45; }
+
+/* "?" help button in the in-game headers */
+.help-btn {
+  margin-left: auto; background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 50%; width: 1.9rem; height: 1.9rem; color: ${C.muted};
+  font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.12s, color 0.12s;
+}
+.help-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
+
 /* ---- Locked lobby card ---- */
 .card.locked { cursor: default; }
 .card.locked:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
@@ -662,6 +754,33 @@ body {
   align-items: center;
   gap: 0.4rem;
 }
+
+/* ---- Leaderboard scope tabs + rating ladder (phase 4) ---- */
+.lb-scope-tabs { display: flex; gap: 0.35rem; margin: 0.5rem 0 0.6rem; flex-wrap: wrap; }
+.lb-scope-tab {
+  padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.75rem;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted};
+  transition: border-color 0.12s, color 0.12s;
+}
+.lb-scope-tab:not(.active):hover { border-color: ${C.accent}; color: ${C.text}; }
+.lb-scope-tab.active { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.lboard.ladder { max-width: 640px; margin: 0.5rem auto; }
+/* Ladder rows carry five cells (rank, name, streak, elo, delta) — the base
+   .lrow grid is four columns, so widen it here. */
+.lboard.ladder .lrow { grid-template-columns: 2.4rem 1fr auto auto auto; }
+.ladder-games { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.ladder-note { font-size: 0.78rem; color: ${C.muted}; margin-bottom: 0.8rem; line-height: 1.45; }
+.ladder-movers {
+  font-size: 0.8rem; color: ${C.text}; background: ${C.emerald}14;
+  border: 1px solid ${C.emerald}44; border-radius: 8px;
+  padding: 0.45rem 0.7rem; margin-bottom: 0.7rem;
+}
+.ladder-streak { min-width: 2.6rem; text-align: right; color: ${C.gold}; font-size: 0.8rem; }
+.ladder-delta { min-width: 2.8rem; text-align: right; font-size: 0.8rem; }
+.ladder-delta.up { color: ${C.emerald}; }
+.ladder-delta.down { color: ${C.rose}; }
+.ladder-delta.flat { color: ${C.muted}; }
 
 /* ---- Daily leaderboard ---- */
 .lboard {
@@ -868,20 +987,6 @@ body {
   font-weight: 600;
   color: ${C.rose};
 }
-/* MATCH on-chain explorer affordances (shared across games + wallet) */
-.match-explorer-link {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: ${C.accent};
-  text-decoration: none;
-  white-space: nowrap;
-}
-.match-explorer-link:hover { text-decoration: underline; }
-.match-explorer-mock, .match-explorer-pending {
-  font-size: 0.7rem;
-  color: ${C.muted};
-  white-space: nowrap;
-}
 /* Hinted reveals in the daily puzzles */
 .scell.hinted {
   color: ${C.gold};
@@ -904,25 +1009,6 @@ body {
   0%, 100% { box-shadow: 0 0 6px ${C.gold}; }
   50% { box-shadow: 0 0 16px ${C.gold}; }
 }
-/* Wallet — MATCH activity list */
-.match-activity-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.match-activity-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.55rem 0.7rem;
-  background: ${C.panel2 || C.panel};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-}
-.match-activity-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.match-activity-what { font-size: 0.82rem; font-weight: 600; }
-.match-activity-sub { font-size: 0.7rem; color: ${C.muted}; }
-.match-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; }
-.match-activity-amt.earn { color: ${C.mint || C.accent}; }
-.match-activity-amt.spend { color: ${C.rose}; }
-.match-activity-empty { font-size: 0.8rem; color: ${C.muted}; text-align: center; padding: 0.5rem; }
 .cw-board {
   display: grid;
   gap: 0.4rem;
@@ -1120,24 +1206,6 @@ body {
   transition: border-color 0.12s;
 }
 .ms-theme-toggle:hover { border-color: ${C.accent}; }
-.ms-wallet-status {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  text-align: right;
-}
-.ms-wallet-status .ms-ws-label {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: ${C.emerald};
-}
-.ms-wallet-status .ms-ws-label.mock { color: ${C.gold}; }
-.ms-wallet-status .ms-ws-label.unavail { color: ${C.muted}; }
-.ms-wallet-status .ms-ws-addr {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  color: ${C.muted};
-}
 .ms-action-row {
   display: flex;
   gap: 0.6rem;
@@ -1893,11 +1961,6 @@ body {
 .t2048-finish-btn { background: ${C.card}; color: ${C.text}; border: 1px solid ${C.border}; }
 .t2048-finish-btn:hover { border-color: ${C.accent}; }
 
-.poker-auth-notice {
-  font-size: 0.75rem; color: ${C.muted}; text-align: center; padding: 0.4rem;
-  border-radius: 8px; background: ${C.surface}; border: 1px solid ${C.border};
-}
-
 /* ---- Snake ---- */
 .snake-board-wrap {
   position: relative;
@@ -2434,7 +2497,7 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.tm-play-btn:hover { background: #4F52D9; }
+.tm-play-btn:hover { background: #234C8E; }
 .tm-level-won {
   background: ${C.card};
   border: 1px solid ${C.emerald}55;
@@ -2650,7 +2713,7 @@ body {
 .cg-sheet-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(10,14,26,0.6);
+  background: rgba(38,33,18,0.45);
   z-index: 45;
   opacity: 0;
   pointer-events: none;
@@ -2990,393 +3053,6 @@ body {
 }
 @keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
-/* ---- Texas Hold 'Em (redesigned) ---- */
-.poker-shell {
-  position: fixed; inset: 0; display: flex; flex-direction: column;
-  background: #050a0e; color: ${C.text}; font-family: 'Space Grotesk', system-ui, sans-serif;
-  overflow: hidden; z-index: 10;
-}
-.poker-top-bar {
-  display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.5);
-  border-bottom: 1px solid ${C.border}44; flex-shrink: 0; min-height: 44px;
-}
-.poker-top-bar-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
-.poker-top-bar-info { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: ${C.muted}; }
-.poker-conn-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: ${C.emerald};
-  flex-shrink: 0;
-}
-.poker-conn-dot.slow { background: ${C.gold}; }
-.poker-back-btn {
-  background: none; border: none; color: ${C.muted}; cursor: pointer;
-  font-size: 1.1rem; padding: 0.2rem 0.4rem; border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  transition: color 0.12s, background 0.12s;
-}
-.poker-back-btn:hover { color: ${C.text}; background: ${C.border}44; }
-.poker-main {
-  flex: 1; position: relative; overflow: hidden;
-  display: flex; flex-direction: column;
-}
-.poker-oval-wrap {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  position: relative; padding: 0.5rem;
-}
-.poker-oval {
-  position: relative;
-  width: min(90vw, 540px);
-  height: min(54vw, 320px);
-  background: radial-gradient(ellipse at center, #1a5c32 0%, #0d3a1e 55%, #071f10 100%);
-  border-radius: 50%;
-  border: 3px solid ${C.gold}55;
-  box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
-  overflow: visible;
-}
-.poker-seat {
-  position: absolute; transform: translate(-50%, -50%);
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 12px; padding: 0.35rem 0.5rem;
-  min-width: 80px; max-width: 110px;
-  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
-  cursor: default; user-select: none; transition: border-color 0.2s, box-shadow 0.2s;
-  z-index: 2;
-}
-.poker-seat.active {
-  border-color: ${C.gold}; box-shadow: 0 0 12px ${C.gold}55;
-  animation: poker-pulse 1.2s ease-in-out infinite;
-}
-.poker-seat.winner { border-color: ${C.emerald}; box-shadow: 0 0 16px ${C.emerald}66; animation: poker-winner-glow 0.6s ease-in-out 3; }
-.poker-seat.folded { opacity: 0.45; }
-.poker-seat.eliminated { opacity: 0.25; border-style: dashed; }
-.poker-seat-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
-}
-.poker-seat-name {
-  font-size: 0.68rem; font-weight: 600; color: ${C.text};
-  display: flex; align-items: center; gap: 0.25rem; white-space: nowrap;
-}
-.poker-seat-badge {
-  font-size: 0.55rem; font-weight: 700; padding: 0.08rem 0.3rem;
-  border-radius: 999px; background: ${C.border}; color: ${C.muted};
-}
-.poker-seat-badge.dealer { background: ${C.gold}33; color: ${C.gold}; }
-.poker-seat-badge.sb { background: ${C.accent}22; color: ${C.accent}; }
-.poker-seat-badge.bb { background: ${C.violet}22; color: ${C.violet}; }
-.poker-seat-chips {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
-  color: ${C.gold}; font-weight: 600;
-}
-.poker-seat-cards { display: flex; gap: 0.18rem; justify-content: center; }
-.poker-seat-label {
-  font-size: 0.6rem; font-weight: 700; padding: 0.1rem 0.35rem;
-  border-radius: 999px; white-space: nowrap;
-}
-.poker-seat-label.fold { background: ${C.rose}22; color: ${C.rose}; }
-.poker-seat-label.check { background: ${C.border}; color: ${C.muted}; }
-.poker-seat-label.call { background: ${C.accent}22; color: ${C.accent}; }
-.poker-seat-label.raise { background: ${C.gold}22; color: ${C.gold}; }
-.poker-seat-label.allin { background: ${C.violet}22; color: ${C.violet}; }
-.poker-seat-label.bet { background: ${C.gold}22; color: ${C.gold}; }
-.poker-seat-timer {
-  width: 100%; height: 2px; background: ${C.border}; border-radius: 1px; overflow: hidden; margin-top: 0.1rem;
-}
-.poker-seat-timer-bar { height: 100%; background: ${C.gold}; transition: width 0.3s linear; border-radius: 1px; }
-.poker-community {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
-  pointer-events: none;
-}
-.poker-pot-row {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
-  color: ${C.gold}; font-weight: 600;
-  background: rgba(0,0,0,0.5); padding: 0.18rem 0.5rem; border-radius: 999px;
-}
-.poker-board { display: flex; gap: 0.28rem; }
-.poker-card-slot {
-  width: 34px; height: 50px; border-radius: 5px;
-  background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.18);
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; overflow: hidden;
-}
-.poker-card {
-  width: 34px; height: 50px; border-radius: 5px; background: #fff; color: #111;
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
-  flex-shrink: 0; user-select: none;
-}
-.poker-card.back {
-  background: ${C.accent}; border-color: ${C.accent}80;
-  background-image: repeating-linear-gradient(
-    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
-  );
-}
-.poker-card.red { color: ${C.rose}; }
-.poker-card.flip-in { animation: poker-flip-in 220ms ease both; }
-.poker-card-rank { font-size: 0.65rem; line-height: 1; }
-.poker-card-suit { font-size: 0.75rem; line-height: 1; align-self: center; }
-.poker-card-suit-bot { transform: rotate(180deg); align-self: flex-end; }
-.poker-card-lg {
-  width: 40px; height: 58px; border-radius: 6px; background: #fff; color: #111;
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 2px 3px; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem; font-weight: 700; border: 1px solid rgba(0,0,0,0.12);
-  flex-shrink: 0; user-select: none;
-}
-.poker-card-lg.back {
-  background: ${C.accent}; border-color: ${C.accent}80;
-  background-image: repeating-linear-gradient(
-    45deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 2px, transparent 2px, transparent 7px
-  );
-}
-.poker-card-lg.red { color: ${C.rose}; }
-.poker-street {
-  font-size: 0.65rem; font-weight: 600; color: ${C.emerald};
-  letter-spacing: 0.07em; text-transform: uppercase;
-}
-.poker-action-bar {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.55);
-  border-top: 1px solid ${C.border}44; flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.poker-action-btn {
-  flex: 1; min-width: 62px; padding: 0.55rem 0.4rem; border-radius: 10px; cursor: pointer;
-  font-family: inherit; font-size: 0.82rem; font-weight: 700; border: 1px solid transparent;
-  transition: opacity 0.12s, transform 0.08s; text-align: center;
-}
-.poker-action-btn:active:not(:disabled) { transform: scale(0.96); }
-.poker-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.poker-action-btn.fold { background: ${C.rose}22; border-color: ${C.rose}55; color: ${C.rose}; }
-.poker-action-btn.fold:hover:not(:disabled) { background: ${C.rose}33; }
-.poker-action-btn.check { background: ${C.border}; border-color: ${C.border}; color: ${C.text}; }
-.poker-action-btn.check:hover:not(:disabled) { background: ${C.dim}; }
-.poker-action-btn.call { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
-.poker-action-btn.call:hover:not(:disabled) { opacity: 0.88; }
-.poker-action-btn.raise { background: ${C.gold}22; border-color: ${C.gold}55; color: ${C.gold}; }
-.poker-action-btn.raise:hover:not(:disabled) { background: ${C.gold}33; }
-.poker-action-btn.allin { background: ${C.violet}22; border-color: ${C.violet}55; color: ${C.violet}; }
-.poker-action-btn.allin:hover:not(:disabled) { background: ${C.violet}33; }
-.poker-action-btn.next { background: ${C.emerald}22; border-color: ${C.emerald}55; color: ${C.emerald}; }
-.poker-action-btn.next:hover:not(:disabled) { background: ${C.emerald}33; }
-.poker-raise-panel {
-  position: absolute; bottom: 100%; left: 0; right: 0;
-  background: ${C.card}; border-top: 1px solid ${C.border};
-  padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;
-  animation: slideUp 0.18s ease;
-}
-@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.poker-preset-row { display: flex; gap: 0.4rem; }
-.poker-preset-btn {
-  flex: 1; padding: 0.4rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.75rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s;
-}
-.poker-preset-btn:hover { border-color: ${C.gold}; color: ${C.gold}; }
-.poker-preset-btn.sel { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}15; }
-.poker-raise-row { display: flex; align-items: center; gap: 0.5rem; }
-.poker-raise-slider { flex: 1; accent-color: ${C.gold}; }
-.poker-raise-input {
-  width: 60px; background: ${C.surface}; border: 1px solid ${C.border};
-  color: ${C.gold}; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
-  border-radius: 6px; padding: 0.3rem 0.4rem; text-align: center;
-}
-.poker-raise-row-btns { display: flex; gap: 0.4rem; }
-.poker-raise-confirm { flex: 1; background: ${C.gold}; color: #000; border: none; border-radius: 8px; padding: 0.45rem; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
-.poker-raise-cancel { background: none; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 8px; padding: 0.45rem 0.7rem; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
-.poker-float-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 20; }
-.poker-float-btn {
-  width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6);
-  border: 1px solid ${C.border}55; color: ${C.text}; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
-  transition: background 0.12s;
-}
-.poker-float-btn:hover { background: rgba(0,0,0,0.8); }
-.poker-float-popover {
-  position: absolute; top: 100%; right: 0; margin-top: 0.4rem;
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
-  padding: 0.4rem; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  display: flex; flex-direction: column; gap: 0.2rem;
-}
-.poker-float-item {
-  background: none; border: none; color: ${C.text}; cursor: pointer;
-  font-family: inherit; font-size: 0.85rem; padding: 0.5rem 0.75rem;
-  text-align: left; border-radius: 7px; transition: background 0.1s;
-}
-.poker-float-item:hover { background: ${C.border}44; }
-.poker-sidebar {
-  position: fixed; top: 0; bottom: 0; width: 280px; max-width: 85vw;
-  background: ${C.card}; border: 1px solid ${C.border};
-  display: flex; flex-direction: column; z-index: 30;
-  transition: transform 0.22s ease; overflow: hidden;
-}
-.poker-sidebar.left { left: 0; border-radius: 0 14px 14px 0; transform: translateX(-100%); }
-.poker-sidebar.left.open { transform: translateX(0); }
-.poker-sidebar.right { right: 0; border-radius: 14px 0 0 14px; transform: translateX(100%); }
-.poker-sidebar.right.open { transform: translateX(0); }
-.poker-sidebar-header {
-  display: flex; align-items: center; padding: 0.75rem 1rem;
-  border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; flex-shrink: 0;
-}
-.poker-sidebar-close {
-  margin-left: auto; background: none; border: none; color: ${C.muted};
-  cursor: pointer; font-size: 1.1rem; display: flex; align-items: center;
-}
-.poker-sidebar-close:hover { color: ${C.text}; }
-.poker-sidebar-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.poker-sidebar-section { border-bottom: 1px solid ${C.border}22; padding-bottom: 0.5rem; }
-.poker-sidebar-section-title { font-size: 0.72rem; font-weight: 700; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.4rem; }
-.poker-log-entry { font-size: 0.78rem; color: ${C.muted}; padding: 0.2rem 0; border-bottom: 1px solid ${C.border}22; }
-.poker-log-entry.win { color: ${C.emerald}; }
-.poker-log-entry.lose { color: ${C.rose}; }
-.poker-log-entry.hand { color: ${C.gold}; font-weight: 600; }
-.poker-chat-msg { font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid ${C.border}22; }
-.poker-chat-msg .who { font-weight: 600; }
-.poker-chat-msg .who.player { color: ${C.accent}; }
-.poker-chat-msg .who.bot { color: ${C.muted}; }
-.poker-chat-input-row { display: flex; gap: 0.4rem; padding-top: 0.5rem; flex-shrink: 0; }
-.poker-chat-input {
-  flex: 1; background: ${C.surface}; border: 1px solid ${C.border};
-  color: ${C.text}; border-radius: 8px; padding: 0.45rem 0.6rem;
-  font-family: inherit; font-size: 0.82rem;
-}
-.poker-chat-send {
-  background: ${C.accent}; border: none; color: #fff; border-radius: 8px;
-  padding: 0.45rem 0.75rem; cursor: pointer; font-family: inherit; font-size: 0.82rem; font-weight: 600;
-}
-.poker-drawer {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: ${C.card}; border-top: 1px solid ${C.border};
-  border-radius: 14px 14px 0 0; z-index: 30;
-  max-height: 60vh; display: flex; flex-direction: column;
-  transform: translateY(100%); transition: transform 0.22s ease;
-}
-.poker-drawer.open { transform: translateY(0); }
-.poker-drawer-handle { width: 36px; height: 4px; background: ${C.border}; border-radius: 2px; margin: 0.6rem auto 0; }
-.poker-drawer-header { display: flex; align-items: center; padding: 0.6rem 1rem; border-bottom: 1px solid ${C.border}; font-weight: 700; gap: 0.5rem; }
-.poker-drawer-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.poker-setup {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1.25rem; padding: 1.5rem 1.25rem; text-align: center; overflow-y: auto;
-}
-.poker-setup-title { font-size: 1.4rem; font-weight: 700; }
-.poker-setup-sub { font-size: 0.85rem; color: ${C.muted}; }
-.poker-setup-card {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
-  padding: 1.25rem; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 1rem;
-}
-.poker-setup-label { font-size: 0.78rem; font-weight: 600; color: ${C.muted}; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
-.poker-setup-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.poker-bot-btn {
-  flex: 1; min-width: 44px; padding: 0.5rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.88rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
-}
-.poker-bot-btn:hover { border-color: ${C.accent}; }
-.poker-bot-btn.sel { background: ${C.accent}22; border-color: ${C.accent}; color: ${C.accent}; }
-.poker-diff-btn {
-  flex: 1; padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer; font-family: inherit;
-  font-size: 0.82rem; font-weight: 600; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; transition: border-color 0.12s, background 0.12s;
-}
-.poker-diff-btn:hover { border-color: ${C.gold}; }
-.poker-diff-btn.sel { background: ${C.gold}15; border-color: ${C.gold}; color: ${C.gold}; }
-.poker-setup-chips { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: ${C.gold}; font-weight: 600; }
-.poker-start-btn {
-  width: 100%; padding: 0.75rem; border-radius: 10px; cursor: pointer; font-family: inherit;
-  font-size: 1rem; font-weight: 700; border: none; background: ${C.accent}; color: #fff;
-  transition: opacity 0.12s;
-}
-.poker-start-btn:hover { opacity: 0.88; }
-/* ---- Hand Strength Panel ---- */
-.poker-hand-panel {
-  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px;
-  padding: 0.28rem 0.38rem; margin-top: 0.28rem; font-size: 0.62rem; width: 100%;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-.poker-hand-panel.improved {
-  animation: poker-hand-improve 0.55s ease;
-  border-color: ${C.gold}88;
-}
-@keyframes poker-hand-improve {
-  0%   { transform: scale(1); box-shadow: none; }
-  30%  { transform: scale(1.06); box-shadow: 0 0 10px ${C.gold}55; }
-  100% { transform: scale(1); box-shadow: none; }
-}
-.poker-hand-panel-rank {
-  display: flex; align-items: center; gap: 0.22rem; font-weight: 700; font-size: 0.65rem; line-height: 1.2;
-}
-.poker-hand-panel-name { color: ${C.gold}; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.poker-hand-panel-num { color: ${C.dim}; font-size: 0.58rem; font-family: 'JetBrains Mono', monospace; }
-.poker-hand-panel-desc { color: ${C.muted}; font-size: 0.58rem; margin: 0.12rem 0 0.18rem; line-height: 1.2; }
-.poker-hand-panel-cards { display: flex; gap: 0.12rem; flex-wrap: wrap; }
-.poker-hand-card {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; padding: 0.08rem 0.14rem;
-  border-radius: 3px; border: 1px solid transparent; background: rgba(255,255,255,0.05);
-  color: ${C.text}; letter-spacing: -0.02em;
-}
-.poker-hand-card.used {
-  border-color: ${C.gold}99; background: rgba(251,191,36,0.15); box-shadow: 0 0 5px ${C.gold}44;
-}
-.poker-hand-card.unused { opacity: 0.42; }
-.poker-hand-card.red { color: ${C.rose}; }
-/* ---- Seat card highlighting (hole cards) ---- */
-.poker-seat-card-hl { position: relative; display: inline-block; }
-.poker-seat-card-hl.hl-used .poker-card,
-.poker-seat-card-hl.hl-used .poker-card-lg { box-shadow: 0 0 7px ${C.gold}88; border-color: ${C.gold}; }
-.poker-seat-card-hl.hl-unused .poker-card,
-.poker-seat-card-hl.hl-unused .poker-card-lg { opacity: 0.45; }
-.poker-winner-overlay {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.75); z-index: 25;
-}
-.poker-winner-msg {
-  background: ${C.card}; border: 2px solid ${C.gold}; border-radius: 16px;
-  padding: 1.5rem 2rem; text-align: center; display: flex; flex-direction: column; gap: 0.6rem;
-  box-shadow: 0 0 30px ${C.gold}44;
-}
-.poker-winner-msg h2 { font-size: 1.4rem; font-weight: 700; color: ${C.gold}; }
-.poker-winner-msg .sub { font-size: 0.88rem; color: ${C.muted}; }
-.poker-hand-hist-item { background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.8rem; }
-.poker-hand-hist-title { font-weight: 600; color: ${C.text}; margin-bottom: 0.25rem; }
-.poker-hand-hist-detail { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
-.poker-overlay-backdrop { position: fixed; inset: 0; z-index: 25; }
-@keyframes poker-pulse {
-  0%, 100% { box-shadow: 0 0 8px ${C.gold}44; }
-  50% { box-shadow: 0 0 18px ${C.gold}99, 0 0 32px ${C.gold}44; }
-}
-@keyframes poker-flip-in {
-  from { transform: rotateY(90deg) scale(0.8); opacity: 0; }
-  to { transform: rotateY(0deg) scale(1); opacity: 1; }
-}
-@keyframes poker-winner-glow {
-  0%, 100% { box-shadow: 0 0 8px ${C.emerald}44; }
-  50% { box-shadow: 0 0 24px ${C.emerald}88; }
-}
-@media (max-width: 768px) {
-  .poker-oval { width: min(95vw, 480px); height: min(57vw, 280px); }
-  .poker-seat { min-width: 70px; max-width: 95px; }
-  .poker-card { width: 28px; height: 42px; font-size: 0.6rem; }
-  .poker-card-slot { width: 28px; height: 42px; }
-  .poker-card-lg { width: 32px; height: 48px; }
-  .poker-action-btn { min-width: 52px; font-size: 0.75rem; padding: 0.45rem 0.3rem; }
-}
-@media (max-width: 480px) {
-  .poker-oval { width: 98vw; height: 58vw; }
-  .poker-seat { min-width: 62px; max-width: 82px; padding: 0.25rem 0.35rem; }
-  .poker-seat-avatar { width: 22px; height: 22px; font-size: 0.6rem; }
-  .poker-card { width: 22px; height: 34px; font-size: 0.5rem; }
-  .poker-card-slot { width: 22px; height: 34px; }
-  .poker-card-lg { width: 26px; height: 38px; }
-  .poker-card-rank { font-size: 0.5rem; }
-  .poker-card-suit { font-size: 0.6rem; }
-  .poker-action-btn { min-width: 44px; font-size: 0.7rem; padding: 0.4rem 0.2rem; }
-  .poker-action-bar { padding: 0.4rem 0.5rem; gap: 0.35rem; }
-}
-
 @media (orientation: landscape) and (max-height: 560px) {
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
@@ -3385,175 +3061,6 @@ body {
   .cg-sheet, .tm-grid .tm-tile, .dr-gem, .snake-cell { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
 }
-
-/* ---- Idle Clicker ---- */
-.idle-container { display: flex; flex-direction: column; height: 100%; }
-.idle-main { flex: 1; padding: 1.5rem 1.25rem; max-width: 800px; margin: 0 auto; width: 100%; }
-.idle-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; }
-.idle-stat-box {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  padding: 0.8rem;
-  text-align: center;
-}
-.idle-stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
-.idle-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1.2rem; margin-top: 0.2rem; }
-.idle-stat-value.currency { color: ${C.gold}; }
-.idle-stat-value.prestige { color: ${C.accent}; }
-.idle-stat-value.income { color: ${C.emerald}; }
-
-.idle-tap-section { text-align: center; margin-bottom: 2rem; }
-.idle-tap-btn {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, ${C.gold}, ${C.accent});
-  border: 3px solid ${C.border};
-  color: white;
-  font-size: 2.5rem;
-  cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-  font-weight: 700;
-}
-.idle-tap-btn:active { transform: scale(0.95); box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-.idle-tap-label { font-size: 0.85rem; color: ${C.muted}; margin-top: 0.5rem; }
-
-.idle-shop { margin-top: 1rem; }
-.idle-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid ${C.border};
-}
-.idle-tab {
-  padding: 0.75rem 1.25rem;
-  background: none;
-  border: none;
-  color: ${C.muted};
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 600;
-  position: relative;
-  transition: color 0.12s ease;
-}
-.idle-tab.active {
-  color: ${C.accent};
-  font-weight: 700;
-}
-.idle-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: ${C.accent};
-}
-
-.idle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
-.idle-card {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 12px;
-  padding: 1rem;
-  cursor: pointer;
-  transition: border-color 0.12s ease, transform 0.12s ease;
-}
-.idle-card:hover { border-color: ${C.accent}; transform: translateY(-2px); }
-.idle-card-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-.idle-card-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.3rem; }
-.idle-card-desc { font-size: 0.75rem; color: ${C.muted}; margin-bottom: 0.5rem; }
-.idle-card-stats { font-size: 0.7rem; color: ${C.muted}; margin-bottom: 0.5rem; }
-.idle-card-btn {
-  width: 100%;
-  padding: 0.5rem;
-  background: ${C.accent};
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-.idle-card-btn:hover { background: #4F52D9; }
-.idle-card-btn:disabled { background: ${C.muted}; cursor: not-allowed; }
-
-.idle-coin-popup {
-  position: fixed;
-  pointer-events: none;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
-  color: ${C.gold};
-  font-size: 1.2rem;
-  animation: float-up 1s ease-out forwards;
-}
-@keyframes float-up {
-  0% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-40px); }
-}
-
-.prestige-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 14, 26, 0.85);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 1.25rem;
-}
-.prestige-card {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 18px;
-  padding: 2rem;
-  text-align: center;
-  max-width: 380px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-.prestige-card h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
-.prestige-card .sub { color: ${C.muted}; font-size: 0.9rem; margin-bottom: 1.25rem; }
-.prestige-rows {
-  text-align: left;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.9rem;
-  border-top: 1px solid ${C.border};
-  border-bottom: 1px solid ${C.border};
-  padding: 1rem 0;
-  margin-bottom: 1.25rem;
-}
-.prestige-row { display: flex; justify-content: space-between; padding: 0.3rem 0; }
-.prestige-row .k { color: ${C.muted}; }
-.prestige-row .v { color: ${C.gold}; font-weight: 600; }
-.prestige-buttons { display: flex; gap: 0.8rem; }
-.prestige-confirm {
-  flex: 1;
-  padding: 0.8rem;
-  background: ${C.accent};
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-.prestige-confirm:hover { background: #4F52D9; }
-.prestige-cancel {
-  flex: 1;
-  padding: 0.8rem;
-  background: ${C.surface};
-  color: ${C.text};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-}
-.prestige-cancel:hover { border-color: ${C.accent}; }
 
 /* ---- Knight's Tour ---- */
 .kt-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
@@ -3729,161 +3236,6 @@ body {
 .dr-end-btns { display: flex; flex-direction: column; gap: 0.55rem; width: 100%; margin-top: 0.5rem; }
 .dr-hint { color: ${C.muted}; font-size: 0.8rem; }
 
-/* ---- PvP Arena ---- */
-.pvp-lobby { max-width: 680px; margin: 0 auto; padding: 0.25rem 0; }
-.pvp-header { margin-bottom: 1.5rem; text-align: center; }
-.pvp-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.25rem; }
-.pvp-subtitle { color: ${C.muted}; font-size: 0.9rem; }
-.pvp-balance {
-  margin-top: 0.7rem; display: inline-block;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.9rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
-  color: ${C.gold};
-}
-.pvp-how {
-  display: flex; flex-direction: column; gap: 0.4rem;
-  background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 1.5rem;
-}
-.pvp-how-step { font-size: 0.85rem; color: ${C.muted}; }
-.pvp-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.9rem; }
-.pvp-tier-card {
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 14px; padding: 1.1rem;
-  display: flex; flex-direction: column; gap: 0.4rem;
-  transition: border-color 0.12s, box-shadow 0.12s;
-}
-.pvp-tier-card:hover { border-color: var(--pvp-color); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
-.pvp-tier-label { font-size: 1.15rem; font-weight: 700; color: var(--pvp-color); }
-.pvp-tier-desc { font-size: 0.82rem; color: ${C.muted}; }
-.pvp-tier-payout { font-size: 0.78rem; color: ${C.text}; font-family: 'JetBrains Mono', monospace; }
-.pvp-tier-btn {
-  margin-top: 0.5rem; border: none; border-radius: 10px; color: #fff;
-  font-family: inherit; font-size: 0.9rem; font-weight: 600;
-  padding: 0.65rem; cursor: pointer; transition: opacity 0.12s;
-}
-.pvp-tier-btn:disabled { opacity: 0.5; cursor: default; }
-.pvp-tier-btn:not(:disabled):hover { opacity: 0.85; }
-.pvp-matchmaking {
-  max-width: 400px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
-}
-.pvp-mm-icon { font-size: 3rem; }
-.pvp-mm-title { font-size: 1.25rem; font-weight: 700; }
-.pvp-mm-code {
-  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 10px; padding: 0.5rem 1.2rem; color: ${C.accent};
-  letter-spacing: 0.08em;
-}
-.pvp-mm-hint { color: ${C.muted}; font-size: 0.85rem; }
-.pvp-cancel-btn {
-  margin-top: 0.5rem; background: transparent; border: 1px solid ${C.border};
-  color: ${C.muted}; border-radius: 10px; padding: 0.5rem 1.2rem;
-  font-family: inherit; font-size: 0.875rem; cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
-}
-.pvp-cancel-btn:hover { border-color: ${C.rose}; color: ${C.rose}; }
-.pvp-mm-pulse {
-  width: 2.5rem; height: 2.5rem; border-radius: 50%;
-  border: 3px solid ${C.accent}; border-top-color: transparent;
-  animation: pvp-spin 0.8s linear infinite;
-}
-@keyframes pvp-spin { to { transform: rotate(360deg); } }
-.pvp-deposit {
-  max-width: 360px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; gap: 0.75rem; align-items: center;
-}
-.pvp-deposit-title { font-size: 1.2rem; font-weight: 700; }
-.pvp-deposit-amount {
-  font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; font-weight: 700;
-  color: ${C.gold};
-}
-.pvp-deposit-hint { color: ${C.muted}; font-size: 0.82rem; }
-.pvp-waiting {
-  max-width: 360px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem;
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
-}
-.pvp-waiting-title { font-size: 1.1rem; font-weight: 600; }
-.pvp-waiting-hint { color: ${C.muted}; font-size: 0.85rem; }
-.pvp-game-wrap .pvp-vs-bar {
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 12px; padding: 0.55rem 1rem; margin-bottom: 0.75rem;
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 0.85rem;
-}
-.pvp-vs-bar .pvp-vs-opp { color: ${C.muted}; }
-.pvp-vs-bar .pvp-vs-label {
-  font-weight: 700; font-size: 0.75rem; letter-spacing: 0.08em;
-  color: ${C.rose}; text-transform: uppercase;
-}
-.pvp-vs-bar .pvp-forfeit-btn {
-  background: transparent; border: 1px solid ${C.border}; color: ${C.muted};
-  border-radius: 8px; padding: 0.3rem 0.65rem; font-size: 0.78rem;
-  font-family: inherit; cursor: pointer; transition: border-color 0.12s, color 0.12s;
-}
-.pvp-vs-bar .pvp-forfeit-btn:hover { border-color: ${C.rose}; color: ${C.rose}; }
-.pvp-result {
-  max-width: 360px; margin: 2rem auto; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem;
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
-}
-.pvp-result-emoji { font-size: 3rem; }
-.pvp-result-title { font-size: 1.4rem; font-weight: 700; }
-.pvp-result .pvp-result-btns { width: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
-.pvp-auth-msg {
-  text-align: center; color: ${C.muted}; padding: 2rem;
-  font-size: 0.95rem;
-}
-.pvp-mm-countdown {
-  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
-  color: ${C.accent}; letter-spacing: 0.06em;
-}
-.pvp-mm-countdown-expired { color: ${C.rose}; }
-.pvp-mm-btns { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
-.pvp-reclaim-btn {
-  background: ${C.rose}; border: none; border-radius: 10px; color: #fff;
-  font-family: inherit; font-size: 0.9rem; font-weight: 600;
-  padding: 0.6rem 1.4rem; cursor: pointer; transition: opacity 0.12s;
-}
-.pvp-reclaim-btn:disabled { opacity: 0.55; cursor: default; }
-.pvp-reclaim-btn:not(:disabled):hover { opacity: 0.85; }
-.pvp-opp-bar { flex: 1; margin: 0 0.75rem; }
-.pvp-opp-bar-label { font-size: 0.72rem; color: ${C.muted}; margin-bottom: 0.2rem; }
-.pvp-opp-bar-track {
-  height: 6px; background: ${C.surface}; border-radius: 99px; overflow: hidden;
-}
-.pvp-opp-bar-fill {
-  height: 100%; background: ${C.violet}; border-radius: 99px;
-  transition: width 0.5s ease;
-}
-.pvp-telem-summary {
-  width: 100%; background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 10px; padding: 0.65rem 0.9rem;
-  display: flex; flex-direction: column; gap: 0.3rem;
-}
-.pvp-telem-row {
-  display: flex; justify-content: space-between; font-size: 0.82rem; color: ${C.muted};
-}
-.pvp-telem-row .mono { color: ${C.text}; }
-.pvp-prize-anim {
-  width: 100%; background: ${C.surface}; border: 1px solid ${C.emerald};
-  border-radius: 10px; padding: 0.65rem 0.9rem;
-  display: flex; flex-direction: column; gap: 0.35rem;
-  animation: pvp-prize-fade 0.5s ease;
-}
-@keyframes pvp-prize-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.pvp-prize-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: ${C.emerald}; margin-bottom: 0.15rem; }
-.pvp-prize-row {
-  display: flex; justify-content: space-between; font-size: 0.82rem; color: ${C.muted};
-}
-.pvp-prize-row .mono { color: ${C.text}; }
-.pvp-prize-winner { color: ${C.emerald}; font-weight: 600; }
-.pvp-prize-winner .mono { color: ${C.emerald}; }
-
 /* ---- Tile Match Puzzle menu & competitive tabs ---- */
 .tm-menu { display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; width: 100%; }
 .tm-menu-header {
@@ -3891,13 +3243,6 @@ body {
   padding: 0.5rem 0 0.6rem; gap: 0.5rem;
 }
 .tm-menu-header h2 { font-size: 1rem; font-weight: 700; margin: 0; flex: 1; }
-.tm-wallet-chip {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 20px; padding: 0.25rem 0.65rem;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
-  font-weight: 600; color: ${C.gold}; white-space: nowrap;
-}
 .tm-menu-tabs {
   display: flex; gap: 0.15rem;
   border-bottom: 1px solid ${C.border};
@@ -3947,7 +3292,7 @@ body {
   padding: 0.45rem 0.85rem; font-family: inherit; font-size: 0.83rem;
   font-weight: 600; cursor: pointer; transition: background 0.12s;
 }
-.tm-duel-find-btn:hover:not(:disabled) { background: #4F52D9; }
+.tm-duel-find-btn:hover:not(:disabled) { background: #234C8E; }
 .tm-duel-find-btn:disabled { opacity: 0.35; cursor: not-allowed; background: ${C.muted}; }
 .tm-duel-matchmaking {
   text-align: center; padding: 2rem 1rem;
@@ -4023,93 +3368,10 @@ body {
 .wallet-addr-row {
   display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
 }
-.wallet-balance-big {
-  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
-  color: ${C.emerald};
-}
-.wallet-balance-sub { font-size: 0.8rem; color: ${C.muted}; margin-top: 0.2rem; }
-.wallet-pending-big {
-  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
-  color: ${C.gold};
-}
-.wallet-mock-badge {
-  display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px;
-  background: ${C.dim}; border: 1px solid ${C.border};
-  font-size: 0.68rem; color: ${C.muted}; margin-bottom: 1rem;
-}
-.wallet-activity-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.45rem 0; border-bottom: 1px solid ${C.border}40;
-  font-size: 0.83rem;
-}
-.wallet-activity-row:last-child { border-bottom: none; }
-.wallet-activity-kind { color: ${C.muted}; }
-.wallet-activity-amt { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
-.wallet-activity-earned { color: ${C.emerald}; }
-.wallet-activity-tip-recv { color: ${C.gold}; }
-.wallet-activity-tip-sent { color: ${C.rose}; }
 .wallet-no-wallet {
   text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
 }
 .wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
-.wallet-freeze-info {
-  font-size: 0.8rem; color: ${C.muted}; margin-top: 0.35rem;
-}
-/* ---- Nav wallet chip ---- */
-.nav-wallet-chip {
-  display: flex; align-items: center; gap: 0.35rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.7rem;
-  cursor: pointer; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
-  color: ${C.emerald}; transition: border-color 0.15s;
-}
-.nav-wallet-chip:hover { border-color: ${C.emerald}; }
-.nav-match-chip {
-  display: flex; align-items: center; gap: 0.35rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.7rem;
-  font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
-  color: ${C.gold}; white-space: nowrap;
-}
-.nav-integration-chip {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.7rem;
-  font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
-  color: ${C.accent};
-}
-/* ---- Tip modal ---- */
-.tip-modal-backdrop {
-  position: fixed; inset: 0; background: #00000099; z-index: 50;
-  display: flex; align-items: center; justify-content: center;
-}
-.tip-modal {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
-  padding: 1.5rem; width: min(95vw, 380px);
-}
-.tip-modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
-.tip-presets { display: flex; gap: 0.5rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
-.tip-preset-btn {
-  padding: 0.35rem 0.8rem; border-radius: 8px; border: 1px solid ${C.border};
-  background: ${C.surface}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.85rem; cursor: pointer; transition: border-color 0.12s;
-}
-.tip-preset-btn.active { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
-.tip-input {
-  width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px;
-  border: 1px solid ${C.border}; background: ${C.surface}; color: ${C.text};
-  font-family: 'JetBrains Mono', monospace; font-size: 1rem;
-  margin-bottom: 0.85rem;
-}
-.tip-input:focus { outline: none; border-color: ${C.accent}; }
-/* ---- Win overlay reward line ---- */
-.win-reward-row {
-  display: flex; justify-content: space-between; padding: 0.4rem 0;
-  border-top: 1px solid ${C.border}40; margin-top: 0.4rem;
-}
-.win-reward-row .k { color: ${C.muted}; font-size: 0.88rem; }
-.win-reward-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; }
-
 /* ---- DApp Mode ---- */
 .dapp-badge {
   display: inline-flex; align-items: center; gap: 0.4rem; width: 100%;
@@ -4210,6 +3472,111 @@ body {
   .badges-earned-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
   .badges-earned-row.hide { display: none; }
 }
+/* ---- Phase 5 board games (Checkers / Reversi / Four in a Row / Gomoku / Ludo) ---- */
+.brg-intro {
+  font-size: 0.85rem; color: ${C.text}; background: ${C.accent}14;
+  border: 1px solid ${C.accent}44; border-radius: 10px;
+  padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; text-align: center;
+}
+.brg-note {
+  text-align: center; font-size: 0.8rem; color: ${C.gold}; margin: 0.4rem 0;
+  display: flex; gap: 0.8rem; justify-content: center; align-items: center; flex-wrap: wrap;
+}
+.brg-legend {
+  display: flex; gap: 0.9rem; justify-content: center; align-items: center;
+  font-size: 0.72rem; color: ${C.muted}; margin-top: 0.6rem; flex-wrap: wrap;
+}
+.brg-legend > span { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+.ck-board {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
+  border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
+}
+.ck-cell { background: #d8c49a; display: flex; align-items: center; justify-content: center; }
+.ck-cell.dark { background: #7a5a3a; cursor: pointer; }
+.ck-cell.sel { box-shadow: inset 0 0 0 3px ${C.gold}; }
+.ck-piece {
+  width: 74%; height: 74%; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; color: #ffffffcc;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.35);
+}
+.ck-piece.p1 { background: ${C.accent}; }
+.ck-piece.p2 { background: #2b2f3d; border: 1px solid #555; }
+.ck-piece-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
+.ck-piece-mini.p1 { background: ${C.accent}; }
+.ck-piece-mini.p2 { background: #2b2f3d; border: 1px solid #555; }
+
+.rv-board {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
+  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
+}
+.rv-cell { background: #1d5c3a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.rv-disc { width: 76%; height: 76%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
+.rv-disc.d1, .rv-disc-mini.d1 { background: #171a24; border: 1px solid #444; }
+.rv-disc.d2, .rv-disc-mini.d2 { background: #f2f0e8; }
+.rv-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
+.rv-count { display: inline-flex; align-items: center; gap: 0.3rem; color: ${C.text}; font-weight: 600; }
+
+.fir-board {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  width: min(92vw, 340px); margin: 0 auto; padding: 8px;
+  background: #22335e; border-radius: 12px;
+}
+.fir-cell {
+  aspect-ratio: 1; background: ${C.bg || '#0a0e1a'}; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.fir-cell.last { box-shadow: 0 0 0 2px ${C.gold}; }
+.fir-disc { width: 86%; height: 86%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
+.fir-disc.d1, .fir-disc-mini.d1 { background: ${C.rose}; }
+.fir-disc.d2, .fir-disc-mini.d2 { background: ${C.gold}; }
+.fir-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
+
+.gmk-scroll { overflow-x: auto; }
+.gmk-board {
+  display: grid; grid-template-columns: repeat(15, 1fr); gap: 1px;
+  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
+  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 6px; overflow: hidden;
+}
+.gmk-cell { background: #b08b4f; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.gmk-cell.last { box-shadow: inset 0 0 0 2px ${C.gold}; }
+.gmk-stone { width: 78%; height: 78%; border-radius: 50%; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3); }
+.gmk-stone.s1 { background: #171a24; }
+.gmk-stone.s2 { background: #f2f0e8; }
+
+.ludo-board {
+  display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
+  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
+  background: ${C.surface}; border: 2px solid ${C.border}; border-radius: 10px;
+  position: relative; padding: 2px; gap: 1px;
+}
+.ludo-cell {
+  border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; color: ${C.muted};
+}
+.ludo-cell.ring { background: ${C.card}; border: 1px solid ${C.border}; }
+.ludo-cell.ring.safe { color: ${C.gold}; }
+.ludo-cell.ring.start1 { background: ${C.accent}33; border-color: ${C.accent}; }
+.ludo-cell.ring.start2 { background: ${C.rose}33; border-color: ${C.rose}; }
+.ludo-cell.home1 { background: ${C.accent}22; border: 1px dashed ${C.accent}66; }
+.ludo-cell.home2 { background: ${C.rose}22; border: 1px dashed ${C.rose}66; }
+.ludo-cell.base1 { background: ${C.accent}18; border: 1px solid ${C.accent}55; border-radius: 50%; }
+.ludo-cell.base2 { background: ${C.rose}18; border: 1px solid ${C.rose}55; border-radius: 50%; }
+.ludo-cell.center { background: ${C.gold}22; border: 1px solid ${C.gold}; font-size: 0.8rem; }
+.ludo-token {
+  z-index: 2; width: 85%; height: 85%; border-radius: 50%; align-self: center; justify-self: center;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; font-weight: 700; color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.ludo-token.p1 { background: ${C.accent}; }
+.ludo-token.p2 { background: ${C.rose}; }
+.ludo-token.movable { cursor: pointer; box-shadow: 0 0 0 2px ${C.gold}, 0 1px 3px rgba(0,0,0,0.5); animation: ludoPulse 0.9s ease-in-out infinite; }
+@keyframes ludoPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
 /* ---- Chutes & Ladders ---- */
 .cnl-banner {
   text-align: center; font-size: 0.82rem; font-weight: 600;
@@ -4301,7 +3668,7 @@ body {
 /* ---- Pre-launch Game Mode Modal ---- */
 .gm-modal-backdrop {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(8, 10, 18, 0.72); backdrop-filter: blur(4px);
+  background: rgba(38,33,18,0.5); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; padding: 1rem;
   animation: gmFade 0.18s ease-out;
 }
@@ -4309,7 +3676,7 @@ body {
 .gm-modal {
   position: relative; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto;
   background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 50px rgba(63,51,24,0.22);
 }
 .gm-modal-close {
   position: absolute; top: 0.75rem; right: 0.75rem; width: 2rem; height: 2rem;
@@ -4367,6 +3734,412 @@ body {
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
 .hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
+
+/* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
+.p6-btn {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 10px; padding: 8px 12px; font-family: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: border-color .15s;
+}
+.p6-btn:hover { border-color: ${C.accent}; }
+.p6-btn:disabled { opacity: .4; cursor: default; }
+.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgba(45,95,174,.14); }
+.p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
+.p6-banner {
+  background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.4); color: ${C.gold};
+  border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
+}
+
+.ce-card {
+  width: 44px; height: 62px; border-radius: 6px; box-sizing: border-box;
+  background: #F4F6FB; border: 1px solid #C9D2E4; cursor: pointer; user-select: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; line-height: 1; flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+.ce-card .ce-rank { font-size: 15px; font-weight: 700; }
+.ce-card .ce-suit { font-size: 15px; margin-top: 2px; }
+.ce-card.red { color: #DC2626; }
+.ce-card.black { color: #1E293B; }
+.ce-card.down {
+  background: repeating-linear-gradient(135deg, #3730A3, #3730A3 4px, #4338CA 4px, #4338CA 8px);
+  border-color: #312E81;
+}
+.ce-card.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; }
+.ce-card.dim { opacity: .5; }
+.ce-card.ce-slot {
+  background: rgba(255,255,255,.04); border: 1.5px dashed ${C.dim}; box-shadow: none;
+  color: ${C.dim}; font-size: 18px;
+}
+
+.kl-game { max-width: 400px; margin: 0 auto; }
+.kl-top { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
+.kl-gap { width: 14px; }
+.kl-tab { display: flex; gap: 6px; justify-content: center; }
+.kl-col { position: relative; width: 44px; }
+
+.sp-game { max-width: 420px; margin: 0 auto; }
+.sp-game .status-bar { flex-wrap: wrap; align-items: center; gap: 8px; }
+.sp-tab { display: flex; gap: 3px; justify-content: center; }
+.sp-col { position: relative; width: 34px; }
+.sp-col .ce-card { width: 34px; height: 46px; border-radius: 5px; }
+.sp-col .ce-card .ce-rank { font-size: 12px; }
+.sp-col .ce-card .ce-suit { font-size: 10px; margin-top: 1px; }
+.sp-col .ce-card.ce-slot.sm { font-size: 12px; }
+
+.mj-game { display: flex; flex-direction: column; align-items: center; }
+.mj-game .status-bar { align-items: center; gap: 8px; }
+.mj-board { position: relative; margin: 4px auto 0; }
+.mj-tile {
+  position: absolute; width: 36px; height: 46px; border-radius: 6px; cursor: pointer;
+  background: linear-gradient(180deg, #F8FAFF, #DDE4F2); border: 1px solid #B7C2D8;
+  border-bottom-width: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: 19px; user-select: none; box-shadow: 2px 3px 4px rgba(0,0,0,.45);
+}
+.mj-tile.blocked { filter: brightness(.62); cursor: default; }
+.mj-tile.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; filter: brightness(1.08); }
+.mj-tile.up1 { border-color: #A3B0CB; }
+.mj-tile.up2, .mj-tile.up3 { border-color: #8E9DBD; }
+
+.ng-game { max-width: 420px; margin: 0 auto; }
+.ng-modes { display: flex; gap: 6px; margin-left: auto; }
+.ng-wrap {
+  display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  justify-content: center; gap: 4px;
+}
+.ng-corner { grid-row: 1; grid-column: 1; }
+.ng-colclues { grid-row: 1; grid-column: 2; display: grid; grid-template-columns: repeat(8, 34px); gap: 2px; }
+.ng-colclue {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 12px; gap: 1px; padding-bottom: 2px;
+}
+.ng-rowclues { grid-row: 2; grid-column: 1; display: grid; grid-template-rows: repeat(8, 34px); gap: 2px; }
+.ng-rowclue {
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;
+  color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 12px; min-width: 34px;
+}
+.ng-grid { grid-row: 2; grid-column: 2; display: grid; grid-template-columns: repeat(8, 34px); grid-auto-rows: 34px; gap: 2px; }
+.ng-cell {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 4px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: ${C.muted}; font-size: 14px;
+}
+.ng-cell:nth-child(8n+4), .ng-cell:nth-child(8n+5) { border-left-color: ${C.dim}; }
+.ng-cell.fill { background: ${C.accent}; border-color: ${C.accent}; }
+.ng-cell.mark { color: ${C.dim}; }
+
+.mf-game { max-width: 420px; margin: 0 auto; }
+.mf-game .status-bar { align-items: center; gap: 8px; }
+.mf-grid { display: grid; grid-template-columns: repeat(9, 36px); grid-auto-rows: 36px; gap: 3px; justify-content: center; }
+.mf-cell {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 5px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; color: ${C.text};
+  user-select: none;
+}
+.mf-cell:not(.rev):hover { border-color: ${C.accent}; }
+.mf-cell.rev { background: rgba(255,255,255,.05); border-color: ${C.dim}; cursor: default; }
+.mf-cell.rev.mine { background: rgba(251,113,133,.15); }
+.mf-cell.boom { background: rgba(251,113,133,.45); border-color: ${C.rose}; }
+
+.an-game { max-width: 420px; margin: 0 auto; text-align: center; }
+.an-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+.an-dot {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 999px;
+  padding: 3px 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+}
+.an-dot.solved { border-color: ${C.emerald}; color: ${C.emerald}; }
+.an-dot.cur { border-color: ${C.accent}; color: ${C.text}; }
+.an-slots { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; }
+.an-slot {
+  width: 40px; height: 48px; border-radius: 8px; border: 1.5px dashed ${C.dim};
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: ${C.text};
+}
+.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgba(45,95,174,.10); }
+.an-slots.bad .an-slot.has { border-color: ${C.rose}; background: rgba(251,113,133,.12); animation: an-shake .4s; }
+@keyframes an-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.an-rack { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+.an-tile {
+  width: 44px; height: 52px; border-radius: 8px; border: 1px solid ${C.border}; cursor: pointer;
+  background: ${C.card}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
+  font-size: 20px; font-weight: 700;
+}
+.an-tile:hover { border-color: ${C.accent}; }
+.an-tile.used { opacity: .25; cursor: default; }
+.an-actions { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
+
+.cp-game { display: flex; flex-direction: column; align-items: center; }
+.cp-grid { display: grid; grid-auto-rows: 34px; gap: 2px; margin-bottom: 14px; }
+.cp-cell {
+  background: ${C.card}; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 20px; user-select: none;
+}
+.cp-cell.wall { background: ${C.dim}; border-radius: 2px; }
+.cp-cell.goal { background: rgba(30,143,99,.14); box-shadow: inset 0 0 0 2px rgba(30,143,99,.45); }
+.cp-crate.ongoal { filter: hue-rotate(60deg) brightness(1.2); }
+.cp-pad {
+  display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; margin-bottom: 10px;
+}
+.cp-pad .p6-btn { padding: 10px 0; }
+
+.ds-game { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+.ds-next {
+  position: relative; height: 30px; color: ${C.muted}; font-size: 12px; margin-bottom: 6px;
+  display: flex; align-items: flex-start; gap: 8px; padding-left: 0;
+}
+.ds-next { min-width: 120px; }
+.ds-next .ds-mini { position: absolute; width: 8px; height: 8px; border-radius: 2px; }
+.ds-next .ds-last { color: ${C.gold}; }
+.ds-grid {
+  display: grid; grid-template-columns: repeat(9, 30px); grid-auto-rows: 30px; gap: 2px;
+  background: rgba(255,255,255,.03); border: 1px solid ${C.border}; border-radius: 8px; padding: 6px;
+  margin-bottom: 12px;
+}
+.ds-cell { background: ${C.card}; border-radius: 3px; border: 1px solid transparent; cursor: pointer; }
+.ds-cell.hover { opacity: .5; }
+.ds-cell.ghost { background: transparent; border-style: dashed; }
+.ds-pad { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+
+/* ---- Phase 7: GotD hero, home reorg, chat ---- */
+.gotd-hero {
+  border: 1px solid ${C.border}; border-top: 3px solid var(--accent, ${C.accent});
+  background: linear-gradient(160deg, ${C.card}, ${C.surface});
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 1.4rem;
+}
+.gotd-label { color: var(--accent, ${C.accent}); font-size: 11px; letter-spacing: 0.12em; margin-bottom: 10px; }
+.gotd-main { display: flex; align-items: center; gap: 14px; cursor: pointer; }
+.gotd-icon { font-size: 44px; line-height: 1; }
+.gotd-info { flex: 1; min-width: 0; }
+.gotd-name { font-size: 20px; font-weight: 700; }
+.gotd-desc { color: ${C.muted}; font-size: 13px; margin-top: 2px; }
+.gotd-meta { color: ${C.muted}; font-size: 11.5px; margin-top: 6px; }
+.gotd-play { padding: 10px 18px; white-space: nowrap; flex-shrink: 0; width: auto; margin: 0; }
+@media (max-width: 560px) {
+  .gotd-main { flex-wrap: wrap; }
+  .gotd-play { width: 100%; margin-top: 4px; }
+}
+.gotd-play:disabled { opacity: 0.75; }
+.gotd-lb { border-top: 1px solid ${C.border}; margin-top: 14px; padding-top: 10px; }
+.gotd-lb-title { color: ${C.muted}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.gotd-lb-row { display: flex; gap: 10px; align-items: center; padding: 3px 0; font-size: 13px; }
+.gotd-lb-row .r { color: ${C.muted}; width: 28px; }
+.gotd-lb-row .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gotd-lb-row .t { color: ${C.emerald}; }
+.gotd-lb-row.me .n { color: ${C.gold}; font-weight: 700; }
+.gotd-lb-more { color: ${C.dim}; font-size: 11.5px; margin-top: 4px; }
+.gotd-signedout { color: ${C.muted}; font-size: 12.5px; margin-top: 12px; }
+
+/* Phase 8 — anonymous play + "make it count" */
+.guest-cta {
+  border: 1px solid ${C.accent}66; background: rgba(45,95,174,0.08);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 0.9rem; text-align: left;
+}
+.guest-rank { font-size: 15px; margin-bottom: 6px; }
+.guest-rank strong { color: ${C.gold}; }
+.guest-note { color: ${C.muted}; font-size: 12.5px; line-height: 1.5; }
+.guest-note strong { color: ${C.text}; }
+.commit-notice {
+  border: 1px solid ${C.emerald}66; background: rgba(30,143,99,0.09); color: ${C.text};
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem; font-size: 13.5px;
+  cursor: pointer;
+}
+
+/* "New this week" strip + What's-new sheet (weekly changelog) */
+.whatsnew-strip {
+  display: flex; align-items: stretch; gap: 6px;
+  border: 1px solid ${C.border}; background: ${C.card};
+  border-left: 3px solid ${C.gold};
+  border-radius: 12px; margin-bottom: 1rem; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(63,51,24,0.06);
+}
+.wn-strip-body {
+  flex: 1; text-align: left; background: none; border: none; cursor: pointer;
+  color: ${C.text}; font-family: inherit; font-size: 13px; line-height: 1.45;
+  padding: 9px 4px 9px 12px;
+}
+.wn-strip-body strong { font-family: 'Fraunces', Georgia, serif; }
+.wn-more { color: ${C.accent}; font-weight: 600; white-space: nowrap; }
+.wn-strip-dismiss {
+  background: none; border: none; color: ${C.muted}; cursor: pointer;
+  font-size: 12px; padding: 0 12px;
+}
+.wn-strip-dismiss:hover { color: ${C.text}; }
+.wn-panel { height: min(64vh, 560px); }
+.wn-list { gap: 16px; }
+.wn-week-title {
+  font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 14.5px;
+  border-bottom: 1px solid ${C.border}; padding-bottom: 4px; margin-bottom: 6px;
+}
+.wn-items { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 5px; }
+.wn-items li { font-size: 13px; line-height: 1.5; color: ${C.text}; }
+
+.home-links { display: flex; gap: 8px; margin-bottom: 1.2rem; flex-wrap: wrap; }
+.home-link-btn {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 999px; padding: 7px 14px; font-family: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer;
+}
+.home-link-btn:hover { border-color: ${C.accent}; }
+.home-section-title {
+  font-size: 15px; font-weight: 700; margin: 1.4rem 0 0.7rem;
+  color: ${C.text};
+}
+.home-back-btn {
+  background: none; border: none; color: ${C.accent}; font-family: inherit;
+  font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 0.8rem;
+}
+
+.inprog-row-wrap { margin-bottom: 0.4rem; }
+.inprog-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.inprog-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
+  padding: 10px 14px; min-width: 150px; cursor: pointer; flex-shrink: 0;
+}
+.inprog-card:hover { border-color: ${C.accent}; }
+.inprog-card .ip-icon { font-size: 22px; }
+.inprog-card .ip-name { font-weight: 600; font-size: 13.5px; margin-top: 4px; white-space: nowrap; }
+.inprog-card .ip-sub { font-size: 11.5px; color: ${C.muted}; margin-top: 3px; }
+.inprog-card .ip-sub.resume { color: ${C.gold}; }
+.inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
+.inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
+
+.chat-overlay {
+  position: fixed; inset: 0; background: rgba(38,33,18,0.5); z-index: 240;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.chat-panel {
+  background: ${C.surface}; border: 1px solid ${C.border}; border-bottom: none;
+  border-radius: 18px 18px 0 0; width: 100%; max-width: 560px;
+  height: min(72vh, 640px); display: flex; flex-direction: column;
+}
+.chat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px; border-bottom: 1px solid ${C.border};
+}
+.chat-title { font-weight: 700; font-size: 15px; }
+.chat-close {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted};
+  border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 13px;
+}
+.chat-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.chat-empty { color: ${C.muted}; font-size: 13px; text-align: center; margin-top: 24px; }
+.chat-msg { background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px; padding: 8px 10px; max-width: 88%; }
+.chat-msg.mine { align-self: flex-end; border-color: ${C.accent}55; background: rgba(45,95,174,0.08); }
+.chat-msg.hidden-msg { background: none; border-style: dashed; }
+.chat-tombstone { color: ${C.dim}; font-size: 12px; font-style: italic; }
+.chat-msg-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.chat-author { color: ${C.violet}; font-size: 12px; font-weight: 700; }
+.chat-report {
+  background: none; border: none; cursor: pointer; font-size: 11px; opacity: 0.35;
+  margin-left: auto; padding: 0 2px;
+}
+.chat-report:hover { opacity: 1; }
+.chat-body { font-size: 13.5px; line-height: 1.45; word-break: break-word; }
+.chat-notice { color: ${C.gold}; font-size: 12px; text-align: center; padding: 4px 0; }
+.chat-input-row { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid ${C.border}; }
+.chat-input {
+  flex: 1; background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 13.5px; outline: none;
+}
+.chat-input:focus { border-color: ${C.accent}; }
+.chat-send {
+  background: ${C.accent}; border: none; color: white; border-radius: 10px;
+  padding: 0 18px; font-family: inherit; font-weight: 700; font-size: 13.5px; cursor: pointer;
+}
+.chat-send:disabled { opacity: 0.4; cursor: default; }
+.chat-btn-inline {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 10px; padding: 8px 12px; font-family: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer;
+}
+.chat-btn-inline:hover { border-color: ${C.accent}; }
+
+/* ============================================================
+   Appendix A — "The Daily Page, Warmed" editorial layer.
+   Serif masthead + datelines, newsprint rules, card-weight white
+   surfaces with soft warm shadows, brass reserved for streaks /
+   wins / medals. Pure restyle: later rules of equal-or-greater
+   specificity re-skin the same markup — no layout changes.
+   ============================================================ */
+.serif { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; }
+
+/* Serif display type on the shell's headline moments. */
+.nav-brand, .lobby-head h1, .home-section-title, .gotd-name,
+.pregame-card h2, .win-card h2, .locked-card h2, .gm-modal h2,
+.howto-head h3, .chat-title {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  letter-spacing: 0;
+}
+.nav-brand { font-weight: 700; }
+.nav-brand .logo { color: ${C.gold}; }
+
+/* Brass for streaks (spec: brass = streaks/wins/medals; green stays a
+   live/success color elsewhere). */
+.nav-stat .value.streak { color: ${C.gold}; }
+.lobby-head .lobby-hint { color: ${C.gold}; }
+
+/* ---- Home masthead: numbered edition + dateline over a double rule ---- */
+.lobby-head.masthead { text-align: center; margin-bottom: 1.6rem; }
+.lobby-head.masthead h1 {
+  font-size: 2.1rem; font-weight: 900; letter-spacing: 0.005em; line-height: 1.1;
+}
+.masthead-dateline {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.64rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.14em; color: ${C.muted};
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+.masthead-dateline::before, .masthead-dateline::after {
+  content: ''; flex: 1; max-width: 72px; height: 1px; background: ${C.border};
+}
+.lobby-head.masthead .masthead-rule {
+  height: 4px; margin: 0.7rem auto 0; max-width: 460px;
+  border-top: 2px solid ${C.text}; border-bottom: 1px solid ${C.text};
+}
+.lobby-head.masthead p { font-style: italic; font-family: 'Fraunces', Georgia, serif; }
+.lobby-head.masthead .lobby-hint { font-style: normal; font-family: 'Space Grotesk', system-ui, sans-serif; }
+
+/* Section headers as newspaper column rules. */
+.home-section-title {
+  font-size: 1.05rem; font-weight: 700;
+  border-bottom: 1px solid ${C.border}; padding-bottom: 0.35rem;
+}
+
+/* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
+.card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
+.lboard, .howto-card, .gm-modal {
+  box-shadow: 0 1px 2px rgba(63,51,24,0.06), 0 6px 18px rgba(63,51,24,0.07);
+}
+.win-card, .howto-card, .gm-modal { box-shadow: 0 20px 50px rgba(63,51,24,0.22); }
+
+/* GotD hero reads as the front-page lead story. */
+.gotd-hero { background: ${C.card}; }
+.gotd-label {
+  font-family: 'JetBrains Mono', monospace; font-weight: 600;
+  text-transform: uppercase;
+}
+.gotd-name { font-size: 22px; font-weight: 900; }
+.gotd-desc { font-family: 'Fraunces', Georgia, serif; font-style: italic; }
+
+/* Per-game chrome picks up the game's accent (set as --accent inline on
+   the lobby card, hero, and modal): accent Play buttons + tag pills. */
+.gotd-play, .gm-modal .primary-btn, .pregame-card .pregame-play {
+  background: var(--accent, ${C.accent});
+}
+.gotd-play:hover, .gm-modal .primary-btn:hover, .pregame-card .pregame-play:hover {
+  background: var(--accent, ${C.accent}); filter: brightness(0.88);
+}
+.pregame-card { border-top: 3px solid var(--accent, ${C.accent}); }
+
+/* Buttons: crisp editorial edges. */
+.primary-btn { box-shadow: 0 1px 2px rgba(63,51,24,0.18); }
+
+/* Wins are brass moments. */
+.win-card .trophy { filter: none; }
+.win-card h2 { color: ${C.text}; }
+.score-row.total .v { color: ${C.gold}; }
 `;
 
 /* ============================================================
@@ -4696,7 +4469,7 @@ function useClassicSave(gameId) {
   const loadState = async () => {
     const { ok, body } = await api(`/api/state/${gameId}`);
     if (ok && body && body.state && body.state.mode === 'bot') {
-      return { ...body.state, __anchorTxHash: body.anchorTxHash || null };
+      return { ...body.state };
     }
     return null;
   };
@@ -4926,9 +4699,9 @@ function GameModeModal({ game, onStart, onClose }) {
 
 // The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
 // only), and Post to Feed (after a result).
-function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onPostToFeed, onClose }) {
+function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose }) {
   const [picking, setPicking] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain' | 'onchain'
+  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain'
   const modes = game.modes || [];
   const usePicker = !!game.menuModePicker && modes.length > 0;
   // Default new-game mode for games without an inline picker.
@@ -4939,8 +4712,7 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
     setSaveStatus('saving');
     const result = await onSaveGame();
     if (result && result.ok) {
-      const next = result.anchored ? 'onchain' : 'plain';
-      setSaveStatus(next);
+      setSaveStatus('plain');
       setTimeout(() => setSaveStatus(null), 1500);
     } else {
       setSaveStatus(null);
@@ -4948,7 +4720,6 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
   };
 
   const saveLabel = saveStatus === 'saving' ? 'Saving…'
-    : saveStatus === 'onchain' ? 'Saved on-chain ✓'
     : saveStatus === 'plain' ? 'Saved ✓'
     : '💾 Save Game';
 
@@ -4970,32 +4741,16 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
         </>
       )}
 
-      {lastResult && (
-        <>
-          <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Share</div>
-          <button className="cg-sheet-action" style={{ borderColor: C.emerald, color: C.emerald }}
-            onClick={() => { onPostToFeed(lastResult); onClose && onClose(); }}>📤 Post to Feed</button>
-        </>
-      )}
     </div>
   );
 }
 
 // A small in-stage banner offering to resume a saved Versus-Bot game.
-// anchorTxHash — when present, shows an ⛓ On-chain badge linking to the explorer.
-function ClassicResumeBanner({ onResume, onDismiss, anchorTxHash }) {
+function ClassicResumeBanner({ onResume, onDismiss }) {
   return (
     <div className="cg-resume-banner">
       <span>
         💾 You have a saved game.
-        {anchorTxHash && (
-          <a
-            href={`https://social-vibecoding.usernodelabs.org/explorer/tx/${anchorTxHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="cg-onchain-badge"
-          >⛓ On-chain</a>
-        )}
       </span>
       <div className="cg-resume-actions">
         <button onClick={onResume}>Resume</button>
@@ -5007,7 +4762,7 @@ function ClassicResumeBanner({ onResume, onDismiss, anchorTxHash }) {
 
 // game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
 // menuConfig (optional): wires the first "Menu" tab — New Game / Save / Post to Feed.
-function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig }) {
+function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig, onHowTo, onChat }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [, force] = useState(0);
   const sections = [
@@ -5035,6 +4790,8 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
           {modePill && <span className="cg-mode-pill">{modePill.icon} {menuConfig.gameMode === '2p' ? '2P' : menuConfig.gameMode === 'online' ? 'Online' : 'Bot'}</span>}
         </div>
         {onNewGame && !hideQuickReset && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
+        {onChat && <button className="cg-btn" onClick={() => { cgSound('click'); onChat(); }} title="Game chat" aria-label="Game chat">💬</button>}
+        {onHowTo && <button className="cg-btn" onClick={() => { cgSound('click'); onHowTo(); }} title="How to play" aria-label="How to play">?</button>}
         <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
         <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
       </div>
@@ -5117,33 +4874,72 @@ async function submitClassicScore(gameId, score, extra) {
 // Reusable global leaderboard for the score-based classic games. Lazily fetches
 // /api/classic/:gameId/leaderboard, highlights the caller, and pins their row
 // when outside the top N. `valueFmt` formats a row's headline number.
+/* ---- Leaderboard scope tabs (phase 4) --------------------------------------
+   Global | Friends pills shared by every board. `?lbscope=friends` in the URL
+   preselects the Friends view (used by proposal tests and deep links). */
+function lbInitialScope() {
+  try {
+    return new URLSearchParams(window.location.search).get('lbscope') === 'friends'
+      ? 'friends' : 'global';
+  } catch { return 'global'; }
+}
+function LbScopeTabs({ scope, onChange }) {
+  return (
+    <div className="lb-scope-tabs">
+      <button
+        className={'lb-scope-tab' + (scope === 'global' ? ' active' : '')}
+        onClick={() => onChange('global')}
+      >🌍 Global</button>
+      <button
+        className={'lb-scope-tab' + (scope === 'friends' ? ' active' : '')}
+        onClick={() => onChange('friends')}
+      >👥 Friends</button>
+    </div>
+  );
+}
+const LB_FRIENDS_EMPTY = 'No friends on this board yet — follow players from their profiles.';
+
 function ClassicLeaderboard({ gameId, url, valueLabel = 'Score', valueFmt }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Friends scope only exists on the generic classic endpoint — boards with a
+  // custom `url` (snake, breakout, …) stay single-scope.
+  const [scope, setScope] = useState(url ? 'global' : lbInitialScope());
   const fmt = valueFmt || ((r) => `${r.bestScore} pts`);
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(false);
-    api(url || `/api/classic/${gameId}/leaderboard`).then(({ ok, body }) => {
+    const path = url || `/api/classic/${gameId}/leaderboard${scope === 'friends' ? '?scope=friends' : ''}`;
+    api(path).then(({ ok, body }) => {
       if (cancelled) return;
       if (ok && body) setData(body); else setError(true);
       setLoading(false);
     }).catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [gameId]);
+  }, [gameId, scope]);
 
-  if (loading) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Loading…</div></div>;
-  if (error) return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">Couldn't load leaderboard.</div></div>;
+  const scopeTabs = !url && <LbScopeTabs scope={scope} onChange={setScope} />;
+  if (loading) return <div><h4>Leaderboard</h4>{scopeTabs}<div className="cg-sheet-empty">Loading…</div></div>;
+  if (error) return <div><h4>Leaderboard</h4>{scopeTabs}<div className="cg-sheet-empty">Couldn't load leaderboard.</div></div>;
   const entries = (data && data.entries) || [];
   const me = data && data.me;
   const meInTop = me && entries.some(e => e.rank === me.rank);
   if (entries.length === 0) {
-    return <div><h4>Leaderboard</h4><div className="cg-sheet-empty">No scores yet — play to rank!</div></div>;
+    return (
+      <div>
+        <h4>Leaderboard</h4>
+        {scopeTabs}
+        <div className="cg-sheet-empty">
+          {scope === 'friends' ? LB_FRIENDS_EMPTY : 'No scores yet — play to rank!'}
+        </div>
+      </div>
+    );
   }
   return (
     <div>
       <h4>Leaderboard <span style={{ color: C.muted, fontWeight: 400, fontSize: '0.78rem' }}>· {valueLabel}</span></h4>
+      {scopeTabs}
       <div className="snake-lb">
         {entries.map(r => (
           <div key={r.rank} className={'snake-lb-row' + (me && r.rank === me.rank ? ' snake-lb-me' : '')}>
@@ -5355,10 +5151,61 @@ function hashStr(s) {
   return h >>> 0;
 }
 
+// Server-issued daily seeds (phase 2), keyed by gameId. Populated by loadDaily
+// from GET /api/daily (or GET /api/public/daily when signed out) BEFORE any
+// game can mount, and refreshed from the /start response so a client that sat
+// on the lobby across the UTC reset still mounts the new day's board. When a
+// seed is missing (partial deploy, network hiccup) the legacy day-number
+// derivation below keeps the board renderable — and because the server's
+// generation policy currently issues that same legacy value, both paths agree.
+let SERVER_DAILY_SEEDS = {};
+// True when the viewer is signed out (phase 8 guest mode). Set by loadDaily
+// before any game can mount; hooks that talk to account-keyed endpoints
+// (hint counters, autosave) consult it so a guest run never fires requests
+// that can only 401.
+let GUEST_MODE = false;
+function serverDailySeed(gameId) {
+  const s = SERVER_DAILY_SEEDS[gameId];
+  return Number.isFinite(s) ? s : null;
+}
+
+// ---- Anonymous pending runs (phase 8, spec §6.10) ---------------------------
+// A guest's finished daily run is held client-side as a pending run — one per
+// game, overwritten across days, no server state at all. On the first
+// AUTHENTICATED load the client posts each same-day run to
+// POST /api/daily/:gameId/commit ("make it count") and clears the slot. A run
+// not claimed before the UTC reset simply expires: yesterday's board can't
+// join today's leaderboard.
+const PENDING_RUNS_KEY = 'pc_pending_runs_v1';
+function loadPendingRuns() {
+  try {
+    const m = JSON.parse(localStorage.getItem(PENDING_RUNS_KEY));
+    return m && typeof m === 'object' ? m : {};
+  } catch { return {}; }
+}
+function savePendingRun(gameId, run) {
+  try {
+    const m = loadPendingRuns();
+    m[gameId] = run;
+    localStorage.setItem(PENDING_RUNS_KEY, JSON.stringify(m));
+  } catch {}
+}
+function clearPendingRun(gameId) {
+  try {
+    const m = loadPendingRuns();
+    delete m[gameId];
+    localStorage.setItem(PENDING_RUNS_KEY, JSON.stringify(m));
+  } catch {}
+}
+
 // A fresh seeded RNG for (today, gameId). Everyone on the same UTC day gets the
 // identical board for each game — the precondition for a fair leaderboard.
+// Prefers the server-issued seed; mulberry32 stays the downstream generator
+// either way, so game code is untouched by the server-seed flip.
 function dailyRng(offset, gameId) {
-  return mulberry32((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+  const srv = serverDailySeed(gameId);
+  const seed = srv != null ? srv : ((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+  return mulberry32(seed >>> 0);
 }
 
 // Mancala Daily Challenge opening board, derived from the server-anchored UTC
@@ -5502,161 +5349,70 @@ async function dappAnchor(session) {
   return session;
 }
 
-/* ============================================================
-   MATCH on-chain ledger — bridge-memo anchoring + explorer links
-   Every MATCH spend/earn is mirrored as a real, zero-value usernode
-   transaction whose calldata carries the structured memo the server
-   built. Mirrors dappAnchor's best-effort, degrade-to-mock pattern.
-   ============================================================ */
 
-// Public block-explorer link for a tx hash (via the platform's public proxy).
-function explorerTxUrl(txHash) {
-  return `/explorer-api/tx/${encodeURIComponent(txHash)}`;
-}
-
-// Anchor a pending MATCH ledger row on-chain: hex-encode the memo into a
-// zero-value tx to the node address, send via the bridge, then confirm with the
-// server. Best-effort — degrades to a 'mock' record when the bridge is absent
-// or in mock mode, and never throws. Returns { txHash, status } (status is
-// 'onchain' | 'mock'); returns null when there's nothing to anchor.
-async function anchorMatchLedger(ledgerId, memo) {
-  if (ledgerId == null || !memo) return null;
-  let txHash = null;
-  let mock = true;
-  try {
-    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-      ? !(await window.usernode.isMockEnabled())
-      : false;
-    if (window.usernode && window.usernode.sendTransaction && window.usernode.getNodeAddress && bridgeMockOff) {
-      const addr = await window.usernode.getNodeAddress();
-      if (addr) {
-        // Hex-encode the ASCII memo into the tx data field.
-        let hex = '0x';
-        for (let i = 0; i < memo.length; i++) hex += memo.charCodeAt(i).toString(16).padStart(2, '0');
-        const tx = await window.usernode.sendTransaction({ to: addr, data: hex, value: 0 });
-        txHash = tx && tx.hash ? tx.hash : null;
-        mock = !txHash;
-      }
-    }
-  } catch (e) { /* fall through to mock record */ }
-  try {
-    const { ok, body } = await api(`/api/match/ledger/${ledgerId}/confirm`, {
-      method: 'POST', body: JSON.stringify({ txHash, mock }),
-    });
-    if (ok && body) return { txHash: body.txHash || txHash, status: body.status || (mock ? 'mock' : 'onchain') };
-  } catch (e) {}
-  return { txHash, status: mock ? 'mock' : 'onchain' };
-}
-
-// Anchor a MATCH ledger movement (earn / spend / tip) on-chain via the bridge,
-// then confirm with the server. Best-effort and modeled on dappAnchor: degrades
-// to a 'mock' anchor when the bridge/wallet is unavailable (staging) and never
-// throws. `receipt` is { eventId, chainHash, ... }; returns the updated receipt.
-async function matchAnchor(receipt) {
-  if (!receipt || !receipt.eventId || !receipt.chainHash) return receipt;
-  let txHash = null;
-  let mock = true;
-  try {
-    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-      ? !(await window.usernode.isMockEnabled())
-      : false;
-    if (window.usernode && window.usernode.sendTransaction && window.usernode.getNodeAddress && bridgeMockOff) {
-      const addr = await window.usernode.getNodeAddress();
-      if (addr) {
-        const tx = await window.usernode.sendTransaction({ to: addr, data: '0x' + receipt.chainHash, value: 0 });
-        txHash = tx && tx.hash ? tx.hash : null;
-        mock = false;
-      }
-    }
-  } catch (e) { /* fall through to mock anchor */ }
-  try {
-    const { ok, body } = await api(`/api/match/ledger/${receipt.eventId}/anchor/confirm`, {
-      method: 'POST', body: JSON.stringify({ txHash, mock }),
-    });
-    if (ok && body) return { ...receipt, anchorStatus: body.anchorStatus, anchorTxHash: body.anchorTxHash };
-  } catch (e) {}
-  return { ...receipt, anchorStatus: 'mock' };
-}
-
-// Small inline "View on explorer" affordance for a confirmed MATCH movement.
-// Renders a link only for a real on-chain tx; otherwise a muted local marker.
-function MatchExplorerLink({ txHash, status, compact }) {
-  if (status === 'onchain' && txHash) {
-    return (
-      <a className="match-explorer-link" href={explorerTxUrl(txHash)} target="_blank" rel="noopener noreferrer"
-         title={txHash}>
-        🔗 View on explorer
-      </a>
-    );
-  }
-  if (status === 'pending') {
-    return <span className="match-explorer-pending">⏳ recording on-chain…</span>;
-  }
-  return <span className="match-explorer-mock">{compact ? '· local' : '· local record'}</span>;
-}
-
-// Shared hint bar for every daily puzzle. Renders the "💡 Hint · cost 🪙"
-// button, the live MATCH balance, an optional message, and the explorer link
-// for the most recent purchase. Behaviour-free: the parent owns the hint state
-// and passes a `buy` handler (kept identical across all four daily games so the
-// control looks and feels the same everywhere).
-function HintBar({ nextCost, balance, canAfford, exhausted, buying, onBuy, msg, lastTx, label }) {
+// Shared hint bar for every daily puzzle. Hints are FREE (the MATCH currency
+// is retired) but capped per day and counted server-side. Behaviour-free: the
+// parent owns the hint state and passes a `buy` handler (kept identical across
+// all four daily games so the control looks and feels the same everywhere).
+function HintBar({ hintsLeft, exhausted, buying, onBuy, msg, label }) {
   return (
     <div className="cw-hint-bar">
       <button
         className="cw-hint-btn"
         onClick={onBuy}
-        disabled={buying || exhausted || !canAfford}
+        disabled={buying || exhausted}
       >
         {exhausted
           ? `💡 ${label || 'No more hints'}`
-          : <>💡 Hint · {nextCost} 🪙</>}
+          : <>💡 Hint{Number.isFinite(hintsLeft) ? ` · ${hintsLeft} left` : ''}</>}
       </button>
-      <span className="cw-hint-balance">
-        Balance: {balance == null ? '…' : balance} 🪙 MATCH
-      </span>
       {msg && <span className="cw-hint-msg">{msg}</span>}
-      {lastTx && <MatchExplorerLink txHash={lastTx.txHash} status={lastTx.status} compact />}
     </div>
   );
 }
 
-// Shared hint state hook for the daily games that buy a generic "reveal" (Sudoku
-// cell, Word Hunt start, Tile Match nudge). Reads today's server-authoritative
-// count, exposes the doubling next cost, and performs the atomic buy + on-chain
-// anchor. `onReveal(purchasedIndex)` applies the game-specific reveal and should
-// return false to abort (e.g. nothing left to reveal) — the purchase only fires
-// when a reveal is actually available. Crypto Wordle keeps its own bespoke
-// per-round logic and does not use this hook.
-function useDailyHints({ gameId, maxHints, matchBalance, onMatchBalanceChange }) {
+// Shared hint state hook for the daily games that use a generic "reveal"
+// (Sudoku cell, Word Hunt start, Tile Match nudge). Reads today's
+// server-authoritative count and performs the atomic capped use — free, no
+// currency involved. `onReveal(usedIndex)` applies the game-specific reveal
+// and should return false to abort (e.g. nothing left to reveal). Crypto
+// Wordle keeps its own bespoke per-round logic and does not use this hook.
+function useDailyHints({ gameId, maxHints }) {
   const { useState, useEffect } = React;
   const [hintsPurchased, setHintsPurchased] = useState(0);
   const [buying, setBuying] = useState(false);
   const [msg, setMsg] = useState('');
-  const [lastTx, setLastTx] = useState(null);
 
   useEffect(() => {
+    if (GUEST_MODE) return; // guests count hints locally — no account counter
     let alive = true;
     (async () => {
       const { ok, body } = await api(`/api/daily/${gameId}/hint`);
       if (!alive || !ok || !body) return;
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
     })();
     return () => { alive = false; };
   }, []);
 
-  const nextCost = DAILY_HINT_BASE_COST * Math.pow(2, hintsPurchased);
-  const canAfford = matchBalance != null && matchBalance >= nextCost;
   const exhausted = maxHints != null && hintsPurchased >= maxHints;
+  const hintsLeft = maxHints != null ? Math.max(0, maxHints - hintsPurchased) : null;
 
   // onReveal(index) must apply the reveal and return true; returning false
-  // aborts before charging.
+  // aborts (the server counter has already advanced, which only means one
+  // fewer free hint today — never a lost purchase).
   const buy = async (onReveal) => {
     if (buying || exhausted) return;
+    // Guest mode (phase 8): hints work, counted locally for this run only —
+    // there's no account to key the server's daily counter to, and the POST
+    // would just 401. Same per-board cap as signed-in play.
+    if (GUEST_MODE) {
+      const applied = onReveal ? onReveal(hintsPurchased) : true;
+      if (applied === false) return;
+      setHintsPurchased((n) => n + 1);
+      return;
+    }
     setBuying(true);
     setMsg('');
-    setLastTx(null);
     const { ok, status, body } = await api(`/api/daily/${gameId}/hint`, {
       method: 'POST', body: JSON.stringify({ maxHints }),
     });
@@ -5664,27 +5420,18 @@ function useDailyHints({ gameId, maxHints, matchBalance, onMatchBalanceChange })
     if (ok && body) {
       const idx = (Number.isFinite(body.hintsPurchased) ? body.hintsPurchased : hintsPurchased + 1) - 1;
       const applied = onReveal ? onReveal(idx) : true;
-      if (applied === false) return; // shouldn't happen — server already charged
+      if (applied === false) return;
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
-      // Anchor the spend on-chain in the background, then surface the link.
-      if (body.ledgerId) {
-        setLastTx({ status: 'pending', txHash: null });
-        anchorMatchLedger(body.ledgerId, body.memo).then(r => { if (r) setLastTx(r); });
-      }
       return;
     }
-    if (status === 409 && body && body.code === 'insufficient_funds') {
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
-      setMsg('Not enough MATCH');
-    } else if (status === 409 && body && body.code === 'no_more_hints') {
+    if (status === 409 && body && body.code === 'no_more_hints') {
       setMsg('No more hints');
     } else {
-      setMsg('Could not buy hint');
+      setMsg('Could not use hint');
     }
   };
 
-  return { hintsPurchased, nextCost, canAfford, exhausted, buying, msg, lastTx, buy };
+  return { hintsPurchased, hintsLeft, exhausted, buying, msg, buy };
 }
 
 // HH:MM:SS for a millisecond remainder.
@@ -5718,6 +5465,70 @@ const STREAK_TIERS = [
   { min: 3,  mult: 1.1 },
   { min: 0,  mult: 1.0 },
 ];
+
+/* ============================================================
+   What's new — in-repo weekly changelog (newest first).
+   Add an entry (with a fresh id) whenever a player-visible change
+   ships; the Home "New this week" strip shows the newest entry's
+   headline until dismissed (dismissal is per-browser, keyed on the
+   entry id in localStorage, like the how-to first-open state).
+   ============================================================ */
+const CHANGELOG = [
+  {
+    id: 'w2026-07-20',
+    weekOf: 'Week of July 20, 2026',
+    items: [
+      'PuzzleChain is now Game Corner — same games, one name everywhere.',
+      'Streaks now follow the Game of the Day: finish the featured game to keep your streak (every day you already earned still counts).',
+      'Share cards include your rank on today’s board.',
+      'Online matches now time out — 48 quiet hours forfeits the turn.',
+      'Marble Loop (was Zuma) and Daily Cipher (was Crypto Wordle) — new names, same games.',
+      'The Community Feed retired; game chat, share cards, and Friends leaderboards are the social corner now.',
+    ],
+  },
+  {
+    id: 'w2026-07-13',
+    weekOf: 'Week of July 13, 2026',
+    items: [
+      'Play without signing in — today’s boards are open to everyone, and signing in before midnight UTC makes a finished guest run count.',
+      'A warmer, newspaper-style look for the whole app.',
+    ],
+  },
+  {
+    id: 'w2026-07-06',
+    weekOf: 'Week of July 6, 2026',
+    items: [
+      'Game of the Day: one featured board everyone plays, front and center on Home.',
+      'Eight new daily puzzles, five new board games, and a public chat room for every game.',
+    ],
+  },
+];
+const WHATSNEW_SEEN_KEY = 'pc_whatsnew_seen_v1';
+
+// Bottom-sheet listing the recent weekly changes. Presented like the chat
+// panel (shared overlay idiom); pure display, no server state.
+function WhatsNewSheet({ onClose }) {
+  return (
+    <div className="chat-overlay" onClick={onClose}>
+      <div className="chat-panel wn-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-head">
+          <div className="chat-title">🗞️ What&apos;s new</div>
+          <button className="chat-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="chat-list wn-list">
+          {CHANGELOG.map((entry) => (
+            <div key={entry.id} className="wn-week">
+              <div className="wn-week-title">{entry.weekOf}</div>
+              <ul className="wn-items">
+                {entry.items.map((it, i) => <li key={i}>{it}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Multiplier for a streak length (consecutive days, including the current win).
 function streakMultiplier(streak) {
@@ -5953,7 +5764,7 @@ function sudokuSolved(grid) {
   return sudokuConflicts(grid).size === 0;
 }
 
-function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
   const init = useRef(generateSudoku6(dailyRng(offset, 'sudoku'))).current;
   const { puzzle, solution } = init;
   const dayNum = useRef(utcDayNum(offset)).current;
@@ -5984,7 +5795,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
 
   // Paid hints: total empty cells in the puzzle is the per-day cap.
   const totalEmpty = useRef(puzzle.flat().filter(v => v === 0).length).current;
-  const hints = useDailyHints({ gameId: 'sudoku', maxHints: totalEmpty, matchBalance, onMatchBalanceChange });
+  const hints = useDailyHints({ gameId: 'sudoku', maxHints: totalEmpty });
   const emptyCells = () => {
     const out = [];
     for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) if (grid[r][c] === 0) out.push([r, c]);
@@ -6119,14 +5930,11 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
 
       {!done && (
         <HintBar
-          nextCost={hints.nextCost}
-          balance={matchBalance}
-          canAfford={hints.canAfford}
+          hintsLeft={hints.hintsLeft}
           exhausted={hints.exhausted || noEmpty}
           buying={hints.buying}
           onBuy={buyHint}
           msg={hints.msg}
-          lastTx={hints.lastTx}
           label={noEmpty ? 'Board full' : 'No more hints'}
         />
       )}
@@ -6194,14 +6002,11 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect, matchBalance, walletBalance }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, onOpenFriends, onBack, onVerify, onDisconnect }) {
   const [copied, setCopied] = React.useState(false);
-  const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [confirmDisc, setConfirmDisc] = React.useState(false);
-  const dappEnabled = !!(integration && integration.enabled);
-  const dappPubkey = integration && integration.pubkey;
   const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
 
   // status: 'verified' | 'linked' | 'none'
@@ -6213,15 +6018,6 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
       await navigator.clipboard.writeText(user.usernodePubkey);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
-
-  const copyDappPubkey = async () => {
-    if (!dappPubkey) return;
-    try {
-      await navigator.clipboard.writeText(dappPubkey);
-      setDappCopied(true);
-      setTimeout(() => setDappCopied(false), 1500);
     } catch {}
   };
 
@@ -6244,7 +6040,7 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
     setMsg(null);
     try {
       await onDisconnect();
-      setMsg({ ok: true, text: 'Disconnected. Your public link is kept so received tips still resolve.' });
+      setMsg({ ok: true, text: 'Disconnected. Your public wallet link is kept on your account.' });
     } catch {
       setMsg({ ok: false, text: 'Could not disconnect.' });
     }
@@ -6264,7 +6060,7 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
       {(!authOk || !user) ? (
         <div className="wallet-card">
           <div className="account-signed-out">
-            You’re signed out. Open PuzzleChain inside Usernode so your progress
+            You’re signed out. Open Game Corner inside Usernode so your progress
             and identity are saved to your account.
           </div>
         </div>
@@ -6307,7 +6103,7 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
               {status === 'linked' && 'Your wallet address is linked to your account, but ownership hasn’t been proven yet. Verify to confirm it’s really yours.'}
               {status === 'none' && (bridgeAvailable
                 ? 'No wallet is linked yet. Connect to read your Usernode wallet and link it to your account.'
-                : 'On-chain features are unavailable in this environment (no wallet could be read). Open PuzzleChain inside Usernode.')}
+                : 'On-chain features are unavailable in this environment (no wallet could be read). Open Game Corner inside Usernode.')}
             </div>
 
             <div className="wallet-btn-row">
@@ -6333,20 +6129,10 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
             )}
           </div>
 
-          {/* Connections — Friends + dApps + balances, shown here only on narrow
-              viewports (hidden ≥561px via CSS, where they live in the top bar). */}
+          {/* Connections — Friends, shown here only on narrow viewports
+              (hidden ≥561px via CSS, where it lives in the top bar). */}
           <div className="wallet-card account-connections">
             <div className="wallet-card-title">Connections</div>
-            {matchBalance != null && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
-                🪙 {matchBalance} MATCH
-              </div>
-            )}
-            {walletBalance && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', fontSize: '0.9rem', color: C.emerald, fontFamily: "'JetBrains Mono', monospace" }}>
-                🪙 {fmtUtgo(walletBalance)}
-              </div>
-            )}
             <button
               type="button"
               className="account-connection-row"
@@ -6355,25 +6141,6 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
               👥 Friends
               <span className="chev">›</span>
             </button>
-            {dappEnabled && (
-              <div className="account-dapps-row">
-                <div className="wallet-card-title">dApps integration</div>
-                <div className="account-status account-status-verified">
-                  <span className="account-status-dot" />
-                  <span>Active</span>
-                </div>
-                {dappPubkey && (
-                  <div className="wallet-addr-row">
-                    <span className="account-dapps-pubkey" title={dappPubkey}>
-                      🔗 {truncAddr(dappPubkey)}
-                    </span>
-                    <button className="back-btn" onClick={copyDappPubkey}>
-                      {dappCopied ? 'Copied ✓' : 'Copy'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </>
       )}
@@ -6391,20 +6158,22 @@ const lbFmtTime = s =>
 
 function Leaderboard({ gameId, solved }) {
   const [state, setState] = useState({ loading: true });
+  const [scope, setScope] = useState(lbInitialScope);
 
   useEffect(() => {
     let alive = true;
+    setState({ loading: true });
     (async () => {
-      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard`);
+      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard${scope === 'friends' ? '?scope=friends' : ''}`);
       if (!alive) return;
       if (ok && body) setState({ loading: false, ...body });
       else setState({ loading: false, entries: [], me: null, total: 0, error: true });
     })();
     return () => { alive = false; };
-  }, [gameId]);
+  }, [gameId, scope]);
 
   if (state.loading) {
-    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><div className="lboard-empty">Loading…</div></div>;
+    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
   }
 
   const entries = state.entries || [];
@@ -6417,8 +6186,11 @@ function Leaderboard({ gameId, solved }) {
         Today's leaderboard
         {state.total > 0 && <span className="lboard-count">{state.total} solved</span>}
       </div>
+      <LbScopeTabs scope={scope} onChange={setScope} />
       {entries.length === 0 ? (
-        <div className="lboard-empty">Be the first to solve today's puzzle.</div>
+        <div className="lboard-empty">
+          {scope === 'friends' ? LB_FRIENDS_EMPTY : "Be the first to solve today's puzzle."}
+        </div>
       ) : (
         <div className="lboard-rows">
           {entries.map(e => (
@@ -6454,20 +6226,22 @@ function Leaderboard({ gameId, solved }) {
    ============================================================ */
 function TodayChampions({ onSelectUser }) {
   const [state, setState] = useState({ loading: true });
+  const [scope, setScope] = useState(lbInitialScope);
 
   useEffect(() => {
     let alive = true;
+    setState({ loading: true });
     (async () => {
-      const { ok, body } = await api('/api/daily/leaderboard/today');
+      const { ok, body } = await api(`/api/daily/leaderboard/today${scope === 'friends' ? '?scope=friends' : ''}`);
       if (!alive) return;
       if (ok && body) setState({ loading: false, ...body });
       else setState({ loading: false, entries: [], me: null, total: 0, error: true });
     })();
     return () => { alive = false; };
-  }, []);
+  }, [scope]);
 
   if (state.loading) {
-    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><div className="lboard-empty">Loading…</div></div>;
+    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
   }
 
   const entries = state.entries || [];
@@ -6493,13 +6267,101 @@ function TodayChampions({ onSelectUser }) {
         Today's Champions
         {state.total > 0 && <span className="lboard-count">{state.total} playing</span>}
       </div>
+      <LbScopeTabs scope={scope} onChange={setScope} />
       {entries.length === 0 ? (
-        <div className="lboard-empty">No one has solved today's puzzles yet — be the first!</div>
+        <div className="lboard-empty">
+          {scope === 'friends' ? LB_FRIENDS_EMPTY : "No one has solved today's puzzles yet — be the first!"}
+        </div>
       ) : (
         <div className="lboard-rows">
           {entries.map(e => row(e, false))}
           {me && !meVisible && row(me, true)}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Rating ladder (phase 4) — Elo standings for the head-to-head
+   games, fed by online room/match results. Shows rating, current
+   win streak, and this week's movement per player.
+   ============================================================ */
+const LADDER_GAMES = [
+  'chutes-ladders', 'mancala', '2048', 'blockblast',
+  // Phase 5 board games (rules modules over classic_rooms).
+  'checkers', 'reversi', 'fourinarow', 'gomoku', 'ludo',
+];
+
+function LadderScreen() {
+  const [gameId, setGameId] = useState(LADDER_GAMES[0]);
+  const [state, setState] = useState({ loading: true });
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true });
+    api(`/api/ladder/${gameId}`).then(({ ok, body }) => {
+      if (!alive) return;
+      setState(ok && body
+        ? { loading: false, ...body }
+        : { loading: false, entries: [], me: null, movers: [], error: true });
+    }).catch(() => { if (alive) setState({ loading: false, entries: [], me: null, movers: [] }); });
+    return () => { alive = false; };
+  }, [gameId]);
+
+  const games = GAMES.filter(g => LADDER_GAMES.includes(g.id));
+  const entries = state.entries || [];
+  const me = state.me || null;
+  const meVisible = me && entries.some(e => e.isCurrentUser);
+  const delta = (d) => d > 0
+    ? <span className="ladder-delta up mono">▲{d}</span>
+    : d < 0
+    ? <span className="ladder-delta down mono">▼{-d}</span>
+    : <span className="ladder-delta flat mono">—</span>;
+  const row = (e, pinned) => (
+    <div key={pinned ? 'me-pinned' : e.rank} className={`lrow${e.isCurrentUser ? ' me' : ''}${pinned ? ' pinned' : ''}`}>
+      <span className="lrank mono">#{e.rank}</span>
+      <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+      <span className="ladder-streak mono" title="Current win streak">{e.winStreak > 0 ? `🔥${e.winStreak}` : '·'}</span>
+      <span className="ltime mono" title="Elo rating">{e.elo}</span>
+      {delta(e.weeklyDelta)}
+    </div>
+  );
+
+  return (
+    <div className="lboard ladder">
+      <div className="ladder-games">
+        {games.map(g => (
+          <button
+            key={g.id}
+            className={'lb-scope-tab' + (gameId === g.id ? ' active' : '')}
+            onClick={() => setGameId(g.id)}
+          >{g.icon} {g.name}</button>
+        ))}
+      </div>
+      <p className="ladder-note">
+        Everyone starts at 1000 — win online matches to climb. 🔥 is the current
+        win streak; ▲▼ show this week's rating movement.
+      </p>
+      {state.loading ? (
+        <div className="lboard-empty">Loading…</div>
+      ) : entries.length === 0 ? (
+        <div className="lboard-empty">
+          No rated matches yet — play someone online (room code) to start this ladder.
+        </div>
+      ) : (
+        <>
+          {(state.movers || []).length > 0 && (
+            <div className="ladder-movers">
+              📈 <strong>Weekly movers:</strong>{' '}
+              {state.movers.map(m => `${m.username} +${m.weeklyDelta}`).join(' · ')}
+            </div>
+          )}
+          <div className="lboard-rows">
+            {entries.map(e => row(e, false))}
+            {me && !meVisible && row(me, true)}
+          </div>
+        </>
       )}
     </div>
   );
@@ -6564,6 +6426,351 @@ function BadgeStrip({ badges, achievements }) {
 /* ============================================================
    Locked screen — shown when today's attempt is already used
    ============================================================ */
+/* ============================================================
+   Shell-owned game chrome (phase 3) — How-to-Play + pre-game screen
+   ============================================================ */
+
+// First-open tracking for the auto-shown How-to-Play cards, persisted per
+// browser in localStorage (deliberately per-device: the how-to is an
+// onboarding aid, not server state).
+const HOWTO_SEEN_KEY = 'pc_howto_seen_v1';
+function howtoSeen(gameId) {
+  try { return !!(JSON.parse(localStorage.getItem(HOWTO_SEEN_KEY) || '{}'))[gameId]; }
+  catch { return false; }
+}
+function markHowtoSeen(gameId) {
+  try {
+    const seen = JSON.parse(localStorage.getItem(HOWTO_SEEN_KEY) || '{}');
+    seen[gameId] = true;
+    localStorage.setItem(HOWTO_SEEN_KEY, JSON.stringify(seen));
+  } catch {}
+}
+
+// How-to-Play modal, rendered from the game's manifest `howToPlay` cards.
+// Shell-owned: auto-shown on a player's first-ever open of each game and
+// always reachable from the "?" in the in-game header. Timed dailies can't
+// tick under the auto-show — it appears on the PRE-GAME screen, and the game
+// (with its timer) only mounts after Play.
+function HowToPlayModal({ game, onClose }) {
+  const cards = game.howToPlay || [];
+  return (
+    <div className="howto-overlay" onClick={onClose}>
+      <div className="howto-card" onClick={(e) => e.stopPropagation()}>
+        <div className="howto-head">
+          <span className="howto-icon">{game.icon}</span>
+          <h3>How to play {game.name}</h3>
+        </div>
+        <div className="howto-list">
+          {cards.map((c, i) => (
+            <div className="howto-step" key={i}>
+              <div className="howto-step-num mono">{i + 1}</div>
+              <div>
+                <div className="howto-step-title">{c.title}</div>
+                <div className="howto-step-body">{c.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button className="primary-btn" onClick={onClose}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
+// Manifest chip copy for the pre-game screen.
+const SESSION_LENGTH_LABEL = { short: '≈ 1–3 min', medium: '≈ 3–10 min', long: '10+ min' };
+const INPUT_LABEL = { tap: '👆 Tap', drag: '✋ Drag', swipe: '👉 Swipe', keyboard: '⌨️ Type' };
+
+// Standard pre-game screen (shell-owned chrome, phase 3): game identity,
+// manifest chips, personal best, streak, and the daily-challenge context
+// (countdown + same-deal-for-everyone). Consume-on-start only fires when the
+// player hits Play — peeking at this screen never burns the day's attempt.
+/* ============================================================
+   Phase 7 — Game of the Day hero, home in-progress row, chat
+   ============================================================ */
+
+// Game of the Day hero card: today's featured game (from daily_featured via
+// /api/daily), reset countdown, state-aware CTA, and a top-3 leaderboard
+// preview. Clicking anywhere routes through the normal launch flow, so the
+// pre-game / resume / locked machinery is untouched.
+function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay }) {
+  const countdown = useCountdown(nextResetUtc, offset, onReset);
+  const [preview, setPreview] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api(`/api/daily/${game.id}/leaderboard`)
+      .then(({ ok, body }) => { if (alive && ok && body) setPreview(body); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [game.id]);
+
+  const finished = !!(attempt && attempt.finishedAt);
+  const inProgress = !!attempt && !finished;
+  const fmtT = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  return (
+    <div className="gotd-hero" style={{ '--accent': game.tagColor }}>
+      <div className="gotd-label mono">🎯 GAME OF THE DAY</div>
+      <div className="gotd-main" onClick={onPlay}>
+        <div className="gotd-icon">{game.icon}</div>
+        <div className="gotd-info">
+          <div className="gotd-name">{game.name}</div>
+          <div className="gotd-desc">{game.desc}</div>
+          <div className="gotd-meta mono">
+            Next puzzle in {countdown} · 🌍 same deal for everyone · 🔥 keeps your streak
+          </div>
+        </div>
+        <button className="primary-btn gotd-play" disabled={finished}>
+          {finished ? `🔒 +${attempt.score != null ? attempt.score : 0}` : inProgress ? '▶ Resume' : 'Play'}
+        </button>
+      </div>
+      {preview && Array.isArray(preview.entries) && preview.entries.length > 0 && (
+        <div className="gotd-lb">
+          <div className="gotd-lb-title">Today's fastest</div>
+          {preview.entries.slice(0, 3).map((e) => (
+            <div key={e.rank} className={'gotd-lb-row' + (e.isCurrentUser ? ' me' : '')}>
+              <span className="r mono">#{e.rank}</span>
+              <span className="n">{e.username}</span>
+              <span className="t mono">{e.timeSecs != null ? fmtT(e.timeSecs) : '—'}</span>
+            </div>
+          ))}
+          {preview.total > 3 && <div className="gotd-lb-more">{preview.total} solved today</div>}
+        </div>
+      )}
+      {authOk === false && (
+        <div className="gotd-signedout">Play today's deal free as a guest — sign in to join the board and keep a streak.</div>
+      )}
+    </div>
+  );
+}
+
+// Home "in progress" row: resumable daily runs (claimed, unfinished attempts)
+// and online matches where it's your turn. Horizontal card strip; each card
+// re-enters through the normal launch/resume path.
+// Hours until an active room's 48h turn timer forfeits it, from the server's
+// lastMoveAt + turnTimeoutHours. Null when the room carries no timer info.
+function roomExpiresInHours(room) {
+  if (!room || !room.lastMoveAt || !Number.isFinite(room.turnTimeoutHours)) return null;
+  const ms = new Date(room.lastMoveAt).getTime() + room.turnTimeoutHours * 3600 * 1000 - Date.now();
+  return Math.max(0, Math.ceil(ms / 3600000));
+}
+
+function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
+  if (!items.length) return null;
+  return (
+    <div className="inprog-row-wrap">
+      <div className="home-section-title">In progress</div>
+      <div className="inprog-row">
+        {items.map((it) => {
+          if (it.type === 'daily') {
+            return (
+              <div key={'d-' + it.game.id} className="inprog-card" onClick={() => onOpenDaily(it.game)}>
+                <div className="ip-icon">{it.game.icon}</div>
+                <div className="ip-name">{it.game.name}</div>
+                <div className="ip-sub resume">▶ Resume run</div>
+              </div>
+            );
+          }
+          const expH = roomExpiresInHours(it.room);
+          return (
+            <div key={'r-' + it.room.id} className="inprog-card room" onClick={() => onOpenRoom(it.room)}>
+              <div className="ip-icon">{it.game.icon}</div>
+              <div className="ip-name">{it.game.name}</div>
+              <div className={'ip-sub' + (it.room.myTurn ? ' turn' : '')}>
+                {it.room.myTurn ? '🔔 Your turn' : '⏳ Their move'} · vs {it.room.opponentName}
+              </div>
+              {expH != null && (
+                <div className={'ip-sub' + (expH <= 6 ? ' expiring' : '')}>
+                  ⏱ expires in {expH}h
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Per-game public chat room (phase 7): one room per game, 10s polling, report-
+// to-hide moderation (3 distinct reports auto-hide a message server-side).
+function ChatPanel({ game, user, onClose }) {
+  const [messages, setMessages] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const listRef = useRef(null);
+  const lastIdRef = useRef(0);
+
+  const merge = (incoming) => {
+    if (!incoming.length) return;
+    setMessages((prev) => {
+      const seen = new Set(prev.map((m) => m.id));
+      const merged = prev.concat(incoming.filter((m) => !seen.has(m.id)));
+      return merged.slice(-200);
+    });
+  };
+
+  useEffect(() => {
+    let alive = true;
+    const load = async (initial) => {
+      const q = initial || !lastIdRef.current ? '' : `?after=${lastIdRef.current}`;
+      const { ok, body } = await api(`/api/chat/${game.id}${q}`);
+      if (alive && ok && body) {
+        merge(body.messages || []);
+        setLoaded(true);
+      }
+    };
+    load(true);
+    const t = setInterval(() => load(false), 10000);
+    return () => { alive = false; clearInterval(t); };
+  }, [game.id]);
+
+  useEffect(() => {
+    lastIdRef.current = messages.length ? messages[messages.length - 1].id : 0;
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [messages]);
+
+  const send = async () => {
+    const body = input.trim();
+    if (!body || busy) return;
+    setBusy(true);
+    const { ok, body: resp } = await api(`/api/chat/${game.id}`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    });
+    setBusy(false);
+    if (ok && resp && resp.message) {
+      merge([resp.message]);
+      setInput('');
+    } else {
+      setNotice('Could not send — try again.');
+      setTimeout(() => setNotice(''), 2500);
+    }
+  };
+
+  const report = async (m) => {
+    if (!window.confirm('Report this message? 3 reports hide it for everyone.')) return;
+    const { ok, body } = await api(`/api/chat/messages/${m.id}/report`, { method: 'POST' });
+    if (ok && body) {
+      if (body.hidden) {
+        setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, hidden: true, body: null, username: null } : x)));
+      } else {
+        setNotice('Reported — thanks for keeping the room clean.');
+        setTimeout(() => setNotice(''), 2500);
+      }
+    }
+  };
+
+  const myId = user && user.id;
+  return (
+    <div className="chat-overlay" onClick={onClose}>
+      <div className="chat-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-head">
+          <div className="chat-title">
+            <span>{game.icon}</span> {game.name} · Chat
+          </div>
+          <button className="chat-close" onClick={onClose} aria-label="Close chat">✕</button>
+        </div>
+        <div className="chat-list" ref={listRef}>
+          {!loaded && <div className="chat-empty">Loading room…</div>}
+          {loaded && messages.length === 0 && (
+            <div className="chat-empty">No messages yet — say hi to today's players.</div>
+          )}
+          {messages.map((m) =>
+            m.hidden ? (
+              <div key={m.id} className="chat-msg hidden-msg">
+                <span className="chat-tombstone">🚫 Hidden by community reports</span>
+              </div>
+            ) : (
+              <div key={m.id} className={'chat-msg' + (myId && m.userId === myId ? ' mine' : '')}>
+                <div className="chat-msg-top">
+                  <span className="chat-author">{m.username}</span>
+                  {(!myId || m.userId !== myId) && (
+                    <button className="chat-report" title="Report" onClick={() => report(m)}>🚩</button>
+                  )}
+                </div>
+                <div className="chat-body">{m.body}</div>
+              </div>
+            )
+          )}
+        </div>
+        {notice && <div className="chat-notice">{notice}</div>}
+        <div className="chat-input-row">
+          <input
+            className="chat-input"
+            placeholder="Message this game's room…"
+            value={input}
+            maxLength={500}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+          />
+          <button className="chat-send" onClick={send} disabled={busy || !input.trim()}>Send</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat }) {
+  const countdown = useCountdown(nextResetUtc, offset, onReset);
+  const resuming = !!(attempt && !attempt.finishedAt);
+  const m = game.manifest || {};
+  return (
+    <div className="pregame-card" style={{ '--accent': game.tagColor || C.accent }}>
+      <div className="pregame-icon">{game.icon}</div>
+      <h2>{game.name}</h2>
+      <div className="sub">{game.desc}</div>
+      <div className="pregame-chips">
+        {m.sessionLength && SESSION_LENGTH_LABEL[m.sessionLength] && (
+          <span className="pregame-chip">⏱ {SESSION_LENGTH_LABEL[m.sessionLength]}</span>
+        )}
+        {m.input && INPUT_LABEL[m.input] && <span className="pregame-chip">{INPUT_LABEL[m.input]}</span>}
+        {m.undo === 'free' && <span className="pregame-chip">↩︎ Undo allowed</span>}
+        {m.undo === 'booster' && <span className="pregame-chip">↩︎ Limited boosters</span>}
+      </div>
+      <div className="pregame-stats">
+        <div className="pregame-stat">
+          <div className="l">Personal best</div>
+          <div className="v mono">{best && best.score != null ? `+${best.score}` : '—'}</div>
+        </div>
+        <div className="pregame-stat">
+          <div className="l">Streak</div>
+          <div className="v mono">{authOk ? `${streak}d` : '—'}</div>
+        </div>
+        {game.daily && nextResetUtc && (
+          <div className="pregame-stat">
+            <div className="l">New deal in</div>
+            <div className="v mono">{countdown}</div>
+          </div>
+        )}
+      </div>
+      {game.daily && (
+        <div className="pregame-deal">
+          🌍 Everyone plays this <strong>exact deal</strong> today — one attempt, same board for all.
+        </div>
+      )}
+      {resuming && (
+        <div className="pregame-resume-note">▶ You have a run in progress — jump back in where you left off.</div>
+      )}
+      <button className="primary-btn pregame-play" onClick={onPlay}>
+        {resuming ? '▶ Resume' : !authOk && game.daily ? 'Play as guest' : 'Play'}
+      </button>
+      {game.daily && !authOk && (
+        <div className="pregame-signedout">
+          Playing as a guest — finish today's board and sign in before midnight UTC
+          to put your run on the leaderboard and start a streak.
+        </div>
+      )}
+      <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+      {onChat && (
+        <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>
+      )}
+    </div>
+  );
+}
+
 function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const hasResult = attempt && attempt.score != null;
@@ -6680,7 +6887,7 @@ function locateWord(letters, word) {
   return null;
 }
 
-function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
   const board = useRef(generateWordSearch(dailyRng(offset, 'wordhunt'))).current;
   const { theme, words, letters } = board;
   const total = words.length;
@@ -6738,7 +6945,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   );
 
   // Paid hint: highlight the first cell of one random not-yet-found word.
-  const hints = useDailyHints({ gameId: 'wordhunt', maxHints: total, matchBalance, onMatchBalanceChange });
+  const hints = useDailyHints({ gameId: 'wordhunt', maxHints: total });
   const buyHint = () => {
     if (done) return;
     hints.buy(() => {
@@ -6875,14 +7082,11 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
       {!done && (
         <HintBar
-          nextCost={hints.nextCost}
-          balance={matchBalance}
-          canAfford={hints.canAfford}
+          hintsLeft={hints.hintsLeft}
           exhausted={hints.exhausted || hintsExhausted}
           buying={hints.buying}
           onBuy={buyHint}
           msg={hints.msg}
-          lastTx={hints.lastTx}
           label="No more hints"
         />
       )}
@@ -6959,12 +7163,6 @@ const CW_WORDS = [
   { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement',       hints: ['Self-executing code on a chain', 'Smart ones run on Ethereum'] },
 ];
 
-// Hint pricing — single tuning knob. Cost of the Nth hint purchased today
-// (0-indexed) is CW_HINT_BASE_COST * 2**N → 1, 2, 4, 8, … in MATCH tokens.
-// The server is authoritative; this client copy is for display only.
-const DAILY_HINT_BASE_COST = 1;
-const CW_HINT_BASE_COST = DAILY_HINT_BASE_COST;
-const cwHintCost = (purchased) => DAILY_HINT_BASE_COST * Math.pow(2, purchased);
 
 // Guesses allowed for a given word length: one more than the length, so a
 // 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
@@ -7029,7 +7227,7 @@ function cwDailyRounds(offset) {
   return picked;
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, matchBalance, onMatchBalanceChange }) {
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
   // The day's stack of independent word rounds (stable for the render lifetime).
   const roundsDef = useRef(cwDailyRounds(offset)).current;
@@ -7098,13 +7296,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     !done
   );
 
-  // Paid-hint state. hintsPurchased is the server-authoritative DAILY count that
-  // drives the doubling cost ramp; the MATCH balance is the global nav balance
-  // passed in via props. Both are read on mount and reconciled from purchases.
+  // Hint state. Hints are FREE (the MATCH currency is retired) but
+  // hintsPurchased stays a server-authoritative DAILY count so a reload can't
+  // reset it and the server-side cap still applies.
   const [hintsPurchased, setHintsPurchased] = useState(0);
   const [buying, setBuying] = useState(false);
   const [hintMsg, setHintMsg] = useState('');
-  const [lastHintTx, setLastHintTx] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -7112,7 +7309,6 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
       const { ok, body } = await api('/api/cryptowordle/hint');
       if (!alive || !ok || !body) return;
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
     })();
     return () => { alive = false; };
   }, []);
@@ -7124,16 +7320,13 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const activeHintsApplied = active ? (hintsByRound[activeIdx] || 0) : 0;
   const revealedExtra = active ? Math.min(activeWrong + activeHintsApplied, activeHints.length) : 0;
   const cluesLeft = activeHints.length - revealedExtra;
-  const nextCost = cwHintCost(hintsPurchased);
-  const canAffordHint = matchBalance != null && matchBalance >= nextCost;
-  // Daily cap sent to the server: total clues purchasable across all rounds.
+  // Daily cap sent to the server: total clues available across all rounds.
   const dailyClueTotal = roundsDef.reduce((a, rd) => a + (rd.hints ? rd.hints.length : 0), 0);
 
   const buyHint = async () => {
     if (buying || done || !active || cluesLeft <= 0) return;
     setBuying(true);
     setHintMsg('');
-    setLastHintTx(null);
     const { ok, status, body } = await api('/api/cryptowordle/hint', {
       method: 'POST',
       body: JSON.stringify({ maxHints: dailyClueTotal }),
@@ -7141,32 +7334,23 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     setBuying(false);
     if (ok && body) {
       if (Number.isFinite(body.hintsPurchased)) setHintsPurchased(body.hintsPurchased);
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
       // Apply the revealed clue to the active round and persist immediately so a
-      // reload can't lose a paid reveal while the server counter already advanced.
+      // reload can't lose a reveal while the server counter already advanced.
       const nextHbr = hintsByRound.map((n, i) => (i === activeIdx ? (n || 0) + 1 : n));
       setHintsByRound(nextHbr);
       onSaveProgress && onSaveProgress(buildProgress(roundGuesses, nextHbr), totalSteps, secs);
-      // Mirror the spend on-chain (best-effort) and surface the explorer link.
-      if (body.ledgerId) {
-        setLastHintTx({ status: 'pending', txHash: null });
-        anchorMatchLedger(body.ledgerId, body.memo).then(r => { if (r) setLastHintTx(r); });
-      }
       return;
     }
-    if (status === 409 && body && body.code === 'insufficient_funds') {
-      if (Number.isFinite(body.balance) && onMatchBalanceChange) onMatchBalanceChange(body.balance);
-      setHintMsg('Not enough MATCH');
-    } else if (status === 409 && body && body.code === 'no_more_hints') {
+    if (status === 409 && body && body.code === 'no_more_hints') {
       setHintMsg('No more clues');
     } else {
-      setHintMsg('Could not buy hint');
+      setHintMsg('Could not use hint');
     }
   };
 
   // Spoiler-free multi-word share: one line per word (✅/❌ + blank squares).
   const buildShare = (rs) => {
-    const lines = [`Crypto Wordle #${dayNum} — ${rs.filter(r => r.solved).length}/${rs.length} · ${totalScore} pts`];
+    const lines = [`Daily Cipher #${dayNum} — ${rs.filter(r => r.solved).length}/${rs.length} · ${totalScore} pts`];
     rs.forEach(r => {
       lines.push((r.solved ? '✅ ' : '❌ ') + (r.solved ? '🟩' : '⬛').repeat(r.def.word.length));
     });
@@ -7299,14 +7483,11 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
 
           {activeHints.length > 0 && (
             <HintBar
-              nextCost={nextCost}
-              balance={matchBalance}
-              canAfford={canAffordHint}
+              hintsLeft={cluesLeft}
               exhausted={cluesLeft <= 0}
               buying={buying}
               onBuy={buyHint}
               msg={hintMsg}
-              lastTx={lastHintTx}
               label="No more clues"
             />
           )}
@@ -7577,7 +7758,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     };
     msSaveEntry(entry);
     setGameHistory(msLoadHistory());
-    const shareText = `Minesweeper ${dateStr} — 💰×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
+    const shareText = `Minesweeper ${dateStr} — 🔒×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
     submitClassicScore('minesweeper', finalScore, { safeRevealed, timeSecs: secs });
     onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
   };
@@ -7671,7 +7852,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
                 onClick={handleCashOut}
                 disabled={!cashOutActive}
               >
-                Cash Out 💰 ×{cashoutMultiplier}
+                Lock In 🔒 ×{cashoutMultiplier}
               </button>
               {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
@@ -7746,28 +7927,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               <button className="ms-theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
                 {theme === 'dark' ? '🌙 Dark' : '☀ Light'}
               </button>
-            </div>
-          </div>
-          <div className="ms-settings-section">
-            <h4>Usernode Wallet</h4>
-            <div className="ms-settings-row">
-              <span className="ms-settings-label">Connection</span>
-              {isMock ? (
-                <div className="ms-wallet-status">
-                  <span className="ms-ws-label mock">🔧 Dev mode</span>
-                  <span className="ms-ws-addr">mock wallet active</span>
-                </div>
-              ) : window.usernode ? (
-                <div className="ms-wallet-status">
-                  <span className="ms-ws-label">🔗 Connected</span>
-                  {walletAddr && <span className="ms-ws-addr">{truncAddr(walletAddr)}</span>}
-                </div>
-              ) : (
-                <div className="ms-wallet-status">
-                  <span className="ms-ws-label unavail">Not available</span>
-                  <span className="ms-ws-addr">open in Usernode</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -9478,7 +9637,7 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
 
   return (
     <div>
-      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />}
+      {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
@@ -10009,7 +10168,7 @@ function t2048_maxTile(grid) {
 function t2048_toShareText(score, moves, secs, highTile) {
   const mm = String(Math.floor(secs / 60)).padStart(2, '0');
   const ss = String(secs % 60).padStart(2, '0');
-  return '2048 🔢 Score: ' + score.toLocaleString() + '\nHighest tile: ' + highTile + ' 🏆\nMoves: ' + moves + ' | Time: ' + mm + ':' + ss + '\nPlay at PuzzleChain';
+  return '2048 🔢 Score: ' + score.toLocaleString() + '\nHighest tile: ' + highTile + ' 🏆\nMoves: ' + moves + ' | Time: ' + mm + ':' + ss + '\nPlay at Game Corner';
 }
 
 function t2048_stripAnim(grid) {
@@ -10429,7 +10588,7 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOp
   if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
     return (
       <ClassicRaceGame
-        game={{ id: '2048', name: '2048', icon: '🔢', tagColor: C.emerald }}
+        game={{ id: '2048', name: '2048', icon: '🔢', tagColor: GA.amber }}
         roomId={gameModeOpts.roomId}
         myPlayerNum={gameModeOpts.roomAction === 'join' ? 2 : 1}
         onExitLobby={() => onBack && onBack()}
@@ -11272,1011 +11431,6 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   );
 }
 
-/* ---------------- Texas Hold 'Em (redesigned) ---------------- */
-const TH_SUITS = ['♠', '♥', '♦', '♣'];
-const TH_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-function thDeck() {
-  const d = [];
-  for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) d.push({ r: r + 2, s });
-  for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
-  return d;
-}
-function thScore5(cards) {
-  const ranks = cards.map(c => c.r).sort((a, b) => b - a);
-  const suits = cards.map(c => c.s);
-  const flush = suits.every(s => s === suits[0]);
-  const uniq = [...new Set(ranks)];
-  let straightHigh = 0;
-  if (uniq.length === 5) {
-    if (uniq[0] - uniq[4] === 4) straightHigh = uniq[0];
-    else if (uniq[0] === 14 && uniq[1] === 5 && uniq[4] === 2) straightHigh = 5; // wheel
-  }
-  const counts = {};
-  ranks.forEach(r => { counts[r] = (counts[r] || 0) + 1; });
-  const groups = Object.entries(counts).map(([r, n]) => [n, +r]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
-  const kick = groups.map(g => g[1]);
-  let cat;
-  if (straightHigh && flush) cat = 8;
-  else if (groups[0][0] === 4) cat = 7;
-  else if (groups[0][0] === 3 && groups[1][0] === 2) cat = 6;
-  else if (flush) cat = 5;
-  else if (straightHigh) cat = 4;
-  else if (groups[0][0] === 3) cat = 3;
-  else if (groups[0][0] === 2 && groups[1][0] === 2) cat = 2;
-  else if (groups[0][0] === 2) cat = 1;
-  else cat = 0;
-  const order = (cat === 4 || cat === 8) ? [straightHigh, 0, 0, 0, 0] : kick;
-  let v = cat;
-  for (let i = 0; i < 5; i++) v = v * 15 + (order[i] || 0);
-  return v;
-}
-function thBest(cards) {
-  if (cards.length < 5) return 0;
-  let best = 0;
-  const n = cards.length;
-  for (let a = 0; a < n - 4; a++) for (let b = a + 1; b < n - 3; b++) for (let c = b + 1; c < n - 2; c++)
-    for (let d = c + 1; d < n - 1; d++) for (let e = d + 1; e < n; e++) {
-      const v = thScore5([cards[a], cards[b], cards[c], cards[d], cards[e]]);
-      if (v > best) best = v;
-    }
-  return best;
-}
-const TH_CATS = ['High card', 'Pair', 'Two pair', 'Three of a kind', 'Straight', 'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
-function thCatName(v) { let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15); return TH_CATS[cat] || ''; }
-function thHandStrength(hole, board) {
-  if (board.length >= 3) {
-    const v = thBest([...hole, ...board]);
-    let cat = v; for (let i = 0; i < 5; i++) cat = Math.floor(cat / 15);
-    return Math.min(1, cat / 6 + (hole[0].r + hole[1].r) / 200);
-  }
-  // preflop heuristic
-  const [a, b] = hole;
-  let s = (a.r + b.r) / 40;
-  if (a.r === b.r) s += 0.35;
-  if (a.s === b.s) s += 0.08;
-  if (Math.abs(a.r - b.r) === 1) s += 0.05;
-  return Math.min(0.95, s);
-}
-/*
- * CLIENT-SIDE ONLY — never send results via WebSocket, API, or any shared state.
- * For UX display to the local player only. Winner determination is always
- * server-authoritative. Bot hole cards must never be passed to these functions
- * before showdown; the isPlayer guard in PokerSeat enforces this invariant.
- */
-/* ---- Poker hand evaluator ---- */
-const POKER_HAND_INFO = [
-  null,
-  { rank: 1,  name: 'High Card',       emoji: '🃏', desc: 'Highest card plays'                  },
-  { rank: 2,  name: 'One Pair',        emoji: '1️⃣', desc: 'Two cards of the same rank'          },
-  { rank: 3,  name: 'Two Pair',        emoji: '2️⃣', desc: 'Two different pairs'                  },
-  { rank: 4,  name: 'Three of a Kind', emoji: '3️⃣', desc: 'Three cards of the same rank'        },
-  { rank: 5,  name: 'Straight',        emoji: '➡️', desc: 'Five consecutive cards'              },
-  { rank: 6,  name: 'Flush',           emoji: '💧', desc: 'Five cards of the same suit'         },
-  { rank: 7,  name: 'Full House',      emoji: '🏠', desc: 'Three of a kind plus a pair'         },
-  { rank: 8,  name: 'Four of a Kind',  emoji: '💥', desc: 'Four cards of the same rank'         },
-  { rank: 9,  name: 'Straight Flush',  emoji: '🔥', desc: 'Five consecutive cards, same suit'   },
-  { rank: 10, name: 'Royal Flush',     emoji: '👑', desc: 'A, K, Q, J, 10 of the same suit'    },
-];
-
-function pokerCombinations(arr, k) {
-  if (k === 0) return [[]];
-  if (arr.length < k) return [];
-  const [h, ...t] = arr;
-  return [
-    ...pokerCombinations(t, k - 1).map(c => [h, ...c]),
-    ...pokerCombinations(t, k),
-  ];
-}
-
-function pokerScoreCat(score) {
-  let c = score;
-  for (let i = 0; i < 5; i++) c = Math.floor(c / 15);
-  return c; // 0=high card … 8=straight flush
-}
-
-function pokerDescHand(cards, cat, isRoyal) {
-  if (isRoyal) return 'A, K, Q, J, 10 — same suit';
-  const rg = {};
-  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
-  const rn = r => TH_RANKS[r - 2] || String(r);
-  switch (cat) {
-    case 0: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)} high`; }
-    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? `Pair of ${rn(p[0].r)}s` : ''; }
-    case 2: {
-      const ps = Object.values(rg).filter(g => g.length >= 2).sort((a, b) => b[0].r - a[0].r);
-      return ps.length >= 2 ? `${rn(ps[0][0].r)}s and ${rn(ps[1][0].r)}s` : '';
-    }
-    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? `Three ${rn(t[0].r)}s` : ''; }
-    case 4: { const rs = cards.map(c => c.r).sort((a, b) => b - a); return `${rn(rs[0])}-high straight`; }
-    case 5: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high flush`; }
-    case 6: {
-      const t = Object.values(rg).find(g => g.length >= 3);
-      const p = Object.values(rg).find(g => g.length >= 2 && t && g[0].r !== t[0].r);
-      return t && p ? `${rn(t[0].r)}s full of ${rn(p[0].r)}s` : '';
-    }
-    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? `Four ${rn(q[0].r)}s` : ''; }
-    case 8: { const h = cards.reduce((m, c) => c.r > m.r ? c : m); return `${rn(h.r)}-high straight flush`; }
-    default: return '';
-  }
-}
-
-function pokerHandCards(cards, cat) {
-  // Returns the subset of cards that form the hand pattern (excluding pure kickers)
-  const rg = {};
-  cards.forEach(c => { rg[c.r] = rg[c.r] || []; rg[c.r].push(c); });
-  switch (cat) {
-    case 0: return [cards.reduce((m, c) => c.r > m.r ? c : m)];
-    case 1: { const p = Object.values(rg).find(g => g.length >= 2); return p ? p.slice(0, 2) : cards; }
-    case 2: { const ps = Object.values(rg).filter(g => g.length >= 2); return ps.flatMap(p => p.slice(0, 2)).slice(0, 4); }
-    case 3: { const t = Object.values(rg).find(g => g.length >= 3); return t ? t.slice(0, 3) : cards; }
-    case 4: return cards;  // straight: all 5 are key
-    case 5: return cards;  // flush: all 5 are key
-    case 6: return cards;  // full house: all 5 are key
-    case 7: { const q = Object.values(rg).find(g => g.length >= 4); return q ? q.slice(0, 4) : cards; }
-    case 8: return cards;  // straight flush: all 5 are key
-    default: return cards;
-  }
-}
-
-function evaluateBestHand(holeCards, boardCards) {
-  if (!holeCards || holeCards.length < 2) return null;
-  const all = [...holeCards, ...(boardCards || [])];
-  const combos = all.length >= 5 ? pokerCombinations(all, 5) : [all];
-
-  let bestScore = -1, bestCombo = null;
-  for (const combo of combos) {
-    const score = thScore5(combo);
-    if (score > bestScore) { bestScore = score; bestCombo = combo; }
-  }
-  if (!bestCombo) return null;
-
-  const cat = pokerScoreCat(bestScore);
-  // Royal Flush = straight flush containing A, K, Q, J, 10
-  const isRoyal = cat === 8 && [10, 11, 12, 13, 14].every(r => bestCombo.some(c => c.r === r));
-  const idx = isRoyal ? 10 : cat + 1;
-  const info = POKER_HAND_INFO[idx];
-
-  return {
-    rank: info.rank,
-    rankName: info.name,
-    emoji: info.emoji,
-    desc: pokerDescHand(bestCombo, cat, isRoyal),
-    bestFive: bestCombo,
-    handCards: isRoyal ? bestCombo : pokerHandCards(bestCombo, cat),
-    partial: all.length < 5,
-  };
-}
-
-/*
- * CLIENT-SIDE ONLY — rendered exclusively for the local human player
- * (isPlayer === true). Never serialised, broadcast, or sent to the server.
- * The server evaluates hands independently at showdown for authoritative results.
- */
-/* ---- HandStrengthPanel component ---- */
-function HandStrengthPanel({ holeCards, board, handNum }) {
-  const prevRankRef = useRef(0);
-  const timerRef = useRef(null);
-  const [improved, setImproved] = useState(false);
-
-  const result = evaluateBestHand(holeCards, board || []);
-  const currentRank = result ? result.rank : 0;
-
-  useEffect(() => {
-    if (currentRank > 0 && prevRankRef.current > 0 && currentRank > prevRankRef.current) {
-      setImproved(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setImproved(false), 600);
-    }
-    prevRankRef.current = currentRank;
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [currentRank]);
-
-  // Reset on new hand
-  useEffect(() => {
-    prevRankRef.current = 0;
-    setImproved(false);
-  }, [handNum]);
-
-  if (!result) return null;
-
-  const cardKey = (c) => `${c.r}.${c.s}`;
-  const usedKeys = new Set((result.handCards || []).map(cardKey));
-
-  return (
-    <div className={'poker-hand-panel' + (improved ? ' improved' : '')}>
-      <div className="poker-hand-panel-rank">
-        <span>{result.emoji}</span>
-        <span className="poker-hand-panel-name">{result.rankName}</span>
-        <span className="poker-hand-panel-num">#{result.rank}</span>
-      </div>
-      <div className="poker-hand-panel-desc">{result.desc}</div>
-      {result.bestFive && result.bestFive.length >= 2 && (
-        <div className="poker-hand-panel-cards">
-          {result.bestFive.map((card, i) => {
-            const used = usedKeys.has(cardKey(card));
-            const red = card.s === 1 || card.s === 2;
-            return (
-              <span key={i} className={'poker-hand-card' + (used ? ' used' : ' unused') + (red ? ' red' : '')}>
-                {TH_RANKS[card.r - 2]}{TH_SUITS[card.s]}
-              </span>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ---- Poker sub-components ---- */
-const POKER_BOT_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
-const POKER_SEAT_COLORS = ['#6366F1', '#FBBF24', '#34D399', '#FB7185', '#A78BFA', '#F97316'];
-
-function PokerCardFace({ card, hidden, lg }) {
-  if (!card) {
-    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
-    return <div className={cls} />;
-  }
-  if (hidden) {
-    const cls = lg ? 'poker-card-lg back' : 'poker-card back';
-    return <div className={cls} />;
-  }
-  const red = card.s === 1 || card.s === 2;
-  const rank = TH_RANKS[card.r - 2];
-  const suit = TH_SUITS[card.s];
-  const cls = (lg ? 'poker-card-lg' : 'poker-card') + (red ? ' red flip-in' : ' flip-in');
-  return (
-    <div className={cls}>
-      <span className="poker-card-rank">{rank}</span>
-      <span className="poker-card-suit">{suit}</span>
-    </div>
-  );
-}
-
-function PokerSetupScreen({ onStart, savedChips, numBots, setNumBots, difficulty, setDifficulty }) {
-  const BB = 10;
-  const startChips = savedChips || 1000;
-  return (
-    <div className="poker-setup">
-      <div className="poker-setup-title">Texas Hold 'Em</div>
-      <div className="poker-setup-sub">Heads-up and multi-player poker vs bots</div>
-      <div className="poker-setup-card">
-        <div>
-          <div className="poker-setup-label">Your chips</div>
-          <div className="poker-setup-chips">{startChips} chips</div>
-        </div>
-        <div>
-          <div className="poker-setup-label">How many bots?</div>
-          <div className="poker-setup-row">
-            {[1, 2, 3, 4].map(n => (
-              <button key={n} className={'poker-bot-btn' + (numBots === n ? ' sel' : '')} onClick={() => setNumBots(n)}>{n}</button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="poker-setup-label">Difficulty</div>
-          <div className="poker-setup-row">
-            {['Easy', 'Normal', 'Hard'].map(d => (
-              <button key={d} className={'poker-diff-btn' + (difficulty === d ? ' sel' : '')} onClick={() => setDifficulty(d)}>{d}</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ fontSize: '0.78rem', color: '#8B95A8' }}>
-          Big blind: {BB} chips &middot; Starting stack: {startChips}
-        </div>
-        <button className="poker-start-btn" onClick={() => onStart(startChips)}>Start Game</button>
-      </div>
-    </div>
-  );
-}
-
-function PokerTopBar({ handNum, phase, onBack, playerChips, BB }) {
-  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
-  const streetName = streetNames[phase] || '';
-  return (
-    <div className="poker-top-bar">
-      <button className="poker-back-btn" onClick={onBack} title="Leave game">&#8592;</button>
-      <div className="poker-top-bar-title">Texas Hold 'Em</div>
-      <div className="poker-top-bar-info">{streetName} &middot; Hand #{handNum}</div>
-      <div className="poker-conn-dot" title="Connected" />
-    </div>
-  );
-}
-
-function pokerSeatPos(i, n) {
-  // Distribute seats around the oval. Player (seat 0) is always at the bottom.
-  // Angles in degrees: 0 = bottom, clockwise.
-  const angles = {
-    1: [180, 0],           // heads-up: opponent top, player bottom
-    2: [180, 300, 60],     // 3-way
-    3: [180, 270, 0, 90],  // 4-way
-    4: [180, 252, 324, 36, 108], // 5-way
-  };
-  const arr = angles[n] || angles[4];
-  const deg = arr[i] || (i * (360 / (n + 1)));
-  const rad = (deg - 90) * Math.PI / 180;
-  // Use oval proportions: rx=50, ry=50 (percentage), but oval is wider than tall
-  const rx = 46, ry = 42;
-  const x = 50 + rx * Math.cos(rad);
-  const y = 50 + ry * Math.sin(rad);
-  return { x, y };
-}
-
-function PokerSeat({ seat, isPlayer, dealerIdx, sbIdx, bbIdx, isActive, isWinner, actionLabel, showCards, seatIdx, board, handNum, gamePhase }) {
-  const color = POKER_SEAT_COLORS[seatIdx % POKER_SEAT_COLORS.length];
-  const cls = 'poker-seat' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '') +
-    (seat.folded ? ' folded' : '') + (seat.chips <= 0 && !isActive ? ' eliminated' : '');
-
-  // Compute hand eval for player seat (cheap: ≤21 combos)
-  const showPanel = isPlayer && seat.hand && seat.hand.length >= 2 && gamePhase === 'playing';
-  const handEval = showPanel ? evaluateBestHand(seat.hand, board || []) : null;
-
-  const cardKey = (c) => `${c.r}.${c.s}`;
-  const bestKeys = handEval ? new Set((handEval.bestFive || []).map(cardKey)) : null;
-  const usedKeys = handEval ? new Set((handEval.handCards || []).map(cardKey)) : null;
-
-  return (
-    <div className={cls}>
-      <div className="poker-seat-avatar" style={{ background: color + '33', border: `1.5px solid ${color}` }}>
-        {isPlayer ? 'You' : seat.name[0]}
-      </div>
-      <div className="poker-seat-name">
-        <span>{isPlayer ? 'You' : seat.name}</span>
-        {seatIdx === dealerIdx && <span className="poker-seat-badge dealer">D</span>}
-        {seatIdx === sbIdx && <span className="poker-seat-badge sb">SB</span>}
-        {seatIdx === bbIdx && <span className="poker-seat-badge bb">BB</span>}
-      </div>
-      <div className="poker-seat-chips">{seat.chips}</div>
-      {seat.bet > 0 && <div style={{ fontSize: '0.6rem', color: '#FBBF2488', fontFamily: 'monospace' }}>bet {seat.bet}</div>}
-      <div className="poker-seat-cards">
-        {seat.hand && seat.hand.map((card, ci) => {
-          const hidden = !showCards && !isPlayer && !seat.revealed;
-          if (isPlayer && bestKeys && !hidden) {
-            const k = cardKey(card);
-            const hlCls = usedKeys.has(k) ? 'hl-used' : bestKeys.has(k) ? '' : 'hl-unused';
-            return (
-              <div key={ci} className={'poker-seat-card-hl' + (hlCls ? ' ' + hlCls : '')}>
-                <PokerCardFace card={card} hidden={false} />
-              </div>
-            );
-          }
-          return <PokerCardFace key={ci} card={card} hidden={hidden} />;
-        })}
-      </div>
-      {showPanel && handEval && (
-        <HandStrengthPanel holeCards={seat.hand} board={board} handNum={handNum} />
-      )}
-      {actionLabel && <div className={'poker-seat-label ' + actionLabel.type}>{actionLabel.text}</div>}
-    </div>
-  );
-}
-
-function CommunityArea({ board, pot, street }) {
-  const streetNames = ['Pre-flop', 'Flop', 'Turn', 'River', 'Showdown'];
-  const slots = [0, 1, 2, 3, 4];
-  return (
-    <div className="poker-community">
-      {pot > 0 && <div className="poker-pot-row">Pot: {pot}</div>}
-      <div className="poker-board">
-        {slots.map(i => (
-          <div key={i} className="poker-card-slot">
-            {board[i] ? <PokerCardFace card={board[i]} /> : null}
-          </div>
-        ))}
-      </div>
-      {street > 0 && <div className="poker-street">{streetNames[street] || ''}</div>}
-    </div>
-  );
-}
-
-function RaisePanel({ minRaise, maxRaise, BB, onRaise, onClose }) {
-  const [amt, setAmt] = useState(minRaise);
-  const presets = [
-    { lbl: '0.5 pot', mult: 0.5 },
-    { lbl: 'Pot', mult: 1 },
-    { lbl: '2x', mult: 2 },
-    { lbl: 'All-in', mult: 999 },
-  ];
-  return (
-    <div className="poker-raise-panel">
-      <div className="poker-preset-row">
-        {presets.map(p => {
-          const v = p.mult >= 999 ? maxRaise : Math.min(maxRaise, Math.max(minRaise, Math.round(minRaise * p.mult)));
-          return (
-            <button key={p.lbl} className={'poker-preset-btn' + (amt === v ? ' sel' : '')}
-              onClick={() => setAmt(v)}>{p.lbl}</button>
-          );
-        })}
-      </div>
-      <div className="poker-raise-row">
-        <input type="range" className="poker-raise-slider"
-          min={minRaise} max={maxRaise} step={BB}
-          value={Math.min(amt, maxRaise)} onChange={e => setAmt(+e.target.value)} />
-        <input type="number" className="poker-raise-input"
-          min={minRaise} max={maxRaise} value={amt}
-          onChange={e => setAmt(Math.min(maxRaise, Math.max(minRaise, +e.target.value || minRaise)))} />
-      </div>
-      <div className="poker-raise-row-btns">
-        <button className="poker-raise-cancel" onClick={onClose}>Cancel</button>
-        <button className="poker-raise-confirm" onClick={() => { onRaise(Math.min(amt, maxRaise)); onClose(); }}>
-          Raise to {Math.min(amt, maxRaise)}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FloatingMenu({ onLeave, onLog, onHistory, soundOn, onToggleSound }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="poker-float-menu">
-      <button className="poker-float-btn" onClick={() => setOpen(o => !o)}>&#9776;</button>
-      {open && (
-        <>
-          <div className="poker-overlay-backdrop" onClick={() => setOpen(false)} />
-          <div className="poker-float-popover">
-            <button className="poker-float-item" onClick={() => { onToggleSound(); setOpen(false); }}>
-              {soundOn ? 'Mute sounds' : 'Unmute sounds'}
-            </button>
-            <button className="poker-float-item" onClick={() => { onLog(); setOpen(false); }}>Game log</button>
-            <button className="poker-float-item" onClick={() => { onHistory(); setOpen(false); }}>Hand history</button>
-            <button className="poker-float-item" onClick={() => { onLeave(); setOpen(false); }}>Leave table</button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function GameLogSidebar({ open, onClose, log }) {
-  return (
-    <div className={'poker-sidebar right' + (open ? ' open' : '')}>
-      <div className="poker-sidebar-header">
-        Game Log
-        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
-      </div>
-      <div className="poker-sidebar-body">
-        {log.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No events yet.</div>}
-        {log.slice().reverse().map((entry, i) => (
-          <div key={i} className={'poker-log-entry' + (entry.type === 'win' ? ' win' : entry.type === 'lose' ? ' lose' : entry.type === 'hand' ? ' hand' : '')}>
-            {entry.msg}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HandHistoryDrawer({ open, onClose, history }) {
-  return (
-    <div className={'poker-drawer' + (open ? ' open' : '')}>
-      <div className="poker-drawer-handle" />
-      <div className="poker-drawer-header">
-        Hand History
-        <button className="poker-sidebar-close" onClick={onClose}>&#10005;</button>
-      </div>
-      <div className="poker-drawer-body">
-        {history.length === 0 && <div style={{ color: '#8B95A8', fontSize: '0.82rem' }}>No completed hands yet.</div>}
-        {history.slice().reverse().map((h, i) => (
-          <div key={i} className="poker-hand-hist-item">
-            <div className="poker-hand-hist-title">Hand #{h.num}: {h.result}</div>
-            <div className="poker-hand-hist-detail">{h.detail}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ---- Texas Hold 'Em main component ---- */
-function TexasHoldemGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, gameMode, onModeChange }) {
-  const BB = 10;
-
-  // Setup state
-  const [phase, setPhase] = useState('setup'); // 'setup' | 'playing'
-  const [numBots, setNumBots] = useState(1);
-  const [difficulty, setDifficulty] = useState('Normal');
-  const [savedChips, setSavedChips] = useState(1000);
-
-  // Game state
-  const [gs, setGs] = useState(null);
-  const [raiseOpen, setRaiseOpen] = useState(false);
-  const [logOpen, setLogOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
-  const [handHistory, setHandHistory] = useState([]);
-  const [gameLog, setGameLog] = useState([]);
-  const [soundOn, setSoundOn] = useState(cgPrefs.sound);
-
-  const doneRef = useRef(false);
-  const handsRef = useRef(0);
-  const secsRef = useRef(0);
-  const gsRef = useRef(gs);
-  gsRef.current = gs;
-
-  const secs = useElapsed(resetKey, phase === 'playing' && !doneRef.current);
-  secsRef.current = secs;
-
-  // Report bot mode
-  useEffect(() => { onModeChange && onModeChange('bot'); }, []);
-
-  // Load saved chips from server on mount
-  useEffect(() => {
-    api('/api/poker/chips').then(r => {
-      if (r && typeof r.chips === 'number') setSavedChips(r.chips);
-    }).catch(() => {});
-  }, []);
-
-  const addLog = (msg, type) => {
-    setGameLog(prev => [...prev, { msg, type: type || 'info', ts: Date.now() }]);
-  };
-
-  // --- Game logic helpers ---
-  const buildSeats = (playerChips, n) => {
-    const seats = [];
-    seats.push({ name: 'You', chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: true });
-    for (let i = 0; i < n; i++) {
-      seats.push({ name: POKER_BOT_NAMES[i % POKER_BOT_NAMES.length], chips: playerChips, hand: [], bet: 0, folded: false, allIn: false, isPlayer: false });
-    }
-    return seats;
-  };
-
-  const nextActive = (seats, from, dir) => {
-    const n = seats.length;
-    let idx = (from + (dir || 1) + n) % n;
-    let tries = 0;
-    while ((seats[idx].folded || seats[idx].chips <= 0) && tries < n) {
-      idx = (idx + (dir || 1) + n) % n;
-      tries++;
-    }
-    return tries < n ? idx : -1;
-  };
-
-  const activeSeatCount = (seats) => seats.filter(s => !s.folded && s.chips > 0).length;
-
-  const dealNewHand = (seats, dealerIdx) => {
-    const deck = thDeck();
-    const newSeats = seats.map(s => ({
-      ...s, hand: [], bet: 0, folded: s.chips <= 0,
-      allIn: false, revealed: false, lastAction: null,
-    }));
-
-    // Deal 2 cards to each active seat
-    for (let round = 0; round < 2; round++) {
-      for (let i = 0; i < newSeats.length; i++) {
-        if (!newSeats[i].folded) newSeats[i].hand.push(deck.pop());
-      }
-    }
-
-    const n = newSeats.length;
-    const activeCount = newSeats.filter(s => !s.folded).length;
-    let sbIdx, bbIdx, toActIdx;
-
-    if (activeCount === 2) {
-      // heads-up: dealer=SB acts first preflop
-      sbIdx = dealerIdx;
-      bbIdx = nextActive(newSeats, sbIdx);
-      toActIdx = sbIdx; // dealer/SB acts first preflop in heads-up
-    } else {
-      sbIdx = nextActive(newSeats, dealerIdx);
-      bbIdx = nextActive(newSeats, sbIdx);
-      toActIdx = nextActive(newSeats, bbIdx); // UTG acts first
-    }
-
-    // Post blinds
-    const postBlind = (seatArr, idx, amount) => {
-      const actual = Math.min(amount, seatArr[idx].chips);
-      seatArr[idx].chips -= actual;
-      seatArr[idx].bet = actual;
-      if (seatArr[idx].chips === 0) seatArr[idx].allIn = true;
-      return actual;
-    };
-    postBlind(newSeats, sbIdx, BB / 2);
-    postBlind(newSeats, bbIdx, BB);
-
-    const maxBet = Math.max(...newSeats.map(s => s.bet));
-
-    return {
-      seats: newSeats,
-      board: [],
-      deck,
-      pot: 0,
-      dealerIdx,
-      sbIdx,
-      bbIdx,
-      toActIdx,
-      street: 0, // 0=preflop,1=flop,2=turn,3=river,4=showdown
-      maxBet,
-      roundActed: new Array(newSeats.length).fill(false),
-      phase: 'betting',
-      handNum: handsRef.current + 1,
-      actionLabels: new Array(newSeats.length).fill(null),
-    };
-  };
-
-  const allBetsEqual = (gs) => {
-    const seats = gs.seats;
-    const active = seats.filter(s => !s.folded && !s.allIn);
-    if (active.length === 0) return true;
-    return active.every(s => s.bet === gs.maxBet) && gs.roundActed.every((a, i) => a || seats[i].folded || seats[i].allIn || seats[i].chips <= 0);
-  };
-
-  const collectBets = (seats, pot) => {
-    let newPot = pot;
-    const newSeats = seats.map(s => { newPot += s.bet; return { ...s, bet: 0 }; });
-    return { seats: newSeats, pot: newPot };
-  };
-
-  const advanceStreet = (g) => {
-    const { seats, pot } = collectBets(g.seats, g.pot);
-    const newRoundActed = new Array(seats.length).fill(false);
-    const actionLabels = new Array(seats.length).fill(null);
-
-    let newStreet = g.street + 1;
-    let board = g.board.slice();
-    const deck = g.deck.slice();
-
-    if (newStreet === 1) { board.push(deck.pop(), deck.pop(), deck.pop()); } // flop
-    else if (newStreet === 2 || newStreet === 3) { board.push(deck.pop()); } // turn/river
-    else if (newStreet >= 4) {
-      // Showdown
-      return doShowdown({ ...g, seats, pot, board, deck, street: 4, actionLabels });
-    }
-
-    // First to act post-flop: first active after dealer
-    const firstToAct = nextActive(seats, g.dealerIdx);
-    return {
-      ...g, seats, pot, board, deck, street: newStreet,
-      toActIdx: firstToAct, maxBet: 0, roundActed: newRoundActed,
-      phase: 'betting', actionLabels,
-    };
-  };
-
-  const doShowdown = (g) => {
-    const { seats, pot, board } = g;
-    // Reveal all non-folded hands
-    const newSeats = seats.map(s => ({ ...s, revealed: true }));
-    // Find best hand among active players
-    const active = newSeats.map((s, i) => ({ s, i, score: s.folded ? -1 : thBest([...s.hand, ...board]) })).filter(x => x.score >= 0);
-    const bestScore = Math.max(...active.map(x => x.score));
-    const winners = active.filter(x => x.score === bestScore);
-    const share = Math.floor(pot / winners.length);
-    winners.forEach(w => { newSeats[w.i].chips += share; });
-    // Leftover chips (rounding) go to first winner
-    const leftover = pot - share * winners.length;
-    if (leftover > 0 && winners.length > 0) newSeats[winners[0].i].chips += leftover;
-
-    const winnerNames = winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ');
-    const handName = winners[0] ? thCatName(bestScore) : '';
-    addLog(`Hand #${g.handNum}: ${winnerNames} win${winners.length > 1 ? '' : 's'} pot ${pot} (${handName})`, winners.some(w => w.s.isPlayer) ? 'win' : 'lose');
-
-    setHandHistory(prev => [...prev, {
-      num: g.handNum,
-      result: winners.map(w => w.s.isPlayer ? 'You' : w.s.name).join(' & ') + ' won',
-      detail: `Pot: ${pot} · ${handName}`,
-    }]);
-
-    return {
-      ...g, seats: newSeats, pot: 0, phase: 'handover', street: 4,
-      winnerIdxs: winners.map(w => w.i), actionLabels: new Array(newSeats.length).fill(null),
-    };
-  };
-
-  const processBotTurn = (g) => {
-    if (!g || g.phase !== 'betting') return g;
-    const seat = g.seats[g.toActIdx];
-    if (!seat || seat.isPlayer || seat.folded) return g;
-
-    const toCall = g.maxBet - seat.bet;
-    const strength = thHandStrength(seat.hand, g.board);
-    const r = Math.random();
-    const diffMult = difficulty === 'Easy' ? 0.7 : difficulty === 'Hard' ? 1.3 : 1.0;
-
-    let action, amount;
-    if (toCall > 0) {
-      const potOdds = toCall / (g.pot + toCall);
-      if (strength * diffMult < 0.25 && potOdds > 0.2 && r > 0.25) {
-        action = 'fold';
-      } else if (strength * diffMult > 0.72 && seat.chips > toCall + BB && r > 0.5) {
-        action = 'raise';
-        amount = Math.min(seat.chips, toCall + BB * 2);
-      } else {
-        action = 'call';
-      }
-    } else {
-      if (strength * diffMult > 0.6 && r > 0.5 && seat.chips > BB) {
-        action = 'raise';
-        amount = Math.min(seat.chips, BB * 2);
-      } else {
-        action = 'check';
-      }
-    }
-
-    return applyAction(g, g.toActIdx, action, amount);
-  };
-
-  const applyAction = (g, seatIdx, action, amount) => {
-    const seats = g.seats.map(s => ({ ...s }));
-    const seat = seats[seatIdx];
-    const roundActed = [...g.roundActed];
-    const actionLabels = new Array(seats.length).fill(null);
-
-    let maxBet = g.maxBet;
-
-    if (action === 'fold') {
-      seat.folded = true;
-      seat.hand = seat.hand; // keep for reveal
-      actionLabels[seatIdx] = { type: 'fold', text: 'Fold' };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} fold`, 'info');
-      cgSound('click');
-    } else if (action === 'check') {
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: 'check', text: 'Check' };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} check`, 'info');
-      cgSound('chip');
-    } else if (action === 'call') {
-      const toCall = g.maxBet - seat.bet;
-      const pay = Math.min(toCall, seat.chips);
-      seat.chips -= pay; seat.bet += pay;
-      if (seat.chips === 0) seat.allIn = true;
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: 'call', text: `Call ${pay}` };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} call ${pay}`, 'info');
-      cgSound('chip');
-    } else if (action === 'raise' || action === 'bet') {
-      const raiseAmt = amount || BB;
-      const totalBet = g.maxBet + raiseAmt;
-      const pay = Math.min(totalBet - seat.bet, seat.chips);
-      seat.chips -= pay; seat.bet += pay;
-      if (seat.chips === 0) seat.allIn = true;
-      maxBet = seat.bet;
-      roundActed.fill(false);
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: action === 'bet' ? 'bet' : 'raise', text: `${action === 'bet' ? 'Bet' : 'Raise'} ${seat.bet}` };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} ${action === 'bet' ? 'bet' : 'raise'} ${seat.bet}`, 'info');
-      cgSound('chip'); cgHaptic(12);
-    } else if (action === 'allin') {
-      const pay = seat.chips;
-      seat.chips = 0; seat.bet += pay; seat.allIn = true;
-      if (seat.bet > maxBet) { maxBet = seat.bet; roundActed.fill(false); }
-      roundActed[seatIdx] = true;
-      actionLabels[seatIdx] = { type: 'allin', text: `All-in ${seat.bet}` };
-      addLog(`${seat.isPlayer ? 'You' : seat.name} go all-in ${seat.bet}`, 'info');
-      cgSound('chip'); cgHaptic([10, 20, 10]);
-    }
-
-    let newGs = { ...g, seats, maxBet, roundActed, actionLabels };
-
-    // Check if only 1 player remains (everyone else folded)
-    const stillIn = seats.filter(s => !s.folded);
-    if (stillIn.length === 1) {
-      // Award pot to last standing
-      const { seats: collectedSeats, pot } = collectBets(seats, g.pot);
-      collectedSeats[seats.indexOf(stillIn[0])].chips += pot;
-      const winner = stillIn[0];
-      addLog(`${winner.isPlayer ? 'You' : winner.name} win pot ${pot} (others folded)`, winner.isPlayer ? 'win' : 'lose');
-      setHandHistory(prev => [...prev, { num: g.handNum, result: `${winner.isPlayer ? 'You' : winner.name} won (fold)`, detail: `Pot: ${pot}` }]);
-      return { ...newGs, seats: collectedSeats, pot: 0, phase: 'handover', winnerIdxs: [seats.indexOf(stillIn[0])], actionLabels: new Array(seats.length).fill(null) };
-    }
-
-    // Check if betting round is complete
-    if (allBetsEqualCheck(newGs)) {
-      return advanceStreet(newGs);
-    }
-
-    // Advance to next active player
-    const nextIdx = nextActive(seats, seatIdx);
-    return { ...newGs, toActIdx: nextIdx };
-  };
-
-  const allBetsEqualCheck = (g) => {
-    const seats = g.seats;
-    const active = seats.filter(s => !s.folded && s.chips > 0);
-    if (active.length === 0) return true;
-    const maxB = g.maxBet;
-    // All active (non-all-in) players have matched maxBet and had a chance to act
-    return active.every((s, _, arr) => {
-      const idx = seats.indexOf(s);
-      return s.bet === maxB && g.roundActed[idx];
-    });
-  };
-
-  const startGame = (chipCount) => {
-    handsRef.current = 0;
-    doneRef.current = false;
-    const seats = buildSeats(chipCount, numBots);
-    const gs0 = dealNewHand(seats, 0);
-    handsRef.current = 1;
-    gs0.handNum = 1;
-    addLog('Game started', 'hand');
-    addLog(`Hand #1 dealt (Dealer: ${seats[0].isPlayer ? 'You' : seats[gs0.dealerIdx].name})`, 'hand');
-    setGs(gs0);
-    setPhase('playing');
-    cgSound('deal');
-  };
-
-  const handlePlayerAction = (action, amount) => {
-    if (!gs || gs.phase !== 'betting' || gs.toActIdx !== 0) return;
-    setRaiseOpen(false);
-    setGs(prev => applyAction(prev, 0, action, amount));
-  };
-
-  const handleNextHand = () => {
-    if (!gs) return;
-    const seats = gs.seats;
-    // Check end condition
-    const playerSeat = seats[0];
-    const activePlayers = seats.filter(s => s.chips > 0);
-    if (activePlayers.length <= 1) {
-      // Game over
-      const youWin = playerSeat.chips > 0;
-      doneRef.current = true;
-      cgSound(youWin ? 'win' : 'lose'); cgHaptic(youWin ? [15, 30, 15] : [20, 40]);
-      cgSaveHistory(TH_KEY, { win: youWin, hands: handsRef.current, ts: Date.now() });
-      // Save chips to server
-      api('/api/poker/chips', { method: 'POST', body: JSON.stringify({ chips: Math.max(playerSeat.chips, 0) }) }).catch(() => {});
-      const score = Math.max(0, playerSeat.chips);
-      if (youWin) {
-        onWin(score, handsRef.current, secsRef.current, { share: `Won Texas Hold 'Em in ${handsRef.current} hands with ${score} chips!` });
-      } else {
-        onLose(handsRef.current, secsRef.current, { share: `Busted out after ${handsRef.current} hands`, answer: 'Out of chips' });
-      }
-      return;
-    }
-    // Rotate dealer, remove busted players
-    const nextDealerIdx = (seats.findIndex((s, i) => i > gs.dealerIdx && s.chips > 0) + 1 || 1) % seats.length;
-    // Actually just rotate dealer among active seats
-    let newDealerIdx = gs.dealerIdx;
-    for (let i = 1; i <= seats.length; i++) {
-      const idx = (gs.dealerIdx + i) % seats.length;
-      if (seats[idx].chips > 0) { newDealerIdx = idx; break; }
-    }
-    handsRef.current++;
-    onStepChange && onStepChange(handsRef.current);
-    const newGs = dealNewHand(seats, newDealerIdx);
-    newGs.handNum = handsRef.current;
-    addLog(`Hand #${handsRef.current} dealt`, 'hand');
-    setGs(newGs);
-    cgSound('deal');
-  };
-
-  // Bot AI effect
-  useEffect(() => {
-    if (!gs || gs.phase !== 'betting' || !gs.seats[gs.toActIdx]) return;
-    if (gs.seats[gs.toActIdx].isPlayer) return;
-    if (gs.seats[gs.toActIdx].folded) return;
-    const delay = difficulty === 'Easy' ? 400 : difficulty === 'Hard' ? 1100 : 750;
-    const t = setTimeout(() => {
-      setGs(prev => {
-        if (!prev || prev.phase !== 'betting') return prev;
-        if (!prev.seats[prev.toActIdx] || prev.seats[prev.toActIdx].isPlayer) return prev;
-        return processBotTurn(prev);
-      });
-    }, delay);
-    return () => clearTimeout(t);
-  }, [gs && gs.toActIdx, gs && gs.phase, gs && gs.handNum]);
-
-  // Render
-  if (phase === 'setup') {
-    return (
-      <div className="poker-shell">
-        <div className="poker-top-bar">
-          <button className="poker-back-btn" onClick={onBack}>&#8592;</button>
-          <div className="poker-top-bar-title">Texas Hold 'Em</div>
-          <div className="poker-conn-dot" />
-        </div>
-        <PokerSetupScreen
-          onStart={startGame}
-          savedChips={savedChips}
-          numBots={numBots} setNumBots={setNumBots}
-          difficulty={difficulty} setDifficulty={setDifficulty}
-        />
-      </div>
-    );
-  }
-
-  if (!gs) return null;
-
-  const playerSeat = gs.seats[0];
-  const canAct = gs.phase === 'betting' && gs.toActIdx === 0 && !doneRef.current;
-  const toCall = canAct ? Math.max(0, gs.maxBet - playerSeat.bet) : 0;
-  const canCheck = canAct && toCall === 0;
-  const canCall = canAct && toCall > 0;
-  const minRaise = gs.maxBet + BB;
-  const maxRaise = playerSeat.chips;
-  const canRaise = canAct && playerSeat.chips > toCall;
-
-  return (
-    <div className="poker-shell">
-      <PokerTopBar handNum={gs.handNum} phase={gs.street} onBack={() => { setPhase('setup'); setGs(null); }} playerChips={playerSeat.chips} BB={BB} />
-      <div className="poker-main">
-        <div className="poker-oval-wrap">
-          <div className="poker-oval">
-            {gs.seats.map((seat, i) => {
-              const pos = pokerSeatPos(i, numBots);
-              const isWinner = gs.phase === 'handover' && gs.winnerIdxs && gs.winnerIdxs.includes(i);
-              return (
-                <div key={i} style={{ position: 'absolute', left: pos.x + '%', top: pos.y + '%', transform: 'translate(-50%,-50%)' }}>
-                  <PokerSeat
-                    seat={seat}
-                    isPlayer={seat.isPlayer}
-                    dealerIdx={gs.dealerIdx}
-                    sbIdx={gs.sbIdx}
-                    bbIdx={gs.bbIdx}
-                    isActive={gs.phase === 'betting' && gs.toActIdx === i && !seat.folded}
-                    isWinner={isWinner}
-                    actionLabel={gs.actionLabels && gs.actionLabels[i]}
-                    showCards={gs.phase === 'handover'}
-                    seatIdx={i}
-                    board={gs.board}
-                    handNum={gs.handNum}
-                    gamePhase={phase}
-                  />
-                </div>
-              );
-            })}
-            <CommunityArea board={gs.board} pot={gs.pot + gs.seats.reduce((sum, s) => sum + (s.bet || 0), 0)} street={gs.street} />
-          </div>
-        </div>
-
-        {gs.phase === 'handover' && gs.winnerIdxs && (
-          <div style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.88rem', color: '#34D399', fontWeight: 600 }}>
-            {gs.winnerIdxs.includes(0) ? 'You win this hand!' : `${gs.seats[gs.winnerIdxs[0]].name} wins`}
-          </div>
-        )}
-
-        <FloatingMenu
-          onLeave={() => { setPhase('setup'); setGs(null); }}
-          onLog={() => setLogOpen(o => !o)}
-          onHistory={() => setHistoryOpen(o => !o)}
-          soundOn={soundOn}
-          onToggleSound={() => { const ns = !soundOn; setSoundOn(ns); cgSetPref('sound', ns); }}
-        />
-
-        <GameLogSidebar open={logOpen} onClose={() => setLogOpen(false)} log={gameLog} />
-        <HandHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} history={handHistory} />
-        {(logOpen || historyOpen) && (
-          <div className="poker-overlay-backdrop" style={{ background: 'rgba(0,0,0,0.4)' }}
-            onClick={() => { setLogOpen(false); setHistoryOpen(false); }} />
-        )}
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        {raiseOpen && canRaise && (
-          <RaisePanel
-            minRaise={Math.min(minRaise, maxRaise)}
-            maxRaise={maxRaise}
-            BB={BB}
-            onRaise={amt => handlePlayerAction('raise', amt - gs.maxBet)}
-            onClose={() => setRaiseOpen(false)}
-          />
-        )}
-        <div className="poker-action-bar">
-          {gs.phase === 'handover' ? (
-            <button className="poker-action-btn next" onClick={handleNextHand} style={{ flex: 2 }}>
-              Next hand &rarr;
-            </button>
-          ) : (
-            <>
-              <button className="poker-action-btn fold" disabled={!canAct} onClick={() => handlePlayerAction('fold')}>Fold</button>
-              {canCheck
-                ? <button className="poker-action-btn check" disabled={!canAct} onClick={() => handlePlayerAction('check')}>Check</button>
-                : <button className="poker-action-btn call" disabled={!canCall} onClick={() => handlePlayerAction('call')}>Call {toCall}</button>
-              }
-              <button className="poker-action-btn raise" disabled={!canRaise}
-                onClick={() => { if (canRaise) { setRaiseOpen(o => !o); cgSound('click'); } }}>
-                {toCall > 0 ? 'Raise' : 'Bet'}
-              </button>
-              <button className="poker-action-btn allin" disabled={!canAct} onClick={() => { handlePlayerAction('allin'); setRaiseOpen(false); }}>
-                All-in
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 /* ============================================================
    Game 7 — Tile Match (3-Tiles style)
@@ -12406,14 +11560,6 @@ function tmSortBar(bar, tilesMap) {
    Tile Match Puzzle — competitive sub-components
    ============================================================ */
 
-function TileMatchWalletChip({ balance }) {
-  return (
-    <div className="tm-wallet-chip">
-      🪙 {balance != null ? balance : '—'} MATCH
-    </div>
-  );
-}
-
 function TileMatchLeaderboard({ user }) {
   const [sub, setSub] = useState('global');
   const [data, setData] = useState(null);
@@ -12476,226 +11622,6 @@ function TileMatchLeaderboard({ user }) {
   );
 }
 
-function TileMatchDuelArena({ user, balance, onBalanceChange }) {
-  const [duelPhase, setDuelPhase] = useState('lobby'); // lobby|matchmaking|game|result
-  const [duelId, setDuelId] = useState(null);
-  const [duelData, setDuelData] = useState(null);
-  const [resultData, setResultData] = useState(null);
-  const [mmCountdown, setMmCountdown] = useState(120);
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState(null);
-  const pollRef = useRef(null);
-  const mmRef = useRef(null);
-
-  const authHeader = { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' };
-
-  const stopPolling = () => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    if (mmRef.current) { clearInterval(mmRef.current); mmRef.current = null; }
-  };
-
-  useEffect(() => () => stopPolling(), []);
-
-  const startMatchmaking = async (stakeTokens) => {
-    setError(null);
-    setJoining(true);
-    try {
-      const r = await fetch('/api/tilematch/duel/join', {
-        method: 'POST', headers: authHeader,
-        body: JSON.stringify({ stakeTokens }),
-      });
-      const d = await r.json();
-      if (!r.ok) { setError(d.error || 'Failed to join'); setJoining(false); return; }
-      if (d.status === 'active') {
-        setDuelId(d.duelId); setDuelData(d.duel); setDuelPhase('game');
-        if (onBalanceChange) onBalanceChange(b => b - stakeTokens);
-      } else {
-        setDuelId(d.duelId); setDuelPhase('matchmaking');
-        setMmCountdown(120);
-        if (onBalanceChange) onBalanceChange(b => b - stakeTokens);
-        let c = 120;
-        mmRef.current = setInterval(() => { c--; setMmCountdown(c); }, 1000);
-        pollRef.current = setInterval(async () => {
-          try {
-            const pr = await fetch(`/api/tilematch/duel/${d.duelId}`, { headers: { 'x-usernode-token': window._unToken || '' } });
-            const pd = await pr.json();
-            if (pd.duel && pd.duel.status === 'active') {
-              stopPolling();
-              setDuelData(pd.duel); setDuelPhase('game');
-            } else if (pd.timedOut || (pd.duel && pd.duel.status === 'cancelled')) {
-              stopPolling();
-              setError('No opponent found — your tokens have been returned.');
-              if (onBalanceChange) onBalanceChange(b => b + stakeTokens);
-              setDuelPhase('lobby');
-            }
-          } catch {}
-        }, 2000);
-      }
-    } catch (e) {
-      setError('Connection error. Please try again.');
-    }
-    setJoining(false);
-  };
-
-  const handleForfeit = async () => {
-    if (!duelId) return;
-    await fetch(`/api/tilematch/duel/${duelId}/forfeit`, {
-      method: 'POST', headers: authHeader, body: '{}',
-    }).catch(() => {});
-    stopPolling();
-    setResultData({ isWinner: false, forfeited: true });
-    setDuelPhase('result');
-  };
-
-  const handleDuelWin = async (score, steps, timeSecs) => {
-    if (!duelId || !duelData) return;
-    stopPolling();
-    try {
-      const r = await fetch(`/api/tilematch/duel/${duelId}/finish`, {
-        method: 'POST', headers: authHeader,
-        body: JSON.stringify({ score, steps, timeSecs, remainingTiles: 0, telemetry: [] }),
-      });
-      const d = await r.json();
-      if (d.waiting) {
-        // Poll for opponent
-        pollRef.current = setInterval(async () => {
-          try {
-            const pr = await fetch(`/api/tilematch/duel/${duelId}`, { headers: { 'x-usernode-token': window._unToken || '' } });
-            const pd = await pr.json();
-            if (pd.duel && pd.duel.status === 'finished') {
-              stopPolling();
-              const won = pd.duel.winner_id === user.id;
-              const prize = pd.duel ? Math.floor(pd.duel.stakeTokens * 2 * 0.9) : 0;
-              setResultData({ isWinner: won, prize: { winnerPayout: prize, stakeTokens: pd.duel?.stakeTokens } });
-              if (won && onBalanceChange) onBalanceChange(b => b + prize);
-              setDuelPhase('result');
-            }
-          } catch {}
-        }, 2000);
-      } else {
-        if (d.isWinner && onBalanceChange && d.newBalance != null) onBalanceChange(() => d.newBalance);
-        setResultData(d);
-        setDuelPhase('result');
-      }
-    } catch {}
-  };
-
-  const handleDuelLose = async (steps, timeSecs) => {
-    await handleDuelWin(0, steps, timeSecs);
-  };
-
-  const TIERS = [10, 50, 100];
-
-  if (duelPhase === 'lobby') return (
-    <div>
-      {error && <div style={{ background: '#ef444420', border: '1px solid #ef4444', borderRadius: 8, padding: '0.5rem 0.75rem', marginBottom: '0.75rem', fontSize: '0.84rem', color: '#ef4444' }}>{error}</div>}
-      <p style={{ fontSize: '0.84rem', color: 'var(--c-muted,#888)', marginBottom: '0.75rem' }}>
-        Stake MATCH tokens and race the same board as your opponent. Winner takes 90% of the pot.
-      </p>
-      <div className="tm-duel-tiers">
-        {TIERS.map(stake => {
-          const payout = Math.floor(stake * 2 * 0.9);
-          const canAfford = (balance || 0) >= stake;
-          return (
-            <div key={stake} className="tm-duel-tier-card">
-              <div className="tm-duel-stake">🪙 {stake}</div>
-              <div className="tm-duel-payout">Stake {stake} MATCH → win <strong>{payout} MATCH</strong></div>
-              <button className="tm-duel-find-btn" disabled={!canAfford || joining} onClick={() => startMatchmaking(stake)}>
-                {joining ? '…' : 'Find Match'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      {(balance || 0) < 10 && (
-        <p style={{ fontSize: '0.8rem', color: 'var(--c-muted,#888)', textAlign: 'center', marginTop: '0.5rem' }}>
-          Complete daily tasks to earn MATCH tokens.
-        </p>
-      )}
-    </div>
-  );
-
-  if (duelPhase === 'matchmaking') return (
-    <div className="tm-duel-matchmaking">
-      <div className="tm-duel-pulse" />
-      <div style={{ fontSize: '0.9rem', color: 'var(--c-text,#e4e4e7)', fontWeight: 600 }}>Finding opponent…</div>
-      <div className="tm-duel-timer">{String(Math.floor(mmCountdown / 60)).padStart(2,'0')}:{String(mmCountdown % 60).padStart(2,'0')}</div>
-      <button className="tm-duel-back-btn" onClick={handleForfeit}>Cancel</button>
-    </div>
-  );
-
-  if (duelPhase === 'game' && duelData) return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
-        <button className="tm-duel-back-btn" onClick={handleForfeit}>Forfeit</button>
-      </div>
-      <TileMatchingDailyGame
-        onWin={(score, steps, secs) => handleDuelWin(score, steps, secs)}
-        onLose={(steps, secs) => handleDuelLose(steps, secs)}
-        onStepChange={() => {}}
-        resetKey={duelId}
-        boardSeedOverride={duelData.boardSeed}
-      />
-    </div>
-  );
-
-  if (duelPhase === 'result') return (
-    <div className="tm-duel-result">
-      <div className="tm-duel-outcome">{resultData?.isWinner ? '🏆' : resultData?.forfeited ? '🏳' : '😤'}</div>
-      <h3>{resultData?.isWinner ? 'You won!' : resultData?.forfeited ? 'You forfeited' : 'Better luck next time!'}</h3>
-      {resultData?.prize && <div className="tm-duel-balance">Prize: 🪙 {resultData.prize.winnerPayout} MATCH</div>}
-      {resultData?.newBalance != null && <div className="tm-duel-balance">Balance: 🪙 {resultData.newBalance} MATCH</div>}
-      <button className="tm-duel-back-btn" onClick={() => { setDuelPhase('lobby'); setResultData(null); setDuelId(null); setError(null); }}>
-        Back to Duel Lobby
-      </button>
-    </div>
-  );
-
-  return null;
-}
-
-function TileMatchDailyTasks({ tasks, onClaim }) {
-  const allDone = tasks.length > 0 && tasks.every(t => t.claimed);
-  if (allDone) return (
-    <div className="tm-tasks-all-done">
-      <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>🎉</div>
-      All tasks done — come back tomorrow!
-    </div>
-  );
-  return (
-    <div>
-      {tasks.map(task => {
-        const pct = Math.min(100, Math.round((task.progress / task.target) * 100));
-        return (
-          <div key={task.id} className="tm-task-card">
-            <div className="tm-task-header">
-              <span className="tm-task-label">{task.label}</span>
-              <span className="tm-task-reward">+{task.rewardTokens} 🪙</span>
-            </div>
-            <div className="tm-task-desc">{task.description}</div>
-            <div className="tm-task-bar-wrap">
-              <div className="tm-task-bar-fill" style={{ width: pct + '%' }} />
-            </div>
-            <div className="tm-task-footer">
-              <span className="tm-task-progress-lbl">{task.progress} / {task.target}</span>
-              {task.claimed ? (
-                <span className="tm-task-claimed">Claimed ✓</span>
-              ) : (
-                <button
-                  className="tm-task-claim-btn"
-                  disabled={!task.completable}
-                  onClick={() => onClaim(task.id)}
-                >
-                  Claim
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
@@ -12715,10 +11641,8 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const [flashIds, setFlashIds] = useState(new Set());
   const [levelScore, setLevelScore] = useState(0);
   const [timeLimit, setTimeLimit] = useState(0);
-  // Competitive menu state
+  // Menu state ('play' | 'leaderboard')
   const [tmMenuTab, setTmMenuTab] = useState('play');
-  const [tmBalance, setTmBalance] = useState(null);
-  const [tmTasks, setTmTasks] = useState([]);
   const { secs } = useTimer(!done && phase === 'playing');
   const secsRef = useRef(0);
   const totalSecsRef = useRef(0);
@@ -12927,27 +11851,6 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     setBarFull(false);
   };
 
-  // Load wallet + tasks when the select screen is shown for the first time
-  useEffect(() => {
-    const token = window._unToken || '';
-    const headers = { 'x-usernode-token': token };
-    Promise.all([
-      fetch('/api/tilematch/wallet', { headers }).then(r => r.json()).catch(() => null),
-      fetch('/api/tilematch/tasks', { headers }).then(r => r.json()).catch(() => null),
-    ]).then(([walletData, tasksData]) => {
-      if (walletData && walletData.balance != null) setTmBalance(walletData.balance);
-      if (tasksData && tasksData.tasks) setTmTasks(tasksData.tasks);
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const reportProgress = (lvlCleared, tileTaps) => {
-    fetch('/api/tilematch/tasks/report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
-      body: JSON.stringify({ levelsCleared: lvlCleared || 0, tileTaps: tileTaps || 0 }),
-    }).then(r => r.json()).then(d => { if (d.tasks) setTmTasks(d.tasks); }).catch(() => {});
-  };
-
   const submitScore = (highestLevel, totalCleared, sessionScore) => {
     fetch('/api/tilematch/scores/submit', {
       method: 'POST',
@@ -12960,8 +11863,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     const ns = sessionScore + levelScore;
     setSessionScore(ns);
     setCompletedLevels(prev => new Set([...prev, selectedLevel]));
-    // Fire-and-forget: report task progress + submit score
-    reportProgress(1, moves);
+    // Fire-and-forget: submit score
     submitScore(selectedLevel, completedLevels.size + 1, ns);
     const nextLvl = selectedLevel < 1000 ? selectedLevel + 1 : null;
     if (nextLvl) {
@@ -12975,34 +11877,15 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     const totalS = totalSecsRef.current;
     const newTotalMoves = totalMoves + moves;
     const share = `Tile Match ⬢ L${completedLevels.size + 1} cleared | ${ns} pts 🀄✨`;
-    // Fire-and-forget: report task progress + submit score
-    reportProgress(1, moves);
+    // Fire-and-forget: submit score
     submitScore(selectedLevel, completedLevels.size + 1, ns);
     onWin(ns, newTotalMoves, totalS, { share });
-  };
-
-  const handleTaskClaim = (taskId) => {
-    fetch(`/api/tilematch/tasks/${taskId}/claim`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-usernode-token': window._unToken || '' },
-      body: '{}',
-    }).then(r => r.json()).then(d => {
-      if (d.newBalance != null) setTmBalance(d.newBalance);
-      if (d.task) setTmTasks(prev => prev.map(t => t.id === taskId ? { ...t, claimed: true, completable: false } : t));
-    }).catch(() => {});
   };
 
   // ---- Level selector screen ----
   if (phase === 'select') {
     const menuContent = () => {
       if (tmMenuTab === 'leaderboard') return <TileMatchLeaderboard />;
-      if (tmMenuTab === 'duel') return (
-        <TileMatchDuelArena
-          balance={tmBalance}
-          onBalanceChange={(fn) => setTmBalance(b => typeof fn === 'function' ? fn(b || 0) : fn)}
-        />
-      );
-      if (tmMenuTab === 'tasks') return <TileMatchDailyTasks tasks={tmTasks} onClaim={handleTaskClaim} />;
       // 'play' tab — existing level selector
       if (tierPage === null) return (
         <div>
@@ -13055,10 +11938,9 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
       <div className="tm-menu">
         <div className="tm-menu-header">
           <h2>Tile Match Puzzle</h2>
-          <TileMatchWalletChip balance={tmBalance} />
         </div>
         <div className="tm-menu-tabs">
-          {['play', 'leaderboard', 'duel', 'tasks'].map(tab => (
+          {['play', 'leaderboard'].map(tab => (
             <button key={tab} className={'tm-menu-tab' + (tmMenuTab === tab ? ' active' : '')} onClick={() => setTmMenuTab(tab)}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -13216,7 +12098,7 @@ const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
 
 const TM_DAILY_HINT_CAP = 5; // paid hints per day for the Daily Tile Match
 
-function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile, matchBalance, onMatchBalanceChange }) {
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile }) {
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -13263,7 +12145,10 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   // present so a resumed attempt restores the exact tiles/bar/moves/boosters
   // and continues the timer from where it stopped.
   useEffect(() => {
-    const seed = boardSeedOverride != null ? boardSeedOverride : (dayNum * 31 + 7);
+    // Server-issued seed first (phase 2); legacy dayNum derivation as fallback.
+    const srvSeed = serverDailySeed('tilematchingdaily');
+    const seed = boardSeedOverride != null ? boardSeedOverride
+      : (srvSeed != null ? srvSeed : (dayNum * 31 + 7));
     const freshTiles = tmGenerateLevel(TM_DAILY_CONFIG, seed);
     const resume = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.tiles)
       ? savedProgress
@@ -13275,6 +12160,9 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
       setSecs(Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0);
       setBoosters(resume.boosters ? { ...resume.boosters } : { ...TM_DAILY_CONFIG.boosters });
       setHintsApplied(Number.isFinite(resume.hintsApplied) ? resume.hintsApplied : 0);
+      // A resumed run's earlier taps predate this mount — the move log is
+      // incomplete, so the finish can't be replay-validated (tier B instead).
+      if (onMoveTile) onMoveTile({ replayBreak: 'resume', tsClient: Date.now() });
     } else {
       setTiles(freshTiles);
       setBar([]);
@@ -13319,7 +12207,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   // Paid hint: highlight a recommended next tile. Prefer a free tile whose type
   // already has ≥2 copies in the bar (completes a triple), else any free tile
   // whose type has another free copy on the board, else any free tile.
-  const tmHints = useDailyHints({ gameId: 'tilematchingdaily', maxHints: TM_DAILY_HINT_CAP, matchBalance, onMatchBalanceChange });
+  const tmHints = useDailyHints({ gameId: 'tilematchingdaily', maxHints: TM_DAILY_HINT_CAP });
   const recommendTile = () => {
     const free = tiles.filter(t => !t.removed && !t.inBar && !tmIsLocked(t, tiles));
     if (!free.length) return null;
@@ -13429,6 +12317,9 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     setLastBarEntry(null);
     setBoosters(b => ({ ...b, undo: b.undo - 1 }));
     setBarFull(false);
+    // Boosters aren't modeled by the server replay engine — mark the run
+    // replay-ineligible (finish falls back to tier-B heuristics).
+    if (onMoveTile) onMoveTile({ replayBreak: 'undo', tsClient: Date.now() });
   };
 
   const doShuffle = () => {
@@ -13448,6 +12339,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     });
     setTiles(tilesCopy);
     setBoosters(b => ({ ...b, shuffle: b.shuffle - 1 }));
+    if (onMoveTile) onMoveTile({ replayBreak: 'shuffle', tsClient: Date.now() });
   };
 
   const doClearMode = () => {
@@ -13469,6 +12361,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     setBoosters(b => ({ ...b, clear: b.clear - 1 }));
     setClearSlotMode(false);
     setBarFull(false);
+    if (onMoveTile) onMoveTile({ replayBreak: 'clear-slot', tsClient: Date.now() });
   };
 
   const cfg = TM_DAILY_CONFIG;
@@ -13554,14 +12447,11 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
 
       {!done && (
         <HintBar
-          nextCost={tmHints.nextCost}
-          balance={matchBalance}
-          canAfford={tmHints.canAfford}
+          hintsLeft={tmHints.hintsLeft}
           exhausted={tmHints.exhausted || boardTiles.length === 0}
           buying={tmHints.buying}
           onBuy={buyTmHint}
           msg={tmHints.msg}
-          lastTx={tmHints.lastTx}
           label="No more hints"
         />
       )}
@@ -13569,300 +12459,6 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   );
 }
 
-
-/* ============================================================
-   Idle clicker game constants & helpers
-   ============================================================ */
-const IDLE_UNITS = [
-  { id: 'worker', name: 'Worker Hamster', icon: '🐹', baseCost: 10, incomePerSec: 0.1 },
-  { id: 'coinpress', name: 'Coin Press', icon: '🏭', baseCost: 100, incomePerSec: 1 },
-  { id: 'goldenwheel', name: 'Golden Wheel', icon: '✨', baseCost: 1000, incomePerSec: 10 },
-  { id: 'vault', name: 'Treasure Vault', icon: '💰', baseCost: 10000, incomePerSec: 100 },
-];
-
-const IDLE_UPGRADES = [
-  { id: 'iron_paws', name: 'Iron Paws', baseCost: 50, maxLevel: 10, effect: 'tap', multiplier: 1.1, desc: 'Boost tap power' },
-  { id: 'worker_motivation', name: 'Worker Motivation', baseCost: 150, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'worker', desc: 'Worker +25%' },
-  { id: 'coinpress_boost', name: 'Press Power', baseCost: 500, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'coinpress', desc: 'Press +25%' },
-  { id: 'goldenwheel_boost', name: 'Wheel Speed', baseCost: 5000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'goldenwheel', desc: 'Wheel +25%' },
-  { id: 'vault_boost', name: 'Vault Depth', baseCost: 50000, maxLevel: 5, effect: 'unit', multiplier: 1.25, unitId: 'vault', desc: 'Vault +25%' },
-];
-
-function idleUnitCost(unit, count) {
-  return Math.ceil(unit.baseCost * Math.pow(1.15, count));
-}
-
-function idleUpgradeCost(upgrade, level) {
-  return Math.ceil(upgrade.baseCost * Math.pow(1.1, level));
-}
-
-function computePassiveIncome(unitsOwned, upgrades) {
-  let income = 0;
-  for (const unit of IDLE_UNITS) {
-    const count = unitsOwned[unit.id] || 0;
-    let unitIncome = unit.incomePerSec * count;
-    // Apply unit-specific upgrades (5 levels of 1.25x each = 3.05x at max)
-    for (const upgrade of IDLE_UPGRADES) {
-      if (upgrade.unitId === unit.id && upgrades[upgrade.id]) {
-        unitIncome *= Math.pow(upgrade.multiplier, upgrades[upgrade.id]);
-      }
-    }
-    income += unitIncome;
-  }
-  return income;
-}
-
-function computePrestigeMultiplier(prestigePoints) {
-  return 1 + 0.05 * prestigePoints;
-}
-
-function IdleGame() {
-  const [state, setState] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('units');
-  const [pendingPrestige, setPendingPrestige] = useState(null);
-  const [popups, setPopups] = useState([]);
-  const [offlineAccum, setOfflineAccum] = useState(0);
-  const tapPowerRef = useRef(1);
-
-  const loadState = async () => {
-    const { ok, body } = await api('/api/idle/state');
-    if (ok && body) {
-      setState(body);
-      tapPowerRef.current = parseFloat(body.tapPower) || 1;
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadState();
-  }, []);
-
-  // Passive income accumulation loop
-  useEffect(() => {
-    if (!state) return;
-    const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
-    const multiplier = computePrestigeMultiplier(state.prestigePoints);
-    const id = setInterval(() => {
-      setState(prev => {
-        const newCur = prev.currency + passiveIncome * multiplier;
-        const newPeak = Math.max(prev.peakCurrency, newCur);
-        return { ...prev, currency: newCur, peakCurrency: newPeak };
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [state]);
-
-  // Sync offline accumulation periodically
-  useEffect(() => {
-    if (offlineAccum <= 0 || !state) return;
-    const timer = setTimeout(async () => {
-      const { ok } = await api('/api/idle/tap', { method: 'POST', body: JSON.stringify({ tapCount: offlineAccum }) });
-      if (ok) setOfflineAccum(0);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [offlineAccum, state]);
-
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
-  if (!state) return <div style={{ padding: '2rem', textAlign: 'center' }}>Failed to load game</div>;
-
-  const passiveIncome = computePassiveIncome(state.unitsOwned, state.upgrades);
-  const multiplier = computePrestigeMultiplier(state.prestigePoints);
-  const displayCurrency = Math.floor(state.currency);
-
-  const handleTap = async () => {
-    const tapPower = tapPowerRef.current;
-    const tapValue = tapPower * multiplier;
-    const newCur = state.currency + tapValue;
-    const newPeak = Math.max(state.peakCurrency, newCur);
-    setState(prev => ({ ...prev, currency: newCur, peakCurrency: newPeak }));
-    setOfflineAccum(offlineAccum + 1);
-
-    // Coin popup
-    const popupId = Math.random();
-    const x = Math.random() * 100 - 50;
-    const y = Math.random() * 50;
-    setPopups(prev => [...prev, { id: popupId, value: '+' + Math.ceil(tapValue), x, y }]);
-    setTimeout(() => setPopups(prev => prev.filter(p => p.id !== popupId)), 1000);
-  };
-
-  const handleBuyUnit = async (unit) => {
-    const count = state.unitsOwned[unit.id] || 0;
-    const cost = idleUnitCost(unit, count);
-    if (state.currency < cost) return alert('Insufficient currency');
-
-    const { ok, status } = await api('/api/idle/buy-unit', {
-      method: 'POST',
-      body: JSON.stringify({ unitId: unit.id })
-    });
-    if (ok) loadState();
-    else if (status === 409) alert('Insufficient currency');
-  };
-
-  const handleUpgrade = async (upgrade) => {
-    const level = state.upgrades[upgrade.id] || 0;
-    if (level >= upgrade.maxLevel) return alert('Already maxed');
-    const cost = idleUpgradeCost(upgrade, level);
-    if (state.currency < cost) return alert('Insufficient currency');
-
-    const { ok, status } = await api('/api/idle/upgrade', {
-      method: 'POST',
-      body: JSON.stringify({ upgradeId: upgrade.id })
-    });
-    if (ok) loadState();
-    else if (status === 409) alert('Insufficient currency');
-  };
-
-  const handlePrestige = async () => {
-    const bonus = Math.floor(Math.sqrt(state.peakCurrency / 1000));
-    const newPrestigePoints = state.prestigePoints + bonus;
-    const multiplierGain = (0.05 * bonus).toFixed(1);
-    setPendingPrestige({ bonus, newPoints: newPrestigePoints, multiplierGain });
-  };
-
-  const confirmPrestige = async () => {
-    const { ok } = await api('/api/idle/prestige', { method: 'POST' });
-    if (ok) {
-      setPendingPrestige(null);
-      loadState();
-    }
-  };
-
-  return (
-    <div className="idle-container">
-      <div className="idle-main">
-        <div className="idle-stats">
-          <div className="idle-stat-box">
-            <div className="idle-stat-label">Coins</div>
-            <div className="idle-stat-value currency">{displayCurrency.toLocaleString()}</div>
-          </div>
-          <div className="idle-stat-box">
-            <div className="idle-stat-label">Per Second</div>
-            <div className="idle-stat-value income">{(passiveIncome * multiplier).toFixed(2)}</div>
-          </div>
-          <div className="idle-stat-box">
-            <div className="idle-stat-label">Prestige Bonus</div>
-            <div className="idle-stat-value prestige">+{Math.round(state.prestigePoints * 5)}%</div>
-          </div>
-        </div>
-
-        <div className="idle-tap-section">
-          <button className="idle-tap-btn" onClick={handleTap}>TAP</button>
-          <div className="idle-tap-label">Tap Power: {tapPowerRef.current.toFixed(2)}×</div>
-        </div>
-
-        <div className="idle-shop">
-          <div className="idle-tabs">
-            <button
-              className={`idle-tab ${activeTab === 'units' ? 'active' : ''}`}
-              onClick={() => setActiveTab('units')}
-            >
-              Units ({Object.values(state.unitsOwned).reduce((a, b) => a + b, 0)})
-            </button>
-            <button
-              className={`idle-tab ${activeTab === 'upgrades' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upgrades')}
-            >
-              Upgrades
-            </button>
-          </div>
-
-          <div className="idle-grid">
-            {activeTab === 'units' && IDLE_UNITS.map(unit => {
-              const count = state.unitsOwned[unit.id] || 0;
-              const cost = idleUnitCost(unit, count);
-              const canAfford = state.currency >= cost;
-              return (
-                <div key={unit.id} className="idle-card">
-                  <div className="idle-card-icon">{unit.icon}</div>
-                  <div className="idle-card-name">{unit.name}</div>
-                  <div className="idle-card-stats">Income: {unit.incomePerSec.toFixed(2)}/s</div>
-                  <div className="idle-card-stats">Own: {count}</div>
-                  <button
-                    className="idle-card-btn"
-                    disabled={!canAfford}
-                    onClick={() => handleBuyUnit(unit)}
-                  >
-                    {cost.toLocaleString()}
-                  </button>
-                </div>
-              );
-            })}
-
-            {activeTab === 'upgrades' && IDLE_UPGRADES.map(upgrade => {
-              const level = state.upgrades[upgrade.id] || 0;
-              const cost = idleUpgradeCost(upgrade, level);
-              const canAfford = state.currency >= cost && level < upgrade.maxLevel;
-              return (
-                <div key={upgrade.id} className="idle-card">
-                  <div className="idle-card-icon">⚡</div>
-                  <div className="idle-card-name">{upgrade.name}</div>
-                  <div className="idle-card-desc">{upgrade.desc}</div>
-                  <div className="idle-card-stats">Level: {level}/{upgrade.maxLevel}</div>
-                  <button
-                    className="idle-card-btn"
-                    disabled={!canAfford}
-                    onClick={() => handleUpgrade(upgrade)}
-                  >
-                    {level >= upgrade.maxLevel ? 'MAXED' : cost.toLocaleString()}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {popups.map(p => (
-        <div
-          key={p.id}
-          className="idle-coin-popup"
-          style={{
-            left: 'calc(50% + ' + p.x + 'px)',
-            top: 'calc(50% + ' + p.y + 'px)',
-          }}
-        >
-          {p.value}
-        </div>
-      ))}
-
-      {pendingPrestige && (
-        <div className="prestige-modal">
-          <div className="prestige-card">
-            <h2>✨ Prestige</h2>
-            <div className="sub">Reset your progress and earn prestige points!</div>
-            <div className="prestige-rows">
-              <div className="prestige-row">
-                <span className="k">Peak Currency:</span>
-                <span className="v">{Math.floor(state.peakCurrency).toLocaleString()}</span>
-              </div>
-              <div className="prestige-row">
-                <span className="k">Bonus Points:</span>
-                <span className="v">+{pendingPrestige.bonus}</span>
-              </div>
-              <div className="prestige-row">
-                <span className="k">New Total:</span>
-                <span className="v">{pendingPrestige.newPoints}</span>
-              </div>
-              <div className="prestige-row">
-                <span className="k">Multiplier Gain:</span>
-                <span className="v">+{pendingPrestige.multiplierGain}%</span>
-              </div>
-            </div>
-            <div className="prestige-buttons">
-              <button className="prestige-confirm" onClick={confirmPrestige}>
-                Prestige
-              </button>
-              <button className="prestige-cancel" onClick={() => setPendingPrestige(null)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ============================================================
    Game — Knight's Tour (8×8, visit every square exactly once)
@@ -14921,980 +13517,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 }
 
 /* ============================================================
-   PvP Arena components
-   ============================================================ */
-const PVP_TIERS = [
-  { label: '10 MATCH',  value: 10,  color: C.emerald, payout: '18 MATCH' },
-  { label: '50 MATCH',  value: 50,  color: C.gold,    payout: '90 MATCH' },
-  { label: '100 MATCH', value: 100, color: C.rose,    payout: '180 MATCH' },
-];
-
-function PvpLobby({ user, balance, onJoin, joining }) {
-  const balFmt = balance != null
-    ? (Number(BigInt(balance)) / 1e18).toFixed(2) + ' MATCH'
-    : '…';
-  return (
-    <div className="pvp-lobby">
-      <div className="pvp-header">
-        <div className="pvp-title">⚔️ PvP Arena</div>
-        <div className="pvp-subtitle">Stake MATCH and battle for the best tile-match score</div>
-        <div className="pvp-balance">Balance: {balFmt}</div>
-      </div>
-      <div className="pvp-how">
-        <div className="pvp-how-step">1. Choose a wager tier and get matched with an opponent</div>
-        <div className="pvp-how-step">2. Both players clear the same seeded board — highest score wins, fastest time breaks ties</div>
-        <div className="pvp-how-step">3. Winner claims 90% of the pot · 8% treasury · 2% burned 🔥</div>
-      </div>
-      <div className="pvp-tiers">
-        {PVP_TIERS.map(t => (
-          <div key={t.value} className="pvp-tier-card" style={{ '--pvp-color': t.color }}>
-            <div className="pvp-tier-label">{t.label}</div>
-            <div className="pvp-tier-payout">Win → {t.payout}</div>
-            <button
-              className="pvp-tier-btn"
-              style={{ background: t.color }}
-              disabled={joining !== null}
-              onClick={() => onJoin(t.value)}
-            >
-              {joining === t.value ? 'Finding…' : 'Find Match'}
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PvpMatchmaking({ match, onCancel, onReclaim, cancelQueueCalldata }) {
-  const { useState: useS, useEffect: useE } = React;
-  const [secsLeft, setSecsLeft] = useS(() => {
-    if (!match || !match.createdAt) return 120;
-    const elapsed = Math.floor((Date.now() - new Date(match.createdAt).getTime()) / 1000);
-    return Math.max(0, 120 - elapsed);
-  });
-  const [reclaiming, setReclaiming] = useS(false);
-
-  useE(() => {
-    if (secsLeft <= 0) return;
-    const id = setInterval(() => setSecsLeft(s => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(id);
-  }, [secsLeft > 0]);
-
-  const canReclaim = secsLeft === 0;
-  const mm = String(Math.floor(secsLeft / 60)).padStart(2, '0');
-  const ss = String(secsLeft % 60).padStart(2, '0');
-
-  const handleReclaim = async () => {
-    setReclaiming(true);
-    try {
-      onReclaim && onReclaim();
-    } catch (e) {
-      console.error('[pvp] reclaim failed:', e && e.message);
-      onReclaim && onReclaim(); // fall back to cancel even if tx fails
-    } finally {
-      setReclaiming(false);
-    }
-  };
-
-  return (
-    <div className="pvp-matchmaking">
-      <div className="pvp-mm-icon">⚔️</div>
-      <div className="pvp-mm-pulse" />
-      <div className="pvp-mm-title">Finding opponent…</div>
-      <div className="pvp-mm-code">Room · {match && match.matchId}</div>
-      <div className={`pvp-mm-countdown${canReclaim ? ' pvp-mm-countdown-expired' : ''}`}>{mm}:{ss}</div>
-      <div className="pvp-mm-hint">
-        {canReclaim
-          ? 'Queue timed out — reclaim your deposit below'
-          : `Waiting for a ${match && match.betTier ? match.betTier + ' MATCH' : ''} opponent`}
-      </div>
-      <div className="pvp-mm-btns">
-        {canReclaim && (
-          <button className="pvp-reclaim-btn" onClick={handleReclaim} disabled={reclaiming}>
-            {reclaiming ? 'Reclaiming…' : 'Reclaim Deposit'}
-          </button>
-        )}
-        <button className="pvp-cancel-btn" onClick={onCancel}>Cancel</button>
-      </div>
-    </div>
-  );
-}
-
-function PvpDepositScreen({ match, playerIsP1, onDeposit, depositing }) {
-  const alreadyDeposited = playerIsP1 ? match.p1Deposited : match.p2Deposited;
-  const oppDeposited = playerIsP1 ? match.p2Deposited : match.p1Deposited;
-  const wagerFmt = match.wagerUtgo
-    ? (Number(BigInt(match.wagerUtgo)) / 1e18).toFixed(2) + ' MATCH'
-    : '?';
-  return (
-    <div className="pvp-deposit">
-      <div className="pvp-deposit-title">Deposit Wager</div>
-      <div className="pvp-deposit-amount">{wagerFmt}</div>
-      <div className="pvp-deposit-hint">
-        {alreadyDeposited
-          ? (oppDeposited ? 'Both deposited — starting!' : 'Waiting for opponent to deposit…')
-          : 'Deposit your wager to lock in the match'}
-      </div>
-      {!alreadyDeposited && (
-        <button className="primary-btn" disabled={depositing} onClick={onDeposit}>
-          {depositing ? 'Depositing…' : 'Deposit & Play'}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function PvpGameScreen({ match, playerIsP1, onResult }) {
-  const [depositing, setDepositing] = useState(false);
-  const [deposited, setDeposited] = useState(
-    playerIsP1 ? match.p1Deposited : match.p2Deposited
-  );
-  const [oppDeposited, setOppDeposited] = useState(
-    playerIsP1 ? match.p2Deposited : match.p1Deposited
-  );
-  const [playing, setPlaying] = useState(deposited && oppDeposited);
-  const [waiting, setWaiting] = useState(false);
-  const [oppPct, setOppPct] = useState(null); // opponent tile-clear %, rounded to 10
-  const [myRemaining, setMyRemaining] = useState(72);
-  const pollRef = useRef(null);
-  const resultPollRef = useRef(null);
-  // Accumulate telemetry locally — useRef avoids stale closures in handleWin/handleLose
-  const telemetryRef = useRef([]);
-
-  // Poll for opponent deposit
-  useEffect(() => {
-    if (playing || !deposited) return;
-    const poll = async () => {
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
-      if (!ok) return;
-      const oppNow = playerIsP1 ? body.p2Deposited : body.p1Deposited;
-      if (oppNow) {
-        setOppDeposited(true);
-        setPlaying(true);
-        clearInterval(pollRef.current);
-      }
-    };
-    pollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(pollRef.current);
-  }, [deposited, playing]);
-
-  // During play: poll every 2s for opponent progress + inactivity forfeit
-  useEffect(() => {
-    if (!playing || waiting) return;
-    const poll = async () => {
-      const rem = myRemaining;
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}?remaining=${rem}`);
-      if (!ok) return;
-      if (body.forfeitedBy) {
-        clearInterval(resultPollRef.current);
-        onResult({
-          match: body,
-          isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id),
-          claimCalldata: body.claimCalldata,
-          contractAddr: body.contractAddr,
-        });
-        return;
-      }
-      if (body.status === 'finished' || body.status === 'disputed') {
-        clearInterval(resultPollRef.current);
-        onResult({ match: body, isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id) });
-        return;
-      }
-      // Update opponent progress bar (rounded to nearest 10%)
-      const oppRem = playerIsP1 ? body.p2Remaining : body.p1Remaining;
-      if (oppRem != null) {
-        const cleared = 72 - oppRem;
-        setOppPct(Math.round(cleared / 72 * 10) * 10);
-      }
-    };
-    resultPollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(resultPollRef.current);
-  }, [playing, waiting]);
-
-  // Poll for opponent finish result while waiting
-  useEffect(() => {
-    if (!waiting) return;
-    const poll = async () => {
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
-      if (!ok) return;
-      if (body.status === 'finished' || body.status === 'disputed') {
-        clearInterval(pollRef.current);
-        onResult({ match: body, isWinner: body.winnerId === (playerIsP1 ? match.player1Id : match.player2Id) });
-      }
-    };
-    pollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(pollRef.current);
-  }, [waiting]);
-
-  const handleDeposit = async () => {
-    setDepositing(true);
-    let txHash = '0xstaging';
-    const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-      ? !(await window.usernode.isMockEnabled())
-      : false;
-    if (bridgeMockOff && window.usernode.sendTransaction && UTGO_CONTRACT_ADDRESS && match.depositCalldata) {
-      try {
-        const tx = await window.usernode.sendTransaction({ to: UTGO_CONTRACT_ADDRESS, data: match.depositCalldata });
-        txHash = (tx && tx.hash) || txHash;
-      } catch (e) {
-        console.error('[pvp] deposit tx failed:', e && e.message);
-        setDepositing(false);
-        return;
-      }
-    }
-    await api(`/api/pvp/match/${match.matchId}/deposit-confirmed`, {
-      method: 'POST',
-      body: JSON.stringify({ txHash }),
-    });
-    setDeposited(true);
-    setDepositing(false);
-  };
-
-  // Accumulate tile moves locally — no per-move API call
-  const handleMoveTile = ({ tileType, moveSeq, tsClient }) => {
-    telemetryRef.current.push({ tileType, moveSeq, tsClient });
-  };
-
-  const handleWin = async (score, steps, secs) => {
-    clearInterval(resultPollRef.current);
-    const { ok, body } = await api(`/api/pvp/match/${match.matchId}/finish`, {
-      method: 'POST',
-      body: JSON.stringify({
-        score, steps, timeSecs: secs, remainingTiles: 0,
-        telemetry: telemetryRef.current,
-      }),
-    });
-    if (!ok) return;
-    if (body.waiting) {
-      setWaiting(true);
-    } else {
-      onResult({
-        match: body.match,
-        isWinner: body.isWinner,
-        claimCalldata: body.claimCalldata,
-        contractAddr: body.contractAddr,
-        prize: body.prize,
-        telemetrySummary: body.telemetrySummary,
-        dapp: body.dapp,
-      });
-    }
-  };
-
-  const handleLose = async (steps, secs, meta) => {
-    clearInterval(resultPollRef.current);
-    if (meta && meta.isTimeUp) {
-      // Time expired — submit finish with score 0
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}/finish`, {
-        method: 'POST',
-        body: JSON.stringify({
-          score: 0, steps, timeSecs: secs,
-          remainingTiles: meta.remainingTiles || 0,
-          telemetry: telemetryRef.current,
-        }),
-      });
-      if (ok && body) {
-        if (body.waiting) { setWaiting(true); return; }
-        onResult({
-          match: body.match,
-          isWinner: body.isWinner,
-          claimCalldata: body.claimCalldata,
-          contractAddr: body.contractAddr,
-          prize: body.prize,
-          telemetrySummary: body.telemetrySummary,
-          dapp: body.dapp,
-        });
-      }
-    } else {
-      // Bar full / manual forfeit
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}/forfeit`, { method: 'POST' });
-      onResult({ isWinner: false, match: ok && body ? body : null });
-    }
-  };
-
-  const handleStepChange = (n) => {
-    setMyRemaining(Math.max(0, 72 - n));
-  };
-
-  const oppName = playerIsP1 ? (match.player2Name || 'Opponent') : (match.player1Name || 'Opponent');
-
-  if (!deposited || !oppDeposited) {
-    return (
-      <PvpDepositScreen
-        match={match}
-        playerIsP1={playerIsP1}
-        onDeposit={handleDeposit}
-        depositing={depositing}
-      />
-    );
-  }
-
-  if (waiting) {
-    return (
-      <div className="pvp-waiting">
-        <div className="pvp-mm-pulse" />
-        <div className="pvp-waiting-title">Waiting for {oppName}…</div>
-        <div className="pvp-waiting-hint">Your result has been submitted</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pvp-game-wrap game-wrap">
-      <div className="pvp-vs-bar">
-        <span>vs <span style={{ color: C.violet }}>{oppName}</span></span>
-        <div className="pvp-opp-bar">
-          <div className="pvp-opp-bar-label">{oppName} {oppPct !== null ? `${oppPct}%` : '—'}</div>
-          <div className="pvp-opp-bar-track">
-            <div className="pvp-opp-bar-fill" style={{ width: `${oppPct || 0}%` }} />
-          </div>
-        </div>
-        <button className="pvp-forfeit-btn" onClick={() => handleLose(0, 0, {})}>Forfeit</button>
-      </div>
-      <TileMatchingDailyGame
-        boardSeedOverride={match.boardSeed}
-        onWin={handleWin}
-        onLose={handleLose}
-        onStepChange={handleStepChange}
-        onMoveTile={handleMoveTile}
-        resetKey={match.matchId}
-        offset={0}
-      />
-    </div>
-  );
-}
-
-function PvpResult({ result, onBack, onOpenReceipt }) {
-  const { isWinner, match, claimCalldata, contractAddr, prize, telemetrySummary } = result || {};
-  const [claiming, setClaiming] = useState(false);
-  const [claimed, setClaimed] = useState(false);
-  const [claimErr, setClaimErr] = useState(null);
-  const [txHash, setTxHash] = useState(null);
-  // DApp Mode: surface + anchor the verified session minted from this match's
-  // telemetry (server already replayed it).
-  const [dappSession, setDappSession] = useState(result && result.dapp);
-  useEffect(() => {
-    if (result && result.dapp) {
-      setDappSession(result.dapp);
-      dappAnchor(result.dapp).then(setDappSession);
-    }
-  }, [result && result.dapp && result.dapp.sessionId]);
-
-  const handleClaim = async () => {
-    if (!claimCalldata || !contractAddr) return;
-    setClaiming(true);
-    setClaimErr(null);
-    try {
-      const tx = await window.usernode.sendTransaction({ to: contractAddr, data: claimCalldata });
-      setTxHash(tx && tx.hash ? tx.hash : null);
-      setClaimed(true);
-    } catch (e) {
-      setClaimErr(e && e.message ? e.message : 'Transaction failed');
-    }
-    setClaiming(false);
-  };
-
-  const myScore = match && (result.playerIsP1 !== false
-    ? (match.p1Score != null ? match.p1Score : match.p2Score)
-    : (match.p2Score != null ? match.p2Score : match.p1Score));
-  const oppScore = match && (result.playerIsP1 !== false
-    ? match.p2Score
-    : match.p1Score);
-
-  return (
-    <div className="pvp-result">
-      <div className="pvp-result-emoji">{isWinner ? '🏆' : '💀'}</div>
-      <div className="pvp-result-title">{isWinner ? 'You Won!' : 'You Lost'}</div>
-
-      {dappSession && <VerifiedBadge session={dappSession} onOpenReceipt={onOpenReceipt} />}
-
-      {telemetrySummary && (
-        <div className="pvp-telem-summary">
-          <div className="pvp-telem-row">
-            <span>Moves</span><span className="mono">{telemetrySummary.moveCount}</span>
-          </div>
-          <div className="pvp-telem-row">
-            <span>Time</span><span className="mono">{telemetrySummary.timeTaken}s</span>
-          </div>
-          <div className="pvp-telem-row">
-            <span>Tiles cleared</span><span className="mono">{telemetrySummary.tilesCleared}/72</span>
-          </div>
-        </div>
-      )}
-
-      {match && (
-        <div className="score-rows" style={{ width: '100%', textAlign: 'left' }}>
-          <div className="score-row">
-            <span className="k">Your score</span>
-            <span className="v mono">{myScore != null ? myScore : '—'}</span>
-          </div>
-          <div className="score-row">
-            <span className="k">Opponent</span>
-            <span className="v mono">{oppScore != null ? oppScore : '—'}</span>
-          </div>
-        </div>
-      )}
-
-      {isWinner && prize && (
-        <div className="pvp-prize-anim">
-          <div className="pvp-prize-title">Prize Distribution</div>
-          <div className="pvp-prize-row pvp-prize-winner">
-            <span>You (90%)</span><span className="mono">+{prize.winnerPrize} MATCH</span>
-          </div>
-          <div className="pvp-prize-row">
-            <span>Treasury (8%)</span><span className="mono">{prize.treasuryFee} MATCH</span>
-          </div>
-          <div className="pvp-prize-row">
-            <span>Burned (2%)</span><span className="mono">{prize.burned} MATCH 🔥</span>
-          </div>
-        </div>
-      )}
-
-      {claiming && (
-        <div style={{ color: C.text, fontSize: '0.85rem', margin: '0.5rem 0' }}>
-          Funds are being sent to your wallet…
-        </div>
-      )}
-      {claimed && txHash && (
-        <div style={{ color: C.emerald, fontSize: '0.8rem', wordBreak: 'break-all', margin: '0.25rem 0' }}>
-          Tx: {txHash}
-        </div>
-      )}
-      {claimErr && <div style={{ color: C.rose, fontSize: '0.8rem', margin: '0.25rem 0' }}>{claimErr}</div>}
-
-      <div className="pvp-result-btns">
-        {isWinner && claimCalldata && !claimed && (
-          <button className="primary-btn" onClick={handleClaim} disabled={claiming}>
-            {claiming ? 'Claiming…' : 'Claim Winnings'}
-          </button>
-        )}
-        {claimed && <div style={{ color: C.emerald, fontWeight: 600 }}>Winnings claimed!</div>}
-        <button
-          className="primary-btn"
-          style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-          onClick={onBack}
-        >
-          Back to Arena
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PvpArena({ user, authOk, walletAddr: appWalletAddr, walletBalance: appWalletBalance, onOpenReceipt }) {
-  const [phase, setPhase] = useState('lobby'); // lobby | matchmaking | game | result
-  const [match, setMatch] = useState(null);
-  const [joining, setJoining] = useState(null);
-  const [pvpResult, setPvpResult] = useState(null);
-  // Use app-level wallet addr/balance when available; fall back to own fetch
-  const [localAddr, setLocalAddr] = useState(null);
-  const [localBalance, setLocalBalance] = useState(null);
-  const playerAddr = appWalletAddr || localAddr;
-  const balance = appWalletBalance || localBalance;
-  const pollRef = useRef(null);
-
-  useEffect(() => {
-    if (appWalletAddr) return; // already have it from app level
-    if (!window.usernode || !window.usernode.getNodeAddress) return;
-    window.usernode.getNodeAddress().then(addr => {
-      if (!addr) return;
-      setLocalAddr(addr);
-      api(`/api/pvp/balance?addr=${encodeURIComponent(addr)}`)
-        .then(({ ok, body }) => { if (ok && body) setLocalBalance(body.balance); })
-        .catch(() => {});
-    }).catch(() => {});
-  }, [appWalletAddr]);
-
-  // Poll for opponent joining while in matchmaking; also refresh cancelQueueCalldata
-  useEffect(() => {
-    if (phase !== 'matchmaking' || !match) return;
-    const poll = async () => {
-      const { ok, body } = await api(`/api/pvp/match/${match.matchId}`);
-      if (!ok) return;
-      if (body.status === 'active') {
-        clearInterval(pollRef.current);
-        setMatch(body);
-        setPhase('game');
-      } else {
-        // Refresh cancelQueueCalldata when it becomes available after 120s
-        setMatch(prev => prev ? { ...prev, cancelQueueCalldata: body.cancelQueueCalldata || prev.cancelQueueCalldata } : prev);
-      }
-    };
-    pollRef.current = setInterval(poll, 2000);
-    return () => clearInterval(pollRef.current);
-  }, [phase, match && match.matchId]);
-
-  const handleJoin = async (betTier) => {
-    if (!playerAddr) return;
-    setJoining(betTier);
-    const { ok, body } = await api('/api/pvp/join', {
-      method: 'POST',
-      body: JSON.stringify({ betTier, playerAddr }),
-    });
-    setJoining(null);
-    if (!ok || !body) return;
-    setMatch(body);
-    setPhase(body.status === 'active' ? 'game' : 'matchmaking');
-  };
-
-  const handleCancel = async () => {
-    if (match) {
-      await api(`/api/pvp/match/${match.matchId}/cancel`, { method: 'DELETE' });
-    }
-    clearInterval(pollRef.current);
-    setMatch(null);
-    setPhase('lobby');
-  };
-
-  const handleReclaim = () => {
-    clearInterval(pollRef.current);
-    setMatch(null);
-    setPhase('lobby');
-  };
-
-  const handleResult = (result) => {
-    setPvpResult(result);
-    setPhase('result');
-  };
-
-  if (!authOk) {
-    return <div className="pvp-auth-msg">Sign in to play PvP matches.</div>;
-  }
-
-  const playerIsP1 = match && user && match.player1Id === user.id;
-
-  if (phase === 'lobby') {
-    return <PvpLobby user={user} balance={balance} onJoin={handleJoin} joining={joining} />;
-  }
-  if (phase === 'matchmaking') {
-    return <PvpMatchmaking
-      match={match}
-      onCancel={handleCancel}
-      onReclaim={handleReclaim}
-      cancelQueueCalldata={match && match.cancelQueueCalldata}
-    />;
-  }
-  if (phase === 'game' && match) {
-    return <PvpGameScreen match={match} playerIsP1={playerIsP1} onResult={handleResult} />;
-  }
-  if (phase === 'result') {
-    return <PvpResult result={pvpResult} onBack={() => { setMatch(null); setPhase('lobby'); }} onOpenReceipt={onOpenReceipt} />;
-  }
-  return null;
-}
-
-/* ============================================================
-   Wallet helpers
-   ============================================================ */
-function fmtUtgo(weiStr) {
-  if (!weiStr || weiStr === '0') return '0.00 MATCH';
-  try {
-    const n = Number(BigInt(weiStr)) / 1e18;
-    return n.toFixed(2) + ' MATCH';
-  } catch { return '0.00 MATCH'; }
-}
-
-// MATCH is the single in-app currency — an integer count, not wei.
-function fmtMatch(n) {
-  const v = Number.isFinite(n) ? n : 0;
-  return `${v} MATCH`;
-}
-
-// Feature flag: the $UTGO-staked PvP Arena is hidden while the app runs a single
-// in-app currency (MATCH). Flip to true once PvP is relaunched on MATCH stakes.
-const PVP_ENABLED = false;
-
-// The "returning soon on MATCH" placeholder shown where the $UTGO PvP Arena used
-// to render.
-function PvpReturningSoon() {
-  return (
-    <div className="pvp-arena" style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
-      <div style={{ fontSize: '2.4rem', marginBottom: '0.75rem' }}>⚔️</div>
-      <div className="pvp-title" style={{ marginBottom: '0.5rem' }}>PvP Arena</div>
-      <p style={{ color: C.muted, maxWidth: '28rem', margin: '0 auto' }}>
-        PvP is being rebuilt to wager <strong style={{ color: C.gold }}>MATCH</strong>, PuzzleChain's
-        single in-app currency. It's <strong>returning soon on MATCH</strong> — meanwhile, duel for
-        MATCH in the Tile Match Puzzle arena.
-      </p>
-    </div>
-  );
-}
-
-function shortAddr(addr) {
-  if (!addr) return '';
-  return addr.slice(0, 6) + '…' + addr.slice(-4);
-}
-
-/* ============================================================
-   TipModal — send MATCH (the single in-app currency) to another user
-   ============================================================ */
-function TipModal({ toUser, onClose, onSuccess }) {
-  const TIP_PRESETS = ['1', '5', '10'];
-  const [amount, setAmount] = React.useState('1');
-  const [customAmount, setCustomAmount] = React.useState('');
-  const [sending, setSending] = React.useState(false);
-  const [err, setErr] = React.useState(null);
-  const [done, setDone] = React.useState(null);
-
-  const selectedAmount = customAmount || amount;
-
-  const handleSend = async () => {
-    const amountInt = Math.round(parseFloat(selectedAmount));
-    if (!amountInt || amountInt <= 0) {
-      setErr('Enter a valid amount');
-      return;
-    }
-    setSending(true);
-    setErr(null);
-    try {
-      const { ok, body } = await api('/api/wallet/tip', {
-        method: 'POST',
-        body: JSON.stringify({ toUserId: toUser.id, amount: amountInt }),
-      });
-      if (!ok) {
-        setErr(body && body.error ? body.error : 'Failed to send tip');
-        setSending(false);
-        return;
-      }
-      // Anchor the MATCH transfer on-chain (best-effort).
-      if (body.receipt && body.receipt.eventId) { matchAnchor(body.receipt).catch(() => {}); }
-      setDone({ amount: `${amountInt} MATCH` });
-    } catch (e) {
-      setErr(e && e.message ? e.message : 'Failed to send tip');
-    }
-    setSending(false);
-  };
-
-  return (
-    <div className="tip-modal-backdrop" onClick={onClose}>
-      <div className="tip-modal" onClick={e => e.stopPropagation()}>
-        <h3>Tip {toUser.username}</h3>
-        {done ? (
-          <div>
-            <div style={{ color: C.emerald, fontWeight: 600, marginBottom: '0.5rem' }}>
-              Sent {done.amount}! 🪙
-            </div>
-            <div style={{ fontSize: '0.72rem', color: C.muted, marginBottom: '0.75rem' }}>
-              Recorded on the Usernode chain.
-            </div>
-            <button className="primary-btn" onClick={() => { onSuccess && onSuccess(); onClose(); }}>Done</button>
-          </div>
-        ) : (
-          <div>
-            <div style={{ fontSize: '0.82rem', color: C.muted, marginBottom: '0.75rem' }}>
-              Quick amounts (MATCH):
-            </div>
-            <div className="tip-presets">
-              {TIP_PRESETS.map(p => (
-                <button
-                  key={p}
-                  className={'tip-preset-btn' + (amount === p && !customAmount ? ' active' : '')}
-                  onClick={() => { setAmount(p); setCustomAmount(''); }}
-                >{p}</button>
-              ))}
-            </div>
-            <input
-              className="tip-input"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="Custom amount"
-              value={customAmount}
-              onChange={e => { setCustomAmount(e.target.value); setAmount(''); }}
-            />
-            {err && <div style={{ color: C.rose, fontSize: '0.82rem', marginBottom: '0.5rem' }}>{err}</div>}
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button className="primary-btn" disabled={sending} onClick={handleSend} style={{ flex: 1 }}>
-                {sending ? 'Sending…' : `Send ${selectedAmount || '?'} MATCH`}
-              </button>
-              <button
-                className="primary-btn"
-                style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-                onClick={onClose}
-              >Cancel</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   WalletScreen — the full wallet management view
-   ============================================================ */
-function WalletScreen({ user, authOk, walletAddr, walletMock, onBack, onBalanceRefresh, onOpenReceipt }) {
-  const [walletData, setWalletData] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  const [buyingFreeze, setBuyingFreeze] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
-  const [freezeMsg, setFreezeMsg] = React.useState(null);
-  const [matchLedger, setMatchLedger] = React.useState(null);
-
-  const loadWallet = async () => {
-    const demo = new URLSearchParams(window.location.search).get('demo');
-    const path = '/api/wallet' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, body } = await api(path);
-    if (ok && body) setWalletData(body);
-    setLoading(false);
-  };
-
-  const loadMatchLedger = async () => {
-    const demo = new URLSearchParams(window.location.search).get('demo');
-    const path = '/api/match/ledger' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, body } = await api(path);
-    if (ok && body && Array.isArray(body.entries)) {
-      // Opportunistically anchor any still-pending rows (e.g. a duel payout
-      // credited server-side) so their explorer links appear on next refresh.
-      const pending = body.entries.filter(e => e.status === 'pending');
-      if (pending.length) {
-        Promise.all(pending.map(e => anchorMatchLedger(e.id, e.memo))).then(() => {
-          api(path).then(r => { if (r.ok && r.body && Array.isArray(r.body.entries)) setMatchLedger(r.body.entries); });
-        });
-      }
-      setMatchLedger(body.entries);
-    }
-  };
-
-  React.useEffect(() => { loadWallet(); loadMatchLedger(); }, []);
-
-  const handleCopy = async () => {
-    if (!walletData || !walletData.addr) return;
-    try {
-      await navigator.clipboard.writeText(walletData.addr);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
-
-  const handleBuyFreeze = async () => {
-    setBuyingFreeze(true);
-    setFreezeMsg(null);
-    const { ok, body } = await api('/api/wallet/spend/streak-freeze', { method: 'POST' });
-    if (ok && body) {
-      setFreezeMsg(`Freeze purchased! You now have ${body.streakFreezes} freeze${body.streakFreezes === 1 ? '' : 's'}.`);
-      if (body.receipt && body.receipt.eventId) { matchAnchor(body.receipt).catch(() => {}); }
-      await loadWallet();
-      onBalanceRefresh && onBalanceRefresh(body.balance);
-    } else {
-      setFreezeMsg((body && body.error) || 'Insufficient MATCH');
-    }
-    setBuyingFreeze(false);
-  };
-
-  // DApp Mode: prove wallet ownership (challenge → signMessage → verify) and
-  // disconnect (clear the proof). Connect itself happens automatically at app
-  // load; this button (re)runs the cryptographic proof on demand.
-  const [proving, setProving] = React.useState(false);
-  const handleProve = async () => {
-    setProving(true);
-    try {
-      const addr = (walletData && walletData.addr) || walletAddr;
-      if (!addr) { setProving(false); return; }
-      if (!window.usernode || !window.usernode.signMessage) {
-        setFreezeMsg('This wallet cannot sign — identity stays linked (unproven).');
-        setProving(false);
-        return;
-      }
-      const { ok, body } = await api('/api/wallet/challenge');
-      if (ok && body && body.message) {
-        const sig = await window.usernode.signMessage(body.message);
-        if (sig) {
-          await api('/api/wallet/prove', { method: 'POST', body: JSON.stringify({ addr, nonce: body.nonce, signature: sig }) });
-          await loadWallet();
-        }
-      }
-    } catch (e) {}
-    setProving(false);
-  };
-  const handleDisconnect = async () => {
-    await api('/api/wallet/disconnect', { method: 'POST' }).catch(() => {});
-    await loadWallet();
-  };
-
-  if (!authOk) {
-    return (
-      <div className="wallet-screen">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <div className="wallet-no-wallet" style={{ marginTop: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔐</div>
-          <div>Sign in to PuzzleChain to access your wallet.</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="wallet-screen">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <p style={{ color: C.muted, marginTop: '1rem' }}>Loading wallet…</p>
-      </div>
-    );
-  }
-
-  if (!walletData) {
-    return (
-      <div className="wallet-screen">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <h2>My Wallet</h2>
-        <div className="wallet-no-wallet">
-          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🪙</div>
-          <div>Couldn't load your wallet right now.</div>
-        </div>
-      </div>
-    );
-  }
-
-  const d = walletData;
-  const balance = Number.isFinite(d.balance) ? d.balance : 0;
-  const freezePrice = Number.isFinite(d.streakFreezePrice) ? d.streakFreezePrice : 50;
-  const canAffordFreeze = balance >= freezePrice;
-
-  return (
-    <div className="wallet-screen">
-      <button className="back-btn" onClick={onBack}>← Back</button>
-      <h2>My Wallet</h2>
-
-      {/* MATCH balance — the single in-app currency */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">MATCH Balance</div>
-        <div className="wallet-balance-big">🪙 {balance} MATCH</div>
-        <div className="wallet-balance-sub">
-          {d.lifetimeEarned || 0} earned · {d.lifetimeSpent || 0} spent (lifetime)
-        </div>
-        <div className="wallet-freeze-info" style={{ marginTop: '0.5rem' }}>
-          Earn MATCH by solving daily puzzles. Spend it on hints, streak freezes, and tips —
-          every move is anchored on the Usernode chain.
-        </div>
-      </div>
-
-      {/* Identity / linked wallet (optional — MATCH itself is in-app) */}
-      {d.addr && (
-        <div className="wallet-card">
-          <div className="wallet-card-title">
-            Connected Wallet
-            {d.identityVerified
-              ? <span className="dapp-identity-badge">✓ Verified identity</span>
-              : <span className="dapp-identity-badge unproven">Linked (unproven)</span>}
-          </div>
-          <div className="wallet-addr-row">
-            <span className="wallet-addr mono">{d.addr}</span>
-            <button
-              className="primary-btn"
-              style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', flexShrink: 0 }}
-              onClick={handleCopy}
-            >{copied ? 'Copied!' : 'Copy'}</button>
-          </div>
-          <div className="dapp-wallet-btns">
-            {!d.identityVerified && (
-              <button className="primary-btn" disabled={proving}
-                style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem' }}
-                onClick={handleProve}>
-                {proving ? 'Signing…' : 'Prove ownership'}
-              </button>
-            )}
-            <button className="primary-btn"
-              style={{ padding: '0.35rem 0.7rem', fontSize: '0.78rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-              onClick={handleDisconnect}>
-              Disconnect
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Streak freeze — now priced in MATCH */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">Streak Freeze</div>
-        <div style={{ fontSize: '0.88rem', marginBottom: '0.6rem' }}>
-          You have <strong style={{ color: C.gold }}>{d.streakFreezes}</strong> freeze{d.streakFreezes === 1 ? '' : 's'} banked.
-          A freeze protects your streak against one missed day.
-        </div>
-        {freezeMsg && (
-          <div style={{ fontSize: '0.82rem', color: C.emerald, marginBottom: '0.5rem' }}>{freezeMsg}</div>
-        )}
-        <button
-          className="primary-btn"
-          disabled={buyingFreeze || !canAffordFreeze}
-          onClick={handleBuyFreeze}
-          style={!canAffordFreeze ? { opacity: 0.45, cursor: 'not-allowed' } : { background: C.gold + 'cc' }}
-        >
-          {buyingFreeze ? 'Purchasing…' : `Buy Freeze (${freezePrice} MATCH)`}
-        </button>
-        {!canAffordFreeze && <div className="wallet-freeze-info">Earn more MATCH by solving daily puzzles first.</div>}
-      </div>
-
-      {/* Recent activity */}
-      {d.recent && d.recent.length > 0 && (
-        <div className="wallet-card">
-          <div className="wallet-card-title">Recent Activity</div>
-          {d.recent.map((ev, i) => {
-            const positive = ev.amount > 0;
-            const labels = {
-              earn: '🪙 Daily win',
-              spend_hint: '💡 Hint',
-              spend_freeze: '🧊 Streak freeze',
-              tip_received: '💰 Tip received',
-              tip_sent: '→ Tip sent',
-              migration: '↪ Converted from $UTGO',
-            };
-            const label = labels[ev.kind] || ev.kind;
-            const amtClass = positive ? 'wallet-activity-earned' : 'wallet-activity-tip-sent';
-            const anchorTag = ev.anchor_status === 'anchored'
-              ? <span style={{ fontSize: '0.66rem', color: C.emerald, marginLeft: '0.4rem' }} title={ev.anchor_tx_hash || ''}>⛓️ on-chain ✓</span>
-              : ev.anchor_status === 'migration'
-                ? null
-                : <span style={{ fontSize: '0.66rem', color: C.muted, marginLeft: '0.4rem' }}>⛓️ demo</span>;
-            return (
-              <div className="wallet-activity-row" key={i}>
-                <span className="wallet-activity-kind">{label}{anchorTag}</span>
-                <span className={`wallet-activity-amt ${amtClass}`}>{positive ? '+' : ''}{ev.amount} MATCH</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* MATCH on-chain activity */}
-      <div className="wallet-card">
-        <div className="wallet-card-title">MATCH activity</div>
-        {matchLedger == null ? (
-          <div className="match-activity-empty">Loading…</div>
-        ) : matchLedger.length === 0 ? (
-          <div className="match-activity-empty">No MATCH movements yet — buy a hint or win a duel to see on-chain activity here.</div>
-        ) : (
-          <div className="match-activity-list">
-            {matchLedger.map(e => (
-              <div className="match-activity-row" key={e.id}>
-                <div className="match-activity-main">
-                  <span className="match-activity-what">{matchLedgerLabel(e)}</span>
-                  <span className="match-activity-sub">
-                    <MatchExplorerLink txHash={e.txHash} status={e.status} />
-                  </span>
-                </div>
-                <span className={`match-activity-amt ${e.action}`}>
-                  {e.action === 'earn' ? '+' : '−'}{e.amount} 🪙
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Human label for a MATCH ledger row.
-function matchLedgerLabel(e) {
-  const names = {
-    cryptowordle: 'Crypto Wordle', sudoku: 'Mini Sudoku', wordhunt: 'Word Hunt',
-    tilematchingdaily: 'Daily Tile Match', tilematching: 'Tile Match task',
-    tilematch_pvp: 'Tile Match duel', match: 'MATCH',
-  };
-  const where = names[e.gameId] || e.gameId || 'MATCH';
-  return e.action === 'earn' ? `Earned · ${where}` : `Hint · ${where}`;
-}
-
-/* ============================================================
    DApp Mode — Verified badge, session receipt, verified leaderboard
    ============================================================ */
 function shortHash(h) {
@@ -16060,7 +13682,6 @@ function VerifiedLeaderboard({ gameId, onOpenReceipt }) {
 function ProfileScreen({ userId, user: loggedInUser, onBack }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showTip, setShowTip] = useState(false);
 
   const loadProfile = async () => {
     const { ok, body } = await api(`/api/social/profile/${userId}`);
@@ -16139,23 +13760,6 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
               >
                 {profile.following ? 'Unfollow' : 'Follow'}
               </button>
-              <button
-                className="primary-btn"
-                disabled={!profile.walletLinked}
-                title={!profile.walletLinked ? "This user hasn't set up a wallet yet" : `Tip ${profile.user.username}`}
-                style={{
-                  padding: '0.4rem 0.9rem',
-                  background: profile.walletLinked ? C.gold + 'cc' : C.surface,
-                  border: `1px solid ${profile.walletLinked ? C.gold : C.border}`,
-                  color: profile.walletLinked ? C.bg : C.muted,
-                  cursor: profile.walletLinked ? 'pointer' : 'not-allowed',
-                  fontSize: '0.85rem',
-                  opacity: profile.walletLinked ? 1 : 0.5,
-                }}
-                onClick={() => profile.walletLinked && setShowTip(true)}
-              >
-                🪙 Tip
-              </button>
             </div>
           )}
         </div>
@@ -16187,42 +13791,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
           />
         </div>
 
-        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '1rem', fontSize: '0.9rem' }}>
-          <p style={{ margin: '0.5rem 0' }}>
-            <span style={{ color: C.muted }}>Followers:</span>{' '}
-            <span style={{ fontWeight: 600, color: C.accent }}>{profile.followerCount}</span>
-          </p>
-          <p style={{ margin: '0.5rem 0' }}>
-            <span style={{ color: C.muted }}>Following:</span>{' '}
-            <span style={{ fontWeight: 600, color: C.accent }}>{profile.followingCount}</span>
-          </p>
-          {profile.tipsReceivedMatch > 0 && (
-            <p style={{ margin: '0.5rem 0' }}>
-              <span style={{ color: C.muted }}>Tips received:</span>{' '}
-              <span style={{ fontWeight: 600, color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>
-                {profile.tipsReceivedMatch} MATCH
-              </span>
-            </p>
-          )}
-          {profile.recentTippers && profile.recentTippers.length > 0 && (
-            <div style={{ marginTop: '0.5rem' }}>
-              <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: '0.25rem' }}>Recent tips:</div>
-              {profile.recentTippers.slice(0, 3).map((t, i) => (
-                <div key={i} style={{ fontSize: '0.82rem', color: C.text }}>
-                  {t.fromUserId} → <span style={{ color: C.gold, fontFamily: "'JetBrains Mono', monospace" }}>{t.amount} MATCH</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
-      {showTip && (
-        <TipModal
-          toUser={profile.user}
-          onClose={() => setShowTip(false)}
-          onSuccess={loadProfile}
-        />
-      )}
     </div>
   );
 }
@@ -16503,8 +14072,8 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
     onWinRef.current(s, bp, secs, {
       winnerLabel: cleared ? 'Cleared! 🎉' : 'Game Over',
       share: cleared
-        ? '🐸 Zuma — ' + s + ' pts, all 3 levels cleared!'
-        : '🐸 Zuma — ' + s + ' pts, level ' + lv,
+        ? '🐸 Marble Loop — ' + s + ' pts, all 3 levels cleared!'
+        : '🐸 Marble Loop — ' + s + ' pts, level ' + lv,
     });
   }
 
@@ -17470,7 +15039,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   return (
     <div>
       {resumeOffer && (
-        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} anchorTxHash={resumeOffer.__anchorTxHash} />
+        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
       )}
       <div className="status-bar">
         <div className="pill">
@@ -17729,10 +15298,398 @@ const CNL_STREAK_KEY = 'puzzlechain_cnl_streak';
 
 // Chutes & Ladders wrapper — picks a mode (2P / Versus Bot / Online) and
 // delegates. Honors the Game Menu's gameMode/gameModeOpts props.
+/* ============================================================
+   Phase 5 board games — Checkers, Reversi, Four in a Row, Gomoku,
+   Ludo. Online head-to-head only: the SERVER is the referee (rules
+   modules in lib/board-rules.js over classic_rooms), so these
+   components only render polled state and submit move intents —
+   there are no client-side rules to drift out of sync.
+   ============================================================ */
+
+// Create/Join setup for the online-only board games (reuses the Mancala
+// mode-select styling).
+function OnlineRoomSetup({ gameId, onReady }) {
+  const [action, setAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const start = async () => {
+    if (action === 'create') {
+      setBusy(true);
+      const { ok, body } = await api(`/api/classic/${gameId}/rooms`, { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onReady(body.id, 1);
+      else setError('Could not create room. Try again.');
+    } else if (action === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api(`/api/classic/${gameId}/rooms/${code}/join`, { method: 'POST' });
+      setBusy(false);
+      if (ok) onReady(code, 2);
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  return (
+    <div className="mnc-mode-select">
+      <div className="brg-intro">
+        🌐 Online head-to-head — play a friend via room code. Wins count on the <strong>Ladder</strong>.
+      </div>
+      <div className="mnc-online-actions">
+        <div className="mnc-mode-sub">
+          <button className={'mnc-difficulty-pill' + (action === 'create' ? ' active' : '')} onClick={() => { setAction('create'); setError(''); }}>Create Room</button>
+          <button className={'mnc-difficulty-pill' + (action === 'join' ? ' active' : '')} onClick={() => { setAction('join'); setError(''); }}>Join Room</button>
+        </div>
+        {action === 'join' && (
+          <div className="mnc-join-form">
+            <input
+              className="mnc-join-input"
+              placeholder="Room code (e.g. AB3K7P)"
+              value={joinCode}
+              onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }}
+              maxLength={8}
+            />
+          </div>
+        )}
+      </div>
+      {error && <div className="mnc-join-error">{error}</div>}
+      {action && (
+        <button
+          className="mnc-mode-start-btn"
+          onClick={start}
+          disabled={busy || (action === 'join' && joinCode.trim().length < 4)}
+        >{busy ? 'Please wait…' : action === 'create' ? 'Create & share code' : 'Join game'}</button>
+      )}
+    </div>
+  );
+}
+
+// ---- Per-game board views ----------------------------------------------
+// Each gets { st, myPlayerNum, isMyTurn, submit } — pure render + intent.
+
+function ckOwnerOf(v) { return v === 1 || v === 3 ? 1 : v === 2 || v === 4 ? 2 : 0; }
+
+function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const [sel, setSel] = useState(null);
+  const board = st.board || [];
+  const click = (i) => {
+    if (!isMyTurn) return;
+    const owner = ckOwnerOf(board[i]);
+    if (owner === myPlayerNum) { setSel(i === sel ? null : i); return; }
+    if (sel != null && board[i] === 0) { submit({ from: sel, to: i }); setSel(null); }
+  };
+  return (
+    <div>
+      {st.mustJumpFrom != null && isMyTurn && (
+        <div className="brg-note">Chain jump! Continue with the same piece.</div>
+      )}
+      <div className="ck-board">
+        {board.map((v, i) => {
+          const r = Math.floor(i / 8), c = i % 8;
+          const dark = (r + c) % 2 === 1;
+          const owner = ckOwnerOf(v);
+          return (
+            <div key={i} className={'ck-cell' + (dark ? ' dark' : '') + (sel === i ? ' sel' : '')} onClick={() => dark && click(i)}>
+              {owner !== 0 && (
+                <div className={'ck-piece p' + owner + (v > 2 ? ' king' : '')}>{v > 2 ? '♛' : ''}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="brg-legend">
+        <span><span className="ck-piece-mini p1" /> Player 1 (moves down)</span>
+        <span><span className="ck-piece-mini p2" /> Player 2 (moves up)</span>
+      </div>
+    </div>
+  );
+}
+
+function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const board = st.board || [];
+  const p1 = board.filter(x => x === 1).length;
+  const p2 = board.filter(x => x === 2).length;
+  return (
+    <div>
+      <div className="brg-note">
+        <span className="rv-count"><span className="rv-disc-mini d1" /> {p1}</span>
+        <span className="rv-count"><span className="rv-disc-mini d2" /> {p2}</span>
+        {st.passed && <span style={{ marginLeft: '0.6rem' }}>Opponent had no move — you go again.</span>}
+      </div>
+      <div className="rv-board">
+        {board.map((v, i) => (
+          <div key={i} className="rv-cell" onClick={() => isMyTurn && v === 0 && submit({ cell: i })}>
+            {v !== 0 && <div className={'rv-disc d' + v} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
+  const board = st.board || [];
+  return (
+    <div>
+      <div className="fir-board">
+        {board.map((v, i) => (
+          <div
+            key={i}
+            className={'fir-cell' + (st.lastMove === i ? ' last' : '')}
+            onClick={() => isMyTurn && submit({ col: i % 7 })}
+          >
+            {v !== 0 && <div className={'fir-disc d' + v} />}
+          </div>
+        ))}
+      </div>
+      <div className="brg-legend">
+        <span><span className="fir-disc-mini d1" /> Player 1</span>
+        <span><span className="fir-disc-mini d2" /> Player 2</span>
+        <span style={{ color: C.muted }}>Tap a column to drop</span>
+      </div>
+    </div>
+  );
+}
+
+function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const board = st.board || [];
+  return (
+    <div className="gmk-scroll">
+      <div className="gmk-board">
+        {board.map((v, i) => (
+          <div
+            key={i}
+            className={'gmk-cell' + (st.lastMove === i ? ' last' : '')}
+            onClick={() => isMyTurn && v === 0 && submit({ cell: i })}
+          >
+            {v !== 0 && <div className={'gmk-stone s' + v} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Ludo board geometry — 15×15 grid mirror of the server module's relative
+// track (lib/board-rules.js): 52-cell ring, per-player 6-cell home column,
+// center home. [col,row] pairs; ring index 0 = P1 start, 26 = P2 start.
+const LUDO_RING_XY = [
+  [1,6],[2,6],[3,6],[4,6],[5,6], [6,5],[6,4],[6,3],[6,2],[6,1],[6,0], [7,0],[8,0],
+  [8,1],[8,2],[8,3],[8,4],[8,5], [9,6],[10,6],[11,6],[12,6],[13,6],[14,6], [14,7],[14,8],
+  [13,8],[12,8],[11,8],[10,8],[9,8], [8,9],[8,10],[8,11],[8,12],[8,13],[8,14], [7,14],[6,14],
+  [6,13],[6,12],[6,11],[6,10],[6,9], [5,8],[4,8],[3,8],[2,8],[1,8],[0,8], [0,7],[0,6],
+];
+const LUDO_HOME_XY = {
+  1: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+  2: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
+};
+const LUDO_BASE_XY = { 1: [[2,2],[4,2],[2,4],[4,4]], 2: [[10,10],[12,10],[10,12],[12,12]] };
+const LUDO_START_ABS = { 1: 0, 2: 26 };
+
+function ludoTokenXY(player, pos, tokenIdx) {
+  if (pos === -1) return LUDO_BASE_XY[player][tokenIdx];
+  if (pos >= 51 && pos <= 56) return LUDO_HOME_XY[player][pos - 51];
+  if (pos >= 57) return [7, 7];
+  return LUDO_RING_XY[(LUDO_START_ABS[player] + pos) % 52];
+}
+
+function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const phase = st.phase || 'roll';
+  const myTokens = (myPlayerNum === 1 ? st.p1 : st.p2) || [];
+  const canMoveToken = (pos) => {
+    if (phase !== 'move' || !isMyTurn || st.die == null) return false;
+    if (pos >= 57) return false;
+    if (pos === -1) return st.die === 6;
+    return pos + st.die <= 57;
+  };
+  const cells = [];
+  // Ring
+  LUDO_RING_XY.forEach(([x, y], i) => {
+    const safe = i === 0 || i === 26;
+    const startOwner = i === 0 ? 1 : i === 26 ? 2 : 0;
+    cells.push(
+      <div key={'r' + i} className={'ludo-cell ring' + (safe ? ' safe' : '') + (startOwner ? ' start' + startOwner : '')}
+           style={{ gridColumn: x + 1, gridRow: y + 1 }}>{safe ? '★' : ''}</div>
+    );
+  });
+  // Home columns + center + bases
+  for (const p of [1, 2]) {
+    LUDO_HOME_XY[p].forEach(([x, y], i) => {
+      cells.push(<div key={'h' + p + i} className={'ludo-cell home' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
+    });
+    LUDO_BASE_XY[p].forEach(([x, y], i) => {
+      cells.push(<div key={'b' + p + i} className={'ludo-cell base' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
+    });
+  }
+  cells.push(<div key="center" className="ludo-cell center" style={{ gridColumn: 8, gridRow: 8 }}>🏁</div>);
+  // Tokens (offset stacked tokens slightly so pile-ups stay visible)
+  const tokens = [];
+  for (const p of [1, 2]) {
+    const toks = (p === 1 ? st.p1 : st.p2) || [];
+    toks.forEach((pos, i) => {
+      const [x, y] = ludoTokenXY(p, pos, i);
+      const mine = p === myPlayerNum;
+      const movable = mine && canMoveToken(pos);
+      tokens.push(
+        <div
+          key={'t' + p + i}
+          className={'ludo-token p' + p + (movable ? ' movable' : '')}
+          style={{
+            gridColumn: x + 1, gridRow: y + 1,
+            transform: `translate(${(i % 2) * 5 - 2}px, ${Math.floor(i / 2) * 5 - 2}px)`,
+          }}
+          onClick={() => movable && submit({ type: 'move', token: i })}
+        >{i + 1}</div>
+      );
+    });
+  }
+  return (
+    <div>
+      <div className="ludo-board">{cells}{tokens}</div>
+      <div className="cnl-die"><div className="cnl-die-face">{st.die == null ? '·' : st.die}</div></div>
+      {st.lastEvent === 'no-move' && <div className="brg-note">No legal move for that roll — turn passed.</div>}
+      {st.lastEvent === 'capture' && <div className="brg-note">💥 Capture! Token sent back to base.</div>}
+      <div className="cnl-roll-buttons">
+        <button
+          className="cnl-roll-btn"
+          style={{ background: myPlayerNum === 1 ? C.accent : C.rose }}
+          onClick={() => submit({ type: 'roll' })}
+          disabled={!isMyTurn || phase !== 'roll'}
+        >
+          {!isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a highlighted token'}
+        </button>
+      </div>
+      <div className="brg-legend">
+        <span>🎲 6 leaves base & rolls again</span>
+        <span>★ safe cells</span>
+        <span>Exact roll to finish</span>
+      </div>
+    </div>
+  );
+}
+
+const BOARD_VIEWS = {
+  checkers: CheckersBoardView,
+  reversi: ReversiBoardView,
+  fourinarow: FourInARowView,
+  gomoku: GomokuBoardView,
+  ludo: LudoBoardView,
+};
+
+// Polling room shell shared by all five board games (mirrors the Chutes &
+// Ladders online flow: waiting screen → status bar → board → finish → onWin).
+function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
+  const { room, pollingError, opponentDisconnected, submitMove } = useClassicRoom(gameId, roomId);
+  const winCalledRef = useRef(false);
+  const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
+  const secsRef = useRef(0); secsRef.current = secs;
+  const movesRef = useRef(0);
+
+  useEffect(() => {
+    if (!room || room.status !== 'finished' || winCalledRef.current) return;
+    winCalledRef.current = true;
+    const name = (GAMES.find(g => g.id === gameId) || {}).name || gameId;
+    const draw = room.winner === 'draw';
+    const youWin = room.winner === String(myPlayerNum);
+    onWin(youWin ? 200 : 0, movesRef.current, secsRef.current, {
+      winnerLabel: draw ? "It's a draw 🤝" : youWin ? 'You win! 🎉' : 'Opponent wins',
+      share: `♟️ ${name} online — ${draw ? 'we drew!' : youWin ? 'I won!' : 'good game!'}`,
+    });
+  }, [room && room.status]);
+
+  if (!room && !pollingError) {
+    return <div style={{ textAlign: 'center', padding: '2rem' }}><div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} /><div style={{ color: C.muted, fontSize: '0.85rem' }}>Connecting…</div></div>;
+  }
+  if (pollingError === 'room_not_found') {
+    return <div style={{ textAlign: 'center', padding: '1.5rem', color: C.rose }}>Room not found.</div>;
+  }
+  if (room && room.status === 'waiting') {
+    return (
+      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+        <div style={{ color: C.muted, marginBottom: '0.6rem', fontSize: '0.85rem' }}>Waiting for opponent to join…</div>
+        <div className="mnc-room-code">{roomId}</div>
+        <div style={{ color: C.muted, fontSize: '0.78rem', marginTop: '0.4rem' }}>Share this room code</div>
+        <div className="mnc-spinner" style={{ margin: '1rem auto 0' }} />
+      </div>
+    );
+  }
+
+  const st = room.state || {};
+  const isMyTurn = room.status === 'active' && (st.currentPlayer || 1) === myPlayerNum;
+  const myColor = myPlayerNum === 1 ? C.accent : C.rose;
+  const turnLabel = room.status === 'finished'
+    ? (room.winner === 'draw' ? 'Draw' : room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
+    : isMyTurn ? 'Your turn' : "Opponent's turn";
+  const View = BOARD_VIEWS[gameId];
+  const submit = (move) => {
+    movesRef.current += 1;
+    onStepChange && onStepChange(movesRef.current);
+    submitMove({ move });
+  };
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
+        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.82rem' }}>P{myPlayerNum}</div></div>
+        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
+      </div>
+      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      {room.status === 'active' && (() => {
+        // Correspondence turn timer: the server auto-forfeits the side to move
+        // after turnTimeoutHours without a move — surface the remaining window.
+        const expH = roomExpiresInHours(room);
+        return expH != null ? (
+          <div style={{ textAlign: 'center', color: expH <= 6 ? C.rose : C.muted, fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            ⏱ {isMyTurn ? 'Your move' : 'Their move'} · expires in {expH}h
+          </div>
+        ) : null;
+      })()}
+      <View st={st} myPlayerNum={myPlayerNum} isMyTurn={isMyTurn} submit={submit} />
+    </div>
+  );
+}
+
+// Top-level component per board game: create/join setup, then the room.
+function BoardRoomGame({ gameId, onWin, onStepChange, resetKey, gameModeOpts }) {
+  // A pre-seated room (phase 7 in-progress row) skips the create/join setup:
+  // the home your-turn card passes { roomId, myPlayerNum } through the classic
+  // game-mode opts to land straight back in the live match.
+  const [roomInfo, setRoomInfo] = useState(() =>
+    gameModeOpts && gameModeOpts.roomId && gameModeOpts.myPlayerNum
+      ? { roomId: gameModeOpts.roomId, myPlayerNum: gameModeOpts.myPlayerNum }
+      : null
+  );
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (mounted.current) setRoomInfo(null);
+    else mounted.current = true;
+  }, [resetKey]);
+  if (!roomInfo) {
+    return <OnlineRoomSetup gameId={gameId} onReady={(roomId, myPlayerNum) => setRoomInfo({ roomId, myPlayerNum })} />;
+  }
+  return <BoardOnlineRoom gameId={gameId} roomId={roomInfo.roomId} myPlayerNum={roomInfo.myPlayerNum} onWin={onWin} onStepChange={onStepChange} />;
+}
+
+function CheckersGame(props)   { return <BoardRoomGame gameId="checkers" {...props} />; }
+function ReversiGame(props)    { return <BoardRoomGame gameId="reversi" {...props} />; }
+function FourInARowGame(props) { return <BoardRoomGame gameId="fourinarow" {...props} />; }
+function GomokuGame(props)     { return <BoardRoomGame gameId="gomoku" {...props} />; }
+function LudoGame(props)       { return <BoardRoomGame gameId="ludo" {...props} />; }
+
 function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
   const [mode, setMode] = useState(gameMode || null);
   const [roomId, setRoomId] = useState((gameModeOpts && gameModeOpts.roomId) || null);
-  const [myPlayerNum, setMyPlayerNum] = useState(gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1);
+  const [myPlayerNum, setMyPlayerNum] = useState(
+    gameModeOpts && gameModeOpts.myPlayerNum
+      ? gameModeOpts.myPlayerNum
+      : gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1
+  );
   const [resumeState, setResumeState] = useState(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const { loadState, clearState } = useClassicSave('chutes-ladders');
@@ -18081,6 +16038,1509 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
   );
 }
 
+/* ============================================================
+   Phase 6 — Shared card/tile engine + Lane A daily games
+   ------------------------------------------------------------
+   A small client-side engine every card/tile daily rides:
+   seeded deck building + Fisher-Yates shuffling (mulberry32 via
+   dailyRng, same PRNG family as lib/dapp.js's tile-match board
+   generator), a shared <CeCard> renderer, and a layered-tile
+   layout helper (free-tile rule + reverse-deal solvable dealing,
+   the same layer/overlap model as lib/dapp.js's tileBoard).
+   All phase-6 games are tier B server-side (snapshot + timing
+   heuristics through settleDailySession); their onStepChange
+   calls feed the shared daily run log automatically.
+   ============================================================ */
+
+// ---- Card primitives -------------------------------------------------------
+const CE_SUIT_GLYPH = ['♠', '♥', '♦', '♣'];
+const CE_RANK_LABEL = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const ceIsRed = (card) => card.s === 1 || card.s === 2;
+
+// Fisher-Yates over a seeded rng — the engine's single shuffle primitive.
+function ceShuffle(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Build n standard decks as {id, s (suit 0-3), r (rank 0=A..12=K), up}.
+// `suits` restricts the suit pool (Spider's 1-suit variant passes [0]).
+function ceDeck(nDecks, suits, rng) {
+  const cards = [];
+  let id = 0;
+  for (let d = 0; d < nDecks; d++) {
+    for (const s of (suits || [0, 1, 2, 3])) {
+      for (let r = 0; r < 13; r++) cards.push({ id: id++, s, r, up: false });
+    }
+  }
+  return rng ? ceShuffle(cards, rng) : cards;
+}
+
+// Shared card renderer. Face-down cards show a patterned back; face-up cards
+// show rank + suit in red/black. `sel` draws the selection ring.
+function CeCard({ card, sel, dim, onClick, style }) {
+  const cls = ['ce-card'];
+  if (!card.up) cls.push('down');
+  else cls.push(ceIsRed(card) ? 'red' : 'black');
+  if (sel) cls.push('sel');
+  if (dim) cls.push('dim');
+  return (
+    <div className={cls.join(' ')} style={style} onClick={onClick}>
+      {card.up && (
+        <React.Fragment>
+          <div className="ce-rank">{CE_RANK_LABEL[card.r]}</div>
+          <div className="ce-suit">{CE_SUIT_GLYPH[card.s]}</div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+// An empty pile slot (foundation / empty column / stock base).
+function CeSlot({ label, onClick, className }) {
+  return (
+    <div className={'ce-card ce-slot' + (className ? ' ' + className : '')} onClick={onClick}>
+      {label || ''}
+    </div>
+  );
+}
+
+/* ---- Klondike Solitaire (daily) -------------------------------------------
+   Classic single-deck patience: 7 tableau columns, draw-1 stock with
+   unlimited recycles, 4 foundations by suit. Tap a face-up card to select
+   it (and the run below it), tap a destination to move; tapping the
+   selected card again sends it to a foundation when legal. */
+
+function klDeal(rng) {
+  const deck = ceDeck(1, null, rng);
+  const tab = [];
+  let idx = 0;
+  for (let p = 0; p < 7; p++) {
+    const col = [];
+    for (let i = 0; i <= p; i++) {
+      const c = deck[idx++];
+      col.push({ ...c, up: i === p });
+    }
+    tab.push(col);
+  }
+  const stock = deck.slice(idx).map((c) => ({ ...c, up: false }));
+  return { stock, waste: [], found: [[], [], [], []], tab, moves: 0 };
+}
+
+function klValidState(st) {
+  return st && Array.isArray(st.stock) && Array.isArray(st.waste) &&
+    Array.isArray(st.found) && st.found.length === 4 &&
+    Array.isArray(st.tab) && st.tab.length === 7 && Number.isFinite(st.moves);
+}
+
+function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const freshDeal = useRef(null);
+  if (!freshDeal.current) freshDeal.current = klDeal(dailyRng(offset, 'klondike'));
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && klValidState(savedProgress.st)
+    ? savedProgress.st : null;
+
+  const [st, setSt] = useState(() => resumed || freshDeal.current);
+  const [sel, setSel] = useState(null); // {z:'waste'} | {z:'tab',p,i} | {z:'found',p}
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { st, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, st: stateRef.current.st }, steps: stateRef.current.st.moves, secs: stateRef.current.secs }),
+    !done
+  );
+  const commit = (next) => {
+    setSt(next);
+    setSel(null);
+    onStepChange(next.moves);
+    const won = next.found.every((f) => f.length === 13);
+    // Don't autosave the winning move — the finish call is about to close the
+    // attempt, and a progress write racing it 409s against the finished row.
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, st: next }, next.moves, secs);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1600 - next.moves * 3 - secs, 300);
+      onWin(score, next.moves, secs, {
+        share: `Game Corner Klondike Solitaire — solved today's deal in ${fmt} (${next.moves} moves) 🃏`,
+      });
+    }
+  };
+
+  const clone = () => ({
+    stock: st.stock.slice(), waste: st.waste.slice(),
+    found: st.found.map((f) => f.slice()), tab: st.tab.map((c) => c.slice()),
+    moves: st.moves,
+  });
+
+  const tapStock = () => {
+    if (done) return;
+    const n = clone();
+    if (n.stock.length) {
+      const c = n.stock.pop();
+      n.waste.push({ ...c, up: true });
+    } else if (n.waste.length) {
+      n.stock = n.waste.slice().reverse().map((c) => ({ ...c, up: false }));
+      n.waste = [];
+    } else return;
+    n.moves++;
+    commit(n);
+  };
+
+  const canTab = (card, destTop) =>
+    destTop ? (ceIsRed(card) !== ceIsRed(destTop) && card.r === destTop.r - 1) : card.r === 12;
+  const canFound = (card, f) =>
+    f.length ? (card.s === f[f.length - 1].s && card.r === f[f.length - 1].r + 1) : card.r === 0;
+
+  // The selected run (array of cards) plus a mutator that removes it.
+  const takeSel = (n, s) => {
+    if (s.z === 'waste') return [n.waste.pop()];
+    if (s.z === 'found') return [n.found[s.p].pop()];
+    const run = n.tab[s.p].splice(s.i);
+    const col = n.tab[s.p];
+    if (col.length && !col[col.length - 1].up) col[col.length - 1] = { ...col[col.length - 1], up: true };
+    return run;
+  };
+  const selCards = (s) => {
+    if (!s) return [];
+    if (s.z === 'waste') return st.waste.slice(-1);
+    if (s.z === 'found') return st.found[s.p].slice(-1);
+    return st.tab[s.p].slice(s.i);
+  };
+
+  const tryFoundation = (s) => {
+    const cards = selCards(s);
+    if (cards.length !== 1) return false;
+    const fi = st.found.findIndex((f) => canFound(cards[0], f));
+    if (fi < 0) return false;
+    const n = clone();
+    n.found[fi].push({ ...takeSel(n, s)[0], up: true });
+    n.moves++;
+    commit(n);
+    return true;
+  };
+
+  const moveSelToTab = (p) => {
+    const cards = selCards(sel);
+    if (!cards.length) return false;
+    const destTop = st.tab[p].length ? st.tab[p][st.tab[p].length - 1] : null;
+    if (!canTab(cards[0], destTop)) return false;
+    const n = clone();
+    n.tab[p] = n.tab[p].concat(takeSel(n, sel));
+    n.moves++;
+    commit(n);
+    return true;
+  };
+  const moveSelToFound = (fi) => {
+    const cards = selCards(sel);
+    if (cards.length !== 1 || !canFound(cards[0], st.found[fi])) return false;
+    const n = clone();
+    n.found[fi].push({ ...takeSel(n, sel)[0], up: true });
+    n.moves++;
+    commit(n);
+    return true;
+  };
+
+  const isSel = (z, p, i) => sel && sel.z === z && sel.p === p && (z !== 'tab' || sel.i === i);
+
+  const tapWaste = () => {
+    if (done || !st.waste.length) return;
+    if (isSel('waste')) { if (!tryFoundation(sel)) setSel(null); return; }
+    if (sel) { setSel({ z: 'waste' }); return; }
+    setSel({ z: 'waste' });
+  };
+  const tapFound = (fi) => {
+    if (done) return;
+    if (sel && !isSel('found', fi)) { if (moveSelToFound(fi)) return; }
+    if (isSel('found', fi)) { setSel(null); return; }
+    if (st.found[fi].length) setSel({ z: 'found', p: fi });
+  };
+  const tapTab = (p, i) => {
+    if (done) return;
+    const col = st.tab[p];
+    // Tap on empty column or anywhere in a column while a selection exists →
+    // try to move there first.
+    if (sel && !isSel('tab', p, i)) {
+      if (moveSelToTab(p)) return;
+    }
+    if (i == null || i < 0 || !col[i] || !col[i].up) { setSel(null); return; }
+    if (isSel('tab', p, i)) {
+      // Second tap on the same card: auto-send to a foundation (top card only).
+      if (i === col.length - 1 && tryFoundation(sel)) return;
+      setSel(null);
+      return;
+    }
+    setSel({ z: 'tab', p, i });
+  };
+
+  const maxCol = Math.max(...st.tab.map((c) => c.length), 1);
+  return (
+    <div className="kl-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
+        <div className="pill"><div className="plabel">Home</div><div className="pvalue">{st.found.reduce((a, f) => a + f.length, 0)}/52</div></div>
+      </div>
+      <div className="kl-top">
+        {st.stock.length
+          ? <CeCard card={{ s: 0, r: 0, up: false }} onClick={tapStock} />
+          : <CeSlot label="↻" onClick={tapStock} />}
+        {st.waste.length
+          ? <CeCard card={st.waste[st.waste.length - 1]} sel={isSel('waste')} onClick={tapWaste} />
+          : <CeSlot />}
+        <div className="kl-gap" />
+        {st.found.map((f, fi) => (
+          f.length
+            ? <CeCard key={fi} card={f[f.length - 1]} sel={isSel('found', fi)} onClick={() => tapFound(fi)} />
+            : <CeSlot key={fi} label={CE_SUIT_GLYPH[fi]} onClick={() => tapFound(fi)} />
+        ))}
+      </div>
+      <div className="kl-tab">
+        {st.tab.map((col, p) => (
+          <div
+            key={p}
+            className="kl-col"
+            style={{ height: 62 + (maxCol - 1) * 20 }}
+            onClick={(e) => { if (e.target === e.currentTarget) tapTab(p, col.length ? col.length - 1 : null); }}
+          >
+            {col.length === 0 && <CeSlot onClick={() => tapTab(p, null)} />}
+            {col.map((c, i) => (
+              <CeCard
+                key={c.id}
+                card={c}
+                sel={sel && sel.z === 'tab' && sel.p === p && i >= sel.i}
+                onClick={() => tapTab(p, i)}
+                style={{ position: 'absolute', top: i * (col.length > 12 ? 14 : 20), left: 0, zIndex: i }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="p6-hint">Tap a card, then its destination. Tap a selected card again to send it home.</div>
+    </div>
+  );
+}
+
+/* ---- Spider Solitaire (daily, 1 suit) --------------------------------------
+   104 spade cards over 10 columns. Move any descending run; complete
+   K→A runs clear to the foundation; deal a row from the stock. */
+
+function spDeal(rng) {
+  const deck = ceDeck(8, [0], rng); // 8 × A..K of one suit = 104
+  const cols = [];
+  let idx = 0;
+  for (let p = 0; p < 10; p++) {
+    const size = p < 4 ? 6 : 5;
+    const col = [];
+    for (let i = 0; i < size; i++) {
+      const c = deck[idx++];
+      col.push({ ...c, up: i === size - 1 });
+    }
+    cols.push(col);
+  }
+  return { cols, stock: deck.slice(idx).map((c) => ({ ...c, up: false })), done8: 0, moves: 0 };
+}
+
+function spValidState(st) {
+  return st && Array.isArray(st.cols) && st.cols.length === 10 &&
+    Array.isArray(st.stock) && Number.isFinite(st.done8) && Number.isFinite(st.moves);
+}
+
+// Remove any completed K→A run from a column (mutates), returns count removed.
+function spSweep(n) {
+  let swept = 0;
+  for (let p = 0; p < 10; p++) {
+    const col = n.cols[p];
+    if (col.length < 13) continue;
+    const tail = col.slice(-13);
+    let run = tail.every((c) => c.up) && tail[0].r === 12;
+    if (run) for (let i = 1; i < 13; i++) if (tail[i].r !== tail[i - 1].r - 1) { run = false; break; }
+    if (run) {
+      n.cols[p] = col.slice(0, -13);
+      const nc = n.cols[p];
+      if (nc.length && !nc[nc.length - 1].up) nc[nc.length - 1] = { ...nc[nc.length - 1], up: true };
+      swept++;
+    }
+  }
+  return swept;
+}
+
+function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const freshDeal = useRef(null);
+  if (!freshDeal.current) freshDeal.current = spDeal(dailyRng(offset, 'spider'));
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && spValidState(savedProgress.st)
+    ? savedProgress.st : null;
+
+  const [st, setSt] = useState(() => resumed || freshDeal.current);
+  const [sel, setSel] = useState(null); // {p, i}
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { st, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, st: stateRef.current.st }, steps: stateRef.current.st.moves, secs: stateRef.current.secs }),
+    !done
+  );
+
+  const commit = (n) => {
+    n.done8 += spSweep(n);
+    setSt(n);
+    setSel(null);
+    onStepChange(n.moves);
+    const won = n.done8 >= 8;
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, st: n }, n.moves, secs);
+    if (won) {
+      setDone(true);
+      const score = Math.max(2000 - n.moves * 3 - secs, 300);
+      onWin(score, n.moves, secs, {
+        share: `Game Corner Spider Solitaire — cleared today's deal in ${fmt} (${n.moves} moves) 🕷️`,
+      });
+    }
+  };
+  const clone = () => ({ cols: st.cols.map((c) => c.slice()), stock: st.stock.slice(), done8: st.done8, moves: st.moves });
+
+  // A selection is valid if cards i..end are all face-up and strictly descending.
+  const runOk = (col, i) => {
+    if (!col[i] || !col[i].up) return false;
+    for (let k = i + 1; k < col.length; k++) if (!col[k].up || col[k].r !== col[k - 1].r - 1) return false;
+    return true;
+  };
+
+  const dealRow = () => {
+    if (done || !st.stock.length) return;
+    const n = clone();
+    for (let p = 0; p < 10 && n.stock.length; p++) {
+      const c = n.stock.pop();
+      n.cols[p] = n.cols[p].concat({ ...c, up: true });
+    }
+    n.moves++;
+    commit(n);
+  };
+
+  const tapCol = (p, i) => {
+    if (done) return;
+    const col = st.cols[p];
+    if (sel && sel.p !== p) {
+      // Attempt the move onto column p.
+      const moving = st.cols[sel.p].slice(sel.i);
+      const destTop = col.length ? col[col.length - 1] : null;
+      if (!destTop || destTop.r === moving[0].r + 1) {
+        const n = clone();
+        const run = n.cols[sel.p].splice(sel.i);
+        const src = n.cols[sel.p];
+        if (src.length && !src[src.length - 1].up) src[src.length - 1] = { ...src[src.length - 1], up: true };
+        n.cols[p] = n.cols[p].concat(run);
+        n.moves++;
+        commit(n);
+        return;
+      }
+    }
+    if (i == null || !runOk(col, i)) { setSel(null); return; }
+    if (sel && sel.p === p && sel.i === i) { setSel(null); return; }
+    setSel({ p, i });
+  };
+
+  const maxCol = Math.max(...st.cols.map((c) => c.length), 1);
+  return (
+    <div className="sp-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
+        <div className="pill"><div className="plabel">Runs</div><div className="pvalue">{st.done8}/8</div></div>
+        <button className="p6-btn" onClick={dealRow} disabled={!st.stock.length}>
+          Deal +10 ({Math.floor(st.stock.length / 10)})
+        </button>
+      </div>
+      <div className="sp-tab">
+        {st.cols.map((col, p) => (
+          <div
+            key={p}
+            className="sp-col"
+            style={{ height: 46 + (maxCol - 1) * 13 }}
+            onClick={(e) => { if (e.target === e.currentTarget) tapCol(p, col.length ? col.length - 1 : null); }}
+          >
+            {col.length === 0 && <CeSlot className="sm" onClick={() => tapCol(p, null)} />}
+            {col.map((c, i) => (
+              <CeCard
+                key={c.id}
+                card={c}
+                sel={sel && sel.p === p && i >= sel.i}
+                onClick={() => tapCol(p, i)}
+                style={{ position: 'absolute', top: i * 13, left: 0, zIndex: i }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="p6-hint">One suit: any descending run moves. Build K→A to clear a run — 8 clears win.</div>
+    </div>
+  );
+}
+
+/* ---- Mahjong Solitaire (daily) ----------------------------------------------
+   60-tile stepped pyramid. A tile is free when nothing rests on it and its
+   left or right side is open. The deal is generated by reverse-removal, so
+   today's board is always solvable in at least one order. */
+
+const MJ_LAYOUT = (() => {
+  const pos = [];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 8; c++) pos.push({ x: c * 2, y: r * 2, z: 0 });
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) pos.push({ x: 2 + c * 2, y: 1 + r * 2, z: 1 });
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) pos.push({ x: 4 + c * 2, y: 2 + r * 2, z: 2 });
+  pos.push({ x: 6, y: 3, z: 3 });
+  pos.push({ x: 8, y: 3, z: 3 });
+  return pos; // 32 + 18 + 8 + 2 = 60 slots
+})();
+const MJ_FACES = ['🌸', '🎋', '🌊', '🔥', '⛰️', '🌙', '☀️', '⭐', '🐉', '🐢', '🦅', '🎐', '🍂', '❄️', '🌈', '🪷'];
+
+function mjIsFree(i, removed) {
+  const p = MJ_LAYOUT[i];
+  for (let j = 0; j < MJ_LAYOUT.length; j++) {
+    if (j === i || removed[j]) continue;
+    const q = MJ_LAYOUT[j];
+    if (q.z === p.z + 1 && Math.abs(q.x - p.x) < 2 && Math.abs(q.y - p.y) < 2) return false;
+  }
+  let left = false, right = false;
+  for (let j = 0; j < MJ_LAYOUT.length; j++) {
+    if (j === i || removed[j]) continue;
+    const q = MJ_LAYOUT[j];
+    if (q.z !== p.z || Math.abs(q.y - p.y) >= 2) continue;
+    if (q.x === p.x - 2) left = true;
+    if (q.x === p.x + 2) right = true;
+  }
+  return !(left && right);
+}
+
+// Reverse-deal: repeatedly pick two currently-free slots and give them the
+// same face, then remove them. Playing back in that order solves the board,
+// so the deal is guaranteed winnable. Conceptual sibling of lib/dapp.js's
+// tileBoard (same layered-board model, solvability added).
+function mjDeal(rng, present) {
+  const faces = new Array(MJ_LAYOUT.length).fill(-1);
+  const removed = MJ_LAYOUT.map((_, i) => !present[i]);
+  let remaining = present.filter(Boolean).length;
+  let pairIdx = 0;
+  while (remaining >= 2) {
+    const free = [];
+    for (let i = 0; i < MJ_LAYOUT.length; i++) if (!removed[i] && mjIsFree(i, removed)) free.push(i);
+    let a, b;
+    if (free.length >= 2) {
+      const ai = Math.floor(rng() * free.length);
+      a = free.splice(ai, 1)[0];
+      b = free[Math.floor(rng() * free.length)];
+    } else {
+      const rest = [];
+      for (let i = 0; i < removed.length; i++) if (!removed[i]) rest.push(i);
+      a = rest[0]; b = rest[1];
+    }
+    faces[a] = pairIdx % MJ_FACES.length;
+    faces[b] = pairIdx % MJ_FACES.length;
+    pairIdx++;
+    removed[a] = true;
+    removed[b] = true;
+    remaining -= 2;
+  }
+  return faces;
+}
+
+// Any free matching pair left on the board?
+function mjHasMove(faces, removed) {
+  const free = [];
+  for (let i = 0; i < MJ_LAYOUT.length; i++) if (!removed[i] && mjIsFree(i, removed)) free.push(i);
+  for (let a = 0; a < free.length; a++) {
+    for (let b = a + 1; b < free.length; b++) {
+      if (faces[free[a]] === faces[free[b]]) return true;
+    }
+  }
+  return false;
+}
+
+function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const seedBase = useRef(null);
+  if (seedBase.current == null) {
+    const srv = serverDailySeed('mahjongsol');
+    seedBase.current = srv != null ? srv : ((utcDayNum(offset) + hashStr('mahjongsol')) >>> 0);
+  }
+  const resumed = savedProgress && savedProgress.dayNum === dayNum &&
+    Array.isArray(savedProgress.faces) && savedProgress.faces.length === MJ_LAYOUT.length &&
+    Array.isArray(savedProgress.removed)
+    ? savedProgress : null;
+
+  const [faces, setFaces] = useState(() =>
+    resumed ? resumed.faces.slice() : mjDeal(mulberry32(seedBase.current), MJ_LAYOUT.map(() => true))
+  );
+  const [removed, setRemoved] = useState(() =>
+    resumed ? resumed.removed.map(Boolean) : MJ_LAYOUT.map(() => false)
+  );
+  const [shuffles, setShuffles] = useState(resumed && Number.isFinite(resumed.shuffles) ? resumed.shuffles : 2);
+  const [sel, setSel] = useState(null);
+  const [pairs, setPairs] = useState(resumed && Number.isFinite(resumed.pairs) ? resumed.pairs : 0);
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const remaining = removed.filter((r) => !r).length;
+  const stuck = !done && remaining > 0 && !mjHasMove(faces, removed);
+
+  const stateRef = useRef({});
+  stateRef.current = { faces, removed, shuffles, pairs, secs };
+  const buildProgress = () => ({
+    dayNum,
+    faces: stateRef.current.faces,
+    removed: stateRef.current.removed.map((r) => (r ? 1 : 0)),
+    shuffles: stateRef.current.shuffles,
+    pairs: stateRef.current.pairs,
+  });
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: buildProgress(), steps: stateRef.current.pairs, secs: stateRef.current.secs }),
+    !done
+  );
+  const saveNow = (f, rm, sh, pr) =>
+    onSaveProgress && onSaveProgress(
+      { dayNum, faces: f, removed: rm.map((r) => (r ? 1 : 0)), shuffles: sh, pairs: pr },
+      pr, secs
+    );
+
+  const tap = (i) => {
+    if (done || removed[i] || !mjIsFree(i, removed)) return;
+    if (sel === i) { setSel(null); return; }
+    if (sel != null && faces[sel] === faces[i]) {
+      const rm = removed.slice();
+      rm[sel] = true;
+      rm[i] = true;
+      const pr = pairs + 1;
+      setRemoved(rm);
+      setSel(null);
+      setPairs(pr);
+      onStepChange(pr);
+      const won = rm.every(Boolean);
+      if (!won) saveNow(faces, rm, shuffles, pr);
+      if (won) {
+        setDone(true);
+        const score = Math.max(1500 - secs * 2 - (2 - shuffles) * 150, 300);
+        onWin(score, pr, secs, {
+          share: `Game Corner Mahjong Solitaire — cleared today's board in ${fmt} 🀄`,
+        });
+      }
+      return;
+    }
+    setSel(i);
+  };
+
+  const doShuffle = () => {
+    if (done || shuffles <= 0 || remaining === 0) return;
+    // Re-deal the remaining slots with a fresh (still deterministic-ish) seed;
+    // the reverse-deal keeps the rest of the board solvable.
+    const rng = mulberry32((seedBase.current + remaining * 7919 + shuffles * 104729) >>> 0);
+    const nf = mjDeal(rng, removed.map((r) => !r));
+    const merged = faces.map((f, i) => (removed[i] ? f : nf[i]));
+    const sh = shuffles - 1;
+    setFaces(merged);
+    setShuffles(sh);
+    setSel(null);
+    saveNow(merged, removed, sh, pairs);
+  };
+
+  // Out of moves and out of shuffles → the day is lost.
+  useEffect(() => {
+    if (stuck && shuffles <= 0 && !done) {
+      setDone(true);
+      onLose && onLose(pairs, secs, {
+        share: `Game Corner Mahjong Solitaire — today's board got the better of me 🀄`,
+        answer: `${remaining} tiles were left with no free pair.`,
+      });
+    }
+  }, [stuck, shuffles, done]);
+
+  const TW = 36, TH = 46;
+  const boardW = 15 * (TW / 2) + TW;
+  const boardH = 7 * (TH / 2) + TH + 12;
+  return (
+    <div className="mj-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Tiles</div><div className="pvalue">{remaining}/60</div></div>
+        <button className="p6-btn" onClick={doShuffle} disabled={shuffles <= 0}>🔀 Shuffle ({shuffles})</button>
+      </div>
+      {stuck && shuffles > 0 && (
+        <div className="p6-banner">No free pair left — use a shuffle to keep going.</div>
+      )}
+      <div className="mj-board" style={{ width: boardW, height: boardH }}>
+        {MJ_LAYOUT.map((p, i) => {
+          if (removed[i]) return null;
+          const free = mjIsFree(i, removed);
+          return (
+            <div
+              key={i}
+              className={'mj-tile' + (free ? '' : ' blocked') + (sel === i ? ' sel' : '') + (p.z > 0 ? ' up' + p.z : '')}
+              style={{
+                left: p.x * (TW / 2),
+                top: p.y * (TH / 2) - p.z * 5,
+                zIndex: p.z * 100 + p.y,
+              }}
+              onClick={() => tap(i)}
+            >{MJ_FACES[faces[i]]}</div>
+          );
+        })}
+      </div>
+      <div className="p6-hint">Tap two matching free tiles (uncovered, with an open side) to clear them.</div>
+    </div>
+  );
+}
+
+/* ---- Nonogram (daily) --------------------------------------------------------
+   8×8 picture-logic puzzle. Fill cells so every row and column matches its
+   run clues; any grid satisfying all clues wins. */
+
+function ngClues(line) {
+  const out = [];
+  let run = 0;
+  for (const v of line) {
+    if (v === 1) run++;
+    else if (run) { out.push(run); run = 0; }
+  }
+  if (run) out.push(run);
+  return out.length ? out : [0];
+}
+
+function ngGenerate(rng) {
+  let g = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    g = [];
+    let filled = 0;
+    for (let r = 0; r < 8; r++) {
+      const row = [];
+      for (let c = 0; c < 8; c++) {
+        const v = rng() < 0.55 ? 1 : 0;
+        row.push(v);
+        filled += v;
+      }
+      g.push(row);
+    }
+    if (filled < 22 || filled > 44) continue;
+    const rowsOk = g.every((row) => row.some((v) => v === 1));
+    const colsOk = g[0].every((_, c) => g.some((row) => row[c] === 1));
+    if (rowsOk && colsOk) return g;
+  }
+  return g;
+}
+
+function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const target = useRef(null);
+  if (!target.current) target.current = ngGenerate(dailyRng(offset, 'nonogram'));
+  const rowClues = useRef(target.current.map(ngClues)).current;
+  const colClues = useRef(target.current[0].map((_, c) => ngClues(target.current.map((row) => row[c])))).current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+    ? savedProgress : null;
+  // 0 = blank, 1 = filled, 2 = marked ✗
+  const [grid, setGrid] = useState(() =>
+    resumed ? resumed.grid.map((row) => row.slice()) : Array.from({ length: 8 }, () => new Array(8).fill(0))
+  );
+  const [mode, setMode] = useState('fill'); // 'fill' | 'mark'
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { grid, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, grid: stateRef.current.grid }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
+
+  const solved = (g) => {
+    for (let r = 0; r < 8; r++) {
+      const got = ngClues(g[r].map((v) => (v === 1 ? 1 : 0)));
+      if (got.length !== rowClues[r].length || got.some((v, k) => v !== rowClues[r][k])) return false;
+    }
+    for (let c = 0; c < 8; c++) {
+      const got = ngClues(g.map((row) => (row[c] === 1 ? 1 : 0)));
+      if (got.length !== colClues[c].length || got.some((v, k) => v !== colClues[c][k])) return false;
+    }
+    return true;
+  };
+
+  const tap = (r, c) => {
+    if (done) return;
+    const g = grid.map((row) => row.slice());
+    const cur = g[r][c];
+    if (mode === 'fill') g[r][c] = cur === 1 ? 0 : 1;
+    else g[r][c] = cur === 2 ? 0 : 2;
+    const ns = steps + 1;
+    setGrid(g);
+    setSteps(ns);
+    onStepChange(ns);
+    const won = solved(g);
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g }, ns, secs);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1400 - ns * 4 - secs * 2, 250);
+      onWin(score, ns, secs, {
+        share: `Game Corner Nonogram — solved today's 8×8 picture in ${fmt} 🖼️`,
+      });
+    }
+  };
+
+  return (
+    <div className="ng-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
+        <div className="ng-modes">
+          <button className={'p6-btn' + (mode === 'fill' ? ' on' : '')} onClick={() => setMode('fill')}>⬛ Fill</button>
+          <button className={'p6-btn' + (mode === 'mark' ? ' on' : '')} onClick={() => setMode('mark')}>✗ Mark</button>
+        </div>
+      </div>
+      <div className="ng-wrap">
+        <div className="ng-corner" />
+        <div className="ng-colclues">
+          {colClues.map((cl, c) => (
+            <div key={c} className="ng-colclue">{cl.map((v, k) => <span key={k}>{v}</span>)}</div>
+          ))}
+        </div>
+        <div className="ng-rowclues">
+          {rowClues.map((cl, r) => (
+            <div key={r} className="ng-rowclue">{cl.join(' ')}</div>
+          ))}
+        </div>
+        <div className="ng-grid">
+          {grid.map((row, r) =>
+            row.map((v, c) => (
+              <div
+                key={r + '-' + c}
+                className={'ng-cell' + (v === 1 ? ' fill' : '') + (v === 2 ? ' mark' : '')}
+                onClick={() => tap(r, c)}
+              >{v === 2 ? '✗' : ''}</div>
+            ))
+          )}
+        </div>
+      </div>
+      <div className="p6-hint">Numbers are runs of filled cells, in order. Match every row and column clue.</div>
+    </div>
+  );
+}
+
+/* ---- Mine Finder (daily) -----------------------------------------------------
+   9×9 with 10 mines, same board for everyone. A safe opening area is
+   revealed for you; one wrong tap ends the day. */
+
+function mfBuild(rng) {
+  const idxs = ceShuffle(Array.from({ length: 81 }, (_, i) => i), rng);
+  const mines = new Set(idxs.slice(0, 10));
+  const counts = new Array(81).fill(0);
+  for (let i = 0; i < 81; i++) {
+    if (mines.has(i)) { counts[i] = -1; continue; }
+    const r = Math.floor(i / 9), c = i % 9;
+    let n = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < 9 && cc >= 0 && cc < 9 && mines.has(rr * 9 + cc)) n++;
+    }
+    counts[i] = n;
+  }
+  // Deterministic safe opening: the zero-cell whose flood region is largest.
+  let best = -1, bestSize = -1;
+  const seen = new Set();
+  for (let i = 0; i < 81; i++) {
+    if (counts[i] !== 0 || seen.has(i)) continue;
+    const region = mfFlood(i, counts);
+    for (const j of region) seen.add(j);
+    if (region.size > bestSize) { bestSize = region.size; best = i; }
+  }
+  if (best < 0) best = counts.findIndex((v) => v >= 0); // no zeros: any safe cell
+  return { mines, counts, start: best };
+}
+
+function mfFlood(startIdx, counts) {
+  const out = new Set([startIdx]);
+  const queue = [startIdx];
+  while (queue.length) {
+    const i = queue.pop();
+    if (counts[i] !== 0) continue;
+    const r = Math.floor(i / 9), c = i % 9;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= 9 || cc < 0 || cc >= 9) continue;
+      const j = rr * 9 + cc;
+      if (!out.has(j) && counts[j] >= 0) { out.add(j); queue.push(j); }
+    }
+  }
+  return out;
+}
+
+function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const board = useRef(null);
+  if (!board.current) board.current = mfBuild(dailyRng(offset, 'minefinder'));
+  const { mines, counts, start } = board.current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.revealed)
+    ? savedProgress : null;
+  const [revealed, setRevealed] = useState(() =>
+    new Set(resumed ? resumed.revealed : [...mfFlood(start, counts)])
+  );
+  const [flags, setFlags] = useState(() => new Set(resumed && Array.isArray(resumed.flags) ? resumed.flags : []));
+  const [flagMode, setFlagMode] = useState(false);
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [done, setDone] = useState(false);
+  const [boom, setBoom] = useState(-1);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { revealed, flags, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: { dayNum, revealed: [...stateRef.current.revealed], flags: [...stateRef.current.flags] },
+      steps: stateRef.current.steps, secs: stateRef.current.secs,
+    }),
+    !done
+  );
+  const saveNow = (rv, fl, ns) =>
+    onSaveProgress && onSaveProgress({ dayNum, revealed: [...rv], flags: [...fl] }, ns, secs);
+
+  const tap = (i) => {
+    if (done || revealed.has(i)) return;
+    const ns = steps + 1;
+    setSteps(ns);
+    onStepChange(ns);
+    if (flagMode) {
+      const fl = new Set(flags);
+      if (fl.has(i)) fl.delete(i); else fl.add(i);
+      setFlags(fl);
+      saveNow(revealed, fl, ns);
+      return;
+    }
+    if (flags.has(i)) return; // flagged cells don't reveal by accident
+    if (mines.has(i)) {
+      setBoom(i);
+      setDone(true);
+      const rv = new Set(revealed);
+      for (const m of mines) rv.add(m);
+      setRevealed(rv);
+      onLose && onLose(ns, secs, {
+        share: `Game Corner Mine Finder — today's field got me 💥`,
+        answer: 'You hit a mine — the field is revealed above.',
+      });
+      return;
+    }
+    const rv = new Set(revealed);
+    if (counts[i] === 0) for (const j of mfFlood(i, counts)) rv.add(j);
+    else rv.add(i);
+    setRevealed(rv);
+    const won = rv.size >= 71;
+    if (!won) saveNow(rv, flags, ns);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1000 - secs * 3 - ns * 2, 200);
+      onWin(score, ns, secs, {
+        share: `Game Corner Mine Finder — swept today's field in ${fmt} 🚩`,
+      });
+    }
+  };
+
+  return (
+    <div className="mf-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Mines</div><div className="pvalue">{Math.max(10 - flags.size, 0)}</div></div>
+        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
+        <button className={'p6-btn' + (flagMode ? ' on' : '')} onClick={() => setFlagMode(!flagMode)}>🚩 Flag</button>
+      </div>
+      <div className="mf-grid">
+        {counts.map((v, i) => {
+          const isRev = revealed.has(i);
+          const isMine = mines.has(i);
+          const cls = ['mf-cell'];
+          if (isRev) cls.push('rev');
+          if (isRev && isMine) cls.push('mine');
+          if (i === boom) cls.push('boom');
+          return (
+            <div key={i} className={cls.join(' ')} onClick={() => tap(i)}>
+              {isRev
+                ? (isMine ? '💣' : (v > 0 ? v : ''))
+                : (flags.has(i) ? '🚩' : '')}
+            </div>
+          );
+        })}
+      </div>
+      <div className="p6-hint">Numbers count adjacent mines. Toggle 🚩 Flag mode to mark suspects — same field for everyone today.</div>
+    </div>
+  );
+}
+
+/* ---- Anagram Sprint (daily) --------------------------------------------------
+   Unscramble five words back-to-back. Tap the shuffled letters to build
+   your answer; wrong submissions cost steps, not the day. */
+
+const AN_POOL_5 = ['APPLE', 'BEACH', 'CANDY', 'DANCE', 'EAGLE', 'FLAME', 'GRAPE', 'HONEY', 'IVORY', 'JUICE', 'LEMON', 'MANGO', 'NIGHT', 'OCEAN', 'PIANO', 'QUEEN', 'RIVER', 'STONE', 'TIGER', 'WHALE', 'ZEBRA', 'CLOUD', 'BRAVE', 'SPARK', 'TRAIL'];
+const AN_POOL_6 = ['ANCHOR', 'BASKET', 'CAMERA', 'DRAGON', 'FOREST', 'GARDEN', 'HAMMER', 'ISLAND', 'JUNGLE', 'KERNEL', 'LEGEND', 'MARBLE', 'NECTAR', 'ORCHID', 'PLANET', 'RIDDLE', 'SILVER', 'TEMPLE', 'VELVET', 'WINTER', 'WIZARD', 'YELLOW', 'BREEZE', 'CASTLE', 'FALCON'];
+const AN_POOL_7 = ['ANTIQUE', 'BALLOON', 'CAPTAIN', 'DOLPHIN', 'EMERALD', 'FORTUNE', 'GRANITE', 'HARVEST', 'IMAGINE', 'JOURNEY', 'KINGDOM', 'LIBRARY', 'MACHINE', 'NETWORK', 'OCTOPUS', 'PYRAMID', 'RAINBOW', 'SUNRISE', 'THUNDER', 'VILLAGE', 'WHISPER', 'CRYSTAL', 'LANTERN', 'PENGUIN', 'MONSOON'];
+
+function anPickWords(rng) {
+  const pick = (pool) => pool[Math.floor(rng() * pool.length)];
+  const words = [];
+  const used = new Set();
+  const take = (pool) => {
+    let w = pick(pool);
+    for (let g = 0; g < 20 && used.has(w); g++) w = pick(pool);
+    used.add(w);
+    words.push(w);
+  };
+  take(AN_POOL_5); take(AN_POOL_5); take(AN_POOL_6); take(AN_POOL_6); take(AN_POOL_7);
+  return words;
+}
+
+function anScramble(word, rng) {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const idx = ceShuffle(Array.from({ length: word.length }, (_, i) => i), rng);
+    const s = idx.map((i) => word[i]).join('');
+    if (s !== word) return idx.map((i) => ({ ch: word[i], used: false }));
+  }
+  // Degenerate scramble (e.g. repeated letters): rotate by one.
+  const rot = (word.slice(1) + word[0]).split('');
+  return rot.map((ch) => ({ ch, used: false }));
+}
+
+function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const deal = useRef(null);
+  if (!deal.current) {
+    const rng = dailyRng(offset, 'anagrams');
+    const words = anPickWords(rng);
+    deal.current = { words, tiles: words.map((w) => anScramble(w, rng)) };
+  }
+  const { words, tiles } = deal.current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Number.isFinite(savedProgress.solved)
+    ? savedProgress : null;
+  const [wordIdx, setWordIdx] = useState(() => Math.min(resumed ? resumed.solved : 0, words.length - 1));
+  const [solvedCount, setSolvedCount] = useState(resumed ? resumed.solved : 0);
+  const [picked, setPicked] = useState([]); // [{tileIdx, ch}]
+  const [flash, setFlash] = useState(false);
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { solvedCount, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, solved: stateRef.current.solvedCount }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
+
+  const word = words[wordIdx];
+  const rack = tiles[wordIdx];
+  const usedSet = new Set(picked.map((p) => p.tileIdx));
+
+  const tapTile = (i) => {
+    if (done || usedSet.has(i) || picked.length >= word.length) return;
+    setPicked(picked.concat({ tileIdx: i, ch: rack[i].ch }));
+  };
+  const backspace = () => setPicked(picked.slice(0, -1));
+  const submit = () => {
+    if (done || picked.length !== word.length) return;
+    const ns = steps + 1;
+    setSteps(ns);
+    onStepChange(ns);
+    const guess = picked.map((p) => p.ch).join('');
+    if (guess === word) {
+      const sc = solvedCount + 1;
+      setSolvedCount(sc);
+      setPicked([]);
+      const won = sc >= words.length;
+      if (!won && onSaveProgress) onSaveProgress({ dayNum, solved: sc }, ns, secs);
+      if (won) {
+        setDone(true);
+        const score = Math.max(1300 - ns * 25 - secs * 2, 250);
+        onWin(score, ns, secs, {
+          share: `Game Corner Anagram Sprint — unscrambled all ${words.length} words in ${fmt} 🔀`,
+        });
+      } else {
+        setWordIdx(sc);
+      }
+    } else {
+      setFlash(true);
+      setTimeout(() => setFlash(false), 500);
+      if (onSaveProgress) onSaveProgress({ dayNum, solved: solvedCount }, ns, secs);
+    }
+  };
+
+  return (
+    <div className="an-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Word</div><div className="pvalue">{Math.min(solvedCount + 1, words.length)}/{words.length}</div></div>
+        <div className="pill"><div className="plabel">Tries</div><div className="pvalue">{steps}</div></div>
+      </div>
+      <div className="an-dots">
+        {words.map((w, i) => (
+          <span key={i} className={'an-dot' + (i < solvedCount ? ' solved' : i === wordIdx && !done ? ' cur' : '')}>
+            {i < solvedCount ? w : w.length}
+          </span>
+        ))}
+      </div>
+      <div className={'an-slots' + (flash ? ' bad' : '')}>
+        {Array.from({ length: word.length }, (_, i) => (
+          <div key={i} className={'an-slot' + (picked[i] ? ' has' : '')} onClick={backspace}>
+            {picked[i] ? picked[i].ch : ''}
+          </div>
+        ))}
+      </div>
+      <div className="an-rack">
+        {rack.map((t, i) => (
+          <button key={i} className={'an-tile' + (usedSet.has(i) ? ' used' : '')} onClick={() => tapTile(i)}>
+            {t.ch}
+          </button>
+        ))}
+      </div>
+      <div className="an-actions">
+        <button className="p6-btn" onClick={backspace} disabled={!picked.length}>⌫ Undo letter</button>
+        <button className="p6-btn primary" onClick={submit} disabled={picked.length !== word.length}>Submit</button>
+      </div>
+      <div className="p6-hint">Tap letters to build the word, tap a slot to take one back. Wrong guesses cost tries, never the day.</div>
+    </div>
+  );
+}
+
+/* ---- Crate Push (daily) --------------------------------------------------------
+   Push every crate onto a goal pad. One hand-built warehouse per day
+   (picked by the daily seed); moves are undoable and the room restartable. */
+
+const CP_LEVELS = [
+  ['#######',
+   '#     #',
+   '# .$@ #',
+   '#     #',
+   '#######'],
+  ['#######',
+   '#  .  #',
+   '#  $  #',
+   '#  @  #',
+   '#     #',
+   '#######'],
+  ['########',
+   '#      #',
+   '# .$@$.#',
+   '#      #',
+   '########'],
+  ['#######',
+   '#. $  #',
+   '#  @  #',
+   '#  $ .#',
+   '#######'],
+  ['########',
+   '#   #  #',
+   '# @$  .#',
+   '#   #  #',
+   '########'],
+  ['#######',
+   '#  .  #',
+   '# $$  #',
+   '# .@  #',
+   '#######'],
+  ['########',
+   '#  ..  #',
+   '#  $$  #',
+   '#      #',
+   '#  @   #',
+   '########'],
+  ['#########',
+   '#       #',
+   '# @$  . #',
+   '#       #',
+   '# .  $  #',
+   '#       #',
+   '#########'],
+  ['#######',
+   '#     #',
+   '# $.$ #',
+   '# . . #',
+   '#  $  #',
+   '#  @  #',
+   '#######'],
+  ['########',
+   '# @    #',
+   '# $$$  #',
+   '# ...  #',
+   '#      #',
+   '########'],
+];
+
+function cpParse(rows) {
+  const walls = new Set(), goals = new Set();
+  const crates = [];
+  let player = null;
+  for (let y = 0; y < rows.length; y++) {
+    for (let x = 0; x < rows[y].length; x++) {
+      const ch = rows[y][x];
+      const key = x + ',' + y;
+      if (ch === '#') walls.add(key);
+      if (ch === '.' || ch === '*' || ch === '+') goals.add(key);
+      if (ch === '$' || ch === '*') crates.push([x, y]);
+      if (ch === '@' || ch === '+') player = [x, y];
+    }
+  }
+  return { walls, goals, crates, player, w: Math.max(...rows.map((r) => r.length)), h: rows.length };
+}
+
+function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const levelIdx = useRef(null);
+  if (levelIdx.current == null) levelIdx.current = Math.floor(dailyRng(offset, 'cratepush')() * CP_LEVELS.length);
+  const level = useRef(cpParse(CP_LEVELS[levelIdx.current])).current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum &&
+    Array.isArray(savedProgress.player) && Array.isArray(savedProgress.crates)
+    ? savedProgress : null;
+  const [player, setPlayer] = useState(() => (resumed ? resumed.player.slice() : level.player.slice()));
+  const [crates, setCrates] = useState(() =>
+    (resumed ? resumed.crates : level.crates).map((c) => c.slice())
+  );
+  const [moves, setMoves] = useState(resumed && Number.isFinite(resumed.moves) ? resumed.moves : 0);
+  const [hist, setHist] = useState([]);
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { player, crates, moves, secs, done };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: { dayNum, player: stateRef.current.player, crates: stateRef.current.crates, moves: stateRef.current.moves },
+      steps: stateRef.current.moves, secs: stateRef.current.secs,
+    }),
+    !done
+  );
+  const saveNow = (p, cr, m) =>
+    onSaveProgress && onSaveProgress({ dayNum, player: p, crates: cr, moves: m }, m, secs);
+
+  const crateAt = (cr, x, y) => cr.findIndex(([cx, cy]) => cx === x && cy === y);
+
+  const move = (dx, dy) => {
+    const cur = stateRef.current;
+    if (cur.done) return;
+    const [px, py] = cur.player;
+    const nx = px + dx, ny = py + dy;
+    if (level.walls.has(nx + ',' + ny)) return;
+    const cr = cur.crates.map((c) => c.slice());
+    const ci = crateAt(cr, nx, ny);
+    if (ci >= 0) {
+      const cx = nx + dx, cy = ny + dy;
+      if (level.walls.has(cx + ',' + cy) || crateAt(cr, cx, cy) >= 0) return;
+      cr[ci] = [cx, cy];
+    }
+    const m = cur.moves + 1;
+    setHist((h) => h.concat([{ player: cur.player, crates: cur.crates, moves: cur.moves }]).slice(-200));
+    setPlayer([nx, ny]);
+    setCrates(cr);
+    setMoves(m);
+    onStepChange(m);
+    const won = cr.every(([cx, cy]) => level.goals.has(cx + ',' + cy));
+    if (!won) saveNow([nx, ny], cr, m);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1200 - m * 6 - secs * 2, 250);
+      onWin(score, m, secs, {
+        share: `Game Corner Crate Push — shifted today's warehouse in ${m} moves (${fmt}) 📦`,
+      });
+    }
+  };
+
+  const undo = () => {
+    if (done || !hist.length) return;
+    const prev = hist[hist.length - 1];
+    setHist(hist.slice(0, -1));
+    setPlayer(prev.player.slice());
+    setCrates(prev.crates.map((c) => c.slice()));
+    setMoves(prev.moves);
+    onStepChange(prev.moves);
+    saveNow(prev.player, prev.crates, prev.moves);
+  };
+  const restart = () => {
+    if (done) return;
+    setHist([]);
+    setPlayer(level.player.slice());
+    setCrates(level.crates.map((c) => c.slice()));
+    setMoves(0);
+    onStepChange(0);
+    saveNow(level.player, level.crates, 0);
+  };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+      if (map[e.key]) { e.preventDefault(); move(...map[e.key]); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const cells = [];
+  for (let y = 0; y < level.h; y++) {
+    for (let x = 0; x < level.w; x++) {
+      const key = x + ',' + y;
+      const wall = level.walls.has(key);
+      const goal = level.goals.has(key);
+      const crate = crateAt(crates, x, y) >= 0;
+      const isP = player[0] === x && player[1] === y;
+      cells.push(
+        <div key={key} className={'cp-cell' + (wall ? ' wall' : '') + (goal ? ' goal' : '')}>
+          {crate ? <span className={'cp-crate' + (goal ? ' ongoal' : '')}>📦</span> : isP ? '🧍' : ''}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className="cp-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
+        <div className="pill"><div className="plabel">Room</div><div className="pvalue">#{levelIdx.current + 1}</div></div>
+      </div>
+      <div className="cp-grid" style={{ gridTemplateColumns: `repeat(${level.w}, 34px)` }}>{cells}</div>
+      <div className="cp-pad">
+        <div />
+        <button className="p6-btn" onClick={() => move(0, -1)}>▲</button>
+        <div />
+        <button className="p6-btn" onClick={() => move(-1, 0)}>◀</button>
+        <button className="p6-btn" onClick={() => move(0, 1)}>▼</button>
+        <button className="p6-btn" onClick={() => move(1, 0)}>▶</button>
+      </div>
+      <div className="an-actions">
+        <button className="p6-btn" onClick={undo} disabled={!hist.length}>↶ Undo</button>
+        <button className="p6-btn" onClick={restart}>⟲ Restart</button>
+      </div>
+      <div className="p6-hint">Push every crate onto a green pad. You can push one crate at a time — never pull.</div>
+    </div>
+  );
+}
+
+/* ---- Drop Stack (daily) ---------------------------------------------------------
+   Place today's fixed sequence of 40 falling pieces without topping out.
+   Turn-based: line up each piece, then drop it — same order for everyone. */
+
+const DS_W = 9, DS_H = 14, DS_PIECES = 40;
+const DS_SHAPES = [
+  { cells: [[0, 0], [1, 0], [2, 0], [3, 0]], color: '#38BDF8' },
+  { cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: '#FBBF24' },
+  { cells: [[0, 0], [1, 0], [2, 0], [1, 1]], color: '#A78BFA' },
+  { cells: [[1, 0], [2, 0], [0, 1], [1, 1]], color: '#34D399' },
+  { cells: [[0, 0], [1, 0], [1, 1], [2, 1]], color: '#FB7185' },
+  { cells: [[0, 0], [0, 1], [1, 1], [2, 1]], color: '#818CF8' },
+  { cells: [[2, 0], [0, 1], [1, 1], [2, 1]], color: '#F59E0B'  },
+];
+
+function dsSequence(rng) {
+  const seq = [];
+  while (seq.length < DS_PIECES) {
+    seq.push(...ceShuffle([0, 1, 2, 3, 4, 5, 6], rng));
+  }
+  return seq.slice(0, DS_PIECES);
+}
+
+// Rotate a shape's cells 90° clockwise `rot` times, normalized to (0,0).
+function dsCells(shapeIdx, rot) {
+  let cells = DS_SHAPES[shapeIdx].cells;
+  for (let k = 0; k < (rot % 4 + 4) % 4; k++) {
+    const maxY = Math.max(...cells.map(([, y]) => y));
+    cells = cells.map(([x, y]) => [maxY - y, x]);
+  }
+  const minX = Math.min(...cells.map(([x]) => x));
+  const minY = Math.min(...cells.map(([, y]) => y));
+  return cells.map(([x, y]) => [x - minX, y - minY]);
+}
+
+function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const seq = useRef(null);
+  if (!seq.current) seq.current = dsSequence(dailyRng(offset, 'dropstack'));
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+    ? savedProgress : null;
+  const [grid, setGrid] = useState(() =>
+    resumed ? resumed.grid.map((row) => row.slice()) : Array.from({ length: DS_H }, () => new Array(DS_W).fill(0))
+  );
+  const [pieceIdx, setPieceIdx] = useState(resumed && Number.isFinite(resumed.pieceIdx) ? resumed.pieceIdx : 0);
+  const [lines, setLines] = useState(resumed && Number.isFinite(resumed.lines) ? resumed.lines : 0);
+  const [points, setPoints] = useState(resumed && Number.isFinite(resumed.points) ? resumed.points : 0);
+  const [col, setCol] = useState(3);
+  const [rot, setRot] = useState(0);
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { grid, pieceIdx, lines, points, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: {
+        dayNum, grid: stateRef.current.grid, pieceIdx: stateRef.current.pieceIdx,
+        lines: stateRef.current.lines, points: stateRef.current.points,
+      },
+      steps: stateRef.current.pieceIdx, secs: stateRef.current.secs,
+    }),
+    !done
+  );
+
+  const shapeIdx = pieceIdx < DS_PIECES ? seq.current[pieceIdx] : 0;
+  const cells = dsCells(shapeIdx, rot);
+  const shapeW = Math.max(...cells.map(([x]) => x)) + 1;
+  const clampedCol = Math.min(Math.max(col, 0), DS_W - shapeW);
+
+  const canPlace = (g, atCol, yOff) =>
+    cells.every(([dx, dy]) => {
+      const x = atCol + dx, y = yOff + dy;
+      return x >= 0 && x < DS_W && y < DS_H && (y < 0 || g[y][x] === 0);
+    }) && cells.every(([, dy]) => yOff + dy >= 0);
+
+  const landingY = (g, atCol) => {
+    if (!canPlace(g, atCol, 0)) return -1;
+    let y = 0;
+    while (canPlace(g, atCol, y + 1)) y++;
+    return y;
+  };
+
+  const drop = () => {
+    if (done || pieceIdx >= DS_PIECES) return;
+    const g = grid.map((row) => row.slice());
+    const y = landingY(g, clampedCol);
+    const np = pieceIdx + 1;
+    if (y < 0) {
+      // Piece can't enter the well — topped out; the day is lost.
+      setDone(true);
+      onLose && onLose(pieceIdx, secs, {
+        share: `Game Corner Drop Stack — topped out after ${pieceIdx} pieces 🧱`,
+        answer: `The stack reached the top with ${DS_PIECES - pieceIdx} pieces left.`,
+      });
+      return;
+    }
+    for (const [dx, dy] of cells) g[y + dy][clampedCol + dx] = shapeIdx + 1;
+    let cleared = 0;
+    for (let r = DS_H - 1; r >= 0; r--) {
+      if (g[r].every((v) => v !== 0)) {
+        g.splice(r, 1);
+        g.unshift(new Array(DS_W).fill(0));
+        cleared++;
+        r++;
+      }
+    }
+    const gained = [0, 100, 250, 450, 700][cleared] || 0;
+    const nl = lines + cleared, npts = points + gained;
+    setGrid(g);
+    setPieceIdx(np);
+    setLines(nl);
+    setPoints(npts);
+    setRot(0);
+    setCol(3);
+    onStepChange(np);
+    const won = np >= DS_PIECES;
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g, pieceIdx: np, lines: nl, points: npts }, np, secs);
+    if (won) {
+      setDone(true);
+      const score = npts + 200 + nl * 10;
+      onWin(score, np, secs, {
+        share: `Game Corner Drop Stack — placed all ${DS_PIECES} pieces, ${nl} lines, ${npts + 200 + nl * 10} pts 🧱`,
+      });
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); setCol((c) => Math.max(c - 1, 0)); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); setCol((c) => Math.min(c + 1, DS_W - 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setRot((r) => r + 1); }
+      if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); drop(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const ghostY = landingY(grid, clampedCol);
+  const ghost = new Set();
+  const hover = new Set();
+  if (!done && pieceIdx < DS_PIECES) {
+    for (const [dx, dy] of cells) {
+      hover.add(dy * DS_W + (clampedCol + dx));
+      if (ghostY >= 0) ghost.add((ghostY + dy) * DS_W + (clampedCol + dx));
+    }
+  }
+  const nextIdx = pieceIdx + 1 < DS_PIECES ? seq.current[pieceIdx + 1] : null;
+
+  return (
+    <div className="ds-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">{Math.min(pieceIdx + 1, DS_PIECES)}/{DS_PIECES}</div></div>
+        <div className="pill"><div className="plabel">Lines</div><div className="pvalue">{lines}</div></div>
+        <div className="pill"><div className="plabel">Points</div><div className="pvalue">{points}</div></div>
+      </div>
+      <div className="ds-next">
+        Next: {nextIdx != null
+          ? dsCells(nextIdx, 0).map(([x, y], k) => (
+            <span key={k} className="ds-mini" style={{ background: DS_SHAPES[nextIdx].color, left: 42 + x * 10, top: 4 + y * 10 }} />
+          ))
+          : <span className="ds-last">last piece</span>}
+      </div>
+      <div className="ds-grid">
+        {grid.map((row, r) =>
+          row.map((v, c) => {
+            const i = r * DS_W + c;
+            const cls = ['ds-cell'];
+            let bg = v ? DS_SHAPES[v - 1].color : null;
+            if (!v && hover.has(i)) { cls.push('hover'); bg = DS_SHAPES[shapeIdx].color; }
+            else if (!v && ghost.has(i)) cls.push('ghost');
+            return (
+              <div
+                key={i}
+                className={cls.join(' ')}
+                style={bg ? { background: bg } : (ghost.has(i) && !v ? { borderColor: DS_SHAPES[shapeIdx].color } : undefined)}
+                onClick={() => setCol(Math.min(Math.max(c - Math.floor(shapeW / 2), 0), DS_W - shapeW))}
+              />
+            );
+          })
+        )}
+      </div>
+      <div className="ds-pad">
+        <button className="p6-btn" onClick={() => setCol((c) => Math.max(c - 1, 0))}>◀</button>
+        <button className="p6-btn" onClick={() => setRot((r) => r + 1)}>⟳ Rotate</button>
+        <button className="p6-btn" onClick={() => setCol((c) => Math.min(c + 1, DS_W - 1))}>▶</button>
+        <button className="p6-btn primary" onClick={drop}>⬇ Drop</button>
+      </div>
+      <div className="p6-hint">Line up each piece (tap the well or use ◀ ▶ ⟳), then Drop. Clear lines for points — top out and the day is lost.</div>
+    </div>
+  );
+}
+
+// Each entry also carries the Game Corner harness `manifest` (phase 2),
+// mirrored by id in server.js's GAME_REGISTRY — machine-relevant fields
+// (scoreDirection / tieBreak / sessionLength / input / undo) must match the
+// server; `howToPlay` card copy lives ONLY here (display strings are the
+// client's). Phase 3's shell-owned pre-game chrome renders these cards; until
+// then they're declarative metadata.
 const GAMES = [
   {
     id: 'sudoku',
@@ -18091,7 +17551,13 @@ const GAMES = [
     daily: true,
     desc: 'Fill the 6×6 grid so every row, column, and box has 1–6.',
     tag: 'Logic',
-    tagColor: C.accent,
+    tagColor: GA.sky,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Fill the grid', body: 'Tap a cell, then pick a number 1–6. Every row, column, and 2×3 box must contain each number exactly once.' },
+      { title: 'Change your mind freely', body: 'Tap a filled cell to overwrite it — wrong entries cost steps, not the game.' },
+      { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone gets the same board today.' },
+    ],
     component: SudokuGame,
   },
   {
@@ -18103,19 +17569,31 @@ const GAMES = [
     daily: true,
     desc: 'Find every hidden word in the letter grid.',
     tag: 'Word',
-    tagColor: C.violet,
+    tagColor: GA.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag', undo: 'none' },
+    howToPlay: [
+      { title: 'Find the words', body: 'Drag across the letter grid to select a word — horizontally, vertically, or diagonally, forwards or backwards.' },
+      { title: 'Clear the list', body: 'Find every listed word to solve the puzzle. Stray drags count as steps, so aim carefully.' },
+      { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone hunts the same grid today.' },
+    ],
     component: WordHuntGame,
   },
   {
     id: 'cryptowordle',
-    name: 'Crypto Wordle',
+    name: 'Daily Cipher',
     icon: '🟩',
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Solve a daily stack of crypto words — clues unlock as you go, or buy a hint.',
-    tag: 'Web3',
-    tagColor: C.emerald,
+    desc: 'Decode a daily stack of crypto-vocabulary words — clues unlock as you go, or use a free hint.',
+    tag: 'Words',
+    tagColor: GA.teal,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
+    howToPlay: [
+      { title: 'Guess the word', body: 'Type a guess and submit. Green = right letter, right spot; gold = right letter, wrong spot.' },
+      { title: 'Work the stack', body: "Today's puzzle is a stack of crypto words — solve one to unlock the next. Clues unlock as you go, and free hints are capped per day." },
+      { title: 'Careful', body: 'Run out of guesses on any word and the day is lost — the board locks until the next UTC reset.' },
+    ],
     component: CryptoWordleGame,
   },
   {
@@ -18124,9 +17602,14 @@ const GAMES = [
     icon: '💣',
     category: 'classic',
     shell: 'classic',
-    desc: 'Clear the 8×8 grid of mines. Cash Out early to lock in a risk multiplier.',
+    desc: 'Clear the 8×8 grid of mines. Lock In early to bank a risk multiplier.',
     tag: 'Risk',
-    tagColor: C.rose,
+    tagColor: GA.coral,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Clear the field', body: 'Tap to reveal a cell; numbers tell you how many mines touch it. Long-press to flag suspected mines.' },
+      { title: 'Lock in or push on', body: 'Lock In early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
+    ],
     component: MinesweeperGame,
   },
   {
@@ -18137,7 +17620,12 @@ const GAMES = [
     shell: 'classic',
     desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
     tag: 'Strategy',
-    tagColor: C.gold,
+    tagColor: GA.amber,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Sow your stones', body: 'Tap one of your pits to scoop its stones and drop them one-by-one counter-clockwise. Landing in your store banks a stone and earns another turn.' },
+      { title: 'Capture', body: 'Land your last stone in an empty pit on your side to capture it plus everything opposite. Most stones banked when a side empties wins.' },
+    ],
     component: MancalaGame,
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
@@ -18150,7 +17638,12 @@ const GAMES = [
     shell: 'classic',
     desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
     tag: 'Board',
-    tagColor: C.emerald,
+    tagColor: GA.lime,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; chutes drop you back.' },
+      { title: 'First to 100 wins', body: 'Play the bot, a hotseat friend, or online via room code. Win streaks climb the leaderboard.' },
+    ],
     component: ChutesLaddersGame,
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
@@ -18166,7 +17659,12 @@ const GAMES = [
     shell: 'classic',
     desc: 'Slide tiles to merge numbers and reach 2048.',
     tag: 'Numbers',
-    tagColor: C.emerald,
+    tagColor: GA.amber,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'swipe', undo: 'none' },
+    howToPlay: [
+      { title: 'Slide and merge', body: 'Swipe to slide every tile. Two matching tiles merge into their sum — chase 2048 and beyond.' },
+      { title: "Don't jam the board", body: 'A new tile appears after every move. The run ends when no merges are left.' },
+    ],
     component: T2048Game,
     modes: ['solo', 'online'],
     preLaunchModal: true,
@@ -18180,7 +17678,12 @@ const GAMES = [
     shell: 'classic',
     desc: "Move a chess knight to visit all 64 squares exactly once.",
     tag: 'Puzzle',
-    tagColor: C.violet,
+    tagColor: GA.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Tour the board', body: 'Move the knight in its L-shape to squares it has never visited. Visit all 64 exactly once for a full tour.' },
+      { title: 'Undo freely', body: 'Stuck? Step back with Undo and try a different route — longer tours score higher.' },
+    ],
     component: KnightsTourGame,
   },
   {
@@ -18191,7 +17694,12 @@ const GAMES = [
     shell: 'self',
     desc: 'Swipe to steer, eat to grow, and chase a high score without crashing.',
     tag: 'Arcade',
-    tagColor: C.emerald,
+    tagColor: GA.lime,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    howToPlay: [
+      { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. Eat food to grow and score.' },
+      { title: 'Stay alive', body: 'Hitting a wall or your own tail ends the run. Longer snakes and faster modes score more.' },
+    ],
     component: SnakeGame,
   },
   {
@@ -18202,7 +17710,12 @@ const GAMES = [
     shell: 'self',
     desc: 'Drag blocks onto the grid and clear full lines. How long can you last?',
     tag: 'Puzzle',
-    tagColor: C.accent,
+    tagColor: GA.sky,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'drag', undo: 'none' },
+    howToPlay: [
+      { title: 'Place the pieces', body: 'Drag each offered block onto the grid anywhere it fits. Fill a full row or column to clear it.' },
+      { title: 'Keep space open', body: 'The run ends when no offered piece fits. Multi-line clears and combos score big.' },
+    ],
     component: BlockBlastGame,
     modes: ['solo', 'online'],
     preLaunchModal: true,
@@ -18216,21 +17729,13 @@ const GAMES = [
     shell: 'self',
     desc: 'Swap gems to line up 3+ and cascade your way to the target score.',
     tag: 'Match',
-    tagColor: C.rose,
+    tagColor: GA.coral,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Swap to match', body: 'Tap two adjacent gems to swap them. Line up 3 or more of a kind to clear them.' },
+      { title: 'Chase cascades', body: 'Cleared gems drop new ones — chains cascade for bonus points. Hit the target score before time runs out.' },
+    ],
     component: DiamondRushGame,
-  },
-  {
-    id: 'texas',
-    name: "Texas Hold 'Em",
-    icon: '🃏',
-    category: 'classic',
-    shell: 'self',
-    desc: 'Heads-up poker vs the computer. Bet smart and take all the chips.',
-    tag: 'Cards',
-    tagColor: C.gold,
-    component: TexasHoldemGame,
-    modes: ['bot'],
-    supportsSave: true,
   },
   {
     id: 'tilematching',
@@ -18240,7 +17745,12 @@ const GAMES = [
     shell: 'classic',
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
-    tagColor: C.accent,
+    tagColor: GA.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'booster' },
+    howToPlay: [
+      { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind in the bar clear automatically.' },
+      { title: 'Mind the bar', body: 'If the bar fills with no match, the round is lost. Undo, shuffle, and clear-slot boosters are limited — spend them wisely.' },
+    ],
     component: TileMatchingGame,
   },
   {
@@ -18251,18 +17761,28 @@ const GAMES = [
     shell: 'classic',
     desc: "Smash every brick with a bouncing ball. Don't let it fall — climb the leaderboard.",
     tag: 'Arcade',
-    tagColor: C.rose,
+    tagColor: GA.coral,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'drag', undo: 'none' },
+    howToPlay: [
+      { title: 'Keep it up', body: 'Drag the paddle to keep the ball in play and smash every brick.' },
+      { title: 'Clear the wall', body: 'Some bricks take multiple hits. Lose the ball and the run ends — full clears score best.' },
+    ],
     component: BounceGame,
   },
   {
     id: 'zuma',
-    name: 'Zuma',
+    name: 'Marble Loop',
     icon: '🐸',
     category: 'classic',
     shell: 'classic',
     desc: 'Shoot colored balls to match 3 in a row before the chain reaches the skull.',
     tag: 'Arcade',
-    tagColor: C.emerald,
+    tagColor: GA.teal,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Shoot to match', body: 'Aim and tap to fire a colored ball into the moving chain. Three or more of a color clear.' },
+      { title: 'Beat the chain', body: 'Clear the whole chain before it reaches the skull. Gaps and combos multiply your score.' },
+    ],
     component: ZumaGame,
   },
   {
@@ -18273,7 +17793,12 @@ const GAMES = [
     shell: 'classic',
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
-    tagColor: C.gold,
+    tagColor: GA.amber,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Swap to match', body: 'Tap two adjacent pieces to swap. Match 3+ to clear them and rack up points.' },
+      { title: 'Beat each level', body: 'Every level has a target score under move and time limits. 50 levels — progress saves as you go.' },
+    ],
     component: Match3Game,
   },
   {
@@ -18283,10 +17808,106 @@ const GAMES = [
     category: 'classic',
     shell: 'self',
     desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
-    tag: 'Crypto',
-    tagColor: C.gold,
+    tag: 'Arcade',
+    tagColor: GA.plum,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    howToPlay: [
+      { title: 'Dodge and collect', body: 'Steer your miner between lanes — grab hash tokens, dodge the invalid blocks.' },
+      { title: 'Survive', body: 'The chain speeds up the longer you last. One collision ends the run.' },
+    ],
     component: HashRushGame,
     leaderboard: true,
+  },
+  // Phase 5 board games — online head-to-head over classic_rooms; the server
+  // referees every move (rules modules in lib/board-rules.js) and wins settle
+  // on the rating ladder.
+  {
+    id: 'checkers',
+    name: 'Checkers',
+    icon: '⛃',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Classic draughts vs a friend online — jump, chain captures, crown your kings.',
+    tag: 'Board',
+    tagColor: GA.coral,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Move diagonally', body: 'Tap your piece, then a dark square ahead of it. Jump over an adjacent enemy piece to capture it.' },
+      { title: 'Chain your jumps', body: 'After a capture, the same piece may keep jumping while captures are available.' },
+      { title: 'Crown kings', body: 'Reach the far row to crown a king — kings move and capture in all four diagonals. Take every enemy piece (or leave them no move) to win.' },
+    ],
+    component: CheckersGame,
+    modes: ['online'],
+  },
+  {
+    id: 'reversi',
+    name: 'Reversi',
+    icon: '⚫',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Flip your way to a majority — outflank your opponent online.',
+    tag: 'Board',
+    tagColor: GA.teal,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Outflank to flip', body: 'Place a disc so a straight line of enemy discs is trapped between yours — they all flip to your color.' },
+      { title: 'Every move must flip', body: 'You can only play cells that flip at least one disc. No legal move? Your turn passes automatically.' },
+      { title: 'Majority wins', body: 'When neither player can move, the most discs on the board wins.' },
+    ],
+    component: ReversiGame,
+    modes: ['online'],
+  },
+  {
+    id: 'fourinarow',
+    name: 'Four in a Row',
+    icon: '🔴',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Drop discs and line up four before your opponent does.',
+    tag: 'Board',
+    tagColor: GA.sky,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Drop a disc', body: 'Tap a column — your disc falls to the lowest empty slot.' },
+      { title: 'Line up four', body: 'Four of your discs in a row — across, down, or diagonally — wins. A full board with no line is a draw.' },
+    ],
+    component: FourInARowGame,
+    modes: ['online'],
+  },
+  {
+    id: 'gomoku',
+    name: 'Gomoku',
+    icon: '⚪',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Five stones in a row on a 15×15 board — pure placement strategy.',
+    tag: 'Board',
+    tagColor: GA.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Take turns placing stones', body: 'Tap any empty intersection to place a stone. Stones never move once placed.' },
+      { title: 'Five in a row wins', body: 'First to line up five (or more) stones — across, down, or diagonally — wins the game.' },
+    ],
+    component: GomokuGame,
+    modes: ['online'],
+  },
+  {
+    id: 'ludo',
+    name: 'Ludo',
+    icon: '🎲',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Race all four tokens home — roll sixes, capture rivals, play it safe on the stars.',
+    tag: 'Board',
+    tagColor: GA.lime,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Roll, then move', body: 'Roll the die, then tap a highlighted token. You need a 6 to leave base — and a 6 earns another roll.' },
+      { title: 'Capture and stay safe', body: "Land on an opponent's token to send it back to base. Star cells are safe — no captures there." },
+      { title: 'Bring all four home', body: 'Race around the board into your home column. You need an exact roll to finish each token; first with all four home wins.' },
+    ],
+    component: LudoGame,
+    modes: ['online'],
   },
   {
     id: 'tilematchingdaily',
@@ -18297,273 +17918,163 @@ const GAMES = [
     daily: true,
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',
     tag: 'Puzzle',
-    tagColor: C.accent,
+    tagColor: GA.teal,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'booster' },
+    howToPlay: [
+      { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind clear automatically.' },
+      { title: 'Beat the clock', body: 'Clear the whole layered board in 3 minutes. A full bar with no match loses the day.' },
+      { title: 'Boosters', body: 'Undo, shuffle, and clear-slot are limited per day — everyone plays the same board, so spend them wisely.' },
+    ],
     component: TileMatchingDailyGame,
   },
+  // Phase 6 Lane A dailies — shared card/tile engine games. All daily,
+  // shell 'daily', tier B server-side (see GAME_REGISTRY). Names follow the
+  // spec's IP-hygiene rules: generic public-domain game names only.
   {
-    id: 'idle',
-    name: 'Idle Empire',
-    icon: '🐹',
-    category: 'classic',
-    shell: 'classic',
-    desc: 'Tap, upgrade, and build your hamster empire with prestige rewards.',
-    tag: 'Idle',
-    tagColor: C.gold,
-    component: IdleGame,
+    id: 'klondike',
+    name: 'Klondike Solitaire',
+    icon: '🃏',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'The classic patience deal — everyone plays the same shuffle today.',
+    tag: 'Cards',
+    tagColor: GA.sky,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Build down, alternate colors', body: 'Tap a face-up card, then its destination. Tableau piles build downward in alternating colors; only a King moves to an empty column.' },
+      { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
+      { title: 'Score', body: 'Fill all four foundations to win. Fewer moves and faster solves score higher — same deal for everyone today.' },
+    ],
+    component: KlondikeGame,
   },
   {
-    id: 'pvp-arena',
-    name: 'PvP Arena',
-    icon: '⚔️',
-    category: 'classic',
-    shell: 'custom',
-    desc: 'Stake MATCH and compete head-to-head. Winner takes 90% of the pot.',
-    tag: 'Wager',
-    tagColor: C.rose,
-    component: () => null,
+    id: 'spider',
+    name: 'Spider Solitaire',
+    icon: '🕷️',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'One-suit spider: build eight King-to-Ace runs to clear the board.',
+    tag: 'Cards',
+    tagColor: GA.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Move descending runs', body: 'Tap a face-up card to pick up it and the run below, then tap a column whose top card is one rank higher (or any empty column).' },
+      { title: 'Complete runs', body: 'A full King-to-Ace run clears off the board. Clear eight runs to win. Deal a fresh row of ten from the stock when you\'re stuck.' },
+      { title: 'Score', body: 'Fewer moves and faster clears score higher. Everyone gets the same 104-card deal today.' },
+    ],
+    component: SpiderGame,
+  },
+  {
+    id: 'mahjongsol',
+    name: 'Mahjong Solitaire',
+    icon: '🎴',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Clear the layered tile pyramid by pairing free matching tiles.',
+    tag: 'Tiles',
+    tagColor: GA.teal,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'booster' },
+    howToPlay: [
+      { title: 'Pair free tiles', body: 'A tile is free when nothing rests on top of it and its left or right side is open. Tap two matching free tiles to clear them.' },
+      { title: 'Plan your order', body: 'Today\'s deal is always solvable in at least one order — but a careless order can dead-end you. Two shuffles are your safety net.' },
+      { title: 'Score', body: 'Clear all 60 tiles to win. Faster clears with unused shuffles score higher; run out of moves and shuffles and the day is lost.' },
+    ],
+    component: MahjongSolitaireGame,
+  },
+  {
+    id: 'nonogram',
+    name: 'Nonogram',
+    icon: '🖼️',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Fill the 8×8 grid so every row and column matches its number clues.',
+    tag: 'Logic',
+    tagColor: GA.plum,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Read the clues', body: 'Each number is a run of filled cells in that row or column, in order, with at least one gap between runs.' },
+      { title: 'Fill and mark', body: 'Use ⬛ Fill for cells you\'re sure of and ✗ Mark for cells that must stay empty. Both toggle freely — mistakes cost steps, not the day.' },
+      { title: 'Score', body: 'The puzzle solves when every clue is satisfied. Fewer taps and faster solves score higher.' },
+    ],
+    component: NonogramGame,
+  },
+  {
+    id: 'minefinder',
+    name: 'Mine Finder',
+    icon: '🚩',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Sweep the daily minefield — one wrong tap ends the day.',
+    tag: 'Risk',
+    tagColor: GA.coral,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Count the numbers', body: 'Each number counts the mines touching that cell. A safe opening area is revealed for you — work outward from it.' },
+      { title: 'Flag suspects', body: 'Toggle 🚩 Flag mode to mark cells you believe are mines. Flagged cells can\'t be revealed by a stray tap.' },
+      { title: 'Careful', body: 'Reveal all 71 safe cells to win. Tap a mine and the day is lost — everyone sweeps the same field today.' },
+    ],
+    component: MineFinderGame,
+  },
+  {
+    id: 'anagrams',
+    name: 'Anagram Sprint',
+    icon: '🔀',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Unscramble five words back-to-back against the clock.',
+    tag: 'Word',
+    tagColor: GA.amber,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Rebuild the word', body: 'Tap the scrambled letters in order to build your answer; tap a slot (or ⌫) to take a letter back.' },
+      { title: 'Five in a row', body: 'Solve all five words — two 5-letter, two 6-letter, and one 7-letter. Wrong submissions cost tries, never the day.' },
+      { title: 'Score', body: 'Fewer tries and faster sprints score higher. Everyone unscrambles the same five words today.' },
+    ],
+    component: AnagramsGame,
+  },
+  {
+    id: 'cratepush',
+    name: 'Crate Push',
+    icon: '📦',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Push every crate onto a goal pad in today\'s warehouse.',
+    tag: 'Puzzle',
+    tagColor: GA.lime,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Push, never pull', body: 'Move with the arrows (or arrow keys). Walking into a crate pushes it one cell — you can\'t pull, and you can\'t push two at once.' },
+      { title: 'Don\'t get cornered', body: 'A crate shoved against a wall corner may be stuck for good. Undo steps back freely, or Restart the room.' },
+      { title: 'Score', body: 'Park every crate on a green pad to win. Fewer moves and faster solves score higher.' },
+    ],
+    component: CratePushGame,
+  },
+  {
+    id: 'dropstack',
+    name: 'Drop Stack',
+    icon: '🧊',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Place today\'s fixed sequence of 40 falling pieces without topping out.',
+    tag: 'Puzzle',
+    tagColor: GA.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Line up, then drop', body: 'Move the hovering piece with ◀ ▶ (or tap the well), rotate with ⟳, then hit Drop. Pieces fall instantly — no timer pressure.' },
+      { title: 'Clear lines', body: 'Complete a full row to clear it: 100 points for one line, up to 700 for four at once.' },
+      { title: 'Survive the sequence', body: 'Everyone gets the same 40-piece order today. Place them all to win; stack past the top and the day is lost.' },
+    ],
+    component: DropStackGame,
   },
 ];
-
-/* ============================================================
-   Social: Feed & Posts
-   ============================================================ */
-
-function FeedScreen({ user, setScreen }) {
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedPostId, setSelectedPostId] = useState(null);
-
-  useEffect(() => {
-    const loadFeed = async () => {
-      const { ok, body } = await api('/api/posts/feed?limit=20&offset=0');
-      if (ok && body) setPosts(body.posts || []);
-      setLoading(false);
-    };
-    loadFeed();
-    // Pause background polling while a post is open — no reason to refetch
-    // the whole feed list behind a detail view the user is actively reading.
-    if (selectedPostId) return;
-    const id = setInterval(loadFeed, 10000);
-    return () => clearInterval(id);
-  }, [selectedPostId]);
-
-  if (selectedPostId) {
-    const post = posts.find(p => p.id === selectedPostId);
-    if (post) {
-      return (
-        <PostDetail
-          post={post}
-          onBack={() => setSelectedPostId(null)}
-        />
-      );
-    }
-  }
-
-  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading feed...</div>;
-
-  const gameNameMap = {};
-  GAMES.forEach(g => gameNameMap[g.id] = g);
-
-  return (
-    <div className="lobby" style={{ maxWidth: '600px' }}>
-      {posts.length === 0 ? (
-        <div style={{ textAlign: 'center', color: C.muted, padding: '2rem' }}>
-          <p>No posts yet. Play a game and share your wins!</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {posts.map(p => {
-            const game = gameNameMap[p.gameId];
-            return (
-              <div
-                key={p.id}
-                className="card"
-                style={{ cursor: 'pointer', '--accent': game?.tagColor || C.accent }}
-                onClick={() => setSelectedPostId(p.id)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <div style={{
-                    width: '1.8rem', height: '1.8rem', borderRadius: '50%',
-                    background: C.accent, color: '#fff', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: '600'
-                  }}>
-                    {(p.username || 'U')[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{p.username}</div>
-                    <div style={{ fontSize: '0.75rem', color: C.muted }}>
-                      {p.createdAt ? new Date(p.createdAt).toLocaleString() : 'now'}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '1.2rem' }}>{game?.icon || '🎮'}</span>
-                  <span style={{ fontWeight: '600' }}>{game?.name || p.gameId}</span>
-                </div>
-                <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  {p.score} pts
-                </div>
-                {p.caption && <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>{p.caption}</div>}
-                <div style={{ fontSize: '0.8rem', color: C.muted }}>
-                  💬 {p.commentCount} comment{p.commentCount !== 1 ? 's' : ''}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PostDetail({ post, onBack }) {
-  const [comments, setComments] = useState([]);
-  const [commentText, setCommentText] = useState('');
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadPost = async () => {
-      const { ok: userOk, body: userData } = await api('/api/daily');
-      if (userOk) setUser(userData.user);
-
-      const { ok, body } = await api(`/api/posts/${post.id}/comments?limit=50&offset=0`);
-      if (ok && body) setComments(body.comments || []);
-      setLoading(false);
-    };
-    loadPost();
-  }, [post.id]);
-
-  const addComment = async () => {
-    if (!commentText.trim()) return;
-    const { ok, body } = await api(`/api/posts/${post.id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ text: commentText }),
-    });
-    if (ok && body) {
-      setComments(prev => [body, ...prev]);
-      setCommentText('');
-    }
-  };
-
-  const deleteComment = async (commentId) => {
-    const { ok } = await api(`/api/posts/${post.id}/comments/${commentId}`, {
-      method: 'DELETE',
-    });
-    if (ok) {
-      setComments(prev => prev.filter(c => c.id !== commentId));
-    }
-  };
-
-  const gameNameMap = {};
-  GAMES.forEach(g => gameNameMap[g.id] = g);
-  const game = gameNameMap[post.gameId];
-
-  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
-
-  return (
-    <div className="game-wrap">
-      <button className="back-btn" onClick={onBack}>← Back</button>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <div style={{
-              width: '2rem', height: '2rem', borderRadius: '50%',
-              background: C.accent, color: '#fff', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', fontWeight: '600'
-            }}>
-              {(post.username || 'U')[0].toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontWeight: '600' }}>{post.username}</div>
-              <div style={{ fontSize: '0.8rem', color: C.muted }}>
-                {post.createdAt ? new Date(post.createdAt).toLocaleString() : 'now'}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '1.5rem' }}>{game?.icon || '🎮'}</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: '600' }}>{game?.name || post.gameId}</span>
-          </div>
-          <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', fontSize: '1.1rem', marginBottom: '0.75rem' }}>
-            {post.score} pts{post.timeSecs ? ` · ${Math.floor(post.timeSecs / 60)}:${String(post.timeSecs % 60).padStart(2, '0')}` : ''}
-          </div>
-          {post.caption && <div style={{ fontSize: '0.95rem', marginTop: '0.75rem' }}>{post.caption}</div>}
-        </div>
-
-        <div style={{ marginTop: '2rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Comments ({comments.length})</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            {comments.map(c => (
-              <div key={c.id} className="card" style={{ padding: '0.8rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.username}</div>
-                    <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.4rem' }}>
-                      {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'now'}
-                    </div>
-                    <div style={{ fontSize: '0.9rem' }}>{c.text}</div>
-                  </div>
-                  {user && user.id === c.userId && (
-                    <button
-                      onClick={() => deleteComment(c.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: C.rose,
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        marginLeft: '0.5rem',
-                      }}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
-              placeholder="Add a comment..."
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value.slice(0, 280))}
-              onKeyDown={(e) => e.key === 'Enter' && addComment()}
-              style={{
-                flex: 1,
-                padding: '0.6rem 0.8rem',
-                background: C.card,
-                border: `1px solid ${C.border}`,
-                borderRadius: '10px',
-                color: C.text,
-                fontFamily: 'inherit',
-                fontSize: '0.9rem',
-                outline: 'none',
-              }}
-            />
-            <button
-              onClick={addComment}
-              style={{
-                padding: '0.6rem 1rem',
-                background: C.accent,
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-              }}
-            >
-              Reply
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ============================================================
    Root app
@@ -18670,14 +18181,13 @@ function BadgesPlaceholder({ state, onRetry }) {
 
 function App() {
   const [screen, setScreen] = useState(() => {
-    // Support ?screen=wallet / ?screen=session deep links for testing
+    // Support ?screen=account / ?screen=session deep links for testing
     const params = new URLSearchParams(window.location.search);
     const s = params.get('screen');
-    if (s === 'wallet') return 'wallet';
     if (s === 'account') return 'account';
     if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'wallet' | 'account' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'account' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
   const [receiptSessionId, setReceiptSessionId] = useState(() => {
@@ -18713,11 +18223,35 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
-  // Lobby tab: 'daily', 'classic', 'idle', 'pvp', or 'feed' — initialized from ?tab= URL param
+  // Lobby view (phase 7 home reorg): 'home' is the single scrolling home
+  // (GotD hero → in-progress → all games); 'ladder' is the one remaining
+  // sub-screen. Legacy ?tab=daily/classic/feed deep links land on home (the
+  // Community Feed was retired — chat, share cards, and Friends boards are
+  // the social surface now).
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'idle' ? 'idle' : t === 'pvp' ? 'pvp' : t === 'feed' ? 'feed' : 'daily';
+    return t === 'ladder' ? 'ladder' : 'home';
   });
+  // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
+  const [featured, setFeatured] = useState(null);
+  // The viewer's active online matches (your-turn row), from /api/rooms/mine.
+  const [myRooms, setMyRooms] = useState([]);
+  // Game whose public chat room is open (null = closed).
+  const [chatGame, setChatGame] = useState(null);
+  // Phase 8 "make it count": banner shown after a pending anonymous run was
+  // retroactively committed on an authenticated load.
+  const [commitNotice, setCommitNotice] = useState(null);
+  // What's-new sheet + the dismissible "New this week" strip. The strip shows
+  // until this browser has dismissed the NEWEST changelog entry (per-device
+  // state, like the how-to first-open tracking).
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [wnDismissed, setWnDismissed] = useState(() => {
+    try { return localStorage.getItem(WHATSNEW_SEEN_KEY) === CHANGELOG[0].id; } catch { return false; }
+  });
+  const dismissWhatsNew = () => {
+    setWnDismissed(true);
+    try { localStorage.setItem(WHATSNEW_SEEN_KEY, CHANGELOG[0].id); } catch {}
+  };
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Classic Games — Game Menu state. `classicGameMode` is the active mode of
@@ -18729,30 +18263,87 @@ function App() {
   const [classicLastResult, setClassicLastResult] = useState(null);
   // Pre-launch game-mode modal (multi-mode classic games, e.g. 2048 / Block Blast)
   const [preLaunchGame, setPreLaunchGame] = useState(null);
+  // Shell-owned chrome (phase 3): all-time personal bests per daily game
+  // (from /api/daily), and the game whose How-to-Play modal is open (null =
+  // closed). The modal renders above every screen/shell.
+  const [bests, setBests] = useState({});
+  const [howToGame, setHowToGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
-  // Wallet state (app-level so PvP and nav share one source)
+  // Wallet identity state (linked/verified address shown on the Account screen)
   const [walletAddr, setWalletAddr] = useState(null);
-  const [walletBalance, setWalletBalance] = useState(null); // wei string
-  const [walletMock, setWalletMock] = useState(true);
-  // Global off-chain MATCH token balance, shown in the nav and spent on hints.
-  const [matchBalance, setMatchBalance] = useState(null); // integer, null = loading
   // Share modal for posting wins to feed
-  const [shareModal, setShareModal] = useState({ show: false, caption: '' });
   // Badges section toggle (mobile: collapsed by default)
   const [badgesOpen, setBadgesOpen] = useState(false);
-  // dApps-integration availability. Disabled (e.g. staging with an empty
-  // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
-  // gracefully alongside the server.
-  const [integration, setIntegration] = useState({ enabled: false, pubkey: null });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
+  // Per-run daily move log (phase 2). Every daily game feeds move events with
+  // client timestamps into this ref — the Daily Tile Match via its native
+  // onMoveTile (engine-shaped { tileType } moves, replay-eligible), the other
+  // dailies via their onStepChange calls (timestamp-only events for the
+  // server's tier-B timing heuristics). `replayOk` goes false when the run
+  // can't be fully replayed server-side: a resume (earlier moves predate this
+  // mount) or a booster (not modeled by the replay engine). Submitted with
+  // /finish; reset by launchGame so a retry re-sends the same log.
+  const dailyRunLog = useRef({ moves: [], replayOk: true });
+  const recordDailyMove = (m) => {
+    const log = dailyRunLog.current;
+    if (m && m.replayBreak) log.replayOk = false;
+    if (log.moves.length < 800) {
+      log.moves.push({ ...m, tsClient: m && m.tsClient != null ? m.tsClient : Date.now() });
+    }
+  };
+
   // Hydrate today's locked/result state from the server on mount, and
   // recompute the score from finished attempts so it survives reloads.
+  // Phase 8 "make it count": on an authenticated load, retroactively commit
+  // any SAME-DAY pending anonymous runs through POST /api/daily/:gameId/commit
+  // (full validation parity with normal finishes), then clear the local slot.
+  // Expired (410), already-played (409), or invalid (400) runs are discarded —
+  // boards freeze at midnight UTC and a signed-in run always stands. Server
+  // hiccups keep the run for a retry on the next load.
+  const commitPendingRuns = async (daily) => {
+    const runs = loadPendingRuns();
+    const ids = Object.keys(runs);
+    if (!ids.length) return;
+    const serverDayNum = Math.floor(new Date(daily.serverNowUtc).getTime() / 86400000);
+    for (const gid of ids) {
+      const run = runs[gid];
+      const game = GAMES.find((g) => g.id === gid);
+      if (!run || !game || run.dayNum !== serverDayNum || !(run.score > 0)) {
+        clearPendingRun(gid);
+        continue;
+      }
+      if (daily.attempts && daily.attempts[gid] && daily.attempts[gid].finishedAt) {
+        clearPendingRun(gid); // already played signed-in — that run stands
+        continue;
+      }
+      try {
+        const { ok, status, body } = await api(`/api/daily/${gid}/commit`, {
+          method: 'POST',
+          body: JSON.stringify({
+            seed: run.seed, score: run.score, steps: run.steps, timeSecs: run.secs,
+            moves: Array.isArray(run.moves) ? run.moves : [],
+            replay: run.replay === true,
+          }),
+        });
+        if (ok && body && body.attempt) {
+          setAttempts((prev) => ({ ...prev, [gid]: body.attempt }));
+          if (typeof body.streak === 'number') setStreak(body.streak);
+          setTotalScore((t) => t + (body.attempt.score || 0));
+          setCommitNotice(`✅ Your guest ${game.name} run now counts — you're on today's board!`);
+          clearPendingRun(gid);
+        } else if (Number.isFinite(status) && status !== 500 && status !== 0) {
+          clearPendingRun(gid);
+        }
+      } catch {}
+    }
+  };
+
   const loadDaily = async () => {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
@@ -18760,6 +18351,7 @@ function App() {
     const { ok, status, body } = await api(path);
     if (ok && body) {
       setBadgeLoadState('ok');
+      GUEST_MODE = false;
       setAuthOk(true);
       setUser(body.user || null);
       setAttempts(body.attempts || {});
@@ -18770,45 +18362,98 @@ function App() {
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
         ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
         : { types: [], milestones: [] });
+      // Server-issued daily seeds — must land before any daily game mounts
+      // (they do: games launch from the lobby, which renders after loading).
+      SERVER_DAILY_SEEDS = body.seeds || {};
+      setBests(body.bests || {});
+      setFeatured(body.featured || null);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
       setTotalScore(sum);
+      // Phase 8 "make it count": commit any same-day pending anonymous runs
+      // now that we're authenticated. Fire-and-forget; state merges on success.
+      commitPendingRuns(body);
     } else {
       // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
       // so persistence isn't guaranteed — reflect that in the nav.
       // Distinguish "signed out" (401) from a transient backend failure so the
       // badge slot can explain the empty space instead of rendering nothing.
       setBadgeLoadState(status === 401 ? 'signedout' : 'error');
+      GUEST_MODE = true;
       setAuthOk(false);
       setUser(null);
       setStreak(0);
       setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [] });
+      // Signed-out (or backend hiccup): the public read surface still supplies
+      // server time, the reset countdown, and today's board seeds, so the
+      // signed-out lobby stays anchored to server time.
+      try {
+        const pub = await api('/api/public/daily');
+        if (pub.ok && pub.body) {
+          SERVER_DAILY_SEEDS = pub.body.seeds || {};
+          if (pub.body.nextResetUtc) setNextResetUtc(pub.body.nextResetUtc);
+          if (pub.body.serverNowUtc) setOffset(new Date(pub.body.serverNowUtc).getTime() - Date.now());
+          if (pub.body.featured) setFeatured(pub.body.featured);
+        }
+      } catch {}
     }
     setLoading(false);
   };
 
   useEffect(() => { loadDaily(); }, []);
 
-  // Global MATCH token balance for the nav chip + hint spending. Re-fetchable so
-  // the chip refreshes when returning to the lobby after a Tile Match earn/spend.
-  const loadMatchBalance = React.useCallback(async () => {
-    const { ok, body } = await api('/api/tilematch/wallet');
-    if (ok && body && Number.isFinite(body.balance)) setMatchBalance(body.balance);
-  }, []);
-  useEffect(() => { loadMatchBalance(); }, [loadMatchBalance]);
-
-  // dApps-integration status. Degrades gracefully: a failed/absent response
-  // leaves the feature disabled (chip stays hidden) rather than erroring.
+  // Home in-progress row (phase 7): the viewer's active online matches.
+  // Refetched on every return to the lobby so a just-made move updates the
+  // your-turn flag without waiting for a reload.
   useEffect(() => {
-    api('/api/integration/status')
+    if (loading || !authOk || screen !== 'lobby') return;
+    api('/api/rooms/mine')
+      .then(({ ok, body }) => { if (ok && body) setMyRooms(body.rooms || []); })
+      .catch(() => {});
+  }, [loading, authOk, screen]);
+
+  // ?demo=makeitcount: render the anonymous end screen (score + would-be rank
+  // + "make it count" CTA) without an actual signed-out session, so proposal
+  // checks can assert on it. The server side of this param seeds today's
+  // boards (same fixture as demo=leaderboard) so the rank-preview has real
+  // ranks to compute against. Available in every environment — it's an
+  // explicit opt-in demo param, not an env-gated code path.
+  useEffect(() => {
+    if (loading) return;
+    if (new URLSearchParams(window.location.search).get('demo') !== 'makeitcount') return;
+    const g = GAMES.find((x) => x.id === 'sudoku');
+    if (!g) return;
+    setCurrentGame(g);
+    setScreen('game');
+    setWinData({
+      score: 905, bonus: 0, finalScore: 905, steps: 21, timeSecs: 95,
+      multiplier: 1, effectiveStreak: 0,
+      guest: true, guestSaved: false, gameId: 'sudoku',
+      share: `Game Corner Mini Sudoku — solved today's board in 01:35!\nPlay the same board (no login): ${window.location.origin}/?game=sudoku`,
+    });
+    api('/api/public/daily/sudoku/rank-preview?timeSecs=95&steps=21')
       .then(({ ok, body }) => {
-        if (ok && body) setIntegration({ enabled: !!body.enabled, pubkey: body.pubkey || null });
+        if (ok && body && Number.isFinite(body.rank)) {
+          setWinData((prev) => (prev && prev.guest ? { ...prev, guestRank: body.rank, guestOf: body.of } : prev));
+        }
       })
       .catch(() => {});
-  }, []);
+  }, [loading]);
+
+  // ?chat=<gameId> deep link opens that game's chat room once the daily load
+  // (and any ?demo= fixture seeding inside it) has settled. Proposal tests use
+  // it; it's also a handy share target.
+  useEffect(() => {
+    if (loading) return;
+    const cid = new URLSearchParams(window.location.search).get('chat');
+    if (!cid) return;
+    const g = GAMES.find((x) => x.id === cid);
+    if (g) setChatGame(g);
+  }, [loading]);
+
 
   // Wallet: read EVM address from the bridge, link it to the account, optionally
   // prove ownership (sign a challenge), and fetch balance. Extracted into one
@@ -18844,12 +18489,6 @@ function App() {
       } catch {}
     }
 
-    // Fetch on-chain balance.
-    try {
-      const { ok, body } = await api(`/api/wallet/balance?addr=${encodeURIComponent(addr)}`);
-      if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
-    } catch {}
-
     return { ok: true, addr, verified };
   }, []);
 
@@ -18872,15 +18511,6 @@ function App() {
     connectAndVerifyWallet();
   }, [connectAndVerifyWallet]);
 
-  // Refresh balance on demand (called after claim/tip)
-  const refreshWalletBalance = () => {
-    if (!walletAddr) return;
-    api(`/api/wallet/balance?addr=${encodeURIComponent(walletAddr)}`)
-      .then(({ ok, body }) => {
-        if (ok && body) { setWalletBalance(body.balance); setWalletMock(!!body.mock); }
-      }).catch(() => {});
-  };
-
   // Midnight UTC reached — reload state so everything unlocks.
   const onReset = () => {
     setScreen('lobby');
@@ -18890,9 +18520,48 @@ function App() {
     loadDaily();
   };
 
-  const launchGame = async (game) => {
-    // Non-daily games (classic, idle, PvP) skip the per-day start/lock system.
+  // Opening a game lands on the shell-owned PRE-GAME screen (phase 3) — the
+  // day's attempt is only claimed when the player hits Play (startDailyRun),
+  // so browsing the pre-game screen never burns the attempt. The How-to-Play
+  // cards auto-open on a player's first-ever open of each game; because timed
+  // dailies only mount (and start their clock) after Play, the auto-shown
+  // how-to can never eat into the timer.
+  const launchGame = (game) => {
     if (!game.daily) {
+      setCurrentGame(game);
+      setStepCount(0);
+      setWinData(null);
+      setLoseData(null);
+      setScreen('game');
+      // Classic games mount immediately, so the first-open how-to overlays
+      // the running game (none of the in-scope classics are hard-timed).
+      if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
+      return;
+    }
+    const existing = attempts[game.id];
+    if (existing && existing.finishedAt) {
+      // Finished today — straight to the locked screen.
+      setCurrentGame(game);
+      setScreen('locked');
+      return;
+    }
+    setCurrentGame(game);
+    setWinData(null);
+    setLoseData(null);
+    setScreen('pregame');
+    if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
+  };
+
+  // Claim (or resume) the day's single attempt and mount the game. Extracted
+  // from launchGame so the pre-game screen's Play button owns consume-on-start.
+  const startDailyRun = async (game) => {
+    // Guest mode (phase 8): a signed-out visitor plays today's board from the
+    // public seed with NO server claim — the one-play lock is account-keyed
+    // and can't apply to guests (§6.7's structural defense: the board only
+    // takes accounted entries, so replaying anonymously buys nothing). The
+    // finished run is held locally and committed retroactively on sign-in.
+    if (!authOk) {
+      dailyRunLog.current = { moves: [], replayOk: true };
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -18903,12 +18572,14 @@ function App() {
     const existing = attempts[game.id];
     if (existing) {
       if (existing.finishedAt) {
-        // Finished today — straight to the locked screen.
         setCurrentGame(game);
         setScreen('locked');
       } else {
         // Claimed but unfinished — resume into the saved board state. The row
-        // is already claimed, so do NOT call /start again.
+        // is already claimed, so do NOT call /start again. A resumed run's
+        // earlier moves predate this page load, so its finish can't be
+        // replay-validated (server falls back to tier-B heuristics).
+        dailyRunLog.current = { moves: [], replayOk: false };
         setCurrentGame(game);
         setStepCount(existing.steps || 0);
         setWinData(null);
@@ -18918,8 +18589,12 @@ function App() {
       return;
     }
     const { ok, status, body } = await api(`/api/daily/${game.id}/start`, { method: 'POST' });
+    // Merge the seed issued with the claim — covers a client that sat on the
+    // lobby across the UTC reset, whose mount-time seeds are yesterday's.
+    if (body && Number.isFinite(body.seed)) SERVER_DAILY_SEEDS[game.id] = body.seed;
     if (ok) {
       if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
+      dailyRunLog.current = { moves: [], replayOk: true };
       setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
       setCurrentGame(game);
       setStepCount(0);
@@ -18930,6 +18605,7 @@ function App() {
       // Lost the race / already locked — show the locked screen.
       if (body && body.nextResetUtc) setNextResetUtc(body.nextResetUtc);
       if (body && body.attempt) setAttempts(prev => ({ ...prev, [game.id]: body.attempt }));
+      dailyRunLog.current = { moves: [], replayOk: false };
       setCurrentGame(game);
       setScreen(body && body.attempt && !body.attempt.finishedAt ? 'game' : 'locked');
     }
@@ -18952,7 +18628,15 @@ function App() {
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
     if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
-    if (g.shell === 'custom') { setCurrentGame(g); setScreen('game'); return; }
+    // ?play=1 skips the pre-game screen (and the first-open how-to) and
+    // claims/mounts immediately — used by proposal tests that assert on
+    // in-game UI, and by "jump straight in" share links.
+    if (params.get('play') === '1') {
+      if (g.daily) { startDailyRun(g); return; }
+      launchGame(g);
+      setHowToGame(null); // suppress the classic first-open auto-show too
+      return;
+    }
     launchGame(g);
   }, [loading]);
 
@@ -18968,6 +18652,9 @@ function App() {
   // a tab close. Never blocks gameplay.
   const handleSaveProgress = (progress, steps, secs) => {
     if (!currentGame) return;
+    // Guests have no server attempt row to save into — the POST would just
+    // 401 and log console errors. A guest run lives only until its finish.
+    if (!authOk) return;
     const gameId = currentGame.id;
     api(`/api/daily/${gameId}/progress`, {
       method: 'POST',
@@ -18987,12 +18674,40 @@ function App() {
   // button can re-run exactly the same submission. Returns true on success.
   // Best-effort: a network throw is treated as a failed sync (syncError), never
   // an uncaught rejection that would break the overlay.
+  // Three-line share card (spec-audit item 6): an edition/date line, the
+  // game's own spoiler-free result line, then rank + the playable no-login
+  // challenge link. `rank` is optional — the card reads fine while it's still
+  // being fetched (or for guests before the rank preview lands).
+  const buildShareCard = (gameId, resultLine, rank) => {
+    const d = new Date(Date.now() + offset);
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    const lines = [`Game Corner No. ${utcDayNum(offset) - 20000} · ${dateStr}`];
+    // Game result lines historically self-prefix the app name; strip it so
+    // the card doesn't read "Game Corner … Game Corner …".
+    if (resultLine) lines.push(resultLine.replace(/^Game Corner /, ''));
+    lines.push(
+      (Number.isFinite(rank) ? `#${rank} on today's board · ` : '') +
+      `Play the same deal (no login): ${window.location.origin}/?game=${gameId}`
+    );
+    return lines.join('\n');
+  };
+
   const submitDailyFinish = async (gameId, finalScore, steps, timeSecs) => {
     let ok = false, body = null;
     try {
+      // Attach the per-run move log (phase 2): engine-shaped moves make the
+      // finish replay-validatable (tier A); timestamp-only events feed the
+      // server's tier-B timing heuristics. The ref survives until the next
+      // launchGame, so the overlay's retry re-sends the identical log.
+      const log = dailyRunLog.current;
+      const moves = log.moves.slice(0, 800);
       const res = await api(`/api/daily/${gameId}/finish`, {
         method: 'POST',
-        body: JSON.stringify({ score: finalScore, steps, timeSecs }),
+        body: JSON.stringify({
+          score: finalScore, steps, timeSecs,
+          moves,
+          replay: log.replayOk && moves.some(m => Number.isInteger(m.tileType)),
+        }),
       });
       ok = res.ok; body = res.body;
     } catch (e) {
@@ -19039,22 +18754,10 @@ function App() {
         return {
           ...prev,
           syncError: false,
-          matchEarned: body && body.matchEarned,
-          matchReceipt: body && body.matchReceipt,
           newAchievements: newAch,
           justAchievement: firstNew ? achievementBadgeFor(firstNew) : prev.justAchievement,
         };
       });
-      // Reflect the new MATCH balance in the nav chip immediately.
-      if (body && body.matchReceipt && Number.isFinite(body.matchReceipt.balanceAfter)) {
-        setMatchBalance(body.matchReceipt.balanceAfter);
-      }
-      // Anchor the MATCH earn on-chain (best-effort), then update the receipt badge.
-      if (body && body.matchReceipt && body.matchReceipt.eventId) {
-        matchAnchor(body.matchReceipt).then(updated => {
-          setWinData(prev => prev ? { ...prev, matchReceipt: updated } : prev);
-        }).catch(() => {});
-      }
       // DApp Mode: surface the Verified badge, then anchor on-chain (best-effort).
       if (body && body.dapp) {
         setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
@@ -19087,13 +18790,10 @@ function App() {
           isClassic: true,
           bestScore: meta && meta.bestScore,
           longestSnake: meta && meta.longestSnake,
-          // Carry the game id so the win card's "Share to Feed" button can post
-          // this classic result, mirroring the daily branch below.
           gameId: currentGame.id,
-          canPost: true,
         });
-        // Remember this result so the Game Menu's Post to Feed stays reachable
-        // after Play Again.
+        // Remember the round's result for the Game Menu (kept for future
+        // share affordances; the feed post button was retired).
         setClassicLastResult({ gameId: currentGame.id, score, steps, timeSecs });
         return;
       }
@@ -19101,15 +18801,69 @@ function App() {
       // dead zone ReferenceError that previously killed the entire win flow
       // (no overlay, no finish call). Keep this above setWinData.
       const gameId = currentGame.id;
-      // The streak this win lands in: the first finished game of the day extends
-      // the consecutive-day streak by 1; a second game the same day reuses the
-      // same day count (the multiplier is per-day, not per-game).
-      const playedToday = Object.values(attempts).some(a => a && a.score != null);
-      const effectiveStreak = playedToday ? streak : streak + 1;
+      // Guest run (phase 8): no server finish. Hold the run locally as a
+      // same-day pending run (moves + seed, the exact payload a normal finish
+      // sends, so the retroactive commit gets full validation parity), fetch
+      // the would-be rank from the public read surface, and show the
+      // anonymous end screen with the "make it count" CTA.
+      if (!authOk) {
+        const log = dailyRunLog.current;
+        const seed = serverDailySeed(gameId);
+        if (seed != null) {
+          savePendingRun(gameId, {
+            dayNum: utcDayNum(offset), gameId, seed,
+            score, steps, secs: timeSecs,
+            moves: log.moves.slice(0, 800),
+            replay: log.replayOk && log.moves.some(m => Number.isInteger(m.tileType)),
+            at: new Date().toISOString(),
+          });
+        }
+        setWinData({
+          score, bonus: 0, finalScore: score, steps, timeSecs,
+          multiplier: 1, effectiveStreak: 0,
+          guest: true, guestSaved: seed != null,
+          share: buildShareCard(gameId, meta && meta.share),
+          gameId,
+        });
+        try {
+          const { ok, body } = await api(
+            `/api/public/daily/${gameId}/rank-preview?timeSecs=${Math.round(timeSecs || 0)}&steps=${Math.round(steps || 0)}`
+          );
+          if (ok && body && Number.isFinite(body.rank)) {
+            // Would-be rank into the CTA and the share card's rank line alike.
+            setWinData(prev => (prev && prev.guest
+              ? { ...prev, guestRank: body.rank, guestOf: body.of, share: buildShareCard(gameId, meta && meta.share, body.rank) }
+              : prev));
+          }
+        } catch {}
+        return;
+      }
+      // The streak this win lands in. GotD-participation semantics: only
+      // finishing TODAY'S FEATURED game extends the consecutive-day streak by
+      // 1 (the server's computeStreak reconciles via the finish response);
+      // every other daily reuses the current day count — the multiplier stays
+      // per-day, not per-game.
+      const isFeaturedWin = featured && featured.gameId === gameId;
+      const featuredDoneToday = featured && attempts[featured.gameId]
+        && attempts[featured.gameId].score != null;
+      const effectiveStreak = (isFeaturedWin && !featuredDoneToday) ? streak + 1 : streak;
       const multiplier = streakMultiplier(effectiveStreak);
       const finalScore = Math.round(score * multiplier);
       const bonus = finalScore - score;
       setStreak(effectiveStreak);
+      // Personal-best comparison for the end screen (phase 3), captured BEFORE
+      // merging this win into the bests map.
+      const prevBest = bests[gameId] && Number.isFinite(bests[gameId].score) ? bests[gameId].score : null;
+      setBests(prev => {
+        const cur = prev[gameId] || {};
+        return {
+          ...prev,
+          [gameId]: {
+            score: cur.score != null ? Math.max(cur.score, finalScore) : finalScore,
+            timeSecs: cur.timeSecs != null && timeSecs != null ? Math.min(cur.timeSecs, timeSecs) : (cur.timeSecs != null ? cur.timeSecs : timeSecs),
+          },
+        };
+      });
       // A badge unlocked the moment this win's streak lands exactly on a tier.
       const unlocked = justUnlockedBadge(effectiveStreak);
       if (unlocked) {
@@ -19119,13 +18873,16 @@ function App() {
       // call below, so the player always gets a clear "Solved!" confirmation.
       setWinData({
         score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+        prevBest,
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
-        share: meta && meta.share,
+        // Three-line share card: edition/date, the game's spoiler-free result
+        // line, then rank + the playable no-login challenge link. The rank
+        // line is threaded in below once the finish lands on the board.
+        share: meta && meta.share ? buildShareCard(gameId, meta.share) : undefined,
         hintsUsed: meta && meta.hintsUsed,
         wordsSolved: meta && meta.wordsSolved,
         wordsTotal: meta && meta.wordsTotal,
-        canPost: true,
         gameId,
         syncError: false,
         newAchievements: [],
@@ -19133,6 +18890,20 @@ function App() {
       setTotalScore(t => t + finalScore);
       // Submit to the server (records result, streak, reward, badges, receipt).
       await submitDailyFinish(gameId, finalScore, steps, timeSecs);
+      // Now that the finish is on today's board, thread the earned rank into
+      // the share card ("#N on today's board · …"). Best-effort — the card
+      // reads fine without a rank if the fetch loses or hasn't landed.
+      if (meta && meta.share) {
+        try {
+          const { ok, body } = await api(`/api/daily/${gameId}/leaderboard`);
+          const rank = ok && body && body.me && Number.isFinite(body.me.rank) ? body.me.rank : null;
+          if (rank) {
+            setWinData(prev => (prev && !prev.isClassic && prev.gameId === gameId)
+              ? { ...prev, myRank: rank, share: buildShareCard(gameId, meta.share, rank) }
+              : prev);
+          }
+        } catch {}
+      }
     } catch (e) {
       // Never let a handler error swallow the win silently again. Surface a
       // minimal overlay so the player sees their solve was registered.
@@ -19174,6 +18945,18 @@ function App() {
         return;
       }
       const gameId = currentGame.id;
+      // Guest loss (phase 8): nothing to commit — a loss has no board entry —
+      // so just show the overlay with the guest note. No server call (no
+      // attempt row exists), no local pending run.
+      if (!authOk) {
+        setLoseData({
+          steps, timeSecs,
+          share: meta && meta.share,
+          answer: meta && meta.answer,
+          guest: true,
+        });
+        return;
+      }
       setLoseData({
         steps,
         timeSecs,
@@ -19220,7 +19003,7 @@ function App() {
     setLoseData(null);
     setStepCount(0);
     setPlayAgainKey(k => k + 1);
-    // Keep classicLastResult so the Game Menu's Post to Feed stays reachable.
+    // Keep classicLastResult for the Game Menu.
   };
 
   // Game Menu "New Game": optionally re-mount the current classic game in a
@@ -19236,46 +19019,16 @@ function App() {
   };
 
   // Game Menu "Save Game": persist the active Versus-Bot game's snapshot via
-  // the generic user_game_state store, then attempt an on-chain hash anchor.
-  // Returns { ok, anchored } — the on-chain step is fire-and-continue; a tx
-  // failure still returns ok:true as long as the server save succeeded.
+  // the generic user_game_state store.
   const handleSaveGame = async () => {
-    if (!currentGame) return { ok: false, anchored: false };
+    if (!currentGame) return { ok: false };
     const snap = ClassicBridge.getSnapshot ? ClassicBridge.getSnapshot() : null;
-    if (!snap) return { ok: false, anchored: false };
-    const { ok, body } = await api(`/api/state/${currentGame.id}`, {
+    if (!snap) return { ok: false };
+    const { ok } = await api(`/api/state/${currentGame.id}`, {
       method: 'PUT',
       body: JSON.stringify({ state: { mode: 'bot', savedAt: Date.now(), ...snap } }),
-    }).catch(() => ({ ok: false, body: null }));
-    if (!ok) return { ok: false, anchored: false };
-
-    // Attempt on-chain anchor: send 0-value tx with the save hash as calldata,
-    // mirroring the dappAnchor pattern. Silently skipped in mock/no-wallet mode.
-    let anchored = false;
-    try {
-      const saveHash = body && body.saveHash;
-      const bridgeMockOff = window.usernode && window.usernode.isMockEnabled
-        ? !(await window.usernode.isMockEnabled())
-        : false;
-      if (saveHash && window.usernode && window.usernode.sendTransaction && bridgeMockOff) {
-        const userAddr = window.usernode.getNodeAddress
-          ? await window.usernode.getNodeAddress()
-          : null;
-        if (userAddr) {
-          const tx = await window.usernode.sendTransaction({ to: userAddr, data: '0x' + saveHash, value: 0 });
-          const txHash = tx && tx.hash ? tx.hash : null;
-          if (txHash) {
-            await api(`/api/state/${currentGame.id}/anchor/confirm`, {
-              method: 'POST',
-              body: JSON.stringify({ txHash }),
-            }).catch(() => {});
-            anchored = true;
-          }
-        }
-      }
-    } catch (_e) { /* on-chain step is optional — save already succeeded */ }
-
-    return { ok: true, anchored };
+    }).catch(() => ({ ok: false }));
+    return { ok: !!ok };
   };
 
   // Build the menu config passed into ClassicShell for classic games.
@@ -19285,7 +19038,6 @@ function App() {
     lastResult: classicLastResult,
     onNewGameMode: handleNewGameMode,
     onSaveGame: handleSaveGame,
-    onPostToFeed: (r) => setShareModal({ show: true, caption: '', gameId: r.gameId, score: r.score, steps: r.steps, timeSecs: r.timeSecs }),
   } : null;
 
   // Copy-to-clipboard Share button for the win/loss overlays. Flips its label
@@ -19322,19 +19074,6 @@ function App() {
   const renderGameBody = () => {
     if (!currentGame) return null;
     switch (currentGame.shell) {
-      case 'custom':
-        // Bespoke screen (e.g. PvP Arena) — App owns the layout, not `component`.
-        return (
-          <div className="game-wrap">
-            <div className="game-head">
-              <button className="back-btn" onClick={backToLobby}>← Back</button>
-              <div className="game-title">
-                <span>{currentGame.icon}</span> {currentGame.name}
-              </div>
-            </div>
-            <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} />
-          </div>
-        );
       case 'self':
         // Full-screen, gesture-first game that renders its own ClassicShell.
         return (
@@ -19364,6 +19103,9 @@ function App() {
             onNewGame={() => setPlayAgainKey(k => k + 1)}
             menuConfig={classicMenuConfig}
             sheetSections={classicSections}
+            onHowTo={currentGame.howToPlay && currentGame.howToPlay.length > 0
+              ? () => setHowToGame(currentGame) : undefined}
+            onChat={authOk ? () => setChatGame(currentGame) : undefined}
           >
             <div className="cg-stage cg-scroll">
               <GameComponent
@@ -19382,8 +19124,13 @@ function App() {
         );
       }
       case 'daily':
-      default:
+      default: {
         // Daily puzzle (and any back-header game-wrap game): resumable, locked.
+        // The Daily Tile Match reports its own engine-shaped moves through
+        // onMoveTile; the other dailies get their onStepChange calls recorded
+        // as timestamp-only events (recording BOTH for the tile match would
+        // double every tap in the log and skew the timing heuristics).
+        const logsOwnMoves = currentGame.id === 'tilematchingdaily';
         return (
           <div className="game-wrap">
             <div className="game-head">
@@ -19391,20 +19138,39 @@ function App() {
               <div className="game-title">
                 <span>{currentGame.icon}</span> {currentGame.name}
               </div>
+              {authOk && (
+                <button
+                  className="help-btn"
+                  title="Game chat"
+                  aria-label="Game chat"
+                  onClick={() => setChatGame(currentGame)}
+                >💬</button>
+              )}
+              {currentGame.howToPlay && currentGame.howToPlay.length > 0 && (
+                <button
+                  className="help-btn"
+                  title="How to play"
+                  aria-label="How to play"
+                  onClick={() => setHowToGame(currentGame)}
+                >?</button>
+              )}
             </div>
             <GameComponent
               onWin={handleWin}
               onLose={handleLose}
-              onStepChange={setStepCount}
+              onStepChange={logsOwnMoves ? setStepCount : (n) => {
+                recordDailyMove({ k: 'step' });
+                setStepCount(n);
+              }}
+              onMoveTile={logsOwnMoves ? recordDailyMove : undefined}
               offset={offset}
               savedProgress={progressFor(attempts[currentGame.id])}
               onSaveProgress={handleSaveProgress}
-              matchBalance={matchBalance}
-              onMatchBalanceChange={setMatchBalance}
               resetKey={playAgainKey}
             />
           </div>
         );
+      }
     }
   };
 
@@ -19413,12 +19179,34 @@ function App() {
   const activeMult = authOk ? streakMultiplier(streak) : 1;
   const tierAhead = authOk && streak > 0 ? nextTierInfo(streak) : null;
 
+  // Phase 7 home derivations. featuredGame resolves the server's daily_featured
+  // row against the client registry; inProgressItems merges resumable daily
+  // runs with the viewer's active online matches for the in-progress row.
+  const featuredGame = featured ? GAMES.find((g) => g.id === featured.gameId) : null;
+  const inProgressItems = [
+    ...GAMES.filter((g) => g.daily && attempts[g.id] && !attempts[g.id].finishedAt)
+      .map((g) => ({ type: 'daily', game: g })),
+    ...myRooms
+      .map((r) => ({ type: 'room', room: r, game: GAMES.find((g) => g.id === r.gameId) }))
+      .filter((x) => x.game),
+  ];
+  // Re-enter an active online match from the in-progress row: pre-seat the
+  // player (roomId + seat number) through the classic game-mode opts so
+  // BoardRoomGame / Chutes & Ladders skip the create/join setup screen.
+  const resumeRoom = (room) => {
+    const g = GAMES.find((x) => x.id === room.gameId);
+    if (!g || loading) return;
+    setClassicGameMode('online');
+    setClassicGameModeOpts({ roomId: room.id, myPlayerNum: room.myPlayerNum });
+    launchGame(g);
+  };
+
   return (
     <div className="app">
       <style>{css}</style>
 
       <nav className="nav">
-        <div className="nav-brand"><span className="logo">⬢</span> PuzzleChain</div>
+        <div className="nav-brand"><span className="logo">⬢</span> Game Corner</div>
         <div className="nav-right">
           <div className="nav-stats">
             <div className="nav-stat">
@@ -19443,20 +19231,11 @@ function App() {
           </div>
           {authOk && (
             <button
-              className="nav-match-chip"
-              title="MATCH — your in-app currency. Earned from daily wins, spent on hints, freezes & tips. Tap to open your wallet."
-              onClick={() => setScreen('wallet')}
-              style={{ cursor: 'pointer', border: 'none' }}
-            >
-              🪙 {matchBalance == null ? '…' : matchBalance} MATCH
-            </button>
-          )}
-          {authOk && (
-            <button
               className="primary-btn nav-friends-btn"
               style={{
                 background: 'transparent',
                 border: `1px solid ${C.border}`,
+                color: C.text,
                 padding: '0.4rem 0.8rem',
                 fontSize: '0.8rem',
                 cursor: 'pointer',
@@ -19466,14 +19245,6 @@ function App() {
             >
               👥 Friends
             </button>
-          )}
-          {authOk && integration.enabled && (
-            <span
-              className="nav-integration-chip"
-              title={`dApps integration active${integration.pubkey ? ' · ' + integration.pubkey : ''}`}
-            >
-              🔗 dApps
-            </span>
           )}
           <AccountChip
             loading={loading}
@@ -19500,31 +19271,16 @@ function App() {
         />
       )}
 
-      {screen === 'wallet' && (
-        <WalletScreen
-          user={user}
-          authOk={authOk}
-          walletAddr={walletAddr}
-          walletMock={walletMock}
-          onBack={() => setScreen('lobby')}
-          onBalanceRefresh={refreshWalletBalance}
-          onOpenReceipt={openReceipt}
-        />
-      )}
-
       {screen === 'account' && (
         <AccountScreen
           user={user}
           authOk={authOk}
           walletAddr={walletAddr}
           walletVerified={walletVerified}
-          integration={integration}
           onOpenFriends={() => setScreen('friends')}
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
           onDisconnect={disconnectWallet}
-          matchBalance={matchBalance}
-          walletBalance={walletBalance}
         />
       )}
 
@@ -19538,130 +19294,178 @@ function App() {
 
       {screen === 'lobby' && (
         <div className="lobby">
-          <div className="lobby-head">
-            <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles' : lobbyTab === 'classic' ? 'Classic Games' : 'Community Feed'}
-            </h1>
-            <p>
-              {lobbyTab === 'daily'
-                ? 'One attempt each, per day. Resets at midnight UTC.'
-                : lobbyTab === 'classic'
-                ? 'Play anytime — track your best scores.'
-                : 'See what your friends have been playing'}
-            </p>
-            {lobbyTab === 'daily' && authOk && streak > 0 && (
-              <p className="lobby-hint">
-                🔥 {streak}-day streak · {tierAhead
-                  ? `${tierAhead.daysAway} more daily win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
-                  : `max ×${activeMult} multiplier active`}
-              </p>
-            )}
-            {lobbyTab === 'daily' && nextResetUtc && (
-              <p className="reset-countdown mono">
-                Next puzzle in {fmtHoursMins(
-                  new Date(nextResetUtc).getTime() - (Date.now() + offset))}
-              </p>
-            )}
-          </div>
-          <div className="lobby-tabs">
-            <button
-              className={'lobby-tab' + (lobbyTab === 'daily' ? ' active' : '')}
-              onClick={() => setLobbyTab('daily')}
-            >Daily Puzzle</button>
-            <button
-              className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
-              onClick={() => setLobbyTab('classic')}
-            >Classic Games</button>
-            {authOk && (
-              <button
-                className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
-                onClick={() => setLobbyTab('feed')}
-              >Feed</button>
-            )}
-          </div>
-          {authOk && lobbyTab !== 'pvp' && lobbyTab !== 'feed' && (() => {
-            // Single persistent, collapsible badge panel — rendered directly
-            // under the header band (above the game grid) on the Daily and
-            // Classic tabs so players find their badges where they expect them.
-            // Feed it the union of permanently earned streak day-thresholds and
-            // any the LIVE streak now satisfies, so a freshly-won streak badge
-            // lights up immediately — before the server round-trip reconciles
-            // `badges`. Achievement/solve-milestone chips come straight from
-            // the server-backed `achievements` state.
-            const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
-            return (
-              <BadgesSection
-                badges={earnedDays}
-                achievements={achievements}
-                streak={streak}
-                solveCount={solveCount}
-                open={badgesOpen}
-                onToggle={() => setBadgesOpen(b => !b)}
-              />
-            );
-          })()}
-          {!authOk && (lobbyTab === 'daily' || lobbyTab === 'classic') && (
-            // Signed-out / load-failure affordance: explain the empty badge slot
-            // instead of rendering nothing. Limited to Daily/Classic (Feed/PvP
-            // own their viewport). Retry re-runs the daily load and flips back
-            // to the real panel on success.
-            <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
-          )}
-          {lobbyTab === 'pvp' ? (
-            PVP_ENABLED
-              ? <PvpArena user={user} authOk={authOk} walletAddr={walletAddr} walletBalance={walletBalance} onOpenReceipt={openReceipt} />
-              : <PvpReturningSoon />
-          ) : lobbyTab === 'feed' ? (
-            <FeedScreen user={user} setScreen={setScreen} />
+          {lobbyTab === 'ladder' ? (
+            <React.Fragment>
+              <button className="home-back-btn" onClick={() => setLobbyTab('home')}>← Home</button>
+              <div className="lobby-head">
+                <h1>Rating Ladder</h1>
+                <p>Head-to-head Elo — win online matches to climb.</p>
+              </div>
+              {/* Gated on !loading so a ?demo=ladder fixture (seeded inside
+                  loadDaily's /api/daily call) lands before the ladder fetches. */}
+              {!loading && <LadderScreen />}
+            </React.Fragment>
           ) : (
-          <div className="grid">
-            {GAMES.filter(g => g.category === lobbyTab).map(g => {
-              // Only daily games carry the per-day finished/in-progress lock state.
-              const a = attempts[g.id];
-              const finished = !!g.daily && !!(a && a.finishedAt);
-              const inProgress = !!g.daily && !!a && !finished;
-              return (
-                <div
-                  key={g.id}
-                  className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
-                  style={{ '--accent': g.tagColor }}
-                  onClick={() => {
-                    if (loading) return;
-                    if (g.shell === 'custom') { setCurrentGame(g); return; }
-                    if (g.preLaunchModal) { setPreLaunchGame(g); return; }
-                    launchGame(g);
-                  }}
-                >
-                  <div className="card-icon">{g.icon}</div>
-                  <div className="card-name">{g.name}</div>
-                  <div className="card-desc">{g.desc}</div>
-                  {finished ? (
-                    <div className="card-lock">
-                      🔒 {a.score != null
-                        ? <span>+{a.score} pts · resets in {fmtCountdown(
-                            (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
-                        : <span>Played · locked until reset</span>}
-                    </div>
-                  ) : inProgress ? (
-                    <div className="card-resume">▶ In progress · resume</div>
-                  ) : (
-                    <span
-                      className="tag mono"
-                      style={{ background: g.tagColor + '22', color: g.tagColor }}
-                    >
-                      {g.tag}
-                    </span>
-                  )}
+            /* Phase 7 home: GotD hero → in-progress row → all-games grid.
+               The old three-tab lobby is retired; Feed and Ladder are now
+               screens behind the quick links below. */
+            <React.Fragment>
+              <div className="lobby-head masthead">
+                {/* Numbered-edition dateline (Appendix A masthead). The edition
+                    counts up one per UTC day from the same server-anchored day
+                    number the dailies use, so every visitor sees the same issue. */}
+                <div className="masthead-dateline">
+                  <span>No. {utcDayNum(offset) - 20000} · {new Date(Date.now() + offset).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
                 </div>
-              );
-            })}
+                <h1>Game Corner</h1>
+                <p>One shared board per game, per day. Resets at midnight UTC.</p>
+                {authOk && streak > 0 && (
+                  <p className="lobby-hint">
+                    🔥 {streak}-day streak · {tierAhead
+                      ? `${tierAhead.daysAway} more Game-of-the-Day win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
+                      : `max ×${activeMult} multiplier active`}
+                  </p>
+                )}
+                <div className="masthead-rule" />
+              </div>
+              {commitNotice && (
+                <div className="commit-notice" onClick={() => setCommitNotice(null)}>{commitNotice}</div>
+              )}
+              {!wnDismissed && (
+                <div className="whatsnew-strip">
+                  <button className="wn-strip-body" onClick={() => setWhatsNewOpen(true)}>
+                    🗞️ <strong>New this week:</strong> {CHANGELOG[0].items[0]} <span className="wn-more">See all ›</span>
+                  </button>
+                  <button className="wn-strip-dismiss" title="Dismiss" onClick={dismissWhatsNew}>✕</button>
+                </div>
+              )}
+              {featuredGame ? (
+                <GotdHero
+                  game={featuredGame}
+                  attempt={attempts[featuredGame.id]}
+                  authOk={authOk}
+                  nextResetUtc={nextResetUtc}
+                  offset={offset}
+                  onReset={onReset}
+                  onPlay={() => { if (!loading) launchGame(featuredGame); }}
+                />
+              ) : nextResetUtc ? (
+                <p className="reset-countdown mono">
+                  Next puzzle in {fmtHoursMins(
+                    new Date(nextResetUtc).getTime() - (Date.now() + offset))}
+                </p>
+              ) : null}
+              {authOk && (
+                <InProgressRow
+                  items={inProgressItems}
+                  onOpenDaily={(g) => { if (!loading) launchGame(g); }}
+                  onOpenRoom={resumeRoom}
+                />
+              )}
+              <div className="home-links">
+                <button className="home-link-btn" onClick={() => setLobbyTab('ladder')}>🏆 Ladder</button>
+                <button className="home-link-btn" onClick={() => setWhatsNewOpen(true)}>🗞️ What's new</button>
+              </div>
+              {authOk ? (
+                (() => {
+                  // Persistent, collapsible badge panel (unchanged from the
+                  // tabbed lobby) — union of permanently earned streak badges
+                  // and any the LIVE streak now satisfies.
+                  const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
+                  return (
+                    <BadgesSection
+                      badges={earnedDays}
+                      achievements={achievements}
+                      streak={streak}
+                      solveCount={solveCount}
+                      open={badgesOpen}
+                      onToggle={() => setBadgesOpen(b => !b)}
+                    />
+                  );
+                })()
+              ) : (
+                <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
+              )}
+              {(() => {
+                const gameCard = (g) => {
+                  // Only daily games carry the per-day finished/in-progress lock state.
+                  const a = attempts[g.id];
+                  const finished = !!g.daily && !!(a && a.finishedAt);
+                  const inProgress = !!g.daily && !!a && !finished;
+                  return (
+                    <div
+                      key={g.id}
+                      className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
+                      style={{ '--accent': g.tagColor }}
+                      onClick={() => {
+                        if (loading) return;
+                        if (g.preLaunchModal) { setPreLaunchGame(g); return; }
+                        launchGame(g);
+                      }}
+                    >
+                      <div className="card-icon">{g.icon}</div>
+                      <div className="card-name">{g.name}</div>
+                      <div className="card-desc">{g.desc}</div>
+                      {finished ? (
+                        <div className="card-lock">
+                          🔒 {a.score != null
+                            ? <span>+{a.score} pts · resets in {fmtCountdown(
+                                (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
+                            : <span>Played · locked until reset</span>}
+                        </div>
+                      ) : inProgress ? (
+                        <div className="card-resume">▶ In progress · resume</div>
+                      ) : (
+                        <span
+                          className="tag mono"
+                          style={{ background: g.tagColor + '22', color: g.tagColor }}
+                        >
+                          {g.tag}
+                        </span>
+                      )}
+                    </div>
+                  );
+                };
+                return (
+                  <React.Fragment>
+                    <div className="home-section-title">Daily Puzzles</div>
+                    <div className="grid">{GAMES.filter(g => g.category === 'daily').map(gameCard)}</div>
+                    <div className="home-section-title">Classic Games</div>
+                    <div className="grid">{GAMES.filter(g => g.category === 'classic').map(gameCard)}</div>
+                  </React.Fragment>
+                );
+              })()}
+              {authOk && !loading && (
+                <TodayChampions
+                  onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+                />
+              )}
+            </React.Fragment>
+          )}
+        </div>
+      )}
+
+      {screen === 'pregame' && currentGame && (
+        <div className="game-wrap">
+          <div className="game-head">
+            <button className="back-btn" onClick={backToLobby}>← Back</button>
+            <div className="game-title">
+              <span>{currentGame.icon}</span> {currentGame.name}
+            </div>
           </div>
-          )}
-          {lobbyTab === 'daily' && authOk && (
-            <TodayChampions
-              onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-            />
-          )}
+          <PreGameScreen
+            game={currentGame}
+            attempt={attempts[currentGame.id]}
+            best={bests[currentGame.id]}
+            streak={streak}
+            authOk={authOk}
+            nextResetUtc={nextResetUtc}
+            offset={offset}
+            onReset={onReset}
+            onPlay={() => startDailyRun(currentGame)}
+            onHowTo={() => setHowToGame(currentGame)}
+            onChat={authOk ? () => setChatGame(currentGame) : undefined}
+          />
         </div>
       )}
 
@@ -19704,7 +19508,7 @@ function App() {
         <div className="win-overlay">
           <div className="win-card">
             <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
-            <h2>{winData.winnerLabel || (winData.cashOut ? 'Cashed Out! 💰' : 'Solved!')}</h2>
+            <h2>{winData.winnerLabel || (winData.cashOut ? 'Locked In! 🔒' : 'Solved!')}</h2>
             <div className="sub">{currentGame && currentGame.name}</div>
             <div className="score-rows">
               <div className="score-row">
@@ -19713,7 +19517,7 @@ function App() {
               </div>
               {winData.isClassic && winData.multiplier > 1 && (
                 <div className="score-row bonus">
-                  <span className="k">Cash Out ×{winData.multiplier}</span>
+                  <span className="k">Lock In ×{winData.multiplier}</span>
                   <span className="v mono">×{winData.multiplier}</span>
                 </div>
               )}
@@ -19743,27 +19547,18 @@ function App() {
                 <span className="k">Earned</span>
                 <span className="v mono">+{winData.finalScore}</span>
               </div>
-              {winData.matchEarned > 0 && !winData.isClassic && (
-                <div className="win-reward-row">
-                  <span className="k">🪙 MATCH earned</span>
-                  <span className="v">+{winData.matchEarned} MATCH</span>
-                </div>
-              )}
-              {winData.matchReceipt && !winData.isClassic && (
-                <div className="win-reward-row" style={{ fontSize: '0.74rem' }}>
-                  <span className="k">
-                    {winData.matchReceipt.anchorStatus === 'anchored'
-                      ? '⛓️ On-chain ✓'
-                      : winData.matchReceipt.anchorStatus === 'pending'
-                        ? '⛓️ Anchoring…'
-                        : '⛓️ Demo — not anchored'}
-                  </span>
-                  <span className="v mono">
-                    {winData.matchReceipt.anchorTxHash
-                      ? shortHash(winData.matchReceipt.anchorTxHash)
-                      : (winData.matchReceipt.chainHash ? shortHash(winData.matchReceipt.chainHash) : '—')}
-                  </span>
-                </div>
+              {!winData.isClassic && winData.prevBest !== undefined && (
+                winData.prevBest == null || winData.finalScore > winData.prevBest ? (
+                  <div className="score-row bonus">
+                    <span className="k">🏅 New personal best!</span>
+                    <span className="v mono">+{winData.finalScore}</span>
+                  </div>
+                ) : (
+                  <div className="score-row">
+                    <span className="k">Personal best</span>
+                    <span className="v mono">+{winData.prevBest}</span>
+                  </div>
+                )
               )}
               {winData.isClassic && winData.bestScore !== undefined && (
                 <div className="score-row">
@@ -19798,7 +19593,7 @@ function App() {
                 <div className="bu-name">{winData.justAchievement.name}</div>
               </div>
             )}
-            {!winData.isClassic && (() => {
+            {!winData.isClassic && !winData.guest && (() => {
               // Next-milestone progress so every solve shows forward motion even
               // when nothing unlocked this run. Streak progress is based on the
               // streak this win landed in; solve progress on the lifetime count.
@@ -19823,18 +19618,24 @@ function App() {
                 </button>
               </div>
             )}
+            {winData.guest && (
+              <div className="guest-cta">
+                <div className="guest-rank">
+                  {Number.isFinite(winData.guestRank)
+                    ? <span>You'd be <strong>#{winData.guestRank}</strong> of {winData.guestOf} on today's board</span>
+                    : <span>Great solve — today's board takes signed-in entries</span>}
+                </div>
+                <div className="guest-note">
+                  🔑 <strong>Make it count — sign in.</strong> Open Game Corner inside
+                  Usernode and this exact run joins today's leaderboard and starts
+                  your streak.
+                  {winData.guestSaved && ' Your run is saved on this device — it counts if you sign in before midnight UTC.'}
+                </div>
+              </div>
+            )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
-            {authOk && winData.gameId && (
-              <button
-                className="primary-btn"
-                style={{ marginBottom: '0.6rem', background: C.emerald }}
-                onClick={() => setShareModal({ show: true, caption: '', gameId: winData.gameId, score: winData.finalScore, steps: winData.steps, timeSecs: winData.timeSecs })}
-              >
-                📤 Share to Feed
-              </button>
-            )}
             {winData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
                 Play Again
@@ -19879,6 +19680,12 @@ function App() {
                 <span className="v mono">+0</span>
               </div>
             </div>
+            {loseData.guest && (
+              <div className="guest-note" style={{ marginBottom: '0.8rem' }}>
+                🔑 Playing as a guest — sign in inside Usernode to lock in streaks
+                and appear on daily boards.
+              </div>
+            )}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
@@ -19891,79 +19698,21 @@ function App() {
         </div>
       )}
 
-      {shareModal.show && (
-        <div className="win-overlay">
-          <div className="win-card">
-            {shareModal.posted ? (
-              <>
-                <div className="trophy">✅</div>
-                <h2>Shared!</h2>
-                <div className="sub">Your result is live in the Community Feed.</div>
-                <button
-                  className="primary-btn"
-                  onClick={() => { setShareModal({ show: false, caption: '' }); backToLobby(); }}
-                >
-                  Done
-                </button>
-              </>
-            ) : (
-              <>
-                <h2>Share to Feed</h2>
-                <div style={{ marginBottom: '1rem' }}>
-                  <textarea
-                    placeholder="Add a caption (optional, max 280 chars)"
-                    value={shareModal.caption}
-                    onChange={(e) => setShareModal(prev => ({ ...prev, caption: e.target.value.slice(0, 280) }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.8rem',
-                      background: C.card,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: '10px',
-                      color: C.text,
-                      fontFamily: 'inherit',
-                      fontSize: '0.9rem',
-                      minHeight: '80px',
-                      resize: 'vertical',
-                      outline: 'none',
-                    }}
-                  />
-                  <div style={{ fontSize: '0.75rem', color: C.muted, marginTop: '0.4rem', textAlign: 'right' }}>
-                    {shareModal.caption.length}/280
-                  </div>
-                </div>
-                <button
-                  className="primary-btn"
-                  onClick={async () => {
-                    const { ok } = await api('/api/posts', {
-                      method: 'POST',
-                      body: JSON.stringify({
-                        gameId: shareModal.gameId,
-                        score: shareModal.score,
-                        steps: shareModal.steps,
-                        timeSecs: shareModal.timeSecs,
-                        caption: shareModal.caption || null,
-                      }),
-                    });
-                    // Land on a "Shared!" confirmation the player dismisses themselves,
-                    // instead of silently closing the modal and auto-navigating away.
-                    if (ok) setShareModal(prev => ({ ...prev, posted: true }));
-                  }}
-                  style={{ marginBottom: '0.6rem' }}
-                >
-                  ✓ Post to Feed
-                </button>
-                <button
-                  className="primary-btn"
-                  style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-                  onClick={() => setShareModal({ show: false, caption: '' })}
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+      {whatsNewOpen && <WhatsNewSheet onClose={() => setWhatsNewOpen(false)} />}
+
+      {chatGame && (
+        <ChatPanel
+          game={chatGame}
+          user={user}
+          onClose={() => setChatGame(null)}
+        />
+      )}
+
+      {howToGame && (
+        <HowToPlayModal
+          game={howToGame}
+          onClose={() => { markHowtoSeen(howToGame.id); setHowToGame(null); }}
+        />
       )}
     </div>
   );

@@ -486,6 +486,21 @@
       "name": "Featured game exposed on the public read surface",
       "path": "/api/public/daily",
       "expectText": "featured"
+    },
+    {
+      "name": "Anonymous end screen renders (make it count)",
+      "path": "/?demo=makeitcount",
+      "expectText": "Make it count"
+    },
+    {
+      "name": "Anonymous end screen shows the would-be board line",
+      "path": "/?demo=makeitcount",
+      "expectText": "today's board"
+    },
+    {
+      "name": "Rank preview endpoint readable without auth",
+      "path": "/api/public/daily/sudoku/rank-preview?timeSecs=95&steps=21",
+      "expectText": "rank"
     }
   ]
 }

@@ -2350,6 +2350,7 @@ const PUBLIC_PREFIXES = ['/explorer-api/'];
 // isCurrentUser: false).
 const PUBLIC_API_GET = [
   /^\/api\/public\/daily$/,               // anonymous daily state (seeds, directory, server time)
+  /^\/api\/public\/daily\/[A-Za-z0-9_-]+\/rank-preview$/, // would-be rank for an anonymous run (read-only)
   /^\/api\/daily\/[A-Za-z0-9_-]+\/leaderboard$/,
   /^\/api\/daily\/leaderboard\/today$/,
   /^\/api\/classic\/[A-Za-z0-9_-]+\/leaderboard$/,
@@ -3099,9 +3100,9 @@ app.get('/api/daily', async (req, res) => {
         { type: 'solve_milestone', meta: { count: 100 } },
       ];
       for (const a of achSeed) {
-        const guard = a.type === 'solve_milestone'
-          ? `AND type = 'solve_milestone' AND (metadata->>'count')::int = $3`
-          : `AND type = $2`;
+        // $3 must be referenced (with an explicit cast) in both branches —
+        // an unreferenced parameter fails the whole statement in Postgres.
+        const guard = `AND type = $2 AND ($3::int IS NULL OR (metadata->>'count')::int = $3::int)`;
         await pool.query(
           `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
            SELECT $1, $2, NULL, NULL, $4::jsonb
@@ -3120,7 +3121,11 @@ app.get('/api/daily', async (req, res) => {
     // daily games each demo user solved today, so the lobby-wide "Today's
     // Champions" board shows a spread of total-points and games-solved counts
     // (not every user clearing every game). Idempotent, strict no-op in prod.
-    if (IS_STAGING && req.query.demo === 'leaderboard') {
+    // demo=makeitcount (phase 8) reuses this same seed: it fills today's
+    // boards so the anonymous end screen's rank-preview has real ranks to
+    // compute against; the anonymous end screen itself is a client-side demo
+    // driven by the ?demo=makeitcount param.
+    if (IS_STAGING && (req.query.demo === 'leaderboard' || req.query.demo === 'makeitcount')) {
       const lbSeed = [
         { name: 'Staging demo Ada',  time: 47,  steps: 12, games: 4 }, // swept all → top of champions
         { name: 'Staging demo Borg', time: 63,  steps: 18, games: 3 },
@@ -3773,6 +3778,241 @@ async function settleDailySession({ user, gameId, score, steps, timeSecs, moves,
 
 // Record the result of today's attempt (score/steps/time). Only touches
 // today's already-claimed row. Also updates user stats and creates achievements.
+// Shared finalization for a claimed, unfinished daily attempt — used by BOTH
+// POST /api/daily/:gameId/finish (the normal signed-in path) and the phase-8
+// POST /api/daily/:gameId/commit (retroactive anonymous-run commit), so a
+// committed guest run passes the IDENTICAL scoring, badge, streak, and
+// game_sessions/validateSession settlement as every other finish (§6.10
+// integrity parity). Records score/steps/time on today's row (finished_at IS
+// NULL guard makes concurrent finishes single-winner), updates stats +
+// achievements, recomputes the streak, and settles the validation session.
+// Returns the finish response payload, or null when there is no claimed,
+// unfinished attempt today (callers map that to 409). Throws on DB errors.
+async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, moves, replay }) {
+
+  // Read the player's previous best for this game BEFORE today's finish is
+  // committed, so it naturally excludes the in-flight attempt (its
+  // finished_at is still NULL at this point). Querying this after the
+  // UPDATE below would always see today's own just-written score as the
+  // max, so personal_best could never fire.
+  const { rows: bestRows } = await pool.query(
+    `SELECT MAX(score) as max_score FROM daily_attempts
+     WHERE user_id = $1 AND game_id = $2 AND score IS NOT NULL
+       AND finished_at IS NOT NULL`,
+    [user.id, gameId]
+  );
+  const prevBest = bestRows.length > 0 ? bestRows[0].max_score : null;
+
+  const { rows } = await pool.query(
+    `UPDATE daily_attempts
+       SET score = $3, steps = $4, time_secs = $5, finished_at = now()
+     WHERE user_id = $1 AND game_id = $2
+       AND attempt_date = (now() AT TIME ZONE 'utc')::date
+       AND finished_at IS NULL
+     RETURNING *`,
+    [user.id, gameId, score, steps, timeSecs]
+  );
+  if (rows.length === 0) {
+    // No claimed, unfinished attempt today (client out of sync, or this
+    // attempt was already finished) — surface so it resyncs instead of
+    // silently overwriting an already-recorded score.
+    return null;
+  }
+
+  // Update stats snapshot if this is a win (score > 0)
+  if (score && score > 0) {
+    await pool.query(
+      `INSERT INTO user_stats_snapshot (user_id, username, total_score, last_win_at, updated_at)
+       VALUES ($1, $2, $3, now(), now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         total_score = user_stats_snapshot.total_score + $3,
+         last_win_at = now(),
+         updated_at = now()`,
+      [user.id, user.username || null, score]
+    );
+
+    // Personal best for this game — award once. No unique constraint
+    // backs user_achievements yet, but ON CONFLICT DO NOTHING is added
+    // defensively for when one lands (see deferred work).
+    if (!prevBest || score > prevBest) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+         VALUES ($1, 'personal_best', $2, $3, $4)
+         ON CONFLICT DO NOTHING`,
+        [user.id, gameId, score, JSON.stringify({ previousBest: prevBest })]
+      );
+    }
+  }
+
+
+  // Recompute the streak now that today is finished so the client can
+  // reconcile its optimistic value without a full reload.
+  const streak = await computeStreak(user.id);
+
+  // Newly-awarded achievements THIS finish, so the client can pop a one-time
+  // celebration. Both the streak-milestone block and the non-streak award()
+  // helper push into it via their RETURNING clauses.
+  const newAchievements = [];
+  // Lifetime won-solve count, surfaced in the response so the client can drive
+  // the "X/Y solves → milestone" progress hint. Set from the solve_milestone
+  // block below (which already counts it); falls back to 0 on a non-win.
+  let lifetimeSolves = 0;
+
+  // Award streak-milestone badges as permanent achievements when this win
+  // pushes the consecutive-day streak to (or past) a threshold. Idempotent:
+  // each threshold is recorded at most once per user via a NOT EXISTS guard,
+  // so a second daily game the same day (or a re-finish) never duplicates a
+  // badge. RETURNING surfaces only the threshold(s) NEWLY crossed this finish
+  // into newAchievements (shape { type:'streak_milestone', metadata:{streak} })
+  // so the win overlay can celebrate them server-authoritatively — not relying
+  // on the client's optimistic streak math. Best-effort; never blocks.
+  if (score && score > 0) {
+    try {
+      for (const days of STREAK_BADGE_DAYS) {
+        if (streak >= days) {
+          const { rows: sIns } = await pool.query(
+            `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+             SELECT $1, 'streak_milestone', NULL, NULL, $2::jsonb
+              WHERE NOT EXISTS (
+                SELECT 1 FROM user_achievements
+                 WHERE user_id = $1 AND type = 'streak_milestone'
+                   AND (metadata->>'streak')::int = $3
+              )
+             RETURNING type`,
+            [user.id, JSON.stringify({ streak: days }), days]
+          );
+          if (sIns.length > 0) {
+            newAchievements.push({ type: 'streak_milestone', metadata: { streak: days } });
+          }
+        }
+      }
+    } catch (badgeErr) {
+      console.warn('[daily] streak badge award failed (non-fatal):', badgeErr.message);
+    }
+  }
+
+  // Award non-streak achievement badges. Each criterion derives from data we
+  // just recorded (time/steps/score/game/day). Every insert is guarded by a
+  // NOT EXISTS so it's awarded at most once per user (per milestone count for
+  // solve_milestone), and RETURNING tells us which ones were NEW this finish
+  // so the client can pop a one-time celebration. Best-effort; never blocks.
+  if (score && score > 0) {
+    try {
+      // Helper: idempotent guarded insert; returns true if newly inserted.
+      const award = async (type, metadata) => {
+        const meta = metadata || {};
+        const metaJson = JSON.stringify(meta);
+        // For solve_milestone we de-dup per count ($4 = the count); for the
+        // rest, per type ($4 is passed as NULL and the guard collapses to the
+        // type match). $4 must be referenced with an explicit ::int cast in
+        // BOTH branches — an unreferenced parameter makes Postgres fail the
+        // whole statement with "could not determine data type of parameter",
+        // which silently killed every non-streak badge award.
+        const guard = `AND type = $2 AND ($4::int IS NULL OR (metadata->>'count')::int = $4::int)`;
+        const { rows: ins } = await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
+           SELECT $1, $2, $3, NULL, $5::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements WHERE user_id = $1 ${guard}
+            )
+           RETURNING type`,
+          [user.id, type, gameId, type === 'solve_milestone' ? meta.count : null, metaJson]
+        );
+        if (ins.length > 0) newAchievements.push({ type, metadata: meta });
+      };
+
+      // first_solve — the user's first ever WON daily attempt.
+      await award('first_solve', {});
+
+      // speed_demon — solved any daily in under SPEED_DEMON_MAX_SECS.
+      if (timeSecs !== null && timeSecs < SPEED_DEMON_MAX_SECS) {
+        await award('speed_demon', { timeSecs });
+      }
+
+      // flawless — solved a move-counted daily at/under its step threshold.
+      const flawlessMax = FLAWLESS_STEP_THRESHOLDS[gameId];
+      if (flawlessMax != null && steps !== null && steps <= flawlessMax) {
+        await award('flawless', { gameId, steps });
+      }
+
+      // daily_sweep — solved (won) EVERY daily game within today's UTC day.
+      const { rows: sweepRows } = await pool.query(
+        `SELECT COUNT(DISTINCT game_id)::int AS n
+           FROM daily_attempts
+          WHERE user_id = $1
+            AND attempt_date = (now() AT TIME ZONE 'utc')::date
+            AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
+        [user.id]
+      );
+      if (sweepRows[0] && sweepRows[0].n >= GAME_IDS.size) {
+        await award('daily_sweep', {});
+      }
+
+      // podium — held rank #1 on THIS game's daily leaderboard at finish time.
+      // Count solvers strictly ahead under the (time, steps, finished_at)
+      // ordering; zero ahead ⇒ currently #1. Rank can change as others finish
+      // later in the day — this is intentional ("held #1 at finish time").
+      if (timeSecs !== null) {
+        const { rows: aheadRows } = await pool.query(
+          `SELECT COUNT(*)::int AS ahead
+             FROM daily_attempts
+            WHERE game_id = $1
+              AND attempt_date = (now() AT TIME ZONE 'utc')::date
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
+              AND user_id <> $2
+              AND (
+                time_secs < $3
+                OR (time_secs = $3 AND steps < $4)
+              )`,
+          [gameId, user.id, timeSecs, steps]
+        );
+        if (aheadRows[0] && aheadRows[0].ahead === 0) {
+          await award('podium', { gameId });
+        }
+      }
+
+      // solve_milestone — lifetime finished+won solves crossed a threshold.
+      const { rows: cntRows } = await pool.query(
+        `SELECT COUNT(*)::int AS n
+           FROM daily_attempts
+          WHERE user_id = $1 AND finished_at IS NOT NULL
+            AND score IS NOT NULL AND score > 0`,
+        [user.id]
+      );
+      const totalSolves = (cntRows[0] && cntRows[0].n) || 0;
+      lifetimeSolves = totalSolves;
+      for (const m of SOLVE_MILESTONES) {
+        if (totalSolves >= m) await award('solve_milestone', { count: m });
+      }
+    } catch (achErr) {
+      console.warn('[daily] achievement award failed (non-fatal):', achErr.message);
+    }
+  }
+
+
+  // ---- DApp Mode: settle a session for EVERY daily win --------------------
+  // Phase 2: every daily win routes through the game_sessions +
+  // validateSession pipeline (settleDailySession below) — tier A full replay
+  // re-simulation where an engine exists and the client sent a
+  // replay-eligible move log, tier B snapshot + timing heuristics otherwise.
+  // Best-effort: a pipeline failure never blocks the recorded attempt, and a
+  // 'disputed' verdict just means no Verified badge on the win overlay.
+  let dappSession = null;
+  if (score && score > 0) {
+    try {
+      dappSession = await settleDailySession({
+        user, gameId, score, steps, timeSecs,
+        moves,
+        replay,
+      });
+    } catch (dappErr) {
+      console.error('[daily] dapp session settle failed (non-fatal):', dappErr.message);
+    }
+  }
+
+  return { attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, solveCount: lifetimeSolves, dapp: dappSession, newAchievements };
+}
+
 app.post('/api/daily/:gameId/finish', async (req, res) => {
   const { gameId } = req.params;
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
@@ -3780,227 +4020,112 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
   const steps = Number.isFinite(req.body.steps) ? Math.round(req.body.steps) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   try {
-    // Read the player's previous best for this game BEFORE today's finish is
-    // committed, so it naturally excludes the in-flight attempt (its
-    // finished_at is still NULL at this point). Querying this after the
-    // UPDATE below would always see today's own just-written score as the
-    // max, so personal_best could never fire.
-    const { rows: bestRows } = await pool.query(
-      `SELECT MAX(score) as max_score FROM daily_attempts
-       WHERE user_id = $1 AND game_id = $2 AND score IS NOT NULL
-         AND finished_at IS NOT NULL`,
-      [req.user.id, gameId]
-    );
-    const prevBest = bestRows.length > 0 ? bestRows[0].max_score : null;
-
-    const { rows } = await pool.query(
-      `UPDATE daily_attempts
-         SET score = $3, steps = $4, time_secs = $5, finished_at = now()
-       WHERE user_id = $1 AND game_id = $2
-         AND attempt_date = (now() AT TIME ZONE 'utc')::date
-         AND finished_at IS NULL
-       RETURNING *`,
-      [req.user.id, gameId, score, steps, timeSecs]
-    );
-    if (rows.length === 0) {
+    const result = await finalizeDailyAttempt(req.user, gameId, {
+      score, steps, timeSecs,
+      moves: Array.isArray(req.body.moves) ? req.body.moves.slice(0, 800) : [],
+      replay: req.body.replay === true,
+    });
+    if (!result) {
       // No claimed, unfinished attempt today (client out of sync, or this
       // attempt was already finished) — surface so it resyncs instead of
       // silently overwriting an already-recorded score.
       return res.status(409).json({ error: 'No active attempt to finish' });
     }
-
-    // Update stats snapshot if this is a win (score > 0)
-    if (score && score > 0) {
-      await pool.query(
-        `INSERT INTO user_stats_snapshot (user_id, username, total_score, last_win_at, updated_at)
-         VALUES ($1, $2, $3, now(), now())
-         ON CONFLICT (user_id) DO UPDATE SET
-           total_score = user_stats_snapshot.total_score + $3,
-           last_win_at = now(),
-           updated_at = now()`,
-        [req.user.id, req.user.username || null, score]
-      );
-
-      // Personal best for this game — award once. No unique constraint
-      // backs user_achievements yet, but ON CONFLICT DO NOTHING is added
-      // defensively for when one lands (see deferred work).
-      if (!prevBest || score > prevBest) {
-        await pool.query(
-          `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
-           VALUES ($1, 'personal_best', $2, $3, $4)
-           ON CONFLICT DO NOTHING`,
-          [req.user.id, gameId, score, JSON.stringify({ previousBest: prevBest })]
-        );
-      }
-    }
-
-
-    // Recompute the streak now that today is finished so the client can
-    // reconcile its optimistic value without a full reload.
-    const streak = await computeStreak(req.user.id);
-
-    // Newly-awarded achievements THIS finish, so the client can pop a one-time
-    // celebration. Both the streak-milestone block and the non-streak award()
-    // helper push into it via their RETURNING clauses.
-    const newAchievements = [];
-    // Lifetime won-solve count, surfaced in the response so the client can drive
-    // the "X/Y solves → milestone" progress hint. Set from the solve_milestone
-    // block below (which already counts it); falls back to 0 on a non-win.
-    let lifetimeSolves = 0;
-
-    // Award streak-milestone badges as permanent achievements when this win
-    // pushes the consecutive-day streak to (or past) a threshold. Idempotent:
-    // each threshold is recorded at most once per user via a NOT EXISTS guard,
-    // so a second daily game the same day (or a re-finish) never duplicates a
-    // badge. RETURNING surfaces only the threshold(s) NEWLY crossed this finish
-    // into newAchievements (shape { type:'streak_milestone', metadata:{streak} })
-    // so the win overlay can celebrate them server-authoritatively — not relying
-    // on the client's optimistic streak math. Best-effort; never blocks.
-    if (score && score > 0) {
-      try {
-        for (const days of STREAK_BADGE_DAYS) {
-          if (streak >= days) {
-            const { rows: sIns } = await pool.query(
-              `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
-               SELECT $1, 'streak_milestone', NULL, NULL, $2::jsonb
-                WHERE NOT EXISTS (
-                  SELECT 1 FROM user_achievements
-                   WHERE user_id = $1 AND type = 'streak_milestone'
-                     AND (metadata->>'streak')::int = $3
-                )
-               RETURNING type`,
-              [req.user.id, JSON.stringify({ streak: days }), days]
-            );
-            if (sIns.length > 0) {
-              newAchievements.push({ type: 'streak_milestone', metadata: { streak: days } });
-            }
-          }
-        }
-      } catch (badgeErr) {
-        console.warn('[daily] streak badge award failed (non-fatal):', badgeErr.message);
-      }
-    }
-
-    // Award non-streak achievement badges. Each criterion derives from data we
-    // just recorded (time/steps/score/game/day). Every insert is guarded by a
-    // NOT EXISTS so it's awarded at most once per user (per milestone count for
-    // solve_milestone), and RETURNING tells us which ones were NEW this finish
-    // so the client can pop a one-time celebration. Best-effort; never blocks.
-    if (score && score > 0) {
-      try {
-        // Helper: idempotent guarded insert; returns true if newly inserted.
-        const award = async (type, metadata) => {
-          const meta = metadata || {};
-          const metaJson = JSON.stringify(meta);
-          // For solve_milestone we de-dup per count; for the rest, per type.
-          const guard = type === 'solve_milestone'
-            ? `AND type = 'solve_milestone' AND (metadata->>'count')::int = $4`
-            : `AND type = $2`;
-          const { rows: ins } = await pool.query(
-            `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
-             SELECT $1, $2, $3, NULL, $5::jsonb
-              WHERE NOT EXISTS (
-                SELECT 1 FROM user_achievements WHERE user_id = $1 ${guard}
-              )
-             RETURNING type`,
-            [req.user.id, type, gameId, type === 'solve_milestone' ? meta.count : null, metaJson]
-          );
-          if (ins.length > 0) newAchievements.push({ type, metadata: meta });
-        };
-
-        // first_solve — the user's first ever WON daily attempt.
-        await award('first_solve', {});
-
-        // speed_demon — solved any daily in under SPEED_DEMON_MAX_SECS.
-        if (timeSecs !== null && timeSecs < SPEED_DEMON_MAX_SECS) {
-          await award('speed_demon', { timeSecs });
-        }
-
-        // flawless — solved a move-counted daily at/under its step threshold.
-        const flawlessMax = FLAWLESS_STEP_THRESHOLDS[gameId];
-        if (flawlessMax != null && steps !== null && steps <= flawlessMax) {
-          await award('flawless', { gameId, steps });
-        }
-
-        // daily_sweep — solved (won) EVERY daily game within today's UTC day.
-        const { rows: sweepRows } = await pool.query(
-          `SELECT COUNT(DISTINCT game_id)::int AS n
-             FROM daily_attempts
-            WHERE user_id = $1
-              AND attempt_date = (now() AT TIME ZONE 'utc')::date
-              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
-          [req.user.id]
-        );
-        if (sweepRows[0] && sweepRows[0].n >= GAME_IDS.size) {
-          await award('daily_sweep', {});
-        }
-
-        // podium — held rank #1 on THIS game's daily leaderboard at finish time.
-        // Count solvers strictly ahead under the (time, steps, finished_at)
-        // ordering; zero ahead ⇒ currently #1. Rank can change as others finish
-        // later in the day — this is intentional ("held #1 at finish time").
-        if (timeSecs !== null) {
-          const { rows: aheadRows } = await pool.query(
-            `SELECT COUNT(*)::int AS ahead
-               FROM daily_attempts
-              WHERE game_id = $1
-                AND attempt_date = (now() AT TIME ZONE 'utc')::date
-                AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
-                AND user_id <> $2
-                AND (
-                  time_secs < $3
-                  OR (time_secs = $3 AND steps < $4)
-                )`,
-            [gameId, req.user.id, timeSecs, steps]
-          );
-          if (aheadRows[0] && aheadRows[0].ahead === 0) {
-            await award('podium', { gameId });
-          }
-        }
-
-        // solve_milestone — lifetime finished+won solves crossed a threshold.
-        const { rows: cntRows } = await pool.query(
-          `SELECT COUNT(*)::int AS n
-             FROM daily_attempts
-            WHERE user_id = $1 AND finished_at IS NOT NULL
-              AND score IS NOT NULL AND score > 0`,
-          [req.user.id]
-        );
-        const totalSolves = (cntRows[0] && cntRows[0].n) || 0;
-        lifetimeSolves = totalSolves;
-        for (const m of SOLVE_MILESTONES) {
-          if (totalSolves >= m) await award('solve_milestone', { count: m });
-        }
-      } catch (achErr) {
-        console.warn('[daily] achievement award failed (non-fatal):', achErr.message);
-      }
-    }
-
-
-    // ---- DApp Mode: settle a session for EVERY daily win --------------------
-    // Phase 2: every daily win routes through the game_sessions +
-    // validateSession pipeline (settleDailySession below) — tier A full replay
-    // re-simulation where an engine exists and the client sent a
-    // replay-eligible move log, tier B snapshot + timing heuristics otherwise.
-    // Best-effort: a pipeline failure never blocks the recorded attempt, and a
-    // 'disputed' verdict just means no Verified badge on the win overlay.
-    let dappSession = null;
-    if (score && score > 0) {
-      try {
-        dappSession = await settleDailySession({
-          user: req.user, gameId, score, steps, timeSecs,
-          moves: Array.isArray(req.body.moves) ? req.body.moves.slice(0, 800) : [],
-          replay: req.body.replay === true,
-        });
-      } catch (dappErr) {
-        console.error('[daily] dapp session settle failed (non-fatal):', dappErr.message);
-      }
-    }
-
-    res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, solveCount: lifetimeSolves, dapp: dappSession, newAchievements });
+    res.json(result);
   } catch (err) {
     console.error('[daily] finish failed:', err.message);
     res.status(500).json({ error: 'Failed to record result' });
+  }
+});
+
+// ---- Phase 8: anonymous play, "make it count" (spec §6.10) ------------------
+
+// Retroactively commit an anonymous run. The client held the finished run in
+// localStorage (one pending run per game, same-day only); on the first
+// authenticated load it posts it here. Flow, mirroring a normal play:
+//   1. gameId must be a daily game.
+//   2. The submitted seed must equal TODAY's daily_seeds row — boards freeze
+//      at midnight UTC, so a run from a previous day is rejected (410).
+//   3. Claim the day's attempt with the same INSERT … ON CONFLICT DO NOTHING
+//      idiom as /start. An already-FINISHED row means the signed-in run
+//      stands and the anonymous run is discarded (409). A claimed-but-
+//      unfinished row is reused (the guest run finishes it — same board).
+//   4. finalizeDailyAttempt: identical scoring/badges/streak recompute and
+//      game_sessions + validateSession settlement as every signed-in finish —
+//      full integrity parity per §6.10.
+app.post('/api/daily/:gameId/commit', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
+  const steps = Number.isFinite(req.body.steps) ? Math.round(req.body.steps) : null;
+  const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
+  if (!(score > 0)) return res.status(400).json({ error: 'Nothing to commit' });
+  try {
+    const todaySeed = await ensureDailySeed(gameId);
+    if (Number(req.body.seed) !== todaySeed) {
+      return res.status(410).json({
+        error: 'Board expired — an anonymous run only counts on the day it was played',
+      });
+    }
+    const { rows: ins } = await pool.query(
+      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date)
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date)
+       ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
+       RETURNING *`,
+      [req.user.id, req.user.username || null, gameId]
+    );
+    if (ins.length === 0) {
+      const { rows: existing } = await pool.query(
+        `SELECT finished_at FROM daily_attempts
+          WHERE user_id = $1 AND game_id = $2
+            AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
+        [req.user.id, gameId]
+      );
+      if (existing[0] && existing[0].finished_at) {
+        return res.status(409).json({ error: 'Already played today — your signed-in run stands' });
+      }
+    }
+    const result = await finalizeDailyAttempt(req.user, gameId, {
+      score, steps, timeSecs,
+      moves: Array.isArray(req.body.moves) ? req.body.moves.slice(0, 800) : [],
+      replay: req.body.replay === true,
+    });
+    if (!result) return res.status(409).json({ error: 'No attempt to commit into' });
+    res.json({ ...result, committed: true });
+  } catch (err) {
+    console.error('[daily] commit failed:', err.message);
+    res.status(500).json({ error: 'Failed to commit run' });
+  }
+});
+
+// Would-be rank for an anonymous run (public via PUBLIC_API_GET, rate-limited
+// for anonymous callers). Runs the same ordering as the daily leaderboard
+// (time ASC, steps ASC, finished_at ASC — a hypothetical run finishing "now"
+// loses every (time, steps) tie) and writes nothing.
+app.get('/api/public/daily/:gameId/rank-preview', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const t = Number.parseInt(req.query.timeSecs, 10);
+  const s = Number.parseInt(req.query.steps, 10);
+  if (!Number.isFinite(t)) return res.status(400).json({ error: 'timeSecs required' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE time_secs < $2 OR (time_secs = $2 AND steps <= $3))::int AS ahead
+         FROM daily_attempts
+        WHERE game_id = $1
+          AND attempt_date = (now() AT TIME ZONE 'utc')::date
+          AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
+      [gameId, t, Number.isFinite(s) ? s : 2147483647]
+    );
+    res.json({
+      rank: rows[0].ahead + 1,
+      of: rows[0].total + 1, // the board as it would look with this run on it
+      solvers: rows[0].total,
+    });
+  } catch (err) {
+    console.error('[daily] rank-preview failed:', err.message);
+    res.status(500).json({ error: 'Failed to preview rank' });
   }
 });
 

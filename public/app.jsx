@@ -3944,6 +3944,21 @@ body {
 .gotd-lb-more { color: ${C.dim}; font-size: 11.5px; margin-top: 4px; }
 .gotd-signedout { color: ${C.muted}; font-size: 12.5px; margin-top: 12px; }
 
+/* Phase 8 — anonymous play + "make it count" */
+.guest-cta {
+  border: 1px solid ${C.accent}66; background: rgba(99,102,241,0.10);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 0.9rem; text-align: left;
+}
+.guest-rank { font-size: 15px; margin-bottom: 6px; }
+.guest-rank strong { color: ${C.gold}; }
+.guest-note { color: ${C.muted}; font-size: 12.5px; line-height: 1.5; }
+.guest-note strong { color: ${C.text}; }
+.commit-notice {
+  border: 1px solid ${C.emerald}66; background: rgba(52,211,153,0.10); color: ${C.text};
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem; font-size: 13.5px;
+  cursor: pointer;
+}
+
 .home-links { display: flex; gap: 8px; margin-bottom: 1.2rem; flex-wrap: wrap; }
 .home-link-btn {
   background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
@@ -5050,9 +5065,43 @@ function hashStr(s) {
 // derivation below keeps the board renderable — and because the server's
 // generation policy currently issues that same legacy value, both paths agree.
 let SERVER_DAILY_SEEDS = {};
+// True when the viewer is signed out (phase 8 guest mode). Set by loadDaily
+// before any game can mount; hooks that talk to account-keyed endpoints
+// (hint counters, autosave) consult it so a guest run never fires requests
+// that can only 401.
+let GUEST_MODE = false;
 function serverDailySeed(gameId) {
   const s = SERVER_DAILY_SEEDS[gameId];
   return Number.isFinite(s) ? s : null;
+}
+
+// ---- Anonymous pending runs (phase 8, spec §6.10) ---------------------------
+// A guest's finished daily run is held client-side as a pending run — one per
+// game, overwritten across days, no server state at all. On the first
+// AUTHENTICATED load the client posts each same-day run to
+// POST /api/daily/:gameId/commit ("make it count") and clears the slot. A run
+// not claimed before the UTC reset simply expires: yesterday's board can't
+// join today's leaderboard.
+const PENDING_RUNS_KEY = 'pc_pending_runs_v1';
+function loadPendingRuns() {
+  try {
+    const m = JSON.parse(localStorage.getItem(PENDING_RUNS_KEY));
+    return m && typeof m === 'object' ? m : {};
+  } catch { return {}; }
+}
+function savePendingRun(gameId, run) {
+  try {
+    const m = loadPendingRuns();
+    m[gameId] = run;
+    localStorage.setItem(PENDING_RUNS_KEY, JSON.stringify(m));
+  } catch {}
+}
+function clearPendingRun(gameId) {
+  try {
+    const m = loadPendingRuns();
+    delete m[gameId];
+    localStorage.setItem(PENDING_RUNS_KEY, JSON.stringify(m));
+  } catch {}
 }
 
 // A fresh seeded RNG for (today, gameId). Everyone on the same UTC day gets the
@@ -5241,6 +5290,7 @@ function useDailyHints({ gameId, maxHints }) {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
+    if (GUEST_MODE) return; // guests count hints locally — no account counter
     let alive = true;
     (async () => {
       const { ok, body } = await api(`/api/daily/${gameId}/hint`);
@@ -5258,6 +5308,15 @@ function useDailyHints({ gameId, maxHints }) {
   // fewer free hint today — never a lost purchase).
   const buy = async (onReveal) => {
     if (buying || exhausted) return;
+    // Guest mode (phase 8): hints work, counted locally for this run only —
+    // there's no account to key the server's daily counter to, and the POST
+    // would just 401. Same per-board cap as signed-in play.
+    if (GUEST_MODE) {
+      const applied = onReveal ? onReveal(hintsPurchased) : true;
+      if (applied === false) return;
+      setHintsPurchased((n) => n + 1);
+      return;
+    }
     setBuying(true);
     setMsg('');
     const { ok, status, body } = await api(`/api/daily/${gameId}/hint`, {
@@ -6351,7 +6410,7 @@ function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay
         </div>
       )}
       {authOk === false && (
-        <div className="gotd-signedout">Sign in inside Usernode to play today's deal and join the board.</div>
+        <div className="gotd-signedout">Play today's deal free as a guest — sign in to join the board and keep a streak.</div>
       )}
     </div>
   );
@@ -6551,11 +6610,14 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
       {resuming && (
         <div className="pregame-resume-note">▶ You have a run in progress — jump back in where you left off.</div>
       )}
-      <button className="primary-btn pregame-play" onClick={onPlay} disabled={game.daily && !authOk}>
-        {resuming ? '▶ Resume' : 'Play'}
+      <button className="primary-btn pregame-play" onClick={onPlay}>
+        {resuming ? '▶ Resume' : !authOk && game.daily ? 'Play as guest' : 'Play'}
       </button>
       {game.daily && !authOk && (
-        <div className="pregame-signedout">Signed out — open PuzzleChain inside Usernode to play today's deal.</div>
+        <div className="pregame-signedout">
+          Playing as a guest — finish today's board and sign in before midnight UTC
+          to put your run on the leaderboard and start a streak.
+        </div>
       )}
       <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
       {onChat && (
@@ -18293,6 +18355,9 @@ function App() {
   const [myRooms, setMyRooms] = useState([]);
   // Game whose public chat room is open (null = closed).
   const [chatGame, setChatGame] = useState(null);
+  // Phase 8 "make it count": banner shown after a pending anonymous run was
+  // retroactively committed on an authenticated load.
+  const [commitNotice, setCommitNotice] = useState(null);
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Classic Games — Game Menu state. `classicGameMode` is the active mode of
@@ -18346,6 +18411,50 @@ function App() {
 
   // Hydrate today's locked/result state from the server on mount, and
   // recompute the score from finished attempts so it survives reloads.
+  // Phase 8 "make it count": on an authenticated load, retroactively commit
+  // any SAME-DAY pending anonymous runs through POST /api/daily/:gameId/commit
+  // (full validation parity with normal finishes), then clear the local slot.
+  // Expired (410), already-played (409), or invalid (400) runs are discarded —
+  // boards freeze at midnight UTC and a signed-in run always stands. Server
+  // hiccups keep the run for a retry on the next load.
+  const commitPendingRuns = async (daily) => {
+    const runs = loadPendingRuns();
+    const ids = Object.keys(runs);
+    if (!ids.length) return;
+    const serverDayNum = Math.floor(new Date(daily.serverNowUtc).getTime() / 86400000);
+    for (const gid of ids) {
+      const run = runs[gid];
+      const game = GAMES.find((g) => g.id === gid);
+      if (!run || !game || run.dayNum !== serverDayNum || !(run.score > 0)) {
+        clearPendingRun(gid);
+        continue;
+      }
+      if (daily.attempts && daily.attempts[gid] && daily.attempts[gid].finishedAt) {
+        clearPendingRun(gid); // already played signed-in — that run stands
+        continue;
+      }
+      try {
+        const { ok, status, body } = await api(`/api/daily/${gid}/commit`, {
+          method: 'POST',
+          body: JSON.stringify({
+            seed: run.seed, score: run.score, steps: run.steps, timeSecs: run.secs,
+            moves: Array.isArray(run.moves) ? run.moves : [],
+            replay: run.replay === true,
+          }),
+        });
+        if (ok && body && body.attempt) {
+          setAttempts((prev) => ({ ...prev, [gid]: body.attempt }));
+          if (typeof body.streak === 'number') setStreak(body.streak);
+          setTotalScore((t) => t + (body.attempt.score || 0));
+          setCommitNotice(`✅ Your guest ${game.name} run now counts — you're on today's board!`);
+          clearPendingRun(gid);
+        } else if (Number.isFinite(status) && status !== 500 && status !== 0) {
+          clearPendingRun(gid);
+        }
+      } catch {}
+    }
+  };
+
   const loadDaily = async () => {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
@@ -18353,6 +18462,7 @@ function App() {
     const { ok, status, body } = await api(path);
     if (ok && body) {
       setBadgeLoadState('ok');
+      GUEST_MODE = false;
       setAuthOk(true);
       setUser(body.user || null);
       setAttempts(body.attempts || {});
@@ -18372,12 +18482,16 @@ function App() {
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
       setTotalScore(sum);
+      // Phase 8 "make it count": commit any same-day pending anonymous runs
+      // now that we're authenticated. Fire-and-forget; state merges on success.
+      commitPendingRuns(body);
     } else {
       // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
       // so persistence isn't guaranteed — reflect that in the nav.
       // Distinguish "signed out" (401) from a transient backend failure so the
       // badge slot can explain the empty space instead of rendering nothing.
       setBadgeLoadState(status === 401 ? 'signedout' : 'error');
+      GUEST_MODE = true;
       setAuthOk(false);
       setUser(null);
       setStreak(0);
@@ -18411,6 +18525,34 @@ function App() {
       .then(({ ok, body }) => { if (ok && body) setMyRooms(body.rooms || []); })
       .catch(() => {});
   }, [loading, authOk, screen]);
+
+  // ?demo=makeitcount: render the anonymous end screen (score + would-be rank
+  // + "make it count" CTA) without an actual signed-out session, so proposal
+  // checks can assert on it. The server side of this param seeds today's
+  // boards (same fixture as demo=leaderboard) so the rank-preview has real
+  // ranks to compute against. Available in every environment — it's an
+  // explicit opt-in demo param, not an env-gated code path.
+  useEffect(() => {
+    if (loading) return;
+    if (new URLSearchParams(window.location.search).get('demo') !== 'makeitcount') return;
+    const g = GAMES.find((x) => x.id === 'sudoku');
+    if (!g) return;
+    setCurrentGame(g);
+    setScreen('game');
+    setWinData({
+      score: 905, bonus: 0, finalScore: 905, steps: 21, timeSecs: 95,
+      multiplier: 1, effectiveStreak: 0,
+      guest: true, guestSaved: false, gameId: 'sudoku', canPost: false,
+      share: `PuzzleChain Mini Sudoku — solved today's board in 01:35!\nPlay the same board (no login): ${window.location.origin}/?game=sudoku`,
+    });
+    api('/api/public/daily/sudoku/rank-preview?timeSecs=95&steps=21')
+      .then(({ ok, body }) => {
+        if (ok && body && Number.isFinite(body.rank)) {
+          setWinData((prev) => (prev && prev.guest ? { ...prev, guestRank: body.rank, guestOf: body.of } : prev));
+        }
+      })
+      .catch(() => {});
+  }, [loading]);
 
   // ?chat=<gameId> deep link opens that game's chat room once the daily load
   // (and any ?demo= fixture seeding inside it) has settled. Proposal tests use
@@ -18533,6 +18675,20 @@ function App() {
   // Claim (or resume) the day's single attempt and mount the game. Extracted
   // from launchGame so the pre-game screen's Play button owns consume-on-start.
   const startDailyRun = async (game) => {
+    // Guest mode (phase 8): a signed-out visitor plays today's board from the
+    // public seed with NO server claim — the one-play lock is account-keyed
+    // and can't apply to guests (§6.7's structural defense: the board only
+    // takes accounted entries, so replaying anonymously buys nothing). The
+    // finished run is held locally and committed retroactively on sign-in.
+    if (!authOk) {
+      dailyRunLog.current = { moves: [], replayOk: true };
+      setCurrentGame(game);
+      setStepCount(0);
+      setWinData(null);
+      setLoseData(null);
+      setScreen('game');
+      return;
+    }
     const existing = attempts[game.id];
     if (existing) {
       if (existing.finishedAt) {
@@ -18616,6 +18772,9 @@ function App() {
   // a tab close. Never blocks gameplay.
   const handleSaveProgress = (progress, steps, secs) => {
     if (!currentGame) return;
+    // Guests have no server attempt row to save into — the POST would just
+    // 401 and log console errors. A guest run lives only until its finish.
+    if (!authOk) return;
     const gameId = currentGame.id;
     api(`/api/daily/${gameId}/progress`, {
       method: 'POST',
@@ -18747,6 +18906,41 @@ function App() {
       // dead zone ReferenceError that previously killed the entire win flow
       // (no overlay, no finish call). Keep this above setWinData.
       const gameId = currentGame.id;
+      // Guest run (phase 8): no server finish. Hold the run locally as a
+      // same-day pending run (moves + seed, the exact payload a normal finish
+      // sends, so the retroactive commit gets full validation parity), fetch
+      // the would-be rank from the public read surface, and show the
+      // anonymous end screen with the "make it count" CTA.
+      if (!authOk) {
+        const log = dailyRunLog.current;
+        const seed = serverDailySeed(gameId);
+        if (seed != null) {
+          savePendingRun(gameId, {
+            dayNum: utcDayNum(offset), gameId, seed,
+            score, steps, secs: timeSecs,
+            moves: log.moves.slice(0, 800),
+            replay: log.replayOk && log.moves.some(m => Number.isInteger(m.tileType)),
+            at: new Date().toISOString(),
+          });
+        }
+        setWinData({
+          score, bonus: 0, finalScore: score, steps, timeSecs,
+          multiplier: 1, effectiveStreak: 0,
+          guest: true, guestSaved: seed != null,
+          share: (meta && meta.share ? meta.share + '\n' : '') +
+            `Play the same board (no login): ${window.location.origin}/?game=${gameId}`,
+          gameId, canPost: false,
+        });
+        try {
+          const { ok, body } = await api(
+            `/api/public/daily/${gameId}/rank-preview?timeSecs=${Math.round(timeSecs || 0)}&steps=${Math.round(steps || 0)}`
+          );
+          if (ok && body && Number.isFinite(body.rank)) {
+            setWinData(prev => (prev && prev.guest ? { ...prev, guestRank: body.rank, guestOf: body.of } : prev));
+          }
+        } catch {}
+        return;
+      }
       // The streak this win lands in: the first finished game of the day extends
       // the consecutive-day streak by 1; a second game the same day reuses the
       // same day count (the multiplier is per-day, not per-game).
@@ -18781,7 +18975,12 @@ function App() {
         prevBest,
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
-        share: meta && meta.share,
+        // Daily share texts carry a link that lands recipients on the
+        // playable no-login challenge (the ?game= pre-game screen, which
+        // guests can now play from — phase 8).
+        share: meta && meta.share
+          ? `${meta.share}\nPlay the same board (no login): ${window.location.origin}/?game=${gameId}`
+          : undefined,
         hintsUsed: meta && meta.hintsUsed,
         wordsSolved: meta && meta.wordsSolved,
         wordsTotal: meta && meta.wordsTotal,
@@ -18834,6 +19033,18 @@ function App() {
         return;
       }
       const gameId = currentGame.id;
+      // Guest loss (phase 8): nothing to commit — a loss has no board entry —
+      // so just show the overlay with the guest note. No server call (no
+      // attempt row exists), no local pending run.
+      if (!authOk) {
+        setLoseData({
+          steps, timeSecs,
+          share: meta && meta.share,
+          answer: meta && meta.answer,
+          guest: true,
+        });
+        return;
+      }
       setLoseData({
         steps,
         timeSecs,
@@ -19216,6 +19427,9 @@ function App() {
                   </p>
                 )}
               </div>
+              {commitNotice && (
+                <div className="commit-notice" onClick={() => setCommitNotice(null)}>{commitNotice}</div>
+              )}
               {featuredGame ? (
                 <GotdHero
                   game={featuredGame}
@@ -19470,7 +19684,7 @@ function App() {
                 <div className="bu-name">{winData.justAchievement.name}</div>
               </div>
             )}
-            {!winData.isClassic && (() => {
+            {!winData.isClassic && !winData.guest && (() => {
               // Next-milestone progress so every solve shows forward motion even
               // when nothing unlocked this run. Streak progress is based on the
               // streak this win landed in; solve progress on the lifetime count.
@@ -19493,6 +19707,21 @@ function App() {
                 <button onClick={retryDailyFinish} disabled={winData.syncing}>
                   {winData.syncing ? 'Retrying…' : 'Retry sync'}
                 </button>
+              </div>
+            )}
+            {winData.guest && (
+              <div className="guest-cta">
+                <div className="guest-rank">
+                  {Number.isFinite(winData.guestRank)
+                    ? <span>You'd be <strong>#{winData.guestRank}</strong> of {winData.guestOf} on today's board</span>
+                    : <span>Great solve — today's board takes signed-in entries</span>}
+                </div>
+                <div className="guest-note">
+                  🔑 <strong>Make it count — sign in.</strong> Open PuzzleChain inside
+                  Usernode and this exact run joins today's leaderboard and starts
+                  your streak.
+                  {winData.guestSaved && ' Your run is saved on this device — it counts if you sign in before midnight UTC.'}
+                </div>
               </div>
             )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
@@ -19551,6 +19780,12 @@ function App() {
                 <span className="v mono">+0</span>
               </div>
             </div>
+            {loseData.guest && (
+              <div className="guest-note" style={{ marginBottom: '0.8rem' }}>
+                🔑 Playing as a guest — sign in inside Usernode to lock in streaks
+                and appear on daily boards.
+              </div>
+            )}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (

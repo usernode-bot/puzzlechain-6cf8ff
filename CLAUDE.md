@@ -388,6 +388,44 @@ pieces (all in `public/app.jsx`):
   tab renders only after `loadDaily` settles so the fixture lands
   before the ladder fetch.
 
+## Game Corner phase 5 — turn-based rules registry + board games
+
+- **Rules registry (`lib/board-rules.js`).** Pure, DB-free rules
+  modules shaped like `lib/dapp.js`'s `gameEngines`, one per
+  turn-based game: `initialState()` (must include `currentPlayer`)
+  and `applyMove(state, player, move)` → `{ state, gameOver, winner }`
+  (throws on an illegal move; the endpoint surfaces it as a 400).
+  Mancala's pure rules (`srvMncDistribute`/`srvMncApplyMove`) and the
+  Chutes & Ladders roll logic were EXTRACTED here from server.js —
+  server.js re-imports the mancala functions under their old names so
+  the bot AI / ZK replay / daily-challenge call sites are untouched.
+  Dice games own their randomness server-side (`crypto.randomInt`).
+  `boardRules.selfTest()` runs at boot next to the dapp self-test.
+- **Five new board games** — Checkers, Reversi, Four in a Row, Gomoku,
+  Ludo (`BOARD_RULE_GAME_IDS`) — run on the EXISTING classic_rooms
+  infrastructure: create/join by room code, turn ownership from
+  `state.currentPlayer`, `move_seq` CAS, 1.5s polling, the guarded
+  forfeit endpoint, and ladder rating on finish (all five are in
+  `H2H_GAME_IDS`). The generic move endpoint dispatches on the
+  registry; the move payload is game-specific under `{ move: {...} }`
+  (chutes' legacy top-level roll body still works). They are
+  **online-only and tier C**: the server referees every move, so the
+  client (`BoardRoomGame` → `OnlineRoomSetup` + `BoardOnlineRoom` +
+  per-game `BOARD_VIEWS` renderers) only renders polled state and
+  submits move intents — no client-side rules to drift.
+  - Checkers: captures not forced; multi-jump keeps the turn
+    (`mustJumpFrom`); promotion ends a chain; no pieces/no moves loses.
+  - Reversi: auto-pass when a side has no reply; disc count on double
+    pass. Four in a Row: 7×6, draw on full board. Gomoku: 15×15,
+    five-or-more wins. Ludo: relative token positions (−1 base,
+    0–50 ring, 51–56 home column, 57 home), roll→move phases, 6 leaves
+    base and re-rolls, ring captures except safe start cells, exact
+    roll to finish.
+- **Staging fixtures:** `demo=ladder` now also seeds checkers/reversi
+  ratings; `demo=boardroom` (re-)arms a WAITING Checkers room with
+  code `DEMOBG` whose state starts at `currentPlayer: 2`, so a tester
+  who joins it moves immediately against a fake opponent.
+
 ## Retired features (Game Corner phase 1 — do not resurrect)
 
 As of the "Game Corner" evolution's phase-1 subtraction, the following

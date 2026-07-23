@@ -376,6 +376,36 @@
       "name": "Ladder endpoint readable without auth",
       "path": "/api/ladder/chutes-ladders",
       "expectText": "entries"
+    },
+    {
+      "name": "Checkers screen offers online room setup",
+      "path": "/?game=checkers&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Reversi screen offers online room setup",
+      "path": "/?game=reversi&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Four in a Row screen offers online room setup",
+      "path": "/?game=fourinarow&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Gomoku screen offers online room setup",
+      "path": "/?game=gomoku&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Ludo screen offers online room setup",
+      "path": "/?game=ludo&play=1",
+      "expectText": "Create Room"
+    },
+    {
+      "name": "Ladder picker includes Checkers with seeded ratings",
+      "path": "/?tab=ladder&demo=ladder",
+      "expectText": "Checkers"
     }
   ]
 }

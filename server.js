@@ -5,6 +5,10 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const ethers = require('ethers');
 const dapp = require('./lib/dapp');
+const boardRules = require('./lib/board-rules');
+// Mancala's pure rules moved to the rules registry (phase 5); keep the local
+// names so the routes / bot AI / ZK replay / daily challenge stay untouched.
+const { srvMncOpposite, srvMncDistribute, srvMncApplyMove } = boardRules;
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -159,6 +163,19 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+  // Phase 5 board games — server-authoritative rules modules (lib/board-rules.js)
+  // over classic_rooms; online head-to-head only, rated on the ladder. Tier C:
+  // the server IS the referee, so no replay validation is needed.
+  checkers:          { name: 'Checkers',          category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+  reversi:           { name: 'Reversi',           category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+  fourinarow:        { name: 'Four in a Row',     category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  gomoku:            { name: 'Gomoku',            category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+  ludo:              { name: 'Ludo',              category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
 };
 // Retired games (Texas Hold 'Em, Idle Empire, the PvP staking arena's
 // tilematch_pvp pseudo-game) are deliberately absent: their routes and lobby
@@ -256,7 +273,11 @@ async function ensureDailySeeds() {
 // ---- Rating ladder (phase 4) ------------------------------------------------
 // Head-to-head games whose online matches feed the Elo ladder: turn-based
 // rooms (Mancala, Chutes & Ladders) and score races (2048, Block Blast).
-const H2H_GAME_IDS = new Set(['mancala', 'chutes-ladders', '2048', 'blockblast']);
+const H2H_GAME_IDS = new Set([
+  'mancala', 'chutes-ladders', '2048', 'blockblast',
+  // Phase 5 board games (rules modules over classic_rooms).
+  'checkers', 'reversi', 'fourinarow', 'gomoku', 'ludo',
+]);
 const ELO_K = 32;
 const ELO_START = 1000;
 
@@ -1919,48 +1940,6 @@ function generateRoomId() {
   return id;
 }
 
-function srvMncOpposite(i) { return 12 - i; }
-
-// Server-side reimplementation of mncDistribute (mirrors client logic).
-function srvMncDistribute(pits, pitIdx, player) {
-  const p = pits.slice();
-  const stones = p[pitIdx];
-  p[pitIdx] = 0;
-  const skipStore = player === 1 ? 13 : 6;
-  const ownStore  = player === 1 ? 6  : 13;
-  const ownMin    = player === 1 ? 0  : 7;
-  const ownMax    = player === 1 ? 5  : 12;
-  let cur = pitIdx;
-  for (let i = 0; i < stones; i++) {
-    do { cur = (cur + 1) % 14; } while (cur === skipStore);
-    p[cur]++;
-  }
-  const lastIdx = cur;
-  const extraTurn = lastIdx === ownStore;
-  if (!extraTurn && lastIdx >= ownMin && lastIdx <= ownMax && p[lastIdx] === 1) {
-    const opp = srvMncOpposite(lastIdx);
-    if (p[opp] > 0) {
-      p[ownStore] += p[opp] + 1;
-      p[lastIdx]  = 0;
-      p[opp]      = 0;
-    }
-  }
-  return { pits: p, extraTurn };
-}
-
-// Apply distribute and sweep; returns final pits + game outcome.
-function srvMncApplyMove(pits, pitIdx, player) {
-  const { pits: p, extraTurn } = srvMncDistribute(pits, pitIdx, player);
-  const p1Empty = p.slice(0, 6).every(v => v === 0);
-  const p2Empty = p.slice(7, 13).every(v => v === 0);
-  if (p1Empty || p2Empty) {
-    for (let i = 0; i < 6;  i++) { p[6]  += p[i]; p[i] = 0; }
-    for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; }
-    const winner = p[6] > p[13] ? '1' : p[13] > p[6] ? '2' : 'draw';
-    return { pits: p, extraTurn: false, gameOver: true, winner, nextPlayer: null };
-  }
-  return { pits: p, extraTurn, gameOver: false, winner: null, nextPlayer: extraTurn ? player : (player === 1 ? 2 : 1) };
-}
 
 /* ============================================================
    Mancala Daily Challenge — deterministic board + AI engine
@@ -3226,7 +3205,7 @@ app.get('/api/daily', async (req, res) => {
         ['staging-demo-rival-7', 'Staging rival Quill',  987, 0,  4, 11,   0],
         ['staging-demo-rival-8', 'Staging rival Rho',    934, 0,  3, 12, -27],
       ];
-      for (const g of ['chutes-ladders', '2048']) {
+      for (const g of ['chutes-ladders', '2048', 'checkers', 'reversi']) {
         for (const [uid, name, elo, streak, wins, losses, delta] of rivals) {
           await pool.query(
             `INSERT INTO game_ratings
@@ -3261,6 +3240,30 @@ app.get('/api/daily', async (req, res) => {
           [rid, gid, p1, n1, p2, n2, winner]
         );
       }
+    }
+
+    // Staging-only demo seed (phase 5): a WAITING Checkers room with the code
+    // DEMOBG, created by a fake opponent, whose state has currentPlayer: 2 —
+    // so a tester who joins (becoming player 2) can move immediately and see
+    // the server-authoritative board respond. Idempotent; no-op in production.
+    if (IS_STAGING && req.query.demo === 'boardroom') {
+      const ckInit = boardRules.getRules('checkers').initialState();
+      ckInit.currentPlayer = 2;
+      await pool.query(
+        `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state, status)
+         VALUES ('DEMOBG', 'checkers', 'staging-demo-opp', 'Staging demo Opp', $1::jsonb, 'waiting')
+         ON CONFLICT (id) DO NOTHING`,
+        [JSON.stringify(ckInit)]
+      );
+      // A fresh copy for repeat testers: if the demo room already finished or
+      // was joined, re-arm it (still obviously fake, still idempotent per state).
+      await pool.query(
+        `UPDATE classic_rooms
+            SET player2_id = NULL, player2_name = NULL, status = 'waiting',
+                state = $1::jsonb, move_seq = 0, winner = NULL, last_move_at = now()
+          WHERE id = 'DEMOBG' AND game_id = 'checkers' AND status <> 'waiting'`,
+        [JSON.stringify(ckInit)]
+      );
     }
 
     if (IS_STAGING && req.query.demo === 'classic-scores') {
@@ -4048,10 +4051,13 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
 // Currently wired for Chutes & Ladders; the table/state is generic so other
 // classic games can slot in later. Any authenticated user can join by code.
 
-// Chutes & Ladders board map (mirrors CNL_LADDERS/CNL_CHUTES in public/app.jsx).
-const CNL_LADDERS_SRV = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
-const CNL_CHUTES_SRV  = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
-const CNL_JUMPS_SRV   = Object.assign({}, CNL_LADDERS_SRV, CNL_CHUTES_SRV);
+// Turn-based rules now live in lib/board-rules.js (phase 5): one registry
+// module per game — Chutes & Ladders (extracted from the inline rules that
+// used to sit here), plus Checkers, Reversi, Four in a Row, Gomoku, and Ludo.
+// The generic room endpoints below dispatch on boardRules.getRules(gameId).
+const BOARD_RULE_GAME_IDS = new Set(
+  Object.keys(boardRules.boardRules).filter((id) => id !== 'mancala')
+);
 
 function shapeClassicRoom(r) {
   return {
@@ -4073,33 +4079,13 @@ function shapeClassicRoom(r) {
   };
 }
 
-// Apply a single Chutes & Ladders roll for `player` (1|2) to the room state.
-// Returns the next state plus terminal info. Server owns the dice (anti-cheat).
-function cnlApplyRoll(state, player) {
-  const die = crypto.randomInt(1, 7); // 1..6
-  const fromKey = player === 1 ? 'p1Pos' : 'p2Pos';
-  const from = state[fromKey] || 0;
-  const next = { ...state, die, rolls: (state.rolls || 0) + 1, lastJump: null };
-  let landed = from;
-  if (from + die <= 100) {
-    landed = from + die;
-    if (CNL_JUMPS_SRV[landed] !== undefined) {
-      next.lastJump = { from: landed, to: CNL_JUMPS_SRV[landed] };
-      landed = CNL_JUMPS_SRV[landed];
-    }
-  }
-  next[fromKey] = landed;
-  const gameOver = landed === 100;
-  next.currentPlayer = gameOver ? player : (player === 1 ? 2 : 1);
-  return { state: next, gameOver, winner: gameOver ? String(player) : null };
-}
-
 // Create an open room. Body: nothing needed; gameId is the path param.
 app.post('/api/classic/:gameId/rooms', async (req, res) => {
   const { gameId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
-  const initState = gameId === 'chutes-ladders'
-    ? { p1Pos: 0, p2Pos: 0, currentPlayer: 1, die: null, rolls: 0 }
+  const rules = boardRules.getRules(gameId);
+  const initState = BOARD_RULE_GAME_IDS.has(gameId) && rules
+    ? rules.initialState()
     : CLASSIC_RACE_GAME_IDS.has(gameId)
     ? { mode: 'race' }
     : {};
@@ -4165,11 +4151,17 @@ app.get('/api/classic/:gameId/rooms/:roomId', async (req, res) => {
 
 // Apply a move. For Chutes & Ladders the only move is { type: 'roll' }; the
 // server rolls the die so neither client can cheat. move_seq guards duplicates.
+// Apply a turn-based move. The per-game rules come from the registry
+// (lib/board-rules.js): the endpoint owns loading, turn ownership, and the
+// move_seq CAS; the module owns legality and the state transition. The move
+// payload is game-specific (`{ move: {...} }`; legacy chutes clients send the
+// roll fields at the top level, which its module ignores anyway).
 app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
   const { gameId, roomId } = req.params;
   const { moveSeq } = req.body || {};
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
-  if (gameId !== 'chutes-ladders') return res.status(400).json({ error: 'Online moves not supported for this game' });
+  const rules = BOARD_RULE_GAME_IDS.has(gameId) ? boardRules.getRules(gameId) : null;
+  if (!rules) return res.status(400).json({ error: 'Online moves not supported for this game' });
   if (typeof moveSeq !== 'number') return res.status(400).json({ error: 'moveSeq is required' });
   try {
     const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
@@ -4182,7 +4174,13 @@ app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
     if (player === 1 && req.user.id !== r.player1_id) return res.status(403).json({ error: 'Not your turn' });
     if (player === 2 && req.user.id !== r.player2_id) return res.status(403).json({ error: 'Not your turn' });
 
-    const { state: newState, gameOver, winner } = cnlApplyRoll(r.state || {}, player);
+    let newState, gameOver, winner;
+    try {
+      const result = rules.applyMove(r.state || rules.initialState(), player, req.body.move || req.body);
+      newState = result.state; gameOver = result.gameOver; winner = result.winner;
+    } catch (moveErr) {
+      return res.status(400).json({ error: moveErr.message || 'Illegal move' });
+    }
     const newStatus = gameOver ? 'finished' : 'active';
 
     const { rows: updated } = await pool.query(
@@ -6610,6 +6608,12 @@ try {
   console.log('[dapp] verification self-test passed');
 } catch (e) {
   console.error('[dapp] verification self-test FAILED:', e.message);
+}
+try {
+  boardRules.selfTest();
+  console.log('[board-rules] rules-registry self-test passed');
+} catch (e) {
+  console.error('[board-rules] rules-registry self-test FAILED:', e.message);
 }
 
 // Global last-resort handlers so a stray rejection/throw during boot or at

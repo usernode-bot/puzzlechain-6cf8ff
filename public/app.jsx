@@ -3486,6 +3486,111 @@ body {
   .badges-earned-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
   .badges-earned-row.hide { display: none; }
 }
+/* ---- Phase 5 board games (Checkers / Reversi / Four in a Row / Gomoku / Ludo) ---- */
+.brg-intro {
+  font-size: 0.85rem; color: ${C.text}; background: ${C.accent}14;
+  border: 1px solid ${C.accent}44; border-radius: 10px;
+  padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; text-align: center;
+}
+.brg-note {
+  text-align: center; font-size: 0.8rem; color: ${C.gold}; margin: 0.4rem 0;
+  display: flex; gap: 0.8rem; justify-content: center; align-items: center; flex-wrap: wrap;
+}
+.brg-legend {
+  display: flex; gap: 0.9rem; justify-content: center; align-items: center;
+  font-size: 0.72rem; color: ${C.muted}; margin-top: 0.6rem; flex-wrap: wrap;
+}
+.brg-legend > span { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+.ck-board {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
+  border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
+}
+.ck-cell { background: #d8c49a; display: flex; align-items: center; justify-content: center; }
+.ck-cell.dark { background: #7a5a3a; cursor: pointer; }
+.ck-cell.sel { box-shadow: inset 0 0 0 3px ${C.gold}; }
+.ck-piece {
+  width: 74%; height: 74%; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; color: #ffffffcc;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.35);
+}
+.ck-piece.p1 { background: ${C.accent}; }
+.ck-piece.p2 { background: #2b2f3d; border: 1px solid #555; }
+.ck-piece-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
+.ck-piece-mini.p1 { background: ${C.accent}; }
+.ck-piece-mini.p2 { background: #2b2f3d; border: 1px solid #555; }
+
+.rv-board {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
+  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
+}
+.rv-cell { background: #1d5c3a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.rv-disc { width: 76%; height: 76%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
+.rv-disc.d1, .rv-disc-mini.d1 { background: #171a24; border: 1px solid #444; }
+.rv-disc.d2, .rv-disc-mini.d2 { background: #f2f0e8; }
+.rv-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
+.rv-count { display: inline-flex; align-items: center; gap: 0.3rem; color: ${C.text}; font-weight: 600; }
+
+.fir-board {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  width: min(92vw, 340px); margin: 0 auto; padding: 8px;
+  background: #22335e; border-radius: 12px;
+}
+.fir-cell {
+  aspect-ratio: 1; background: ${C.bg || '#0a0e1a'}; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.fir-cell.last { box-shadow: 0 0 0 2px ${C.gold}; }
+.fir-disc { width: 86%; height: 86%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
+.fir-disc.d1, .fir-disc-mini.d1 { background: ${C.rose}; }
+.fir-disc.d2, .fir-disc-mini.d2 { background: ${C.gold}; }
+.fir-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
+
+.gmk-scroll { overflow-x: auto; }
+.gmk-board {
+  display: grid; grid-template-columns: repeat(15, 1fr); gap: 1px;
+  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
+  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 6px; overflow: hidden;
+}
+.gmk-cell { background: #b08b4f; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.gmk-cell.last { box-shadow: inset 0 0 0 2px ${C.gold}; }
+.gmk-stone { width: 78%; height: 78%; border-radius: 50%; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3); }
+.gmk-stone.s1 { background: #171a24; }
+.gmk-stone.s2 { background: #f2f0e8; }
+
+.ludo-board {
+  display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
+  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
+  background: ${C.surface}; border: 2px solid ${C.border}; border-radius: 10px;
+  position: relative; padding: 2px; gap: 1px;
+}
+.ludo-cell {
+  border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; color: ${C.muted};
+}
+.ludo-cell.ring { background: ${C.card}; border: 1px solid ${C.border}; }
+.ludo-cell.ring.safe { color: ${C.gold}; }
+.ludo-cell.ring.start1 { background: ${C.accent}33; border-color: ${C.accent}; }
+.ludo-cell.ring.start2 { background: ${C.rose}33; border-color: ${C.rose}; }
+.ludo-cell.home1 { background: ${C.accent}22; border: 1px dashed ${C.accent}66; }
+.ludo-cell.home2 { background: ${C.rose}22; border: 1px dashed ${C.rose}66; }
+.ludo-cell.base1 { background: ${C.accent}18; border: 1px solid ${C.accent}55; border-radius: 50%; }
+.ludo-cell.base2 { background: ${C.rose}18; border: 1px solid ${C.rose}55; border-radius: 50%; }
+.ludo-cell.center { background: ${C.gold}22; border: 1px solid ${C.gold}; font-size: 0.8rem; }
+.ludo-token {
+  z-index: 2; width: 85%; height: 85%; border-radius: 50%; align-self: center; justify-self: center;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; font-weight: 700; color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.ludo-token.p1 { background: ${C.accent}; }
+.ludo-token.p2 { background: ${C.rose}; }
+.ludo-token.movable { cursor: pointer; box-shadow: 0 0 0 2px ${C.gold}, 0 1px 3px rgba(0,0,0,0.5); animation: ludoPulse 0.9s ease-in-out infinite; }
+@keyframes ludoPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
 /* ---- Chutes & Ladders ---- */
 .cnl-banner {
   text-align: center; font-size: 0.82rem; font-weight: 600;
@@ -5719,7 +5824,11 @@ function TodayChampions({ onSelectUser }) {
    games, fed by online room/match results. Shows rating, current
    win streak, and this week's movement per player.
    ============================================================ */
-const LADDER_GAMES = ['chutes-ladders', 'mancala', '2048', 'blockblast'];
+const LADDER_GAMES = [
+  'chutes-ladders', 'mancala', '2048', 'blockblast',
+  // Phase 5 board games (rules modules over classic_rooms).
+  'checkers', 'reversi', 'fourinarow', 'gomoku', 'ludo',
+];
 
 function LadderScreen() {
   const [gameId, setGameId] = useState(LADDER_GAMES[0]);
@@ -14524,6 +14633,369 @@ const CNL_STREAK_KEY = 'puzzlechain_cnl_streak';
 
 // Chutes & Ladders wrapper — picks a mode (2P / Versus Bot / Online) and
 // delegates. Honors the Game Menu's gameMode/gameModeOpts props.
+/* ============================================================
+   Phase 5 board games — Checkers, Reversi, Four in a Row, Gomoku,
+   Ludo. Online head-to-head only: the SERVER is the referee (rules
+   modules in lib/board-rules.js over classic_rooms), so these
+   components only render polled state and submit move intents —
+   there are no client-side rules to drift out of sync.
+   ============================================================ */
+
+// Create/Join setup for the online-only board games (reuses the Mancala
+// mode-select styling).
+function OnlineRoomSetup({ gameId, onReady }) {
+  const [action, setAction] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const start = async () => {
+    if (action === 'create') {
+      setBusy(true);
+      const { ok, body } = await api(`/api/classic/${gameId}/rooms`, { method: 'POST' });
+      setBusy(false);
+      if (ok && body) onReady(body.id, 1);
+      else setError('Could not create room. Try again.');
+    } else if (action === 'join') {
+      const code = joinCode.trim().toUpperCase();
+      if (code.length < 4) { setError('Enter a valid room code.'); return; }
+      setBusy(true);
+      const { ok, status } = await api(`/api/classic/${gameId}/rooms/${code}/join`, { method: 'POST' });
+      setBusy(false);
+      if (ok) onReady(code, 2);
+      else if (status === 404) setError('Room not found. Check the code.');
+      else if (status === 409) setError('Room is full or you created it.');
+      else setError('Could not join. Try again.');
+    }
+  };
+
+  return (
+    <div className="mnc-mode-select">
+      <div className="brg-intro">
+        🌐 Online head-to-head — play a friend via room code. Wins count on the <strong>Ladder</strong>.
+      </div>
+      <div className="mnc-online-actions">
+        <div className="mnc-mode-sub">
+          <button className={'mnc-difficulty-pill' + (action === 'create' ? ' active' : '')} onClick={() => { setAction('create'); setError(''); }}>Create Room</button>
+          <button className={'mnc-difficulty-pill' + (action === 'join' ? ' active' : '')} onClick={() => { setAction('join'); setError(''); }}>Join Room</button>
+        </div>
+        {action === 'join' && (
+          <div className="mnc-join-form">
+            <input
+              className="mnc-join-input"
+              placeholder="Room code (e.g. AB3K7P)"
+              value={joinCode}
+              onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }}
+              maxLength={8}
+            />
+          </div>
+        )}
+      </div>
+      {error && <div className="mnc-join-error">{error}</div>}
+      {action && (
+        <button
+          className="mnc-mode-start-btn"
+          onClick={start}
+          disabled={busy || (action === 'join' && joinCode.trim().length < 4)}
+        >{busy ? 'Please wait…' : action === 'create' ? 'Create & share code' : 'Join game'}</button>
+      )}
+    </div>
+  );
+}
+
+// ---- Per-game board views ----------------------------------------------
+// Each gets { st, myPlayerNum, isMyTurn, submit } — pure render + intent.
+
+function ckOwnerOf(v) { return v === 1 || v === 3 ? 1 : v === 2 || v === 4 ? 2 : 0; }
+
+function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const [sel, setSel] = useState(null);
+  const board = st.board || [];
+  const click = (i) => {
+    if (!isMyTurn) return;
+    const owner = ckOwnerOf(board[i]);
+    if (owner === myPlayerNum) { setSel(i === sel ? null : i); return; }
+    if (sel != null && board[i] === 0) { submit({ from: sel, to: i }); setSel(null); }
+  };
+  return (
+    <div>
+      {st.mustJumpFrom != null && isMyTurn && (
+        <div className="brg-note">Chain jump! Continue with the same piece.</div>
+      )}
+      <div className="ck-board">
+        {board.map((v, i) => {
+          const r = Math.floor(i / 8), c = i % 8;
+          const dark = (r + c) % 2 === 1;
+          const owner = ckOwnerOf(v);
+          return (
+            <div key={i} className={'ck-cell' + (dark ? ' dark' : '') + (sel === i ? ' sel' : '')} onClick={() => dark && click(i)}>
+              {owner !== 0 && (
+                <div className={'ck-piece p' + owner + (v > 2 ? ' king' : '')}>{v > 2 ? '♛' : ''}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="brg-legend">
+        <span><span className="ck-piece-mini p1" /> Player 1 (moves down)</span>
+        <span><span className="ck-piece-mini p2" /> Player 2 (moves up)</span>
+      </div>
+    </div>
+  );
+}
+
+function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const board = st.board || [];
+  const p1 = board.filter(x => x === 1).length;
+  const p2 = board.filter(x => x === 2).length;
+  return (
+    <div>
+      <div className="brg-note">
+        <span className="rv-count"><span className="rv-disc-mini d1" /> {p1}</span>
+        <span className="rv-count"><span className="rv-disc-mini d2" /> {p2}</span>
+        {st.passed && <span style={{ marginLeft: '0.6rem' }}>Opponent had no move — you go again.</span>}
+      </div>
+      <div className="rv-board">
+        {board.map((v, i) => (
+          <div key={i} className="rv-cell" onClick={() => isMyTurn && v === 0 && submit({ cell: i })}>
+            {v !== 0 && <div className={'rv-disc d' + v} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
+  const board = st.board || [];
+  return (
+    <div>
+      <div className="fir-board">
+        {board.map((v, i) => (
+          <div
+            key={i}
+            className={'fir-cell' + (st.lastMove === i ? ' last' : '')}
+            onClick={() => isMyTurn && submit({ col: i % 7 })}
+          >
+            {v !== 0 && <div className={'fir-disc d' + v} />}
+          </div>
+        ))}
+      </div>
+      <div className="brg-legend">
+        <span><span className="fir-disc-mini d1" /> Player 1</span>
+        <span><span className="fir-disc-mini d2" /> Player 2</span>
+        <span style={{ color: C.muted }}>Tap a column to drop</span>
+      </div>
+    </div>
+  );
+}
+
+function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const board = st.board || [];
+  return (
+    <div className="gmk-scroll">
+      <div className="gmk-board">
+        {board.map((v, i) => (
+          <div
+            key={i}
+            className={'gmk-cell' + (st.lastMove === i ? ' last' : '')}
+            onClick={() => isMyTurn && v === 0 && submit({ cell: i })}
+          >
+            {v !== 0 && <div className={'gmk-stone s' + v} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Ludo board geometry — 15×15 grid mirror of the server module's relative
+// track (lib/board-rules.js): 52-cell ring, per-player 6-cell home column,
+// center home. [col,row] pairs; ring index 0 = P1 start, 26 = P2 start.
+const LUDO_RING_XY = [
+  [1,6],[2,6],[3,6],[4,6],[5,6], [6,5],[6,4],[6,3],[6,2],[6,1],[6,0], [7,0],[8,0],
+  [8,1],[8,2],[8,3],[8,4],[8,5], [9,6],[10,6],[11,6],[12,6],[13,6],[14,6], [14,7],[14,8],
+  [13,8],[12,8],[11,8],[10,8],[9,8], [8,9],[8,10],[8,11],[8,12],[8,13],[8,14], [7,14],[6,14],
+  [6,13],[6,12],[6,11],[6,10],[6,9], [5,8],[4,8],[3,8],[2,8],[1,8],[0,8], [0,7],[0,6],
+];
+const LUDO_HOME_XY = {
+  1: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+  2: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
+};
+const LUDO_BASE_XY = { 1: [[2,2],[4,2],[2,4],[4,4]], 2: [[10,10],[12,10],[10,12],[12,12]] };
+const LUDO_START_ABS = { 1: 0, 2: 26 };
+
+function ludoTokenXY(player, pos, tokenIdx) {
+  if (pos === -1) return LUDO_BASE_XY[player][tokenIdx];
+  if (pos >= 51 && pos <= 56) return LUDO_HOME_XY[player][pos - 51];
+  if (pos >= 57) return [7, 7];
+  return LUDO_RING_XY[(LUDO_START_ABS[player] + pos) % 52];
+}
+
+function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
+  const phase = st.phase || 'roll';
+  const myTokens = (myPlayerNum === 1 ? st.p1 : st.p2) || [];
+  const canMoveToken = (pos) => {
+    if (phase !== 'move' || !isMyTurn || st.die == null) return false;
+    if (pos >= 57) return false;
+    if (pos === -1) return st.die === 6;
+    return pos + st.die <= 57;
+  };
+  const cells = [];
+  // Ring
+  LUDO_RING_XY.forEach(([x, y], i) => {
+    const safe = i === 0 || i === 26;
+    const startOwner = i === 0 ? 1 : i === 26 ? 2 : 0;
+    cells.push(
+      <div key={'r' + i} className={'ludo-cell ring' + (safe ? ' safe' : '') + (startOwner ? ' start' + startOwner : '')}
+           style={{ gridColumn: x + 1, gridRow: y + 1 }}>{safe ? '★' : ''}</div>
+    );
+  });
+  // Home columns + center + bases
+  for (const p of [1, 2]) {
+    LUDO_HOME_XY[p].forEach(([x, y], i) => {
+      cells.push(<div key={'h' + p + i} className={'ludo-cell home' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
+    });
+    LUDO_BASE_XY[p].forEach(([x, y], i) => {
+      cells.push(<div key={'b' + p + i} className={'ludo-cell base' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
+    });
+  }
+  cells.push(<div key="center" className="ludo-cell center" style={{ gridColumn: 8, gridRow: 8 }}>🏁</div>);
+  // Tokens (offset stacked tokens slightly so pile-ups stay visible)
+  const tokens = [];
+  for (const p of [1, 2]) {
+    const toks = (p === 1 ? st.p1 : st.p2) || [];
+    toks.forEach((pos, i) => {
+      const [x, y] = ludoTokenXY(p, pos, i);
+      const mine = p === myPlayerNum;
+      const movable = mine && canMoveToken(pos);
+      tokens.push(
+        <div
+          key={'t' + p + i}
+          className={'ludo-token p' + p + (movable ? ' movable' : '')}
+          style={{
+            gridColumn: x + 1, gridRow: y + 1,
+            transform: `translate(${(i % 2) * 5 - 2}px, ${Math.floor(i / 2) * 5 - 2}px)`,
+          }}
+          onClick={() => movable && submit({ type: 'move', token: i })}
+        >{i + 1}</div>
+      );
+    });
+  }
+  return (
+    <div>
+      <div className="ludo-board">{cells}{tokens}</div>
+      <div className="cnl-die"><div className="cnl-die-face">{st.die == null ? '·' : st.die}</div></div>
+      {st.lastEvent === 'no-move' && <div className="brg-note">No legal move for that roll — turn passed.</div>}
+      {st.lastEvent === 'capture' && <div className="brg-note">💥 Capture! Token sent back to base.</div>}
+      <div className="cnl-roll-buttons">
+        <button
+          className="cnl-roll-btn"
+          style={{ background: myPlayerNum === 1 ? C.accent : C.rose }}
+          onClick={() => submit({ type: 'roll' })}
+          disabled={!isMyTurn || phase !== 'roll'}
+        >
+          {!isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a highlighted token'}
+        </button>
+      </div>
+      <div className="brg-legend">
+        <span>🎲 6 leaves base & rolls again</span>
+        <span>★ safe cells</span>
+        <span>Exact roll to finish</span>
+      </div>
+    </div>
+  );
+}
+
+const BOARD_VIEWS = {
+  checkers: CheckersBoardView,
+  reversi: ReversiBoardView,
+  fourinarow: FourInARowView,
+  gomoku: GomokuBoardView,
+  ludo: LudoBoardView,
+};
+
+// Polling room shell shared by all five board games (mirrors the Chutes &
+// Ladders online flow: waiting screen → status bar → board → finish → onWin).
+function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
+  const { room, pollingError, opponentDisconnected, submitMove } = useClassicRoom(gameId, roomId);
+  const winCalledRef = useRef(false);
+  const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
+  const secsRef = useRef(0); secsRef.current = secs;
+  const movesRef = useRef(0);
+
+  useEffect(() => {
+    if (!room || room.status !== 'finished' || winCalledRef.current) return;
+    winCalledRef.current = true;
+    const name = (GAMES.find(g => g.id === gameId) || {}).name || gameId;
+    const draw = room.winner === 'draw';
+    const youWin = room.winner === String(myPlayerNum);
+    onWin(youWin ? 200 : 0, movesRef.current, secsRef.current, {
+      winnerLabel: draw ? "It's a draw 🤝" : youWin ? 'You win! 🎉' : 'Opponent wins',
+      share: `♟️ ${name} online — ${draw ? 'we drew!' : youWin ? 'I won!' : 'good game!'}`,
+    });
+  }, [room && room.status]);
+
+  if (!room && !pollingError) {
+    return <div style={{ textAlign: 'center', padding: '2rem' }}><div className="mnc-spinner" style={{ margin: '0 auto 0.75rem' }} /><div style={{ color: C.muted, fontSize: '0.85rem' }}>Connecting…</div></div>;
+  }
+  if (pollingError === 'room_not_found') {
+    return <div style={{ textAlign: 'center', padding: '1.5rem', color: C.rose }}>Room not found.</div>;
+  }
+  if (room && room.status === 'waiting') {
+    return (
+      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+        <div style={{ color: C.muted, marginBottom: '0.6rem', fontSize: '0.85rem' }}>Waiting for opponent to join…</div>
+        <div className="mnc-room-code">{roomId}</div>
+        <div style={{ color: C.muted, fontSize: '0.78rem', marginTop: '0.4rem' }}>Share this room code</div>
+        <div className="mnc-spinner" style={{ margin: '1rem auto 0' }} />
+      </div>
+    );
+  }
+
+  const st = room.state || {};
+  const isMyTurn = room.status === 'active' && (st.currentPlayer || 1) === myPlayerNum;
+  const myColor = myPlayerNum === 1 ? C.accent : C.rose;
+  const turnLabel = room.status === 'finished'
+    ? (room.winner === 'draw' ? 'Draw' : room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
+    : isMyTurn ? 'Your turn' : "Opponent's turn";
+  const View = BOARD_VIEWS[gameId];
+  const submit = (move) => {
+    movesRef.current += 1;
+    onStepChange && onStepChange(movesRef.current);
+    submitMove({ move });
+  };
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
+        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.82rem' }}>P{myPlayerNum}</div></div>
+        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
+      </div>
+      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <View st={st} myPlayerNum={myPlayerNum} isMyTurn={isMyTurn} submit={submit} />
+    </div>
+  );
+}
+
+// Top-level component per board game: create/join setup, then the room.
+function BoardRoomGame({ gameId, onWin, onStepChange, resetKey }) {
+  const [roomInfo, setRoomInfo] = useState(null);
+  useEffect(() => { setRoomInfo(null); }, [resetKey]);
+  if (!roomInfo) {
+    return <OnlineRoomSetup gameId={gameId} onReady={(roomId, myPlayerNum) => setRoomInfo({ roomId, myPlayerNum })} />;
+  }
+  return <BoardOnlineRoom gameId={gameId} roomId={roomInfo.roomId} myPlayerNum={roomInfo.myPlayerNum} onWin={onWin} onStepChange={onStepChange} />;
+}
+
+function CheckersGame(props)   { return <BoardRoomGame gameId="checkers" {...props} />; }
+function ReversiGame(props)    { return <BoardRoomGame gameId="reversi" {...props} />; }
+function FourInARowGame(props) { return <BoardRoomGame gameId="fourinarow" {...props} />; }
+function GomokuGame(props)     { return <BoardRoomGame gameId="gomoku" {...props} />; }
+function LudoGame(props)       { return <BoardRoomGame gameId="ludo" {...props} />; }
+
 function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
   const [mode, setMode] = useState(gameMode || null);
   const [roomId, setRoomId] = useState((gameModeOpts && gameModeOpts.roomId) || null);
@@ -15158,6 +15630,97 @@ const GAMES = [
     ],
     component: HashRushGame,
     leaderboard: true,
+  },
+  // Phase 5 board games — online head-to-head over classic_rooms; the server
+  // referees every move (rules modules in lib/board-rules.js) and wins settle
+  // on the rating ladder.
+  {
+    id: 'checkers',
+    name: 'Checkers',
+    icon: '⛃',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Classic draughts vs a friend online — jump, chain captures, crown your kings.',
+    tag: 'Board',
+    tagColor: C.accent,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Move diagonally', body: 'Tap your piece, then a dark square ahead of it. Jump over an adjacent enemy piece to capture it.' },
+      { title: 'Chain your jumps', body: 'After a capture, the same piece may keep jumping while captures are available.' },
+      { title: 'Crown kings', body: 'Reach the far row to crown a king — kings move and capture in all four diagonals. Take every enemy piece (or leave them no move) to win.' },
+    ],
+    component: CheckersGame,
+    modes: ['online'],
+  },
+  {
+    id: 'reversi',
+    name: 'Reversi',
+    icon: '⚫',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Flip your way to a majority — outflank your opponent online.',
+    tag: 'Board',
+    tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Outflank to flip', body: 'Place a disc so a straight line of enemy discs is trapped between yours — they all flip to your color.' },
+      { title: 'Every move must flip', body: 'You can only play cells that flip at least one disc. No legal move? Your turn passes automatically.' },
+      { title: 'Majority wins', body: 'When neither player can move, the most discs on the board wins.' },
+    ],
+    component: ReversiGame,
+    modes: ['online'],
+  },
+  {
+    id: 'fourinarow',
+    name: 'Four in a Row',
+    icon: '🔴',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Drop discs and line up four before your opponent does.',
+    tag: 'Board',
+    tagColor: C.rose,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Drop a disc', body: 'Tap a column — your disc falls to the lowest empty slot.' },
+      { title: 'Line up four', body: 'Four of your discs in a row — across, down, or diagonally — wins. A full board with no line is a draw.' },
+    ],
+    component: FourInARowGame,
+    modes: ['online'],
+  },
+  {
+    id: 'gomoku',
+    name: 'Gomoku',
+    icon: '⚪',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Five stones in a row on a 15×15 board — pure placement strategy.',
+    tag: 'Board',
+    tagColor: C.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Take turns placing stones', body: 'Tap any empty intersection to place a stone. Stones never move once placed.' },
+      { title: 'Five in a row wins', body: 'First to line up five (or more) stones — across, down, or diagonally — wins the game.' },
+    ],
+    component: GomokuGame,
+    modes: ['online'],
+  },
+  {
+    id: 'ludo',
+    name: 'Ludo',
+    icon: '🎲',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Race all four tokens home — roll sixes, capture rivals, play it safe on the stars.',
+    tag: 'Board',
+    tagColor: C.gold,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Roll, then move', body: 'Roll the die, then tap a highlighted token. You need a 6 to leave base — and a 6 earns another roll.' },
+      { title: 'Capture and stay safe', body: "Land on an opponent's token to send it back to base. Star cells are safe — no captures there." },
+      { title: 'Bring all four home', body: 'Race around the board into your home column. You need an exact roll to finish each token; first with all four home wins.' },
+    ],
+    component: LudoGame,
+    modes: ['online'],
   },
   {
     id: 'tilematchingdaily',

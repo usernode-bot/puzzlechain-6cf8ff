@@ -1,5 +1,6 @@
 {
   "name": "Game Corner",
+  "icon": { "emoji": "🎮" },
   "secrets": [
     {
       "key": "APP_PUBKEY",

@@ -3914,6 +3914,116 @@ body {
 .ds-cell.ghost { background: transparent; border-style: dashed; }
 .ds-pad { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 
+
+/* ---- Phase 7: GotD hero, home reorg, chat ---- */
+.gotd-hero {
+  border: 1px solid ${C.border}; border-top: 3px solid var(--accent, ${C.accent});
+  background: linear-gradient(160deg, ${C.card}, ${C.surface});
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 1.4rem;
+}
+.gotd-label { color: var(--accent, ${C.accent}); font-size: 11px; letter-spacing: 0.12em; margin-bottom: 10px; }
+.gotd-main { display: flex; align-items: center; gap: 14px; cursor: pointer; }
+.gotd-icon { font-size: 44px; line-height: 1; }
+.gotd-info { flex: 1; min-width: 0; }
+.gotd-name { font-size: 20px; font-weight: 700; }
+.gotd-desc { color: ${C.muted}; font-size: 13px; margin-top: 2px; }
+.gotd-meta { color: ${C.muted}; font-size: 11.5px; margin-top: 6px; }
+.gotd-play { padding: 10px 18px; white-space: nowrap; flex-shrink: 0; width: auto; margin: 0; }
+@media (max-width: 560px) {
+  .gotd-main { flex-wrap: wrap; }
+  .gotd-play { width: 100%; margin-top: 4px; }
+}
+.gotd-play:disabled { opacity: 0.75; }
+.gotd-lb { border-top: 1px solid ${C.border}; margin-top: 14px; padding-top: 10px; }
+.gotd-lb-title { color: ${C.muted}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.gotd-lb-row { display: flex; gap: 10px; align-items: center; padding: 3px 0; font-size: 13px; }
+.gotd-lb-row .r { color: ${C.muted}; width: 28px; }
+.gotd-lb-row .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gotd-lb-row .t { color: ${C.emerald}; }
+.gotd-lb-row.me .n { color: ${C.gold}; font-weight: 700; }
+.gotd-lb-more { color: ${C.dim}; font-size: 11.5px; margin-top: 4px; }
+.gotd-signedout { color: ${C.muted}; font-size: 12.5px; margin-top: 12px; }
+
+.home-links { display: flex; gap: 8px; margin-bottom: 1.2rem; flex-wrap: wrap; }
+.home-link-btn {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 999px; padding: 7px 14px; font-family: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer;
+}
+.home-link-btn:hover { border-color: ${C.accent}; }
+.home-section-title {
+  font-size: 15px; font-weight: 700; margin: 1.4rem 0 0.7rem;
+  color: ${C.text};
+}
+.home-back-btn {
+  background: none; border: none; color: ${C.accent}; font-family: inherit;
+  font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 0.8rem;
+}
+
+.inprog-row-wrap { margin-bottom: 0.4rem; }
+.inprog-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.inprog-card {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
+  padding: 10px 14px; min-width: 150px; cursor: pointer; flex-shrink: 0;
+}
+.inprog-card:hover { border-color: ${C.accent}; }
+.inprog-card .ip-icon { font-size: 22px; }
+.inprog-card .ip-name { font-weight: 600; font-size: 13.5px; margin-top: 4px; white-space: nowrap; }
+.inprog-card .ip-sub { font-size: 11.5px; color: ${C.muted}; margin-top: 3px; }
+.inprog-card .ip-sub.resume { color: ${C.gold}; }
+.inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
+
+.chat-overlay {
+  position: fixed; inset: 0; background: rgba(4, 6, 12, 0.72); z-index: 240;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.chat-panel {
+  background: ${C.surface}; border: 1px solid ${C.border}; border-bottom: none;
+  border-radius: 18px 18px 0 0; width: 100%; max-width: 560px;
+  height: min(72vh, 640px); display: flex; flex-direction: column;
+}
+.chat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px; border-bottom: 1px solid ${C.border};
+}
+.chat-title { font-weight: 700; font-size: 15px; }
+.chat-close {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted};
+  border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 13px;
+}
+.chat-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.chat-empty { color: ${C.muted}; font-size: 13px; text-align: center; margin-top: 24px; }
+.chat-msg { background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px; padding: 8px 10px; max-width: 88%; }
+.chat-msg.mine { align-self: flex-end; border-color: ${C.accent}55; background: rgba(99,102,241,0.10); }
+.chat-msg.hidden-msg { background: none; border-style: dashed; }
+.chat-tombstone { color: ${C.dim}; font-size: 12px; font-style: italic; }
+.chat-msg-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.chat-author { color: ${C.violet}; font-size: 12px; font-weight: 700; }
+.chat-report {
+  background: none; border: none; cursor: pointer; font-size: 11px; opacity: 0.35;
+  margin-left: auto; padding: 0 2px;
+}
+.chat-report:hover { opacity: 1; }
+.chat-body { font-size: 13.5px; line-height: 1.45; word-break: break-word; }
+.chat-notice { color: ${C.gold}; font-size: 12px; text-align: center; padding: 4px 0; }
+.chat-input-row { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid ${C.border}; }
+.chat-input {
+  flex: 1; background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 13.5px; outline: none;
+}
+.chat-input:focus { border-color: ${C.accent}; }
+.chat-send {
+  background: ${C.accent}; border: none; color: white; border-radius: 10px;
+  padding: 0 18px; font-family: inherit; font-weight: 700; font-size: 13.5px; cursor: pointer;
+}
+.chat-send:disabled { opacity: 0.4; cursor: default; }
+.chat-btn-inline {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 10px; padding: 8px 12px; font-family: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer;
+}
+.chat-btn-inline:hover { border-color: ${C.accent}; }
+
 `;
 
 /* ============================================================
@@ -4543,7 +4653,7 @@ function ClassicResumeBanner({ onResume, onDismiss }) {
 
 // game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
 // menuConfig (optional): wires the first "Menu" tab — New Game / Save / Post to Feed.
-function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig, onHowTo }) {
+function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig, onHowTo, onChat }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [, force] = useState(0);
   const sections = [
@@ -4571,6 +4681,7 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
           {modePill && <span className="cg-mode-pill">{modePill.icon} {menuConfig.gameMode === '2p' ? '2P' : menuConfig.gameMode === 'online' ? 'Online' : 'Bot'}</span>}
         </div>
         {onNewGame && !hideQuickReset && <button className="cg-btn" onClick={() => { cgSound('click'); onNewGame(); }} title="New game" aria-label="New game">↺</button>}
+        {onChat && <button className="cg-btn" onClick={() => { cgSound('click'); onChat(); }} title="Game chat" aria-label="Game chat">💬</button>}
         {onHowTo && <button className="cg-btn" onClick={() => { cgSound('click'); onHowTo(); }} title="How to play" aria-label="How to play">?</button>}
         <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
         <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
@@ -6188,7 +6299,218 @@ const INPUT_LABEL = { tap: '👆 Tap', drag: '✋ Drag', swipe: '👉 Swipe', ke
 // manifest chips, personal best, streak, and the daily-challenge context
 // (countdown + same-deal-for-everyone). Consume-on-start only fires when the
 // player hits Play — peeking at this screen never burns the day's attempt.
-function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo }) {
+/* ============================================================
+   Phase 7 — Game of the Day hero, home in-progress row, chat
+   ============================================================ */
+
+// Game of the Day hero card: today's featured game (from daily_featured via
+// /api/daily), reset countdown, state-aware CTA, and a top-3 leaderboard
+// preview. Clicking anywhere routes through the normal launch flow, so the
+// pre-game / resume / locked machinery is untouched.
+function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay }) {
+  const countdown = useCountdown(nextResetUtc, offset, onReset);
+  const [preview, setPreview] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api(`/api/daily/${game.id}/leaderboard`)
+      .then(({ ok, body }) => { if (alive && ok && body) setPreview(body); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [game.id]);
+
+  const finished = !!(attempt && attempt.finishedAt);
+  const inProgress = !!attempt && !finished;
+  const fmtT = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  return (
+    <div className="gotd-hero" style={{ '--accent': game.tagColor }}>
+      <div className="gotd-label mono">🎯 GAME OF THE DAY</div>
+      <div className="gotd-main" onClick={onPlay}>
+        <div className="gotd-icon">{game.icon}</div>
+        <div className="gotd-info">
+          <div className="gotd-name">{game.name}</div>
+          <div className="gotd-desc">{game.desc}</div>
+          <div className="gotd-meta mono">
+            Next puzzle in {countdown} · 🌍 same deal for everyone
+          </div>
+        </div>
+        <button className="primary-btn gotd-play" disabled={finished}>
+          {finished ? `🔒 +${attempt.score != null ? attempt.score : 0}` : inProgress ? '▶ Resume' : 'Play'}
+        </button>
+      </div>
+      {preview && Array.isArray(preview.entries) && preview.entries.length > 0 && (
+        <div className="gotd-lb">
+          <div className="gotd-lb-title">Today's fastest</div>
+          {preview.entries.slice(0, 3).map((e) => (
+            <div key={e.rank} className={'gotd-lb-row' + (e.isCurrentUser ? ' me' : '')}>
+              <span className="r mono">#{e.rank}</span>
+              <span className="n">{e.username}</span>
+              <span className="t mono">{e.timeSecs != null ? fmtT(e.timeSecs) : '—'}</span>
+            </div>
+          ))}
+          {preview.total > 3 && <div className="gotd-lb-more">{preview.total} solved today</div>}
+        </div>
+      )}
+      {authOk === false && (
+        <div className="gotd-signedout">Sign in inside Usernode to play today's deal and join the board.</div>
+      )}
+    </div>
+  );
+}
+
+// Home "in progress" row: resumable daily runs (claimed, unfinished attempts)
+// and online matches where it's your turn. Horizontal card strip; each card
+// re-enters through the normal launch/resume path.
+function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
+  if (!items.length) return null;
+  return (
+    <div className="inprog-row-wrap">
+      <div className="home-section-title">In progress</div>
+      <div className="inprog-row">
+        {items.map((it) =>
+          it.type === 'daily' ? (
+            <div key={'d-' + it.game.id} className="inprog-card" onClick={() => onOpenDaily(it.game)}>
+              <div className="ip-icon">{it.game.icon}</div>
+              <div className="ip-name">{it.game.name}</div>
+              <div className="ip-sub resume">▶ Resume run</div>
+            </div>
+          ) : (
+            <div key={'r-' + it.room.id} className="inprog-card room" onClick={() => onOpenRoom(it.room)}>
+              <div className="ip-icon">{it.game.icon}</div>
+              <div className="ip-name">{it.game.name}</div>
+              <div className={'ip-sub' + (it.room.myTurn ? ' turn' : '')}>
+                {it.room.myTurn ? '🔔 Your turn' : '⏳ Their move'} · vs {it.room.opponentName}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Per-game public chat room (phase 7): one room per game, 10s polling, report-
+// to-hide moderation (3 distinct reports auto-hide a message server-side).
+function ChatPanel({ game, user, onClose }) {
+  const [messages, setMessages] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const listRef = useRef(null);
+  const lastIdRef = useRef(0);
+
+  const merge = (incoming) => {
+    if (!incoming.length) return;
+    setMessages((prev) => {
+      const seen = new Set(prev.map((m) => m.id));
+      const merged = prev.concat(incoming.filter((m) => !seen.has(m.id)));
+      return merged.slice(-200);
+    });
+  };
+
+  useEffect(() => {
+    let alive = true;
+    const load = async (initial) => {
+      const q = initial || !lastIdRef.current ? '' : `?after=${lastIdRef.current}`;
+      const { ok, body } = await api(`/api/chat/${game.id}${q}`);
+      if (alive && ok && body) {
+        merge(body.messages || []);
+        setLoaded(true);
+      }
+    };
+    load(true);
+    const t = setInterval(() => load(false), 10000);
+    return () => { alive = false; clearInterval(t); };
+  }, [game.id]);
+
+  useEffect(() => {
+    lastIdRef.current = messages.length ? messages[messages.length - 1].id : 0;
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [messages]);
+
+  const send = async () => {
+    const body = input.trim();
+    if (!body || busy) return;
+    setBusy(true);
+    const { ok, body: resp } = await api(`/api/chat/${game.id}`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    });
+    setBusy(false);
+    if (ok && resp && resp.message) {
+      merge([resp.message]);
+      setInput('');
+    } else {
+      setNotice('Could not send — try again.');
+      setTimeout(() => setNotice(''), 2500);
+    }
+  };
+
+  const report = async (m) => {
+    if (!window.confirm('Report this message? 3 reports hide it for everyone.')) return;
+    const { ok, body } = await api(`/api/chat/messages/${m.id}/report`, { method: 'POST' });
+    if (ok && body) {
+      if (body.hidden) {
+        setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, hidden: true, body: null, username: null } : x)));
+      } else {
+        setNotice('Reported — thanks for keeping the room clean.');
+        setTimeout(() => setNotice(''), 2500);
+      }
+    }
+  };
+
+  const myId = user && user.id;
+  return (
+    <div className="chat-overlay" onClick={onClose}>
+      <div className="chat-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-head">
+          <div className="chat-title">
+            <span>{game.icon}</span> {game.name} · Chat
+          </div>
+          <button className="chat-close" onClick={onClose} aria-label="Close chat">✕</button>
+        </div>
+        <div className="chat-list" ref={listRef}>
+          {!loaded && <div className="chat-empty">Loading room…</div>}
+          {loaded && messages.length === 0 && (
+            <div className="chat-empty">No messages yet — say hi to today's players.</div>
+          )}
+          {messages.map((m) =>
+            m.hidden ? (
+              <div key={m.id} className="chat-msg hidden-msg">
+                <span className="chat-tombstone">🚫 Hidden by community reports</span>
+              </div>
+            ) : (
+              <div key={m.id} className={'chat-msg' + (myId && m.userId === myId ? ' mine' : '')}>
+                <div className="chat-msg-top">
+                  <span className="chat-author">{m.username}</span>
+                  {(!myId || m.userId !== myId) && (
+                    <button className="chat-report" title="Report" onClick={() => report(m)}>🚩</button>
+                  )}
+                </div>
+                <div className="chat-body">{m.body}</div>
+              </div>
+            )
+          )}
+        </div>
+        {notice && <div className="chat-notice">{notice}</div>}
+        <div className="chat-input-row">
+          <input
+            className="chat-input"
+            placeholder="Message this game's room…"
+            value={input}
+            maxLength={500}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+          />
+          <button className="chat-send" onClick={send} disabled={busy || !input.trim()}>Send</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const resuming = !!(attempt && !attempt.finishedAt);
   const m = game.manifest || {};
@@ -6236,6 +6558,9 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         <div className="pregame-signedout">Signed out — open PuzzleChain inside Usernode to play today's deal.</div>
       )}
       <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+      {onChat && (
+        <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>
+      )}
     </div>
   );
 }
@@ -15147,9 +15472,20 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
 }
 
 // Top-level component per board game: create/join setup, then the room.
-function BoardRoomGame({ gameId, onWin, onStepChange, resetKey }) {
-  const [roomInfo, setRoomInfo] = useState(null);
-  useEffect(() => { setRoomInfo(null); }, [resetKey]);
+function BoardRoomGame({ gameId, onWin, onStepChange, resetKey, gameModeOpts }) {
+  // A pre-seated room (phase 7 in-progress row) skips the create/join setup:
+  // the home your-turn card passes { roomId, myPlayerNum } through the classic
+  // game-mode opts to land straight back in the live match.
+  const [roomInfo, setRoomInfo] = useState(() =>
+    gameModeOpts && gameModeOpts.roomId && gameModeOpts.myPlayerNum
+      ? { roomId: gameModeOpts.roomId, myPlayerNum: gameModeOpts.myPlayerNum }
+      : null
+  );
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (mounted.current) setRoomInfo(null);
+    else mounted.current = true;
+  }, [resetKey]);
   if (!roomInfo) {
     return <OnlineRoomSetup gameId={gameId} onReady={(roomId, myPlayerNum) => setRoomInfo({ roomId, myPlayerNum })} />;
   }
@@ -15165,7 +15501,11 @@ function LudoGame(props)       { return <BoardRoomGame gameId="ludo" {...props} 
 function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
   const [mode, setMode] = useState(gameMode || null);
   const [roomId, setRoomId] = useState((gameModeOpts && gameModeOpts.roomId) || null);
-  const [myPlayerNum, setMyPlayerNum] = useState(gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1);
+  const [myPlayerNum, setMyPlayerNum] = useState(
+    gameModeOpts && gameModeOpts.myPlayerNum
+      ? gameModeOpts.myPlayerNum
+      : gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1
+  );
   const [resumeState, setResumeState] = useState(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const { loadState, clearState } = useClassicSave('chutes-ladders');
@@ -17940,11 +18280,19 @@ function App() {
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
-  // Lobby tab: 'daily', 'classic', or 'feed' — initialized from ?tab= URL param
+  // Lobby view (phase 7 home reorg): 'home' is the single scrolling home
+  // (GotD hero → in-progress → all games); 'feed' and 'ladder' are the two
+  // remaining sub-screens. Legacy ?tab=daily/classic deep links land on home.
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'classic' ? 'classic' : t === 'feed' ? 'feed' : t === 'ladder' ? 'ladder' : 'daily';
+    return t === 'feed' ? 'feed' : t === 'ladder' ? 'ladder' : 'home';
   });
+  // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
+  const [featured, setFeatured] = useState(null);
+  // The viewer's active online matches (your-turn row), from /api/rooms/mine.
+  const [myRooms, setMyRooms] = useState([]);
+  // Game whose public chat room is open (null = closed).
+  const [chatGame, setChatGame] = useState(null);
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Classic Games — Game Menu state. `classicGameMode` is the active mode of
@@ -18019,6 +18367,7 @@ function App() {
       // (they do: games launch from the lobby, which renders after loading).
       SERVER_DAILY_SEEDS = body.seeds || {};
       setBests(body.bests || {});
+      setFeatured(body.featured || null);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
         .reduce((acc, a) => acc + (a.score || 0), 0);
@@ -18044,6 +18393,7 @@ function App() {
           SERVER_DAILY_SEEDS = pub.body.seeds || {};
           if (pub.body.nextResetUtc) setNextResetUtc(pub.body.nextResetUtc);
           if (pub.body.serverNowUtc) setOffset(new Date(pub.body.serverNowUtc).getTime() - Date.now());
+          if (pub.body.featured) setFeatured(pub.body.featured);
         }
       } catch {}
     }
@@ -18051,6 +18401,27 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  // Home in-progress row (phase 7): the viewer's active online matches.
+  // Refetched on every return to the lobby so a just-made move updates the
+  // your-turn flag without waiting for a reload.
+  useEffect(() => {
+    if (loading || !authOk || screen !== 'lobby') return;
+    api('/api/rooms/mine')
+      .then(({ ok, body }) => { if (ok && body) setMyRooms(body.rooms || []); })
+      .catch(() => {});
+  }, [loading, authOk, screen]);
+
+  // ?chat=<gameId> deep link opens that game's chat room once the daily load
+  // (and any ?demo= fixture seeding inside it) has settled. Proposal tests use
+  // it; it's also a handy share target.
+  useEffect(() => {
+    if (loading) return;
+    const cid = new URLSearchParams(window.location.search).get('chat');
+    if (!cid) return;
+    const g = GAMES.find((x) => x.id === cid);
+    if (g) setChatGame(g);
+  }, [loading]);
 
   // dApps-integration status. Degrades gracefully: a failed/absent response
   // leaves the feature disabled (chip stays hidden) rather than erroring.
@@ -18612,6 +18983,7 @@ function App() {
             sheetSections={classicSections}
             onHowTo={currentGame.howToPlay && currentGame.howToPlay.length > 0
               ? () => setHowToGame(currentGame) : undefined}
+            onChat={authOk ? () => setChatGame(currentGame) : undefined}
           >
             <div className="cg-stage cg-scroll">
               <GameComponent
@@ -18644,6 +19016,14 @@ function App() {
               <div className="game-title">
                 <span>{currentGame.icon}</span> {currentGame.name}
               </div>
+              {authOk && (
+                <button
+                  className="help-btn"
+                  title="Game chat"
+                  aria-label="Game chat"
+                  onClick={() => setChatGame(currentGame)}
+                >💬</button>
+              )}
               {currentGame.howToPlay && currentGame.howToPlay.length > 0 && (
                 <button
                   className="help-btn"
@@ -18676,6 +19056,28 @@ function App() {
   // never show a multiplier the server can't back.
   const activeMult = authOk ? streakMultiplier(streak) : 1;
   const tierAhead = authOk && streak > 0 ? nextTierInfo(streak) : null;
+
+  // Phase 7 home derivations. featuredGame resolves the server's daily_featured
+  // row against the client registry; inProgressItems merges resumable daily
+  // runs with the viewer's active online matches for the in-progress row.
+  const featuredGame = featured ? GAMES.find((g) => g.id === featured.gameId) : null;
+  const inProgressItems = [
+    ...GAMES.filter((g) => g.daily && attempts[g.id] && !attempts[g.id].finishedAt)
+      .map((g) => ({ type: 'daily', game: g })),
+    ...myRooms
+      .map((r) => ({ type: 'room', room: r, game: GAMES.find((g) => g.id === r.gameId) }))
+      .filter((x) => x.game),
+  ];
+  // Re-enter an active online match from the in-progress row: pre-seat the
+  // player (roomId + seat number) through the classic game-mode opts so
+  // BoardRoomGame / Chutes & Ladders skip the create/join setup screen.
+  const resumeRoom = (room) => {
+    const g = GAMES.find((x) => x.id === room.gameId);
+    if (!g || loading) return;
+    setClassicGameMode('online');
+    setClassicGameModeOpts({ roomId: room.id, myPlayerNum: room.myPlayerNum });
+    launchGame(g);
+  };
 
   return (
     <div className="app">
@@ -18778,137 +19180,144 @@ function App() {
 
       {screen === 'lobby' && (
         <div className="lobby">
-          <div className="lobby-head">
-            <h1>
-              {lobbyTab === 'daily' ? 'Daily Puzzles'
-                : lobbyTab === 'classic' ? 'Classic Games'
-                : lobbyTab === 'ladder' ? 'Rating Ladder'
-                : 'Community Feed'}
-            </h1>
-            <p>
-              {lobbyTab === 'daily'
-                ? 'One attempt each, per day. Resets at midnight UTC.'
-                : lobbyTab === 'classic'
-                ? 'Play anytime — track your best scores.'
-                : lobbyTab === 'ladder'
-                ? 'Head-to-head Elo — win online matches to climb.'
-                : 'See what your friends have been playing'}
-            </p>
-            {lobbyTab === 'daily' && authOk && streak > 0 && (
-              <p className="lobby-hint">
-                🔥 {streak}-day streak · {tierAhead
-                  ? `${tierAhead.daysAway} more daily win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
-                  : `max ×${activeMult} multiplier active`}
-              </p>
-            )}
-            {lobbyTab === 'daily' && nextResetUtc && (
-              <p className="reset-countdown mono">
-                Next puzzle in {fmtHoursMins(
-                  new Date(nextResetUtc).getTime() - (Date.now() + offset))}
-              </p>
-            )}
-          </div>
-          <div className="lobby-tabs">
-            <button
-              className={'lobby-tab' + (lobbyTab === 'daily' ? ' active' : '')}
-              onClick={() => setLobbyTab('daily')}
-            >Daily Puzzle</button>
-            <button
-              className={'lobby-tab' + (lobbyTab === 'classic' ? ' active' : '')}
-              onClick={() => setLobbyTab('classic')}
-            >Classic Games</button>
-            <button
-              className={'lobby-tab' + (lobbyTab === 'ladder' ? ' active' : '')}
-              onClick={() => setLobbyTab('ladder')}
-            >Ladder</button>
-            {authOk && (
-              <button
-                className={'lobby-tab' + (lobbyTab === 'feed' ? ' active' : '')}
-                onClick={() => setLobbyTab('feed')}
-              >Feed</button>
-            )}
-          </div>
-          {authOk && lobbyTab !== 'feed' && lobbyTab !== 'ladder' && (() => {
-            // Single persistent, collapsible badge panel — rendered directly
-            // under the header band (above the game grid) on the Daily and
-            // Classic tabs so players find their badges where they expect them.
-            // Feed it the union of permanently earned streak day-thresholds and
-            // any the LIVE streak now satisfies, so a freshly-won streak badge
-            // lights up immediately — before the server round-trip reconciles
-            // `badges`. Achievement/solve-milestone chips come straight from
-            // the server-backed `achievements` state.
-            const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
-            return (
-              <BadgesSection
-                badges={earnedDays}
-                achievements={achievements}
-                streak={streak}
-                solveCount={solveCount}
-                open={badgesOpen}
-                onToggle={() => setBadgesOpen(b => !b)}
-              />
-            );
-          })()}
-          {!authOk && (lobbyTab === 'daily' || lobbyTab === 'classic') && (
-            // Signed-out / load-failure affordance: explain the empty badge slot
-            // instead of rendering nothing. Limited to Daily/Classic (Feed/PvP
-            // own their viewport). Retry re-runs the daily load and flips back
-            // to the real panel on success.
-            <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
-          )}
           {lobbyTab === 'feed' ? (
-            <FeedScreen user={user} setScreen={setScreen} />
+            <React.Fragment>
+              <button className="home-back-btn" onClick={() => setLobbyTab('home')}>← Home</button>
+              <div className="lobby-head">
+                <h1>Community Feed</h1>
+                <p>See what your friends have been playing</p>
+              </div>
+              <FeedScreen user={user} setScreen={setScreen} />
+            </React.Fragment>
           ) : lobbyTab === 'ladder' ? (
-            // Gated on !loading so a ?demo=ladder fixture (seeded inside
-            // loadDaily's /api/daily call) lands before the ladder fetches.
-            !loading && <LadderScreen />
+            <React.Fragment>
+              <button className="home-back-btn" onClick={() => setLobbyTab('home')}>← Home</button>
+              <div className="lobby-head">
+                <h1>Rating Ladder</h1>
+                <p>Head-to-head Elo — win online matches to climb.</p>
+              </div>
+              {/* Gated on !loading so a ?demo=ladder fixture (seeded inside
+                  loadDaily's /api/daily call) lands before the ladder fetches. */}
+              {!loading && <LadderScreen />}
+            </React.Fragment>
           ) : (
-          <div className="grid">
-            {GAMES.filter(g => g.category === lobbyTab).map(g => {
-              // Only daily games carry the per-day finished/in-progress lock state.
-              const a = attempts[g.id];
-              const finished = !!g.daily && !!(a && a.finishedAt);
-              const inProgress = !!g.daily && !!a && !finished;
-              return (
-                <div
-                  key={g.id}
-                  className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
-                  style={{ '--accent': g.tagColor }}
-                  onClick={() => {
-                    if (loading) return;
-                    if (g.preLaunchModal) { setPreLaunchGame(g); return; }
-                    launchGame(g);
-                  }}
-                >
-                  <div className="card-icon">{g.icon}</div>
-                  <div className="card-name">{g.name}</div>
-                  <div className="card-desc">{g.desc}</div>
-                  {finished ? (
-                    <div className="card-lock">
-                      🔒 {a.score != null
-                        ? <span>+{a.score} pts · resets in {fmtCountdown(
-                            (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
-                        : <span>Played · locked until reset</span>}
-                    </div>
-                  ) : inProgress ? (
-                    <div className="card-resume">▶ In progress · resume</div>
-                  ) : (
-                    <span
-                      className="tag mono"
-                      style={{ background: g.tagColor + '22', color: g.tagColor }}
+            /* Phase 7 home: GotD hero → in-progress row → all-games grid.
+               The old three-tab lobby is retired; Feed and Ladder are now
+               screens behind the quick links below. */
+            <React.Fragment>
+              <div className="lobby-head">
+                <h1>Game Corner</h1>
+                <p>One shared board per game, per day. Resets at midnight UTC.</p>
+                {authOk && streak > 0 && (
+                  <p className="lobby-hint">
+                    🔥 {streak}-day streak · {tierAhead
+                      ? `${tierAhead.daysAway} more daily win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
+                      : `max ×${activeMult} multiplier active`}
+                  </p>
+                )}
+              </div>
+              {featuredGame ? (
+                <GotdHero
+                  game={featuredGame}
+                  attempt={attempts[featuredGame.id]}
+                  authOk={authOk}
+                  nextResetUtc={nextResetUtc}
+                  offset={offset}
+                  onReset={onReset}
+                  onPlay={() => { if (!loading) launchGame(featuredGame); }}
+                />
+              ) : nextResetUtc ? (
+                <p className="reset-countdown mono">
+                  Next puzzle in {fmtHoursMins(
+                    new Date(nextResetUtc).getTime() - (Date.now() + offset))}
+                </p>
+              ) : null}
+              {authOk && (
+                <InProgressRow
+                  items={inProgressItems}
+                  onOpenDaily={(g) => { if (!loading) launchGame(g); }}
+                  onOpenRoom={resumeRoom}
+                />
+              )}
+              <div className="home-links">
+                <button className="home-link-btn" onClick={() => setLobbyTab('ladder')}>🏆 Ladder</button>
+                {authOk && <button className="home-link-btn" onClick={() => setLobbyTab('feed')}>📣 Feed</button>}
+              </div>
+              {authOk ? (
+                (() => {
+                  // Persistent, collapsible badge panel (unchanged from the
+                  // tabbed lobby) — union of permanently earned streak badges
+                  // and any the LIVE streak now satisfies.
+                  const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
+                  return (
+                    <BadgesSection
+                      badges={earnedDays}
+                      achievements={achievements}
+                      streak={streak}
+                      solveCount={solveCount}
+                      open={badgesOpen}
+                      onToggle={() => setBadgesOpen(b => !b)}
+                    />
+                  );
+                })()
+              ) : (
+                <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
+              )}
+              {(() => {
+                const gameCard = (g) => {
+                  // Only daily games carry the per-day finished/in-progress lock state.
+                  const a = attempts[g.id];
+                  const finished = !!g.daily && !!(a && a.finishedAt);
+                  const inProgress = !!g.daily && !!a && !finished;
+                  return (
+                    <div
+                      key={g.id}
+                      className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
+                      style={{ '--accent': g.tagColor }}
+                      onClick={() => {
+                        if (loading) return;
+                        if (g.preLaunchModal) { setPreLaunchGame(g); return; }
+                        launchGame(g);
+                      }}
                     >
-                      {g.tag}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          )}
-          {lobbyTab === 'daily' && authOk && !loading && (
-            <TodayChampions
-              onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-            />
+                      <div className="card-icon">{g.icon}</div>
+                      <div className="card-name">{g.name}</div>
+                      <div className="card-desc">{g.desc}</div>
+                      {finished ? (
+                        <div className="card-lock">
+                          🔒 {a.score != null
+                            ? <span>+{a.score} pts · resets in {fmtCountdown(
+                                (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
+                            : <span>Played · locked until reset</span>}
+                        </div>
+                      ) : inProgress ? (
+                        <div className="card-resume">▶ In progress · resume</div>
+                      ) : (
+                        <span
+                          className="tag mono"
+                          style={{ background: g.tagColor + '22', color: g.tagColor }}
+                        >
+                          {g.tag}
+                        </span>
+                      )}
+                    </div>
+                  );
+                };
+                return (
+                  <React.Fragment>
+                    <div className="home-section-title">Daily Puzzles</div>
+                    <div className="grid">{GAMES.filter(g => g.category === 'daily').map(gameCard)}</div>
+                    <div className="home-section-title">Classic Games</div>
+                    <div className="grid">{GAMES.filter(g => g.category === 'classic').map(gameCard)}</div>
+                  </React.Fragment>
+                );
+              })()}
+              {authOk && !loading && (
+                <TodayChampions
+                  onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+                />
+              )}
+            </React.Fragment>
           )}
         </div>
       )}
@@ -18932,6 +19341,7 @@ function App() {
             onReset={onReset}
             onPlay={() => startDailyRun(currentGame)}
             onHowTo={() => setHowToGame(currentGame)}
+            onChat={authOk ? () => setChatGame(currentGame) : undefined}
           />
         </div>
       )}
@@ -19226,6 +19636,14 @@ function App() {
             )}
           </div>
         </div>
+      )}
+
+      {chatGame && (
+        <ChatPanel
+          game={chatGame}
+          user={user}
+          onClose={() => setChatGame(null)}
+        />
       )}
 
       {howToGame && (

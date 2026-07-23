@@ -292,6 +292,53 @@ async function ensureDailySeeds() {
   return out;
 }
 
+// ---- Game of the Day (phase 7) ---------------------------------------------
+// Deterministic weighted round-robin over the daily pool (all Lane A dailies —
+// GAME_IDS). The schedule interleaves by weight round so the same game never
+// features on consecutive days: round 0 lists every game once (sorted by id),
+// round r adds the games whose weight exceeds r. dayNum % schedule.length
+// picks today's slot — no cron, no randomness, same answer on every process.
+// The chosen row is persisted to daily_featured on the first request of the
+// day; once written it is the day's truth even if weights change later.
+const GOTD_WEIGHTS = { sudoku: 2, wordhunt: 2, cryptowordle: 2, tilematchingdaily: 2 }; // default 1
+
+function gotdSchedule() {
+  const ids = Array.from(GAME_IDS).sort();
+  const maxW = Math.max(...ids.map((id) => GOTD_WEIGHTS[id] || 1));
+  const schedule = [];
+  for (let round = 0; round < maxW; round++) {
+    for (const id of ids) if ((GOTD_WEIGHTS[id] || 1) > round) schedule.push(id);
+  }
+  return schedule;
+}
+
+let dailyFeaturedCache = { date: null, featured: null };
+
+async function ensureDailyFeatured() {
+  const { rows: dRows } = await pool.query(`SELECT (now() AT TIME ZONE 'utc')::date AS d`);
+  const d = dRows[0].d;
+  const dateKey = d.toISOString().slice(0, 10);
+  if (dailyFeaturedCache.date === dateKey && dailyFeaturedCache.featured) {
+    return dailyFeaturedCache.featured;
+  }
+  const dayNum = Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
+  const schedule = gotdSchedule();
+  const gameId = schedule[dayNum % schedule.length];
+  const seed = await ensureDailySeed(gameId);
+  // Upsert-read in one statement (same idiom as ensureDailySeed): the no-op
+  // DO UPDATE makes RETURNING yield whichever row won the day.
+  const { rows } = await pool.query(
+    `INSERT INTO daily_featured (seed_date, game_id, seed)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (seed_date) DO UPDATE SET game_id = daily_featured.game_id
+     RETURNING game_id, seed`,
+    [dateKey, gameId, seed]
+  );
+  const featured = { date: dateKey, gameId: rows[0].game_id, seed: Number(rows[0].seed) };
+  dailyFeaturedCache = { date: dateKey, featured };
+  return featured;
+}
+
 // ---- Rating ladder (phase 4) ------------------------------------------------
 // Head-to-head games whose online matches feed the Elo ladder: turn-based
 // rooms (Mancala, Chutes & Ladders) and score races (2048, Block Blast).
@@ -559,6 +606,54 @@ async function migrate() {
       seed       BIGINT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (game_id, seed_date)
+    )
+  `);
+
+  // daily_featured is PUBLIC (shared-by-definition data, like daily_seeds):
+  // one row per UTC day naming the Game of the Day, written lazily on the
+  // first request of the day by ensureDailyFeatured() — a deterministic
+  // weighted round-robin over the daily pool. Once written, the row is the
+  // truth for that day even if weights change mid-day.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_featured (
+      seed_date  DATE PRIMARY KEY,
+      game_id    TEXT NOT NULL,
+      seed       BIGINT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  // chat_messages is PUBLIC by policy review (phase 7): each game's chat room
+  // is open to every signed-in user in-app — the platform's "already visible
+  // to other users in-app" test — so staging may carry prod rows. Moderation
+  // is report-to-hide: hidden_at set once CHAT_REPORT_THRESHOLD distinct
+  // reporters file (chat_reports below); hidden rows stay for audit but render
+  // as tombstones.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id         BIGSERIAL PRIMARY KEY,
+      game_id    TEXT NOT NULL,
+      user_id    TEXT NOT NULL,
+      username   TEXT,
+      body       TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      hidden_at  TIMESTAMPTZ,
+      hide_reason TEXT
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_chat_messages_game_id ON chat_messages (game_id, id)`
+  );
+
+  // chat_reports is PUBLIC (it references only public message ids + reporter
+  // ids, same identity class as leaderboard rows). One report per
+  // (message, reporter) — the PK dedupes repeat taps.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_reports (
+      message_id  BIGINT NOT NULL,
+      reporter_id TEXT NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (message_id, reporter_id)
     )
   `);
 
@@ -2886,10 +2981,14 @@ app.post('/api/collab/sessions/:roomId/finish', async (req, res) => {
 app.get('/api/public/daily', async (_req, res) => {
   try {
     const seeds = await ensureDailySeeds();
+    let featured = null;
+    try { featured = await ensureDailyFeatured(); }
+    catch (e) { console.warn('[public] featured failed (non-fatal):', e.message); }
     res.json({
       serverNowUtc: new Date().toISOString(),
       nextResetUtc: nextResetUtc(),
       seeds,
+      featured,
       games: Object.keys(GAME_REGISTRY).map((id) => ({
         id,
         name: GAME_REGISTRY[id].name,
@@ -3288,6 +3387,90 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed (phase 7): ~6 fake finished attempts for TODAY'S
+    // featured game, so the Game of the Day hero's leaderboard preview has
+    // rows on a fresh staging DB. Idempotent; strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'gotd') {
+      const feat = await ensureDailyFeatured();
+      const gotdSeed = [
+        { name: 'Staging demo Ada',  time: 52,  steps: 11 },
+        { name: 'Staging demo Borg', time: 71,  steps: 19 },
+        { name: 'Staging demo Cleo', time: 84,  steps: 15 },
+        { name: 'Staging demo Dax',  time: 102, steps: 22 },
+        { name: 'Staging demo Evy',  time: 155, steps: 27 },
+        { name: 'Staging demo Finn', time: 240, steps: 40 },
+      ];
+      for (let i = 0; i < gotdSeed.length; i++) {
+        const r = gotdSeed[i];
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+           VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, $5, $6, now())
+           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+          [`staging-demo-gotd-${i + 1}`, r.name, feat.gameId, 1000 - r.time, r.steps, r.time]
+        );
+      }
+    }
+
+    // Staging-only demo seed (phase 7): ~10 chat messages across two game
+    // rooms — today's featured game and Checkers — including one message
+    // hidden by reports, so the chat sheet + moderation tombstone are
+    // demonstrable. Fixed high ids keep it idempotent (fresh staging tables
+    // never reach them organically); strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'chat') {
+      const feat = await ensureDailyFeatured();
+      const chatSeed = [
+        [900001, feat.gameId, 'staging-demo-chat-1', 'Staging demo Mallory', 'gg everyone — that deal was rough today', false],
+        [900002, feat.gameId, 'staging-demo-chat-2', 'Staging demo Nia',     'solved it in under two minutes, new PB! 🎉', false],
+        [900003, feat.gameId, 'staging-demo-chat-3', 'Staging demo Otto',    'any tips for the opening?', false],
+        [900004, feat.gameId, 'staging-demo-chat-1', 'Staging demo Mallory', 'work the corners first, always', false],
+        // The hidden-by-reports example lives in the CHECKERS room on purpose:
+        // the featured game rotates daily, but proposal tests need a stable
+        // ?chat=checkers route that shows both live messages and a tombstone.
+        [900005, 'checkers',  'staging-demo-chat-4', 'Staging demo Pia',     'SPAM SPAM SPAM buy coins at example dot com', true],
+        [900006, feat.gameId, 'staging-demo-chat-2', 'Staging demo Nia',     'streak day 12 🔥', false],
+        [900007, 'checkers',  'staging-demo-chat-3', 'Staging demo Otto',    'anyone up for a checkers match? code OTTO42', false],
+        [900008, 'checkers',  'staging-demo-chat-5', 'Staging demo Quill',   'that double jump got me twice in a row 😅', false],
+        [900009, 'checkers',  'staging-demo-chat-2', 'Staging demo Nia',     'king row or bust', false],
+        [900010, 'checkers',  'staging-demo-chat-3', 'Staging demo Otto',    'rematch tonight?', false],
+      ];
+      for (const [id, gid, uid, uname, body, hidden] of chatSeed) {
+        await pool.query(
+          `INSERT INTO chat_messages (id, game_id, user_id, username, body, created_at, hidden_at, hide_reason)
+           VALUES ($1, $2, $3, $4, $5, now() - interval '1 minute' * $6,
+                   ${hidden ? "now()" : 'NULL'}, ${hidden ? "'reports'" : 'NULL'})
+           ON CONFLICT (id) DO NOTHING`,
+          [id, gid, uid, uname, body, 900011 - id]
+        );
+      }
+      for (let i = 1; i <= 3; i++) {
+        await pool.query(
+          `INSERT INTO chat_reports (message_id, reporter_id) VALUES (900005, $1)
+           ON CONFLICT (message_id, reporter_id) DO NOTHING`,
+          [`staging-demo-reporter-${i}`]
+        );
+      }
+    }
+
+    // Staging-only demo seed (phase 7): an ACTIVE checkers room where the
+    // VIEWER is player 2 and it's their turn, so the home "In progress" row's
+    // your-turn card is demonstrable. Re-arms on every hit (DO UPDATE) so
+    // repeat testers always land back in an active, your-turn state.
+    if (IS_STAGING && req.query.demo === 'yourturn') {
+      const ytInit = boardRules.getRules('checkers').initialState();
+      ytInit.currentPlayer = 2;
+      await pool.query(
+        `INSERT INTO classic_rooms
+           (id, game_id, player1_id, player1_name, player2_id, player2_name, state, status)
+         VALUES ('DEMOYT', 'checkers', 'staging-demo-rival', 'Staging demo Rival', $1, $2, $3::jsonb, 'active')
+         ON CONFLICT (id) DO UPDATE
+           SET player2_id = EXCLUDED.player2_id, player2_name = EXCLUDED.player2_name,
+               state = EXCLUDED.state, status = 'active', move_seq = 0, winner = NULL,
+               last_move_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user', JSON.stringify(ytInit)]
+      );
+    }
+
     if (IS_STAGING && req.query.demo === 'classic-scores') {
       const csUsers = [
         { id: 'staging-demo-ada',  name: 'Staging demo Ada' },
@@ -3359,6 +3542,11 @@ app.get('/api/daily', async (req, res) => {
     try { seeds = await ensureDailySeeds(); }
     catch (e) { console.warn('[daily] seed issue failed (client falls back):', e.message); }
 
+    // Game of the Day (phase 7) — lazily written on first request of the day.
+    let featured = null;
+    try { featured = await ensureDailyFeatured(); }
+    catch (e) { console.warn('[daily] featured failed (non-fatal):', e.message); }
+
     // All-time personal bests per daily game (phase 3 pre-game screen): best
     // score and fastest winning solve across every past attempt_date.
     const bests = {};
@@ -3408,6 +3596,8 @@ app.get('/api/daily', async (req, res) => {
       attempts,
       // Today's server-issued per-game board seeds ({ gameId: seed }).
       seeds,
+      // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
+      featured,
       // All-time personal bests per daily game ({ gameId: { score, timeSecs } }).
       bests,
     });
@@ -4065,6 +4255,143 @@ app.post('/api/mancala/rooms/:roomId/move', async (req, res) => {
   } catch (err) {
     console.error('[mancala] move failed:', err.message);
     res.status(500).json({ error: 'Failed to apply move' });
+  }
+});
+
+// ---- Per-game public chat rooms (phase 7) ---------------------------------
+// One room per game, polling transport (10s client cadence — the feed's).
+// Auth-gated (deny-by-default middleware): chat is an account moment per spec
+// §6.10, so none of these join PUBLIC_API_GET. Moderation is report-to-hide:
+// CHAT_REPORT_THRESHOLD distinct reporters auto-hide a message (tombstoned in
+// reads, never deleted).
+const CHAT_REPORT_THRESHOLD = 3;
+const CHAT_MAX_LEN = 500;
+const CHAT_PAGE = 50;
+
+function shapeChatMessage(r) {
+  const hidden = !!r.hidden_at;
+  return {
+    id: Number(r.id),
+    userId: hidden ? null : r.user_id,
+    username: hidden ? null : (r.username || 'anonymous'),
+    // Hidden bodies never leave the server — the client renders a tombstone.
+    body: hidden ? null : r.body,
+    hidden,
+    createdAt: r.created_at,
+  };
+}
+
+// Latest messages for a game's room; ?after=<id> returns only newer rows so
+// the 10s poll is cheap. Both shapes are ascending by id.
+app.get('/api/chat/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const after = Number.parseInt(req.query.after, 10);
+  try {
+    let rows;
+    if (Number.isFinite(after) && after > 0) {
+      ({ rows } = await pool.query(
+        `SELECT * FROM chat_messages WHERE game_id = $1 AND id > $2 ORDER BY id ASC LIMIT $3`,
+        [gameId, after, CHAT_PAGE]
+      ));
+    } else {
+      ({ rows } = await pool.query(
+        `SELECT * FROM (
+           SELECT * FROM chat_messages WHERE game_id = $1 ORDER BY id DESC LIMIT $2
+         ) t ORDER BY id ASC`,
+        [gameId, CHAT_PAGE]
+      ));
+    }
+    res.json({ messages: rows.map(shapeChatMessage) });
+  } catch (err) {
+    console.error('[chat] list failed:', err.message);
+    res.status(500).json({ error: 'Failed to load chat' });
+  }
+});
+
+// Post a message to a game's room.
+app.post('/api/chat/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const body = typeof req.body.body === 'string' ? req.body.body.trim() : '';
+  if (!body) return res.status(400).json({ error: 'Empty message' });
+  if (body.length > CHAT_MAX_LEN) return res.status(400).json({ error: `Message too long (max ${CHAT_MAX_LEN})` });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO chat_messages (game_id, user_id, username, body)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [gameId, req.user.id, req.user.username || null, body]
+    );
+    res.json({ message: shapeChatMessage(rows[0]) });
+  } catch (err) {
+    console.error('[chat] post failed:', err.message);
+    res.status(500).json({ error: 'Failed to post message' });
+  }
+});
+
+// Report a message. One report per (message, reporter); at
+// CHAT_REPORT_THRESHOLD distinct reporters the message auto-hides.
+app.post('/api/chat/messages/:id/report', async (req, res) => {
+  const msgId = Number.parseInt(req.params.id, 10);
+  if (!Number.isFinite(msgId)) return res.status(400).json({ error: 'Bad message id' });
+  try {
+    const { rows: mRows } = await pool.query('SELECT * FROM chat_messages WHERE id = $1', [msgId]);
+    if (!mRows[0]) return res.status(404).json({ error: 'Message not found' });
+    await pool.query(
+      `INSERT INTO chat_reports (message_id, reporter_id) VALUES ($1, $2)
+       ON CONFLICT (message_id, reporter_id) DO NOTHING`,
+      [msgId, req.user.id]
+    );
+    const { rows: cRows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM chat_reports WHERE message_id = $1', [msgId]
+    );
+    let hidden = !!mRows[0].hidden_at;
+    if (!hidden && cRows[0].n >= CHAT_REPORT_THRESHOLD) {
+      await pool.query(
+        `UPDATE chat_messages SET hidden_at = now(), hide_reason = 'reports'
+          WHERE id = $1 AND hidden_at IS NULL`,
+        [msgId]
+      );
+      hidden = true;
+    }
+    res.json({ reported: true, reports: cRows[0].n, hidden });
+  } catch (err) {
+    console.error('[chat] report failed:', err.message);
+    res.status(500).json({ error: 'Failed to report message' });
+  }
+});
+
+// ---- My active rooms (phase 7 home "in progress" row) ----------------------
+// The viewer's active turn-based classic_rooms matches, flagged with whether
+// it's their turn (state.currentPlayer vs their player number). Score races
+// have no turn concept and rejoin mid-run isn't supported, so only rules-
+// module games (which include chutes-ladders) are listed.
+app.get('/api/rooms/mine', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM classic_rooms
+        WHERE status = 'active' AND (player1_id = $1 OR player2_id = $1)
+        ORDER BY last_move_at DESC LIMIT 10`,
+      [req.user.id]
+    );
+    const rooms = [];
+    for (const r of rows) {
+      if (!BOARD_RULE_GAME_IDS.has(r.game_id)) continue;
+      const myPlayerNum = r.player1_id === req.user.id ? 1 : 2;
+      const cur = r.state && Number(r.state.currentPlayer);
+      rooms.push({
+        id: r.id,
+        gameId: r.game_id,
+        myPlayerNum,
+        myTurn: cur === myPlayerNum,
+        opponentName: (myPlayerNum === 1 ? r.player2_name : r.player1_name) || 'opponent',
+        lastMoveAt: r.last_move_at,
+      });
+    }
+    res.json({ rooms });
+  } catch (err) {
+    console.error('[rooms] mine failed:', err.message);
+    res.status(500).json({ error: 'Failed to load rooms' });
   }
 });
 

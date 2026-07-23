@@ -479,6 +479,55 @@ Shared card/tile engine + Lane A daily games"):
   one pass; the spec's deferred file-split remains available if it
   grows past comfortable, but was not needed for this phase.
 
+## Game Corner phase 7 — Game of the Day, home reorg, per-game chat
+
+- **Game of the Day.** New PUBLIC `daily_featured` table (seed_date PK →
+  game_id, seed). `ensureDailyFeatured()` (`server.js`, next to
+  `ensureDailySeeds`) picks today's game by a **deterministic weighted
+  round-robin**: `gotdSchedule()` expands `GOTD_WEIGHTS` (flagship four = 2,
+  every other daily = 1, pool = all Lane A dailies via `GAME_IDS`) into a
+  round-interleaved schedule — round 0 lists every game, round r adds games
+  with weight > r — and indexes it by UTC day number, so the same game never
+  features on consecutive days and every process computes the same answer.
+  The row is upserted lazily on the first request of the day and returned as
+  `featured: { date, gameId, seed }` from BOTH `GET /api/daily` and the
+  public `GET /api/public/daily` (so the signed-out hero renders too). The
+  seed is the game's normal daily seed; streaks are **unchanged** (any daily
+  play counts — GotD-participation streaks per spec §6.3 remain deferred).
+- **Home reorg.** The three-tab lobby is retired. `lobbyTab` is now
+  `'home' | 'feed' | 'ladder'` (legacy `?tab=daily/classic` land on home;
+  `?tab=ladder` / `?tab=feed` still deep-link). Home renders, in order:
+  `GotdHero` (identity, "Next puzzle in" countdown, state-aware CTA, top-3
+  leaderboard preview from the per-game daily board) → `InProgressRow`
+  (resumable daily attempts + the viewer's active online matches from the
+  new auth-gated `GET /api/rooms/mine`, your-turn flagged via
+  `state.currentPlayer`) → Ladder/Feed quick links → badges panel →
+  "Daily Puzzles" grid + "Classic Games" grid (same card markup as before —
+  tests assert on its strings) → Today's Champions. Tapping a your-turn card
+  re-enters the live room: it pre-seats `{ roomId, myPlayerNum }` through
+  `classicGameModeOpts`, which `BoardRoomGame` (and Chutes & Ladders) now
+  read to skip the create/join setup screen.
+- **Per-game public chat.** New tables `chat_messages` + `chat_reports` —
+  both PUBLIC after the policy review: each game's room is open to every
+  signed-in user in-app (the "already visible to other users" test), so
+  staging may carry prod rows. Routes (all auth-gated — chat is an account
+  moment; deliberately NOT in `PUBLIC_API_GET`):
+  `GET /api/chat/:gameId?after=<id>` (ascending, last 50, 10s client poll),
+  `POST /api/chat/:gameId` (`{ body }`, ≤500 chars), and
+  `POST /api/chat/messages/:id/report` — one row per (message, reporter),
+  auto-hide at `CHAT_REPORT_THRESHOLD = 3` distinct reporters. Hidden
+  messages are tombstoned in reads (body/user nulled server-side, never
+  deleted). Client `ChatPanel` is a bottom-sheet overlay reachable from the
+  pre-game screen, the daily in-game header, and the ClassicShell topbar
+  (new `onChat` prop); `?chat=<gameId>` deep-links it open (tests use it).
+- **Staging fixtures** (in `GET /api/daily`, all idempotent, IS_STAGING):
+  `demo=gotd` (6 fake finished attempts for today's featured game so the
+  hero preview renders), `demo=chat` (10 messages across the featured game's
+  room and the Checkers room — the hidden-by-reports example lives in
+  **checkers** so tests have a stable `?chat=checkers` target), and
+  `demo=yourturn` (re-arms active checkers room `DEMOYT` with the viewer as
+  player 2 to move, so the your-turn card renders).
+
 ## Retired features (Game Corner phase 1 — do not resurrect)
 
 As of the "Game Corner" evolution's phase-1 subtraction, the following

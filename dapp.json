@@ -451,6 +451,41 @@
       "name": "New dailies get server-issued seeds",
       "path": "/api/public/daily",
       "expectText": "klondike"
+    },
+    {
+      "name": "Game of the Day hero renders on home",
+      "path": "/",
+      "expectText": "GAME OF THE DAY"
+    },
+    {
+      "name": "Home shows the all-games sections",
+      "path": "/",
+      "expectText": "Classic Games"
+    },
+    {
+      "name": "GotD hero leaderboard preview with seeded solvers",
+      "path": "/?demo=gotd",
+      "expectText": "Today's fastest"
+    },
+    {
+      "name": "Your-turn match card on home",
+      "path": "/?demo=yourturn",
+      "expectText": "Your turn"
+    },
+    {
+      "name": "Chat room shows seeded messages",
+      "path": "/?demo=chat&chat=checkers",
+      "expectText": "Staging demo Otto"
+    },
+    {
+      "name": "Chat moderation tombstone renders",
+      "path": "/?demo=chat&chat=checkers",
+      "expectText": "Hidden by community reports"
+    },
+    {
+      "name": "Featured game exposed on the public read surface",
+      "path": "/api/public/daily",
+      "expectText": "featured"
     }
   ]
 }

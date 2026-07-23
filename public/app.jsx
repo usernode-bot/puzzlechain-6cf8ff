@@ -3748,6 +3748,172 @@ body {
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
 .hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
+
+/* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
+.p6-btn {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
+  border-radius: 10px; padding: 8px 12px; font-family: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: border-color .15s;
+}
+.p6-btn:hover { border-color: ${C.accent}; }
+.p6-btn:disabled { opacity: .4; cursor: default; }
+.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgba(99,102,241,.18); }
+.p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
+.p6-banner {
+  background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.4); color: ${C.gold};
+  border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
+}
+
+.ce-card {
+  width: 44px; height: 62px; border-radius: 6px; box-sizing: border-box;
+  background: #F4F6FB; border: 1px solid #C9D2E4; cursor: pointer; user-select: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; line-height: 1; flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+.ce-card .ce-rank { font-size: 15px; font-weight: 700; }
+.ce-card .ce-suit { font-size: 15px; margin-top: 2px; }
+.ce-card.red { color: #DC2626; }
+.ce-card.black { color: #1E293B; }
+.ce-card.down {
+  background: repeating-linear-gradient(135deg, #3730A3, #3730A3 4px, #4338CA 4px, #4338CA 8px);
+  border-color: #312E81;
+}
+.ce-card.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; }
+.ce-card.dim { opacity: .5; }
+.ce-card.ce-slot {
+  background: rgba(255,255,255,.04); border: 1.5px dashed ${C.dim}; box-shadow: none;
+  color: ${C.dim}; font-size: 18px;
+}
+
+.kl-game { max-width: 400px; margin: 0 auto; }
+.kl-top { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
+.kl-gap { width: 14px; }
+.kl-tab { display: flex; gap: 6px; justify-content: center; }
+.kl-col { position: relative; width: 44px; }
+
+.sp-game { max-width: 420px; margin: 0 auto; }
+.sp-game .status-bar { flex-wrap: wrap; align-items: center; gap: 8px; }
+.sp-tab { display: flex; gap: 3px; justify-content: center; }
+.sp-col { position: relative; width: 34px; }
+.sp-col .ce-card { width: 34px; height: 46px; border-radius: 5px; }
+.sp-col .ce-card .ce-rank { font-size: 12px; }
+.sp-col .ce-card .ce-suit { font-size: 10px; margin-top: 1px; }
+.sp-col .ce-card.ce-slot.sm { font-size: 12px; }
+
+.mj-game { display: flex; flex-direction: column; align-items: center; }
+.mj-game .status-bar { align-items: center; gap: 8px; }
+.mj-board { position: relative; margin: 4px auto 0; }
+.mj-tile {
+  position: absolute; width: 36px; height: 46px; border-radius: 6px; cursor: pointer;
+  background: linear-gradient(180deg, #F8FAFF, #DDE4F2); border: 1px solid #B7C2D8;
+  border-bottom-width: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: 19px; user-select: none; box-shadow: 2px 3px 4px rgba(0,0,0,.45);
+}
+.mj-tile.blocked { filter: brightness(.62); cursor: default; }
+.mj-tile.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; filter: brightness(1.08); }
+.mj-tile.up1 { border-color: #A3B0CB; }
+.mj-tile.up2, .mj-tile.up3 { border-color: #8E9DBD; }
+
+.ng-game { max-width: 420px; margin: 0 auto; }
+.ng-modes { display: flex; gap: 6px; margin-left: auto; }
+.ng-wrap {
+  display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  justify-content: center; gap: 4px;
+}
+.ng-corner { grid-row: 1; grid-column: 1; }
+.ng-colclues { grid-row: 1; grid-column: 2; display: grid; grid-template-columns: repeat(8, 34px); gap: 2px; }
+.ng-colclue {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 12px; gap: 1px; padding-bottom: 2px;
+}
+.ng-rowclues { grid-row: 2; grid-column: 1; display: grid; grid-template-rows: repeat(8, 34px); gap: 2px; }
+.ng-rowclue {
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;
+  color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 12px; min-width: 34px;
+}
+.ng-grid { grid-row: 2; grid-column: 2; display: grid; grid-template-columns: repeat(8, 34px); grid-auto-rows: 34px; gap: 2px; }
+.ng-cell {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 4px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: ${C.muted}; font-size: 14px;
+}
+.ng-cell:nth-child(8n+4), .ng-cell:nth-child(8n+5) { border-left-color: ${C.dim}; }
+.ng-cell.fill { background: ${C.accent}; border-color: ${C.accent}; }
+.ng-cell.mark { color: ${C.dim}; }
+
+.mf-game { max-width: 420px; margin: 0 auto; }
+.mf-game .status-bar { align-items: center; gap: 8px; }
+.mf-grid { display: grid; grid-template-columns: repeat(9, 36px); grid-auto-rows: 36px; gap: 3px; justify-content: center; }
+.mf-cell {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 5px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; color: ${C.text};
+  user-select: none;
+}
+.mf-cell:not(.rev):hover { border-color: ${C.accent}; }
+.mf-cell.rev { background: rgba(255,255,255,.05); border-color: ${C.dim}; cursor: default; }
+.mf-cell.rev.mine { background: rgba(251,113,133,.15); }
+.mf-cell.boom { background: rgba(251,113,133,.45); border-color: ${C.rose}; }
+
+.an-game { max-width: 420px; margin: 0 auto; text-align: center; }
+.an-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+.an-dot {
+  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 999px;
+  padding: 3px 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+}
+.an-dot.solved { border-color: ${C.emerald}; color: ${C.emerald}; }
+.an-dot.cur { border-color: ${C.accent}; color: ${C.text}; }
+.an-slots { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; }
+.an-slot {
+  width: 40px; height: 48px; border-radius: 8px; border: 1.5px dashed ${C.dim};
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: ${C.text};
+}
+.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgba(99,102,241,.12); }
+.an-slots.bad .an-slot.has { border-color: ${C.rose}; background: rgba(251,113,133,.12); animation: an-shake .4s; }
+@keyframes an-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.an-rack { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+.an-tile {
+  width: 44px; height: 52px; border-radius: 8px; border: 1px solid ${C.border}; cursor: pointer;
+  background: ${C.card}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
+  font-size: 20px; font-weight: 700;
+}
+.an-tile:hover { border-color: ${C.accent}; }
+.an-tile.used { opacity: .25; cursor: default; }
+.an-actions { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
+
+.cp-game { display: flex; flex-direction: column; align-items: center; }
+.cp-grid { display: grid; grid-auto-rows: 34px; gap: 2px; margin-bottom: 14px; }
+.cp-cell {
+  background: ${C.card}; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 20px; user-select: none;
+}
+.cp-cell.wall { background: ${C.dim}; border-radius: 2px; }
+.cp-cell.goal { background: rgba(52,211,153,.16); box-shadow: inset 0 0 0 2px rgba(52,211,153,.5); }
+.cp-crate.ongoal { filter: hue-rotate(60deg) brightness(1.2); }
+.cp-pad {
+  display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; margin-bottom: 10px;
+}
+.cp-pad .p6-btn { padding: 10px 0; }
+
+.ds-game { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+.ds-next {
+  position: relative; height: 30px; color: ${C.muted}; font-size: 12px; margin-bottom: 6px;
+  display: flex; align-items: flex-start; gap: 8px; padding-left: 0;
+}
+.ds-next { min-width: 120px; }
+.ds-next .ds-mini { position: absolute; width: 8px; height: 8px; border-radius: 2px; }
+.ds-next .ds-last { color: ${C.gold}; }
+.ds-grid {
+  display: grid; grid-template-columns: repeat(9, 30px); grid-auto-rows: 30px; gap: 2px;
+  background: rgba(255,255,255,.03); border: 1px solid ${C.border}; border-radius: 8px; padding: 6px;
+  margin-bottom: 12px;
+}
+.ds-cell { background: ${C.card}; border-radius: 3px; border: 1px solid transparent; cursor: pointer; }
+.ds-cell.hover { opacity: .5; }
+.ds-cell.ghost { background: transparent; border-style: dashed; }
+.ds-pad { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
 `;
 
 /* ============================================================
@@ -15348,6 +15514,1503 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
   );
 }
 
+/* ============================================================
+   Phase 6 — Shared card/tile engine + Lane A daily games
+   ------------------------------------------------------------
+   A small client-side engine every card/tile daily rides:
+   seeded deck building + Fisher-Yates shuffling (mulberry32 via
+   dailyRng, same PRNG family as lib/dapp.js's tile-match board
+   generator), a shared <CeCard> renderer, and a layered-tile
+   layout helper (free-tile rule + reverse-deal solvable dealing,
+   the same layer/overlap model as lib/dapp.js's tileBoard).
+   All phase-6 games are tier B server-side (snapshot + timing
+   heuristics through settleDailySession); their onStepChange
+   calls feed the shared daily run log automatically.
+   ============================================================ */
+
+// ---- Card primitives -------------------------------------------------------
+const CE_SUIT_GLYPH = ['♠', '♥', '♦', '♣'];
+const CE_RANK_LABEL = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const ceIsRed = (card) => card.s === 1 || card.s === 2;
+
+// Fisher-Yates over a seeded rng — the engine's single shuffle primitive.
+function ceShuffle(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Build n standard decks as {id, s (suit 0-3), r (rank 0=A..12=K), up}.
+// `suits` restricts the suit pool (Spider's 1-suit variant passes [0]).
+function ceDeck(nDecks, suits, rng) {
+  const cards = [];
+  let id = 0;
+  for (let d = 0; d < nDecks; d++) {
+    for (const s of (suits || [0, 1, 2, 3])) {
+      for (let r = 0; r < 13; r++) cards.push({ id: id++, s, r, up: false });
+    }
+  }
+  return rng ? ceShuffle(cards, rng) : cards;
+}
+
+// Shared card renderer. Face-down cards show a patterned back; face-up cards
+// show rank + suit in red/black. `sel` draws the selection ring.
+function CeCard({ card, sel, dim, onClick, style }) {
+  const cls = ['ce-card'];
+  if (!card.up) cls.push('down');
+  else cls.push(ceIsRed(card) ? 'red' : 'black');
+  if (sel) cls.push('sel');
+  if (dim) cls.push('dim');
+  return (
+    <div className={cls.join(' ')} style={style} onClick={onClick}>
+      {card.up && (
+        <React.Fragment>
+          <div className="ce-rank">{CE_RANK_LABEL[card.r]}</div>
+          <div className="ce-suit">{CE_SUIT_GLYPH[card.s]}</div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+// An empty pile slot (foundation / empty column / stock base).
+function CeSlot({ label, onClick, className }) {
+  return (
+    <div className={'ce-card ce-slot' + (className ? ' ' + className : '')} onClick={onClick}>
+      {label || ''}
+    </div>
+  );
+}
+
+/* ---- Klondike Solitaire (daily) -------------------------------------------
+   Classic single-deck patience: 7 tableau columns, draw-1 stock with
+   unlimited recycles, 4 foundations by suit. Tap a face-up card to select
+   it (and the run below it), tap a destination to move; tapping the
+   selected card again sends it to a foundation when legal. */
+
+function klDeal(rng) {
+  const deck = ceDeck(1, null, rng);
+  const tab = [];
+  let idx = 0;
+  for (let p = 0; p < 7; p++) {
+    const col = [];
+    for (let i = 0; i <= p; i++) {
+      const c = deck[idx++];
+      col.push({ ...c, up: i === p });
+    }
+    tab.push(col);
+  }
+  const stock = deck.slice(idx).map((c) => ({ ...c, up: false }));
+  return { stock, waste: [], found: [[], [], [], []], tab, moves: 0 };
+}
+
+function klValidState(st) {
+  return st && Array.isArray(st.stock) && Array.isArray(st.waste) &&
+    Array.isArray(st.found) && st.found.length === 4 &&
+    Array.isArray(st.tab) && st.tab.length === 7 && Number.isFinite(st.moves);
+}
+
+function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const freshDeal = useRef(null);
+  if (!freshDeal.current) freshDeal.current = klDeal(dailyRng(offset, 'klondike'));
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && klValidState(savedProgress.st)
+    ? savedProgress.st : null;
+
+  const [st, setSt] = useState(() => resumed || freshDeal.current);
+  const [sel, setSel] = useState(null); // {z:'waste'} | {z:'tab',p,i} | {z:'found',p}
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { st, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, st: stateRef.current.st }, steps: stateRef.current.st.moves, secs: stateRef.current.secs }),
+    !done
+  );
+  const commit = (next) => {
+    setSt(next);
+    setSel(null);
+    onStepChange(next.moves);
+    const won = next.found.every((f) => f.length === 13);
+    // Don't autosave the winning move — the finish call is about to close the
+    // attempt, and a progress write racing it 409s against the finished row.
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, st: next }, next.moves, secs);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1600 - next.moves * 3 - secs, 300);
+      onWin(score, next.moves, secs, {
+        share: `PuzzleChain Klondike Solitaire — solved today's deal in ${fmt} (${next.moves} moves) 🃏`,
+      });
+    }
+  };
+
+  const clone = () => ({
+    stock: st.stock.slice(), waste: st.waste.slice(),
+    found: st.found.map((f) => f.slice()), tab: st.tab.map((c) => c.slice()),
+    moves: st.moves,
+  });
+
+  const tapStock = () => {
+    if (done) return;
+    const n = clone();
+    if (n.stock.length) {
+      const c = n.stock.pop();
+      n.waste.push({ ...c, up: true });
+    } else if (n.waste.length) {
+      n.stock = n.waste.slice().reverse().map((c) => ({ ...c, up: false }));
+      n.waste = [];
+    } else return;
+    n.moves++;
+    commit(n);
+  };
+
+  const canTab = (card, destTop) =>
+    destTop ? (ceIsRed(card) !== ceIsRed(destTop) && card.r === destTop.r - 1) : card.r === 12;
+  const canFound = (card, f) =>
+    f.length ? (card.s === f[f.length - 1].s && card.r === f[f.length - 1].r + 1) : card.r === 0;
+
+  // The selected run (array of cards) plus a mutator that removes it.
+  const takeSel = (n, s) => {
+    if (s.z === 'waste') return [n.waste.pop()];
+    if (s.z === 'found') return [n.found[s.p].pop()];
+    const run = n.tab[s.p].splice(s.i);
+    const col = n.tab[s.p];
+    if (col.length && !col[col.length - 1].up) col[col.length - 1] = { ...col[col.length - 1], up: true };
+    return run;
+  };
+  const selCards = (s) => {
+    if (!s) return [];
+    if (s.z === 'waste') return st.waste.slice(-1);
+    if (s.z === 'found') return st.found[s.p].slice(-1);
+    return st.tab[s.p].slice(s.i);
+  };
+
+  const tryFoundation = (s) => {
+    const cards = selCards(s);
+    if (cards.length !== 1) return false;
+    const fi = st.found.findIndex((f) => canFound(cards[0], f));
+    if (fi < 0) return false;
+    const n = clone();
+    n.found[fi].push({ ...takeSel(n, s)[0], up: true });
+    n.moves++;
+    commit(n);
+    return true;
+  };
+
+  const moveSelToTab = (p) => {
+    const cards = selCards(sel);
+    if (!cards.length) return false;
+    const destTop = st.tab[p].length ? st.tab[p][st.tab[p].length - 1] : null;
+    if (!canTab(cards[0], destTop)) return false;
+    const n = clone();
+    n.tab[p] = n.tab[p].concat(takeSel(n, sel));
+    n.moves++;
+    commit(n);
+    return true;
+  };
+  const moveSelToFound = (fi) => {
+    const cards = selCards(sel);
+    if (cards.length !== 1 || !canFound(cards[0], st.found[fi])) return false;
+    const n = clone();
+    n.found[fi].push({ ...takeSel(n, sel)[0], up: true });
+    n.moves++;
+    commit(n);
+    return true;
+  };
+
+  const isSel = (z, p, i) => sel && sel.z === z && sel.p === p && (z !== 'tab' || sel.i === i);
+
+  const tapWaste = () => {
+    if (done || !st.waste.length) return;
+    if (isSel('waste')) { if (!tryFoundation(sel)) setSel(null); return; }
+    if (sel) { setSel({ z: 'waste' }); return; }
+    setSel({ z: 'waste' });
+  };
+  const tapFound = (fi) => {
+    if (done) return;
+    if (sel && !isSel('found', fi)) { if (moveSelToFound(fi)) return; }
+    if (isSel('found', fi)) { setSel(null); return; }
+    if (st.found[fi].length) setSel({ z: 'found', p: fi });
+  };
+  const tapTab = (p, i) => {
+    if (done) return;
+    const col = st.tab[p];
+    // Tap on empty column or anywhere in a column while a selection exists →
+    // try to move there first.
+    if (sel && !isSel('tab', p, i)) {
+      if (moveSelToTab(p)) return;
+    }
+    if (i == null || i < 0 || !col[i] || !col[i].up) { setSel(null); return; }
+    if (isSel('tab', p, i)) {
+      // Second tap on the same card: auto-send to a foundation (top card only).
+      if (i === col.length - 1 && tryFoundation(sel)) return;
+      setSel(null);
+      return;
+    }
+    setSel({ z: 'tab', p, i });
+  };
+
+  const maxCol = Math.max(...st.tab.map((c) => c.length), 1);
+  return (
+    <div className="kl-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
+        <div className="pill"><div className="plabel">Home</div><div className="pvalue">{st.found.reduce((a, f) => a + f.length, 0)}/52</div></div>
+      </div>
+      <div className="kl-top">
+        {st.stock.length
+          ? <CeCard card={{ s: 0, r: 0, up: false }} onClick={tapStock} />
+          : <CeSlot label="↻" onClick={tapStock} />}
+        {st.waste.length
+          ? <CeCard card={st.waste[st.waste.length - 1]} sel={isSel('waste')} onClick={tapWaste} />
+          : <CeSlot />}
+        <div className="kl-gap" />
+        {st.found.map((f, fi) => (
+          f.length
+            ? <CeCard key={fi} card={f[f.length - 1]} sel={isSel('found', fi)} onClick={() => tapFound(fi)} />
+            : <CeSlot key={fi} label={CE_SUIT_GLYPH[fi]} onClick={() => tapFound(fi)} />
+        ))}
+      </div>
+      <div className="kl-tab">
+        {st.tab.map((col, p) => (
+          <div
+            key={p}
+            className="kl-col"
+            style={{ height: 62 + (maxCol - 1) * 20 }}
+            onClick={(e) => { if (e.target === e.currentTarget) tapTab(p, col.length ? col.length - 1 : null); }}
+          >
+            {col.length === 0 && <CeSlot onClick={() => tapTab(p, null)} />}
+            {col.map((c, i) => (
+              <CeCard
+                key={c.id}
+                card={c}
+                sel={sel && sel.z === 'tab' && sel.p === p && i >= sel.i}
+                onClick={() => tapTab(p, i)}
+                style={{ position: 'absolute', top: i * (col.length > 12 ? 14 : 20), left: 0, zIndex: i }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="p6-hint">Tap a card, then its destination. Tap a selected card again to send it home.</div>
+    </div>
+  );
+}
+
+/* ---- Spider Solitaire (daily, 1 suit) --------------------------------------
+   104 spade cards over 10 columns. Move any descending run; complete
+   K→A runs clear to the foundation; deal a row from the stock. */
+
+function spDeal(rng) {
+  const deck = ceDeck(8, [0], rng); // 8 × A..K of one suit = 104
+  const cols = [];
+  let idx = 0;
+  for (let p = 0; p < 10; p++) {
+    const size = p < 4 ? 6 : 5;
+    const col = [];
+    for (let i = 0; i < size; i++) {
+      const c = deck[idx++];
+      col.push({ ...c, up: i === size - 1 });
+    }
+    cols.push(col);
+  }
+  return { cols, stock: deck.slice(idx).map((c) => ({ ...c, up: false })), done8: 0, moves: 0 };
+}
+
+function spValidState(st) {
+  return st && Array.isArray(st.cols) && st.cols.length === 10 &&
+    Array.isArray(st.stock) && Number.isFinite(st.done8) && Number.isFinite(st.moves);
+}
+
+// Remove any completed K→A run from a column (mutates), returns count removed.
+function spSweep(n) {
+  let swept = 0;
+  for (let p = 0; p < 10; p++) {
+    const col = n.cols[p];
+    if (col.length < 13) continue;
+    const tail = col.slice(-13);
+    let run = tail.every((c) => c.up) && tail[0].r === 12;
+    if (run) for (let i = 1; i < 13; i++) if (tail[i].r !== tail[i - 1].r - 1) { run = false; break; }
+    if (run) {
+      n.cols[p] = col.slice(0, -13);
+      const nc = n.cols[p];
+      if (nc.length && !nc[nc.length - 1].up) nc[nc.length - 1] = { ...nc[nc.length - 1], up: true };
+      swept++;
+    }
+  }
+  return swept;
+}
+
+function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const freshDeal = useRef(null);
+  if (!freshDeal.current) freshDeal.current = spDeal(dailyRng(offset, 'spider'));
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && spValidState(savedProgress.st)
+    ? savedProgress.st : null;
+
+  const [st, setSt] = useState(() => resumed || freshDeal.current);
+  const [sel, setSel] = useState(null); // {p, i}
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { st, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, st: stateRef.current.st }, steps: stateRef.current.st.moves, secs: stateRef.current.secs }),
+    !done
+  );
+
+  const commit = (n) => {
+    n.done8 += spSweep(n);
+    setSt(n);
+    setSel(null);
+    onStepChange(n.moves);
+    const won = n.done8 >= 8;
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, st: n }, n.moves, secs);
+    if (won) {
+      setDone(true);
+      const score = Math.max(2000 - n.moves * 3 - secs, 300);
+      onWin(score, n.moves, secs, {
+        share: `PuzzleChain Spider Solitaire — cleared today's deal in ${fmt} (${n.moves} moves) 🕷️`,
+      });
+    }
+  };
+  const clone = () => ({ cols: st.cols.map((c) => c.slice()), stock: st.stock.slice(), done8: st.done8, moves: st.moves });
+
+  // A selection is valid if cards i..end are all face-up and strictly descending.
+  const runOk = (col, i) => {
+    if (!col[i] || !col[i].up) return false;
+    for (let k = i + 1; k < col.length; k++) if (!col[k].up || col[k].r !== col[k - 1].r - 1) return false;
+    return true;
+  };
+
+  const dealRow = () => {
+    if (done || !st.stock.length) return;
+    const n = clone();
+    for (let p = 0; p < 10 && n.stock.length; p++) {
+      const c = n.stock.pop();
+      n.cols[p] = n.cols[p].concat({ ...c, up: true });
+    }
+    n.moves++;
+    commit(n);
+  };
+
+  const tapCol = (p, i) => {
+    if (done) return;
+    const col = st.cols[p];
+    if (sel && sel.p !== p) {
+      // Attempt the move onto column p.
+      const moving = st.cols[sel.p].slice(sel.i);
+      const destTop = col.length ? col[col.length - 1] : null;
+      if (!destTop || destTop.r === moving[0].r + 1) {
+        const n = clone();
+        const run = n.cols[sel.p].splice(sel.i);
+        const src = n.cols[sel.p];
+        if (src.length && !src[src.length - 1].up) src[src.length - 1] = { ...src[src.length - 1], up: true };
+        n.cols[p] = n.cols[p].concat(run);
+        n.moves++;
+        commit(n);
+        return;
+      }
+    }
+    if (i == null || !runOk(col, i)) { setSel(null); return; }
+    if (sel && sel.p === p && sel.i === i) { setSel(null); return; }
+    setSel({ p, i });
+  };
+
+  const maxCol = Math.max(...st.cols.map((c) => c.length), 1);
+  return (
+    <div className="sp-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
+        <div className="pill"><div className="plabel">Runs</div><div className="pvalue">{st.done8}/8</div></div>
+        <button className="p6-btn" onClick={dealRow} disabled={!st.stock.length}>
+          Deal +10 ({Math.floor(st.stock.length / 10)})
+        </button>
+      </div>
+      <div className="sp-tab">
+        {st.cols.map((col, p) => (
+          <div
+            key={p}
+            className="sp-col"
+            style={{ height: 46 + (maxCol - 1) * 13 }}
+            onClick={(e) => { if (e.target === e.currentTarget) tapCol(p, col.length ? col.length - 1 : null); }}
+          >
+            {col.length === 0 && <CeSlot className="sm" onClick={() => tapCol(p, null)} />}
+            {col.map((c, i) => (
+              <CeCard
+                key={c.id}
+                card={c}
+                sel={sel && sel.p === p && i >= sel.i}
+                onClick={() => tapCol(p, i)}
+                style={{ position: 'absolute', top: i * 13, left: 0, zIndex: i }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="p6-hint">One suit: any descending run moves. Build K→A to clear a run — 8 clears win.</div>
+    </div>
+  );
+}
+
+/* ---- Mahjong Solitaire (daily) ----------------------------------------------
+   60-tile stepped pyramid. A tile is free when nothing rests on it and its
+   left or right side is open. The deal is generated by reverse-removal, so
+   today's board is always solvable in at least one order. */
+
+const MJ_LAYOUT = (() => {
+  const pos = [];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 8; c++) pos.push({ x: c * 2, y: r * 2, z: 0 });
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) pos.push({ x: 2 + c * 2, y: 1 + r * 2, z: 1 });
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) pos.push({ x: 4 + c * 2, y: 2 + r * 2, z: 2 });
+  pos.push({ x: 6, y: 3, z: 3 });
+  pos.push({ x: 8, y: 3, z: 3 });
+  return pos; // 32 + 18 + 8 + 2 = 60 slots
+})();
+const MJ_FACES = ['🌸', '🎋', '🌊', '🔥', '⛰️', '🌙', '☀️', '⭐', '🐉', '🐢', '🦅', '🎐', '🍂', '❄️', '🌈', '🪷'];
+
+function mjIsFree(i, removed) {
+  const p = MJ_LAYOUT[i];
+  for (let j = 0; j < MJ_LAYOUT.length; j++) {
+    if (j === i || removed[j]) continue;
+    const q = MJ_LAYOUT[j];
+    if (q.z === p.z + 1 && Math.abs(q.x - p.x) < 2 && Math.abs(q.y - p.y) < 2) return false;
+  }
+  let left = false, right = false;
+  for (let j = 0; j < MJ_LAYOUT.length; j++) {
+    if (j === i || removed[j]) continue;
+    const q = MJ_LAYOUT[j];
+    if (q.z !== p.z || Math.abs(q.y - p.y) >= 2) continue;
+    if (q.x === p.x - 2) left = true;
+    if (q.x === p.x + 2) right = true;
+  }
+  return !(left && right);
+}
+
+// Reverse-deal: repeatedly pick two currently-free slots and give them the
+// same face, then remove them. Playing back in that order solves the board,
+// so the deal is guaranteed winnable. Conceptual sibling of lib/dapp.js's
+// tileBoard (same layered-board model, solvability added).
+function mjDeal(rng, present) {
+  const faces = new Array(MJ_LAYOUT.length).fill(-1);
+  const removed = MJ_LAYOUT.map((_, i) => !present[i]);
+  let remaining = present.filter(Boolean).length;
+  let pairIdx = 0;
+  while (remaining >= 2) {
+    const free = [];
+    for (let i = 0; i < MJ_LAYOUT.length; i++) if (!removed[i] && mjIsFree(i, removed)) free.push(i);
+    let a, b;
+    if (free.length >= 2) {
+      const ai = Math.floor(rng() * free.length);
+      a = free.splice(ai, 1)[0];
+      b = free[Math.floor(rng() * free.length)];
+    } else {
+      const rest = [];
+      for (let i = 0; i < removed.length; i++) if (!removed[i]) rest.push(i);
+      a = rest[0]; b = rest[1];
+    }
+    faces[a] = pairIdx % MJ_FACES.length;
+    faces[b] = pairIdx % MJ_FACES.length;
+    pairIdx++;
+    removed[a] = true;
+    removed[b] = true;
+    remaining -= 2;
+  }
+  return faces;
+}
+
+// Any free matching pair left on the board?
+function mjHasMove(faces, removed) {
+  const free = [];
+  for (let i = 0; i < MJ_LAYOUT.length; i++) if (!removed[i] && mjIsFree(i, removed)) free.push(i);
+  for (let a = 0; a < free.length; a++) {
+    for (let b = a + 1; b < free.length; b++) {
+      if (faces[free[a]] === faces[free[b]]) return true;
+    }
+  }
+  return false;
+}
+
+function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const seedBase = useRef(null);
+  if (seedBase.current == null) {
+    const srv = serverDailySeed('mahjongsol');
+    seedBase.current = srv != null ? srv : ((utcDayNum(offset) + hashStr('mahjongsol')) >>> 0);
+  }
+  const resumed = savedProgress && savedProgress.dayNum === dayNum &&
+    Array.isArray(savedProgress.faces) && savedProgress.faces.length === MJ_LAYOUT.length &&
+    Array.isArray(savedProgress.removed)
+    ? savedProgress : null;
+
+  const [faces, setFaces] = useState(() =>
+    resumed ? resumed.faces.slice() : mjDeal(mulberry32(seedBase.current), MJ_LAYOUT.map(() => true))
+  );
+  const [removed, setRemoved] = useState(() =>
+    resumed ? resumed.removed.map(Boolean) : MJ_LAYOUT.map(() => false)
+  );
+  const [shuffles, setShuffles] = useState(resumed && Number.isFinite(resumed.shuffles) ? resumed.shuffles : 2);
+  const [sel, setSel] = useState(null);
+  const [pairs, setPairs] = useState(resumed && Number.isFinite(resumed.pairs) ? resumed.pairs : 0);
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const remaining = removed.filter((r) => !r).length;
+  const stuck = !done && remaining > 0 && !mjHasMove(faces, removed);
+
+  const stateRef = useRef({});
+  stateRef.current = { faces, removed, shuffles, pairs, secs };
+  const buildProgress = () => ({
+    dayNum,
+    faces: stateRef.current.faces,
+    removed: stateRef.current.removed.map((r) => (r ? 1 : 0)),
+    shuffles: stateRef.current.shuffles,
+    pairs: stateRef.current.pairs,
+  });
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: buildProgress(), steps: stateRef.current.pairs, secs: stateRef.current.secs }),
+    !done
+  );
+  const saveNow = (f, rm, sh, pr) =>
+    onSaveProgress && onSaveProgress(
+      { dayNum, faces: f, removed: rm.map((r) => (r ? 1 : 0)), shuffles: sh, pairs: pr },
+      pr, secs
+    );
+
+  const tap = (i) => {
+    if (done || removed[i] || !mjIsFree(i, removed)) return;
+    if (sel === i) { setSel(null); return; }
+    if (sel != null && faces[sel] === faces[i]) {
+      const rm = removed.slice();
+      rm[sel] = true;
+      rm[i] = true;
+      const pr = pairs + 1;
+      setRemoved(rm);
+      setSel(null);
+      setPairs(pr);
+      onStepChange(pr);
+      const won = rm.every(Boolean);
+      if (!won) saveNow(faces, rm, shuffles, pr);
+      if (won) {
+        setDone(true);
+        const score = Math.max(1500 - secs * 2 - (2 - shuffles) * 150, 300);
+        onWin(score, pr, secs, {
+          share: `PuzzleChain Mahjong Solitaire — cleared today's board in ${fmt} 🀄`,
+        });
+      }
+      return;
+    }
+    setSel(i);
+  };
+
+  const doShuffle = () => {
+    if (done || shuffles <= 0 || remaining === 0) return;
+    // Re-deal the remaining slots with a fresh (still deterministic-ish) seed;
+    // the reverse-deal keeps the rest of the board solvable.
+    const rng = mulberry32((seedBase.current + remaining * 7919 + shuffles * 104729) >>> 0);
+    const nf = mjDeal(rng, removed.map((r) => !r));
+    const merged = faces.map((f, i) => (removed[i] ? f : nf[i]));
+    const sh = shuffles - 1;
+    setFaces(merged);
+    setShuffles(sh);
+    setSel(null);
+    saveNow(merged, removed, sh, pairs);
+  };
+
+  // Out of moves and out of shuffles → the day is lost.
+  useEffect(() => {
+    if (stuck && shuffles <= 0 && !done) {
+      setDone(true);
+      onLose && onLose(pairs, secs, {
+        share: `PuzzleChain Mahjong Solitaire — today's board got the better of me 🀄`,
+        answer: `${remaining} tiles were left with no free pair.`,
+      });
+    }
+  }, [stuck, shuffles, done]);
+
+  const TW = 36, TH = 46;
+  const boardW = 15 * (TW / 2) + TW;
+  const boardH = 7 * (TH / 2) + TH + 12;
+  return (
+    <div className="mj-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Tiles</div><div className="pvalue">{remaining}/60</div></div>
+        <button className="p6-btn" onClick={doShuffle} disabled={shuffles <= 0}>🔀 Shuffle ({shuffles})</button>
+      </div>
+      {stuck && shuffles > 0 && (
+        <div className="p6-banner">No free pair left — use a shuffle to keep going.</div>
+      )}
+      <div className="mj-board" style={{ width: boardW, height: boardH }}>
+        {MJ_LAYOUT.map((p, i) => {
+          if (removed[i]) return null;
+          const free = mjIsFree(i, removed);
+          return (
+            <div
+              key={i}
+              className={'mj-tile' + (free ? '' : ' blocked') + (sel === i ? ' sel' : '') + (p.z > 0 ? ' up' + p.z : '')}
+              style={{
+                left: p.x * (TW / 2),
+                top: p.y * (TH / 2) - p.z * 5,
+                zIndex: p.z * 100 + p.y,
+              }}
+              onClick={() => tap(i)}
+            >{MJ_FACES[faces[i]]}</div>
+          );
+        })}
+      </div>
+      <div className="p6-hint">Tap two matching free tiles (uncovered, with an open side) to clear them.</div>
+    </div>
+  );
+}
+
+/* ---- Nonogram (daily) --------------------------------------------------------
+   8×8 picture-logic puzzle. Fill cells so every row and column matches its
+   run clues; any grid satisfying all clues wins. */
+
+function ngClues(line) {
+  const out = [];
+  let run = 0;
+  for (const v of line) {
+    if (v === 1) run++;
+    else if (run) { out.push(run); run = 0; }
+  }
+  if (run) out.push(run);
+  return out.length ? out : [0];
+}
+
+function ngGenerate(rng) {
+  let g = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    g = [];
+    let filled = 0;
+    for (let r = 0; r < 8; r++) {
+      const row = [];
+      for (let c = 0; c < 8; c++) {
+        const v = rng() < 0.55 ? 1 : 0;
+        row.push(v);
+        filled += v;
+      }
+      g.push(row);
+    }
+    if (filled < 22 || filled > 44) continue;
+    const rowsOk = g.every((row) => row.some((v) => v === 1));
+    const colsOk = g[0].every((_, c) => g.some((row) => row[c] === 1));
+    if (rowsOk && colsOk) return g;
+  }
+  return g;
+}
+
+function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const target = useRef(null);
+  if (!target.current) target.current = ngGenerate(dailyRng(offset, 'nonogram'));
+  const rowClues = useRef(target.current.map(ngClues)).current;
+  const colClues = useRef(target.current[0].map((_, c) => ngClues(target.current.map((row) => row[c])))).current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+    ? savedProgress : null;
+  // 0 = blank, 1 = filled, 2 = marked ✗
+  const [grid, setGrid] = useState(() =>
+    resumed ? resumed.grid.map((row) => row.slice()) : Array.from({ length: 8 }, () => new Array(8).fill(0))
+  );
+  const [mode, setMode] = useState('fill'); // 'fill' | 'mark'
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { grid, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, grid: stateRef.current.grid }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
+
+  const solved = (g) => {
+    for (let r = 0; r < 8; r++) {
+      const got = ngClues(g[r].map((v) => (v === 1 ? 1 : 0)));
+      if (got.length !== rowClues[r].length || got.some((v, k) => v !== rowClues[r][k])) return false;
+    }
+    for (let c = 0; c < 8; c++) {
+      const got = ngClues(g.map((row) => (row[c] === 1 ? 1 : 0)));
+      if (got.length !== colClues[c].length || got.some((v, k) => v !== colClues[c][k])) return false;
+    }
+    return true;
+  };
+
+  const tap = (r, c) => {
+    if (done) return;
+    const g = grid.map((row) => row.slice());
+    const cur = g[r][c];
+    if (mode === 'fill') g[r][c] = cur === 1 ? 0 : 1;
+    else g[r][c] = cur === 2 ? 0 : 2;
+    const ns = steps + 1;
+    setGrid(g);
+    setSteps(ns);
+    onStepChange(ns);
+    const won = solved(g);
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g }, ns, secs);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1400 - ns * 4 - secs * 2, 250);
+      onWin(score, ns, secs, {
+        share: `PuzzleChain Nonogram — solved today's 8×8 picture in ${fmt} 🖼️`,
+      });
+    }
+  };
+
+  return (
+    <div className="ng-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
+        <div className="ng-modes">
+          <button className={'p6-btn' + (mode === 'fill' ? ' on' : '')} onClick={() => setMode('fill')}>⬛ Fill</button>
+          <button className={'p6-btn' + (mode === 'mark' ? ' on' : '')} onClick={() => setMode('mark')}>✗ Mark</button>
+        </div>
+      </div>
+      <div className="ng-wrap">
+        <div className="ng-corner" />
+        <div className="ng-colclues">
+          {colClues.map((cl, c) => (
+            <div key={c} className="ng-colclue">{cl.map((v, k) => <span key={k}>{v}</span>)}</div>
+          ))}
+        </div>
+        <div className="ng-rowclues">
+          {rowClues.map((cl, r) => (
+            <div key={r} className="ng-rowclue">{cl.join(' ')}</div>
+          ))}
+        </div>
+        <div className="ng-grid">
+          {grid.map((row, r) =>
+            row.map((v, c) => (
+              <div
+                key={r + '-' + c}
+                className={'ng-cell' + (v === 1 ? ' fill' : '') + (v === 2 ? ' mark' : '')}
+                onClick={() => tap(r, c)}
+              >{v === 2 ? '✗' : ''}</div>
+            ))
+          )}
+        </div>
+      </div>
+      <div className="p6-hint">Numbers are runs of filled cells, in order. Match every row and column clue.</div>
+    </div>
+  );
+}
+
+/* ---- Mine Finder (daily) -----------------------------------------------------
+   9×9 with 10 mines, same board for everyone. A safe opening area is
+   revealed for you; one wrong tap ends the day. */
+
+function mfBuild(rng) {
+  const idxs = ceShuffle(Array.from({ length: 81 }, (_, i) => i), rng);
+  const mines = new Set(idxs.slice(0, 10));
+  const counts = new Array(81).fill(0);
+  for (let i = 0; i < 81; i++) {
+    if (mines.has(i)) { counts[i] = -1; continue; }
+    const r = Math.floor(i / 9), c = i % 9;
+    let n = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < 9 && cc >= 0 && cc < 9 && mines.has(rr * 9 + cc)) n++;
+    }
+    counts[i] = n;
+  }
+  // Deterministic safe opening: the zero-cell whose flood region is largest.
+  let best = -1, bestSize = -1;
+  const seen = new Set();
+  for (let i = 0; i < 81; i++) {
+    if (counts[i] !== 0 || seen.has(i)) continue;
+    const region = mfFlood(i, counts);
+    for (const j of region) seen.add(j);
+    if (region.size > bestSize) { bestSize = region.size; best = i; }
+  }
+  if (best < 0) best = counts.findIndex((v) => v >= 0); // no zeros: any safe cell
+  return { mines, counts, start: best };
+}
+
+function mfFlood(startIdx, counts) {
+  const out = new Set([startIdx]);
+  const queue = [startIdx];
+  while (queue.length) {
+    const i = queue.pop();
+    if (counts[i] !== 0) continue;
+    const r = Math.floor(i / 9), c = i % 9;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= 9 || cc < 0 || cc >= 9) continue;
+      const j = rr * 9 + cc;
+      if (!out.has(j) && counts[j] >= 0) { out.add(j); queue.push(j); }
+    }
+  }
+  return out;
+}
+
+function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const board = useRef(null);
+  if (!board.current) board.current = mfBuild(dailyRng(offset, 'minefinder'));
+  const { mines, counts, start } = board.current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.revealed)
+    ? savedProgress : null;
+  const [revealed, setRevealed] = useState(() =>
+    new Set(resumed ? resumed.revealed : [...mfFlood(start, counts)])
+  );
+  const [flags, setFlags] = useState(() => new Set(resumed && Array.isArray(resumed.flags) ? resumed.flags : []));
+  const [flagMode, setFlagMode] = useState(false);
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [done, setDone] = useState(false);
+  const [boom, setBoom] = useState(-1);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { revealed, flags, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: { dayNum, revealed: [...stateRef.current.revealed], flags: [...stateRef.current.flags] },
+      steps: stateRef.current.steps, secs: stateRef.current.secs,
+    }),
+    !done
+  );
+  const saveNow = (rv, fl, ns) =>
+    onSaveProgress && onSaveProgress({ dayNum, revealed: [...rv], flags: [...fl] }, ns, secs);
+
+  const tap = (i) => {
+    if (done || revealed.has(i)) return;
+    const ns = steps + 1;
+    setSteps(ns);
+    onStepChange(ns);
+    if (flagMode) {
+      const fl = new Set(flags);
+      if (fl.has(i)) fl.delete(i); else fl.add(i);
+      setFlags(fl);
+      saveNow(revealed, fl, ns);
+      return;
+    }
+    if (flags.has(i)) return; // flagged cells don't reveal by accident
+    if (mines.has(i)) {
+      setBoom(i);
+      setDone(true);
+      const rv = new Set(revealed);
+      for (const m of mines) rv.add(m);
+      setRevealed(rv);
+      onLose && onLose(ns, secs, {
+        share: `PuzzleChain Mine Finder — today's field got me 💥`,
+        answer: 'You hit a mine — the field is revealed above.',
+      });
+      return;
+    }
+    const rv = new Set(revealed);
+    if (counts[i] === 0) for (const j of mfFlood(i, counts)) rv.add(j);
+    else rv.add(i);
+    setRevealed(rv);
+    const won = rv.size >= 71;
+    if (!won) saveNow(rv, flags, ns);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1000 - secs * 3 - ns * 2, 200);
+      onWin(score, ns, secs, {
+        share: `PuzzleChain Mine Finder — swept today's field in ${fmt} 🚩`,
+      });
+    }
+  };
+
+  return (
+    <div className="mf-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Mines</div><div className="pvalue">{Math.max(10 - flags.size, 0)}</div></div>
+        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
+        <button className={'p6-btn' + (flagMode ? ' on' : '')} onClick={() => setFlagMode(!flagMode)}>🚩 Flag</button>
+      </div>
+      <div className="mf-grid">
+        {counts.map((v, i) => {
+          const isRev = revealed.has(i);
+          const isMine = mines.has(i);
+          const cls = ['mf-cell'];
+          if (isRev) cls.push('rev');
+          if (isRev && isMine) cls.push('mine');
+          if (i === boom) cls.push('boom');
+          return (
+            <div key={i} className={cls.join(' ')} onClick={() => tap(i)}>
+              {isRev
+                ? (isMine ? '💣' : (v > 0 ? v : ''))
+                : (flags.has(i) ? '🚩' : '')}
+            </div>
+          );
+        })}
+      </div>
+      <div className="p6-hint">Numbers count adjacent mines. Toggle 🚩 Flag mode to mark suspects — same field for everyone today.</div>
+    </div>
+  );
+}
+
+/* ---- Anagram Sprint (daily) --------------------------------------------------
+   Unscramble five words back-to-back. Tap the shuffled letters to build
+   your answer; wrong submissions cost steps, not the day. */
+
+const AN_POOL_5 = ['APPLE', 'BEACH', 'CANDY', 'DANCE', 'EAGLE', 'FLAME', 'GRAPE', 'HONEY', 'IVORY', 'JUICE', 'LEMON', 'MANGO', 'NIGHT', 'OCEAN', 'PIANO', 'QUEEN', 'RIVER', 'STONE', 'TIGER', 'WHALE', 'ZEBRA', 'CLOUD', 'BRAVE', 'SPARK', 'TRAIL'];
+const AN_POOL_6 = ['ANCHOR', 'BASKET', 'CAMERA', 'DRAGON', 'FOREST', 'GARDEN', 'HAMMER', 'ISLAND', 'JUNGLE', 'KERNEL', 'LEGEND', 'MARBLE', 'NECTAR', 'ORCHID', 'PLANET', 'RIDDLE', 'SILVER', 'TEMPLE', 'VELVET', 'WINTER', 'WIZARD', 'YELLOW', 'BREEZE', 'CASTLE', 'FALCON'];
+const AN_POOL_7 = ['ANTIQUE', 'BALLOON', 'CAPTAIN', 'DOLPHIN', 'EMERALD', 'FORTUNE', 'GRANITE', 'HARVEST', 'IMAGINE', 'JOURNEY', 'KINGDOM', 'LIBRARY', 'MACHINE', 'NETWORK', 'OCTOPUS', 'PYRAMID', 'RAINBOW', 'SUNRISE', 'THUNDER', 'VILLAGE', 'WHISPER', 'CRYSTAL', 'LANTERN', 'PENGUIN', 'MONSOON'];
+
+function anPickWords(rng) {
+  const pick = (pool) => pool[Math.floor(rng() * pool.length)];
+  const words = [];
+  const used = new Set();
+  const take = (pool) => {
+    let w = pick(pool);
+    for (let g = 0; g < 20 && used.has(w); g++) w = pick(pool);
+    used.add(w);
+    words.push(w);
+  };
+  take(AN_POOL_5); take(AN_POOL_5); take(AN_POOL_6); take(AN_POOL_6); take(AN_POOL_7);
+  return words;
+}
+
+function anScramble(word, rng) {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const idx = ceShuffle(Array.from({ length: word.length }, (_, i) => i), rng);
+    const s = idx.map((i) => word[i]).join('');
+    if (s !== word) return idx.map((i) => ({ ch: word[i], used: false }));
+  }
+  // Degenerate scramble (e.g. repeated letters): rotate by one.
+  const rot = (word.slice(1) + word[0]).split('');
+  return rot.map((ch) => ({ ch, used: false }));
+}
+
+function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const deal = useRef(null);
+  if (!deal.current) {
+    const rng = dailyRng(offset, 'anagrams');
+    const words = anPickWords(rng);
+    deal.current = { words, tiles: words.map((w) => anScramble(w, rng)) };
+  }
+  const { words, tiles } = deal.current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Number.isFinite(savedProgress.solved)
+    ? savedProgress : null;
+  const [wordIdx, setWordIdx] = useState(() => Math.min(resumed ? resumed.solved : 0, words.length - 1));
+  const [solvedCount, setSolvedCount] = useState(resumed ? resumed.solved : 0);
+  const [picked, setPicked] = useState([]); // [{tileIdx, ch}]
+  const [flash, setFlash] = useState(false);
+  const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { solvedCount, steps, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, solved: stateRef.current.solvedCount }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    !done
+  );
+
+  const word = words[wordIdx];
+  const rack = tiles[wordIdx];
+  const usedSet = new Set(picked.map((p) => p.tileIdx));
+
+  const tapTile = (i) => {
+    if (done || usedSet.has(i) || picked.length >= word.length) return;
+    setPicked(picked.concat({ tileIdx: i, ch: rack[i].ch }));
+  };
+  const backspace = () => setPicked(picked.slice(0, -1));
+  const submit = () => {
+    if (done || picked.length !== word.length) return;
+    const ns = steps + 1;
+    setSteps(ns);
+    onStepChange(ns);
+    const guess = picked.map((p) => p.ch).join('');
+    if (guess === word) {
+      const sc = solvedCount + 1;
+      setSolvedCount(sc);
+      setPicked([]);
+      const won = sc >= words.length;
+      if (!won && onSaveProgress) onSaveProgress({ dayNum, solved: sc }, ns, secs);
+      if (won) {
+        setDone(true);
+        const score = Math.max(1300 - ns * 25 - secs * 2, 250);
+        onWin(score, ns, secs, {
+          share: `PuzzleChain Anagram Sprint — unscrambled all ${words.length} words in ${fmt} 🔀`,
+        });
+      } else {
+        setWordIdx(sc);
+      }
+    } else {
+      setFlash(true);
+      setTimeout(() => setFlash(false), 500);
+      if (onSaveProgress) onSaveProgress({ dayNum, solved: solvedCount }, ns, secs);
+    }
+  };
+
+  return (
+    <div className="an-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Word</div><div className="pvalue">{Math.min(solvedCount + 1, words.length)}/{words.length}</div></div>
+        <div className="pill"><div className="plabel">Tries</div><div className="pvalue">{steps}</div></div>
+      </div>
+      <div className="an-dots">
+        {words.map((w, i) => (
+          <span key={i} className={'an-dot' + (i < solvedCount ? ' solved' : i === wordIdx && !done ? ' cur' : '')}>
+            {i < solvedCount ? w : w.length}
+          </span>
+        ))}
+      </div>
+      <div className={'an-slots' + (flash ? ' bad' : '')}>
+        {Array.from({ length: word.length }, (_, i) => (
+          <div key={i} className={'an-slot' + (picked[i] ? ' has' : '')} onClick={backspace}>
+            {picked[i] ? picked[i].ch : ''}
+          </div>
+        ))}
+      </div>
+      <div className="an-rack">
+        {rack.map((t, i) => (
+          <button key={i} className={'an-tile' + (usedSet.has(i) ? ' used' : '')} onClick={() => tapTile(i)}>
+            {t.ch}
+          </button>
+        ))}
+      </div>
+      <div className="an-actions">
+        <button className="p6-btn" onClick={backspace} disabled={!picked.length}>⌫ Undo letter</button>
+        <button className="p6-btn primary" onClick={submit} disabled={picked.length !== word.length}>Submit</button>
+      </div>
+      <div className="p6-hint">Tap letters to build the word, tap a slot to take one back. Wrong guesses cost tries, never the day.</div>
+    </div>
+  );
+}
+
+/* ---- Crate Push (daily) --------------------------------------------------------
+   Push every crate onto a goal pad. One hand-built warehouse per day
+   (picked by the daily seed); moves are undoable and the room restartable. */
+
+const CP_LEVELS = [
+  ['#######',
+   '#     #',
+   '# .$@ #',
+   '#     #',
+   '#######'],
+  ['#######',
+   '#  .  #',
+   '#  $  #',
+   '#  @  #',
+   '#     #',
+   '#######'],
+  ['########',
+   '#      #',
+   '# .$@$.#',
+   '#      #',
+   '########'],
+  ['#######',
+   '#. $  #',
+   '#  @  #',
+   '#  $ .#',
+   '#######'],
+  ['########',
+   '#   #  #',
+   '# @$  .#',
+   '#   #  #',
+   '########'],
+  ['#######',
+   '#  .  #',
+   '# $$  #',
+   '# .@  #',
+   '#######'],
+  ['########',
+   '#  ..  #',
+   '#  $$  #',
+   '#      #',
+   '#  @   #',
+   '########'],
+  ['#########',
+   '#       #',
+   '# @$  . #',
+   '#       #',
+   '# .  $  #',
+   '#       #',
+   '#########'],
+  ['#######',
+   '#     #',
+   '# $.$ #',
+   '# . . #',
+   '#  $  #',
+   '#  @  #',
+   '#######'],
+  ['########',
+   '# @    #',
+   '# $$$  #',
+   '# ...  #',
+   '#      #',
+   '########'],
+];
+
+function cpParse(rows) {
+  const walls = new Set(), goals = new Set();
+  const crates = [];
+  let player = null;
+  for (let y = 0; y < rows.length; y++) {
+    for (let x = 0; x < rows[y].length; x++) {
+      const ch = rows[y][x];
+      const key = x + ',' + y;
+      if (ch === '#') walls.add(key);
+      if (ch === '.' || ch === '*' || ch === '+') goals.add(key);
+      if (ch === '$' || ch === '*') crates.push([x, y]);
+      if (ch === '@' || ch === '+') player = [x, y];
+    }
+  }
+  return { walls, goals, crates, player, w: Math.max(...rows.map((r) => r.length)), h: rows.length };
+}
+
+function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const levelIdx = useRef(null);
+  if (levelIdx.current == null) levelIdx.current = Math.floor(dailyRng(offset, 'cratepush')() * CP_LEVELS.length);
+  const level = useRef(cpParse(CP_LEVELS[levelIdx.current])).current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum &&
+    Array.isArray(savedProgress.player) && Array.isArray(savedProgress.crates)
+    ? savedProgress : null;
+  const [player, setPlayer] = useState(() => (resumed ? resumed.player.slice() : level.player.slice()));
+  const [crates, setCrates] = useState(() =>
+    (resumed ? resumed.crates : level.crates).map((c) => c.slice())
+  );
+  const [moves, setMoves] = useState(resumed && Number.isFinite(resumed.moves) ? resumed.moves : 0);
+  const [hist, setHist] = useState([]);
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { player, crates, moves, secs, done };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: { dayNum, player: stateRef.current.player, crates: stateRef.current.crates, moves: stateRef.current.moves },
+      steps: stateRef.current.moves, secs: stateRef.current.secs,
+    }),
+    !done
+  );
+  const saveNow = (p, cr, m) =>
+    onSaveProgress && onSaveProgress({ dayNum, player: p, crates: cr, moves: m }, m, secs);
+
+  const crateAt = (cr, x, y) => cr.findIndex(([cx, cy]) => cx === x && cy === y);
+
+  const move = (dx, dy) => {
+    const cur = stateRef.current;
+    if (cur.done) return;
+    const [px, py] = cur.player;
+    const nx = px + dx, ny = py + dy;
+    if (level.walls.has(nx + ',' + ny)) return;
+    const cr = cur.crates.map((c) => c.slice());
+    const ci = crateAt(cr, nx, ny);
+    if (ci >= 0) {
+      const cx = nx + dx, cy = ny + dy;
+      if (level.walls.has(cx + ',' + cy) || crateAt(cr, cx, cy) >= 0) return;
+      cr[ci] = [cx, cy];
+    }
+    const m = cur.moves + 1;
+    setHist((h) => h.concat([{ player: cur.player, crates: cur.crates, moves: cur.moves }]).slice(-200));
+    setPlayer([nx, ny]);
+    setCrates(cr);
+    setMoves(m);
+    onStepChange(m);
+    const won = cr.every(([cx, cy]) => level.goals.has(cx + ',' + cy));
+    if (!won) saveNow([nx, ny], cr, m);
+    if (won) {
+      setDone(true);
+      const score = Math.max(1200 - m * 6 - secs * 2, 250);
+      onWin(score, m, secs, {
+        share: `PuzzleChain Crate Push — shifted today's warehouse in ${m} moves (${fmt}) 📦`,
+      });
+    }
+  };
+
+  const undo = () => {
+    if (done || !hist.length) return;
+    const prev = hist[hist.length - 1];
+    setHist(hist.slice(0, -1));
+    setPlayer(prev.player.slice());
+    setCrates(prev.crates.map((c) => c.slice()));
+    setMoves(prev.moves);
+    onStepChange(prev.moves);
+    saveNow(prev.player, prev.crates, prev.moves);
+  };
+  const restart = () => {
+    if (done) return;
+    setHist([]);
+    setPlayer(level.player.slice());
+    setCrates(level.crates.map((c) => c.slice()));
+    setMoves(0);
+    onStepChange(0);
+    saveNow(level.player, level.crates, 0);
+  };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+      if (map[e.key]) { e.preventDefault(); move(...map[e.key]); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const cells = [];
+  for (let y = 0; y < level.h; y++) {
+    for (let x = 0; x < level.w; x++) {
+      const key = x + ',' + y;
+      const wall = level.walls.has(key);
+      const goal = level.goals.has(key);
+      const crate = crateAt(crates, x, y) >= 0;
+      const isP = player[0] === x && player[1] === y;
+      cells.push(
+        <div key={key} className={'cp-cell' + (wall ? ' wall' : '') + (goal ? ' goal' : '')}>
+          {crate ? <span className={'cp-crate' + (goal ? ' ongoal' : '')}>📦</span> : isP ? '🧍' : ''}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className="cp-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
+        <div className="pill"><div className="plabel">Room</div><div className="pvalue">#{levelIdx.current + 1}</div></div>
+      </div>
+      <div className="cp-grid" style={{ gridTemplateColumns: `repeat(${level.w}, 34px)` }}>{cells}</div>
+      <div className="cp-pad">
+        <div />
+        <button className="p6-btn" onClick={() => move(0, -1)}>▲</button>
+        <div />
+        <button className="p6-btn" onClick={() => move(-1, 0)}>◀</button>
+        <button className="p6-btn" onClick={() => move(0, 1)}>▼</button>
+        <button className="p6-btn" onClick={() => move(1, 0)}>▶</button>
+      </div>
+      <div className="an-actions">
+        <button className="p6-btn" onClick={undo} disabled={!hist.length}>↶ Undo</button>
+        <button className="p6-btn" onClick={restart}>⟲ Restart</button>
+      </div>
+      <div className="p6-hint">Push every crate onto a green pad. You can push one crate at a time — never pull.</div>
+    </div>
+  );
+}
+
+/* ---- Drop Stack (daily) ---------------------------------------------------------
+   Place today's fixed sequence of 40 falling pieces without topping out.
+   Turn-based: line up each piece, then drop it — same order for everyone. */
+
+const DS_W = 9, DS_H = 14, DS_PIECES = 40;
+const DS_SHAPES = [
+  { cells: [[0, 0], [1, 0], [2, 0], [3, 0]], color: '#38BDF8' },
+  { cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: '#FBBF24' },
+  { cells: [[0, 0], [1, 0], [2, 0], [1, 1]], color: '#A78BFA' },
+  { cells: [[1, 0], [2, 0], [0, 1], [1, 1]], color: '#34D399' },
+  { cells: [[0, 0], [1, 0], [1, 1], [2, 1]], color: '#FB7185' },
+  { cells: [[0, 0], [0, 1], [1, 1], [2, 1]], color: '#818CF8' },
+  { cells: [[2, 0], [0, 1], [1, 1], [2, 1]], color: '#F59E0B'  },
+];
+
+function dsSequence(rng) {
+  const seq = [];
+  while (seq.length < DS_PIECES) {
+    seq.push(...ceShuffle([0, 1, 2, 3, 4, 5, 6], rng));
+  }
+  return seq.slice(0, DS_PIECES);
+}
+
+// Rotate a shape's cells 90° clockwise `rot` times, normalized to (0,0).
+function dsCells(shapeIdx, rot) {
+  let cells = DS_SHAPES[shapeIdx].cells;
+  for (let k = 0; k < (rot % 4 + 4) % 4; k++) {
+    const maxY = Math.max(...cells.map(([, y]) => y));
+    cells = cells.map(([x, y]) => [maxY - y, x]);
+  }
+  const minX = Math.min(...cells.map(([x]) => x));
+  const minY = Math.min(...cells.map(([, y]) => y));
+  return cells.map(([x, y]) => [x - minX, y - minY]);
+}
+
+function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const seq = useRef(null);
+  if (!seq.current) seq.current = dsSequence(dailyRng(offset, 'dropstack'));
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+    ? savedProgress : null;
+  const [grid, setGrid] = useState(() =>
+    resumed ? resumed.grid.map((row) => row.slice()) : Array.from({ length: DS_H }, () => new Array(DS_W).fill(0))
+  );
+  const [pieceIdx, setPieceIdx] = useState(resumed && Number.isFinite(resumed.pieceIdx) ? resumed.pieceIdx : 0);
+  const [lines, setLines] = useState(resumed && Number.isFinite(resumed.lines) ? resumed.lines : 0);
+  const [points, setPoints] = useState(resumed && Number.isFinite(resumed.points) ? resumed.points : 0);
+  const [col, setCol] = useState(3);
+  const [rot, setRot] = useState(0);
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
+  const { secs, fmt } = useTimer(!done, initialSecs);
+
+  const stateRef = useRef({});
+  stateRef.current = { grid, pieceIdx, lines, points, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({
+      progress: {
+        dayNum, grid: stateRef.current.grid, pieceIdx: stateRef.current.pieceIdx,
+        lines: stateRef.current.lines, points: stateRef.current.points,
+      },
+      steps: stateRef.current.pieceIdx, secs: stateRef.current.secs,
+    }),
+    !done
+  );
+
+  const shapeIdx = pieceIdx < DS_PIECES ? seq.current[pieceIdx] : 0;
+  const cells = dsCells(shapeIdx, rot);
+  const shapeW = Math.max(...cells.map(([x]) => x)) + 1;
+  const clampedCol = Math.min(Math.max(col, 0), DS_W - shapeW);
+
+  const canPlace = (g, atCol, yOff) =>
+    cells.every(([dx, dy]) => {
+      const x = atCol + dx, y = yOff + dy;
+      return x >= 0 && x < DS_W && y < DS_H && (y < 0 || g[y][x] === 0);
+    }) && cells.every(([, dy]) => yOff + dy >= 0);
+
+  const landingY = (g, atCol) => {
+    if (!canPlace(g, atCol, 0)) return -1;
+    let y = 0;
+    while (canPlace(g, atCol, y + 1)) y++;
+    return y;
+  };
+
+  const drop = () => {
+    if (done || pieceIdx >= DS_PIECES) return;
+    const g = grid.map((row) => row.slice());
+    const y = landingY(g, clampedCol);
+    const np = pieceIdx + 1;
+    if (y < 0) {
+      // Piece can't enter the well — topped out; the day is lost.
+      setDone(true);
+      onLose && onLose(pieceIdx, secs, {
+        share: `PuzzleChain Drop Stack — topped out after ${pieceIdx} pieces 🧱`,
+        answer: `The stack reached the top with ${DS_PIECES - pieceIdx} pieces left.`,
+      });
+      return;
+    }
+    for (const [dx, dy] of cells) g[y + dy][clampedCol + dx] = shapeIdx + 1;
+    let cleared = 0;
+    for (let r = DS_H - 1; r >= 0; r--) {
+      if (g[r].every((v) => v !== 0)) {
+        g.splice(r, 1);
+        g.unshift(new Array(DS_W).fill(0));
+        cleared++;
+        r++;
+      }
+    }
+    const gained = [0, 100, 250, 450, 700][cleared] || 0;
+    const nl = lines + cleared, npts = points + gained;
+    setGrid(g);
+    setPieceIdx(np);
+    setLines(nl);
+    setPoints(npts);
+    setRot(0);
+    setCol(3);
+    onStepChange(np);
+    const won = np >= DS_PIECES;
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g, pieceIdx: np, lines: nl, points: npts }, np, secs);
+    if (won) {
+      setDone(true);
+      const score = npts + 200 + nl * 10;
+      onWin(score, np, secs, {
+        share: `PuzzleChain Drop Stack — placed all ${DS_PIECES} pieces, ${nl} lines, ${npts + 200 + nl * 10} pts 🧱`,
+      });
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); setCol((c) => Math.max(c - 1, 0)); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); setCol((c) => Math.min(c + 1, DS_W - 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setRot((r) => r + 1); }
+      if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); drop(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const ghostY = landingY(grid, clampedCol);
+  const ghost = new Set();
+  const hover = new Set();
+  if (!done && pieceIdx < DS_PIECES) {
+    for (const [dx, dy] of cells) {
+      hover.add(dy * DS_W + (clampedCol + dx));
+      if (ghostY >= 0) ghost.add((ghostY + dy) * DS_W + (clampedCol + dx));
+    }
+  }
+  const nextIdx = pieceIdx + 1 < DS_PIECES ? seq.current[pieceIdx + 1] : null;
+
+  return (
+    <div className="ds-game">
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">{Math.min(pieceIdx + 1, DS_PIECES)}/{DS_PIECES}</div></div>
+        <div className="pill"><div className="plabel">Lines</div><div className="pvalue">{lines}</div></div>
+        <div className="pill"><div className="plabel">Points</div><div className="pvalue">{points}</div></div>
+      </div>
+      <div className="ds-next">
+        Next: {nextIdx != null
+          ? dsCells(nextIdx, 0).map(([x, y], k) => (
+            <span key={k} className="ds-mini" style={{ background: DS_SHAPES[nextIdx].color, left: 42 + x * 10, top: 4 + y * 10 }} />
+          ))
+          : <span className="ds-last">last piece</span>}
+      </div>
+      <div className="ds-grid">
+        {grid.map((row, r) =>
+          row.map((v, c) => {
+            const i = r * DS_W + c;
+            const cls = ['ds-cell'];
+            let bg = v ? DS_SHAPES[v - 1].color : null;
+            if (!v && hover.has(i)) { cls.push('hover'); bg = DS_SHAPES[shapeIdx].color; }
+            else if (!v && ghost.has(i)) cls.push('ghost');
+            return (
+              <div
+                key={i}
+                className={cls.join(' ')}
+                style={bg ? { background: bg } : (ghost.has(i) && !v ? { borderColor: DS_SHAPES[shapeIdx].color } : undefined)}
+                onClick={() => setCol(Math.min(Math.max(c - Math.floor(shapeW / 2), 0), DS_W - shapeW))}
+              />
+            );
+          })
+        )}
+      </div>
+      <div className="ds-pad">
+        <button className="p6-btn" onClick={() => setCol((c) => Math.max(c - 1, 0))}>◀</button>
+        <button className="p6-btn" onClick={() => setRot((r) => r + 1)}>⟳ Rotate</button>
+        <button className="p6-btn" onClick={() => setCol((c) => Math.min(c + 1, DS_W - 1))}>▶</button>
+        <button className="p6-btn primary" onClick={drop}>⬇ Drop</button>
+      </div>
+      <div className="p6-hint">Line up each piece (tap the well or use ◀ ▶ ⟳), then Drop. Clear lines for points — top out and the day is lost.</div>
+    </div>
+  );
+}
+
 // Each entry also carries the Game Corner harness `manifest` (phase 2),
 // mirrored by id in server.js's GAME_REGISTRY — machine-relevant fields
 // (scoreDirection / tieBreak / sessionLength / input / undo) must match the
@@ -15739,6 +17402,153 @@ const GAMES = [
       { title: 'Boosters', body: 'Undo, shuffle, and clear-slot are limited per day — everyone plays the same board, so spend them wisely.' },
     ],
     component: TileMatchingDailyGame,
+  },
+  // Phase 6 Lane A dailies — shared card/tile engine games. All daily,
+  // shell 'daily', tier B server-side (see GAME_REGISTRY). Names follow the
+  // spec's IP-hygiene rules: generic public-domain game names only.
+  {
+    id: 'klondike',
+    name: 'Klondike Solitaire',
+    icon: '🃏',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'The classic patience deal — everyone plays the same shuffle today.',
+    tag: 'Cards',
+    tagColor: C.accent,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Build down, alternate colors', body: 'Tap a face-up card, then its destination. Tableau piles build downward in alternating colors; only a King moves to an empty column.' },
+      { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
+      { title: 'Score', body: 'Fill all four foundations to win. Fewer moves and faster solves score higher — same deal for everyone today.' },
+    ],
+    component: KlondikeGame,
+  },
+  {
+    id: 'spider',
+    name: 'Spider Solitaire',
+    icon: '🕷️',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'One-suit spider: build eight King-to-Ace runs to clear the board.',
+    tag: 'Cards',
+    tagColor: C.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Move descending runs', body: 'Tap a face-up card to pick up it and the run below, then tap a column whose top card is one rank higher (or any empty column).' },
+      { title: 'Complete runs', body: 'A full King-to-Ace run clears off the board. Clear eight runs to win. Deal a fresh row of ten from the stock when you\'re stuck.' },
+      { title: 'Score', body: 'Fewer moves and faster clears score higher. Everyone gets the same 104-card deal today.' },
+    ],
+    component: SpiderGame,
+  },
+  {
+    id: 'mahjongsol',
+    name: 'Mahjong Solitaire',
+    icon: '🎴',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Clear the layered tile pyramid by pairing free matching tiles.',
+    tag: 'Tiles',
+    tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'booster' },
+    howToPlay: [
+      { title: 'Pair free tiles', body: 'A tile is free when nothing rests on top of it and its left or right side is open. Tap two matching free tiles to clear them.' },
+      { title: 'Plan your order', body: 'Today\'s deal is always solvable in at least one order — but a careless order can dead-end you. Two shuffles are your safety net.' },
+      { title: 'Score', body: 'Clear all 60 tiles to win. Faster clears with unused shuffles score higher; run out of moves and shuffles and the day is lost.' },
+    ],
+    component: MahjongSolitaireGame,
+  },
+  {
+    id: 'nonogram',
+    name: 'Nonogram',
+    icon: '🖼️',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Fill the 8×8 grid so every row and column matches its number clues.',
+    tag: 'Logic',
+    tagColor: C.accent,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Read the clues', body: 'Each number is a run of filled cells in that row or column, in order, with at least one gap between runs.' },
+      { title: 'Fill and mark', body: 'Use ⬛ Fill for cells you\'re sure of and ✗ Mark for cells that must stay empty. Both toggle freely — mistakes cost steps, not the day.' },
+      { title: 'Score', body: 'The puzzle solves when every clue is satisfied. Fewer taps and faster solves score higher.' },
+    ],
+    component: NonogramGame,
+  },
+  {
+    id: 'minefinder',
+    name: 'Mine Finder',
+    icon: '🚩',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Sweep the daily minefield — one wrong tap ends the day.',
+    tag: 'Risk',
+    tagColor: C.rose,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Count the numbers', body: 'Each number counts the mines touching that cell. A safe opening area is revealed for you — work outward from it.' },
+      { title: 'Flag suspects', body: 'Toggle 🚩 Flag mode to mark cells you believe are mines. Flagged cells can\'t be revealed by a stray tap.' },
+      { title: 'Careful', body: 'Reveal all 71 safe cells to win. Tap a mine and the day is lost — everyone sweeps the same field today.' },
+    ],
+    component: MineFinderGame,
+  },
+  {
+    id: 'anagrams',
+    name: 'Anagram Sprint',
+    icon: '🔀',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Unscramble five words back-to-back against the clock.',
+    tag: 'Word',
+    tagColor: C.gold,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Rebuild the word', body: 'Tap the scrambled letters in order to build your answer; tap a slot (or ⌫) to take a letter back.' },
+      { title: 'Five in a row', body: 'Solve all five words — two 5-letter, two 6-letter, and one 7-letter. Wrong submissions cost tries, never the day.' },
+      { title: 'Score', body: 'Fewer tries and faster sprints score higher. Everyone unscrambles the same five words today.' },
+    ],
+    component: AnagramsGame,
+  },
+  {
+    id: 'cratepush',
+    name: 'Crate Push',
+    icon: '📦',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Push every crate onto a goal pad in today\'s warehouse.',
+    tag: 'Puzzle',
+    tagColor: C.emerald,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    howToPlay: [
+      { title: 'Push, never pull', body: 'Move with the arrows (or arrow keys). Walking into a crate pushes it one cell — you can\'t pull, and you can\'t push two at once.' },
+      { title: 'Don\'t get cornered', body: 'A crate shoved against a wall corner may be stuck for good. Undo steps back freely, or Restart the room.' },
+      { title: 'Score', body: 'Park every crate on a green pad to win. Fewer moves and faster solves score higher.' },
+    ],
+    component: CratePushGame,
+  },
+  {
+    id: 'dropstack',
+    name: 'Drop Stack',
+    icon: '🧊',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Place today\'s fixed sequence of 40 falling pieces without topping out.',
+    tag: 'Puzzle',
+    tagColor: C.violet,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Line up, then drop', body: 'Move the hovering piece with ◀ ▶ (or tap the well), rotate with ⟳, then hit Drop. Pieces fall instantly — no timer pressure.' },
+      { title: 'Clear lines', body: 'Complete a full row to clear it: 100 points for one line, up to 700 for four at once.' },
+      { title: 'Survive the sequence', body: 'Everyone gets the same 40-piece order today. Place them all to win; stack past the top and the day is lost.' },
+    ],
+    component: DropStackGame,
   },
 ];
 

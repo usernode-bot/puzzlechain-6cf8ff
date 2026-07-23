@@ -163,6 +163,28 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+  // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
+  // (snapshot + timing heuristics through settleDailySession); per-game replay
+  // engines land incrementally in lib/dapp.js, flipping each to tier A without
+  // touching these rows. Being category 'daily' automatically enrolls them in
+  // GAME_IDS → server-issued seeds, consume-on-start locks, resume, streaks,
+  // and the per-game daily leaderboard.
+  klondike:          { name: 'Klondike Solitaire', category: 'daily',  tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+  spider:            { name: 'Spider Solitaire',  category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+  mahjongsol:        { name: 'Mahjong Solitaire', category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
+  nonogram:          { name: 'Nonogram',          category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+  minefinder:        { name: 'Mine Finder',       category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  anagrams:          { name: 'Anagram Sprint',    category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  cratepush:         { name: 'Crate Push',        category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+  dropstack:         { name: 'Drop Stack',        category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   // Phase 5 board games — server-authoritative rules modules (lib/board-rules.js)
   // over classic_rooms; online head-to-head only, rated on the ladder. Tier C:
   // the server IS the referee, so no replay validation is needed.

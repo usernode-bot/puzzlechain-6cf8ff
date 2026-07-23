@@ -426,6 +426,59 @@ pieces (all in `public/app.jsx`):
   code `DEMOBG` whose state starts at `currentPlayer: 2`, so a tester
   who joins it moves immediately against a fake opponent.
 
+## Game Corner phase 6 — shared card/tile engine + Lane A dailies
+
+Phase 6 added a small client-side **card/tile engine** and eight new
+daily games riding it (all in `public/app.jsx`, section "Phase 6 —
+Shared card/tile engine + Lane A daily games"):
+
+- **Engine primitives:** `ceDeck(nDecks, suits, rng)` /
+  `ceShuffle(arr, rng)` (Fisher-Yates over the shared mulberry32
+  family — same PRNG as `lib/dapp.js`'s tile generator), the shared
+  `<CeCard>` / `<CeSlot>` renderers, and the Mahjong layered-tile
+  helpers (`MJ_LAYOUT`, `mjIsFree`, `mjDeal`) — `mjDeal` uses
+  **reverse-removal dealing** so every daily board is solvable in at
+  least one order (the same layer/overlap model as `tileBoard` in
+  `lib/dapp.js`, with solvability added).
+- **Eight new dailies**, ids `klondike`, `spider` (1-suit, 8 decks of
+  spades), `mahjongsol`, `nonogram`, `minefinder`, `anagrams`,
+  `cratepush`, `dropstack`. All are `category: 'daily'` + `shell:
+  'daily'` + `daily: true`, so the existing machinery picked them up
+  with zero route changes: server-issued seeds (`ensureDailySeeds`
+  loops the derived `GAME_IDS`), consume-on-start locks, resume,
+  streak multipliers, per-game leaderboards, pre-game/How-to-Play
+  chrome, and `demo=leaderboard` staging rows (that fixture loops
+  `GAME_IDS` too).
+- **Validation tier:** all eight are **tier B** in `GAME_REGISTRY` —
+  finishes settle through `settleDailySession`'s snapshot + timing
+  heuristics (their `onStepChange` calls feed the shared
+  `dailyRunLog` automatically). Registering a per-game engine in
+  `lib/dapp.js` flips one to tier A without touching game code.
+- **Loss paths:** `minefinder` (mine tap), `mahjongsol` (stuck with
+  no shuffles left), and `dropstack` (top-out) call `onLose` — the
+  day locks with score 0, streak not extended, like Crypto Wordle.
+- **Win-move autosave rule:** these games deliberately **skip the
+  progress save on the winning move** — the finish call closes the
+  attempt immediately and a racing progress write 409s against the
+  finished row (harmless but logs a console error, which trips
+  proposal checks). Keep that pattern for future dailies.
+- **IP hygiene (spec §8):** names are generic on purpose — "Nonogram"
+  not "Picross", "Drop Stack" not "Tetris" (own palette, no trade
+  dress), "Crate Push" not "Sokoban", "Anagram Sprint" not "Boggle".
+  Keep it that way when touching copy.
+- **Determinism quirks:** `cratepush` picks one of ten hand-authored
+  always-solvable rooms (`CP_LEVELS`) via the daily seed; `dropstack`
+  derives a fixed 40-piece bag sequence; `anagrams` picks 2×5 + 2×6 +
+  1×7 words from in-file pools. Progress shapes: klondike/spider
+  `{ dayNum, st }` (full serialized deal state), mahjongsol
+  `{ dayNum, faces, removed, shuffles, pairs }`, nonogram
+  `{ dayNum, grid }`, minefinder `{ dayNum, revealed, flags }`,
+  anagrams `{ dayNum, solved }`, cratepush `{ dayNum, player, crates,
+  moves }`, dropstack `{ dayNum, grid, pieceIdx, lines, points }`.
+- The single-file `app.jsx` (~19k lines) is still esbuild-compiled in
+  one pass; the spec's deferred file-split remains available if it
+  grows past comfortable, but was not needed for this phase.
+
 ## Retired features (Game Corner phase 1 — do not resurrect)
 
 As of the "Game Corner" evolution's phase-1 subtraction, the following

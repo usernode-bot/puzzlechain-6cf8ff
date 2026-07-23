@@ -406,6 +406,51 @@
       "name": "Ladder picker includes Checkers with seeded ratings",
       "path": "/?tab=ladder&demo=ladder",
       "expectText": "Checkers"
+    },
+    {
+      "name": "Klondike Solitaire pre-game screen",
+      "path": "/?game=klondike",
+      "expectText": "Klondike Solitaire"
+    },
+    {
+      "name": "Spider Solitaire pre-game screen",
+      "path": "/?game=spider",
+      "expectText": "Spider Solitaire"
+    },
+    {
+      "name": "Mahjong Solitaire pre-game screen",
+      "path": "/?game=mahjongsol",
+      "expectText": "Mahjong Solitaire"
+    },
+    {
+      "name": "Mine Finder pre-game screen",
+      "path": "/?game=minefinder",
+      "expectText": "Mine Finder"
+    },
+    {
+      "name": "Anagram Sprint pre-game screen",
+      "path": "/?game=anagrams",
+      "expectText": "Anagram Sprint"
+    },
+    {
+      "name": "Crate Push pre-game screen",
+      "path": "/?game=cratepush",
+      "expectText": "Crate Push"
+    },
+    {
+      "name": "Nonogram board renders in-game",
+      "path": "/?game=nonogram&play=1",
+      "expectSelector": ".ng-grid"
+    },
+    {
+      "name": "Drop Stack well renders in-game",
+      "path": "/?game=dropstack&play=1",
+      "expectSelector": ".ds-grid"
+    },
+    {
+      "name": "New dailies get server-issued seeds",
+      "path": "/api/public/daily",
+      "expectText": "klondike"
     }
   ]
 }

@@ -2,27 +2,46 @@ const { useState, useEffect, useRef } = React;
 
 /* ============================================================
    Design system — color palette
+   "The Daily Page, Warmed" (Game Corner spec, Appendix A): an
+   editorial daily-newspaper look. Ivory paper, ink-navy text, warm
+   hairlines, white card surfaces, and brass reserved for streaks /
+   wins / medals. Same token names as before so every ${C.*} in the
+   stylesheet re-themes in place.
    ============================================================ */
 const C = {
-  bg:      '#0A0D14',
-  surface: '#12161F',
-  card:    '#181D29',
-  border:  '#2A3342',
-  accent:  '#6366F1',
-  gold:    '#FBBF24',
-  emerald: '#34D399',
-  violet:  '#A78BFA',
-  rose:    '#FB7185',
-  text:    '#ECEFF6',
-  muted:   '#8B95A8',
-  dim:     '#39424F',
+  bg:      '#FAF6EE', // ivory paper
+  surface: '#F3EDDF', // deeper paper — nav, wells, sheets
+  card:    '#FFFFFF', // card-weight white surfaces
+  border:  '#E7DFCC', // warm hairline
+  accent:  '#2D5FAE', // editorial ink-blue — shell links/buttons/tabs
+  gold:    '#C9A227', // brass — reserved for streaks, wins, medals
+  emerald: '#1E8F63', // deep green (success, live states)
+  violet:  '#7B5CD6',
+  rose:    '#CD4B3A', // warm coral-red (errors, danger)
+  text:    '#1F2B47', // ink navy
+  muted:   '#5E6A87', // muted ink
+  dim:     '#A9A38F', // faded newsprint — faint text, dashed rules
+};
+
+/* One bright accent per game (Appendix A: coral / sky / lime / violet /
+   teal family). Assigned to each GAMES entry's tagColor, which already
+   flows into the lobby card's --accent top rule, tag pill, GotD hero and
+   game modal — so a single hue recolors all of a game's chrome. */
+const GA = {
+  coral:  '#E4604E',
+  sky:    '#3D87C9',
+  lime:   '#71A122',
+  violet: '#7B5CD6',
+  teal:   '#1D9E8F',
+  plum:   '#B14A82',
+  amber:  '#D97E23',
 };
 
 /* ============================================================
    Global stylesheet (injected via <style>)
    ============================================================ */
 const css = `
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -400,7 +419,7 @@ body {
 .card:hover {
   transform: translateY(-3px);
   border-color: var(--accent, ${C.accent});
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  box-shadow: 0 10px 26px rgba(63,51,24,0.14);
 }
 .card.done {
   opacity: 0.55;
@@ -540,7 +559,7 @@ body {
 .win-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10,14,26,0.85);
+  background: rgba(38,33,18,0.52);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
@@ -556,7 +575,7 @@ body {
   text-align: center;
   max-width: 360px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  box-shadow: 0 20px 50px rgba(63,51,24,0.22);
 }
 .win-card .trophy { font-size: 2.6rem; }
 .win-card h2 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
@@ -589,7 +608,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.primary-btn:hover { background: #4F52D9; }
+.primary-btn:hover { background: #234C8E; }
 
 /* ---- Locked screen ---- */
 .locked-card {
@@ -600,7 +619,7 @@ body {
   text-align: center;
   max-width: 420px;
   margin: 1rem auto 0;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  box-shadow: 0 12px 34px rgba(63,51,24,0.18);
 }
 .locked-card .lock-icon { font-size: 2.6rem; }
 .locked-card h2 { font-size: 1.4rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
@@ -687,7 +706,7 @@ body {
 
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
-  position: fixed; inset: 0; background: #000000b3; z-index: 220;
+  position: fixed; inset: 0; background: rgba(38,33,18,0.55); z-index: 220;
   display: flex; align-items: center; justify-content: center; padding: 1rem;
 }
 .howto-card {
@@ -2503,7 +2522,7 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.tm-play-btn:hover { background: #4F52D9; }
+.tm-play-btn:hover { background: #234C8E; }
 .tm-level-won {
   background: ${C.card};
   border: 1px solid ${C.emerald}55;
@@ -2719,7 +2738,7 @@ body {
 .cg-sheet-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(10,14,26,0.6);
+  background: rgba(38,33,18,0.45);
   z-index: 45;
   opacity: 0;
   pointer-events: none;
@@ -3298,7 +3317,7 @@ body {
   padding: 0.45rem 0.85rem; font-family: inherit; font-size: 0.83rem;
   font-weight: 600; cursor: pointer; transition: background 0.12s;
 }
-.tm-duel-find-btn:hover:not(:disabled) { background: #4F52D9; }
+.tm-duel-find-btn:hover:not(:disabled) { background: #234C8E; }
 .tm-duel-find-btn:disabled { opacity: 0.35; cursor: not-allowed; background: ${C.muted}; }
 .tm-duel-matchmaking {
   text-align: center; padding: 2rem 1rem;
@@ -3682,7 +3701,7 @@ body {
 /* ---- Pre-launch Game Mode Modal ---- */
 .gm-modal-backdrop {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(8, 10, 18, 0.72); backdrop-filter: blur(4px);
+  background: rgba(38,33,18,0.5); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; padding: 1rem;
   animation: gmFade 0.18s ease-out;
 }
@@ -3690,7 +3709,7 @@ body {
 .gm-modal {
   position: relative; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto;
   background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 50px rgba(63,51,24,0.22);
 }
 .gm-modal-close {
   position: absolute; top: 0.75rem; right: 0.75rem; width: 2rem; height: 2rem;
@@ -3757,7 +3776,7 @@ body {
 }
 .p6-btn:hover { border-color: ${C.accent}; }
 .p6-btn:disabled { opacity: .4; cursor: default; }
-.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgba(99,102,241,.18); }
+.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgba(45,95,174,.14); }
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
 .p6-banner {
   background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.4); color: ${C.gold};
@@ -3869,7 +3888,7 @@ body {
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: ${C.text};
 }
-.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgba(99,102,241,.12); }
+.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgba(45,95,174,.10); }
 .an-slots.bad .an-slot.has { border-color: ${C.rose}; background: rgba(251,113,133,.12); animation: an-shake .4s; }
 @keyframes an-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .an-rack { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
@@ -3889,7 +3908,7 @@ body {
   font-size: 20px; user-select: none;
 }
 .cp-cell.wall { background: ${C.dim}; border-radius: 2px; }
-.cp-cell.goal { background: rgba(52,211,153,.16); box-shadow: inset 0 0 0 2px rgba(52,211,153,.5); }
+.cp-cell.goal { background: rgba(30,143,99,.14); box-shadow: inset 0 0 0 2px rgba(30,143,99,.45); }
 .cp-crate.ongoal { filter: hue-rotate(60deg) brightness(1.2); }
 .cp-pad {
   display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; margin-bottom: 10px;
@@ -3946,7 +3965,7 @@ body {
 
 /* Phase 8 — anonymous play + "make it count" */
 .guest-cta {
-  border: 1px solid ${C.accent}66; background: rgba(99,102,241,0.10);
+  border: 1px solid ${C.accent}66; background: rgba(45,95,174,0.08);
   border-radius: 12px; padding: 12px 14px; margin-bottom: 0.9rem; text-align: left;
 }
 .guest-rank { font-size: 15px; margin-bottom: 6px; }
@@ -3954,7 +3973,7 @@ body {
 .guest-note { color: ${C.muted}; font-size: 12.5px; line-height: 1.5; }
 .guest-note strong { color: ${C.text}; }
 .commit-notice {
-  border: 1px solid ${C.emerald}66; background: rgba(52,211,153,0.10); color: ${C.text};
+  border: 1px solid ${C.emerald}66; background: rgba(30,143,99,0.09); color: ${C.text};
   border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem; font-size: 13.5px;
   cursor: pointer;
 }
@@ -3989,7 +4008,7 @@ body {
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 
 .chat-overlay {
-  position: fixed; inset: 0; background: rgba(4, 6, 12, 0.72); z-index: 240;
+  position: fixed; inset: 0; background: rgba(38,33,18,0.5); z-index: 240;
   display: flex; align-items: flex-end; justify-content: center;
 }
 .chat-panel {
@@ -4009,7 +4028,7 @@ body {
 .chat-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 .chat-empty { color: ${C.muted}; font-size: 13px; text-align: center; margin-top: 24px; }
 .chat-msg { background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px; padding: 8px 10px; max-width: 88%; }
-.chat-msg.mine { align-self: flex-end; border-color: ${C.accent}55; background: rgba(99,102,241,0.10); }
+.chat-msg.mine { align-self: flex-end; border-color: ${C.accent}55; background: rgba(45,95,174,0.08); }
 .chat-msg.hidden-msg { background: none; border-style: dashed; }
 .chat-tombstone { color: ${C.dim}; font-size: 12px; font-style: italic; }
 .chat-msg-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
@@ -4039,6 +4058,91 @@ body {
 }
 .chat-btn-inline:hover { border-color: ${C.accent}; }
 
+/* ============================================================
+   Appendix A — "The Daily Page, Warmed" editorial layer.
+   Serif masthead + datelines, newsprint rules, card-weight white
+   surfaces with soft warm shadows, brass reserved for streaks /
+   wins / medals. Pure restyle: later rules of equal-or-greater
+   specificity re-skin the same markup — no layout changes.
+   ============================================================ */
+.serif { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; }
+
+/* Serif display type on the shell's headline moments. */
+.nav-brand, .lobby-head h1, .home-section-title, .gotd-name,
+.pregame-card h2, .win-card h2, .locked-card h2, .gm-modal h2,
+.howto-head h3, .chat-title {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  letter-spacing: 0;
+}
+.nav-brand { font-weight: 700; }
+.nav-brand .logo { color: ${C.gold}; }
+
+/* Brass for streaks (spec: brass = streaks/wins/medals; green stays a
+   live/success color elsewhere). */
+.nav-stat .value.streak { color: ${C.gold}; }
+.lobby-head .lobby-hint { color: ${C.gold}; }
+
+/* ---- Home masthead: numbered edition + dateline over a double rule ---- */
+.lobby-head.masthead { text-align: center; margin-bottom: 1.6rem; }
+.lobby-head.masthead h1 {
+  font-size: 2.1rem; font-weight: 900; letter-spacing: 0.005em; line-height: 1.1;
+}
+.masthead-dateline {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.64rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.14em; color: ${C.muted};
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+.masthead-dateline::before, .masthead-dateline::after {
+  content: ''; flex: 1; max-width: 72px; height: 1px; background: ${C.border};
+}
+.lobby-head.masthead .masthead-rule {
+  height: 4px; margin: 0.7rem auto 0; max-width: 460px;
+  border-top: 2px solid ${C.text}; border-bottom: 1px solid ${C.text};
+}
+.lobby-head.masthead p { font-style: italic; font-family: 'Fraunces', Georgia, serif; }
+.lobby-head.masthead .lobby-hint { font-style: normal; font-family: 'Space Grotesk', system-ui, sans-serif; }
+
+/* Section headers as newspaper column rules. */
+.home-section-title {
+  font-size: 1.05rem; font-weight: 700;
+  border-bottom: 1px solid ${C.border}; padding-bottom: 0.35rem;
+}
+
+/* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
+.card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
+.lboard, .howto-card, .gm-modal {
+  box-shadow: 0 1px 2px rgba(63,51,24,0.06), 0 6px 18px rgba(63,51,24,0.07);
+}
+.win-card, .howto-card, .gm-modal { box-shadow: 0 20px 50px rgba(63,51,24,0.22); }
+
+/* GotD hero reads as the front-page lead story. */
+.gotd-hero { background: ${C.card}; }
+.gotd-label {
+  font-family: 'JetBrains Mono', monospace; font-weight: 600;
+  text-transform: uppercase;
+}
+.gotd-name { font-size: 22px; font-weight: 900; }
+.gotd-desc { font-family: 'Fraunces', Georgia, serif; font-style: italic; }
+
+/* Per-game chrome picks up the game's accent (set as --accent inline on
+   the lobby card, hero, and modal): accent Play buttons + tag pills. */
+.gotd-play, .gm-modal .primary-btn, .pregame-card .pregame-play {
+  background: var(--accent, ${C.accent});
+}
+.gotd-play:hover, .gm-modal .primary-btn:hover, .pregame-card .pregame-play:hover {
+  background: var(--accent, ${C.accent}); filter: brightness(0.88);
+}
+.pregame-card { border-top: 3px solid var(--accent, ${C.accent}); }
+
+/* Buttons: crisp editorial edges. */
+.primary-btn { box-shadow: 0 1px 2px rgba(63,51,24,0.18); }
+
+/* Wins are brass moments. */
+.win-card .trophy { filter: none; }
+.win-card h2 { color: ${C.text}; }
+.score-row.total .v { color: ${C.gold}; }
 `;
 
 /* ============================================================
@@ -6574,7 +6678,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
   const resuming = !!(attempt && !attempt.finishedAt);
   const m = game.manifest || {};
   return (
-    <div className="pregame-card">
+    <div className="pregame-card" style={{ '--accent': game.tagColor || C.accent }}>
       <div className="pregame-icon">{game.icon}</div>
       <h2>{game.name}</h2>
       <div className="sub">{game.desc}</div>
@@ -10466,7 +10570,7 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOp
   if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
     return (
       <ClassicRaceGame
-        game={{ id: '2048', name: '2048', icon: '🔢', tagColor: C.emerald }}
+        game={{ id: '2048', name: '2048', icon: '🔢', tagColor: GA.amber }}
         roomId={gameModeOpts.roomId}
         myPlayerNum={gameModeOpts.roomAction === 'join' ? 2 : 1}
         onExitLobby={() => onBack && onBack()}
@@ -17429,7 +17533,7 @@ const GAMES = [
     daily: true,
     desc: 'Fill the 6×6 grid so every row, column, and box has 1–6.',
     tag: 'Logic',
-    tagColor: C.accent,
+    tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
     howToPlay: [
       { title: 'Fill the grid', body: 'Tap a cell, then pick a number 1–6. Every row, column, and 2×3 box must contain each number exactly once.' },
@@ -17447,7 +17551,7 @@ const GAMES = [
     daily: true,
     desc: 'Find every hidden word in the letter grid.',
     tag: 'Word',
-    tagColor: C.violet,
+    tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag', undo: 'none' },
     howToPlay: [
       { title: 'Find the words', body: 'Drag across the letter grid to select a word — horizontally, vertically, or diagonally, forwards or backwards.' },
@@ -17465,7 +17569,7 @@ const GAMES = [
     daily: true,
     desc: 'Solve a daily stack of crypto words — clues unlock as you go, or use a free hint.',
     tag: 'Web3',
-    tagColor: C.emerald,
+    tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
     howToPlay: [
       { title: 'Guess the word', body: 'Type a guess and submit. Green = right letter, right spot; gold = right letter, wrong spot.' },
@@ -17482,7 +17586,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Clear the 8×8 grid of mines. Cash Out early to lock in a risk multiplier.',
     tag: 'Risk',
-    tagColor: C.rose,
+    tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Clear the field', body: 'Tap to reveal a cell; numbers tell you how many mines touch it. Long-press to flag suspected mines.' },
@@ -17498,7 +17602,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
     tag: 'Strategy',
-    tagColor: C.gold,
+    tagColor: GA.amber,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Sow your stones', body: 'Tap one of your pits to scoop its stones and drop them one-by-one counter-clockwise. Landing in your store banks a stone and earns another turn.' },
@@ -17516,7 +17620,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
     tag: 'Board',
-    tagColor: C.emerald,
+    tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; chutes drop you back.' },
@@ -17537,7 +17641,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Slide tiles to merge numbers and reach 2048.',
     tag: 'Numbers',
-    tagColor: C.emerald,
+    tagColor: GA.amber,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'swipe', undo: 'none' },
     howToPlay: [
       { title: 'Slide and merge', body: 'Swipe to slide every tile. Two matching tiles merge into their sum — chase 2048 and beyond.' },
@@ -17556,7 +17660,7 @@ const GAMES = [
     shell: 'classic',
     desc: "Move a chess knight to visit all 64 squares exactly once.",
     tag: 'Puzzle',
-    tagColor: C.violet,
+    tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'free' },
     howToPlay: [
       { title: 'Tour the board', body: 'Move the knight in its L-shape to squares it has never visited. Visit all 64 exactly once for a full tour.' },
@@ -17572,7 +17676,7 @@ const GAMES = [
     shell: 'self',
     desc: 'Swipe to steer, eat to grow, and chase a high score without crashing.',
     tag: 'Arcade',
-    tagColor: C.emerald,
+    tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
     howToPlay: [
       { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. Eat food to grow and score.' },
@@ -17588,7 +17692,7 @@ const GAMES = [
     shell: 'self',
     desc: 'Drag blocks onto the grid and clear full lines. How long can you last?',
     tag: 'Puzzle',
-    tagColor: C.accent,
+    tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'drag', undo: 'none' },
     howToPlay: [
       { title: 'Place the pieces', body: 'Drag each offered block onto the grid anywhere it fits. Fill a full row or column to clear it.' },
@@ -17607,7 +17711,7 @@ const GAMES = [
     shell: 'self',
     desc: 'Swap gems to line up 3+ and cascade your way to the target score.',
     tag: 'Match',
-    tagColor: C.rose,
+    tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Swap to match', body: 'Tap two adjacent gems to swap them. Line up 3 or more of a kind to clear them.' },
@@ -17623,7 +17727,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
-    tagColor: C.accent,
+    tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'booster' },
     howToPlay: [
       { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind in the bar clear automatically.' },
@@ -17639,7 +17743,7 @@ const GAMES = [
     shell: 'classic',
     desc: "Smash every brick with a bouncing ball. Don't let it fall — climb the leaderboard.",
     tag: 'Arcade',
-    tagColor: C.rose,
+    tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'drag', undo: 'none' },
     howToPlay: [
       { title: 'Keep it up', body: 'Drag the paddle to keep the ball in play and smash every brick.' },
@@ -17655,7 +17759,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Shoot colored balls to match 3 in a row before the chain reaches the skull.',
     tag: 'Arcade',
-    tagColor: C.emerald,
+    tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Shoot to match', body: 'Aim and tap to fire a colored ball into the moving chain. Three or more of a color clear.' },
@@ -17671,7 +17775,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
-    tagColor: C.gold,
+    tagColor: GA.amber,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Swap to match', body: 'Tap two adjacent pieces to swap. Match 3+ to clear them and rack up points.' },
@@ -17687,7 +17791,7 @@ const GAMES = [
     shell: 'self',
     desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
     tag: 'Crypto',
-    tagColor: C.gold,
+    tagColor: GA.plum,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
     howToPlay: [
       { title: 'Dodge and collect', body: 'Steer your miner between lanes — grab hash tokens, dodge the invalid blocks.' },
@@ -17707,7 +17811,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Classic draughts vs a friend online — jump, chain captures, crown your kings.',
     tag: 'Board',
-    tagColor: C.accent,
+    tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Move diagonally', body: 'Tap your piece, then a dark square ahead of it. Jump over an adjacent enemy piece to capture it.' },
@@ -17725,7 +17829,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Flip your way to a majority — outflank your opponent online.',
     tag: 'Board',
-    tagColor: C.emerald,
+    tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Outflank to flip', body: 'Place a disc so a straight line of enemy discs is trapped between yours — they all flip to your color.' },
@@ -17743,7 +17847,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Drop discs and line up four before your opponent does.',
     tag: 'Board',
-    tagColor: C.rose,
+    tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Drop a disc', body: 'Tap a column — your disc falls to the lowest empty slot.' },
@@ -17760,7 +17864,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Five stones in a row on a 15×15 board — pure placement strategy.',
     tag: 'Board',
-    tagColor: C.violet,
+    tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Take turns placing stones', body: 'Tap any empty intersection to place a stone. Stones never move once placed.' },
@@ -17777,7 +17881,7 @@ const GAMES = [
     shell: 'classic',
     desc: 'Race all four tokens home — roll sixes, capture rivals, play it safe on the stars.',
     tag: 'Board',
-    tagColor: C.gold,
+    tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Roll, then move', body: 'Roll the die, then tap a highlighted token. You need a 6 to leave base — and a 6 earns another roll.' },
@@ -17796,7 +17900,7 @@ const GAMES = [
     daily: true,
     desc: 'Today\'s layered tile board — 3 minutes to clear it.',
     tag: 'Puzzle',
-    tagColor: C.accent,
+    tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'booster' },
     howToPlay: [
       { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind clear automatically.' },
@@ -17817,7 +17921,7 @@ const GAMES = [
     daily: true,
     desc: 'The classic patience deal — everyone plays the same shuffle today.',
     tag: 'Cards',
-    tagColor: C.accent,
+    tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Build down, alternate colors', body: 'Tap a face-up card, then its destination. Tableau piles build downward in alternating colors; only a King moves to an empty column.' },
@@ -17835,7 +17939,7 @@ const GAMES = [
     daily: true,
     desc: 'One-suit spider: build eight King-to-Ace runs to clear the board.',
     tag: 'Cards',
-    tagColor: C.violet,
+    tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Move descending runs', body: 'Tap a face-up card to pick up it and the run below, then tap a column whose top card is one rank higher (or any empty column).' },
@@ -17853,7 +17957,7 @@ const GAMES = [
     daily: true,
     desc: 'Clear the layered tile pyramid by pairing free matching tiles.',
     tag: 'Tiles',
-    tagColor: C.emerald,
+    tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'booster' },
     howToPlay: [
       { title: 'Pair free tiles', body: 'A tile is free when nothing rests on top of it and its left or right side is open. Tap two matching free tiles to clear them.' },
@@ -17871,7 +17975,7 @@ const GAMES = [
     daily: true,
     desc: 'Fill the 8×8 grid so every row and column matches its number clues.',
     tag: 'Logic',
-    tagColor: C.accent,
+    tagColor: GA.plum,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
     howToPlay: [
       { title: 'Read the clues', body: 'Each number is a run of filled cells in that row or column, in order, with at least one gap between runs.' },
@@ -17889,7 +17993,7 @@ const GAMES = [
     daily: true,
     desc: 'Sweep the daily minefield — one wrong tap ends the day.',
     tag: 'Risk',
-    tagColor: C.rose,
+    tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Count the numbers', body: 'Each number counts the mines touching that cell. A safe opening area is revealed for you — work outward from it.' },
@@ -17907,7 +18011,7 @@ const GAMES = [
     daily: true,
     desc: 'Unscramble five words back-to-back against the clock.',
     tag: 'Word',
-    tagColor: C.gold,
+    tagColor: GA.amber,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Rebuild the word', body: 'Tap the scrambled letters in order to build your answer; tap a slot (or ⌫) to take a letter back.' },
@@ -17925,7 +18029,7 @@ const GAMES = [
     daily: true,
     desc: 'Push every crate onto a goal pad in today\'s warehouse.',
     tag: 'Puzzle',
-    tagColor: C.emerald,
+    tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
     howToPlay: [
       { title: 'Push, never pull', body: 'Move with the arrows (or arrow keys). Walking into a crate pushes it one cell — you can\'t pull, and you can\'t push two at once.' },
@@ -17943,7 +18047,7 @@ const GAMES = [
     daily: true,
     desc: 'Place today\'s fixed sequence of 40 falling pieces without topping out.',
     tag: 'Puzzle',
-    tagColor: C.violet,
+    tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Line up, then drop', body: 'Move the hovering piece with ◀ ▶ (or tap the well), rotate with ⟳, then hit Drop. Pieces fall instantly — no timer pressure.' },
@@ -19324,6 +19428,7 @@ function App() {
               style={{
                 background: 'transparent',
                 border: `1px solid ${C.border}`,
+                color: C.text,
                 padding: '0.4rem 0.8rem',
                 fontSize: '0.8rem',
                 cursor: 'pointer',
@@ -19416,7 +19521,13 @@ function App() {
                The old three-tab lobby is retired; Feed and Ladder are now
                screens behind the quick links below. */
             <React.Fragment>
-              <div className="lobby-head">
+              <div className="lobby-head masthead">
+                {/* Numbered-edition dateline (Appendix A masthead). The edition
+                    counts up one per UTC day from the same server-anchored day
+                    number the dailies use, so every visitor sees the same issue. */}
+                <div className="masthead-dateline">
+                  <span>No. {utcDayNum(offset) - 20000} · {new Date(Date.now() + offset).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
+                </div>
                 <h1>Game Corner</h1>
                 <p>One shared board per game, per day. Resets at midnight UTC.</p>
                 {authOk && streak > 0 && (
@@ -19426,6 +19537,7 @@ function App() {
                       : `max ×${activeMult} multiplier active`}
                   </p>
                 )}
+                <div className="masthead-rule" />
               </div>
               {commitNotice && (
                 <div className="commit-notice" onClick={() => setCommitNotice(null)}>{commitNotice}</div>

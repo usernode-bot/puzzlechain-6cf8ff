@@ -331,14 +331,8 @@ body {
 }
 .account-connection-row:hover { border-color: ${C.accent}; }
 .account-connection-row .chev { margin-left: auto; color: ${C.muted}; }
-.account-dapps-row { margin-top: 1rem; }
-.account-dapps-pubkey {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
-  color: ${C.text}; word-break: break-all; flex: 1;
-}
-
 /* The Connections section is only shown at narrow widths — above 560px the
-   Friends button and dApps chip live in the top bar instead. */
+   Friends button lives in the top bar instead. */
 @media (min-width: 561px) {
   .account-connections { display: none; }
   /* Force badge accordion always-open on desktop/tablet regardless of JS state */
@@ -355,11 +349,10 @@ body {
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
-  /* Friends + dApps chips move into the Account screen's Connections section
-     on mobile. Scoped under .nav-right so they outrank the base chip rules
+  /* The Friends chip moves into the Account screen's Connections section
+     on mobile. Scoped under .nav-right so it outranks the base chip rules
      defined later in this stylesheet regardless of source order. */
   .nav-right .nav-friends-btn { display: none; }
-  .nav-right .nav-integration-chip { display: none; }
   /* Badge accordion: trigger is interactive on mobile */
   .badge-strip-body { overflow: hidden; transition: max-height 280ms ease, opacity 280ms ease; }
   .badge-strip-body.closed { max-height: 0; opacity: 0; }
@@ -1213,24 +1206,6 @@ body {
   transition: border-color 0.12s;
 }
 .ms-theme-toggle:hover { border-color: ${C.accent}; }
-.ms-wallet-status {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  text-align: right;
-}
-.ms-wallet-status .ms-ws-label {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: ${C.emerald};
-}
-.ms-wallet-status .ms-ws-label.mock { color: ${C.gold}; }
-.ms-wallet-status .ms-ws-label.unavail { color: ${C.muted}; }
-.ms-wallet-status .ms-ws-addr {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  color: ${C.muted};
-}
 .ms-action-row {
   display: flex;
   gap: 0.6rem;
@@ -3397,14 +3372,6 @@ body {
   text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
 }
 .wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
-/* ---- Nav integration chip ---- */
-.nav-integration-chip {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  background: ${C.card}; border: 1px solid ${C.border};
-  border-radius: 999px; padding: 0.3rem 0.7rem;
-  font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
-  color: ${C.accent};
-}
 /* ---- DApp Mode ---- */
 .dapp-badge {
   display: inline-flex; align-items: center; gap: 0.4rem; width: 100%;
@@ -3978,6 +3945,35 @@ body {
   cursor: pointer;
 }
 
+/* "New this week" strip + What's-new sheet (weekly changelog) */
+.whatsnew-strip {
+  display: flex; align-items: stretch; gap: 6px;
+  border: 1px solid ${C.border}; background: ${C.card};
+  border-left: 3px solid ${C.gold};
+  border-radius: 12px; margin-bottom: 1rem; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(63,51,24,0.06);
+}
+.wn-strip-body {
+  flex: 1; text-align: left; background: none; border: none; cursor: pointer;
+  color: ${C.text}; font-family: inherit; font-size: 13px; line-height: 1.45;
+  padding: 9px 4px 9px 12px;
+}
+.wn-strip-body strong { font-family: 'Fraunces', Georgia, serif; }
+.wn-more { color: ${C.accent}; font-weight: 600; white-space: nowrap; }
+.wn-strip-dismiss {
+  background: none; border: none; color: ${C.muted}; cursor: pointer;
+  font-size: 12px; padding: 0 12px;
+}
+.wn-strip-dismiss:hover { color: ${C.text}; }
+.wn-panel { height: min(64vh, 560px); }
+.wn-list { gap: 16px; }
+.wn-week-title {
+  font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 14.5px;
+  border-bottom: 1px solid ${C.border}; padding-bottom: 4px; margin-bottom: 6px;
+}
+.wn-items { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 5px; }
+.wn-items li { font-size: 13px; line-height: 1.5; color: ${C.text}; }
+
 .home-links { display: flex; gap: 8px; margin-bottom: 1.2rem; flex-wrap: wrap; }
 .home-link-btn {
   background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
@@ -4006,6 +4002,7 @@ body {
 .inprog-card .ip-sub { font-size: 11.5px; color: ${C.muted}; margin-top: 3px; }
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
+.inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
 
 .chat-overlay {
   position: fixed; inset: 0; background: rgba(38,33,18,0.5); z-index: 240;
@@ -4702,7 +4699,7 @@ function GameModeModal({ game, onStart, onClose }) {
 
 // The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
 // only), and Post to Feed (after a result).
-function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onPostToFeed, onClose }) {
+function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose }) {
   const [picking, setPicking] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain'
   const modes = game.modes || [];
@@ -4744,13 +4741,6 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
         </>
       )}
 
-      {lastResult && (
-        <>
-          <div className="cg-menu-label" style={{ marginTop: '0.6rem' }}>Share</div>
-          <button className="cg-sheet-action" style={{ borderColor: C.emerald, color: C.emerald }}
-            onClick={() => { onPostToFeed(lastResult); onClose && onClose(); }}>📤 Post to Feed</button>
-        </>
-      )}
     </div>
   );
 }
@@ -5476,6 +5466,70 @@ const STREAK_TIERS = [
   { min: 0,  mult: 1.0 },
 ];
 
+/* ============================================================
+   What's new — in-repo weekly changelog (newest first).
+   Add an entry (with a fresh id) whenever a player-visible change
+   ships; the Home "New this week" strip shows the newest entry's
+   headline until dismissed (dismissal is per-browser, keyed on the
+   entry id in localStorage, like the how-to first-open state).
+   ============================================================ */
+const CHANGELOG = [
+  {
+    id: 'w2026-07-20',
+    weekOf: 'Week of July 20, 2026',
+    items: [
+      'PuzzleChain is now Game Corner — same games, one name everywhere.',
+      'Streaks now follow the Game of the Day: finish the featured game to keep your streak (every day you already earned still counts).',
+      'Share cards include your rank on today’s board.',
+      'Online matches now time out — 48 quiet hours forfeits the turn.',
+      'Marble Loop (was Zuma) and Daily Cipher (was Crypto Wordle) — new names, same games.',
+      'The Community Feed retired; game chat, share cards, and Friends leaderboards are the social corner now.',
+    ],
+  },
+  {
+    id: 'w2026-07-13',
+    weekOf: 'Week of July 13, 2026',
+    items: [
+      'Play without signing in — today’s boards are open to everyone, and signing in before midnight UTC makes a finished guest run count.',
+      'A warmer, newspaper-style look for the whole app.',
+    ],
+  },
+  {
+    id: 'w2026-07-06',
+    weekOf: 'Week of July 6, 2026',
+    items: [
+      'Game of the Day: one featured board everyone plays, front and center on Home.',
+      'Eight new daily puzzles, five new board games, and a public chat room for every game.',
+    ],
+  },
+];
+const WHATSNEW_SEEN_KEY = 'pc_whatsnew_seen_v1';
+
+// Bottom-sheet listing the recent weekly changes. Presented like the chat
+// panel (shared overlay idiom); pure display, no server state.
+function WhatsNewSheet({ onClose }) {
+  return (
+    <div className="chat-overlay" onClick={onClose}>
+      <div className="chat-panel wn-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-head">
+          <div className="chat-title">🗞️ What&apos;s new</div>
+          <button className="chat-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="chat-list wn-list">
+          {CHANGELOG.map((entry) => (
+            <div key={entry.id} className="wn-week">
+              <div className="wn-week-title">{entry.weekOf}</div>
+              <ul className="wn-items">
+                {entry.items.map((it, i) => <li key={i}>{it}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Multiplier for a streak length (consecutive days, including the current win).
 function streakMultiplier(streak) {
   for (const t of STREAK_TIERS) if (streak >= t.min) return t.mult;
@@ -5948,14 +6002,11 @@ function truncAddr(a) {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }
 
-function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, onOpenFriends, onBack, onVerify, onDisconnect }) {
+function AccountScreen({ user, walletAddr, walletVerified, authOk, onOpenFriends, onBack, onVerify, onDisconnect }) {
   const [copied, setCopied] = React.useState(false);
-  const [dappCopied, setDappCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [confirmDisc, setConfirmDisc] = React.useState(false);
-  const dappEnabled = !!(integration && integration.enabled);
-  const dappPubkey = integration && integration.pubkey;
   const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
 
   // status: 'verified' | 'linked' | 'none'
@@ -5967,15 +6018,6 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
       await navigator.clipboard.writeText(user.usernodePubkey);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
-
-  const copyDappPubkey = async () => {
-    if (!dappPubkey) return;
-    try {
-      await navigator.clipboard.writeText(dappPubkey);
-      setDappCopied(true);
-      setTimeout(() => setDappCopied(false), 1500);
     } catch {}
   };
 
@@ -6018,7 +6060,7 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
       {(!authOk || !user) ? (
         <div className="wallet-card">
           <div className="account-signed-out">
-            You’re signed out. Open PuzzleChain inside Usernode so your progress
+            You’re signed out. Open Game Corner inside Usernode so your progress
             and identity are saved to your account.
           </div>
         </div>
@@ -6061,7 +6103,7 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
               {status === 'linked' && 'Your wallet address is linked to your account, but ownership hasn’t been proven yet. Verify to confirm it’s really yours.'}
               {status === 'none' && (bridgeAvailable
                 ? 'No wallet is linked yet. Connect to read your Usernode wallet and link it to your account.'
-                : 'On-chain features are unavailable in this environment (no wallet could be read). Open PuzzleChain inside Usernode.')}
+                : 'On-chain features are unavailable in this environment (no wallet could be read). Open Game Corner inside Usernode.')}
             </div>
 
             <div className="wallet-btn-row">
@@ -6087,8 +6129,8 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
             )}
           </div>
 
-          {/* Connections — Friends + dApps + balances, shown here only on narrow
-              viewports (hidden ≥561px via CSS, where they live in the top bar). */}
+          {/* Connections — Friends, shown here only on narrow viewports
+              (hidden ≥561px via CSS, where it lives in the top bar). */}
           <div className="wallet-card account-connections">
             <div className="wallet-card-title">Connections</div>
             <button
@@ -6099,25 +6141,6 @@ function AccountScreen({ user, walletAddr, walletVerified, authOk, integration, 
               👥 Friends
               <span className="chev">›</span>
             </button>
-            {dappEnabled && (
-              <div className="account-dapps-row">
-                <div className="wallet-card-title">dApps integration</div>
-                <div className="account-status account-status-verified">
-                  <span className="account-status-dot" />
-                  <span>Active</span>
-                </div>
-                {dappPubkey && (
-                  <div className="wallet-addr-row">
-                    <span className="account-dapps-pubkey" title={dappPubkey}>
-                      🔗 {truncAddr(dappPubkey)}
-                    </span>
-                    <button className="back-btn" onClick={copyDappPubkey}>
-                      {dappCopied ? 'Copied ✓' : 'Copy'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </>
       )}
@@ -6493,7 +6516,7 @@ function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay
           <div className="gotd-name">{game.name}</div>
           <div className="gotd-desc">{game.desc}</div>
           <div className="gotd-meta mono">
-            Next puzzle in {countdown} · 🌍 same deal for everyone
+            Next puzzle in {countdown} · 🌍 same deal for everyone · 🔥 keeps your streak
           </div>
         </div>
         <button className="primary-btn gotd-play" disabled={finished}>
@@ -6523,29 +6546,46 @@ function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay
 // Home "in progress" row: resumable daily runs (claimed, unfinished attempts)
 // and online matches where it's your turn. Horizontal card strip; each card
 // re-enters through the normal launch/resume path.
+// Hours until an active room's 48h turn timer forfeits it, from the server's
+// lastMoveAt + turnTimeoutHours. Null when the room carries no timer info.
+function roomExpiresInHours(room) {
+  if (!room || !room.lastMoveAt || !Number.isFinite(room.turnTimeoutHours)) return null;
+  const ms = new Date(room.lastMoveAt).getTime() + room.turnTimeoutHours * 3600 * 1000 - Date.now();
+  return Math.max(0, Math.ceil(ms / 3600000));
+}
+
 function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
   if (!items.length) return null;
   return (
     <div className="inprog-row-wrap">
       <div className="home-section-title">In progress</div>
       <div className="inprog-row">
-        {items.map((it) =>
-          it.type === 'daily' ? (
-            <div key={'d-' + it.game.id} className="inprog-card" onClick={() => onOpenDaily(it.game)}>
-              <div className="ip-icon">{it.game.icon}</div>
-              <div className="ip-name">{it.game.name}</div>
-              <div className="ip-sub resume">▶ Resume run</div>
-            </div>
-          ) : (
+        {items.map((it) => {
+          if (it.type === 'daily') {
+            return (
+              <div key={'d-' + it.game.id} className="inprog-card" onClick={() => onOpenDaily(it.game)}>
+                <div className="ip-icon">{it.game.icon}</div>
+                <div className="ip-name">{it.game.name}</div>
+                <div className="ip-sub resume">▶ Resume run</div>
+              </div>
+            );
+          }
+          const expH = roomExpiresInHours(it.room);
+          return (
             <div key={'r-' + it.room.id} className="inprog-card room" onClick={() => onOpenRoom(it.room)}>
               <div className="ip-icon">{it.game.icon}</div>
               <div className="ip-name">{it.game.name}</div>
               <div className={'ip-sub' + (it.room.myTurn ? ' turn' : '')}>
                 {it.room.myTurn ? '🔔 Your turn' : '⏳ Their move'} · vs {it.room.opponentName}
               </div>
+              {expH != null && (
+                <div className={'ip-sub' + (expH <= 6 ? ' expiring' : '')}>
+                  ⏱ expires in {expH}h
+                </div>
+              )}
             </div>
-          )
-        )}
+          );
+        })}
       </div>
     </div>
   );
@@ -7310,7 +7350,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
 
   // Spoiler-free multi-word share: one line per word (✅/❌ + blank squares).
   const buildShare = (rs) => {
-    const lines = [`Crypto Wordle #${dayNum} — ${rs.filter(r => r.solved).length}/${rs.length} · ${totalScore} pts`];
+    const lines = [`Daily Cipher #${dayNum} — ${rs.filter(r => r.solved).length}/${rs.length} · ${totalScore} pts`];
     rs.forEach(r => {
       lines.push((r.solved ? '✅ ' : '❌ ') + (r.solved ? '🟩' : '⬛').repeat(r.def.word.length));
     });
@@ -7718,7 +7758,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     };
     msSaveEntry(entry);
     setGameHistory(msLoadHistory());
-    const shareText = `Minesweeper ${dateStr} — 💰×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
+    const shareText = `Minesweeper ${dateStr} — 🔒×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
     submitClassicScore('minesweeper', finalScore, { safeRevealed, timeSecs: secs });
     onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
   };
@@ -7812,7 +7852,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
                 onClick={handleCashOut}
                 disabled={!cashOutActive}
               >
-                Cash Out 💰 ×{cashoutMultiplier}
+                Lock In 🔒 ×{cashoutMultiplier}
               </button>
               {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
@@ -7887,28 +7927,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               <button className="ms-theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
                 {theme === 'dark' ? '🌙 Dark' : '☀ Light'}
               </button>
-            </div>
-          </div>
-          <div className="ms-settings-section">
-            <h4>Usernode Wallet</h4>
-            <div className="ms-settings-row">
-              <span className="ms-settings-label">Connection</span>
-              {isMock ? (
-                <div className="ms-wallet-status">
-                  <span className="ms-ws-label mock">🔧 Dev mode</span>
-                  <span className="ms-ws-addr">mock wallet active</span>
-                </div>
-              ) : window.usernode ? (
-                <div className="ms-wallet-status">
-                  <span className="ms-ws-label">🔗 Connected</span>
-                  {walletAddr && <span className="ms-ws-addr">{truncAddr(walletAddr)}</span>}
-                </div>
-              ) : (
-                <div className="ms-wallet-status">
-                  <span className="ms-ws-label unavail">Not available</span>
-                  <span className="ms-ws-addr">open in Usernode</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -10150,7 +10168,7 @@ function t2048_maxTile(grid) {
 function t2048_toShareText(score, moves, secs, highTile) {
   const mm = String(Math.floor(secs / 60)).padStart(2, '0');
   const ss = String(secs % 60).padStart(2, '0');
-  return '2048 🔢 Score: ' + score.toLocaleString() + '\nHighest tile: ' + highTile + ' 🏆\nMoves: ' + moves + ' | Time: ' + mm + ':' + ss + '\nPlay at PuzzleChain';
+  return '2048 🔢 Score: ' + score.toLocaleString() + '\nHighest tile: ' + highTile + ' 🏆\nMoves: ' + moves + ' | Time: ' + mm + ':' + ss + '\nPlay at Game Corner';
 }
 
 function t2048_stripAnim(grid) {
@@ -13773,16 +13791,6 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
           />
         </div>
 
-        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '1rem', fontSize: '0.9rem' }}>
-          <p style={{ margin: '0.5rem 0' }}>
-            <span style={{ color: C.muted }}>Followers:</span>{' '}
-            <span style={{ fontWeight: 600, color: C.accent }}>{profile.followerCount}</span>
-          </p>
-          <p style={{ margin: '0.5rem 0' }}>
-            <span style={{ color: C.muted }}>Following:</span>{' '}
-            <span style={{ fontWeight: 600, color: C.accent }}>{profile.followingCount}</span>
-          </p>
-        </div>
       </div>
     </div>
   );
@@ -14064,8 +14072,8 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
     onWinRef.current(s, bp, secs, {
       winnerLabel: cleared ? 'Cleared! 🎉' : 'Game Over',
       share: cleared
-        ? '🐸 Zuma — ' + s + ' pts, all 3 levels cleared!'
-        : '🐸 Zuma — ' + s + ' pts, level ' + lv,
+        ? '🐸 Marble Loop — ' + s + ' pts, all 3 levels cleared!'
+        : '🐸 Marble Loop — ' + s + ' pts, level ' + lv,
     });
   }
 
@@ -15632,6 +15640,16 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
         <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
       </div>
       {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      {room.status === 'active' && (() => {
+        // Correspondence turn timer: the server auto-forfeits the side to move
+        // after turnTimeoutHours without a move — surface the remaining window.
+        const expH = roomExpiresInHours(room);
+        return expH != null ? (
+          <div style={{ textAlign: 'center', color: expH <= 6 ? C.rose : C.muted, fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            ⏱ {isMyTurn ? 'Your move' : 'Their move'} · expires in {expH}h
+          </div>
+        ) : null;
+      })()}
       <View st={st} myPlayerNum={myPlayerNum} isMyTurn={isMyTurn} submit={submit} />
     </div>
   );
@@ -16151,7 +16169,7 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       setDone(true);
       const score = Math.max(1600 - next.moves * 3 - secs, 300);
       onWin(score, next.moves, secs, {
-        share: `PuzzleChain Klondike Solitaire — solved today's deal in ${fmt} (${next.moves} moves) 🃏`,
+        share: `Game Corner Klondike Solitaire — solved today's deal in ${fmt} (${next.moves} moves) 🃏`,
       });
     }
   };
@@ -16386,7 +16404,7 @@ function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
       setDone(true);
       const score = Math.max(2000 - n.moves * 3 - secs, 300);
       onWin(score, n.moves, secs, {
-        share: `PuzzleChain Spider Solitaire — cleared today's deal in ${fmt} (${n.moves} moves) 🕷️`,
+        share: `Game Corner Spider Solitaire — cleared today's deal in ${fmt} (${n.moves} moves) 🕷️`,
       });
     }
   };
@@ -16614,7 +16632,7 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
         setDone(true);
         const score = Math.max(1500 - secs * 2 - (2 - shuffles) * 150, 300);
         onWin(score, pr, secs, {
-          share: `PuzzleChain Mahjong Solitaire — cleared today's board in ${fmt} 🀄`,
+          share: `Game Corner Mahjong Solitaire — cleared today's board in ${fmt} 🀄`,
         });
       }
       return;
@@ -16641,7 +16659,7 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     if (stuck && shuffles <= 0 && !done) {
       setDone(true);
       onLose && onLose(pairs, secs, {
-        share: `PuzzleChain Mahjong Solitaire — today's board got the better of me 🀄`,
+        share: `Game Corner Mahjong Solitaire — today's board got the better of me 🀄`,
         answer: `${remaining} tiles were left with no free pair.`,
       });
     }
@@ -16775,7 +16793,7 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       setDone(true);
       const score = Math.max(1400 - ns * 4 - secs * 2, 250);
       onWin(score, ns, secs, {
-        share: `PuzzleChain Nonogram — solved today's 8×8 picture in ${fmt} 🖼️`,
+        share: `Game Corner Nonogram — solved today's 8×8 picture in ${fmt} 🖼️`,
       });
     }
   };
@@ -16919,7 +16937,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       for (const m of mines) rv.add(m);
       setRevealed(rv);
       onLose && onLose(ns, secs, {
-        share: `PuzzleChain Mine Finder — today's field got me 💥`,
+        share: `Game Corner Mine Finder — today's field got me 💥`,
         answer: 'You hit a mine — the field is revealed above.',
       });
       return;
@@ -16934,7 +16952,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       setDone(true);
       const score = Math.max(1000 - secs * 3 - ns * 2, 200);
       onWin(score, ns, secs, {
-        share: `PuzzleChain Mine Finder — swept today's field in ${fmt} 🚩`,
+        share: `Game Corner Mine Finder — swept today's field in ${fmt} 🚩`,
       });
     }
   };
@@ -17056,7 +17074,7 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
         setDone(true);
         const score = Math.max(1300 - ns * 25 - secs * 2, 250);
         onWin(score, ns, secs, {
-          share: `PuzzleChain Anagram Sprint — unscrambled all ${words.length} words in ${fmt} 🔀`,
+          share: `Game Corner Anagram Sprint — unscrambled all ${words.length} words in ${fmt} 🔀`,
         });
       } else {
         setWordIdx(sc);
@@ -17245,7 +17263,7 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
       setDone(true);
       const score = Math.max(1200 - m * 6 - secs * 2, 250);
       onWin(score, m, secs, {
-        share: `PuzzleChain Crate Push — shifted today's warehouse in ${m} moves (${fmt}) 📦`,
+        share: `Game Corner Crate Push — shifted today's warehouse in ${m} moves (${fmt}) 📦`,
       });
     }
   };
@@ -17415,7 +17433,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
       // Piece can't enter the well — topped out; the day is lost.
       setDone(true);
       onLose && onLose(pieceIdx, secs, {
-        share: `PuzzleChain Drop Stack — topped out after ${pieceIdx} pieces 🧱`,
+        share: `Game Corner Drop Stack — topped out after ${pieceIdx} pieces 🧱`,
         answer: `The stack reached the top with ${DS_PIECES - pieceIdx} pieces left.`,
       });
       return;
@@ -17445,7 +17463,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
       setDone(true);
       const score = npts + 200 + nl * 10;
       onWin(score, np, secs, {
-        share: `PuzzleChain Drop Stack — placed all ${DS_PIECES} pieces, ${nl} lines, ${npts + 200 + nl * 10} pts 🧱`,
+        share: `Game Corner Drop Stack — placed all ${DS_PIECES} pieces, ${nl} lines, ${npts + 200 + nl * 10} pts 🧱`,
       });
     }
   };
@@ -17562,13 +17580,13 @@ const GAMES = [
   },
   {
     id: 'cryptowordle',
-    name: 'Crypto Wordle',
+    name: 'Daily Cipher',
     icon: '🟩',
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Solve a daily stack of crypto words — clues unlock as you go, or use a free hint.',
-    tag: 'Web3',
+    desc: 'Decode a daily stack of crypto-vocabulary words — clues unlock as you go, or use a free hint.',
+    tag: 'Words',
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
     howToPlay: [
@@ -17584,13 +17602,13 @@ const GAMES = [
     icon: '💣',
     category: 'classic',
     shell: 'classic',
-    desc: 'Clear the 8×8 grid of mines. Cash Out early to lock in a risk multiplier.',
+    desc: 'Clear the 8×8 grid of mines. Lock In early to bank a risk multiplier.',
     tag: 'Risk',
     tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Clear the field', body: 'Tap to reveal a cell; numbers tell you how many mines touch it. Long-press to flag suspected mines.' },
-      { title: 'Cash out or push on', body: 'Cash Out early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
+      { title: 'Lock in or push on', body: 'Lock In early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
     ],
     component: MinesweeperGame,
   },
@@ -17753,7 +17771,7 @@ const GAMES = [
   },
   {
     id: 'zuma',
-    name: 'Zuma',
+    name: 'Marble Loop',
     icon: '🐸',
     category: 'classic',
     shell: 'classic',
@@ -17790,7 +17808,7 @@ const GAMES = [
     category: 'classic',
     shell: 'self',
     desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
-    tag: 'Crypto',
+    tag: 'Arcade',
     tagColor: GA.plum,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
     howToPlay: [
@@ -18059,247 +18077,6 @@ const GAMES = [
 ];
 
 /* ============================================================
-   Social: Feed & Posts
-   ============================================================ */
-
-function FeedScreen({ user, setScreen }) {
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedPostId, setSelectedPostId] = useState(null);
-
-  useEffect(() => {
-    const loadFeed = async () => {
-      const { ok, body } = await api('/api/posts/feed?limit=20&offset=0');
-      if (ok && body) setPosts(body.posts || []);
-      setLoading(false);
-    };
-    loadFeed();
-    // Pause background polling while a post is open — no reason to refetch
-    // the whole feed list behind a detail view the user is actively reading.
-    if (selectedPostId) return;
-    const id = setInterval(loadFeed, 10000);
-    return () => clearInterval(id);
-  }, [selectedPostId]);
-
-  if (selectedPostId) {
-    const post = posts.find(p => p.id === selectedPostId);
-    if (post) {
-      return (
-        <PostDetail
-          post={post}
-          onBack={() => setSelectedPostId(null)}
-        />
-      );
-    }
-  }
-
-  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading feed...</div>;
-
-  const gameNameMap = {};
-  GAMES.forEach(g => gameNameMap[g.id] = g);
-
-  return (
-    <div className="lobby" style={{ maxWidth: '600px' }}>
-      {posts.length === 0 ? (
-        <div style={{ textAlign: 'center', color: C.muted, padding: '2rem' }}>
-          <p>No posts yet. Play a game and share your wins!</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {posts.map(p => {
-            const game = gameNameMap[p.gameId];
-            return (
-              <div
-                key={p.id}
-                className="card"
-                style={{ cursor: 'pointer', '--accent': game?.tagColor || C.accent }}
-                onClick={() => setSelectedPostId(p.id)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <div style={{
-                    width: '1.8rem', height: '1.8rem', borderRadius: '50%',
-                    background: C.accent, color: '#fff', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: '600'
-                  }}>
-                    {(p.username || 'U')[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{p.username}</div>
-                    <div style={{ fontSize: '0.75rem', color: C.muted }}>
-                      {p.createdAt ? new Date(p.createdAt).toLocaleString() : 'now'}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '1.2rem' }}>{game?.icon || '🎮'}</span>
-                  <span style={{ fontWeight: '600' }}>{game?.name || p.gameId}</span>
-                </div>
-                <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  {p.score} pts
-                </div>
-                {p.caption && <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>{p.caption}</div>}
-                <div style={{ fontSize: '0.8rem', color: C.muted }}>
-                  💬 {p.commentCount} comment{p.commentCount !== 1 ? 's' : ''}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PostDetail({ post, onBack }) {
-  const [comments, setComments] = useState([]);
-  const [commentText, setCommentText] = useState('');
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadPost = async () => {
-      const { ok: userOk, body: userData } = await api('/api/daily');
-      if (userOk) setUser(userData.user);
-
-      const { ok, body } = await api(`/api/posts/${post.id}/comments?limit=50&offset=0`);
-      if (ok && body) setComments(body.comments || []);
-      setLoading(false);
-    };
-    loadPost();
-  }, [post.id]);
-
-  const addComment = async () => {
-    if (!commentText.trim()) return;
-    const { ok, body } = await api(`/api/posts/${post.id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ text: commentText }),
-    });
-    if (ok && body) {
-      setComments(prev => [body, ...prev]);
-      setCommentText('');
-    }
-  };
-
-  const deleteComment = async (commentId) => {
-    const { ok } = await api(`/api/posts/${post.id}/comments/${commentId}`, {
-      method: 'DELETE',
-    });
-    if (ok) {
-      setComments(prev => prev.filter(c => c.id !== commentId));
-    }
-  };
-
-  const gameNameMap = {};
-  GAMES.forEach(g => gameNameMap[g.id] = g);
-  const game = gameNameMap[post.gameId];
-
-  if (loading) return <div className="lobby" style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
-
-  return (
-    <div className="game-wrap">
-      <button className="back-btn" onClick={onBack}>← Back</button>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <div style={{
-              width: '2rem', height: '2rem', borderRadius: '50%',
-              background: C.accent, color: '#fff', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', fontWeight: '600'
-            }}>
-              {(post.username || 'U')[0].toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontWeight: '600' }}>{post.username}</div>
-              <div style={{ fontSize: '0.8rem', color: C.muted }}>
-                {post.createdAt ? new Date(post.createdAt).toLocaleString() : 'now'}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '1.5rem' }}>{game?.icon || '🎮'}</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: '600' }}>{game?.name || post.gameId}</span>
-          </div>
-          <div style={{ color: C.gold, fontFamily: 'JetBrains Mono, monospace', fontWeight: '600', fontSize: '1.1rem', marginBottom: '0.75rem' }}>
-            {post.score} pts{post.timeSecs ? ` · ${Math.floor(post.timeSecs / 60)}:${String(post.timeSecs % 60).padStart(2, '0')}` : ''}
-          </div>
-          {post.caption && <div style={{ fontSize: '0.95rem', marginTop: '0.75rem' }}>{post.caption}</div>}
-        </div>
-
-        <div style={{ marginTop: '2rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Comments ({comments.length})</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            {comments.map(c => (
-              <div key={c.id} className="card" style={{ padding: '0.8rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.username}</div>
-                    <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.4rem' }}>
-                      {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'now'}
-                    </div>
-                    <div style={{ fontSize: '0.9rem' }}>{c.text}</div>
-                  </div>
-                  {user && user.id === c.userId && (
-                    <button
-                      onClick={() => deleteComment(c.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: C.rose,
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        marginLeft: '0.5rem',
-                      }}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
-              placeholder="Add a comment..."
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value.slice(0, 280))}
-              onKeyDown={(e) => e.key === 'Enter' && addComment()}
-              style={{
-                flex: 1,
-                padding: '0.6rem 0.8rem',
-                background: C.card,
-                border: `1px solid ${C.border}`,
-                borderRadius: '10px',
-                color: C.text,
-                fontFamily: 'inherit',
-                fontSize: '0.9rem',
-                outline: 'none',
-              }}
-            />
-            <button
-              onClick={addComment}
-              style={{
-                padding: '0.6rem 1rem',
-                background: C.accent,
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-              }}
-            >
-              Reply
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
    Root app
    ============================================================ */
 // Next-milestone progress hints so a player who finished today sees concrete
@@ -18447,11 +18224,13 @@ function App() {
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
   // Lobby view (phase 7 home reorg): 'home' is the single scrolling home
-  // (GotD hero → in-progress → all games); 'feed' and 'ladder' are the two
-  // remaining sub-screens. Legacy ?tab=daily/classic deep links land on home.
+  // (GotD hero → in-progress → all games); 'ladder' is the one remaining
+  // sub-screen. Legacy ?tab=daily/classic/feed deep links land on home (the
+  // Community Feed was retired — chat, share cards, and Friends boards are
+  // the social surface now).
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'feed' ? 'feed' : t === 'ladder' ? 'ladder' : 'home';
+    return t === 'ladder' ? 'ladder' : 'home';
   });
   // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
   const [featured, setFeatured] = useState(null);
@@ -18462,6 +18241,17 @@ function App() {
   // Phase 8 "make it count": banner shown after a pending anonymous run was
   // retroactively committed on an authenticated load.
   const [commitNotice, setCommitNotice] = useState(null);
+  // What's-new sheet + the dismissible "New this week" strip. The strip shows
+  // until this browser has dismissed the NEWEST changelog entry (per-device
+  // state, like the how-to first-open tracking).
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [wnDismissed, setWnDismissed] = useState(() => {
+    try { return localStorage.getItem(WHATSNEW_SEEN_KEY) === CHANGELOG[0].id; } catch { return false; }
+  });
+  const dismissWhatsNew = () => {
+    setWnDismissed(true);
+    try { localStorage.setItem(WHATSNEW_SEEN_KEY, CHANGELOG[0].id); } catch {}
+  };
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Classic Games — Game Menu state. `classicGameMode` is the active mode of
@@ -18483,13 +18273,8 @@ function App() {
   // Wallet identity state (linked/verified address shown on the Account screen)
   const [walletAddr, setWalletAddr] = useState(null);
   // Share modal for posting wins to feed
-  const [shareModal, setShareModal] = useState({ show: false, caption: '' });
   // Badges section toggle (mobile: collapsed by default)
   const [badgesOpen, setBadgesOpen] = useState(false);
-  // dApps-integration availability. Disabled (e.g. staging with an empty
-  // APP_SECRET_KEY) → the related nav chip is hidden so the UI degrades
-  // gracefully alongside the server.
-  const [integration, setIntegration] = useState({ enabled: false, pubkey: null });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -18646,8 +18431,8 @@ function App() {
     setWinData({
       score: 905, bonus: 0, finalScore: 905, steps: 21, timeSecs: 95,
       multiplier: 1, effectiveStreak: 0,
-      guest: true, guestSaved: false, gameId: 'sudoku', canPost: false,
-      share: `PuzzleChain Mini Sudoku — solved today's board in 01:35!\nPlay the same board (no login): ${window.location.origin}/?game=sudoku`,
+      guest: true, guestSaved: false, gameId: 'sudoku',
+      share: `Game Corner Mini Sudoku — solved today's board in 01:35!\nPlay the same board (no login): ${window.location.origin}/?game=sudoku`,
     });
     api('/api/public/daily/sudoku/rank-preview?timeSecs=95&steps=21')
       .then(({ ok, body }) => {
@@ -18669,15 +18454,6 @@ function App() {
     if (g) setChatGame(g);
   }, [loading]);
 
-  // dApps-integration status. Degrades gracefully: a failed/absent response
-  // leaves the feature disabled (chip stays hidden) rather than erroring.
-  useEffect(() => {
-    api('/api/integration/status')
-      .then(({ ok, body }) => {
-        if (ok && body) setIntegration({ enabled: !!body.enabled, pubkey: body.pubkey || null });
-      })
-      .catch(() => {});
-  }, []);
 
   // Wallet: read EVM address from the bridge, link it to the account, optionally
   // prove ownership (sign a challenge), and fetch balance. Extracted into one
@@ -18898,6 +18674,24 @@ function App() {
   // button can re-run exactly the same submission. Returns true on success.
   // Best-effort: a network throw is treated as a failed sync (syncError), never
   // an uncaught rejection that would break the overlay.
+  // Three-line share card (spec-audit item 6): an edition/date line, the
+  // game's own spoiler-free result line, then rank + the playable no-login
+  // challenge link. `rank` is optional — the card reads fine while it's still
+  // being fetched (or for guests before the rank preview lands).
+  const buildShareCard = (gameId, resultLine, rank) => {
+    const d = new Date(Date.now() + offset);
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    const lines = [`Game Corner No. ${utcDayNum(offset) - 20000} · ${dateStr}`];
+    // Game result lines historically self-prefix the app name; strip it so
+    // the card doesn't read "Game Corner … Game Corner …".
+    if (resultLine) lines.push(resultLine.replace(/^Game Corner /, ''));
+    lines.push(
+      (Number.isFinite(rank) ? `#${rank} on today's board · ` : '') +
+      `Play the same deal (no login): ${window.location.origin}/?game=${gameId}`
+    );
+    return lines.join('\n');
+  };
+
   const submitDailyFinish = async (gameId, finalScore, steps, timeSecs) => {
     let ok = false, body = null;
     try {
@@ -18996,13 +18790,10 @@ function App() {
           isClassic: true,
           bestScore: meta && meta.bestScore,
           longestSnake: meta && meta.longestSnake,
-          // Carry the game id so the win card's "Share to Feed" button can post
-          // this classic result, mirroring the daily branch below.
           gameId: currentGame.id,
-          canPost: true,
         });
-        // Remember this result so the Game Menu's Post to Feed stays reachable
-        // after Play Again.
+        // Remember the round's result for the Game Menu (kept for future
+        // share affordances; the feed post button was retired).
         setClassicLastResult({ gameId: currentGame.id, score, steps, timeSecs });
         return;
       }
@@ -19031,25 +18822,31 @@ function App() {
           score, bonus: 0, finalScore: score, steps, timeSecs,
           multiplier: 1, effectiveStreak: 0,
           guest: true, guestSaved: seed != null,
-          share: (meta && meta.share ? meta.share + '\n' : '') +
-            `Play the same board (no login): ${window.location.origin}/?game=${gameId}`,
-          gameId, canPost: false,
+          share: buildShareCard(gameId, meta && meta.share),
+          gameId,
         });
         try {
           const { ok, body } = await api(
             `/api/public/daily/${gameId}/rank-preview?timeSecs=${Math.round(timeSecs || 0)}&steps=${Math.round(steps || 0)}`
           );
           if (ok && body && Number.isFinite(body.rank)) {
-            setWinData(prev => (prev && prev.guest ? { ...prev, guestRank: body.rank, guestOf: body.of } : prev));
+            // Would-be rank into the CTA and the share card's rank line alike.
+            setWinData(prev => (prev && prev.guest
+              ? { ...prev, guestRank: body.rank, guestOf: body.of, share: buildShareCard(gameId, meta && meta.share, body.rank) }
+              : prev));
           }
         } catch {}
         return;
       }
-      // The streak this win lands in: the first finished game of the day extends
-      // the consecutive-day streak by 1; a second game the same day reuses the
-      // same day count (the multiplier is per-day, not per-game).
-      const playedToday = Object.values(attempts).some(a => a && a.score != null);
-      const effectiveStreak = playedToday ? streak : streak + 1;
+      // The streak this win lands in. GotD-participation semantics: only
+      // finishing TODAY'S FEATURED game extends the consecutive-day streak by
+      // 1 (the server's computeStreak reconciles via the finish response);
+      // every other daily reuses the current day count — the multiplier stays
+      // per-day, not per-game.
+      const isFeaturedWin = featured && featured.gameId === gameId;
+      const featuredDoneToday = featured && attempts[featured.gameId]
+        && attempts[featured.gameId].score != null;
+      const effectiveStreak = (isFeaturedWin && !featuredDoneToday) ? streak + 1 : streak;
       const multiplier = streakMultiplier(effectiveStreak);
       const finalScore = Math.round(score * multiplier);
       const bonus = finalScore - score;
@@ -19079,16 +18876,13 @@ function App() {
         prevBest,
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
-        // Daily share texts carry a link that lands recipients on the
-        // playable no-login challenge (the ?game= pre-game screen, which
-        // guests can now play from — phase 8).
-        share: meta && meta.share
-          ? `${meta.share}\nPlay the same board (no login): ${window.location.origin}/?game=${gameId}`
-          : undefined,
+        // Three-line share card: edition/date, the game's spoiler-free result
+        // line, then rank + the playable no-login challenge link. The rank
+        // line is threaded in below once the finish lands on the board.
+        share: meta && meta.share ? buildShareCard(gameId, meta.share) : undefined,
         hintsUsed: meta && meta.hintsUsed,
         wordsSolved: meta && meta.wordsSolved,
         wordsTotal: meta && meta.wordsTotal,
-        canPost: true,
         gameId,
         syncError: false,
         newAchievements: [],
@@ -19096,6 +18890,20 @@ function App() {
       setTotalScore(t => t + finalScore);
       // Submit to the server (records result, streak, reward, badges, receipt).
       await submitDailyFinish(gameId, finalScore, steps, timeSecs);
+      // Now that the finish is on today's board, thread the earned rank into
+      // the share card ("#N on today's board · …"). Best-effort — the card
+      // reads fine without a rank if the fetch loses or hasn't landed.
+      if (meta && meta.share) {
+        try {
+          const { ok, body } = await api(`/api/daily/${gameId}/leaderboard`);
+          const rank = ok && body && body.me && Number.isFinite(body.me.rank) ? body.me.rank : null;
+          if (rank) {
+            setWinData(prev => (prev && !prev.isClassic && prev.gameId === gameId)
+              ? { ...prev, myRank: rank, share: buildShareCard(gameId, meta.share, rank) }
+              : prev);
+          }
+        } catch {}
+      }
     } catch (e) {
       // Never let a handler error swallow the win silently again. Surface a
       // minimal overlay so the player sees their solve was registered.
@@ -19195,7 +19003,7 @@ function App() {
     setLoseData(null);
     setStepCount(0);
     setPlayAgainKey(k => k + 1);
-    // Keep classicLastResult so the Game Menu's Post to Feed stays reachable.
+    // Keep classicLastResult for the Game Menu.
   };
 
   // Game Menu "New Game": optionally re-mount the current classic game in a
@@ -19230,7 +19038,6 @@ function App() {
     lastResult: classicLastResult,
     onNewGameMode: handleNewGameMode,
     onSaveGame: handleSaveGame,
-    onPostToFeed: (r) => setShareModal({ show: true, caption: '', gameId: r.gameId, score: r.score, steps: r.steps, timeSecs: r.timeSecs }),
   } : null;
 
   // Copy-to-clipboard Share button for the win/loss overlays. Flips its label
@@ -19399,7 +19206,7 @@ function App() {
       <style>{css}</style>
 
       <nav className="nav">
-        <div className="nav-brand"><span className="logo">⬢</span> PuzzleChain</div>
+        <div className="nav-brand"><span className="logo">⬢</span> Game Corner</div>
         <div className="nav-right">
           <div className="nav-stats">
             <div className="nav-stat">
@@ -19439,14 +19246,6 @@ function App() {
               👥 Friends
             </button>
           )}
-          {authOk && integration.enabled && (
-            <span
-              className="nav-integration-chip"
-              title={`dApps integration active${integration.pubkey ? ' · ' + integration.pubkey : ''}`}
-            >
-              🔗 dApps
-            </span>
-          )}
           <AccountChip
             loading={loading}
             authOk={authOk}
@@ -19478,7 +19277,6 @@ function App() {
           authOk={authOk}
           walletAddr={walletAddr}
           walletVerified={walletVerified}
-          integration={integration}
           onOpenFriends={() => setScreen('friends')}
           onBack={() => setScreen('lobby')}
           onVerify={connectAndVerifyWallet}
@@ -19496,16 +19294,7 @@ function App() {
 
       {screen === 'lobby' && (
         <div className="lobby">
-          {lobbyTab === 'feed' ? (
-            <React.Fragment>
-              <button className="home-back-btn" onClick={() => setLobbyTab('home')}>← Home</button>
-              <div className="lobby-head">
-                <h1>Community Feed</h1>
-                <p>See what your friends have been playing</p>
-              </div>
-              <FeedScreen user={user} setScreen={setScreen} />
-            </React.Fragment>
-          ) : lobbyTab === 'ladder' ? (
+          {lobbyTab === 'ladder' ? (
             <React.Fragment>
               <button className="home-back-btn" onClick={() => setLobbyTab('home')}>← Home</button>
               <div className="lobby-head">
@@ -19533,7 +19322,7 @@ function App() {
                 {authOk && streak > 0 && (
                   <p className="lobby-hint">
                     🔥 {streak}-day streak · {tierAhead
-                      ? `${tierAhead.daysAway} more daily win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
+                      ? `${tierAhead.daysAway} more Game-of-the-Day win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
                       : `max ×${activeMult} multiplier active`}
                   </p>
                 )}
@@ -19541,6 +19330,14 @@ function App() {
               </div>
               {commitNotice && (
                 <div className="commit-notice" onClick={() => setCommitNotice(null)}>{commitNotice}</div>
+              )}
+              {!wnDismissed && (
+                <div className="whatsnew-strip">
+                  <button className="wn-strip-body" onClick={() => setWhatsNewOpen(true)}>
+                    🗞️ <strong>New this week:</strong> {CHANGELOG[0].items[0]} <span className="wn-more">See all ›</span>
+                  </button>
+                  <button className="wn-strip-dismiss" title="Dismiss" onClick={dismissWhatsNew}>✕</button>
+                </div>
               )}
               {featuredGame ? (
                 <GotdHero
@@ -19567,7 +19364,7 @@ function App() {
               )}
               <div className="home-links">
                 <button className="home-link-btn" onClick={() => setLobbyTab('ladder')}>🏆 Ladder</button>
-                {authOk && <button className="home-link-btn" onClick={() => setLobbyTab('feed')}>📣 Feed</button>}
+                <button className="home-link-btn" onClick={() => setWhatsNewOpen(true)}>🗞️ What's new</button>
               </div>
               {authOk ? (
                 (() => {
@@ -19711,7 +19508,7 @@ function App() {
         <div className="win-overlay">
           <div className="win-card">
             <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
-            <h2>{winData.winnerLabel || (winData.cashOut ? 'Cashed Out! 💰' : 'Solved!')}</h2>
+            <h2>{winData.winnerLabel || (winData.cashOut ? 'Locked In! 🔒' : 'Solved!')}</h2>
             <div className="sub">{currentGame && currentGame.name}</div>
             <div className="score-rows">
               <div className="score-row">
@@ -19720,7 +19517,7 @@ function App() {
               </div>
               {winData.isClassic && winData.multiplier > 1 && (
                 <div className="score-row bonus">
-                  <span className="k">Cash Out ×{winData.multiplier}</span>
+                  <span className="k">Lock In ×{winData.multiplier}</span>
                   <span className="v mono">×{winData.multiplier}</span>
                 </div>
               )}
@@ -19829,7 +19626,7 @@ function App() {
                     : <span>Great solve — today's board takes signed-in entries</span>}
                 </div>
                 <div className="guest-note">
-                  🔑 <strong>Make it count — sign in.</strong> Open PuzzleChain inside
+                  🔑 <strong>Make it count — sign in.</strong> Open Game Corner inside
                   Usernode and this exact run joins today's leaderboard and starts
                   your streak.
                   {winData.guestSaved && ' Your run is saved on this device — it counts if you sign in before midnight UTC.'}
@@ -19839,15 +19636,6 @@ function App() {
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
-            {authOk && winData.gameId && (
-              <button
-                className="primary-btn"
-                style={{ marginBottom: '0.6rem', background: C.emerald }}
-                onClick={() => setShareModal({ show: true, caption: '', gameId: winData.gameId, score: winData.finalScore, steps: winData.steps, timeSecs: winData.timeSecs })}
-              >
-                📤 Share to Feed
-              </button>
-            )}
             {winData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
                 Play Again
@@ -19910,80 +19698,7 @@ function App() {
         </div>
       )}
 
-      {shareModal.show && (
-        <div className="win-overlay">
-          <div className="win-card">
-            {shareModal.posted ? (
-              <>
-                <div className="trophy">✅</div>
-                <h2>Shared!</h2>
-                <div className="sub">Your result is live in the Community Feed.</div>
-                <button
-                  className="primary-btn"
-                  onClick={() => { setShareModal({ show: false, caption: '' }); backToLobby(); }}
-                >
-                  Done
-                </button>
-              </>
-            ) : (
-              <>
-                <h2>Share to Feed</h2>
-                <div style={{ marginBottom: '1rem' }}>
-                  <textarea
-                    placeholder="Add a caption (optional, max 280 chars)"
-                    value={shareModal.caption}
-                    onChange={(e) => setShareModal(prev => ({ ...prev, caption: e.target.value.slice(0, 280) }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.8rem',
-                      background: C.card,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: '10px',
-                      color: C.text,
-                      fontFamily: 'inherit',
-                      fontSize: '0.9rem',
-                      minHeight: '80px',
-                      resize: 'vertical',
-                      outline: 'none',
-                    }}
-                  />
-                  <div style={{ fontSize: '0.75rem', color: C.muted, marginTop: '0.4rem', textAlign: 'right' }}>
-                    {shareModal.caption.length}/280
-                  </div>
-                </div>
-                <button
-                  className="primary-btn"
-                  onClick={async () => {
-                    const { ok } = await api('/api/posts', {
-                      method: 'POST',
-                      body: JSON.stringify({
-                        gameId: shareModal.gameId,
-                        score: shareModal.score,
-                        steps: shareModal.steps,
-                        timeSecs: shareModal.timeSecs,
-                        caption: shareModal.caption || null,
-                      }),
-                    });
-                    // Land on a "Shared!" confirmation the player dismisses themselves,
-                    // instead of silently closing the modal and auto-navigating away.
-                    if (ok) setShareModal(prev => ({ ...prev, posted: true }));
-                  }}
-                  style={{ marginBottom: '0.6rem' }}
-                >
-                  ✓ Post to Feed
-                </button>
-                <button
-                  className="primary-btn"
-                  style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
-                  onClick={() => setShareModal({ show: false, caption: '' })}
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {whatsNewOpen && <WhatsNewSheet onClose={() => setWhatsNewOpen(false)} />}
 
       {chatGame && (
         <ChatPanel

@@ -63,7 +63,7 @@
     try { post('info', ['[dev-console ready]'], { kind: 'ready' }); } catch (_) {}
   })();
   </script>
-  <title>PuzzleChain</title>
+  <title>Game Corner</title>
   <!-- Inline data-URI favicon so the browser never requests /favicon.ico,
        which the JWT auth gate would 401 (and that 401 logs a console error
        tripping the no-console-errors check). -->
@@ -130,7 +130,7 @@
          contents on mount, removing this. -->
     <div id="boot-loader">
       <div class="pc-spinner"></div>
-      <div class="pc-loading-text">Loading PuzzleChain…</div>
+      <div class="pc-loading-text">Loading Game Corner…</div>
     </div>
   </div>
   <!-- app.jsx is pre-compiled to app.js by esbuild at build time (see Dockerfile).
@@ -141,7 +141,7 @@
       if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
         document.getElementById('root').innerHTML =
           '<div class="pc-boot-error"><div class="card"><div class="glyph">⬢</div>' +
-          '<h1>PuzzleChain couldn\'t start</h1>' +
+          '<h1>Game Corner couldn\'t start</h1>' +
           '<p>React failed to load. Check your connection and reload.</p>' +
           '<div class="btns"><button type="button" class="primary" onclick="location.reload()">Reload</button></div>' +
           '</div></div>';
@@ -155,7 +155,7 @@
         if (!mounted) {
           root.innerHTML =
             '<div class="pc-boot-error"><div class="card"><div class="glyph">⬢</div>' +
-            '<h1>PuzzleChain couldn\'t start</h1>' +
+            '<h1>Game Corner couldn\'t start</h1>' +
             '<p>This is taking longer than usual — check your connection and reload.</p>' +
             '<div class="btns"><button type="button" class="primary" onclick="location.reload()">Reload</button></div>' +
             '</div></div>';
@@ -163,6 +163,6 @@
       }, 15000);
     })();
   </script>
-  <script src="/app.js" onerror="clearTimeout(window.__pcWatchdog);document.getElementById('root').innerHTML='<div class=pc-boot-error><div class=card><div class=glyph>⬢</div><h1>PuzzleChain couldn\'t start</h1><p>Failed to load app. Try reloading.</p><div class=btns><button class=primary onclick=location.reload()>Reload</button></div></div></div>'"></script>
+  <script src="/app.js" onerror="clearTimeout(window.__pcWatchdog);document.getElementById('root').innerHTML='<div class=pc-boot-error><div class=card><div class=glyph>⬢</div><h1>Game Corner couldn\'t start</h1><p>Failed to load app. Try reloading.</p><div class=btns><button class=primary onclick=location.reload()>Reload</button></div></div></div>'"></script>
 </body>
 </html>

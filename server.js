@@ -133,7 +133,7 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   wordhunt:          { name: 'Word Hunt',         category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag',     undo: 'none' } },
-  cryptowordle:      { name: 'Crypto Wordle',     category: 'daily',   tier: 'A',
+  cryptowordle:      { name: 'Daily Cipher',     category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' } },
   tilematchingdaily: { name: 'Daily Tile Match Puzzle', category: 'daily', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'booster' } },
@@ -157,7 +157,7 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
   bounce:            { name: 'Bounce',            category: 'classic', tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
-  zuma:              { name: 'Zuma',              category: 'classic', tier: 'B',
+  zuma:              { name: 'Marble Loop',              category: 'classic', tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
@@ -302,6 +302,12 @@ async function ensureDailySeeds() {
 // day; once written it is the day's truth even if weights change later.
 const GOTD_WEIGHTS = { sudoku: 2, wordhunt: 2, cryptowordle: 2, tilematchingdaily: 2 }; // default 1
 
+// GotD-participation streak cutover (spec §6.3). From this UTC date on, a
+// streak day is earned ONLY by finishing that day's featured game; every day
+// BEFORE it keeps the legacy any-daily rule, so no live streak resets at the
+// changeover. Set to the first UTC midnight after the feature shipped.
+const GOTD_STREAK_CUTOVER = '2026-07-24';
+
 function gotdSchedule() {
   const ids = Array.from(GAME_IDS).sort();
   const maxW = Math.max(...ids.map((id) => GOTD_WEIGHTS[id] || 1));
@@ -310,6 +316,43 @@ function gotdSchedule() {
     for (const id of ids) if ((GOTD_WEIGHTS[id] || 1) > round) schedule.push(id);
   }
   return schedule;
+}
+
+// Staging-fixture helper: seed `nDays` consecutive finished streak days
+// BEFORE today for one user, valid under the GotD-participation rule — for
+// each prior day it upserts that day's daily_featured row (computed from the
+// same deterministic schedule ensureDailyFeatured uses) and a finished
+// attempt for that featured game. Idempotent; only called from IS_STAGING
+// demo fixtures.
+async function seedFeaturedStreakDays(userId, username, nDays) {
+  const schedule = gotdSchedule();
+  const { rows: dRows } = await pool.query(`SELECT (now() AT TIME ZONE 'utc')::date AS d`);
+  const today = dRows[0].d;
+  const todayNum = Math.floor(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) / 86400000);
+  for (let i = 1; i <= nDays; i++) {
+    const dayNum = todayNum - i;
+    const gameId = schedule[((dayNum % schedule.length) + schedule.length) % schedule.length];
+    await pool.query(
+      `INSERT INTO daily_featured (seed_date, game_id, seed)
+       VALUES (((now() AT TIME ZONE 'utc')::date - $1::int), $2, $3)
+       ON CONFLICT (seed_date) DO NOTHING`,
+      [i, gameId, legacyDailySeed(gameId, dayNum)]
+    );
+    // Match whatever game the day's featured row actually holds (it may
+    // predate this fixture run), so the attempt always counts.
+    const { rows: fRows } = await pool.query(
+      `SELECT game_id FROM daily_featured WHERE seed_date = ((now() AT TIME ZONE 'utc')::date - $1::int)`,
+      [i]
+    );
+    const gid = (fRows[0] && fRows[0].game_id) || gameId;
+    await pool.query(
+      `INSERT INTO daily_attempts
+         (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+       VALUES ($1, $2, $3, ((now() AT TIME ZONE 'utc')::date - $4::int), 900, 20, 120, now())
+       ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+      [userId, username, gid, i]
+    );
+  }
 }
 
 let dailyFeaturedCache = { date: null, featured: null };
@@ -2205,13 +2248,26 @@ function prevUtcDayN(iso, n) {
 // former streak_freeze grace is disabled (column kept dormant). Computed from
 // the existing daily_attempts rows.
 async function computeStreak(userId) {
+  // GotD-participation semantics (spec §6.3): from GOTD_STREAK_CUTOVER on, a
+  // day counts toward the streak only when that day's FEATURED game (the
+  // daily_featured row — written on the first request of every day that has
+  // any player traffic) has a finished attempt. Days before the cutover keep
+  // the legacy any-daily rule, grandfathering every previously earned day so
+  // the changeover resets nobody.
   const { rows } = await pool.query(
     `SELECT DISTINCT attempt_date::text AS d
-       FROM daily_attempts
-      WHERE user_id = $1 AND finished_at IS NOT NULL
+       FROM daily_attempts a
+      WHERE a.user_id = $1 AND a.finished_at IS NOT NULL
+        AND (
+          a.attempt_date < $2::date
+          OR EXISTS (
+            SELECT 1 FROM daily_featured f
+             WHERE f.seed_date = a.attempt_date AND f.game_id = a.game_id
+          )
+        )
       ORDER BY d DESC
       LIMIT 60`,
-    [userId]
+    [userId, GOTD_STREAK_CUTOVER]
   );
   if (rows.length === 0) return 0;
   const days = new Set(rows.map(r => r.d));
@@ -3045,15 +3101,10 @@ app.get('/api/daily', async (req, res) => {
     // open on purpose so a tester can trigger a multiplied win. Idempotent,
     // obviously fake (round scores), strict no-op in production.
     if (IS_STAGING && req.query.demo === 'streak') {
-      for (let i = 1; i <= 10; i++) {
-        await pool.query(
-          `INSERT INTO daily_attempts
-             (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
-           VALUES ($1, $2, 'sudoku', ((now() AT TIME ZONE 'utc')::date - $3::int), 900, 20, 120, now())
-           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
-          [req.user.id, req.user.username || 'staging-demo-user', i]
-        );
-      }
+      // 10 prior days of FEATURED-game finishes (plus their daily_featured
+      // rows), so the streak is demonstrable under the GotD-participation
+      // rule regardless of where the cutover falls relative to the seed days.
+      await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 10);
     }
 
     // Staging-only demo seed: give the current viewer a LONG streak plus the
@@ -3065,15 +3116,8 @@ app.get('/api/daily', async (req, res) => {
     // higher badges render even past the live-streak cap. Today left open so a
     // tester can still trigger a multiplied win. Idempotent, no-op in prod.
     if (IS_STAGING && req.query.demo === 'badges') {
-      for (let i = 1; i <= 60; i++) {
-        await pool.query(
-          `INSERT INTO daily_attempts
-             (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
-           VALUES ($1, $2, 'sudoku', ((now() AT TIME ZONE 'utc')::date - $3::int), 900, 18, 110, now())
-           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
-          [req.user.id, req.user.username || 'staging-demo-user', i]
-        );
-      }
+      // Featured-game finishes so the long streak holds under the GotD rule.
+      await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 60);
       for (const days of STREAK_BADGE_DAYS) {
         await pool.query(
           `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
@@ -3473,6 +3517,20 @@ app.get('/api/daily', async (req, res) => {
                state = EXCLUDED.state, status = 'active', move_seq = 0, winner = NULL,
                last_move_at = now()`,
         [req.user.id, req.user.username || 'staging-demo-user', JSON.stringify(ytInit)]
+      );
+      // Second room with last_move_at backdated ~46h, so the your-turn card's
+      // "expires in ~2h" turn-timer line is demonstrable (48h lazy forfeit).
+      const ytInit2 = boardRules.getRules('gomoku').initialState();
+      ytInit2.currentPlayer = 2;
+      await pool.query(
+        `INSERT INTO classic_rooms
+           (id, game_id, player1_id, player1_name, player2_id, player2_name, state, status, last_move_at)
+         VALUES ('DEMOEX', 'gomoku', 'staging-demo-rival', 'Staging demo Rival', $1, $2, $3::jsonb, 'active', now() - interval '46 hours')
+         ON CONFLICT (id) DO UPDATE
+           SET player2_id = EXCLUDED.player2_id, player2_name = EXCLUDED.player2_name,
+               state = EXCLUDED.state, status = 'active', move_seq = 0, winner = NULL,
+               last_move_at = now() - interval '46 hours'`,
+        [req.user.id, req.user.username || 'staging-demo-user', JSON.stringify(ytInit2)]
       );
     }
 
@@ -4322,7 +4380,8 @@ app.get('/api/mancala/rooms/:roomId', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM mancala_rooms WHERE id = $1', [roomId]);
     if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
-    res.json(shapeRoom(rows[0]));
+    // Lazy turn-timer enforcement: polling a stale room settles the forfeit.
+    res.json(shapeRoom(await expireStaleMancalaRoom(rows[0])));
   } catch (err) {
     console.error('[mancala] get room failed:', err.message);
     res.status(500).json({ error: 'Failed to get room' });
@@ -4500,8 +4559,12 @@ app.get('/api/rooms/mine', async (req, res) => {
       [req.user.id]
     );
     const rooms = [];
-    for (const r of rows) {
+    for (let r of rows) {
       if (!BOARD_RULE_GAME_IDS.has(r.game_id)) continue;
+      // Lazy turn-timer enforcement: a stale room settles as a forfeit here
+      // and drops off the your-turn row.
+      r = await expireStaleClassicRoom(r);
+      if (r.status !== 'active') continue;
       const myPlayerNum = r.player1_id === req.user.id ? 1 : 2;
       const cur = r.state && Number(r.state.currentPlayer);
       rooms.push({
@@ -4511,6 +4574,7 @@ app.get('/api/rooms/mine', async (req, res) => {
         myTurn: cur === myPlayerNum,
         opponentName: (myPlayerNum === 1 ? r.player2_name : r.player1_name) || 'opponent',
         lastMoveAt: r.last_move_at,
+        turnTimeoutHours: TURN_TIMEOUT_HOURS,
       });
     }
     res.json({ rooms });
@@ -4550,7 +4614,83 @@ function shapeClassicRoom(r) {
     p1FinishedAt: r.p1_finished_at || null,
     p2FinishedAt: r.p2_finished_at || null,
     lastMoveAt: r.last_move_at || null,
+    // Correspondence turn timer: an active room auto-forfeits after this many
+    // hours without a move (enforced lazily on read — see expireStale*Room).
+    turnTimeoutHours: TURN_TIMEOUT_HOURS,
   };
+}
+
+// ---- Correspondence turn timer (spec-audit item 7) --------------------------
+// An ACTIVE two-player room whose last move is older than TURN_TIMEOUT_HOURS
+// auto-forfeits the absent side — enforced LAZILY on the room read/poll paths
+// (the app's no-cron idiom), through the same active→finished CAS transition
+// the manual forfeit endpoint uses so rateMatch fires exactly once even when
+// several readers race. Waiting rooms (no opponent yet) never time out.
+const TURN_TIMEOUT_HOURS = 48;
+
+function roomIsStale(r) {
+  if (!r || r.status !== 'active' || !r.player2_id || !r.last_move_at) return false;
+  return Date.now() - new Date(r.last_move_at).getTime() > TURN_TIMEOUT_HOURS * 3600 * 1000;
+}
+
+async function expireStaleClassicRoom(r) {
+  if (!roomIsStale(r)) return r;
+  // Turn-based rooms forfeit the player to move; score races forfeit the side
+  // that never submitted (both absent → the joiner is treated as absent).
+  let loser;
+  const cur = r.state && Number(r.state.currentPlayer);
+  if (cur === 1 || cur === 2) loser = cur;
+  else if (r.p1_score == null && r.p2_score != null) loser = 1;
+  else loser = 2;
+  const winner = String(loser === 1 ? 2 : 1);
+  try {
+    const { rows } = await pool.query(
+      `UPDATE classic_rooms
+         SET status = 'finished', winner = COALESCE(winner, $3)
+       WHERE id = $1 AND game_id = $2 AND status = 'active'
+         AND last_move_at < now() - make_interval(hours => $4)
+       RETURNING *`,
+      [r.id, r.game_id, winner, TURN_TIMEOUT_HOURS]
+    );
+    if (rows.length === 0) return r; // another reader settled it first
+    const settled = rows[0];
+    if (settled.winner && settled.player2_id) {
+      rateMatch(settled.game_id,
+        { id: settled.player1_id, name: settled.player1_name },
+        { id: settled.player2_id, name: settled.player2_name }, settled.winner);
+    }
+    return settled;
+  } catch (e) {
+    console.warn('[rooms] stale-room expiry failed (non-fatal):', e.message);
+    return r;
+  }
+}
+
+async function expireStaleMancalaRoom(r) {
+  if (!roomIsStale(r)) return r;
+  const loser = Number(r.current_player) === 2 ? 2 : 1;
+  const winner = String(loser === 1 ? 2 : 1);
+  try {
+    const { rows } = await pool.query(
+      `UPDATE mancala_rooms
+         SET status = 'finished', winner = COALESCE(winner, $2)
+       WHERE id = $1 AND status = 'active'
+         AND last_move_at < now() - make_interval(hours => $3)
+       RETURNING *`,
+      [r.id, winner, TURN_TIMEOUT_HOURS]
+    );
+    if (rows.length === 0) return r;
+    const settled = rows[0];
+    if (settled.winner && settled.player2_id) {
+      rateMatch('mancala',
+        { id: settled.player1_id, name: settled.player1_name },
+        { id: settled.player2_id, name: settled.player2_name }, settled.winner);
+    }
+    return settled;
+  } catch (e) {
+    console.warn('[mancala] stale-room expiry failed (non-fatal):', e.message);
+    return r;
+  }
 }
 
 // Create an open room. Body: nothing needed; gameId is the path param.
@@ -4616,7 +4756,8 @@ app.get('/api/classic/:gameId/rooms/:roomId', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
     if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
-    res.json(shapeClassicRoom(rows[0]));
+    // Lazy turn-timer enforcement: polling a stale room settles the forfeit.
+    res.json(shapeClassicRoom(await expireStaleClassicRoom(rows[0])));
   } catch (err) {
     console.error('[classic] get room failed:', err.message);
     res.status(500).json({ error: 'Failed to get room' });
@@ -6396,13 +6537,13 @@ app.get('/api/wallet/challenge', async (req, res) => {
   const nonce = `puzzlechain-ownership:${req.user.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
   res.json({
     nonce,
-    message: `PuzzleChain wallet ownership proof\nuser: ${req.user.id}\nnonce: ${nonce}`,
+    message: `Game Corner wallet ownership proof\nuser: ${req.user.id}\nnonce: ${nonce}`,
   });
 });
 
 // Canonical message a client signs for an ownership proof.
 function ownershipMessage(userId, nonce) {
-  return `PuzzleChain wallet ownership proof\nuser: ${userId}\nnonce: ${nonce}`;
+  return `Game Corner wallet ownership proof\nuser: ${userId}\nnonce: ${nonce}`;
 }
 
 // POST /api/wallet/prove { addr, nonce, signature }

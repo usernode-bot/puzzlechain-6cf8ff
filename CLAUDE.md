@@ -1,4 +1,4 @@
-# PuzzleChain — notes for Claude Code
+# Game Corner (formerly PuzzleChain) — notes for Claude Code
 
 This app runs on **Usernode Social Vibecoding**. If you're Claude Code
 editing this repo, read the platform conventions before making
@@ -26,9 +26,11 @@ tables you've marked private), etc.
 
 ---
 
-## About PuzzleChain
+## About Game Corner
 
-PuzzleChain is a **daily-puzzle hub** — a "chain" of bite-size puzzle
+Game Corner (renamed from PuzzleChain via dapp.json's `name` — the repo
+slug stays `puzzlechain-6cf8ff` and localStorage keys keep their
+`puzzlechain_`/`pc_` prefixes on purpose) is a **daily-puzzle hub** — a "chain" of bite-size puzzle
 games sharing one lobby. You play each game **once per day**, earn
 points for solving it (fast/efficient solves score higher), and build
 a **streak** that adds a bonus to every subsequent win. Solving pops a
@@ -236,12 +238,21 @@ describe it as static-only.
 
 ## Streak multiplier tiers
 
-The **streak is now a real consecutive-day count**, server-computed in
-`computeStreak(userId)` from the distinct `attempt_date`s that have a
-non-null `finished_at`: the unbroken run of UTC days ending today (or
-ending yesterday if today isn't played yet — a streak stays alive until
-a full day is missed). It persists across reloads/devices and is
-returned as `streak` from `/api/daily` (and refreshed by `finish`).
+The **streak is a real consecutive-day count** with **GotD-participation
+semantics** (spec §6.3): server-computed in `computeStreak(userId)`, a
+UTC day counts toward the streak only when that day's FEATURED game (its
+`daily_featured` row) has a finished attempt — days before
+`GOTD_STREAK_CUTOVER` (`server.js`, next to `GOTD_WEIGHTS`) keep the
+legacy any-daily rule, grandfathering every previously earned day so the
+changeover reset nobody. The unbroken run ends today (or yesterday if
+today isn't played yet — a streak stays alive until a full day is
+missed). It persists across reloads/devices and is returned as `streak`
+from `/api/daily` (and refreshed by `finish`). Client-side,
+`handleWin` extends the optimistic streak only for a first
+featured-game win of the day; other dailies still earn points/badges at
+the current day count. The `demo=streak`/`demo=badges` fixtures seed
+prior days via `seedFeaturedStreakDays` (featured-game attempts + their
+`daily_featured` rows) so they hold under the new rule.
 
 The streak multiplies points via **tiers**, defined once in
 `STREAK_TIERS` (`public/app.jsx`) and applied client-side in
@@ -495,13 +506,19 @@ Shared card/tile engine + Lane A daily games"):
   seed is the game's normal daily seed; streaks are **unchanged** (any daily
   play counts — GotD-participation streaks per spec §6.3 remain deferred).
 - **Home reorg.** The three-tab lobby is retired. `lobbyTab` is now
-  `'home' | 'feed' | 'ladder'` (legacy `?tab=daily/classic` land on home;
-  `?tab=ladder` / `?tab=feed` still deep-link). Home renders, in order:
+  `'home' | 'ladder'` (legacy `?tab=daily/classic/feed` land on home;
+  `?tab=ladder` still deep-links — the Community Feed screen, post/comment
+  UI, Share-to-Feed, and profile follower counts were retired in the
+  spec-audit pass; `user_follows` + the Friends screen stay, and the
+  post/comment tables/routes remain retired-in-place). Home renders, in order:
   `GotdHero` (identity, "Next puzzle in" countdown, state-aware CTA, top-3
   leaderboard preview from the per-game daily board) → `InProgressRow`
   (resumable daily attempts + the viewer's active online matches from the
   new auth-gated `GET /api/rooms/mine`, your-turn flagged via
-  `state.currentPlayer`) → Ladder/Feed quick links → badges panel →
+  `state.currentPlayer`, with an "expires in Xh" turn-timer line) →
+  Ladder/What's-new quick links + the dismissible "New this week" strip
+  (in-repo `CHANGELOG` const, per-browser dismissal in localStorage
+  `pc_whatsnew_seen_v1`) → badges panel →
   "Daily Puzzles" grid + "Classic Games" grid (same card markup as before —
   tests assert on its strings) → Today's Champions. Tapping a your-turn card
   re-enters the live room: it pre-seats `{ roomId, myPlayerNum }` through
@@ -527,6 +544,26 @@ Shared card/tile engine + Lane A daily games"):
   **checkers** so tests have a stable `?chat=checkers` target), and
   `demo=yourturn` (re-arms active checkers room `DEMOYT` with the viewer as
   player 2 to move, so the your-turn card renders).
+
+## Post-launch spec-audit changes (do not undo)
+
+- **48h correspondence turn timer:** active two-player rooms auto-forfeit
+  the side to move after `TURN_TIMEOUT_HOURS` (48) without a move —
+  enforced LAZILY on the room read/poll paths (`expireStaleClassicRoom`
+  / `expireStaleMancalaRoom` in `server.js`, same active→finished CAS +
+  single `rateMatch` as the manual forfeit). `demo=yourturn` seeds a
+  second room `DEMOEX` backdated 46h to demo the expiry line.
+- **dApps chrome removed** (nav chip, Account row, Minesweeper wallet
+  section); the server integration (`/api/integration/*`) and the
+  Verified badge / session receipts stay.
+- **Share cards are three lines** (`buildShareCard` in App): edition/date,
+  the game's spoiler-free result line, then "#N on today's board" + the
+  no-login `?game=` link. Rank is threaded in after finish (leaderboard
+  `me.rank`) or the guest rank preview.
+- **IP naming sweep:** display names only — Marble Loop (id `zuma`),
+  Daily Cipher (id `cryptowordle`, tag Words), Hash Rush tag Arcade,
+  Minesweeper "Lock In" (was Cash Out). Registry ids NEVER change (they
+  key daily_attempts/classic_scores/chat/deep links).
 
 ## Retired features (Game Corner phase 1 — do not resurrect)
 

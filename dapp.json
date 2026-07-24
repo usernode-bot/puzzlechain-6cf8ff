@@ -1,6 +1,8 @@
 {
   "name": "Game Corner",
-  "icon": { "emoji": "🕹️" },
+  "icon": {
+    "emoji": "🕹️"
+  },
   "secrets": [
     {
       "key": "APP_PUBKEY",
@@ -34,9 +36,9 @@
       "expectText": "resets in"
     },
     {
-      "name": "Word Hunt card in lobby",
+      "name": "Word Search card in lobby",
       "path": "/",
-      "expectText": "Word Hunt"
+      "expectText": "Word Search"
     },
     {
       "name": "Daily Cipher card in lobby",
@@ -74,9 +76,9 @@
       "expectText": "Game Corner"
     },
     {
-      "name": "Minesweeper card in Classic Games tab",
+      "name": "Mine Finder Classic card in Classic Games tab",
       "path": "/?tab=classic",
-      "expectText": "Minesweeper"
+      "expectText": "Mine Finder Classic"
     },
     {
       "name": "Mancala card in Classic Games tab",
@@ -84,9 +86,9 @@
       "expectText": "Mancala"
     },
     {
-      "name": "Chutes & Ladders card in Classic Games tab",
+      "name": "Snakes & Ladders card in Classic Games tab",
       "path": "/?tab=classic",
-      "expectText": "Chutes & Ladders"
+      "expectText": "Snakes & Ladders"
     },
     {
       "name": "2048 card in Classic Games tab",
@@ -104,9 +106,9 @@
       "expectText": "Snake"
     },
     {
-      "name": "Block Blast card in Classic Games tab",
+      "name": "Block Fit card in Classic Games tab",
       "path": "/?tab=classic",
-      "expectText": "Block Blast"
+      "expectText": "Block Fit"
     },
     {
       "name": "Tile Match Puzzle card in Classic Games tab",
@@ -159,7 +161,7 @@
       "expectText": "Online Race"
     },
     {
-      "name": "Block Blast mode modal offers Online Race",
+      "name": "Block Fit mode modal offers Online Race",
       "path": "/?game=blockblast",
       "expectText": "Online Race"
     },
@@ -269,12 +271,12 @@
       "expectText": "Daily Cipher"
     },
     {
-      "name": "Mini Sudoku shows Hint bar",
+      "name": "Sudoku difficulty chooser renders",
       "path": "/?game=sudoku&play=1",
-      "expectText": "Hint"
+      "expectText": "9×9 Classic"
     },
     {
-      "name": "Word Hunt shows Hint bar",
+      "name": "Word Search shows Hint bar",
       "path": "/?game=wordhunt&play=1",
       "expectText": "Hint"
     },
@@ -309,12 +311,12 @@
       "expectText": "Daily Challenge"
     },
     {
-      "name": "Chutes & Ladders mode select offers Versus Bot",
+      "name": "Snakes & Ladders mode select offers Versus Bot",
       "path": "/?game=chutes-ladders",
       "expectText": "Versus Bot"
     },
     {
-      "name": "Chutes & Ladders mode select offers Online Multiplayer",
+      "name": "Snakes & Ladders mode select offers Online Multiplayer",
       "path": "/?game=chutes-ladders",
       "expectText": "Online Multiplayer"
     },
@@ -527,6 +529,56 @@
       "name": "GotD streak demo seeds featured-game days",
       "path": "/?demo=streak",
       "expectText": "streak"
+    },
+    {
+      "name": "Word Sprint pre-game screen",
+      "path": "/?game=wordsprint",
+      "expectText": "Word Sprint"
+    },
+    {
+      "name": "Word Sprint letter grid renders in-game",
+      "path": "/?game=wordsprint&play=1",
+      "expectSelector": ".wspr-grid"
+    },
+    {
+      "name": "Daily Snake pre-game screen",
+      "path": "/?game=snakedaily",
+      "expectText": "Daily Snake"
+    },
+    {
+      "name": "Daily Snake board renders in-game",
+      "path": "/?game=snakedaily&play=1",
+      "expectSelector": ".dsnk-board"
+    },
+    {
+      "name": "Daily Bounce pre-game screen",
+      "path": "/?game=bouncedaily",
+      "expectText": "Daily Bounce"
+    },
+    {
+      "name": "Daily Bounce canvas renders in-game",
+      "path": "/?game=bouncedaily&play=1",
+      "expectSelector": ".dbnc-canvas"
+    },
+    {
+      "name": "New dailies issued server seeds (wordsprint)",
+      "path": "/api/public/daily",
+      "expectText": "wordsprint"
+    },
+    {
+      "name": "Ludo setup offers 2-4 player rooms",
+      "path": "/?game=ludo&play=1",
+      "expectText": "4 players"
+    },
+    {
+      "name": "Multi-seat Ludo demo room seeds cleanly",
+      "path": "/?demo=ludo4",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "Changelog credits the rename sweep",
+      "path": "/",
+      "expectText": "Snakes & Ladders"
     }
   ]
 }

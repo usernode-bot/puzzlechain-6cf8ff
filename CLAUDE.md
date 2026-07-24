@@ -370,7 +370,7 @@ pieces (all in `public/app.jsx`):
 ## Game Corner phase 4 — leaderboard upgrades
 
 - **Friends scope.** The daily per-game leaderboard, the cross-game
-  "Today's Champions" board, and the classic all-time leaderboard all
+  "Today's Top Scores" board (formerly "Today's Champions"), and the classic all-time leaderboard all
   accept `?scope=friends`: same query filtered to the caller + the
   people they follow (`user_follows`), ranks recomputed within the
   filtered set. Anonymous callers get an empty board (no follow
@@ -560,7 +560,7 @@ Shared card/tile engine + Lane A daily games"):
   (new `onChat` prop); `?chat=<gameId>` deep-links it open (tests use it).
 - **Staging fixtures** (in `GET /api/daily`, all idempotent, IS_STAGING):
   `demo=gotd` (6 fake finished attempts for today's featured game so the
-  GotD-scoped Today's Champions board renders), `demo=chat` (10 messages across the featured game's
+  GotD-scoped Today's Top Scores board renders), `demo=chat` (10 messages across the featured game's
   room and the Checkers room — the hidden-by-reports example lives in
   **checkers** so tests have a stable `?chat=checkers` target), and
   `demo=yourturn` (re-arms active checkers room `DEMOYT` with the viewer as

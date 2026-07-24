@@ -3172,9 +3172,9 @@ app.get('/api/daily', async (req, res) => {
     // handful of obviously-fake solvers so the ranking (fastest time, then
     // fewest steps) is demonstrable on a fresh staging DB. Spread time/steps
     // so order and tiebreakers are visible. `games` controls HOW MANY of the
-    // daily games each demo user solved today, so the lobby-wide "Today's
-    // Champions" board shows a spread of total-points and games-solved counts
-    // (not every user clearing every game). Idempotent, strict no-op in prod.
+    // daily games each demo user solved today (the "Today's Top Scores"
+    // board only reads the featured game's rows, but the per-game boards
+    // use them all). Idempotent, strict no-op in prod.
     // demo=makeitcount (phase 8) reuses this same seed: it fills today's
     // boards so the anonymous end screen's rank-preview has real ranks to
     // compute against; the anonymous end screen itself is a client-side demo
@@ -3343,7 +3343,7 @@ app.get('/api/daily', async (req, res) => {
         ['staging-demo-friend-3', 'Staging friend Pia',   201, 38],
         ['staging-demo-friend-4', 'Staging friend Quinn', 260, 45],
       ];
-      // Include today's FEATURED game so the GotD-scoped Today's Champions
+      // Include today's FEATURED game so the GotD-scoped Today's Top Scores
       // board (friends scope) also shows these players, alongside the two
       // fixed per-game boards.
       const flbFeatured = await ensureDailyFeatured();
@@ -4319,7 +4319,7 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   }
 });
 
-// "Today's Champions" leaderboard — GAME-OF-THE-DAY only: everyone who
+// "Today's Top Scores" leaderboard — GAME-OF-THE-DAY only: everyone who
 // finished today's featured game, ranked by score (fastest time, then
 // earliest finish, break ties). Returns { entries: top-N, me, total, gameId }
 // mirroring the per-game shape; `gameId` is today's featured game so the

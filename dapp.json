@@ -219,12 +219,12 @@
       "expectText": "anchored"
     },
     {
-      "name": "Today's Champions board renders in daily lobby",
+      "name": "Today's Top Scores board renders in daily lobby",
       "path": "/?demo=leaderboard",
-      "expectText": "Today's Champions"
+      "expectText": "Today's Top Scores"
     },
     {
-      "name": "Today's Champions lists a seeded solver",
+      "name": "Today's Top Scores lists a seeded solver",
       "path": "/?demo=leaderboard",
       "expectText": "Staging demo Ada"
     },
@@ -474,7 +474,7 @@
       "expectText": "Classic Games"
     },
     {
-      "name": "Today's Champions shows seeded GotD solvers",
+      "name": "Today's Top Scores shows seeded GotD solvers",
       "path": "/?demo=gotd",
       "expectText": "Staging demo Ada"
     },

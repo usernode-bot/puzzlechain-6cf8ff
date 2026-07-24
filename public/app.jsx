@@ -215,7 +215,7 @@ body {
   .badge-chip .badge-chip-icon { font-size: 1.8rem; }
   .badge-chip .badge-chip-name { font-size: 0.62rem; line-height: 1.2; }
 }
-/* Today's Champions leaderboard tweaks (reuses .lboard) */
+/* Today's Top Scores leaderboard tweaks (reuses .lboard) */
 .lboard.champions { margin-top: 0; }
 .lboard .lrow.clickable { cursor: pointer; }
 .lboard .lrow.clickable:hover { background: ${C.border}; }
@@ -4005,7 +4005,9 @@ body {
   text-transform: uppercase;
 }
 .gotd-name { font-size: 22px; font-weight: 900; }
-.gotd-desc { font-family: 'Fraunces', Georgia, serif; font-style: italic; }
+/* GotD description stays serif but upright — the masthead tagline is the
+   home screen's single italic moment. */
+.gotd-desc { font-family: 'Fraunces', Georgia, serif; }
 
 /* Per-game chrome picks up the game's accent (set as --accent inline on
    the lobby card, hero, and modal): accent Play buttons + tag pills. */
@@ -5926,7 +5928,7 @@ function Leaderboard({ gameId, solved }) {
 }
 
 /* ============================================================
-   Today's Champions — everyone who finished today's GAME OF THE DAY,
+   Today's Top Scores — everyone who finished today's GAME OF THE DAY,
    ranked by score (fastest time breaks ties). The server resolves the
    featured game and returns its id so the board can name it. Reuses
    the per-game leaderboard styles. Tapping a row opens that player's
@@ -5952,13 +5954,13 @@ function TodayChampions({ onSelectUser }) {
   const gameLabel = featured ? featured.name : 'Game of the Day';
   const title = (
     <div className="lboard-title">
-      Today's Champions
+      Today's Top Scores
       <span className="lboard-count">🎯 {featured ? `${featured.icon} ` : ''}{gameLabel}{state.total > 0 ? ` · ${state.total} finished` : ''}</span>
     </div>
   );
 
   if (state.loading) {
-    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
+    return <div className="lboard champions"><div className="lboard-title">Today's Top Scores</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
   }
 
   const entries = state.entries || [];
@@ -6218,7 +6220,7 @@ const INPUT_LABEL = { tap: '👆 Tap', drag: '✋ Drag', swipe: '👉 Swipe', ke
 
 // Game of the Day hero card: today's featured game (from daily_featured via
 // /api/daily), reset countdown, and a state-aware CTA. The full Today's
-// Champions board renders directly below the hero, so the hero itself
+// Top Scores board renders directly below the hero, so the hero itself
 // carries no leaderboard preview. Clicking anywhere routes through the
 // normal launch flow, so the pre-game / resume / locked machinery is
 // untouched.
@@ -19009,7 +19011,7 @@ function App() {
               {!loading && <LadderScreen />}
             </React.Fragment>
           ) : (
-            /* Phase 7 home: GotD hero → Today's Champions → in-progress row →
+            /* Phase 7 home: GotD hero → Today's Top Scores → in-progress row →
                all-games grid. The old three-tab lobby is retired; the Rating
                Ladder remains reachable via the ?tab=ladder deep link. */
             <React.Fragment>
@@ -19051,7 +19053,7 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
-              {/* Today's Champions (GotD-only board) sits directly below the
+              {/* Today's Top Scores (GotD-only board) sits directly below the
                   hero so the featured game's results read as one section. */}
               {authOk && !loading && (
                 <TodayChampions

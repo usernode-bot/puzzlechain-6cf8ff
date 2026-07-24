@@ -67,6 +67,49 @@ purpose.
   `<style>{css}</style>`. Add component styles to `css` and reuse `C`
   tokens (e.g. `${C.accent}`); don't introduce a second stylesheet.
   Fonts are Space Grotesk (body) + JetBrains Mono (`.mono`).
+- **Theming — `C` is CSS custom properties, not hex.** `PALETTES.light`
+  / `PALETTES.dark` hold the raw values (plus `DERIVED` for
+  shadow/scrim/well/hover tokens); `paletteVars()` emits them into
+  `:root` and `:root[data-theme="dark"]` at the top of `css`, and every
+  `C.x` is the string `var(--c-x)`. Consequences when writing styles:
+  - Keep using `${C.accent}` — it re-themes for free, in `css` and in
+    inline `style={{}}` objects alike.
+  - **Never concatenate an alpha byte onto a token** (`${C.gold}1f` is
+    broken now — `var()` isn't a hex string). Use **`ca('gold','1f')`**,
+    which emits `rgb(var(--c-gold-rgb) / 12.2%)`.
+  - **Canvas needs real colours**: `ctx.fillStyle = C.bg` draws nothing.
+    Read from **`PAL`**, the live plain object `applyTheme()` keeps in
+    sync with the resolved palette. If a canvas game caches colours,
+    store palette **token names** and resolve via `PAL[name]` at draw
+    time (see `BOUNCE_ROW_COLORS`) so a theme flip recolours mid-game.
+  - Reach for `var(--c-shadow-sm|md|lg)`, `var(--c-scrim)`,
+    `var(--c-well)`, `var(--c-well-strong)` and
+    `var(--c-accent-hover|emerald-hover|gold-hover)` instead of
+    hand-writing rgba shadows/scrims or hand-darkened hues.
+  - **Intrinsic game art stays hardcoded on purpose** — Mancala's
+    carved wood, checkers browns, Reversi felt, the goban, playing-card
+    faces/suits, Mahjong ivory, and the 2048 / Tile Match / Drop Stack /
+    tetromino palettes do NOT follow the theme. Only chrome re-colours.
+  - The **preference** (`'system' | 'light' | 'dark'`, default
+    `'system'`) lives in localStorage under `puzzlechain_theme`, device-
+    local like every other pref. `applyTheme(pref, persist)` is the only
+    writer; `useTheme()` → `{ pref, resolved, setPref }` is how
+    components read it. A module-scope `prefers-color-scheme` listener
+    re-resolves live while the pref is `'system'`.
+  - `public/index.html` carries an **inline pre-paint script** that sets
+    `data-theme` before the first style block (no ivory flash for
+    dark-mode players) plus a self-contained dark boot-shell block. It
+    duplicates the storage key and resolution rule from `app.jsx` on
+    purpose — **keep the two in sync**. `?theme=` and `?settings=1` are
+    the deep links proposal tests use.
+  - The control is `ThemeChoice` (a System/Light/Dark segmented control),
+    rendered by `CgSettings` so the global `SettingsSheet` (⚙ in the nav,
+    ⚙ Settings row on your own profile) and a classic game's ☰ →
+    Settings tab always agree. **Minesweeper's private light/dark button
+    was removed** — its board reads the resolved theme through
+    `data-ms-theme` now (its base `.ms-*` rules are dark and
+    `[data-ms-theme="light"]` overrides them). Don't re-add per-game
+    theme toggles.
 - **Shared timer:** `useTimer(running, initialSecs = 0)` counts **up**
   from `initialSecs` and returns `{ secs, fmt }`. Pass `!done` so it
   stops when the round ends; pass a saved elapsed value as `initialSecs`

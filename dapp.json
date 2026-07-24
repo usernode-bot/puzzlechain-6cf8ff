@@ -49,9 +49,14 @@
       "expectText": "Next puzzle in"
     },
     {
-      "name": "Streak multiplier hint in lobby",
+      "name": "Streak demo seeds and nav stat renders",
       "path": "/?demo=streak",
-      "expectText": "day streak"
+      "expectText": "Streak"
+    },
+    {
+      "name": "New masthead tagline renders",
+      "path": "/",
+      "expectText": "no pay-to-win"
     },
     {
       "name": "Leaderboard seed boots cleanly",
@@ -194,18 +199,18 @@
       "expectText": "could not be verified"
     },
     {
-      "name": "Account screen opens from chip",
+      "name": "Own profile opens via account deep link",
       "path": "/?screen=account",
-      "expectText": "On-chain login"
+      "expectText": "Your Profile"
     },
     {
-      "name": "Account screen shows account heading",
+      "name": "Own profile shows recent games section",
       "path": "/?screen=account",
-      "expectText": "Account"
+      "expectText": "Recent games"
     },
     {
-      "name": "Streak badge ladder renders earned badges",
-      "path": "/?demo=badges",
+      "name": "Streak badge ladder renders earned badges on profile",
+      "path": "/?screen=account&demo=badges",
       "expectText": "Centurion"
     },
     {
@@ -224,29 +229,34 @@
       "expectText": "Staging demo Ada"
     },
     {
-      "name": "Badge collection strip renders",
-      "path": "/?demo=badges",
+      "name": "Badge collection strip renders on profile",
+      "path": "/?screen=account&demo=badges",
       "expectText": "Badges"
     },
     {
-      "name": "Achievement badge Speed Demon renders",
-      "path": "/?demo=badges",
+      "name": "Achievement badge Speed Demon renders on profile",
+      "path": "/?screen=account&demo=badges",
       "expectText": "Speed Demon"
     },
     {
-      "name": "Achievement badge Daily Sweep renders",
-      "path": "/?demo=badges",
+      "name": "Achievement badge Daily Sweep renders on profile",
+      "path": "/?screen=account&demo=badges",
       "expectText": "Daily Sweep"
     },
     {
-      "name": "Badge next-milestone progress hint renders",
-      "path": "/?demo=streak",
+      "name": "Badge next-milestone progress hint renders on profile",
+      "path": "/?screen=account&demo=streak",
       "expectText": "days →"
     },
     {
-      "name": "Signed-out badge placeholder renders",
+      "name": "Signed-out home shows guest hero note",
       "path": "/?demo=signedout",
-      "expectText": "Sign in to track"
+      "expectText": "free as a guest"
+    },
+    {
+      "name": "Friends screen offers player search",
+      "path": "/?screen=friends&demo=friendsearch",
+      "expectSelector": ".friends-search-input"
     },
     {
       "name": "What’s-new strip renders on Home",
@@ -464,9 +474,9 @@
       "expectText": "Classic Games"
     },
     {
-      "name": "GotD hero leaderboard preview with seeded solvers",
+      "name": "Today's Champions shows seeded GotD solvers",
       "path": "/?demo=gotd",
-      "expectText": "Today's fastest"
+      "expectText": "Staging demo Ada"
     },
     {
       "name": "Your-turn match card on home",

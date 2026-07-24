@@ -3,7 +3,6 @@ const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
-const ethers = require('ethers');
 const dapp = require('./lib/dapp');
 const boardRules = require('./lib/board-rules');
 // Mancala's pure rules moved to the rules registry (phase 5); keep the local
@@ -80,9 +79,6 @@ function cwServerMaxHints() {
   const rounds = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
   return rounds * CW_HINTS_PER_WORD;
 }
-
-// EVM address regex (same as PvP validation throughout)
-const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // Single shared connection pool to this app's Postgres DB.
 // connectionTimeoutMillis bounds how long a query waits for a connection so a
@@ -1617,22 +1613,6 @@ async function migrate() {
       `, [p.id, p.name, p.highest, p.best]);
     }
 
-    // Wallet staging seeds — user_wallets is private (schema-only in staging), so
-    // we seed fake wallet addresses for demo users so tip/profile flows have targets.
-    const walletSeeds = [
-      ['staging-demo-user', '0xDEAD000000000000000000000000000000000001'],
-      ['staging-alice',     '0xDEAD000000000000000000000000000000000002'],
-      ['staging-bob',       '0xDEAD000000000000000000000000000000000003'],
-      ['staging-charlie',   '0xDEAD000000000000000000000000000000000004'],
-    ];
-    for (const [uid, addr] of walletSeeds) {
-      await pool.query(
-        `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
-         ON CONFLICT (user_id) DO NOTHING`,
-        [uid, addr]
-      );
-    }
-
     // Seed posts from demo users with varied games
     const posts = [
       ['staging-demo-user', 'sudoku', 980, 17, 132, 'Finally beat my PB! 🎉'],
@@ -1967,16 +1947,6 @@ async function migrate() {
       );
     }
 
-    // One PROVEN wallet for the viewer so the "Verified identity" badge renders.
-    await pool.query(
-      `INSERT INTO wallet_ownership_proofs (user_id, usernode_pubkey, wallet_addr, nonce, signature)
-       VALUES ('staging-demo-user', 'ut1stagingdemo',
-               '0xDEAD000000000000000000000000000000009999',
-               'staging-demo-nonce', '0xstagingdemosignature')
-       ON CONFLICT (user_id) DO NOTHING`
-    );
-
-    // ---- Account screen staging seeds ---------------------------------------
     // Generic per-user game-state store: one demo row for the viewer so
     // GET /api/state/:gameId returns a non-empty payload during testing.
     await pool.query(
@@ -1984,15 +1954,6 @@ async function migrate() {
        VALUES ('staging-demo-user', 'staging-demo-user', 'minesweeper', $1::jsonb)
        ON CONFLICT (user_id, game_id) DO NOTHING`,
       [JSON.stringify({ demo: true, level: 3, board: 'expert', note: 'Staging demo saved state' })]
-    );
-    // "Linked but NOT verified" demo identity: staging-alice already has a
-    // user_wallets row (seeded above) and deliberately NO wallet_ownership_proofs
-    // row, so her Account screen shows "Linked", not "Verified ✓". Ensure the
-    // link exists even if the earlier social block ordering changes.
-    await pool.query(
-      `INSERT INTO user_wallets (user_id, wallet_addr) VALUES ($1, $2)
-       ON CONFLICT (user_id) DO NOTHING`,
-      ['staging-alice', '0xDEAD000000000000000000000000000000000002']
     );
   }
 
@@ -2528,20 +2489,32 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
     );
     const followingCount = parseInt(followingRows[0].count);
 
-    // Wallet info: whether they have a linked address (identity only — the
-    // MATCH currency and tipping are retired).
-    const { rows: walletRows } = await pool.query(
-      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`,
-      [viewedUserId]
-    );
-    const walletLinked = walletRows.length > 0;
-
     // Live, authoritative streak (computed from finished daily_attempts) rather
     // than the stale user_stats_snapshot.current_streak column, plus the set of
     // permanent streak-milestone badges this player has earned.
     const liveStreak = await computeStreak(viewedUserId);
     const badges = await earnedStreakBadges(viewedUserId);
     const achievements = await earnedAchievementBadges(viewedUserId);
+
+    // Recent game statistics: the player's last 10 finished daily runs.
+    // score 0 = a recorded loss (e.g. Daily Cipher) — the client shows "Played".
+    const { rows: recentRows } = await pool.query(
+      `SELECT game_id, attempt_date, score, steps, time_secs
+         FROM daily_attempts
+        WHERE user_id = $1 AND finished_at IS NOT NULL
+        ORDER BY finished_at DESC
+        LIMIT 10`,
+      [viewedUserId]
+    );
+    const recentGames = recentRows.map(r => ({
+      gameId: r.game_id,
+      date: r.attempt_date instanceof Date
+        ? r.attempt_date.toISOString().slice(0, 10)
+        : String(r.attempt_date).slice(0, 10),
+      score: r.score || 0,
+      steps: r.steps,
+      timeSecs: r.time_secs,
+    }));
 
     res.json({
       user: {
@@ -2559,10 +2532,10 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
         classicsPlayed: user.classics_played || 0,
         lastWinAt: user.last_win_at,
       },
+      recentGames,
       following,
       followerCount,
       followingCount,
-      walletLinked,
     });
   } catch (err) {
     console.error('[social] profile failed:', err.message);
@@ -2598,6 +2571,43 @@ app.get('/api/social/friends', async (req, res) => {
   } catch (err) {
     console.error('[social] friends failed:', err.message);
     res.status(500).json({ error: 'Failed to load friends' });
+  }
+});
+
+// GET /api/social/search?q=<term>
+// Name search for the Friends screen's add-friend flow. Auth-gated
+// (deliberately NOT in PUBLIC_API_GET): requires ≥2 chars, matches usernames
+// case-insensitively, excludes the caller, and flags who's already followed.
+app.get('/api/social/search', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 2) {
+    return res.status(400).json({ error: 'Search needs at least 2 characters' });
+  }
+  // Escape ILIKE wildcards so a literal % or _ in the query can't scan-match.
+  const escaped = q.replace(/([\\%_])/g, '\\$1');
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id, u.username,
+              (f.follower_id IS NOT NULL) AS following
+         FROM users u
+         LEFT JOIN user_follows f
+           ON f.followee_id = u.id AND f.follower_id = $1
+        WHERE u.username ILIKE '%' || $2 || '%'
+          AND u.id <> $1
+        ORDER BY u.username ASC
+        LIMIT 20`,
+      [req.user.id, escaped]
+    );
+    res.json({
+      results: rows.map(r => ({
+        id: r.id,
+        username: r.username,
+        following: !!r.following,
+      })),
+    });
+  } catch (err) {
+    console.error('[social] search failed:', err.message);
+    res.status(500).json({ error: 'Failed to search users' });
   }
 });
 
@@ -3333,13 +3343,24 @@ app.get('/api/daily', async (req, res) => {
         ['staging-demo-friend-3', 'Staging friend Pia',   201, 38],
         ['staging-demo-friend-4', 'Staging friend Quinn', 260, 45],
       ];
+      // Include today's FEATURED game so the GotD-scoped Today's Champions
+      // board (friends scope) also shows these players, alongside the two
+      // fixed per-game boards.
+      const flbFeatured = await ensureDailyFeatured();
+      const flbGames = Array.from(new Set(['sudoku', 'wordhunt', flbFeatured.gameId]));
       for (const [uid, name, time, steps] of friends) {
+        // users row so the Friends screen list (which joins users) shows them.
+        await pool.query(
+          `INSERT INTO users (id, username) VALUES ($1, $2)
+           ON CONFLICT (id) DO NOTHING`,
+          [uid, name]
+        );
         await pool.query(
           `INSERT INTO user_follows (follower_id, followee_id)
            VALUES ($1, $2) ON CONFLICT DO NOTHING`,
           [req.user.id, uid]
         );
-        for (const g of ['sudoku', 'wordhunt']) {
+        for (const g of flbGames) {
           await pool.query(
             `INSERT INTO daily_attempts
                (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
@@ -3353,6 +3374,33 @@ app.get('/api/daily', async (req, res) => {
            VALUES ($1, $2, 'chutes-ladders', $3, 5)
            ON CONFLICT (user_id, game_id) DO NOTHING`,
           [uid, name, Math.round((1000 - time) / 100)]
+        );
+      }
+    }
+
+    // Staging-only demo seed: friend SEARCH targets — a handful of fake
+    // players the viewer does NOT follow, present in the users table so
+    // GET /api/social/search finds them (search "Staging" on the Friends
+    // screen and the ＋ Add friend flow is exercisable). Idempotent,
+    // obviously fake, strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'friendsearch') {
+      const seekers = [
+        ['staging-demo-seeker-1', 'Staging seeker Rex'],
+        ['staging-demo-seeker-2', 'Staging seeker Sam'],
+        ['staging-demo-seeker-3', 'Staging seeker Tia'],
+        ['staging-demo-seeker-4', 'Staging seeker Uma'],
+      ];
+      for (const [uid, name] of seekers) {
+        await pool.query(
+          `INSERT INTO users (id, username) VALUES ($1, $2)
+           ON CONFLICT (id) DO NOTHING`,
+          [uid, name]
+        );
+        await pool.query(
+          `INSERT INTO user_stats_snapshot (user_id, total_score, current_streak, games_played)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [uid, 150 + seekers.findIndex(s => s[0] === uid) * 40, 2, 6]
         );
       }
     }
@@ -4271,38 +4319,33 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   }
 });
 
-// Lobby-wide "Today's Champions" leaderboard — everyone who SOLVED at least one
-// daily puzzle today, aggregated across all daily games. Ranked by total points
-// earned today, then games solved (tiebreak), then earliest first finish.
-// Returns { entries: top-N, me, total, gameCount } mirroring the per-game shape
-// so the client can reuse the same row rendering. Auth-gated under /api/.
+// "Today's Champions" leaderboard — GAME-OF-THE-DAY only: everyone who
+// finished today's featured game, ranked by score (fastest time, then
+// earliest finish, break ties). Returns { entries: top-N, me, total, gameId }
+// mirroring the per-game shape; `gameId` is today's featured game so the
+// client can label the board. Public via PUBLIC_API_GET (null-guarded).
 app.get('/api/daily/leaderboard/today', async (req, res) => {
   // ?scope=friends (phase 4): see the per-game handler above.
   const friendsScope = req.query.scope === 'friends';
-  if (friendsScope && !req.user) {
-    return res.json({ entries: [], me: null, total: 0, gameCount: GAME_IDS.size });
-  }
   try {
+    const featured = await ensureDailyFeatured();
+    if (friendsScope && !req.user) {
+      return res.json({ entries: [], me: null, total: 0, gameId: featured.gameId });
+    }
     const { rows } = await pool.query(
-      `SELECT user_id,
-              MAX(username) AS username,
-              SUM(score)::int AS total_points,
-              COUNT(DISTINCT game_id)::int AS games_solved,
-              MIN(finished_at) AS first_finish,
+      `SELECT user_id, username, score, time_secs,
               ROW_NUMBER() OVER (
-                ORDER BY SUM(score) DESC,
-                         COUNT(DISTINCT game_id) DESC,
-                         MIN(finished_at) ASC
+                ORDER BY score DESC, time_secs ASC, finished_at ASC
               ) AS rank
          FROM daily_attempts
-        WHERE attempt_date = (now() AT TIME ZONE 'utc')::date
+        WHERE game_id = $2
+          AND attempt_date = (now() AT TIME ZONE 'utc')::date
           AND finished_at IS NOT NULL
           AND score IS NOT NULL AND score > 0
           AND ($1::text IS NULL
                OR user_id = $1
-               OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1))
-        GROUP BY user_id`,
-      [friendsScope ? req.user.id : null]
+               OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1))`,
+      [friendsScope ? req.user.id : null, featured.gameId]
     );
     const total = rows.length;
     // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
@@ -4310,15 +4353,15 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
     const shape = (r) => ({
       rank: Number(r.rank),
       username: r.username || 'anon',
-      totalPoints: r.total_points,
-      gamesSolved: r.games_solved,
+      score: r.score,
+      timeSecs: r.time_secs,
       userId: r.user_id,
       isCurrentUser: uid != null && r.user_id === uid,
     });
     const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
     const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
     const me = mineRow ? shape(mineRow) : null;
-    res.json({ entries, me, total, gameCount: GAME_IDS.size });
+    res.json({ entries, me, total, gameId: featured.gameId });
   } catch (err) {
     console.error('[daily] today champions failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
@@ -6251,30 +6294,6 @@ app.get('/api/zuma/leaderboard', async (req, res) => {
   }
 });
 
-// ---- Wallet API ----------------------------------------------------------
-
-// POST /api/wallet/link { addr }
-// Upsert the caller's EVM wallet address (captured client-side via bridge getNodeAddress).
-app.post('/api/wallet/link', async (req, res) => {
-  const { addr } = req.body;
-  if (!addr || !EVM_ADDR_RE.test(addr)) {
-    return res.status(400).json({ error: 'Valid EVM address required' });
-  }
-  try {
-    await pool.query(
-      `INSERT INTO user_wallets (user_id, wallet_addr, updated_at)
-       VALUES ($1, $2, now())
-       ON CONFLICT (user_id) DO UPDATE
-         SET wallet_addr = EXCLUDED.wallet_addr, updated_at = now()`,
-      [req.user.id, addr]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('[wallet] link failed:', err.message);
-    res.status(500).json({ error: 'Failed to link wallet' });
-  }
-});
-
 // ---- Daily hints (game-keyed, FREE) ---------------------------------------
 // Per-UTC-day, per-game hint counter. Hints are free (the MATCH currency is
 // retired) but the count stays server-authoritative — it survives reloads,
@@ -6524,116 +6543,6 @@ app.post('/api/tilematch/scores/submit', async (req, res) => {
   } catch (err) {
     console.error('[tilematch] score submit failed:', err.message);
     res.status(500).json({ error: 'Failed to submit score' });
-  }
-});
-
-// ============================================================
-// DApp Mode (Phase 0) — wallet identity + verification framework
-// ============================================================
-
-// GET /api/wallet/challenge — issue a one-time nonce for the client to sign
-// (via the bridge's signMessage, if available) to prove wallet ownership.
-app.get('/api/wallet/challenge', async (req, res) => {
-  const nonce = `puzzlechain-ownership:${req.user.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-  res.json({
-    nonce,
-    message: `Game Corner wallet ownership proof\nuser: ${req.user.id}\nnonce: ${nonce}`,
-  });
-});
-
-// Canonical message a client signs for an ownership proof.
-function ownershipMessage(userId, nonce) {
-  return `Game Corner wallet ownership proof\nuser: ${userId}\nnonce: ${nonce}`;
-}
-
-// POST /api/wallet/prove { addr, nonce, signature }
-// Verify the signature recovers `addr`, then record the proof. Additive to the
-// existing trust-on-report /api/wallet/link (which stays for lookups).
-app.post('/api/wallet/prove', async (req, res) => {
-  const { addr, nonce, signature } = req.body || {};
-  if (!addr || !EVM_ADDR_RE.test(addr)) return res.status(400).json({ error: 'Valid EVM address required' });
-  if (!nonce || !signature) return res.status(400).json({ error: 'nonce and signature required' });
-  try {
-    let recovered = null;
-    try {
-      recovered = ethers.verifyMessage(ownershipMessage(req.user.id, nonce), signature);
-    } catch (e) {
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
-    if (!recovered || recovered.toLowerCase() !== addr.toLowerCase()) {
-      return res.status(400).json({ error: 'Signature does not match address' });
-    }
-    // Keep the (public) wallet link fresh and record the (private) proof.
-    await pool.query(
-      `INSERT INTO user_wallets (user_id, wallet_addr, updated_at)
-       VALUES ($1, $2, now())
-       ON CONFLICT (user_id) DO UPDATE SET wallet_addr = EXCLUDED.wallet_addr, updated_at = now()`,
-      [req.user.id, addr]
-    );
-    await pool.query(
-      `INSERT INTO wallet_ownership_proofs (user_id, usernode_pubkey, wallet_addr, nonce, signature, verified_at)
-       VALUES ($1, $2, $3, $4, $5, now())
-       ON CONFLICT (user_id) DO UPDATE
-         SET usernode_pubkey = EXCLUDED.usernode_pubkey, wallet_addr = EXCLUDED.wallet_addr,
-             nonce = EXCLUDED.nonce, signature = EXCLUDED.signature, verified_at = now()`,
-      [req.user.id, req.user.usernode_pubkey || null, addr, nonce, signature]
-    );
-    res.json({ ok: true, verified: true });
-  } catch (err) {
-    console.error('[wallet] prove failed:', err.message);
-    res.status(500).json({ error: 'Failed to record ownership proof' });
-  }
-});
-
-// POST /api/wallet/disconnect — clear the ownership proof (server-side record of
-// "verified identity"). The public link row is left intact for tip lookups.
-app.post('/api/wallet/disconnect', async (req, res) => {
-  try {
-    await pool.query(`DELETE FROM wallet_ownership_proofs WHERE user_id = $1`, [req.user.id]);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('[wallet] disconnect failed:', err.message);
-    res.status(500).json({ error: 'Failed to disconnect' });
-  }
-});
-
-// Helper: does this user have a verified ownership proof?
-async function walletIdentityVerified(userId) {
-  const { rows } = await pool.query(
-    `SELECT 1 FROM wallet_ownership_proofs WHERE user_id = $1`, [userId]
-  );
-  return rows.length > 0;
-}
-
-// ---- Account API ----------------------------------------------------------
-
-// GET /api/account — consolidated identity for the Account screen in ONE call:
-// username + pubkey from the JWT (req.user), plus wallet link + verified-proof
-// status from the DB. Kept separate from /api/daily and /api/wallet (which also
-// do streak/balance/rewards work) so the Account screen stays cheap.
-app.get('/api/account', async (req, res) => {
-  try {
-    await ensureUser(req.user.id, req.user.username, req.user.usernode_pubkey);
-    const { rows: wRows } = await pool.query(
-      `SELECT wallet_addr FROM user_wallets WHERE user_id = $1`, [req.user.id]
-    );
-    const walletAddr = wRows.length > 0 ? wRows[0].wallet_addr : null;
-    const { rows: pRows } = await pool.query(
-      `SELECT verified_at FROM wallet_ownership_proofs WHERE user_id = $1`, [req.user.id]
-    );
-    const identityVerified = pRows.length > 0;
-    res.json({
-      username: req.user.username || null,
-      id: req.user.id,
-      usernodePubkey: req.user.usernode_pubkey || null,
-      walletAddr,
-      walletLinked: !!walletAddr,
-      identityVerified,
-      verifiedAt: identityVerified ? pRows[0].verified_at : null,
-    });
-  } catch (err) {
-    console.error('[account] GET failed:', err.message);
-    res.status(500).json({ error: 'Failed to load account' });
   }
 });
 

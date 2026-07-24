@@ -208,8 +208,10 @@ describe it as static-only.
 - **Identity comes from `req.user`** (the iframe JWT), never the client.
   Progress is keyed to the Usernode account and persists across reloads
   and devices. The nav's `AccountChip` reads `user` from `/api/daily`
-  to show the signed-in username + "Progress saved" (or a "Signed out"
-  state if the call 401s / the DB is unreachable).
+  to show the signed-in username on one line (nothing renders while the
+  load is in flight; a red "Signed out" state appears only after the
+  call 401s / the DB is unreachable). Tapping it opens the viewer's own
+  profile screen (stats, recent games, badges).
 - **Frontend** hydrates this on mount (`loadDaily`), claims on launch,
   persists on win, and renders a `LockedScreen` with an HH:MM:SS
   countdown driven by a **server-time offset** (`serverNowUtc −
@@ -272,9 +274,10 @@ The streak multiplies points via **tiers**, defined once in
   `finalScore = round(base × streakMultiplier(effectiveStreak))`. The
   client persists `finalScore` via `finish`; the server stores it as-is
   (no server-side multiplier math today — see below).
-- **Surfaced in UI:** a `×N` `.mult-badge` next to the nav Streak, a
-  `.lobby-hint` nudging toward the next tier, and a multiplier row in
-  the win overlay (all hidden at 1.0× or when signed out).
+- **Surfaced in UI:** a `×N` `.mult-badge` next to the nav Streak and a
+  multiplier row in the win overlay (both hidden at 1.0× or when signed
+  out). The masthead's streak/next-tier hint line was removed in the
+  home/profile cleanup pass.
 - **Tier table is the single balance knob** — editing `STREAK_TIERS`
   changes breakpoints/multipliers everywhere.
 - **Deferred:** server-authoritative scoring (server applies the
@@ -390,11 +393,20 @@ pieces (all in `public/app.jsx`):
   earliest-updated, plus `movers` (top weekly climbers) and the
   pinned `me` row. The client's **Ladder lobby tab** (`?tab=ladder`)
   renders it with a game picker.
+- **Friend search (home/profile cleanup pass).** The Friends screen
+  carries a debounced search box backed by auth-gated
+  `GET /api/social/search?q=` (≥2 chars, ILIKE with escaped wildcards,
+  excludes the caller, LIMIT 20, returns `following` per row —
+  deliberately NOT in `PUBLIC_API_GET`); "＋ Add friend" is an instant
+  one-directional follow (no request/accept model). `?screen=friends`
+  deep-links the screen.
 - **Staging fixtures:** `demo=friends-lb` (fake "Staging friend …"
-  users the viewer follows, with today's attempts + classic scores)
-  and `demo=ladder` (8 "Staging rival …" ratings across
+  users the viewer follows, with today's attempts + classic scores),
+  `demo=friendsearch` (4 fake "Staging seeker …" `users` rows the
+  viewer does NOT follow, so searching "Staging" returns addable
+  results), and `demo=ladder` (8 "Staging rival …" ratings across
   chutes-ladders/2048 with varied streaks and week deltas, a viewer
-  row, and backing finished `classic_rooms`). Both idempotent,
+  row, and backing finished `classic_rooms`). All idempotent,
   IS_STAGING-gated, seeded via `GET /api/daily?demo=…`; the ladder
   tab renders only after `loadDaily` settles so the fixture lands
   before the ladder fetch.
@@ -510,20 +522,29 @@ Shared card/tile engine + Lane A daily games"):
   `?tab=ladder` still deep-links — the Community Feed screen, post/comment
   UI, Share-to-Feed, and profile follower counts were retired in the
   spec-audit pass; `user_follows` + the Friends screen stay, and the
-  post/comment tables/routes remain retired-in-place). Home renders, in order:
-  `GotdHero` (identity, "Next puzzle in" countdown, state-aware CTA, top-3
-  leaderboard preview from the per-game daily board) → `InProgressRow`
-  (resumable daily attempts + the viewer's active online matches from the
-  new auth-gated `GET /api/rooms/mine`, your-turn flagged via
-  `state.currentPlayer`, with an "expires in Xh" turn-timer line) →
-  Ladder/What's-new quick links + the dismissible "New this week" strip
-  (in-repo `CHANGELOG` const, per-browser dismissal in localStorage
-  `pc_whatsnew_seen_v1`) → badges panel →
-  "Daily Puzzles" grid + "Classic Games" grid (same card markup as before —
-  tests assert on its strings) → Today's Champions. Tapping a your-turn card
-  re-enters the live room: it pre-seats `{ roomId, myPlayerNum }` through
-  `classicGameModeOpts`, which `BoardRoomGame` (and Chutes & Ladders) now
-  read to skip the create/join setup screen.
+  post/comment tables/routes remain retired-in-place). Home renders, in order
+  (as revised by the home/profile cleanup pass): the dismissible "New this
+  week" strip (in-repo `CHANGELOG` const; dismissal is deliberately
+  per-page-load — plain state, no localStorage — ✕ hides it for that visit
+  and it returns on refresh; its "See all ›" is the only entry to the
+  What's-new sheet) → `GotdHero` (identity, "Next puzzle in" countdown,
+  state-aware CTA; its old top-3 preview was removed as duplicate) →
+  `TodayChampions` (GAME-OF-THE-DAY-ONLY board: `/api/daily/leaderboard/today`
+  resolves today's featured game via `ensureDailyFeatured` and ranks its
+  finishers by `score DESC, time_secs ASC, finished_at ASC`, returning
+  `{ entries, me, total, gameId }` with `userId` per row for the
+  row-tap → profile navigation) → `InProgressRow` (resumable daily attempts +
+  the viewer's active online matches from the auth-gated
+  `GET /api/rooms/mine`, your-turn flagged via `state.currentPlayer`, with an
+  "expires in Xh" turn-timer line) → "Daily Puzzles" grid + "Classic Games"
+  grid (same card markup as before — tests assert on its strings). The home
+  badges panel and the Ladder/What's-new quick-link buttons are retired: the
+  badge collection lives on the profile (`BadgeStrip`, now with the
+  next-milestone progress pills), and the Rating Ladder is reachable only via
+  the `?tab=ladder` deep link. Tapping a your-turn card re-enters the live
+  room: it pre-seats `{ roomId, myPlayerNum }` through `classicGameModeOpts`,
+  which `BoardRoomGame` (and Chutes & Ladders) read to skip the create/join
+  setup screen.
 - **Per-game public chat.** New tables `chat_messages` + `chat_reports` —
   both PUBLIC after the policy review: each game's room is open to every
   signed-in user in-app (the "already visible to other users" test), so
@@ -539,7 +560,7 @@ Shared card/tile engine + Lane A daily games"):
   (new `onChat` prop); `?chat=<gameId>` deep-links it open (tests use it).
 - **Staging fixtures** (in `GET /api/daily`, all idempotent, IS_STAGING):
   `demo=gotd` (6 fake finished attempts for today's featured game so the
-  hero preview renders), `demo=chat` (10 messages across the featured game's
+  GotD-scoped Today's Champions board renders), `demo=chat` (10 messages across the featured game's
   room and the Checkers room — the hidden-by-reports example lives in
   **checkers** so tests have a stable `?chat=checkers` target), and
   `demo=yourturn` (re-arms active checkers room `DEMOYT` with the viewer as
@@ -584,10 +605,19 @@ were **deliberately removed** and should not be re-added piecemeal:
   `tilematch_daily_tasks`) — the migrations are intentionally
   non-destructive; no code path touches them anymore.
 - `REDIS_URL`/ioredis (only ever the PvP matchmaking fast path) and the
-  UTGO wager contract/ABIs are gone. `ethers` stays solely for
-  `verifyMessage` in the wallet ownership proof (Account screen's
-  "On-chain login" identity — which is kept; it's identity, not
-  currency).
+  UTGO wager contract/ABIs are gone.
+- **The Account screen and the wallet ownership proof / "On-chain login"
+  identity** (home/profile cleanup pass): the Usernode-pubkey display,
+  Connect / Verify / Disconnect wallet controls, the avatar "verified"
+  tick, and the routes `POST /api/wallet/link`, `GET /api/wallet/challenge`,
+  `POST /api/wallet/prove`, `POST /api/wallet/disconnect`, and
+  `GET /api/account` are all removed — with them the `ethers` dependency
+  (its only use was `verifyMessage` in the prove route). The
+  `user_wallets` / `wallet_ownership_proofs` tables remain in the schema
+  (non-destructive migrations); no code path touches them. Tapping the
+  nav account chip now opens the viewer's own profile
+  (stats + recent games + badges); `?screen=account` deep links land
+  there too.
 
 The DApp-Mode verification framework (`lib/dapp.js`, `game_sessions` /
 `session_states`, session receipts, the Verified leaderboard) is NOT

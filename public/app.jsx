@@ -558,7 +558,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: 1.25rem;
+  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
 }
 .win-card {
   background: ${C.card};
@@ -569,6 +570,11 @@ body {
   max-width: 360px;
   width: 100%;
   box-shadow: 0 20px 50px rgba(63,51,24,0.22);
+  max-height: calc(100vh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .win-card .trophy { font-size: 2.6rem; }
 .win-card h2 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }

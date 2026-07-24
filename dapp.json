@@ -1,6 +1,8 @@
 {
   "name": "Game Corner",
-  "icon": { "emoji": "🕹️" },
+  "icon": {
+    "emoji": "🕹️"
+  },
   "secrets": [
     {
       "key": "APP_PUBKEY",
@@ -528,5 +530,9 @@
       "path": "/?demo=streak",
       "expectText": "streak"
     }
-  ]
+  ],
+  "visibility": {
+    "build": "public",
+    "view": "public"
+  }
 }

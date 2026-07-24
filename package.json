@@ -11,7 +11,6 @@
     "test:mnc": "node scripts/mancala-daily-selftest.js"
   },
   "dependencies": {
-    "ethers": "^6.13.0",
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.0"

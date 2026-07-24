@@ -41,7 +41,7 @@ const GA = {
    Global stylesheet (injected via <style>)
    ============================================================ */
 const css = `
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,500..900;1,9..144,500..900&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -50,6 +50,9 @@ body {
   background: ${C.bg};
   color: ${C.text};
   -webkit-font-smoothing: antialiased;
+  /* No faux bold/italic: a style we didn't load should fail visibly,
+     not render as a browser-synthesized slant (the old masthead bug). */
+  font-synthesis: none;
 }
 
 .mono { font-family: 'JetBrains Mono', monospace; }
@@ -212,7 +215,7 @@ body {
   .badge-chip .badge-chip-icon { font-size: 1.8rem; }
   .badge-chip .badge-chip-name { font-size: 0.62rem; line-height: 1.2; }
 }
-/* Today's Champions leaderboard tweaks (reuses .lboard) */
+/* Today's Top Scores leaderboard tweaks (reuses .lboard) */
 .lboard.champions { margin-top: 0; }
 .lboard .lrow.clickable { cursor: pointer; }
 .lboard .lrow.clickable:hover { background: ${C.border}; }
@@ -264,64 +267,18 @@ body {
   justify-content: center;
   flex: 0 0 auto;
 }
-.account-chip .who { display: flex; flex-direction: column; line-height: 1.1; }
+.account-chip .who { display: flex; align-items: center; line-height: 1.2; }
 .account-chip .uname { font-size: 0.82rem; font-weight: 600; }
-.account-chip .status { font-size: 0.6rem; color: ${C.emerald}; letter-spacing: 0.02em; }
 .account-chip .dot {
   width: 0.5rem; height: 0.5rem; border-radius: 50%; flex: 0 0 auto;
 }
-.account-chip.loading .dot { background: ${C.muted}; }
-.account-chip.loading { color: ${C.muted}; }
-.account-chip.loading .who { font-size: 0.82rem; }
 .account-chip.off { border-color: ${C.rose}; }
 .account-chip.off .dot { background: ${C.rose}; }
 .account-chip.off .who { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; }
 .account-chip.on { cursor: pointer; font-family: inherit; color: ${C.text}; transition: border-color 0.12s ease; }
 .account-chip.on:hover { border-color: ${C.accent}; }
-.account-chip .avatar { position: relative; }
-.account-chip .avatar-tick {
-  position: absolute; right: -0.2rem; bottom: -0.2rem;
-  width: 0.85rem; height: 0.85rem; border-radius: 50%;
-  background: ${C.emerald}; color: white; font-size: 0.55rem; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  border: 1.5px solid ${C.bg};
-}
 
-/* ---- Account screen ---- */
-.account-screen { max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem; }
-.account-head { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.25rem; }
-.account-head h2 { font-size: 1.4rem; font-weight: 700; }
-.account-id-row { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1rem; }
-.account-avatar {
-  width: 2.6rem; height: 2.6rem; border-radius: 50%; background: ${C.accent};
-  color: white; font-size: 1.1rem; font-weight: 700; flex: 0 0 auto;
-  display: flex; align-items: center; justify-content: center;
-}
-.account-uname { font-size: 1.05rem; font-weight: 700; }
-.account-sub { font-size: 0.78rem; color: ${C.emerald}; }
-.account-field { margin-top: 0.5rem; }
-.account-signed-out { color: ${C.muted}; font-size: 0.9rem; line-height: 1.5; }
-.account-status {
-  display: flex; align-items: center; gap: 0.5rem;
-  font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem;
-}
-.account-status-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: 0 0 auto; }
-.account-status-verified { color: ${C.emerald}; }
-.account-status-verified .account-status-dot { background: ${C.emerald}; }
-.account-status-linked { color: ${C.gold}; }
-.account-status-linked .account-status-dot { background: ${C.gold}; }
-.account-status-none { color: ${C.muted}; }
-.account-status-none .account-status-dot { background: ${C.muted}; }
-.account-wallet-addr {
-  font-size: 0.85rem; color: ${C.text}; margin-bottom: 0.5rem;
-}
-.account-status-desc { font-size: 0.83rem; color: ${C.muted}; line-height: 1.5; }
-.account-danger { color: ${C.rose}; border-color: ${C.rose}; }
-.account-msg { margin-top: 0.75rem; font-size: 0.83rem; line-height: 1.45; }
-.account-msg.ok { color: ${C.emerald}; }
-.account-msg.err { color: ${C.rose}; }
-
-/* Account "Connections" section — Friends + dApps relocated here on mobile. */
+/* Profile "Connections" section — Friends entry, shown on mobile only. */
 .account-connection-row {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
   background: ${C.dim}; border: 1px solid ${C.border};
@@ -349,7 +306,7 @@ body {
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
-  /* The Friends chip moves into the Account screen's Connections section
+  /* The Friends chip moves into the profile's Connections section
      on mobile. Scoped under .nav-right so it outranks the base chip rules
      defined later in this stylesheet regardless of source order. */
   .nav-right .nav-friends-btn { display: none; }
@@ -373,13 +330,6 @@ body {
   font-weight: 600;
   letter-spacing: 0.01em;
 }
-.lobby-head .lobby-hint {
-  margin-top: 0.5rem;
-  color: ${C.emerald};
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -3413,41 +3363,7 @@ body {
 .dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
 .dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
 
-/* ---- Badges section ---- */
-.badges-section { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid ${C.border}; }
-.badges-toggle {
-  all: unset;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: ${C.muted};
-  margin-bottom: 0.6rem;
-  display: block;
-  cursor: default;
-}
-.badges-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-.badges-grid .badge-chip { transition: opacity 0.15s ease; }
-.badges-grid .badge-chip.dim { opacity: 0.38; }
-.badges-grid .badge-chip:not(.dim) {
-  border-color: ${C.gold}55;
-  background: ${C.gold}0d;
-}
-.badges-toggle .badge-strip-count { color: ${C.text}; margin-left: 0.5rem; font-weight: 700; }
-/* Empty/early state + next-milestone progress hints (Bug C). */
-.badges-empty { font-size: 0.8rem; color: ${C.muted}; margin: 0.1rem 0 0.6rem; }
-.badges-retry-btn {
-  all: unset;
-  cursor: pointer;
-  color: ${C.accent};
-  font-weight: 700;
-  text-decoration: underline;
-}
-.badges-retry-btn:hover { color: ${C.text}; }
+/* ---- Badge progress pills (profile BadgeStrip + win overlay) ---- */
 .badge-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }
 .badge-progress-pill {
   font-size: 0.72rem; font-weight: 600; color: ${C.muted};
@@ -3455,29 +3371,8 @@ body {
   border-radius: 999px; padding: 0.2rem 0.55rem;
   display: inline-flex; gap: 0.3rem; align-items: center; white-space: nowrap;
 }
-/* Compact always-visible earned-badge row — mobile only (desktop shows the
-   full grid which already includes earned chips). */
-.badges-earned-row { display: none; }
 /* Win overlay next-milestone progress. */
 .win-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin: 0.6rem 0; }
-@media (max-width: 560px) {
-  .badges-toggle {
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    width: 100%;
-    padding: 0.4rem 0;
-    margin-bottom: 0;
-  }
-  .badges-toggle .badge-strip-count { margin-left: auto; }
-  .badges-toggle:hover { color: ${C.text}; }
-  .badges-toggle-arrow { font-size: 0.7rem; transition: transform 0.15s ease; }
-  .badges-grid { display: none; }
-  .badges-grid.open { display: flex; margin-top: 0.6rem; }
-  .badges-earned-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
-  .badges-earned-row.hide { display: none; }
-}
 /* ---- Phase 5 board games (Checkers / Reversi / Four in a Row / Gomoku / Ludo) ---- */
 .brg-intro {
   font-size: 0.85rem; color: ${C.text}; background: ${C.accent}14;
@@ -3926,14 +3821,6 @@ body {
   .gotd-play { width: 100%; margin-top: 4px; }
 }
 .gotd-play:disabled { opacity: 0.75; }
-.gotd-lb { border-top: 1px solid ${C.border}; margin-top: 14px; padding-top: 10px; }
-.gotd-lb-title { color: ${C.muted}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
-.gotd-lb-row { display: flex; gap: 10px; align-items: center; padding: 3px 0; font-size: 13px; }
-.gotd-lb-row .r { color: ${C.muted}; width: 28px; }
-.gotd-lb-row .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gotd-lb-row .t { color: ${C.emerald}; }
-.gotd-lb-row.me .n { color: ${C.gold}; font-weight: 700; }
-.gotd-lb-more { color: ${C.dim}; font-size: 11.5px; margin-top: 4px; }
 .gotd-signedout { color: ${C.muted}; font-size: 12.5px; margin-top: 12px; }
 
 /* Phase 8 — anonymous play + "make it count" */
@@ -3980,13 +3867,6 @@ body {
 .wn-items { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 5px; }
 .wn-items li { font-size: 13px; line-height: 1.5; color: ${C.text}; }
 
-.home-links { display: flex; gap: 8px; margin-bottom: 1.2rem; flex-wrap: wrap; }
-.home-link-btn {
-  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
-  border-radius: 999px; padding: 7px 14px; font-family: inherit; font-size: 13px;
-  font-weight: 600; cursor: pointer;
-}
-.home-link-btn:hover { border-color: ${C.accent}; }
 .home-section-title {
   font-size: 15px; font-weight: 700; margin: 1.4rem 0 0.7rem;
   color: ${C.text};
@@ -4033,7 +3913,7 @@ body {
 .chat-msg { background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px; padding: 8px 10px; max-width: 88%; }
 .chat-msg.mine { align-self: flex-end; border-color: ${C.accent}55; background: rgba(45,95,174,0.08); }
 .chat-msg.hidden-msg { background: none; border-style: dashed; }
-.chat-tombstone { color: ${C.dim}; font-size: 12px; font-style: italic; }
+.chat-tombstone { color: ${C.dim}; font-size: 12px; }
 .chat-msg-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .chat-author { color: ${C.violet}; font-size: 12px; font-weight: 700; }
 .chat-report {
@@ -4083,7 +3963,6 @@ body {
 /* Brass for streaks (spec: brass = streaks/wins/medals; green stays a
    live/success color elsewhere). */
 .nav-stat .value.streak { color: ${C.gold}; }
-.lobby-head .lobby-hint { color: ${C.gold}; }
 
 /* ---- Home masthead: numbered edition + dateline over a double rule ---- */
 .lobby-head.masthead { text-align: center; margin-bottom: 1.6rem; }
@@ -4105,7 +3984,6 @@ body {
   border-top: 2px solid ${C.text}; border-bottom: 1px solid ${C.text};
 }
 .lobby-head.masthead p { font-style: italic; font-family: 'Fraunces', Georgia, serif; }
-.lobby-head.masthead .lobby-hint { font-style: normal; font-family: 'Space Grotesk', system-ui, sans-serif; }
 
 /* Section headers as newspaper column rules. */
 .home-section-title {
@@ -4127,7 +4005,9 @@ body {
   text-transform: uppercase;
 }
 .gotd-name { font-size: 22px; font-weight: 900; }
-.gotd-desc { font-family: 'Fraunces', Georgia, serif; font-style: italic; }
+/* GotD description stays serif but upright — the masthead tagline is the
+   home screen's single italic moment. */
+.gotd-desc { font-family: 'Fraunces', Georgia, serif; }
 
 /* Per-game chrome picks up the game's accent (set as --accent inline on
    the lobby card, hero, and modal): accent Play buttons + tag pills. */
@@ -4903,7 +4783,7 @@ function LbScopeTabs({ scope, onChange }) {
     </div>
   );
 }
-const LB_FRIENDS_EMPTY = 'No friends on this board yet — follow players from their profiles.';
+const LB_FRIENDS_EMPTY = 'No friends on this board yet — add friends from the Friends screen.';
 
 function ClassicLeaderboard({ gameId, url, valueLabel = 'Score', valueFmt }) {
   const [data, setData] = useState(null);
@@ -5509,7 +5389,6 @@ const CHANGELOG = [
     ],
   },
 ];
-const WHATSNEW_SEEN_KEY = 'pc_whatsnew_seen_v1';
 
 // Bottom-sheet listing the recent weekly changes. Presented like the chat
 // panel (shared overlay idiom); pure display, no server state.
@@ -5541,17 +5420,6 @@ function streakMultiplier(streak) {
   for (const t of STREAK_TIERS) if (streak >= t.min) return t.mult;
   return 1.0;
 }
-
-// The next higher tier above the current streak: { daysAway, mult }, or null
-// when already at the top tier.
-function nextTierInfo(streak) {
-  const above = STREAK_TIERS
-    .filter(t => t.min > streak)
-    .sort((a, b) => a.min - b.min);
-  if (above.length === 0) return null;
-  return { daysAway: above[0].min - streak, mult: above[0].mult };
-}
-
 
 /* ============================================================
    Streak badges — named milestones unlocked at consecutive-day
@@ -5958,17 +5826,12 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
 }
 
 /* ============================================================
-   Account indicator — confirms the signed-in Usernode account so the
-   player knows their progress is being saved (not just session state).
+   Account indicator — confirms the signed-in Usernode account. Renders
+   nothing while the auth check is in flight, so "Signed out" only ever
+   shows after sign-in has definitively failed.
    ============================================================ */
-function AccountChip({ loading, authOk, user, walletVerified, onOpen }) {
-  if (loading) {
-    return (
-      <div className="account-chip loading" title="Checking your account…">
-        <span className="dot" /> <span className="who">Connecting…</span>
-      </div>
-    );
-  }
+function AccountChip({ loading, authOk, user, onOpen }) {
+  if (loading) return null;
   if (!authOk || !user) {
     return (
       <div className="account-chip off" title="Not signed in — progress won't be saved. Open this app inside Usernode.">
@@ -5982,177 +5845,17 @@ function AccountChip({ loading, authOk, user, walletVerified, onOpen }) {
     <button
       type="button"
       className="account-chip on"
-      title={`Signed in as ${name}${walletVerified ? ' · wallet verified' : ''} — tap to open your account.`}
+      title={`Signed in as ${name} — tap to open your profile.`}
       onClick={onOpen}
     >
-      <span className="avatar mono">
-        {initial}
-        {walletVerified && <span className="avatar-tick" title="Wallet verified">✓</span>}
-      </span>
+      <span className="avatar mono">{initial}</span>
       <span className="who">
         <span className="uname">{name}</span>
-        <span className="status">{walletVerified ? '✓ Verified · saved' : '● Progress saved'}</span>
       </span>
     </button>
   );
 }
 
-/* ============================================================
-   Account screen — single place for identity + on-chain login status.
-   Surfaces username, a copyable Usernode pubkey, and a three-state
-   wallet status (Not connected / Linked / Verified ✓), with manual
-   Connect/Verify and Disconnect controls.
-   ============================================================ */
-function truncAddr(a) {
-  if (!a) return '';
-  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
-}
-
-function AccountScreen({ user, walletAddr, walletVerified, authOk, onOpenFriends, onBack, onVerify, onDisconnect }) {
-  const [copied, setCopied] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
-  const [msg, setMsg] = React.useState(null);
-  const [confirmDisc, setConfirmDisc] = React.useState(false);
-  const bridgeAvailable = !!(typeof window !== 'undefined' && window.usernode && window.usernode.getNodeAddress);
-
-  // status: 'verified' | 'linked' | 'none'
-  const status = walletVerified ? 'verified' : (walletAddr ? 'linked' : 'none');
-
-  const copyPubkey = async () => {
-    if (!user || !user.usernodePubkey) return;
-    try {
-      await navigator.clipboard.writeText(user.usernodePubkey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
-
-  const handleVerify = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const res = await onVerify();
-      if (res && res.verified) setMsg({ ok: true, text: 'Wallet ownership verified ✓' });
-      else if (res && res.ok) setMsg({ ok: true, text: 'Wallet linked. Ownership proof unavailable (your wallet can’t sign here).' });
-      else setMsg({ ok: false, text: 'No wallet was readable in this environment.' });
-    } catch {
-      setMsg({ ok: false, text: 'Could not connect to your wallet.' });
-    }
-    setBusy(false);
-  };
-
-  const handleDisconnect = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await onDisconnect();
-      setMsg({ ok: true, text: 'Disconnected. Your public wallet link is kept on your account.' });
-    } catch {
-      setMsg({ ok: false, text: 'Could not disconnect.' });
-    }
-    setConfirmDisc(false);
-    setBusy(false);
-  };
-
-  const initial = (user && user.username ? user.username : '?').charAt(0).toUpperCase();
-
-  return (
-    <div className="account-screen">
-      <div className="account-head">
-        <button className="back-btn" onClick={onBack}>‹ Back</button>
-        <h2>Account</h2>
-      </div>
-
-      {(!authOk || !user) ? (
-        <div className="wallet-card">
-          <div className="account-signed-out">
-            You’re signed out. Open Game Corner inside Usernode so your progress
-            and identity are saved to your account.
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="wallet-card">
-            <div className="account-id-row">
-              <span className="account-avatar mono">{initial}</span>
-              <div>
-                <div className="account-uname">{user.username || 'Linked account'}</div>
-                <div className="account-sub">Signed in · progress saved</div>
-              </div>
-            </div>
-            <div className="account-field">
-              <div className="wallet-card-title">Usernode public key</div>
-              <div className="wallet-addr-row">
-                <span className="wallet-addr">{user.usernodePubkey || '— not linked —'}</span>
-                {user.usernodePubkey && (
-                  <button className="back-btn" onClick={copyPubkey}>{copied ? 'Copied ✓' : 'Copy'}</button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="wallet-card">
-            <div className="wallet-card-title">On-chain login</div>
-            <div className={`account-status account-status-${status}`}>
-              {status === 'verified' && <span className="account-status-dot" />}
-              {status === 'verified' && <span>Verified ✓</span>}
-              {status === 'linked' && <span className="account-status-dot" />}
-              {status === 'linked' && <span>Linked (not verified)</span>}
-              {status === 'none' && <span className="account-status-dot" />}
-              {status === 'none' && <span>Not connected</span>}
-            </div>
-            {walletAddr && (
-              <div className="account-wallet-addr mono" title={walletAddr}>{truncAddr(walletAddr)}</div>
-            )}
-            <div className="account-status-desc">
-              {status === 'verified' && 'You’ve signed an ownership challenge — this wallet is cryptographically yours.'}
-              {status === 'linked' && 'Your wallet address is linked to your account, but ownership hasn’t been proven yet. Verify to confirm it’s really yours.'}
-              {status === 'none' && (bridgeAvailable
-                ? 'No wallet is linked yet. Connect to read your Usernode wallet and link it to your account.'
-                : 'On-chain features are unavailable in this environment (no wallet could be read). Open Game Corner inside Usernode.')}
-            </div>
-
-            <div className="wallet-btn-row">
-              <button
-                className="primary-btn"
-                disabled={busy || !bridgeAvailable}
-                onClick={handleVerify}
-              >
-                {busy ? 'Working…' : status === 'verified' ? 'Re-verify wallet' : 'Connect / Verify wallet'}
-              </button>
-              {status === 'verified' && !confirmDisc && (
-                <button className="back-btn" disabled={busy} onClick={() => setConfirmDisc(true)}>Disconnect</button>
-              )}
-              {confirmDisc && (
-                <>
-                  <button className="back-btn account-danger" disabled={busy} onClick={handleDisconnect}>Confirm disconnect</button>
-                  <button className="back-btn" disabled={busy} onClick={() => setConfirmDisc(false)}>Cancel</button>
-                </>
-              )}
-            </div>
-            {msg && (
-              <div className={`account-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>
-            )}
-          </div>
-
-          {/* Connections — Friends, shown here only on narrow viewports
-              (hidden ≥561px via CSS, where it lives in the top bar). */}
-          <div className="wallet-card account-connections">
-            <div className="wallet-card-title">Connections</div>
-            <button
-              type="button"
-              className="account-connection-row"
-              onClick={onOpenFriends}
-            >
-              👥 Friends
-              <span className="chev">›</span>
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 /* ============================================================
    Daily leaderboard — today's solvers for one game, ranked by fastest
@@ -6225,10 +5928,11 @@ function Leaderboard({ gameId, solved }) {
 }
 
 /* ============================================================
-   Today's Champions — lobby-wide leaderboard aggregating EVERYONE who
-   solved at least one daily puzzle today, ranked by total points then
-   games solved. Reuses the per-game leaderboard styles. Tapping a row
-   opens that player's profile via onSelectUser.
+   Today's Top Scores — everyone who finished today's GAME OF THE DAY,
+   ranked by score (fastest time breaks ties). The server resolves the
+   featured game and returns its id so the board can name it. Reuses
+   the per-game leaderboard styles. Tapping a row opens that player's
+   profile via onSelectUser.
    ============================================================ */
 function TodayChampions({ onSelectUser }) {
   const [state, setState] = useState({ loading: true });
@@ -6246,14 +5950,22 @@ function TodayChampions({ onSelectUser }) {
     return () => { alive = false; };
   }, [scope]);
 
+  const featured = state.gameId ? GAMES.find(g => g.id === state.gameId) : null;
+  const gameLabel = featured ? featured.name : 'Game of the Day';
+  const title = (
+    <div className="lboard-title">
+      Today's Top Scores
+      <span className="lboard-count">🎯 {featured ? `${featured.icon} ` : ''}{gameLabel}{state.total > 0 ? ` · ${state.total} finished` : ''}</span>
+    </div>
+  );
+
   if (state.loading) {
-    return <div className="lboard champions"><div className="lboard-title">Today's Champions</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
+    return <div className="lboard champions"><div className="lboard-title">Today's Top Scores</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
   }
 
   const entries = state.entries || [];
   const me = state.me || null;
   const meVisible = me && entries.some(e => e.isCurrentUser);
-  const gameCount = state.gameCount || 0;
   const row = (e, pinned) => (
     <div
       key={pinned ? 'me-pinned' : e.rank}
@@ -6262,21 +5974,18 @@ function TodayChampions({ onSelectUser }) {
     >
       <span className="lrank mono">#{e.rank}</span>
       <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
-      <span className="ltime mono">{e.totalPoints} pts</span>
-      <span className="lsteps mono">{e.gamesSolved}{gameCount ? ` / ${gameCount}` : ''}</span>
+      <span className="ltime mono">{e.score} pts</span>
+      <span className="lsteps mono">{lbFmtTime(e.timeSecs)}</span>
     </div>
   );
 
   return (
     <div className="lboard champions">
-      <div className="lboard-title">
-        Today's Champions
-        {state.total > 0 && <span className="lboard-count">{state.total} playing</span>}
-      </div>
+      {title}
       <LbScopeTabs scope={scope} onChange={setScope} />
       {entries.length === 0 ? (
         <div className="lboard-empty">
-          {scope === 'friends' ? LB_FRIENDS_EMPTY : "No one has solved today's puzzles yet — be the first!"}
+          {scope === 'friends' ? LB_FRIENDS_EMPTY : `No one has finished today's ${gameLabel} yet — be the first!`}
         </div>
       ) : (
         <div className="lboard-rows">
@@ -6376,14 +6085,13 @@ function LadderScreen() {
 /* ============================================================
    Badge strip — the player's collected badges (streak milestones +
    non-streak achievements). Earned badges render solid; not-yet-earned
-   render dimmed so there's a visible collection to complete. Shared by
-   the lobby and the profile screen.
+   render dimmed so there's a visible collection to complete. Lives on
+   the profile screen (the home Badges panel was retired).
    ============================================================ */
 // Build the canonical badge-chip list (streak milestones + non-streak
 // achievements + lifetime solve milestones) with earned/locked state derived
 // from the server-backed `badges` (earned day thresholds) and `achievements`
-// ({ types, milestones }). Shared by the profile BadgeStrip and the lobby
-// BadgesSection so both render an identical, permanent collection.
+// ({ types, milestones }). Consumed by the profile BadgeStrip.
 function badgeChips(badges, achievements) {
   const earnedDays = new Set(badges || []);
   const ach = achievements || { types: [], milestones: [] };
@@ -6403,9 +6111,15 @@ function badgeChips(badges, achievements) {
   return chips;
 }
 
-function BadgeStrip({ badges, achievements }) {
+function BadgeStrip({ badges, achievements, streak, solveCount }) {
   const chips = badgeChips(badges, achievements);
   const earnedCount = chips.filter(c => c.earned).length;
+  // Next-milestone progress pills (formerly on the home Badges panel) —
+  // rendered only when the caller supplies the live streak/solve counts,
+  // i.e. on the viewer's own profile.
+  const hints = (streak != null || solveCount != null)
+    ? badgeProgressHints(streak || 0, solveCount || 0)
+    : [];
 
   return (
     <div className="badge-strip-wrap">
@@ -6413,6 +6127,15 @@ function BadgeStrip({ badges, achievements }) {
         <span>Badges</span>
         <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
       </div>
+      {hints.length > 0 && (
+        <div className="badge-progress">
+          {hints.map(h => (
+            <span key={h.key} className="badge-progress-pill">
+              <span>{h.icon}</span> {h.text}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="badge-strip">
         {chips.map(c => (
           <div
@@ -6496,23 +6219,15 @@ const INPUT_LABEL = { tap: '👆 Tap', drag: '✋ Drag', swipe: '👉 Swipe', ke
    ============================================================ */
 
 // Game of the Day hero card: today's featured game (from daily_featured via
-// /api/daily), reset countdown, state-aware CTA, and a top-3 leaderboard
-// preview. Clicking anywhere routes through the normal launch flow, so the
-// pre-game / resume / locked machinery is untouched.
+// /api/daily), reset countdown, and a state-aware CTA. The full Today's
+// Top Scores board renders directly below the hero, so the hero itself
+// carries no leaderboard preview. Clicking anywhere routes through the
+// normal launch flow, so the pre-game / resume / locked machinery is
+// untouched.
 function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
-  const [preview, setPreview] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    api(`/api/daily/${game.id}/leaderboard`)
-      .then(({ ok, body }) => { if (alive && ok && body) setPreview(body); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [game.id]);
-
   const finished = !!(attempt && attempt.finishedAt);
   const inProgress = !!attempt && !finished;
-  const fmtT = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return (
     <div className="gotd-hero" style={{ '--accent': game.tagColor }}>
       <div className="gotd-label mono">🎯 GAME OF THE DAY</div>
@@ -6529,19 +6244,6 @@ function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay
           {finished ? `🔒 +${attempt.score != null ? attempt.score : 0}` : inProgress ? '▶ Resume' : 'Play'}
         </button>
       </div>
-      {preview && Array.isArray(preview.entries) && preview.entries.length > 0 && (
-        <div className="gotd-lb">
-          <div className="gotd-lb-title">Today's fastest</div>
-          {preview.entries.slice(0, 3).map((e) => (
-            <div key={e.rank} className={'gotd-lb-row' + (e.isCurrentUser ? ' me' : '')}>
-              <span className="r mono">#{e.rank}</span>
-              <span className="n">{e.username}</span>
-              <span className="t mono">{e.timeSecs != null ? fmtT(e.timeSecs) : '—'}</span>
-            </div>
-          ))}
-          {preview.total > 3 && <div className="gotd-lb-more">{preview.total} solved today</div>}
-        </div>
-      )}
       {authOk === false && (
         <div className="gotd-signedout">Play today's deal free as a guest — sign in to join the board and keep a streak.</div>
       )}
@@ -13685,7 +13387,7 @@ function VerifiedLeaderboard({ gameId, onOpenReceipt }) {
    Social Components — Profile & Friends
    ============================================================ */
 
-function ProfileScreen({ userId, user: loggedInUser, onBack }) {
+function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -13732,6 +13434,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
   }
 
   const isOwnProfile = loggedInUser && loggedInUser.id === profile.user.id;
+  const recentGames = Array.isArray(profile.recentGames) ? profile.recentGames : [];
 
   return (
     <div style={{ maxWidth: '620px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
@@ -13764,7 +13467,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
                 }}
                 onClick={profile.following ? handleUnfollow : handleFollow}
               >
-                {profile.following ? 'Unfollow' : 'Follow'}
+                {profile.following ? '✓ Friends' : '＋ Add friend'}
               </button>
             </div>
           )}
@@ -13790,13 +13493,66 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
           </div>
         </div>
 
+        {/* Recent games — the player's last 10 finished daily runs. */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '0.6rem' }}>
+            Recent games
+          </div>
+          {recentGames.length === 0 ? (
+            <div style={{ fontSize: '0.85rem', color: C.muted }}>
+              No finished games yet — play today's puzzles!
+            </div>
+          ) : (
+            <div>
+              {recentGames.map((r, i) => {
+                const g = GAMES.find(gm => gm.id === r.gameId);
+                return (
+                  <div
+                    key={`${r.gameId}-${r.date}-${i}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.6rem',
+                      padding: '0.5rem 0.2rem', fontSize: '0.88rem',
+                      borderBottom: i < recentGames.length - 1 ? `1px solid ${C.border}` : 'none',
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>{g ? g.icon : '🎮'}</span>
+                    <span style={{ flex: 1, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {g ? g.name : r.gameId}
+                    </span>
+                    <span style={{ color: C.muted, fontSize: '0.78rem', fontFamily: "'JetBrains Mono', monospace" }}>{r.date}</span>
+                    <span style={{ color: r.score > 0 ? C.gold : C.muted, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                      {r.score > 0 ? `+${r.score} pts · ${lbFmtTime(r.timeSecs)}` : 'Played'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div style={{ marginBottom: '1.25rem' }}>
           <BadgeStrip
             badges={Array.isArray(profile.badges) ? profile.badges : []}
             achievements={profile.achievements || { types: [], milestones: [] }}
+            streak={isOwnProfile ? profile.stats.currentStreak : null}
+            solveCount={isOwnProfile ? profile.stats.dailiesCompleted : null}
           />
         </div>
 
+        {/* Connections — Friends entry, mobile-only (the nav carries the
+            Friends button on wide viewports). Own profile only. */}
+        {isOwnProfile && onOpenFriends && (
+          <div className="account-connections">
+            <button
+              type="button"
+              className="account-connection-row"
+              onClick={onOpenFriends}
+            >
+              👥 Friends
+              <span className="chev">›</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -13805,17 +13561,49 @@ function ProfileScreen({ userId, user: loggedInUser, onBack }) {
 function FriendsListScreen({ onSelectUser, onBack }) {
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Search-to-add: query text, debounced results, per-row "just added" state.
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState(null);   // null = no search active
+  const [searching, setSearching] = useState(false);
+  const searchSeq = useRef(0);
 
+  const loadFriends = async () => {
+    const { ok, body } = await api('/api/social/friends');
+    if (ok && body && body.friends) {
+      setFriends(body.friends);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadFriends(); }, []);
+
+  // Debounced (300ms) name search; requires ≥2 chars. Stale responses are
+  // dropped via the sequence counter so fast typing can't race.
   useEffect(() => {
-    const loadFriends = async () => {
-      const { ok, body } = await api('/api/social/friends');
-      if (ok && body && body.friends) {
-        setFriends(body.friends);
-      }
-      setLoading(false);
-    };
-    loadFriends();
-  }, []);
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const seq = ++searchSeq.current;
+    const t = setTimeout(async () => {
+      const { ok, body } = await api(`/api/social/search?q=${encodeURIComponent(q)}`);
+      if (seq !== searchSeq.current) return;
+      setResults(ok && body && Array.isArray(body.results) ? body.results : []);
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const addFriend = async (userId) => {
+    // Optimistic flip; the friends list below refreshes on success.
+    setResults(prev => (prev || []).map(r => r.id === userId ? { ...r, following: true } : r));
+    const { ok } = await api(`/api/social/follow/${userId}`, { method: 'POST' });
+    if (ok) loadFriends();
+    else setResults(prev => (prev || []).map(r => r.id === userId ? { ...r, following: false } : r));
+  };
 
   if (loading) {
     return (
@@ -13832,6 +13620,74 @@ function FriendsListScreen({ onSelectUser, onBack }) {
 
       <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '1.5rem 0 1rem' }}>Friends</h2>
 
+      <input
+        type="text"
+        className="friends-search-input"
+        placeholder="Search players by name…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{
+          width: '100%', padding: '0.7rem 0.9rem', marginBottom: '1rem',
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: '10px',
+          color: C.text, fontFamily: 'inherit', fontSize: '0.95rem', outline: 'none',
+        }}
+      />
+
+      {results !== null && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          {searching ? (
+            <p style={{ color: C.muted, fontSize: '0.85rem' }}>Searching…</p>
+          ) : results.length === 0 ? (
+            <p style={{ color: C.muted, fontSize: '0.85rem' }}>No players match "{query.trim()}".</p>
+          ) : (
+            results.map(r => (
+              <div
+                key={r.id}
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: '10px',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '0.6rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    all: 'unset', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem',
+                    color: C.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  }}
+                  onClick={() => onSelectUser(r.id)}
+                >
+                  {r.username}
+                </button>
+                {r.following ? (
+                  <span style={{ color: C.emerald, fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Friends</span>
+                ) : (
+                  <button
+                    className="primary-btn"
+                    style={{
+                      background: C.accent,
+                      border: `1px solid ${C.accent}`,
+                      padding: '0.4rem 0.8rem',
+                      fontSize: '0.8rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onClick={() => addFriend(r.id)}
+                  >
+                    ＋ Add friend
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {friends.length === 0 ? (
         <div style={{
           background: C.card,
@@ -13841,7 +13697,7 @@ function FriendsListScreen({ onSelectUser, onBack }) {
           textAlign: 'center',
           color: C.muted
         }}>
-          <p>You're not following anyone yet. Go to a profile and click Follow!</p>
+          <p>You haven't added any friends yet — search a player's name above to add them.</p>
         </div>
       ) : (
         <div>
@@ -18097,103 +17953,18 @@ function badgeProgressHints(streak, solveCount) {
   return hints;
 }
 
-// Lobby Badges panel — renders the SAME permanent collection as the profile's
-// BadgeStrip (streak milestones + non-streak achievements + solve milestones),
-// fed by the server-backed `badges`/`achievements` state already loaded from
-// /api/daily. Earned badges stay lit forever (they come from persisted
-// user_achievements rows, not the live streak/today's attempts), so the lobby
-// and profile now show identical earned/locked states.
-//
-// Discoverability: a header with the earned count is always visible; on mobile
-// a compact always-visible row of EARNED chips shows when collapsed (so a
-// player sees their badges without expanding), and the toggle reveals the full
-// dimmed collection. An empty-state line + next-milestone progress hints make
-// it clear how to earn the next one.
-function BadgesSection({ badges, achievements, streak, solveCount, open, onToggle }) {
-  const chips = badgeChips(badges, achievements);
-  const earnedCount = chips.filter(c => c.earned).length;
-  const earnedChips = chips.filter(c => c.earned);
-  const hints = badgeProgressHints(streak || 0, solveCount || 0);
-  return (
-    <div className="badges-section">
-      <button className="badges-toggle" onClick={onToggle}>
-        Badges
-        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
-        <span className="badges-toggle-arrow">{open ? '▾' : '▸'}</span>
-      </button>
-      {earnedCount === 0 && (
-        <div className="badges-empty">Solve a daily puzzle to earn your first badge.</div>
-      )}
-      {hints.length > 0 && (
-        <div className="badge-progress">
-          {hints.map(h => (
-            <span key={h.key} className="badge-progress-pill">
-              <span>{h.icon}</span> {h.text}
-            </span>
-          ))}
-        </div>
-      )}
-      {/* Mobile-only compact strip of earned badges, shown while collapsed. */}
-      {earnedCount > 0 && (
-        <div className={'badges-earned-row' + (open ? ' hide' : '')}>
-          {earnedChips.map(c => (
-            <div key={c.key} className="badge-chip" title={`${c.name} — ${c.sub}`}>
-              <span>{c.icon}</span>
-              <span>{c.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className={'badges-grid' + (open ? ' open' : '')}>
-        {chips.map(c => (
-          <div
-            key={c.key}
-            className={'badge-chip' + (c.earned ? '' : ' dim')}
-            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
-          >
-            <span>{c.icon}</span>
-            <span>{c.name}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Lightweight placeholder shown in the lobby badge slot when the real panel
-// can't load (signed out, or the backend was briefly unreachable). Keeps the
-// "Badges" header so the slot is recognizable, and explains the empty space
-// instead of leaving an unexplained blank gap. `state` is 'signedout' | 'error';
-// the 'error' case offers a retry that re-runs the daily load.
-function BadgesPlaceholder({ state, onRetry }) {
-  const isError = state === 'error';
-  return (
-    <div className="badges-section">
-      <div className="badges-toggle" style={{ cursor: 'default' }}>Badges</div>
-      <div className="badges-empty">
-        {isError
-          ? 'Couldn’t load your badges.'
-          : 'Sign in to track your badges.'}
-        {isError && onRetry && (
-          <>
-            {' '}
-            <button type="button" className="badges-retry-btn" onClick={onRetry}>Retry</button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function App() {
   const [screen, setScreen] = useState(() => {
-    // Support ?screen=account / ?screen=session deep links for testing
+    // Support ?screen=friends / ?screen=session deep links for testing.
+    // ?screen=account (the retired Account screen) now lands on the viewer's
+    // own profile — but the user id isn't known until /api/daily resolves,
+    // so it's handled by the pendingSelfProfile effect below.
     const params = new URLSearchParams(window.location.search);
     const s = params.get('screen');
-    if (s === 'account') return 'account';
+    if (s === 'friends') return 'friends';
     if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'account' | 'session'
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'session'
   // DApp session receipt being viewed (session id), and identity-verified flag.
   // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
   const [receiptSessionId, setReceiptSessionId] = useState(() => {
@@ -18201,7 +17972,6 @@ function App() {
     return params.get('sid') || (params.get('demo') === 'anchor' ? 'DAPPDEMOSUDOKU' : null);
   });
   const openReceipt = (sid) => { setReceiptSessionId(sid); setScreen('session'); };
-  const [walletVerified, setWalletVerified] = useState(false);
   const [currentGame, setCurrentGame] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -18213,10 +17983,6 @@ function App() {
   // Lifetime won-solve count (server-computed), used to drive the
   // "X/Y solves → Solver" next-milestone progress hint.
   const [solveCount, setSolveCount] = useState(0);
-  // Outcome of the last /api/daily load, used to explain an empty badge slot:
-  // 'ok' (real panel renders), 'signedout' (401 — no/expired token), or
-  // 'error' (5xx / network — backend unreachable, offer retry).
-  const [badgeLoadState, setBadgeLoadState] = useState('ok');
   const [winData, setWinData] = useState(null);
   const [loseData, setLoseData] = useState(null);
   // Server-backed per-day attempt state, keyed by game id.
@@ -18247,17 +18013,13 @@ function App() {
   // Phase 8 "make it count": banner shown after a pending anonymous run was
   // retroactively committed on an authenticated load.
   const [commitNotice, setCommitNotice] = useState(null);
-  // What's-new sheet + the dismissible "New this week" strip. The strip shows
-  // until this browser has dismissed the NEWEST changelog entry (per-device
-  // state, like the how-to first-open tracking).
+  // What's-new sheet + the dismissible "New this week" strip. Dismissal is
+  // deliberately per-page-load (plain state, no persistence): ✕ hides the
+  // strip for this visit only, and it reappears on the next refresh — the
+  // strip's "See all ›" is the only entry point to the weekly sheet.
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-  const [wnDismissed, setWnDismissed] = useState(() => {
-    try { return localStorage.getItem(WHATSNEW_SEEN_KEY) === CHANGELOG[0].id; } catch { return false; }
-  });
-  const dismissWhatsNew = () => {
-    setWnDismissed(true);
-    try { localStorage.setItem(WHATSNEW_SEEN_KEY, CHANGELOG[0].id); } catch {}
-  };
+  const [wnDismissed, setWnDismissed] = useState(false);
+  const dismissWhatsNew = () => setWnDismissed(true);
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
   // Classic Games — Game Menu state. `classicGameMode` is the active mode of
@@ -18276,11 +18038,13 @@ function App() {
   const [howToGame, setHowToGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
-  // Wallet identity state (linked/verified address shown on the Account screen)
-  const [walletAddr, setWalletAddr] = useState(null);
-  // Share modal for posting wins to feed
-  // Badges section toggle (mobile: collapsed by default)
-  const [badgesOpen, setBadgesOpen] = useState(false);
+  // ?screen=account / ?screen=profile deep links open the viewer's OWN
+  // profile, which needs the user id from /api/daily — remembered here and
+  // consumed once the load settles.
+  const pendingSelfProfile = useRef((() => {
+    const s = new URLSearchParams(window.location.search).get('screen');
+    return s === 'account' || s === 'profile';
+  })());
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -18356,7 +18120,6 @@ function App() {
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
     const { ok, status, body } = await api(path);
     if (ok && body) {
-      setBadgeLoadState('ok');
       GUEST_MODE = false;
       setAuthOk(true);
       setUser(body.user || null);
@@ -18380,12 +18143,16 @@ function App() {
       // Phase 8 "make it count": commit any same-day pending anonymous runs
       // now that we're authenticated. Fire-and-forget; state merges on success.
       commitPendingRuns(body);
+      // ?screen=account / ?screen=profile deep link: now that we know who the
+      // viewer is, open their own profile (one-shot).
+      if (pendingSelfProfile.current && body.user && body.user.id) {
+        pendingSelfProfile.current = false;
+        setSelectedUserId(body.user.id);
+        setScreen('profile');
+      }
     } else {
       // 401 (no/expired token) or 5xx (DB down): can't confirm the account,
       // so persistence isn't guaranteed — reflect that in the nav.
-      // Distinguish "signed out" (401) from a transient backend failure so the
-      // badge slot can explain the empty space instead of rendering nothing.
-      setBadgeLoadState(status === 401 ? 'signedout' : 'error');
       GUEST_MODE = true;
       setAuthOk(false);
       setUser(null);
@@ -18460,62 +18227,6 @@ function App() {
     if (g) setChatGame(g);
   }, [loading]);
 
-
-  // Wallet: read EVM address from the bridge, link it to the account, optionally
-  // prove ownership (sign a challenge), and fetch balance. Extracted into one
-  // callable so BOTH the on-mount effect and the Account screen's "Connect /
-  // Verify" button run the identical flow. Returns { ok, addr, verified } so the
-  // Account screen can show precise feedback; never throws.
-  const connectAndVerifyWallet = React.useCallback(async () => {
-    if (!window.usernode || !window.usernode.getNodeAddress) {
-      return { ok: false, reason: 'unavailable' };
-    }
-    let addr = null;
-    try { addr = await window.usernode.getNodeAddress(); } catch { return { ok: false, reason: 'unavailable' }; }
-    if (!addr) return { ok: false, reason: 'unavailable' };
-    setWalletAddr(addr);
-    // Link address server-side so tipping lookups work (trust-on-report).
-    try { await api('/api/wallet/link', { method: 'POST', body: JSON.stringify({ addr }) }); } catch {}
-
-    // Optional cryptographic ownership proof — only if the wallet can sign.
-    let verified = false;
-    if (window.usernode.signMessage) {
-      try {
-        const { ok, body } = await api('/api/wallet/challenge');
-        if (ok && body && body.message) {
-          const sig = await window.usernode.signMessage(body.message);
-          if (sig) {
-            const { ok: pOk, body: pBody } = await api('/api/wallet/prove', {
-              method: 'POST',
-              body: JSON.stringify({ addr, nonce: body.nonce, signature: sig }),
-            });
-            if (pOk && pBody && pBody.verified) { verified = true; setWalletVerified(true); }
-          }
-        }
-      } catch {}
-    }
-
-    return { ok: true, addr, verified };
-  }, []);
-
-  // Disconnect the verified-identity proof (public link is kept so received
-  // tips still resolve). Used by the Account screen.
-  const disconnectWallet = React.useCallback(async () => {
-    await api('/api/wallet/disconnect', { method: 'POST' });
-    setWalletVerified(false);
-  }, []);
-
-  // On mount: restore any existing identity/link state from the server first
-  // (so the verified badge + linked address show even before the bridge
-  // resolves or when it's unavailable), then run the connect/verify flow.
-  useEffect(() => {
-    api('/api/account').then(({ ok, body }) => {
-      if (!ok || !body) return;
-      if (body.identityVerified) setWalletVerified(true);
-      if (body.walletAddr) setWalletAddr(prev => prev || body.walletAddr);
-    }).catch(() => {});
-    connectAndVerifyWallet();
-  }, [connectAndVerifyWallet]);
 
   // Midnight UTC reached — reload state so everything unlocks.
   const onReset = () => {
@@ -19180,10 +18891,9 @@ function App() {
     }
   };
 
-  // Reward level surfaced in the nav + lobby. Suppressed when signed out so we
+  // Reward level surfaced in the nav. Suppressed when signed out so we
   // never show a multiplier the server can't back.
   const activeMult = authOk ? streakMultiplier(streak) : 1;
-  const tierAhead = authOk && streak > 0 ? nextTierInfo(streak) : null;
 
   // Phase 7 home derivations. featuredGame resolves the server's daily_featured
   // row against the client registry; inProgressItems merges resumable daily
@@ -19256,8 +18966,9 @@ function App() {
             loading={loading}
             authOk={authOk}
             user={user}
-            walletVerified={walletVerified}
-            onOpen={() => setScreen('account')}
+            onOpen={() => {
+              if (user && user.id) { setSelectedUserId(user.id); setScreen('profile'); }
+            }}
           />
         </div>
       </nav>
@@ -19267,6 +18978,7 @@ function App() {
           userId={selectedUserId}
           user={user}
           onBack={() => { setScreen('lobby'); setSelectedUserId(null); }}
+          onOpenFriends={() => setScreen('friends')}
         />
       )}
 
@@ -19274,19 +18986,6 @@ function App() {
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
           onBack={() => setScreen('lobby')}
-        />
-      )}
-
-      {screen === 'account' && (
-        <AccountScreen
-          user={user}
-          authOk={authOk}
-          walletAddr={walletAddr}
-          walletVerified={walletVerified}
-          onOpenFriends={() => setScreen('friends')}
-          onBack={() => setScreen('lobby')}
-          onVerify={connectAndVerifyWallet}
-          onDisconnect={disconnectWallet}
         />
       )}
 
@@ -19312,9 +19011,9 @@ function App() {
               {!loading && <LadderScreen />}
             </React.Fragment>
           ) : (
-            /* Phase 7 home: GotD hero → in-progress row → all-games grid.
-               The old three-tab lobby is retired; Feed and Ladder are now
-               screens behind the quick links below. */
+            /* Phase 7 home: GotD hero → Today's Top Scores → in-progress row →
+               all-games grid. The old three-tab lobby is retired; the Rating
+               Ladder remains reachable via the ?tab=ladder deep link. */
             <React.Fragment>
               <div className="lobby-head masthead">
                 {/* Numbered-edition dateline (Appendix A masthead). The edition
@@ -19324,14 +19023,7 @@ function App() {
                   <span>No. {utcDayNum(offset) - 20000} · {new Date(Date.now() + offset).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
                 </div>
                 <h1>Game Corner</h1>
-                <p>One shared board per game, per day. Resets at midnight UTC.</p>
-                {authOk && streak > 0 && (
-                  <p className="lobby-hint">
-                    🔥 {streak}-day streak · {tierAhead
-                      ? `${tierAhead.daysAway} more Game-of-the-Day win${tierAhead.daysAway === 1 ? '' : 's'} → ×${tierAhead.mult} points`
-                      : `max ×${activeMult} multiplier active`}
-                  </p>
-                )}
+                <p>Classic games, free to play — no ads, no pay-to-win. Fresh puzzles every day at midnight UTC.</p>
                 <div className="masthead-rule" />
               </div>
               {commitNotice && (
@@ -19361,36 +19053,19 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
+              {/* Today's Top Scores (GotD-only board) sits directly below the
+                  hero so the featured game's results read as one section. */}
+              {authOk && !loading && (
+                <TodayChampions
+                  onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+                />
+              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}
                   onOpenDaily={(g) => { if (!loading) launchGame(g); }}
                   onOpenRoom={resumeRoom}
                 />
-              )}
-              <div className="home-links">
-                <button className="home-link-btn" onClick={() => setLobbyTab('ladder')}>🏆 Ladder</button>
-                <button className="home-link-btn" onClick={() => setWhatsNewOpen(true)}>🗞️ What's new</button>
-              </div>
-              {authOk ? (
-                (() => {
-                  // Persistent, collapsible badge panel (unchanged from the
-                  // tabbed lobby) — union of permanently earned streak badges
-                  // and any the LIVE streak now satisfies.
-                  const earnedDays = Array.from(new Set([...badges, ...streakBadges(streak).map(b => b.min)]));
-                  return (
-                    <BadgesSection
-                      badges={earnedDays}
-                      achievements={achievements}
-                      streak={streak}
-                      solveCount={solveCount}
-                      open={badgesOpen}
-                      onToggle={() => setBadgesOpen(b => !b)}
-                    />
-                  );
-                })()
-              ) : (
-                <BadgesPlaceholder state={badgeLoadState} onRetry={loadDaily} />
               )}
               {(() => {
                 const gameCard = (g) => {
@@ -19441,11 +19116,6 @@ function App() {
                   </React.Fragment>
                 );
               })()}
-              {authOk && !loading && (
-                <TodayChampions
-                  onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-                />
-              )}
             </React.Fragment>
           )}
         </div>

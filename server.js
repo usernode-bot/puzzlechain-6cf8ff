@@ -3245,6 +3245,48 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed: give the current viewer a CLAIMED, UNFINISHED
+    // MINE FINDER attempt for today, so the reworked canvas board (slice 3) is
+    // reachable by plain navigation — `/?game=minefinder&play=1&demo=minefinder`
+    // resumes straight into the field with a carried-over timer and step count
+    // instead of burning a fresh claim.
+    //
+    // The progress payload deliberately carries NO `dayNum`/`revealed`: the
+    // client only hydrates a saved field when `progress.dayNum` matches today's
+    // server-anchored day number, so this marks the row claimed-and-in-progress
+    // while letting the client deal today's real seeded field. (Seeding an
+    // explicit `revealed` set would mean duplicating the client's mfBuild mine
+    // layout here, and any drift would render a nonsense board.) Same trick as
+    // the `demo=resume` wordhunt seed above.
+    //
+    // Targets `minefinder`, which no other viewer-scoped fixture touches
+    // (`demo=locked`/`streak` finish sudoku + cryptowordle; `demo=resume` uses
+    // wordhunt; `demo=leaderboard` only seeds fake `staging-demo-lb-*` users),
+    // so it can't collide on the shared staging DB. The DO UPDATE forces the
+    // row back to unfinished, making it order-independent and re-run safe.
+    // Idempotent; today only; strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'minefinder') {
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'minefinder', (now() AT TIME ZONE 'utc')::date, $3, $4, $5::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL,
+               score = NULL,
+               time_secs = NULL,
+               steps = EXCLUDED.steps,
+               elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          5,
+          38,
+          JSON.stringify({ minefinderDemo: true }),
+        ]
+      );
+    }
+
     // Staging-only demo seed: set up the Crypto Wordle hint flow for the
     // viewer — drop them into a claimed, unfinished cryptowordle attempt
     // (lobby shows "In progress · resume") and pre-use 2 hints so the

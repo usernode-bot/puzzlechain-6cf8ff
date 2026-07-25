@@ -398,6 +398,59 @@ body {
 
 /* ---- Game screen ---- */
 .game-wrap { max-width: 620px; margin: 0 auto; padding: 1.5rem 1.25rem; width: 100%; }
+
+/* Fit-to-viewport layout mode (slice 1). A daily game that opts in renders
+   header + board + controls inside one non-scrolling column: the board region
+   is the only flexible child, and useFitBox measures it to size the cells.
+   The .app-fit class pins the whole shell to one viewport (100dvh, not vh, so
+   mobile browser chrome collapsing doesn't clip the pad) and the wrap then
+   takes whatever is left BELOW the nav — sizing the wrap itself to 100dvh
+   would push the nav's height back out into a scrollbar.
+   NOTE: no backticks in this block — the whole stylesheet is one template
+   literal, so a stray backtick silently ends the string. */
+.app.app-fit { height: 100dvh; min-height: 0; overflow: hidden; }
+.app.app-fit .nav { flex: 0 0 auto; }
+.game-wrap.fit {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0.7rem 0.9rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  gap: 0.45rem;
+}
+.game-wrap.fit .game-head { flex: 0 0 auto; margin-bottom: 0; }
+.game-wrap.fit .fit-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.game-wrap.fit .fit-board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.game-wrap.fit .status-bar { flex: 0 0 auto; margin-bottom: 0; }
+/* In fit mode the hint is a fixed footer line, not a scroll-away paragraph —
+   the board flexes around it so it can never be pushed off the viewport. */
+.game-wrap.fit .p6-hint { flex: 0 0 auto; margin-top: 0; font-size: 11.5px; line-height: 1.35; }
+/* Interactive board cells must never wait on double-tap-to-zoom detection —
+   that browser delay is most of the "laggy clicking" in the daily grids. */
+.mf-cell, .ng-cell, .ds-cell, .cp-cell, .an-tile, .an-slot, .p6-btn,
+.mf-canvas, .board-canvas {
+  touch-action: manipulation;
+}
+/* Canvases that own their own drag/long-press recognizer take the pointer
+   stream outright, so the browser never scrolls or zooms out from under it. */
+.board-canvas { touch-action: none; display: block; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 .game-head {
   display: flex;
   align-items: center;
@@ -3728,19 +3781,34 @@ body {
 .ng-cell.fill { background: ${C.accent}; border-color: ${C.accent}; }
 .ng-cell.mark { color: ${C.dim}; }
 
-.mf-game { max-width: 420px; margin: 0 auto; }
+.mf-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
 .mf-game .status-bar { align-items: center; gap: 8px; }
-.mf-grid { display: grid; grid-template-columns: repeat(9, 36px); grid-auto-rows: 36px; gap: 3px; justify-content: center; }
-.mf-cell {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 5px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; color: ${C.text};
-  user-select: none;
+/* Canvas board (slice 3). The wrapper is the measured box — useFitBox reads
+   its rect and the canvas is sized to an exact multiple of the cell, so the
+   9×9 field is always centred and never clipped. */
+.mf-boardbox {
+  flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
 }
-.mf-cell:not(.rev):hover { border-color: ${C.accent}; }
-.mf-cell.rev { background: rgba(255,255,255,.05); border-color: ${C.dim}; cursor: default; }
-.mf-cell.rev.mine { background: rgba(251,113,133,.15); }
-.mf-cell.boom { background: rgba(251,113,133,.45); border-color: ${C.rose}; }
+.mf-canvas {
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+}
+.mf-controls {
+  flex: 0 0 auto; display: flex; gap: 8px; align-items: center; justify-content: center;
+}
+.mf-mode-btn {
+  flex: 1 1 auto; max-width: 260px; min-height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
+  color: ${C.text}; font-family: inherit; font-size: 15px; font-weight: 600;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.mf-mode-btn .mf-mode-label { font-size: 12px; color: ${C.muted}; font-weight: 500; }
+.mf-mode-btn.flag { border-color: ${C.rose}; background: rgba(205,75,58,.10); }
+.mf-mode-btn.dig  { border-color: ${C.accent}; background: rgba(45,95,174,.10); }
+.mf-mode-btn:active { transform: scale(0.98); }
 
 .an-game { max-width: 420px; margin: 0 auto; text-align: center; }
 .an-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
@@ -4999,6 +5067,171 @@ function useTimer(running, initialSecs = 0) {
   }, [running]);
   const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return { secs, fmt: fmt(secs) };
+}
+
+/* ============================================================
+   Shared responsive-board + input foundation (slice 1)
+   ============================================================
+   Three primitives every board game can lean on so a puzzle fits the
+   viewport and reacts on the next frame:
+
+     useFitBox      — measures the space a board actually has and derives
+                      an integer cell size from it (ResizeObserver based).
+     useCanvasBoard — DPR-correct canvas sizing + redraw scheduling, the
+                      HashRushGame/BounceGame idiom generalized.
+     usePointerCell — tap / long-press / drag over a board element, with
+                      the long-press deliberately firing the OPPOSITE
+                      action in the games that use it.
+
+   None of these own game state; they hand back geometry and events. */
+
+// Measure the board's container and derive a square cell size that makes a
+// cols×rows grid fit inside it. `gap` is the inter-cell gutter (counted
+// cols-1 / rows-1 times, so the caller can lay out at cell+gap and still fit);
+// `padX`/`padY` are subtracted for borders, clue gutters and breathing room.
+// Returns integers so canvas strokes stay crisp.
+function useFitBox(ref, { cols, rows, minCell = 16, maxCell = 64, gap = 0, padX = 0, padY = 0 } = {}) {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      // A collapsed parent (0-height flex child mid-layout) would pin the
+      // cell to minCell forever; ignore those frames and wait for a real one.
+      if (r.width < 1 && r.height < 1) return;
+      setBox(prev => (Math.abs(prev.w - r.width) < 0.5 && Math.abs(prev.h - r.height) < 0.5
+        ? prev : { w: r.width, h: r.height }));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      window.addEventListener('orientationchange', measure);
+      return () => {
+        window.removeEventListener('resize', measure);
+        window.removeEventListener('orientationchange', measure);
+      };
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, cols, rows]);
+
+  // The gutters are fixed overhead, so take them off the box BEFORE dividing —
+  // dividing first and laying out at cell+gap overflows by gap*(n-1).
+  const availW = Math.max(0, box.w - padX - gap * Math.max(0, cols - 1));
+  const availH = Math.max(0, box.h - padY - gap * Math.max(0, rows - 1));
+  const raw = (cols > 0 && rows > 0 && availW > 0 && availH > 0)
+    ? Math.floor(Math.min(availW / cols, availH / rows))
+    : minCell;
+  const cell = Math.max(minCell, Math.min(maxCell, raw));
+  return { cell, boxW: box.w, boxH: box.h, ready: box.w > 0 && box.h > 0 };
+}
+
+// DPR-correct canvas sizing + redraw scheduling. `draw(ctx, geom)` is called
+// on a rAF whenever `deps` change or the element resizes; `geom` carries the
+// CSS-pixel width/height so draw code never touches devicePixelRatio itself.
+function useCanvasBoard(canvasRef, { width, height, draw, deps = [] }) {
+  const drawRef = useRef(draw);
+  drawRef.current = draw;
+  const rafRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !(width > 0) || !(height > 0)) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const pw = Math.round(width * dpr), ph = Math.round(height * dpr);
+    if (canvas.width !== pw || canvas.height !== ph) {
+      canvas.width = pw;
+      canvas.height = ph;
+    }
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const c = canvasRef.current;
+      if (!c) return;
+      const ctx = c.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      drawRef.current(ctx, { w: width, h: height, dpr });
+    });
+    return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; } };
+  }, [canvasRef, width, height, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// Pointer gestures over a board element, reported in element-local CSS pixels.
+// onTap fires on release; onLongPress fires while the finger is still down
+// (so the release that follows is suppressed); onDrag streams while moving.
+function usePointerCell(ref, handlers, { longPressMs = 450, moveTolerance = 10 } = {}) {
+  const h = useRef(handlers);
+  h.current = handlers;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let timer = null, startX = 0, startY = 0, moved = false, fired = false, active = false;
+    const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    const local = (e) => {
+      const r = el.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    const onDown = (e) => {
+      if (e.button != null && e.button !== 0 && e.pointerType === 'mouse') return;
+      active = true; moved = false; fired = false;
+      startX = e.clientX; startY = e.clientY;
+      const p = local(e);
+      if (el.setPointerCapture && e.pointerId != null) {
+        try { el.setPointerCapture(e.pointerId); } catch {}
+      }
+      if (h.current.onDown) h.current.onDown(p, e);
+      clear();
+      if (h.current.onLongPress) {
+        timer = setTimeout(() => {
+          timer = null;
+          if (!moved && active) { fired = true; cgHaptic(12); h.current.onLongPress(p, e); }
+        }, longPressMs);
+      }
+    };
+    const onMove = (e) => {
+      if (!active) return;
+      if (Math.abs(e.clientX - startX) > moveTolerance || Math.abs(e.clientY - startY) > moveTolerance) {
+        moved = true;
+        clear();
+      }
+      if (h.current.onDrag) h.current.onDrag(local(e), { dx: e.clientX - startX, dy: e.clientY - startY, moved }, e);
+    };
+    const onUp = (e) => {
+      if (!active) return;
+      active = false;
+      clear();
+      const p = local(e);
+      if (h.current.onUp) h.current.onUp(p, e);
+      if (!fired && !moved && h.current.onTap) h.current.onTap(p, e);
+    };
+    const onCancel = () => { active = false; clear(); };
+    const onCtx = (e) => {
+      if (!h.current.onContext) return;
+      e.preventDefault();
+      clear();
+      fired = true;
+      h.current.onContext(local(e), e);
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onCancel);
+    el.addEventListener('contextmenu', onCtx);
+    return () => {
+      clear();
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onCancel);
+      el.removeEventListener('contextmenu', onCtx);
+    };
+  }, [ref, longPressMs, moveTolerance]);
 }
 
 /* ============================================================
@@ -16747,6 +16980,23 @@ function mfFlood(startIdx, counts) {
   return out;
 }
 
+// Adjacency-digit palette, matching the classic Minesweeper .ms-nN rules so
+// both mine games read the same. Index = digit.
+const MF_NUM_COLORS = [null, C.accent, C.emerald, C.rose, C.violet, C.gold, '#06b6d4', '#be123c', C.muted];
+const MF_GAP = 3;
+
+// Neighbour indices of a cell on the 9×9 field.
+function mfNeighbors(i) {
+  const r = Math.floor(i / 9), c = i % 9;
+  const out = [];
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (!dr && !dc) continue;
+    const rr = r + dr, cc = c + dc;
+    if (rr >= 0 && rr < 9 && cc >= 0 && cc < 9) out.push(rr * 9 + cc);
+  }
+  return out;
+}
+
 function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const board = useRef(null);
@@ -16763,6 +17013,10 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
   const [done, setDone] = useState(false);
   const [boom, setBoom] = useState(-1);
+  // Transient feedback: a chord attempt whose flag count doesn't match pulses
+  // the number instead of silently doing nothing.
+  const [pulse, setPulse] = useState(-1);
+  const [announce, setAnnounce] = useState('');
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
 
@@ -16779,72 +17033,219 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const saveNow = (rv, fl, ns) =>
     onSaveProgress && onSaveProgress({ dayNum, revealed: [...rv], flags: [...fl] }, ns, secs);
 
-  const tap = (i) => {
-    if (done || revealed.has(i)) return;
-    const ns = steps + 1;
-    setSteps(ns);
-    onStepChange(ns);
-    if (flagMode) {
-      const fl = new Set(flags);
-      if (fl.has(i)) fl.delete(i); else fl.add(i);
-      setFlags(fl);
-      saveNow(revealed, fl, ns);
-      return;
+  // ---- Responsive canvas geometry -----------------------------------------
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, {
+    cols: 9, rows: 9, minCell: 24, maxCell: 46, gap: MF_GAP, padX: 4, padY: 4,
+  });
+  const cellStep = cell + MF_GAP;
+  const boardPx = cellStep * 9 - MF_GAP;
+
+  // Mutable snapshot the pointer handlers read — usePointerCell binds its
+  // listeners once, so it must not close over stale render state.
+  const liveRef = useRef({});
+  liveRef.current = { revealed, flags, flagMode, done, steps, secs, cellStep };
+
+  const idxAt = (p) => {
+    const { cellStep: cs } = liveRef.current;
+    const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
+    if (c < 0 || c > 8 || r < 0 || r > 8) return -1;
+    return r * 9 + c;
+  };
+
+  // ---- Actions -------------------------------------------------------------
+  // Every action funnels its outcome through here so the loss/win/save paths
+  // exist exactly once regardless of how the cells got opened (single dig,
+  // flood, or a chord).
+  const applyReveal = (openIdxs, ns) => {
+    const cur = liveRef.current;
+    const rv = new Set(cur.revealed);
+    let hitMine = -1;
+    for (const i of openIdxs) {
+      if (cur.flags.has(i) || rv.has(i)) continue;
+      if (mines.has(i)) { hitMine = i; break; }
+      if (counts[i] === 0) for (const j of mfFlood(i, counts)) rv.add(j);
+      else rv.add(i);
     }
-    if (flags.has(i)) return; // flagged cells don't reveal by accident
-    if (mines.has(i)) {
-      setBoom(i);
-      setDone(true);
-      const rv = new Set(revealed);
+    if (hitMine >= 0) {
       for (const m of mines) rv.add(m);
+      setBoom(hitMine);
       setRevealed(rv);
-      onLose && onLose(ns, secs, {
+      setDone(true);
+      setAnnounce('Mine hit — the field is revealed.');
+      onLose && onLose(ns, cur.secs, {
         share: `Game Corner Mine Finder — today's field got me 💥`,
         answer: 'You hit a mine — the field is revealed above.',
       });
       return;
     }
-    const rv = new Set(revealed);
-    if (counts[i] === 0) for (const j of mfFlood(i, counts)) rv.add(j);
-    else rv.add(i);
     setRevealed(rv);
     const won = rv.size >= 71;
-    if (!won) saveNow(rv, flags, ns);
+    // Deliberately skip the progress save on the winning move: the finish call
+    // closes the attempt and a racing write would 409 against the closed row.
+    if (!won) saveNow(rv, cur.flags, ns);
     if (won) {
       setDone(true);
-      const score = Math.max(1000 - secs * 3 - ns * 2, 200);
-      onWin(score, ns, secs, {
+      setAnnounce('Field swept — solved!');
+      const score = Math.max(1000 - cur.secs * 3 - ns * 2, 200);
+      onWin(score, ns, cur.secs, {
         share: `Game Corner Mine Finder — swept today's field in ${fmt} 🚩`,
       });
+    } else {
+      setAnnounce(`${rv.size} of 71 safe cells uncovered.`);
     }
   };
+
+  const bumpSteps = () => {
+    const ns = liveRef.current.steps + 1;
+    setSteps(ns);
+    onStepChange(ns);
+    return ns;
+  };
+
+  const doFlag = (i) => {
+    const cur = liveRef.current;
+    if (cur.done || cur.revealed.has(i)) return;
+    const ns = bumpSteps();
+    const fl = new Set(cur.flags);
+    if (fl.has(i)) fl.delete(i); else fl.add(i);
+    setFlags(fl);
+    setAnnounce(fl.has(i) ? 'Flag placed.' : 'Flag removed.');
+    saveNow(cur.revealed, fl, ns);
+  };
+
+  const doDig = (i) => {
+    const cur = liveRef.current;
+    if (cur.done || cur.revealed.has(i)) return;
+    if (cur.flags.has(i)) return; // flagged cells don't reveal by accident
+    // Step is counted only once every early return is past, so bumping a
+    // flagged cell no longer inflates the leaderboard's steps tiebreak.
+    const ns = bumpSteps();
+    applyReveal([i], ns);
+  };
+
+  // Chording: tapping a revealed number whose adjacent flag count already
+  // equals it opens every remaining neighbour. Wrong flags mean a mine — same
+  // as any real minesweeper. One chord is ONE step, however many cells open.
+  const doChord = (i) => {
+    const cur = liveRef.current;
+    if (cur.done || !cur.revealed.has(i) || counts[i] <= 0) return false;
+    const nb = mfNeighbors(i);
+    const flagged = nb.filter((j) => cur.flags.has(j)).length;
+    const closed = nb.filter((j) => !cur.revealed.has(j) && !cur.flags.has(j));
+    if (!closed.length) return false;
+    if (flagged !== counts[i]) {
+      setPulse(i);
+      setTimeout(() => setPulse((p) => (p === i ? -1 : p)), 250);
+      setAnnounce(`Needs ${counts[i]} flags, ${flagged} placed.`);
+      return true;
+    }
+    const ns = bumpSteps();
+    applyReveal(closed, ns);
+    return true;
+  };
+
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done) return;
+      if (liveRef.current.revealed.has(i)) { doChord(i); return; }
+      if (liveRef.current.flagMode) doFlag(i); else doDig(i);
+    },
+    // Long press ALWAYS does the opposite of the current mode.
+    onLongPress: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      if (liveRef.current.flagMode) doDig(i); else doFlag(i);
+    },
+    // Right-click flags, matching the classic Minesweeper game.
+    onContext: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      doFlag(i);
+    },
+  });
+
+  // ---- Draw ----------------------------------------------------------------
+  useCanvasBoard(canvasRef, {
+    width: boardPx,
+    height: boardPx,
+    deps: [cell, revealed, flags, boom, pulse, done],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const radius = Math.max(3, Math.round(cell * 0.16));
+      for (let i = 0; i < 81; i++) {
+        const r = Math.floor(i / 9), c = i % 9;
+        const x = c * cellStep, y = r * cellStep;
+        const isRev = revealed.has(i);
+        const isMine = mines.has(i);
+
+        let fill = C.card, stroke = C.border;
+        if (isRev) { fill = C.surface; stroke = C.border; }
+        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = C.rose; }
+        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = C.rose; }
+        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = C.gold; }
+
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
+        else ctx.rect(x, y, cell, cell);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = stroke;
+        ctx.stroke();
+
+        const cx = x + cell / 2, cy = y + cell / 2;
+        if (isRev && isMine) {
+          ctx.font = `${Math.round(cell * 0.6)}px system-ui, sans-serif`;
+          ctx.fillText('💣', cx, cy + 1);
+        } else if (isRev && counts[i] > 0) {
+          ctx.font = `700 ${Math.round(cell * 0.52)}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = MF_NUM_COLORS[counts[i]] || C.text;
+          ctx.fillText(String(counts[i]), cx, cy + 1);
+        } else if (!isRev && flags.has(i)) {
+          ctx.font = `${Math.round(cell * 0.58)}px system-ui, sans-serif`;
+          ctx.fillText('🚩', cx, cy + 1);
+        }
+      }
+    },
+  });
+
+  const minesLeft = Math.max(10 - flags.size, 0);
 
   return (
     <div className="mf-game">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Mines</div><div className="pvalue">{Math.max(10 - flags.size, 0)}</div></div>
+        <div className="pill"><div className="plabel">Mines</div><div className="pvalue">{minesLeft}</div></div>
         <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
-        <button className={'p6-btn' + (flagMode ? ' on' : '')} onClick={() => setFlagMode(!flagMode)}>🚩 Flag</button>
       </div>
-      <div className="mf-grid">
-        {counts.map((v, i) => {
-          const isRev = revealed.has(i);
-          const isMine = mines.has(i);
-          const cls = ['mf-cell'];
-          if (isRev) cls.push('rev');
-          if (isRev && isMine) cls.push('mine');
-          if (i === boom) cls.push('boom');
-          return (
-            <div key={i} className={cls.join(' ')} onClick={() => tap(i)}>
-              {isRev
-                ? (isMine ? '💣' : (v > 0 ? v : ''))
-                : (flags.has(i) ? '🚩' : '')}
-            </div>
-          );
-        })}
+      <div className="mf-boardbox" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="mf-canvas board-canvas"
+          role="grid"
+          aria-label={`Mine Finder, 9 by 9 field, ${minesLeft} mines unflagged, ${revealed.size} of 71 safe cells uncovered`}
+        />
       </div>
-      <div className="p6-hint">Numbers count adjacent mines. Toggle 🚩 Flag mode to mark suspects — same field for everyone today.</div>
+      <div className="sr-only" aria-live="polite">{announce}</div>
+      <div className="mf-controls">
+        <button
+          className={'mf-mode-btn ' + (flagMode ? 'flag' : 'dig')}
+          aria-pressed={flagMode}
+          onClick={() => setFlagMode(m => !m)}
+        >
+          <span>{flagMode ? '🚩' : '⛏'}</span>
+          <span>Mode: {flagMode ? 'Flag' : 'Dig'}</span>
+          <span className="mf-mode-label">tap to switch</span>
+        </button>
+      </div>
+      <div className="p6-hint">
+        Numbers count adjacent mines. Long-press does the opposite of the current mode
+        (right-click flags). Tap a number whose flags all match to clear around it.
+      </div>
     </div>
   );
 }
@@ -17875,9 +18276,11 @@ const GAMES = [
     tag: 'Risk',
     tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Count the numbers', body: 'Each number counts the mines touching that cell. A safe opening area is revealed for you — work outward from it.' },
-      { title: 'Flag suspects', body: 'Toggle 🚩 Flag mode to mark cells you believe are mines. Flagged cells can\'t be revealed by a stray tap.' },
+      { title: 'Dig or flag', body: 'The big button under the board switches between ⛏ Dig and 🚩 Flag. A long-press always does the OPPOSITE of the current mode, so you never have to switch for a single cell. On a desktop, right-click flags.' },
+      { title: 'Clear around a number', body: 'Once a number has exactly that many flags around it, tap the number to uncover all its remaining neighbours at once. Flag it wrong and you\'ll hit the mine — the number pulses if the flag count doesn\'t match yet.' },
       { title: 'Careful', body: 'Reveal all 71 safe cells to win. Tap a mine and the day is lost — everyone sweeps the same field today.' },
     ],
     component: MineFinderGame,
@@ -17991,7 +18394,13 @@ function App() {
   const [nextResetUtc, setNextResetUtc] = useState(null);
   const [offset, setOffset] = useState(0); // serverNow - clientNow (ms)
   const [loading, setLoading] = useState(true);
-  const [stepCount, setStepCount] = useState(0);
+  // Live step count from the running game. Held in a REF, not state (slice 1):
+  // nothing renders it, and the old useState re-rendered the whole App tree on
+  // every tap of every game — a measurable part of the input latency the grid
+  // dailies were reported for. Kept because launch/resume seed it and future
+  // chrome may want to read it.
+  const stepCountRef = useRef(0);
+  const setStepCount = (n) => { stepCountRef.current = typeof n === 'number' ? n : 0; };
   const [user, setUser] = useState(null);       // { username, id, usernodePubkey }
   const [authOk, setAuthOk] = useState(true);    // false → signed-out / DB unreachable
   const [, setTick] = useState(0); // 1s heartbeat to keep lobby countdowns live
@@ -18244,6 +18653,7 @@ function App() {
   // dailies only mount (and start their clock) after Play, the auto-shown
   // how-to can never eat into the timer.
   const launchGame = (game) => {
+    allowProgressSave(game.id); // a new run lifts any prior finish guard
     if (!game.daily) {
       setCurrentGame(game);
       setStepCount(0);
@@ -18272,6 +18682,7 @@ function App() {
   // Claim (or resume) the day's single attempt and mount the game. Extracted
   // from launchGame so the pre-game screen's Play button owns consume-on-start.
   const startDailyRun = async (game) => {
+    allowProgressSave(game.id); // claiming/resuming a run lifts the finish guard
     // Guest mode (phase 8): a signed-out visitor plays today's board from the
     // public seed with NO server claim — the one-play lock is account-keyed
     // and can't apply to guests (§6.7's structural defense: the board only
@@ -18367,24 +18778,89 @@ function App() {
   // Autosave callback handed to every game: persists in-progress state for
   // today's claimed, unfinished attempt. Best-effort (keepalive) so it survives
   // a tab close. Never blocks gameplay.
+  //
+  // COALESCED (slice 1): games call this on every move, and firing a POST +
+  // a full App re-render per tap was a large share of the "laggy clicking"
+  // in the grid dailies. The latest payload is held in a ref and flushed on a
+  // trailing timer; the local `attempts` mirror moves into that same flush so
+  // a tap no longer re-renders the tree. Resume semantics are unchanged — the
+  // flush always sends the newest state, and unmount/visibilitychange (via
+  // useAutosave's teardown) force it out immediately.
+  // `blockedGameId` is the finish guard: once a run ends, ALL further progress
+  // writes for that game are dropped until a new run is claimed. A one-shot
+  // queue drain isn't enough — unmounting the game body runs useAutosave's
+  // teardown flush, which would re-queue a write against the row the finish
+  // just closed and 409 (a console error that trips the no-console-errors
+  // check). This also covers the games that don't self-suppress their winning
+  // move's save.
+  const saveQueueRef = useRef({ timer: null, gameId: null, payload: null, blockedGameId: null });
+  const PROGRESS_FLUSH_MS = 1000;
+
+  const flushProgressSave = () => {
+    const q = saveQueueRef.current;
+    if (q.timer) { clearTimeout(q.timer); q.timer = null; }
+    const gameId = q.gameId, payload = q.payload;
+    q.gameId = null; q.payload = null;
+    if (!gameId || !payload) return;
+    api(`/api/daily/${gameId}/progress`, {
+      method: 'POST',
+      keepalive: true,
+      body: JSON.stringify({
+        progress: payload.progress, steps: payload.steps, elapsedSecs: payload.secs,
+      }),
+    }).catch(() => {});
+    // Keep local mirror fresh so a same-session re-entry resumes correctly.
+    setAttempts(prev => {
+      const a = prev[gameId];
+      if (!a || a.finishedAt) return prev;
+      return { ...prev, [gameId]: { ...a, progress: payload.progress, steps: payload.steps, elapsedSecs: payload.secs } };
+    });
+  };
+
+  // Drop any queued write without sending it, and block further writes for
+  // this game. Called the moment a run finishes so nothing can race the finish
+  // and 409 against the closed row (the phase-6 "no progress save on the
+  // winning move" rule, generalized to every finish path).
+  const cancelProgressSave = () => {
+    const q = saveQueueRef.current;
+    if (q.timer) { clearTimeout(q.timer); q.timer = null; }
+    if (currentGame) q.blockedGameId = currentGame.id;
+    q.gameId = null; q.payload = null;
+  };
+
+  // Lift the finish guard when a fresh run is claimed/mounted for a game.
+  const allowProgressSave = (gameId) => {
+    const q = saveQueueRef.current;
+    if (q.blockedGameId === gameId) q.blockedGameId = null;
+  };
+
   const handleSaveProgress = (progress, steps, secs) => {
     if (!currentGame) return;
     // Guests have no server attempt row to save into — the POST would just
     // 401 and log console errors. A guest run lives only until its finish.
     if (!authOk) return;
     const gameId = currentGame.id;
-    api(`/api/daily/${gameId}/progress`, {
-      method: 'POST',
-      keepalive: true,
-      body: JSON.stringify({ progress, steps, elapsedSecs: secs }),
-    }).catch(() => {});
-    // Keep local mirror fresh so a same-session re-entry resumes correctly.
-    setAttempts(prev => {
-      const a = prev[gameId];
-      if (!a || a.finishedAt) return prev;
-      return { ...prev, [gameId]: { ...a, progress, steps, elapsedSecs: secs } };
-    });
+    const q = saveQueueRef.current;
+    if (q.blockedGameId === gameId) return; // run already finished
+
+    // Switching games mid-queue: get the old game's state out first.
+    if (q.gameId && q.gameId !== gameId) flushProgressSave();
+    q.gameId = gameId;
+    q.payload = { progress, steps, secs };
+    if (!q.timer) q.timer = setTimeout(() => { saveQueueRef.current.timer = null; flushProgressSave(); }, PROGRESS_FLUSH_MS);
   };
+
+  // Never strand a queued write on unload.
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushProgressSave(); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flushProgressSave);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flushProgressSave);
+      flushProgressSave();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // POST the finished daily result to the server and reconcile client state.
   // Pulled out of handleWin so the win overlay's "couldn't sync — retrying"
@@ -18489,6 +18965,10 @@ function App() {
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
+    // The run is over: drop any queued progress write so a trailing flush
+    // can't land on the row the finish is about to close (a 409 + console
+    // error that would trip the no-console-errors check).
+    cancelProgressSave();
     try {
       // Non-daily games skip the server, streak, and totalScore nav update.
       if (currentGame && !currentGame.daily) {
@@ -18647,6 +19127,7 @@ function App() {
   // finished row with score 0 so the day stays locked, but does NOT touch the
   // streak. Existing win-only games never call this.
   const handleLose = async (steps, timeSecs, meta) => {
+    cancelProgressSave(); // same finish-race guard as handleWin
     try {
       // Non-daily games skip the server entirely.
       if (currentGame && !currentGame.daily) {
@@ -18848,8 +19329,12 @@ function App() {
         // as timestamp-only events (recording BOTH for the tile match would
         // double every tap in the log and skew the timing heuristics).
         const logsOwnMoves = currentGame.id === 'tilematchingdaily';
+        // `fitShell` (slice 1) opts a daily into the non-scrolling
+        // viewport-height column; the game body then flexes to fill it and
+        // sizes its own board with useFitBox. Games without the flag keep the
+        // original scrolling game-wrap untouched.
         return (
-          <div className="game-wrap">
+          <div className={'game-wrap' + (currentGame.fitShell ? ' fit' : '')}>
             <div className="game-head">
               <button className="back-btn" onClick={backToLobby}>← Back</button>
               <div className="game-title">
@@ -18917,8 +19402,14 @@ function App() {
     launchGame(g);
   };
 
+  // Pin the shell to exactly one viewport while a fit-mode game is on screen
+  // (slice 1), so the board's flex column measures against real space instead
+  // of growing the document. Every other screen keeps normal page scrolling.
+  const fitActive = screen === 'game' && !!currentGame && !!currentGame.fitShell
+    && !winData && !loseData;
+
   return (
-    <div className="app">
+    <div className={'app' + (fitActive ? ' app-fit' : '')}>
       <style>{css}</style>
 
       <nav className="nav">

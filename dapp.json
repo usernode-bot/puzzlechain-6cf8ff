@@ -439,6 +439,21 @@
       "expectText": "Mine Finder"
     },
     {
+      "name": "Mine Finder canvas board renders in-game",
+      "path": "/?game=minefinder&play=1",
+      "expectSelector": "canvas.mf-canvas"
+    },
+    {
+      "name": "Mine Finder Dig/Flag mode control renders",
+      "path": "/?game=minefinder&play=1",
+      "expectText": "Mode: Dig"
+    },
+    {
+      "name": "Mine Finder resumes into the canvas board from a claimed attempt",
+      "path": "/?demo=minefinder&game=minefinder&play=1",
+      "expectSelector": ".mf-mode-btn"
+    },
+    {
       "name": "Anagram Sprint pre-game screen",
       "path": "/?game=anagrams",
       "expectText": "Anagram Sprint"

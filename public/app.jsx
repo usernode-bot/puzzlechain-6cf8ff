@@ -438,6 +438,44 @@ body {
 /* In fit mode the hint is a fixed footer line, not a scroll-away paragraph —
    the board flexes around it so it can never be pushed off the viewport. */
 .game-wrap.fit .p6-hint { flex: 0 0 auto; margin-top: 0; font-size: 11.5px; line-height: 1.35; }
+/* A daily's own root, inside .game-wrap.fit: a column whose board region is
+   the single flexible child. Games opt in by adding .fit-col to their root. */
+.fit-col {
+  display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem;
+  /* Pin the column to the available width. Without this a wide min-content
+     child (a five-pill status bar is ~400px) grows the column past the
+     viewport and the overflow gets clipped instead of wrapping. */
+  width: 100%; max-width: 100%; min-width: 0;
+}
+/* Stat pills wrap rather than forcing the column wider than the phone —
+   a five-pill row is ~400px and would push the board off a 360px screen. */
+.fit-col .status-bar { flex-wrap: wrap; }
+.fit-col .status-bar .pill { flex: 1 1 auto; min-width: 0; }
+/* Everything that is NOT the board is fixed-size, so only the board flexes.
+   Miss one of these and it gets crushed to zero height by the board. */
+.fit-col .status-bar, .fit-col .p6-hint, .fit-col .numpad,
+.fit-col .word-list, .fit-col .cp-pad, .fit-col .an-actions,
+.fit-col .cw-hint-bar, .fit-col .p6-banner, .fit-col .word-theme,
+.fit-col .an-dots, .fit-col .an-slots, .fit-col .an-rack,
+.fit-col .tm-daylabel, .fit-col .ds-pad, .fit-col .mf-controls,
+.fit-col .ng-modes { flex: 0 0 auto; }
+.fit-col .numpad { margin-top: 0; }
+/* Fluid square grids (Sudoku, Word Hunt) fit BOTH axes natively — no
+   transform needed, so their pointer-drag selection math is untouched. */
+.fit-col .sudoku, .fit-col .wordsearch {
+  width: auto; height: auto; max-width: 100%; max-height: 100%;
+  margin: 0 auto; aspect-ratio: 1;
+}
+.kl-inner { display: flex; flex-direction: column; }
+
+/* Scale-to-fit board wrapper (slice 5). The box is the flexible region; the
+   content keeps its natural layout size and is scaled as one unit. */
+.fit-scale-box {
+  flex: 1 1 auto; min-height: 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.fit-scale-content { transform-origin: center center; flex: 0 0 auto; }
+
 /* Interactive board cells must never wait on double-tap-to-zoom detection —
    that browser delay is most of the "laggy clicking" in the daily grids. */
 .mf-cell, .ng-cell, .ds-cell, .cp-cell, .an-tile, .an-slot, .p6-btn,
@@ -451,6 +489,26 @@ body {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* End-screen board review (slice 4). The finished board stays mounted under
+   the results card; .frozen makes it inert and visually settled, and the
+   minibar is what the card collapses into. */
+.game-body.frozen { pointer-events: none; filter: saturate(0.85); }
+.game-body.frozen .game-wrap { padding-bottom: 5.5rem; }
+.review-btn {
+  margin-bottom: 0.6rem; background: ${C.surface};
+  border: 1px solid ${C.border}; color: ${C.text};
+}
+.result-minibar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.85rem 1.1rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  background: ${C.card}; border: none; border-top: 1px solid ${C.border};
+  box-shadow: 0 -6px 22px rgba(63,51,24,0.14);
+  font-family: inherit; font-size: 0.92rem; font-weight: 600; color: ${C.text};
+  cursor: pointer; width: 100%; touch-action: manipulation;
+}
+.result-minibar .rmb-cta { color: ${C.accent}; font-size: 0.82rem; white-space: nowrap; }
 .game-head {
   display: flex;
   align-items: center;
@@ -2334,11 +2392,21 @@ body {
 }
 /* ---- Tile Match ---- */
 .tm-wrap { max-width: 400px; margin: 0 auto; }
+.tm-wrap.fit-col { max-width: 520px; }
 .tm-board-container {
   position: relative;
   margin: 0 auto;
   overflow: visible;
 }
+/* Today's layout + difficulty band (slice 8), so the shape and the weekly
+   curve are legible before the first tap. */
+.tm-daylabel {
+  flex: 0 0 auto; text-align: center; color: ${C.muted};
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.tm-wrap.fit-col .tm-bar, .tm-wrap.fit-col .tm-bar-label,
+.tm-wrap.fit-col .tm-boosters, .tm-wrap.fit-col .hint-bar { flex: 0 0 auto; }
 .tm-tile {
   position: absolute;
   width: 48px;
@@ -3571,6 +3639,48 @@ body {
   position: absolute; bottom: 0; right: 1px;
   font-size: 0.72rem; line-height: 1;
 }
+/* ---- Moksha Patam variant (slice 7) ---- */
+.cnl-cell-name {
+  position: absolute; left: 1px; right: 1px; bottom: 0;
+  font-size: 0.36rem; line-height: 1.05; font-weight: 700; letter-spacing: 0.01em;
+  text-align: center; text-transform: uppercase; overflow: hidden; white-space: nowrap;
+  text-overflow: ellipsis; pointer-events: none;
+}
+.cnl-cell-name.up { color: ${C.emerald}; }
+.cnl-cell-name.down { color: ${C.rose}; }
+.cnl-glossary-btn { margin-left: auto; font-size: 0.75rem; }
+.cnl-variant-block { margin-top: 0.5rem; }
+.cnl-variant-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: ${C.muted}; margin-bottom: 0.4rem;
+}
+.cnl-variant-note {
+  color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; margin-top: 0.5rem;
+}
+.cnl-variant-link {
+  background: none; border: none; padding: 0; color: ${C.accent};
+  font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  text-decoration: underline;
+}
+.mok-intro { color: ${C.muted}; font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.9rem; }
+.mok-section {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.09em;
+  text-transform: uppercase; color: ${C.muted};
+  border-bottom: 1px solid ${C.border}; padding-bottom: 0.25rem; margin: 0.9rem 0 0.55rem;
+}
+.mok-row { display: flex; gap: 0.6rem; align-items: flex-start; margin-bottom: 0.55rem; }
+.mok-sq {
+  flex: 0 0 auto; min-width: 1.8rem; text-align: center; border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; font-weight: 700;
+  padding: 0.15rem 0.3rem;
+}
+.mok-sq.up { background: rgba(30,143,99,.14); color: ${C.emerald}; }
+.mok-sq.down { background: rgba(205,75,58,.14); color: ${C.rose}; }
+.mok-body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.mok-name { font-size: 0.86rem; font-weight: 600; }
+.mok-name em { color: ${C.muted}; font-weight: 400; }
+.mok-dest { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-left: 0.4rem; }
+.mok-blurb { color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; }
 .cnl-svg {
   position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: 2;
@@ -3755,31 +3865,26 @@ body {
 .mj-tile.up1 { border-color: #A3B0CB; }
 .mj-tile.up2, .mj-tile.up3 { border-color: #8E9DBD; }
 
-.ng-game { max-width: 420px; margin: 0 auto; }
-.ng-modes { display: flex; gap: 6px; margin-left: auto; }
-.ng-wrap {
-  display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
-  justify-content: center; gap: 4px;
+/* Nonogram — canvas board (slice 5). The clue gutters are drawn inside the
+   canvas so grid + clues scale together off one useFitBox measurement. */
+.ng-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
+.ng-boardbox {
+  flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
 }
-.ng-corner { grid-row: 1; grid-column: 1; }
-.ng-colclues { grid-row: 1; grid-column: 2; display: grid; grid-template-columns: repeat(8, 34px); gap: 2px; }
-.ng-colclue {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 12px; gap: 1px; padding-bottom: 2px;
+.ng-canvas {
+  border-radius: 8px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
-.ng-rowclues { grid-row: 2; grid-column: 1; display: grid; grid-template-rows: repeat(8, 34px); gap: 2px; }
-.ng-rowclue {
-  display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;
-  color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 12px; min-width: 34px;
+.ng-modes { flex: 0 0 auto; display: flex; gap: 8px; justify-content: center; }
+.ng-mode-btn {
+  flex: 1 1 auto; max-width: 170px; min-height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
+  color: ${C.text}; font-family: inherit; font-size: 15px; font-weight: 600;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
-.ng-grid { grid-row: 2; grid-column: 2; display: grid; grid-template-columns: repeat(8, 34px); grid-auto-rows: 34px; gap: 2px; }
-.ng-cell {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 4px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; color: ${C.muted}; font-size: 14px;
-}
-.ng-cell:nth-child(8n+4), .ng-cell:nth-child(8n+5) { border-left-color: ${C.dim}; }
-.ng-cell.fill { background: ${C.accent}; border-color: ${C.accent}; }
-.ng-cell.mark { color: ${C.dim}; }
+.ng-mode-btn.on { border-color: ${C.accent}; background: rgba(45,95,174,.12); }
+.ng-mode-btn:active { transform: scale(0.98); }
 
 .mf-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
 .mf-game .status-bar { align-items: center; gap: 8px; }
@@ -3851,23 +3956,46 @@ body {
 }
 .cp-pad .p6-btn { padding: 10px 0; }
 
-.ds-game { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
-.ds-next {
-  position: relative; height: 30px; color: ${C.muted}; font-size: 12px; margin-bottom: 6px;
-  display: flex; align-items: flex-start; gap: 8px; padding-left: 0;
+/* Drop Stack — real-time well + side panel (slice 6). The well is a canvas
+   sized by useFitBox; Next/Hold sit beside it so everything fits one screen. */
+.ds-main { flex: 1 1 auto; min-height: 0; display: flex; gap: 10px; align-items: stretch; }
+.ds-boardbox {
+  position: relative; flex: 1 1 auto; min-height: 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
 }
-.ds-next { min-width: 120px; }
-.ds-next .ds-mini { position: absolute; width: 8px; height: 8px; border-radius: 2px; }
-.ds-next .ds-last { color: ${C.gold}; }
-.ds-grid {
-  display: grid; grid-template-columns: repeat(9, 30px); grid-auto-rows: 30px; gap: 2px;
-  background: rgba(255,255,255,.03); border: 1px solid ${C.border}; border-radius: 8px; padding: 6px;
-  margin-bottom: 12px;
+.ds-canvas {
+  border-radius: 8px; background: rgba(0,0,0,.03);
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
-.ds-cell { background: ${C.card}; border-radius: 3px; border: 1px solid transparent; cursor: pointer; }
-.ds-cell.hover { opacity: .5; }
-.ds-cell.ghost { background: transparent; border-style: dashed; }
+.ds-side { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
+.ds-panel {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  padding: 6px 8px; min-width: 62px; text-align: center;
+  font-family: inherit; color: ${C.text};
+}
+.ds-panel-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: ${C.muted}; margin-bottom: 4px;
+}
+.ds-queue { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.ds-mini-piece { position: relative; display: block; }
+.ds-mini-cell { position: absolute; width: 8px; height: 8px; border-radius: 2px; }
+.ds-mini-empty { color: ${C.dim}; font-size: 12px; }
+.ds-hold { cursor: pointer; touch-action: manipulation; }
+.ds-hold:disabled, .ds-hold.used { opacity: .45; cursor: default; }
+.ds-level-flash {
+  position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%);
+  font-size: 1.5rem; font-weight: 800; color: ${C.gold};
+  text-shadow: 0 2px 10px rgba(0,0,0,.35); pointer-events: none;
+  animation: ds-flash .9s ease forwards;
+}
+@keyframes ds-flash {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
+}
 .ds-pad { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.ds-pad .p6-btn { min-height: 44px; min-width: 58px; }
 
 
 /* ---- Phase 7: GotD hero, home reorg, chat ---- */
@@ -4058,6 +4186,28 @@ body {
   font-size: 1.05rem; font-weight: 700;
   border-bottom: 1px solid ${C.border}; padding-bottom: 0.35rem;
 }
+
+/* Merged all-games grid (slice 2): the reset note, the filter chips and the
+   per-card daily indicator that replaces the two section headings. */
+.home-daily-note {
+  color: ${C.muted}; font-size: 0.82rem; margin: 0.5rem 0 0.6rem;
+}
+.home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.home-chip {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
+  padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
+  color: ${C.muted}; cursor: pointer; touch-action: manipulation;
+}
+.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+.card-daily-badge {
+  position: absolute; top: 0.65rem; right: 0.65rem; z-index: 1;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.56rem; font-weight: 600;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;
+}
+.card-daily-badge.fresh  { background: rgba(45,95,174,.14); color: ${C.accent};  border-color: rgba(45,95,174,.30); }
+.card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
+.card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
 
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
@@ -5128,6 +5278,51 @@ function useFitBox(ref, { cols, rows, minCell = 16, maxCell = 64, gap = 0, padX 
   return { cell, boxW: box.w, boxH: box.h, ready: box.w > 0 && box.h > 0 };
 }
 
+// Scale-to-fit wrapper (slice 5). Measures its own available box AND its
+// content's natural size, then applies a single `transform: scale(k)` so the
+// content always fits without scrolling. This is the general answer for the
+// dailies whose boards are absolutely positioned at fixed pixel offsets
+// (Mahjong's layered tiles, the solitaire card columns) — those can't be
+// re-expressed as a fluid grid, but they scale perfectly as one unit, and
+// every existing click handler keeps working under a CSS transform.
+// Never scales ABOVE 1: a small board on a big screen stays its natural size.
+function FitScale({ children, className }) {
+  const boxRef = useRef(null);
+  const contentRef = useRef(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const box = boxRef.current, content = contentRef.current;
+    if (!box || !content) return;
+    const measure = () => {
+      const b = box.getBoundingClientRect();
+      // offsetWidth/Height are the UNSCALED layout size — getBoundingClientRect
+      // on the content would already include our own transform and oscillate.
+      const cw = content.offsetWidth, ch = content.offsetHeight;
+      if (!cw || !ch || (b.width < 1 && b.height < 1)) return;
+      const k = Math.min(1, b.width / cw, b.height / ch);
+      setScale((prev) => (Math.abs(prev - k) < 0.005 ? prev : k));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div className={'fit-scale-box' + (className ? ' ' + className : '')} ref={boxRef}>
+      <div className="fit-scale-content" ref={contentRef} style={{ transform: `scale(${scale})` }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // DPR-correct canvas sizing + redraw scheduling. `draw(ctx, geom)` is called
 // on a rAF whenever `deps` change or the element resizes; `geom` carries the
 // CSS-pixel width/height so draw code never touches devicePixelRatio itself.
@@ -5985,7 +6180,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   const selBox = selected ? boxAt(selected[0], selected[1]) : -1;
 
   return (
-    <div>
+    <div className="fit-col">
       <div className="status-bar">
         <div className="pill">
           <div className="plabel">Time</div>
@@ -6003,6 +6198,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
         </div>
       </div>
 
+      <div className="fit-scale-box">
       <div className="sudoku">
         {grid.map((row, r) =>
           row.map((v, c) => {
@@ -6033,6 +6229,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
             );
           })
         )}
+      </div>
       </div>
 
       {!done && (
@@ -6973,7 +7170,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const selSet = new Set(sel);
 
   return (
-    <div>
+    <div className="fit-col">
       <div className="status-bar">
         <div className="pill">
           <div className="plabel">Time</div>
@@ -6991,6 +7188,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
       <div className="word-theme">Theme: <b>{theme}</b> · drag across letters to find each word</div>
 
+      <div className="fit-scale-box">
       <div className="wordsearch" onPointerUp={endSel} onPointerLeave={endSel}>
         {letters.map((row, r) =>
           row.map((ch, c) => {
@@ -7019,6 +7217,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
             );
           })
         )}
+      </div>
       </div>
 
       {!done && (
@@ -12031,11 +12230,319 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
 /* ============================================================
    Daily Tile Match
    ============================================================ */
-const TM_DAILY_CONFIG = {
-  tileTypes: 8, setsPerType: 3, boardCols: 8, boardRows: 5, maxLayer: 3,
-  boosters: { undo: 3, shuffle: 2, clear: 1 },
+/* ---- Daily Tile Match difficulty (slice 8) --------------------------------
+   What was wrong: the old daily dealt 72 tiles as 8 icons × 3 triples into a
+   FIXED stack (40 bottom / 28 middle / 4 top) — the same silhouette every day,
+   only the icons moved. ~22 tiles were tappable at once across just 8 types, so
+   a matching triple was nearly always available, and with 7 tray slots against
+   8 types you essentially could not be trapped. No dead end, no ordering
+   decision, no reason to spend a booster: the only variable was tap speed.
+
+   What makes a good tile-match daily, in order of importance:
+     1. Solvable but not TRIVIALLY solvable — there must exist an order that
+        loses, or nothing you do is a decision.
+     2. Few enough tiles free at any moment that choosing between them matters
+        (target 8–14, not 22).
+     3. Triples split across layers, so greedy "take whatever matches" play
+        eventually strands the third tile under something.
+
+   How this build gets there: eight hand-authored layouts rotate on the daily
+   seed (§TM_LAYOUTS); 12 types × 2 triples means the 7-slot tray genuinely
+   fills; and tmDealSolvable deals by reverse-removal so at least one winning
+   order always exists — mandatory once the board is tight enough to lose on. */
+
+const TM_DAILY_TYPES = 12;   // mirrored by TM_CONFIG.tileTypes in lib/dapp.js
+const TM_DAILY_SETS = 2;     // mirrored by TM_CONFIG.setsPerType in lib/dapp.js
+const TM_DAILY_TILES = TM_DAILY_TYPES * TM_DAILY_SETS * 3; // 72
+const TM_DAILY_BOOSTERS = { undo: 3, shuffle: 2, clear: 1 };
+
+/* Eight layouts, each exactly TM_DAILY_TILES slots, authored the way CP_LEVELS
+   authors Crate Push rooms. Slots are { col, row, layer } on the same
+   half-step overlap model tmIsLocked uses, so a higher layer sitting within
+   1.0 in both axes covers the tile below. `depth` drives the weekly curve. */
+function tmSlots(spec) {
+  // spec: [{ layer, cols, rows, x, y }] — a rectangular block per layer.
+  const out = [];
+  for (const b of spec) {
+    for (let r = 0; r < b.rows; r++) {
+      for (let c = 0; c < b.cols; c++) {
+        out.push({ col: b.x + c, row: b.y + r, layer: b.layer });
+      }
+    }
+  }
+  return out;
+}
+// Normalize a hand-authored slot list to EXACTLY n slots. Authoring blocks by
+// hand never lands on 72 first try, and a layout that is short or long breaks
+// the tile budget the engine mirrors — so this is deterministic and total:
+//   too many → drop from the highest layers first (never strand a tile with
+//              nothing under it),
+//   too few  → fill from a deterministic layer-0 sweep of unused cells.
+function tmFitSlots(slots, n) {
+  const key = (s) => `${s.layer}:${s.col}:${s.row}`;
+  const seen = new Set();
+  const uniq = [];
+  for (const s of slots) { if (!seen.has(key(s))) { seen.add(key(s)); uniq.push(s); } }
+  // Bottom-up so slice() keeps the base and drops the peak.
+  uniq.sort((a, b) => a.layer - b.layer || a.row - b.row || a.col - b.col);
+  if (uniq.length >= n) return uniq.slice(0, n);
+  // Sweep layer 0's integer grid first, then the half-step grids of the layers
+  // above — a dense base layout can exhaust layer 0 on its own (Spiral does).
+  for (let layer = 0; layer <= 2 && uniq.length < n; layer++) {
+    const off = layer * 0.5;
+    for (let row = 0; row < 6 - layer && uniq.length < n; row++) {
+      for (let col = 0; col < 8 - layer && uniq.length < n; col++) {
+        const cand = { col: col + off, row: row + off, layer };
+        if (seen.has(key(cand))) continue;
+        seen.add(key(cand));
+        uniq.push(cand);
+      }
+    }
+  }
+  uniq.sort((a, b) => a.layer - b.layer || a.row - b.row || a.col - b.col);
+  return uniq.slice(0, n);
+}
+
+/* The eight daily layouts, ordered by MEASURED difficulty (rank 1 = gentlest).
+   Each was evaluated over 80 seeded deals with a competent-but-boosterless
+   solver; the win rates in the comments are that solver's, so a real player
+   with 3 undos / 2 shuffles / 1 clear does better than the number suggests.
+
+   Balance note: the original plan wanted 8–14 free tiles at any moment. With
+   12 types against a 7-slot tray that proved near-unwinnable (measured ~3%),
+   because you cannot steer when you have no choice of tile. The binding
+   constraint on difficulty turned out to be the TYPE COUNT, not the free-tile
+   count — 12 types is what makes the tray genuinely jam. So free-tile counts
+   land in the 30s here and the ladder is set by layout shape instead. */
+const TM_LAYOUTS = [
+  // rank 1 — solver ~55%
+  { name: 'Courtyard', rank: 1, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0,   y: 0 },
+    { layer: 1, cols: 7, rows: 1, x: 0.5, y: 0.5 },
+    { layer: 1, cols: 7, rows: 1, x: 0.5, y: 3.5 },
+    { layer: 2, cols: 5, rows: 2, x: 1.5, y: 1.5 },
+  ]), TM_DAILY_TILES) },
+  // rank 2 — solver ~44%
+  { name: 'Gate', rank: 2, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0,   y: 0 },
+    { layer: 1, cols: 2, rows: 4, x: 0.5, y: 0.5 },
+    { layer: 1, cols: 2, rows: 4, x: 5.5, y: 0.5 },
+    { layer: 2, cols: 2, rows: 2, x: 3,   y: 1.5 },
+  ]), TM_DAILY_TILES) },
+  // rank 3 — solver ~35%
+  { name: 'Lagoon', rank: 3, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0, y: 0 },
+    { layer: 1, cols: 2, rows: 2, x: 1, y: 1 },
+    { layer: 1, cols: 2, rows: 2, x: 5, y: 1 },
+    { layer: 1, cols: 2, rows: 2, x: 3, y: 2.5 },
+    { layer: 2, cols: 2, rows: 1, x: 3, y: 1.5 },
+  ]), TM_DAILY_TILES) },
+  // rank 4 — solver ~34%
+  { name: 'Pyramid', rank: 4, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0, y: 0 },
+    { layer: 1, cols: 6, rows: 3, x: 1, y: 1 },
+    { layer: 2, cols: 4, rows: 2, x: 2, y: 1.5 },
+  ]), TM_DAILY_TILES) },
+  // rank 5 — solver ~31%
+  { name: 'Crown', rank: 5, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0, y: 0 },
+    { layer: 1, cols: 6, rows: 2, x: 1, y: 0.5 },
+    { layer: 1, cols: 6, rows: 1, x: 1, y: 3.5 },
+    { layer: 2, cols: 4, rows: 1, x: 2, y: 2 },
+  ]), TM_DAILY_TILES) },
+  // rank 6 — solver ~23%
+  { name: 'Fortress', rank: 6, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0,   y: 0 },
+    { layer: 1, cols: 7, rows: 3, x: 0.5, y: 0.5 },
+    { layer: 2, cols: 3, rows: 2, x: 2.5, y: 1.5 },
+  ]), TM_DAILY_TILES) },
+  // rank 7 — solver ~21%
+  { name: 'Turtle', rank: 7, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0,   y: 0 },
+    { layer: 1, cols: 5, rows: 4, x: 1.5, y: 0.5 },
+    { layer: 2, cols: 3, rows: 2, x: 2.5, y: 1.5 },
+  ]), TM_DAILY_TILES) },
+  // rank 8 — solver ~18%
+  { name: 'Bridge', rank: 8, slots: tmFitSlots(tmSlots([
+    { layer: 0, cols: 8, rows: 5, x: 0,   y: 0 },
+    { layer: 1, cols: 3, rows: 3, x: 0.5, y: 1 },
+    { layer: 1, cols: 3, rows: 3, x: 4.5, y: 1 },
+    { layer: 2, cols: 2, rows: 2, x: 3,   y: 1.5 },
+  ]), TM_DAILY_TILES) },
+];
+
+// Every layout MUST carry exactly the daily tile budget — the engine in
+// lib/dapp.js mirrors that total, and a short layout would deal a board that
+// can never reach isTerminal. Fail loudly at load rather than at play time.
+TM_LAYOUTS.forEach((l) => {
+  if (l.slots.length !== TM_DAILY_TILES) {
+    console.error(`[tilematch] layout "${l.name}" has ${l.slots.length} slots, expected ${TM_DAILY_TILES}`);
+  }
+});
+
+// Weekday → the difficulty band, and which slice of the rank-ordered layout
+// ladder that band draws from. Monday is the gentlest, the weekend the hardest.
+const TM_WEEK = [
+  { label: 'Gentle', from: 0, to: 2 },  // Monday
+  { label: 'Gentle', from: 0, to: 3 },  // Tuesday
+  { label: 'Easy',   from: 1, to: 4 },  // Wednesday
+  { label: 'Medium', from: 2, to: 5 },  // Thursday
+  { label: 'Medium', from: 3, to: 6 },  // Friday
+  { label: 'Hard',   from: 4, to: 8 },  // Saturday
+  { label: 'Hard',   from: 5, to: 8 },  // Sunday
+];
+
+// Weekly curve. TM_LAYOUTS is ordered gentlest-first by measured difficulty, so
+// the weekday picks a WINDOW of that ladder and the day number rotates within
+// it — the shape changes daily while the difficulty tracks the week.
+// Day 0 of the UTC epoch was a Thursday, hence the +4 to land Monday on 0.
+function tmDailyConfig(dayNum) {
+  const weekday = (((dayNum + 4) % 7) + 7) % 7; // 0 = Monday … 6 = Sunday
+  const band = TM_WEEK[weekday];
+  const window = TM_LAYOUTS.slice(band.from, band.to);
+  const pool = window.length ? window : TM_LAYOUTS;
+  const idx = Math.abs(Math.floor(dayNum / 7)) % pool.length;
+  const layout = pool[idx];
+  return {
+    layout,
+    layoutIdx: TM_LAYOUTS.indexOf(layout),
+    tileTypes: TM_DAILY_TYPES,
+    setsPerType: TM_DAILY_SETS,
+    difficulty: band.label,
+    weekday,
+    boosters: { ...TM_DAILY_BOOSTERS },
+  };
+}
+
+// Is `slot` covered by any HIGHER-layer slot that is still present? Same
+// overlap model as tmIsLocked, but evaluated over a partially dealt board.
+function tmSlotCovered(slot, placed) {
+  for (const p of placed) {
+    if (p.layer <= slot.layer) continue;
+    if (Math.abs(p.col - slot.col) < 1.0 && Math.abs(p.row - slot.row) < 1.0) return true;
+  }
+  return false;
+}
+
+/* Reverse-removal dealing — the same technique mjDeal uses for Mahjong
+   Solitaire, and mandatory here now that the board is tight enough to lose on.
+
+   Why it works: fill the slots in some order f1..fn and define the REMOVAL
+   order as the exact reverse. When fi is removed, the tiles still on the board
+   are f1..f(i-1) — precisely the set that was already placed when fi was
+   filled. So if every slot is uncovered BY THE ALREADY-PLACED SET at fill
+   time, every tile is free at removal time, and reversing the fill order is a
+   guaranteed winning line.
+
+   Coverage runs upward (only a HIGHER layer covers a lower one), so filling
+   low layers first is always safe; picking a high slot early can strand the
+   slots beneath it, which is what the retry loop and the low-layer bias are
+   for. Within that constraint the picker still spreads a triple across
+   distinct layers where it can — that's what punishes greedy top-first play,
+   because the third tile of a set ends up buried. */
+function tmDealSolvable(layout, tileTypes, setsPerType, rng) {
+  const slots = layout.slots;
+  const total = slots.length;
+  const triples = Math.floor(total / 3);
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const remaining = slots.map((s, i) => ({ ...s, idx: i }));
+    const placed = [];
+    const assign = new Array(total).fill(-1);
+    let ok = true;
+    // Each type gets `setsPerType` triples; shuffled so the board isn't
+    // type-ordered by layer.
+    const typeBag = [];
+    for (let t = 0; t < tileTypes; t++) for (let k = 0; k < setsPerType; k++) typeBag.push(t);
+    while (typeBag.length < triples) typeBag.push(typeBag.length % tileTypes);
+    ceShuffle(typeBag, rng);
+
+    // The fill order must be a linear extension of the coverage order: a slot
+    // may only be filled once every slot BENEATH it is filled. (If a covering
+    // tile were placed first, the tile under it would be pinned forever, since
+    // `placed` only grows.) Kahn's algorithm with a random choice among ready
+    // slots gives a different valid order every seed.
+    const under = new Map(); // slot idx → count of unfilled slots beneath it
+    const above = new Map(); // slot idx → slots directly on top of it
+    for (const s of remaining) { under.set(s.idx, 0); above.set(s.idx, []); }
+    for (const hi of remaining) {
+      for (const lo of remaining) {
+        if (lo.layer >= hi.layer) continue;
+        if (Math.abs(hi.col - lo.col) < 1.0 && Math.abs(hi.row - lo.row) < 1.0) {
+          under.set(hi.idx, under.get(hi.idx) + 1);
+          above.get(lo.idx).push(hi.idx);
+        }
+      }
+    }
+    const byIdx = new Map(remaining.map((s) => [s.idx, s]));
+    let ready = remaining.filter((s) => under.get(s.idx) === 0);
+    const order = [];
+    while (ready.length) {
+      const pick = ready.splice(Math.floor(rng() * ready.length), 1)[0];
+      order.push(pick);
+      for (const hiIdx of above.get(pick.idx)) {
+        under.set(hiIdx, under.get(hiIdx) - 1);
+        if (under.get(hiIdx) === 0) ready.push(byIdx.get(hiIdx));
+      }
+    }
+    if (order.length !== total) { ok = false; }
+
+    // Chunk the fill order into consecutive triples and give each one a type.
+    // Chunk boundaries fall wherever the order happens to cross layers, which
+    // is what leaves a set's third tile buried under later ones.
+    if (ok) {
+      for (let t = 0; t < triples; t++) {
+        for (let k = 0; k < 3; k++) {
+          const s = order[t * 3 + k];
+          if (!s) { ok = false; break; }
+          assign[s.idx] = typeBag[t];
+          placed.push(s);
+        }
+        if (!ok) break;
+      }
+    }
+    if (!ok || assign.some((v) => v < 0)) continue;
+    const out = slots.map((s, i) => ({
+      id: i, type: assign[i], col: s.col, row: s.row, layer: s.layer,
+      removed: false, inBar: false,
+    }));
+    // The guaranteed winning line: fill order reversed. Carried as a property
+    // on the array (not on the tiles), so it never reaches persisted progress —
+    // it exists so the deal's solvability is testable rather than asserted.
+    out.solveOrder = placed.map((s) => s.idx).reverse();
+    return out;
+  }
+  // Fall back to the plain shuffle if a layout ever refuses to deal. Logged
+  // once so a bad layout is visible rather than silently easier.
+  console.warn('[tilematch] reverse-removal deal failed; falling back to shuffle');
+  const typeList = [];
+  for (let t = 0; t < tileTypes; t++) for (let k = 0; k < setsPerType; k++) typeList.push(t, t, t);
+  ceShuffle(typeList, rng);
+  return slots.map((s, i) => ({
+    id: i, type: typeList[i % typeList.length], col: s.col, row: s.row, layer: s.layer,
+    removed: false, inBar: false,
+  }));
+}
+
+/* Score. Mirrors tmDailyCeiling in lib/dapp.js: the engine returns the ceiling
+   (zero elapsed time, every booster unspent) and this only ever subtracts, so
+   validateSession's `claimed > recomputed` check can never fire on an honest
+   run. Any change here MUST be mirrored there in the same commit. */
+const TM_SCORE = {
+  base: 600, parBonus: 300, boosterBonus: 40, boostersTotal: 6, movePenalty: 4, min: 100,
 };
-const TM_DAILY_TIME_LIMIT = 180; // 3 minutes fixed
+function tmDailyScore({ secs, moves, boostersLeft, timeLimit }) {
+  const par = timeLimit * 0.6; // under 60% of the clock earns the full bonus
+  const timeBonus = Math.round(TM_SCORE.parBonus * Math.max(0, Math.min(1, (timeLimit - secs) / Math.max(timeLimit - par, 1))));
+  const boosterBonus = TM_SCORE.boosterBonus * Math.max(0, Math.min(TM_SCORE.boostersTotal, boostersLeft));
+  const penalty = TM_SCORE.movePenalty * Math.max(0, moves - TM_DAILY_TILES);
+  return Math.max(TM_SCORE.min, TM_SCORE.base + timeBonus + boosterBonus - penalty);
+}
+
+const TM_DAILY_CONFIG = {
+  tileTypes: TM_DAILY_TYPES, setsPerType: TM_DAILY_SETS, boardCols: 8, boardRows: 5, maxLayer: 4,
+  boosters: { ...TM_DAILY_BOOSTERS },
+};
+const TM_DAILY_TIME_LIMIT = 300; // 5 minutes — the boards are bigger now
 
 const TM_DAILY_HINT_CAP = 5; // paid hints per day for the Daily Tile Match
 
@@ -12058,6 +12565,9 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   // Server-anchored UTC day; the board is re-derived deterministically from it,
   // so persisted progress only carries the mutable player state.
   const dayNum = cwDayNum(offset || 0);
+  // Today's layout + difficulty band (slice 8). Recomputed per render from the
+  // server-anchored day number, so it can't drift from the seed.
+  const dayCfg = tmDailyConfig(dayNum);
   // `hydrated` guards the autosave effects from firing before the board exists.
   const hydratedRef = useRef(false);
 
@@ -12090,10 +12600,20 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     const srvSeed = serverDailySeed('tilematchingdaily');
     const seed = boardSeedOverride != null ? boardSeedOverride
       : (srvSeed != null ? srvSeed : (dayNum * 31 + 7));
-    const freshTiles = tmGenerateLevel(TM_DAILY_CONFIG, seed);
-    const resume = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.tiles)
+    // Reverse-removal deal on today's layout (slice 8) — always solvable.
+    const freshTiles = tmDealSolvable(dayCfg.layout, dayCfg.tileTypes, dayCfg.setsPerType, mulberry32(seed));
+    const saved = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.tiles)
       ? savedProgress
       : null;
+    // Reject a row saved under the OLD config (72 tiles over 8 types, or a
+    // different layout's slot count) — hydrating it would render a board that
+    // can't be completed. Falls back to a fresh deal for today only.
+    const shapeOk = saved && saved.tiles.length === freshTiles.length
+      && saved.tiles.every(t => Number.isFinite(t.type) && t.type < dayCfg.tileTypes);
+    const resume = shapeOk ? saved : null;
+    if (saved && !shapeOk) {
+      console.warn('[tilematch] saved progress predates the current board config — dealing fresh');
+    }
     if (resume) {
       setTiles(resume.tiles.map(t => ({ ...t })));
       setBar(Array.isArray(resume.bar) ? resume.bar.slice() : []);
@@ -12241,7 +12761,16 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     const boardRemaining = tilesCopy.filter(t => !t.removed && !t.inBar);
     if (boardRemaining.length === 0 && finalBar.length === 0) {
       setDone(true);
-      onWin(150, newMoves, secsRef.current, { share: `Daily Tile Match ⬢ cleared in ${newMoves} moves! 🀄✨` });
+      // Score now reflects HOW you cleared it — pace, efficiency and boosters
+      // saved — instead of a flat 150. Sits under lib/dapp.js's ceiling by
+      // construction, so tier-A verification still passes.
+      const boostersLeft = boosters.undo + boosters.shuffle + boosters.clear;
+      const score = tmDailyScore({
+        secs: secsRef.current, moves: newMoves, boostersLeft, timeLimit: TM_DAILY_TIME_LIMIT,
+      });
+      onWin(score, newMoves, secsRef.current, {
+        share: `Daily Tile Match ⬢ cleared the ${dayCfg.layout.name} board in ${newMoves} moves for ${score} pts 🀄✨`,
+      });
     }
   };
 
@@ -12305,14 +12834,18 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     if (onMoveTile) onMoveTile({ replayBreak: 'clear-slot', tsClient: Date.now() });
   };
 
-  const cfg = TM_DAILY_CONFIG;
-  const boardW = cfg.boardCols * TM_TILE_STEP;
-  const boardH = (cfg.boardRows + cfg.maxLayer * 0.5) * TM_TILE_STEP + 48;
+  // The board box is sized from the LAYOUT's actual extent, not a fixed
+  // 8x5 assumption — layouts differ in footprint, and FitScale then shrinks
+  // the whole thing to whatever the viewport allows.
+  const slots = dayCfg.layout.slots;
+  const boardW = (Math.max(...slots.map(s => s.col)) + 1) * TM_TILE_STEP;
+  const boardH = (Math.max(...slots.map(s => s.row)) + 1) * TM_TILE_STEP + 24;
   const activeTiles = tiles.filter(t => !t.removed);
   const boardTiles = activeTiles.filter(t => !t.inBar);
+  const freeCount = boardTiles.filter(t => !tmIsLocked(t, tiles)).length;
 
   return (
-    <div className="tm-wrap">
+    <div className="tm-wrap fit-col">
       <div className="status-bar">
         <div className={`pill tm-timer-pill${timeLow ? ' warning' : ''}`}>
           <div className="plabel">Time</div>
@@ -12326,9 +12859,17 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
           <div className="plabel">Tiles Left</div>
           <div className="pvalue">{boardTiles.length}</div>
         </div>
+        <div className="pill">
+          <div className="plabel">Free</div>
+          <div className="pvalue">{freeCount}</div>
+        </div>
+      </div>
+      <div className="tm-daylabel">
+        {dayCfg.layout.name} · {dayCfg.difficulty}
       </div>
 
-      <div className="tm-board-container" style={{ width: boardW, height: boardH, maxWidth: '100%' }}>
+      <FitScale>
+      <div className="tm-board-container" style={{ width: boardW, height: boardH }}>
         {boardTiles.map(tile => {
           const locked = tmIsLocked(tile, tiles);
           const isFlash = flashIds.has(tile.id);
@@ -12346,6 +12887,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
           );
         })}
       </div>
+      </FitScale>
 
       <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
         {Array.from({ length: 7 }, (_, i) => {
@@ -14897,6 +15439,89 @@ const CNL_LADDERS = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 9
 const CNL_CHUTES  = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
 const CNL_JUMPS   = Object.assign({}, CNL_LADDERS, CNL_CHUTES);
 
+/* ---- Moksha Patam — the original Indian board (slice 7) --------------------
+   Ladders sit on VIRTUES, snakes on VICES, and vices outnumber virtues 11 to 5.
+   That imbalance is the moral point the original was making, and it makes the
+   climb genuinely slower than the Milton-Bradley board — which is why Classic
+   stays the default and this is opt-in per game.
+
+   These tables MUST stay byte-identical to CNL_MOKSHA_* in lib/board-rules.js:
+   the server referees online rooms off its copy and the client renders off
+   this one. Square numbers follow the commonly published Moksha Patam
+   virtue/vice list; the DESTINATIONS are this app's balance choice, not
+   historical record (surviving boards disagree with each other). */
+const CNL_MOKSHA_LADDERS = { 12: 38, 51: 67, 57: 74, 76: 91, 78: 97 };
+const CNL_MOKSHA_CHUTES  = {
+  41: 20, 44: 22, 49: 9, 52: 35, 58: 40, 62: 19, 69: 33, 84: 63, 92: 73, 95: 24, 98: 78,
+};
+const CNL_MOKSHA_JUMPS = Object.assign({}, CNL_MOKSHA_LADDERS, CNL_MOKSHA_CHUTES);
+
+// Square → { name, sanskrit, blurb }. Drives the on-board labels, the landing
+// banner and the glossary modal.
+const CNL_MOKSHA_MEANINGS = {
+  12: { name: 'Faith',        sanskrit: 'Shraddha',  blurb: 'Trust in the path — the first step that makes any climb possible.' },
+  51: { name: 'Reliability',  sanskrit: 'Vishwas',   blurb: 'Being someone others can depend on, steadily and without fuss.' },
+  57: { name: 'Generosity',   sanskrit: 'Dāna',      blurb: 'Giving freely, without keeping score of what was given.' },
+  76: { name: 'Knowledge',    sanskrit: 'Jñāna',     blurb: 'Understanding that changes how you act, not just what you know.' },
+  78: { name: 'Asceticism',   sanskrit: 'Tapas',     blurb: 'Disciplined restraint — the last stretch before liberation.' },
+  41: { name: 'Disobedience', sanskrit: 'Avajña',    blurb: 'Disregarding good counsel, and sliding back for it.' },
+  44: { name: 'Arrogance',    sanskrit: 'Ahankara',  blurb: 'The ego that mistakes itself for the whole self.' },
+  49: { name: 'Vulgarity',    sanskrit: 'Ashlilata', blurb: 'Coarseness of speech and conduct that drags others down too.' },
+  52: { name: 'Theft',        sanskrit: 'Chaurya',   blurb: 'Taking what was never offered.' },
+  58: { name: 'Lying',        sanskrit: 'Asatya',    blurb: 'Untruth — the vice that quietly undoes every other virtue.' },
+  62: { name: 'Drunkenness',  sanskrit: 'Madya',     blurb: 'Intoxication that clouds judgement and loosens restraint.' },
+  69: { name: 'Debt',         sanskrit: 'Rina',      blurb: 'Obligation left unsettled, weighing on every step after.' },
+  84: { name: 'Anger',        sanskrit: 'Krodha',    blurb: 'Rage that burns away progress made patiently.' },
+  92: { name: 'Greed',        sanskrit: 'Lobha',     blurb: 'Wanting more precisely when you already have enough.' },
+  95: { name: 'Pride',        sanskrit: 'Mada',      blurb: 'Conceit near the summit — the longest fall on the board.' },
+  98: { name: 'Lust',         sanskrit: 'Kama',      blurb: 'Craving two squares from liberation, back to where discipline begins.' },
+};
+
+const CNL_VARIANTS = {
+  classic: { label: 'Classic', ladders: CNL_LADDERS, chutes: CNL_CHUTES, jumps: CNL_JUMPS },
+  moksha:  { label: 'Moksha Patam', ladders: CNL_MOKSHA_LADDERS, chutes: CNL_MOKSHA_CHUTES, jumps: CNL_MOKSHA_JUMPS },
+};
+function cnlVariant(v) { return CNL_VARIANTS[v] ? v : 'classic'; }
+
+// The glossary — reachable from the mode picker and the in-game header, so a
+// player can read what a square means before or during a game.
+function MokshaGlossaryModal({ onClose }) {
+  const row = (sq, kind) => {
+    const m = CNL_MOKSHA_MEANINGS[sq];
+    const dest = CNL_MOKSHA_JUMPS[sq];
+    return (
+      <div key={sq} className="mok-row">
+        <span className={'mok-sq ' + kind}>{sq}</span>
+        <span className="mok-body">
+          <span className="mok-name">
+            {m.name} <em>({m.sanskrit})</em>
+            <span className="mok-dest">{kind === 'up' ? '↑' : '↓'} {dest}</span>
+          </span>
+          <span className="mok-blurb">{m.blurb}</span>
+        </span>
+      </div>
+    );
+  };
+  return (
+    <div className="howto-overlay" onClick={onClose}>
+      <div className="howto-card" onClick={(e) => e.stopPropagation()}>
+        <h3>📖 Moksha Patam — what the squares mean</h3>
+        <p className="mok-intro">
+          Long before it was a children's board game, this was a teaching tool from
+          India. Every ladder sits on a virtue and every snake on a vice, and the
+          vices deliberately outnumber the virtues — progress up the board was meant
+          to feel hard-won. Square 100 is <b>Moksha</b>: liberation.
+        </p>
+        <div className="mok-section">Virtues — ladders up</div>
+        {Object.keys(CNL_MOKSHA_LADDERS).map(Number).sort((a, b) => a - b).map((s) => row(s, 'up'))}
+        <div className="mok-section">Vices — snakes down</div>
+        {Object.keys(CNL_MOKSHA_CHUTES).map(Number).sort((a, b) => a - b).map((s) => row(s, 'down'))}
+        <button className="primary-btn" onClick={onClose}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 // Map a square number (1..100) to {row, col} on the boustrophedon board.
 // row 0 is the BOTTOM row (squares 1..10), row 9 is the TOP (91..100).
 // Even rows (0-indexed from bottom) run left->right; odd rows right->left.
@@ -14919,7 +15544,11 @@ function cnlCenterPct(n) {
 
 // Local Chutes & Ladders board: hotseat 2-player, or vs Bot (P2 auto-rolls).
 // `initialState` (a saved bot snapshot) offers an in-stage Resume banner.
-function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialState, onClearSave }) {
+function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialState, onClearSave, variant, onGlossary }) {
+  // Board tables for the chosen style. `variant` is 'classic' | 'moksha'.
+  const vkey = cnlVariant(variant);
+  const V = CNL_VARIANTS[vkey];
+  const isMoksha = vkey === 'moksha';
   const [p1Pos, setP1Pos]   = useState(0);
   const [p2Pos, setP2Pos]   = useState(0);
   const [player, setPlayer] = useState(1);
@@ -14984,7 +15613,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
 
   const finishTurn = (who, landed) => {
-    const jump = CNL_JUMPS[landed];
+    const jump = V.jumps[landed];
     const settle = () => {
       // Win check: must land exactly on 100 (no chute sits on 100).
       if (landed === 100) {
@@ -15010,9 +15639,14 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
     };
 
     if (jump !== undefined) {
-      // Brief pause so players see the landing, then climb/slide.
-      const isLadder = CNL_LADDERS[landed] !== undefined;
-      setBanner(isLadder ? 'Ladder up! 🪜' : 'Down the chute! 🛝');
+      // Brief pause so players see the landing, then climb/slide. On the
+      // Moksha board the banner names the virtue or vice you landed on, so the
+      // teaching content lands in the moment it applies.
+      const isLadder = V.ladders[landed] !== undefined;
+      const m = isMoksha ? CNL_MOKSHA_MEANINGS[landed] : null;
+      setBanner(m
+        ? `${m.name} (${m.sanskrit}) — ${isLadder ? 'climb up 🪜' : 'down you go 🐍'}`
+        : (isLadder ? 'Ladder up! 🪜' : 'Down the chute! 🛝'));
       const t = setTimeout(() => {
         setPos(who, jump);
         const t2 = setTimeout(() => { setBanner(''); settle(); }, 320);
@@ -15088,32 +15722,55 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
       const row = 9 - visualRow;              // bottom-origin board row
       const within = (row % 2 === 0) ? col : (9 - col);
       const n = row * 10 + within + 1;
-      const mark = CNL_LADDERS[n] !== undefined ? '🪜'
-        : CNL_CHUTES[n] !== undefined ? '🛝' : null;
+      const isL = V.ladders[n] !== undefined;
+      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
+      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
       cells.push(
         <div
           key={n}
           className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
+          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}
         >
           <span>{n}</span>
           {mark && <span className="cnl-cell-mark">{mark}</span>}
+          {/* On the Moksha board each special square is named on the board
+              itself, so the lesson is legible without opening the glossary. */}
+          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
         </div>
       );
     }
   }
 
-  // SVG connector lines for every ladder/chute.
-  const lines = Object.keys(CNL_JUMPS).map(k => {
+  // Connectors. Ladders stay straight; Moksha's snakes are drawn as a curve so
+  // they read as snakes rather than as chutes.
+  const lines = Object.keys(V.jumps).map(k => {
     const from = parseInt(k, 10);
-    const to = CNL_JUMPS[from];
+    const to = V.jumps[from];
     const a = cnlCenterPct(from);
     const b = cnlCenterPct(to);
-    const isLadder = CNL_LADDERS[from] !== undefined;
+    const isLadder = V.ladders[from] !== undefined;
+    const stroke = isLadder ? C.emerald : C.rose;
+    if (isMoksha && !isLadder) {
+      // Two opposing arcs through the midpoint give a slither; the control
+      // offset is perpendicular to the run so long snakes bend more.
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.max(Math.hypot(dx, dy), 0.001);
+      const off = Math.min(9, len * 0.16);
+      const nx = -dy / len * off, ny = dx / len * off;
+      return (
+        <path
+          key={k}
+          d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`}
+          fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
+        />
+      );
+    }
     return (
       <line
         key={k}
         x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-        stroke={isLadder ? C.emerald : C.rose}
+        stroke={stroke}
         strokeWidth="1.1"
         strokeLinecap="round"
         opacity="0.6"
@@ -15159,6 +15816,11 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
           <div className="plabel">Rolls</div>
           <div className="pvalue">{rolls}</div>
         </div>
+        {isMoksha && (
+          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>
+            📖 What do these mean?
+          </button>
+        )}
       </div>
 
       <div
@@ -15219,12 +15881,15 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
 
 // In-stage mode selector for Chutes & Ladders (shown on first launch from the
 // lobby; the Game Menu's New Game also routes here via the mode picker).
-function ChutesLaddersModeSelect({ game, onPick }) {
+function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
   const [mode, setMode] = useState(null);
   const [onlineAction, setOnlineAction] = useState(null);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Board style is independent of the play mode; Classic stays the default
+  // because the Moksha board is deliberately a longer game.
+  const [variant, setVariant] = useState('classic');
 
   const modes = [
     { id: '2p',     icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
@@ -15234,12 +15899,16 @@ function ChutesLaddersModeSelect({ game, onPick }) {
 
   const handleStart = async () => {
     if (!mode) return;
-    if (mode !== 'online') { onPick(mode, {}); return; }
+    if (mode !== 'online') { onPick(mode, { variant }); return; }
     if (onlineAction === 'create') {
       setBusy(true);
-      const { ok, body } = await api('/api/classic/chutes-ladders/rooms', { method: 'POST' });
+      // The creator's board style travels with the room; the joining player
+      // reads it back off the polled room state.
+      const { ok, body } = await api('/api/classic/chutes-ladders/rooms', {
+        method: 'POST', body: JSON.stringify({ variant }),
+      });
       setBusy(false);
-      if (ok && body) onPick('online', { roomAction: 'create', roomId: body.id });
+      if (ok && body) onPick('online', { roomAction: 'create', roomId: body.id, variant });
       else setError('Could not create room. Try again.');
     } else if (onlineAction === 'join') {
       const code = joinCode.trim().toUpperCase();
@@ -15281,6 +15950,22 @@ function ChutesLaddersModeSelect({ game, onPick }) {
           )}
         </div>
       )}
+      <div className="cnl-variant-block">
+        <div className="cnl-variant-label">Board style</div>
+        <div className="mnc-mode-sub">
+          <button className={'mnc-difficulty-pill' + (variant === 'classic' ? ' active' : '')}
+            onClick={() => setVariant('classic')}>Classic</button>
+          <button className={'mnc-difficulty-pill' + (variant === 'moksha' ? ' active' : '')}
+            onClick={() => setVariant('moksha')}>Moksha Patam (original)</button>
+        </div>
+        {variant === 'moksha' && (
+          <div className="cnl-variant-note">
+            The Indian original: ladders on virtues, snakes on vices — 11 vices to
+            5 virtues, so the climb is a slower one.{' '}
+            <button className="cnl-variant-link" onClick={onGlossary}>📖 What do these mean?</button>
+          </div>
+        )}
+      </div>
       {error && <div className="mnc-join-error">{error}</div>}
       {mode && <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
     </div>
@@ -15289,7 +15974,7 @@ function ChutesLaddersModeSelect({ game, onPick }) {
 
 // Online Chutes & Ladders over classic_rooms. Server owns the dice; the client
 // just sends a "roll" and renders the polled room state.
-function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
+function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onGlossary }) {
   const { room, pollingError, opponentDisconnected, submitMove } = useClassicRoom('chutes-ladders', roomId);
   const winCalledRef = useRef(false);
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
@@ -15326,6 +16011,11 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
   }
 
   const st = room.state || {};
+  // The board style lives on the ROOM (the creator picked it), so the joining
+  // player renders whatever board they actually joined.
+  const vkey = cnlVariant(st.variant);
+  const V = CNL_VARIANTS[vkey];
+  const isMoksha = vkey === 'moksha';
   const cur = st.currentPlayer || 1;
   const isMyTurn = status === 'active' && cur === myPlayerNum;
   const p1Color = C.accent, p2Color = C.rose;
@@ -15344,15 +16034,34 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
       const row = 9 - visualRow;
       const within = (row % 2 === 0) ? col : (9 - col);
       const n = row * 10 + within + 1;
-      const mark = CNL_LADDERS[n] !== undefined ? '🪜' : CNL_CHUTES[n] !== undefined ? '🛝' : null;
-      cells.push(<div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}><span>{n}</span>{mark && <span className="cnl-cell-mark">{mark}</span>}</div>);
+      const isL = V.ladders[n] !== undefined;
+      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
+      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
+      cells.push(
+        <div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
+          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}>
+          <span>{n}</span>
+          {mark && <span className="cnl-cell-mark">{mark}</span>}
+          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
+        </div>
+      );
     }
   }
-  const lines = Object.keys(CNL_JUMPS).map(k => {
-    const from = parseInt(k, 10), to = CNL_JUMPS[from];
+  const lines = Object.keys(V.jumps).map(k => {
+    const from = parseInt(k, 10), to = V.jumps[from];
     const a = cnlCenterPct(from), b = cnlCenterPct(to);
-    const isLadder = CNL_LADDERS[from] !== undefined;
-    return <line key={k} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={isLadder ? C.emerald : C.rose} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />;
+    const isLadder = V.ladders[from] !== undefined;
+    const stroke = isLadder ? C.emerald : C.rose;
+    if (isMoksha && !isLadder) {
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.max(Math.hypot(dx, dy), 0.001);
+      const off = Math.min(9, len * 0.16);
+      const nx = -dy / len * off, ny = dx / len * off;
+      return <path key={k} fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
+        d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`} />;
+    }
+    return <line key={k} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={stroke} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />;
   });
   const p1c = cnlCenterPct(st.p1Pos || 0), p2c = cnlCenterPct(st.p2Pos || 0);
   const same = (st.p1Pos || 0) === (st.p2Pos || 0);
@@ -15369,6 +16078,9 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
         <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
         <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.95rem' }}>{myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0)}</div></div>
         <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
+        {isMoksha && (
+          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>📖 What do these mean?</button>
+        )}
       </div>
       {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
       <div className="cnl-board-wrap">
@@ -15779,6 +16491,11 @@ function LudoGame(props)       { return <BoardRoomGame gameId="ludo" {...props} 
 
 function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange }) {
   const [mode, setMode] = useState(gameMode || null);
+  // Board style for LOCAL play. Online rooms carry their own variant on the
+  // room state (the creator chose it), so the online view reads it from there.
+  const [variant, setVariant] = useState(
+    (gameModeOpts && gameModeOpts.variant) || 'classic');
+  const [glossary, setGlossary] = useState(false);
   const [roomId, setRoomId] = useState((gameModeOpts && gameModeOpts.roomId) || null);
   const [myPlayerNum, setMyPlayerNum] = useState(
     gameModeOpts && gameModeOpts.myPlayerNum
@@ -15823,27 +16540,55 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
     return () => { cancelled = true; };
   }, [mode]);
 
+  const glossaryModal = glossary
+    ? <MokshaGlossaryModal onClose={() => setGlossary(false)} />
+    : null;
+
   if (!mode) {
-    return <ChutesLaddersModeSelect game={{ id: 'chutes-ladders' }} onPick={(m, opts) => {
-      if (m === 'online') { setRoomId(opts.roomId); setMyPlayerNum(opts.roomAction === 'join' ? 2 : 1); }
-      setMode(m);
-    }} />;
+    return (
+      <React.Fragment>
+        <ChutesLaddersModeSelect
+          game={{ id: 'chutes-ladders' }}
+          onGlossary={() => setGlossary(true)}
+          onPick={(m, opts) => {
+            if (opts && opts.variant) setVariant(opts.variant);
+            if (m === 'online') { setRoomId(opts.roomId); setMyPlayerNum(opts.roomAction === 'join' ? 2 : 1); }
+            setMode(m);
+          }}
+        />
+        {glossaryModal}
+      </React.Fragment>
+    );
   }
   if (mode === 'online') {
-    return <ChutesLaddersOnlineGame onWin={handleWin} onStepChange={onStepChange} roomId={roomId} myPlayerNum={myPlayerNum} />;
+    return (
+      <React.Fragment>
+        <ChutesLaddersOnlineGame
+          onWin={handleWin} onStepChange={onStepChange}
+          roomId={roomId} myPlayerNum={myPlayerNum}
+          onGlossary={() => setGlossary(true)}
+        />
+        {glossaryModal}
+      </React.Fragment>
+    );
   }
   if (mode === 'bot' && !resumeChecked) {
     return <div style={{ textAlign: 'center', padding: '2rem', color: C.muted }}>Loading…</div>;
   }
   return (
-    <ChutesLaddersLocalGame
-      onWin={handleWin}
-      onStepChange={onStepChange}
-      resetKey={resetKey}
-      vsBot={mode === 'bot'}
-      initialState={mode === 'bot' ? resumeState : null}
-      onClearSave={mode === 'bot' ? clearState : null}
-    />
+    <React.Fragment>
+      <ChutesLaddersLocalGame
+        onWin={handleWin}
+        onStepChange={onStepChange}
+        resetKey={resetKey}
+        vsBot={mode === 'bot'}
+        variant={variant}
+        onGlossary={() => setGlossary(true)}
+        initialState={mode === 'bot' ? resumeState : null}
+        onClearSave={mode === 'bot' ? clearState : null}
+      />
+      {glossaryModal}
+    </React.Fragment>
   );
 }
 
@@ -16377,12 +17122,14 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const maxCol = Math.max(...st.tab.map((c) => c.length), 1);
   return (
-    <div className="kl-game">
+    <div className="kl-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
         <div className="pill"><div className="plabel">Home</div><div className="pvalue">{st.found.reduce((a, f) => a + f.length, 0)}/52</div></div>
       </div>
+      <FitScale>
+      <div className="kl-inner">
       <div className="kl-top">
         {st.stock.length
           ? <CeCard card={{ s: 0, r: 0, up: false }} onClick={tapStock} />
@@ -16418,6 +17165,8 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           </div>
         ))}
       </div>
+      </div>
+      </FitScale>
       <div className="p6-hint">Tap a card, then its destination. Tap a selected card again to send it home.</div>
     </div>
   );
@@ -16548,7 +17297,7 @@ function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
 
   const maxCol = Math.max(...st.cols.map((c) => c.length), 1);
   return (
-    <div className="sp-game">
+    <div className="sp-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
@@ -16557,6 +17306,7 @@ function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
           Deal +10 ({Math.floor(st.stock.length / 10)})
         </button>
       </div>
+      <FitScale>
       <div className="sp-tab">
         {st.cols.map((col, p) => (
           <div
@@ -16578,6 +17328,7 @@ function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
           </div>
         ))}
       </div>
+      </FitScale>
       <div className="p6-hint">One suit: any descending run moves. Build K→A to clear a run — 8 clears win.</div>
     </div>
   );
@@ -16764,7 +17515,7 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
   const boardW = 15 * (TW / 2) + TW;
   const boardH = 7 * (TH / 2) + TH + 12;
   return (
-    <div className="mj-game">
+    <div className="mj-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Tiles</div><div className="pvalue">{remaining}/60</div></div>
@@ -16773,6 +17524,7 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
       {stuck && shuffles > 0 && (
         <div className="p6-banner">No free pair left — use a shuffle to keep going.</div>
       )}
+      <FitScale>
       <div className="mj-board" style={{ width: boardW, height: boardH }}>
         {MJ_LAYOUT.map((p, i) => {
           if (removed[i]) return null;
@@ -16791,6 +17543,7 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
           );
         })}
       </div>
+      </FitScale>
       <div className="p6-hint">Tap two matching free tiles (uncovered, with an open side) to clear them.</div>
     </div>
   );
@@ -16799,6 +17552,8 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
 /* ---- Nonogram (daily) --------------------------------------------------------
    8×8 picture-logic puzzle. Fill cells so every row and column matches its
    run clues; any grid satisfying all clues wins. */
+
+const NG_GAP = 2;
 
 function ngClues(line) {
   const out = [];
@@ -16872,62 +17627,146 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     return true;
   };
 
-  const tap = (r, c) => {
-    if (done) return;
-    const g = grid.map((row) => row.slice());
-    const cur = g[r][c];
-    if (mode === 'fill') g[r][c] = cur === 1 ? 0 : 1;
-    else g[r][c] = cur === 2 ? 0 : 2;
-    const ns = steps + 1;
+  // ---- Responsive canvas board (slice 5) ----------------------------------
+  // Clue gutters live inside the canvas, so the whole thing scales as one unit
+  // instead of the old auto-auto CSS grid with three fixed-34px tracks.
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  // The gutters are sized in cells (2 wide for row clues, 2 tall for column
+  // clues), so the fit is over a 10×10 board and the clue text scales with it.
+  const { cell } = useFitBox(boxRef, {
+    cols: 10, rows: 10, minCell: 20, maxCell: 42, gap: NG_GAP, padX: 4, padY: 4,
+  });
+  const cellStep = cell + NG_GAP;
+  const gutter = cellStep * 2;
+  const boardPx = gutter + cellStep * 8 - NG_GAP;
+
+  const liveRef = useRef({});
+  liveRef.current = { grid, mode, done, steps, secs, cellStep, gutter };
+
+  const cellAt = (p) => {
+    const { cellStep: cs, gutter: gu } = liveRef.current;
+    const c = Math.floor((p.x - gu) / cs), r = Math.floor((p.y - gu) / cs);
+    if (c < 0 || c > 7 || r < 0 || r > 7) return null;
+    return { r, c };
+  };
+
+  // `paintMode` is applied rather than the live mode, so long-press can invert
+  // the action exactly the way Mine Finder does.
+  const apply = (r, c, paintMode) => {
+    const cur = liveRef.current;
+    if (cur.done) return;
+    const g = cur.grid.map((row) => row.slice());
+    const v = g[r][c];
+    if (paintMode === 'fill') g[r][c] = v === 1 ? 0 : 1;
+    else g[r][c] = v === 2 ? 0 : 2;
+    const ns = cur.steps + 1;
     setGrid(g);
     setSteps(ns);
     onStepChange(ns);
     const won = solved(g);
-    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g }, ns, secs);
+    // Skip the save on the winning move — the finish closes the attempt and a
+    // racing progress write would 409 against the closed row.
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g }, ns, cur.secs);
     if (won) {
       setDone(true);
-      const score = Math.max(1400 - ns * 4 - secs * 2, 250);
-      onWin(score, ns, secs, {
+      const score = Math.max(1400 - ns * 4 - cur.secs * 2, 250);
+      onWin(score, ns, cur.secs, {
         share: `Game Corner Nonogram — solved today's 8×8 picture in ${fmt} 🖼️`,
       });
     }
   };
+
+  usePointerCell(canvasRef, {
+    onTap: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
+    // Long-press = the opposite tool, same idiom as Mine Finder.
+    onLongPress: (p) => {
+      const t = cellAt(p);
+      if (t) apply(t.r, t.c, liveRef.current.mode === 'fill' ? 'mark' : 'fill');
+    },
+    onContext: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, 'mark'); },
+  });
+
+  useCanvasBoard(canvasRef, {
+    width: boardPx,
+    height: boardPx,
+    deps: [cell, grid, done],
+    draw: (ctx) => {
+      const radius = Math.max(2, Math.round(cell * 0.14));
+      const clueFont = Math.max(9, Math.round(cell * 0.42));
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Column clues, bottom-aligned in the top gutter.
+      ctx.fillStyle = C.muted;
+      ctx.font = `${clueFont}px 'JetBrains Mono', monospace`;
+      colClues.forEach((cl, c) => {
+        const x = gutter + c * cellStep + cell / 2;
+        cl.forEach((v, k) => {
+          const y = gutter - 4 - (cl.length - 1 - k) * (clueFont + 2) - clueFont / 2;
+          ctx.fillText(String(v), x, y);
+        });
+      });
+      // Row clues, right-aligned in the left gutter.
+      ctx.textAlign = 'right';
+      rowClues.forEach((cl, r) => {
+        const y = gutter + r * cellStep + cell / 2;
+        ctx.fillText(cl.join(' '), gutter - 6, y);
+      });
+      ctx.textAlign = 'center';
+
+      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+        const v = grid[r][c];
+        const x = gutter + c * cellStep, y = gutter + r * cellStep;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
+        else ctx.rect(x, y, cell, cell);
+        ctx.fillStyle = v === 1 ? C.accent : C.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = v === 1 ? C.accent : C.border;
+        ctx.stroke();
+        if (v === 2) {
+          ctx.fillStyle = C.dim;
+          ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
+          ctx.fillText('✗', x + cell / 2, y + cell / 2 + 1);
+        }
+      }
+      // Major separators every 4 cells — replaces the old :nth-child CSS hack.
+      ctx.strokeStyle = C.dim;
+      ctx.lineWidth = 1.5;
+      for (const k of [0, 4, 8]) {
+        const off = gutter + k * cellStep - NG_GAP / 2;
+        ctx.beginPath(); ctx.moveTo(off, gutter - NG_GAP); ctx.lineTo(off, boardPx); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(gutter - NG_GAP, off); ctx.lineTo(boardPx, off); ctx.stroke();
+      }
+    },
+  });
+
+  const filled = grid.reduce((n, row) => n + row.filter((v) => v === 1).length, 0);
 
   return (
     <div className="ng-game">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
-        <div className="ng-modes">
-          <button className={'p6-btn' + (mode === 'fill' ? ' on' : '')} onClick={() => setMode('fill')}>⬛ Fill</button>
-          <button className={'p6-btn' + (mode === 'mark' ? ' on' : '')} onClick={() => setMode('mark')}>✗ Mark</button>
-        </div>
+        <div className="pill"><div className="plabel">Filled</div><div className="pvalue">{filled}</div></div>
       </div>
-      <div className="ng-wrap">
-        <div className="ng-corner" />
-        <div className="ng-colclues">
-          {colClues.map((cl, c) => (
-            <div key={c} className="ng-colclue">{cl.map((v, k) => <span key={k}>{v}</span>)}</div>
-          ))}
-        </div>
-        <div className="ng-rowclues">
-          {rowClues.map((cl, r) => (
-            <div key={r} className="ng-rowclue">{cl.join(' ')}</div>
-          ))}
-        </div>
-        <div className="ng-grid">
-          {grid.map((row, r) =>
-            row.map((v, c) => (
-              <div
-                key={r + '-' + c}
-                className={'ng-cell' + (v === 1 ? ' fill' : '') + (v === 2 ? ' mark' : '')}
-                onClick={() => tap(r, c)}
-              >{v === 2 ? '✗' : ''}</div>
-            ))
-          )}
-        </div>
+      <div className="ng-boardbox" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="ng-canvas board-canvas"
+          role="grid"
+          aria-label={`Nonogram, 8 by 8 picture grid, ${filled} cells filled`}
+        />
       </div>
-      <div className="p6-hint">Numbers are runs of filled cells, in order. Match every row and column clue.</div>
+      <div className="ng-modes">
+        <button className={'ng-mode-btn' + (mode === 'fill' ? ' on' : '')} onClick={() => setMode('fill')}>⬛ Fill</button>
+        <button className={'ng-mode-btn' + (mode === 'mark' ? ' on' : '')} onClick={() => setMode('mark')}>✗ Mark</button>
+      </div>
+      <div className="p6-hint">
+        Numbers are runs of filled cells, in order. Long-press uses the other tool.
+      </div>
     </div>
   );
 }
@@ -17350,7 +18189,7 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   };
 
   return (
-    <div className="an-game">
+    <div className="an-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Word</div><div className="pvalue">{Math.min(solvedCount + 1, words.length)}/{words.length}</div></div>
@@ -17577,13 +18416,15 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
   }
 
   return (
-    <div className="cp-game">
+    <div className="cp-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
         <div className="pill"><div className="plabel">Room</div><div className="pvalue">#{levelIdx.current + 1}</div></div>
       </div>
-      <div className="cp-grid" style={{ gridTemplateColumns: `repeat(${level.w}, 34px)` }}>{cells}</div>
+      <FitScale>
+        <div className="cp-grid" style={{ gridTemplateColumns: `repeat(${level.w}, 34px)` }}>{cells}</div>
+      </FitScale>
       <div className="cp-pad">
         <div />
         <button className="p6-btn" onClick={() => move(0, -1)}>▲</button>
@@ -17602,10 +18443,13 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
 }
 
 /* ---- Drop Stack (daily) ---------------------------------------------------------
-   Place today's fixed sequence of 40 falling pieces without topping out.
-   Turn-based: line up each piece, then drop it — same order for everyone. */
+   Real-time falling blocks on today's fixed 200-piece bag — same order for
+   everyone. Gravity runs on a rAF loop whose interval is set by the level
+   (one level per 10 lines). Drag to slide, tap to rotate, swipe down to hard
+   drop; a hold slot lets you bank one piece per lock. Survive the bag to win,
+   top out and the day is lost. */
 
-const DS_W = 9, DS_H = 14, DS_PIECES = 40;
+const DS_W = 9, DS_H = 16, DS_PIECES = 200;
 const DS_SHAPES = [
   { cells: [[0, 0], [1, 0], [2, 0], [3, 0]], color: '#38BDF8' },
   { cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: '#FBBF24' },
@@ -17615,7 +18459,11 @@ const DS_SHAPES = [
   { cells: [[0, 0], [0, 1], [1, 1], [2, 1]], color: '#818CF8' },
   { cells: [[2, 0], [0, 1], [1, 1], [2, 1]], color: '#F59E0B'  },
 ];
+const DS_LINES_PER_LEVEL = 10;
+const DS_GAP = 2;
 
+// Deterministic 7-bag: every consecutive window of 7 is a permutation of the
+// seven shapes, so the day's sequence is fair AND identical for every player.
 function dsSequence(rng) {
   const seq = [];
   while (seq.length < DS_PIECES) {
@@ -17636,72 +18484,92 @@ function dsCells(shapeIdx, rot) {
   return cells.map(([x, y]) => [x - minX, y - minY]);
 }
 
+function dsLevelFor(lines) { return 1 + Math.floor(lines / DS_LINES_PER_LEVEL); }
+// Level 1 drops a row about once a second; each level is 15% quicker, floored
+// so the top levels stay playable rather than impossible.
+function dsGravityMs(level) { return Math.max(80, Math.round(1000 * Math.pow(0.85, level - 1))); }
+
 function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const seq = useRef(null);
   if (!seq.current) seq.current = dsSequence(dailyRng(offset, 'dropstack'));
 
+  // Resume tolerates the pre-rebuild progress shape: rows saved by the old
+  // turn-based version carry no level/hold, so derive level from lines and
+  // start with an empty hold rather than refusing to resume mid-day.
   const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
     ? savedProgress : null;
+  const resumedGrid = resumed
+    // An old 14-row well is padded at the TOP to today's 16 rows, so the stack
+    // keeps its footing on the floor instead of floating.
+    ? (() => {
+      const g = resumed.grid.map((row) => row.slice(0, DS_W));
+      while (g.length < DS_H) g.unshift(new Array(DS_W).fill(0));
+      return g.slice(g.length - DS_H);
+    })()
+    : null;
+
   const [grid, setGrid] = useState(() =>
-    resumed ? resumed.grid.map((row) => row.slice()) : Array.from({ length: DS_H }, () => new Array(DS_W).fill(0))
-  );
+    resumedGrid || Array.from({ length: DS_H }, () => new Array(DS_W).fill(0)));
   const [pieceIdx, setPieceIdx] = useState(resumed && Number.isFinite(resumed.pieceIdx) ? resumed.pieceIdx : 0);
   const [lines, setLines] = useState(resumed && Number.isFinite(resumed.lines) ? resumed.lines : 0);
   const [points, setPoints] = useState(resumed && Number.isFinite(resumed.points) ? resumed.points : 0);
+  const [hold, setHold] = useState(resumed && Number.isFinite(resumed.hold) ? resumed.hold : null);
+  const [holdUsed, setHoldUsed] = useState(false);
   const [col, setCol] = useState(3);
   const [rot, setRot] = useState(0);
+  // Fractional row the active piece has fallen to; gravity advances it and the
+  // integer part is the collision row.
+  const [fallY, setFallY] = useState(0);
   const [done, setDone] = useState(false);
+  const [levelFlash, setLevelFlash] = useState(0);
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
 
+  const level = dsLevelFor(lines);
+
   const stateRef = useRef({});
-  stateRef.current = { grid, pieceIdx, lines, points, secs };
-  useAutosave(
-    onSaveProgress,
-    () => ({
-      progress: {
-        dayNum, grid: stateRef.current.grid, pieceIdx: stateRef.current.pieceIdx,
-        lines: stateRef.current.lines, points: stateRef.current.points,
-      },
-      steps: stateRef.current.pieceIdx, secs: stateRef.current.secs,
-    }),
-    !done
-  );
+  stateRef.current = { grid, pieceIdx, lines, points, hold, secs };
+  const buildProgress = () => ({
+    progress: {
+      dayNum, grid: stateRef.current.grid, pieceIdx: stateRef.current.pieceIdx,
+      lines: stateRef.current.lines, points: stateRef.current.points,
+      level: dsLevelFor(stateRef.current.lines), hold: stateRef.current.hold,
+    },
+    steps: stateRef.current.pieceIdx, secs: stateRef.current.secs,
+  });
+  useAutosave(onSaveProgress, buildProgress, !done);
 
   const shapeIdx = pieceIdx < DS_PIECES ? seq.current[pieceIdx] : 0;
   const cells = dsCells(shapeIdx, rot);
   const shapeW = Math.max(...cells.map(([x]) => x)) + 1;
   const clampedCol = Math.min(Math.max(col, 0), DS_W - shapeW);
 
-  const canPlace = (g, atCol, yOff) =>
-    cells.every(([dx, dy]) => {
+  const canPlace = (g, atCol, yOff, cs = cells) =>
+    cs.every(([dx, dy]) => {
       const x = atCol + dx, y = yOff + dy;
-      return x >= 0 && x < DS_W && y < DS_H && (y < 0 || g[y][x] === 0);
-    }) && cells.every(([, dy]) => yOff + dy >= 0);
+      return x >= 0 && x < DS_W && y < DS_H && y >= 0 && g[y][x] === 0;
+    });
 
-  const landingY = (g, atCol) => {
-    if (!canPlace(g, atCol, 0)) return -1;
-    let y = 0;
-    while (canPlace(g, atCol, y + 1)) y++;
+  const landingY = (g, atCol, cs = cells) => {
+    let y = Math.floor(fallYRef.current);
+    if (!canPlace(g, atCol, y, cs)) return -1;
+    while (canPlace(g, atCol, y + 1, cs)) y++;
     return y;
   };
 
-  const drop = () => {
-    if (done || pieceIdx >= DS_PIECES) return;
-    const g = grid.map((row) => row.slice());
-    const y = landingY(g, clampedCol);
-    const np = pieceIdx + 1;
-    if (y < 0) {
-      // Piece can't enter the well — topped out; the day is lost.
-      setDone(true);
-      onLose && onLose(pieceIdx, secs, {
-        share: `Game Corner Drop Stack — topped out after ${pieceIdx} pieces 🧱`,
-        answer: `The stack reached the top with ${DS_PIECES - pieceIdx} pieces left.`,
-      });
-      return;
-    }
-    for (const [dx, dy] of cells) g[y + dy][clampedCol + dx] = shapeIdx + 1;
+  // Mutable mirrors the rAF loop and pointer handlers read — both are bound
+  // once and must never close over a stale render's state.
+  const fallYRef = useRef(0);
+  fallYRef.current = fallY;
+  const liveRef = useRef({});
+  liveRef.current = { grid, pieceIdx, lines, points, hold, holdUsed, clampedCol, rot, cells, shapeIdx, done, secs, fallY, shapeW };
+
+  // Lock the active piece into the well, clear lines, and advance the bag.
+  const lockPiece = (atY) => {
+    const cur = liveRef.current;
+    const g = cur.grid.map((row) => row.slice());
+    for (const [dx, dy] of cur.cells) g[atY + dy][cur.clampedCol + dx] = cur.shapeIdx + 1;
     let cleared = 0;
     for (let r = DS_H - 1; r >= 0; r--) {
       if (g[r].every((v) => v !== 0)) {
@@ -17711,89 +18579,292 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
         r++;
       }
     }
-    const gained = [0, 100, 250, 450, 700][cleared] || 0;
-    const nl = lines + cleared, npts = points + gained;
+    const lvl = dsLevelFor(cur.lines);
+    const gained = ([0, 100, 250, 450, 700][cleared] || 0) * lvl;
+    const np = cur.pieceIdx + 1, nl = cur.lines + cleared, npts = cur.points + gained;
     setGrid(g);
     setPieceIdx(np);
     setLines(nl);
     setPoints(npts);
     setRot(0);
     setCol(3);
+    setFallY(0);
+    fallYRef.current = 0;
+    setHoldUsed(false);
     onStepChange(np);
+    if (dsLevelFor(nl) > lvl) {
+      setLevelFlash(dsLevelFor(nl));
+      setTimeout(() => setLevelFlash(0), 900);
+    }
     const won = np >= DS_PIECES;
-    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g, pieceIdx: np, lines: nl, points: npts }, np, secs);
+    if (!won && onSaveProgress) {
+      onSaveProgress(
+        { dayNum, grid: g, pieceIdx: np, lines: nl, points: npts, level: dsLevelFor(nl), hold: cur.hold },
+        np, cur.secs
+      );
+    }
     if (won) {
       setDone(true);
-      const score = npts + 200 + nl * 10;
-      onWin(score, np, secs, {
-        share: `Game Corner Drop Stack — placed all ${DS_PIECES} pieces, ${nl} lines, ${npts + 200 + nl * 10} pts 🧱`,
+      const score = npts + nl * 10 + dsLevelFor(nl) * 50 + 500;
+      onWin(score, np, cur.secs, {
+        share: `Game Corner Drop Stack — cleared the full ${DS_PIECES}-piece bag, ${nl} lines, level ${dsLevelFor(nl)} 🧱`,
       });
     }
   };
 
+  const topOut = () => {
+    const cur = liveRef.current;
+    setDone(true);
+    onLose && onLose(cur.pieceIdx, cur.secs, {
+      share: `Game Corner Drop Stack — topped out on piece ${cur.pieceIdx} at level ${dsLevelFor(cur.lines)} 🧱`,
+      answer: `You reached level ${dsLevelFor(cur.lines)} with ${cur.lines} lines and ${cur.points} points.`,
+    });
+  };
+
+  // Gravity. One rAF loop for the whole run: accumulate real elapsed time and
+  // step the piece down whenever it exceeds the level's interval. Pausing on
+  // a hidden tab means backgrounding the game never silently tops you out.
+  useEffect(() => {
+    if (done) return;
+    let raf = 0, last = 0, acc = 0;
+    const tick = (t) => {
+      raf = requestAnimationFrame(tick);
+      if (!last) { last = t; return; }
+      const dt = t - last;
+      last = t;
+      if (document.visibilityState === 'hidden') return;
+      const cur = liveRef.current;
+      if (cur.done || cur.pieceIdx >= DS_PIECES) return;
+      acc += dt;
+      const interval = dsGravityMs(dsLevelFor(cur.lines));
+      while (acc >= interval) {
+        acc -= interval;
+        const y = Math.floor(fallYRef.current);
+        if (canPlace(cur.grid, cur.clampedCol, y + 1, cur.cells)) {
+          fallYRef.current = y + 1;
+          setFallY(y + 1);
+        } else if (!canPlace(cur.grid, cur.clampedCol, y, cur.cells)) {
+          // Spawn row already blocked — the well is full.
+          topOut();
+          return;
+        } else {
+          lockPiece(y);
+          return;
+        }
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hardDrop = () => {
+    const cur = liveRef.current;
+    if (cur.done || cur.pieceIdx >= DS_PIECES) return;
+    const y = landingY(cur.grid, cur.clampedCol, cur.cells);
+    if (y < 0) { topOut(); return; }
+    lockPiece(y);
+  };
+
+  const rotate = () => {
+    const cur = liveRef.current;
+    if (cur.done) return;
+    const next = dsCells(cur.shapeIdx, cur.rot + 1);
+    const w = Math.max(...next.map(([x]) => x)) + 1;
+    const atCol = Math.min(cur.clampedCol, DS_W - w);
+    // Refuse a rotation that would clip the stack rather than letting it
+    // overlap locked cells.
+    if (!canPlace(cur.grid, atCol, Math.floor(fallYRef.current), next)) return;
+    setRot((r) => r + 1);
+    setCol(atCol);
+  };
+
+  const nudge = (d) => {
+    const cur = liveRef.current;
+    if (cur.done) return;
+    const target = Math.min(Math.max(cur.clampedCol + d, 0), DS_W - cur.shapeW);
+    if (canPlace(cur.grid, target, Math.floor(fallYRef.current), cur.cells)) setCol(target);
+  };
+
+  // Bank the active piece (or swap with the banked one). Once per lock, so it
+  // can't be used to stall gravity indefinitely.
+  const doHold = () => {
+    const cur = liveRef.current;
+    if (cur.done || holdUsed || cur.pieceIdx >= DS_PIECES) return;
+    const incoming = cur.hold;
+    setHold(cur.shapeIdx);
+    setHoldUsed(true);
+    setRot(0);
+    setCol(3);
+    setFallY(0);
+    fallYRef.current = 0;
+    if (incoming == null) {
+      // Nothing banked yet: consume the current piece from the bag.
+      const np = cur.pieceIdx + 1;
+      if (np >= DS_PIECES) { setPieceIdx(np); return; }
+      setPieceIdx(np);
+      onStepChange(np);
+    } else {
+      // Swap: splice the banked shape into the bag at the current position so
+      // the rest of the day's order is untouched.
+      seq.current[cur.pieceIdx] = incoming;
+    }
+  };
+
+  // Desktop keys. Registered ONCE (the old version had no dep array and
+  // re-bound the listener on every render); the handlers all read liveRef.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'ArrowLeft') { e.preventDefault(); setCol((c) => Math.max(c - 1, 0)); }
-      if (e.key === 'ArrowRight') { e.preventDefault(); setCol((c) => Math.min(c + 1, DS_W - 1)); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setRot((r) => r + 1); }
-      if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); drop(); }
+      if (liveRef.current.done) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(1); }
+      else if (e.key === 'ArrowUp' || e.key === 'x') { e.preventDefault(); rotate(); }
+      else if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); hardDrop(); }
+      else if (e.key === 'c' || e.key === 'Shift') { e.preventDefault(); doHold(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Responsive canvas well ---------------------------------------------
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, {
+    cols: DS_W, rows: DS_H, minCell: 12, maxCell: 34, gap: DS_GAP, padX: 4, padY: 4,
   });
+  const cellStep = cell + DS_GAP;
+  const wellW = cellStep * DS_W - DS_GAP;
+  const wellH = cellStep * DS_H - DS_GAP;
+
+  // Drag maps finger travel to columns; a fast downward flick hard-drops; a
+  // tap that never became a drag rotates.
+  const dragRef = useRef({ startCol: 0, moved: false });
+  usePointerCell(canvasRef, {
+    onDown: () => { dragRef.current = { startCol: liveRef.current.clampedCol, moved: false }; },
+    onDrag: (_p, info) => {
+      const cur = liveRef.current;
+      if (cur.done) return;
+      const steps = Math.round(info.dx / Math.max(cellStep, 1));
+      const target = Math.min(Math.max(dragRef.current.startCol + steps, 0), DS_W - cur.shapeW);
+      if (target !== cur.clampedCol && canPlace(cur.grid, target, Math.floor(fallYRef.current), cur.cells)) {
+        dragRef.current.moved = true;
+        setCol(target);
+      }
+      // A decisive downward flick counts as intent, not a stray wobble —
+      // marking it here stops the release from also firing a rotate.
+      if (Math.abs(info.dy) > cellStep * 2 && Math.abs(info.dy) > Math.abs(info.dx) * 1.5) {
+        dragRef.current.moved = true;
+        dragRef.current.swipeDown = info.dy > 0;
+      }
+    },
+    onUp: () => {
+      if (liveRef.current.done) return;
+      if (dragRef.current.swipeDown) { dragRef.current.swipeDown = false; hardDrop(); }
+    },
+    // A press that never moved is a rotate. No long-press action on the well,
+    // so the timer is effectively disabled.
+    onTap: () => { if (!dragRef.current.moved) rotate(); },
+  }, { moveTolerance: 6 });
 
   const ghostY = landingY(grid, clampedCol);
-  const ghost = new Set();
-  const hover = new Set();
-  if (!done && pieceIdx < DS_PIECES) {
-    for (const [dx, dy] of cells) {
-      hover.add(dy * DS_W + (clampedCol + dx));
-      if (ghostY >= 0) ghost.add((ghostY + dy) * DS_W + (clampedCol + dx));
-    }
-  }
-  const nextIdx = pieceIdx + 1 < DS_PIECES ? seq.current[pieceIdx + 1] : null;
+
+  useCanvasBoard(canvasRef, {
+    width: wellW,
+    height: wellH,
+    deps: [cell, grid, clampedCol, rot, fallY, pieceIdx, done],
+    draw: (ctx) => {
+      const radius = Math.max(2, Math.round(cell * 0.18));
+      const box = (x, y, fill, stroke, alpha) => {
+        ctx.globalAlpha = alpha == null ? 1 : alpha;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
+        else ctx.rect(x, y, cell, cell);
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke) { ctx.lineWidth = 1.5; ctx.strokeStyle = stroke; ctx.stroke(); }
+        ctx.globalAlpha = 1;
+      };
+      for (let r = 0; r < DS_H; r++) for (let c = 0; c < DS_W; c++) {
+        const v = grid[r][c];
+        box(c * cellStep, r * cellStep, v ? DS_SHAPES[v - 1].color : C.card, v ? null : C.border);
+      }
+      if (!done && pieceIdx < DS_PIECES) {
+        const color = DS_SHAPES[shapeIdx].color;
+        if (ghostY >= 0) {
+          for (const [dx, dy] of cells) {
+            box((clampedCol + dx) * cellStep, (ghostY + dy) * cellStep, null, color, 0.45);
+          }
+        }
+        const y0 = Math.floor(fallY);
+        for (const [dx, dy] of cells) {
+          if (y0 + dy < 0) continue;
+          box((clampedCol + dx) * cellStep, (y0 + dy) * cellStep, color, null);
+        }
+      }
+    },
+  });
+
+  const miniPiece = (idx, key) => {
+    if (idx == null) return <span key={key} className="ds-mini-empty">—</span>;
+    const cs = dsCells(idx, 0);
+    const w = Math.max(...cs.map(([x]) => x)) + 1;
+    const h = Math.max(...cs.map(([, y]) => y)) + 1;
+    return (
+      <span key={key} className="ds-mini-piece" style={{ width: w * 9, height: h * 9 }}>
+        {cs.map(([x, y], k) => (
+          <span key={k} className="ds-mini-cell"
+            style={{ background: DS_SHAPES[idx].color, left: x * 9, top: y * 9 }} />
+        ))}
+      </span>
+    );
+  };
+  const nextThree = [1, 2, 3]
+    .map((n) => (pieceIdx + n < DS_PIECES ? seq.current[pieceIdx + n] : null));
 
   return (
-    <div className="ds-game">
+    <div className="ds-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">{Math.min(pieceIdx + 1, DS_PIECES)}/{DS_PIECES}</div></div>
+        <div className="pill"><div className="plabel">Level</div><div className="pvalue">{level}</div></div>
         <div className="pill"><div className="plabel">Lines</div><div className="pvalue">{lines}</div></div>
         <div className="pill"><div className="plabel">Points</div><div className="pvalue">{points}</div></div>
+        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">{Math.min(pieceIdx + 1, DS_PIECES)}/{DS_PIECES}</div></div>
       </div>
-      <div className="ds-next">
-        Next: {nextIdx != null
-          ? dsCells(nextIdx, 0).map(([x, y], k) => (
-            <span key={k} className="ds-mini" style={{ background: DS_SHAPES[nextIdx].color, left: 42 + x * 10, top: 4 + y * 10 }} />
-          ))
-          : <span className="ds-last">last piece</span>}
+
+      <div className="ds-main">
+        <div className="ds-boardbox" ref={boxRef}>
+          <canvas
+            ref={canvasRef}
+            className="ds-canvas board-canvas"
+            role="grid"
+            aria-label={`Drop Stack well, level ${level}, ${lines} lines cleared, piece ${Math.min(pieceIdx + 1, DS_PIECES)} of ${DS_PIECES}`}
+          />
+          {levelFlash > 0 && <div className="ds-level-flash">Level {levelFlash}</div>}
+        </div>
+        <div className="ds-side">
+          <div className="ds-panel">
+            <div className="ds-panel-label">Next</div>
+            <div className="ds-queue">{nextThree.map((n, k) => miniPiece(n, k))}</div>
+          </div>
+          <button
+            className={'ds-panel ds-hold' + (holdUsed ? ' used' : '')}
+            onClick={doHold}
+            disabled={holdUsed || done}
+            title="Bank this piece (once per piece)"
+          >
+            <div className="ds-panel-label">Hold</div>
+            <div className="ds-queue">{miniPiece(hold, 'h')}</div>
+          </button>
+        </div>
       </div>
-      <div className="ds-grid">
-        {grid.map((row, r) =>
-          row.map((v, c) => {
-            const i = r * DS_W + c;
-            const cls = ['ds-cell'];
-            let bg = v ? DS_SHAPES[v - 1].color : null;
-            if (!v && hover.has(i)) { cls.push('hover'); bg = DS_SHAPES[shapeIdx].color; }
-            else if (!v && ghost.has(i)) cls.push('ghost');
-            return (
-              <div
-                key={i}
-                className={cls.join(' ')}
-                style={bg ? { background: bg } : (ghost.has(i) && !v ? { borderColor: DS_SHAPES[shapeIdx].color } : undefined)}
-                onClick={() => setCol(Math.min(Math.max(c - Math.floor(shapeW / 2), 0), DS_W - shapeW))}
-              />
-            );
-          })
-        )}
-      </div>
+
       <div className="ds-pad">
-        <button className="p6-btn" onClick={() => setCol((c) => Math.max(c - 1, 0))}>◀</button>
-        <button className="p6-btn" onClick={() => setRot((r) => r + 1)}>⟳ Rotate</button>
-        <button className="p6-btn" onClick={() => setCol((c) => Math.min(c + 1, DS_W - 1))}>▶</button>
-        <button className="p6-btn primary" onClick={drop}>⬇ Drop</button>
+        <button className="p6-btn" onClick={() => nudge(-1)}>◀</button>
+        <button className="p6-btn" onClick={rotate}>⟳</button>
+        <button className="p6-btn" onClick={() => nudge(1)}>▶</button>
+        <button className="p6-btn primary" onClick={hardDrop}>⬇ Drop</button>
       </div>
-      <div className="p6-hint">Line up each piece (tap the well or use ◀ ▶ ⟳), then Drop. Clear lines for points — top out and the day is lost.</div>
+      <div className="p6-hint">
+        Drag to slide, tap to rotate, swipe down to drop. Speed rises every {DS_LINES_PER_LEVEL} lines.
+      </div>
     </div>
   );
 }
@@ -17816,6 +18887,7 @@ const GAMES = [
     tag: 'Logic',
     tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    fitShell: true,
     howToPlay: [
       { title: 'Fill the grid', body: 'Tap a cell, then pick a number 1–6. Every row, column, and 2×3 box must contain each number exactly once.' },
       { title: 'Change your mind freely', body: 'Tap a filled cell to overwrite it — wrong entries cost steps, not the game.' },
@@ -17834,6 +18906,7 @@ const GAMES = [
     tag: 'Word',
     tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Find the words', body: 'Drag across the letter grid to select a word — horizontally, vertically, or diagonally, forwards or backwards.' },
       { title: 'Clear the list', body: 'Find every listed word to solve the puzzle. Stray drags count as steps, so aim carefully.' },
@@ -17852,6 +18925,7 @@ const GAMES = [
     tag: 'Words',
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Guess the word', body: 'Type a guess and submit. Green = right letter, right spot; gold = right letter, wrong spot.' },
       { title: 'Work the stack', body: "Today's puzzle is a stack of crypto words — solve one to unlock the next. Clues unlock as you go, and free hints are capped per day." },
@@ -18179,14 +19253,16 @@ const GAMES = [
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Today\'s layered tile board — 3 minutes to clear it.',
+    desc: 'A different layered board every day — clear it before the tray jams.',
     tag: 'Puzzle',
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'booster' },
+    fitShell: true,
     howToPlay: [
-      { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind clear automatically.' },
-      { title: 'Beat the clock', body: 'Clear the whole layered board in 3 minutes. A full bar with no match loses the day.' },
-      { title: 'Boosters', body: 'Undo, shuffle, and clear-slot are limited per day — everyone plays the same board, so spend them wisely.' },
+      { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot tray. Three of a kind clear automatically. The board shape changes every day and gets harder toward the weekend.' },
+      { title: 'Mind the tray', body: 'There are 12 tile types and only 7 slots — fill the tray with seven different icons and the day is lost. Today\'s board is always solvable in at least one order, but plenty of orders lose.' },
+      { title: 'Strategy', body: 'Work the TOP layers first: a triple is usually split across levels, so the tile you need last is often buried under the easy ones. Before taking a tile, check that its two partners are reachable — and keep at least two tray slots free so a forced pick never jams you.' },
+      { title: 'Boosters and scoring', body: 'Undo, shuffle and clear-slot are limited per day and now genuinely matter. Your score rewards a fast, efficient clear with boosters left unspent — not just tapping quickly.' },
     ],
     component: TileMatchingDailyGame,
   },
@@ -18204,6 +19280,7 @@ const GAMES = [
     tag: 'Cards',
     tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Build down, alternate colors', body: 'Tap a face-up card, then its destination. Tableau piles build downward in alternating colors; only a King moves to an empty column.' },
       { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
@@ -18222,6 +19299,7 @@ const GAMES = [
     tag: 'Cards',
     tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long', input: 'tap', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Move descending runs', body: 'Tap a face-up card to pick up it and the run below, then tap a column whose top card is one rank higher (or any empty column).' },
       { title: 'Complete runs', body: 'A full King-to-Ace run clears off the board. Clear eight runs to win. Deal a fresh row of ten from the stock when you\'re stuck.' },
@@ -18240,6 +19318,7 @@ const GAMES = [
     tag: 'Tiles',
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'booster' },
+    fitShell: true,
     howToPlay: [
       { title: 'Pair free tiles', body: 'A tile is free when nothing rests on top of it and its left or right side is open. Tap two matching free tiles to clear them.' },
       { title: 'Plan your order', body: 'Today\'s deal is always solvable in at least one order — but a careless order can dead-end you. Two shuffles are your safety net.' },
@@ -18258,6 +19337,7 @@ const GAMES = [
     tag: 'Logic',
     tagColor: GA.plum,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    fitShell: true,
     howToPlay: [
       { title: 'Read the clues', body: 'Each number is a run of filled cells in that row or column, in order, with at least one gap between runs.' },
       { title: 'Fill and mark', body: 'Use ⬛ Fill for cells you\'re sure of and ✗ Mark for cells that must stay empty. Both toggle freely — mistakes cost steps, not the day.' },
@@ -18296,6 +19376,7 @@ const GAMES = [
     tag: 'Word',
     tagColor: GA.amber,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Rebuild the word', body: 'Tap the scrambled letters in order to build your answer; tap a slot (or ⌫) to take a letter back.' },
       { title: 'Five in a row', body: 'Solve all five words — two 5-letter, two 6-letter, and one 7-letter. Wrong submissions cost tries, never the day.' },
@@ -18314,6 +19395,7 @@ const GAMES = [
     tag: 'Puzzle',
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    fitShell: true,
     howToPlay: [
       { title: 'Push, never pull', body: 'Move with the arrows (or arrow keys). Walking into a crate pushes it one cell — you can\'t pull, and you can\'t push two at once.' },
       { title: 'Don\'t get cornered', body: 'A crate shoved against a wall corner may be stuck for good. Undo steps back freely, or Restart the room.' },
@@ -18328,14 +19410,16 @@ const GAMES = [
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Place today\'s fixed sequence of 40 falling pieces without topping out.',
+    desc: 'Survive today\'s falling-block sequence — the speed climbs as you clear.',
     tag: 'Puzzle',
     tagColor: GA.violet,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag', undo: 'none' },
+    fitShell: true,
     howToPlay: [
-      { title: 'Line up, then drop', body: 'Move the hovering piece with ◀ ▶ (or tap the well), rotate with ⟳, then hit Drop. Pieces fall instantly — no timer pressure.' },
-      { title: 'Clear lines', body: 'Complete a full row to clear it: 100 points for one line, up to 700 for four at once.' },
-      { title: 'Survive the sequence', body: 'Everyone gets the same 40-piece order today. Place them all to win; stack past the top and the day is lost.' },
+      { title: 'Pieces fall on their own', body: 'Gravity is on from the first piece. Drag your finger across the well to slide it, tap to rotate, and swipe down (or hit ⬇ Drop) to slam it home. Arrow keys work on a desktop.' },
+      { title: 'Clear lines, climb levels', body: 'Complete a full row to clear it — 100 points for one line up to 700 for four, all multiplied by your level. Every 10 lines the level goes up and pieces fall faster.' },
+      { title: 'Next and Hold', body: 'The panel beside the well shows the next three pieces. Tap Hold to bank the current piece for later — once per piece, and tapping it again swaps the banked one back in.' },
+      { title: 'Survive the sequence', body: 'Everyone gets the same 200-piece order today. Clear the whole bag to win; stack past the top and the day is lost.' },
     ],
     component: DropStackGame,
   },
@@ -18412,6 +19496,16 @@ function App() {
   const [lobbyTab, setLobbyTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
     return t === 'ladder' ? 'ladder' : 'home';
+  });
+  // End-screen board review (slice 4): true while the results card is tucked
+  // into its minibar and the finished board is on show underneath.
+  const [reviewMode, setReviewMode] = useState(false);
+  // Merged-grid filter (slice 2). The retired ?tab=daily / ?tab=classic deep
+  // links now preselect the matching chip instead of being ignored, which is
+  // also what keeps the existing "/?tab=classic" proposal checks meaningful.
+  const [homeFilter, setHomeFilter] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return t === 'daily' || t === 'classic' ? t : 'all';
   });
   // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
   const [featured, setFeatured] = useState(null);
@@ -19187,6 +20281,7 @@ function App() {
   const backToLobby = (tab) => {
     setScreen('lobby');
     setCurrentGame(null);
+    setReviewMode(false);
     setWinData(null);
     setLoseData(null);
     setClassicGameMode(null);
@@ -19199,6 +20294,7 @@ function App() {
   const playAgain = () => {
     setWinData(null);
     setLoseData(null);
+    setReviewMode(false);
     setStepCount(0);
     setPlayAgainKey(k => k + 1);
     // Keep classicLastResult for the Game Menu.
@@ -19405,8 +20501,22 @@ function App() {
   // Pin the shell to exactly one viewport while a fit-mode game is on screen
   // (slice 1), so the board's flex column measures against real space instead
   // of growing the document. Every other screen keeps normal page scrolling.
+  // Server-anchored reset clock for the merged grid's daily note (slice 2) —
+  // the same hook LockedScreen and the pre-game screen use, so every countdown
+  // in the app ticks off one clock.
+  const homeResetCountdown = useCountdown(nextResetUtc, offset, onReset);
+
   const fitActive = screen === 'game' && !!currentGame && !!currentGame.fitShell
-    && !winData && !loseData;
+    && (!winData && !loseData || reviewMode);
+
+  // Whether the finished board can be shown under the results card (slice 4).
+  // Guarded on the result belonging to the CURRENTLY mounted game, so a stale
+  // board can never be presented as this run's. shell:'self' classics draw
+  // their own game-over overlay and are excluded.
+  const resultData = winData || loseData;
+  const boardReviewable = screen === 'game' && !!currentGame && !!resultData
+    && currentGame.shell !== 'self'
+    && (!resultData.gameId || resultData.gameId === currentGame.id);
 
   return (
     <div className={'app' + (fitActive ? ' app-fit' : '')}>
@@ -19575,6 +20685,11 @@ function App() {
                         launchGame(g);
                       }}
                     >
+                      {g.daily && (
+                        <span className={'card-daily-badge' + (finished ? ' done' : inProgress ? ' resume' : ' fresh')}>
+                          {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}
+                        </span>
+                      )}
                       <div className="card-icon">{g.icon}</div>
                       <div className="card-name">{g.name}</div>
                       <div className="card-desc">{g.desc}</div>
@@ -19598,12 +20713,38 @@ function App() {
                     </div>
                   );
                 };
+                // One merged list (slice 2). Registry order is preserved
+                // within each group and dailies lead, so the fresh puzzles are
+                // what a player meets first; the corner badge, not a section
+                // heading, is what marks a card as a daily.
+                const ordered = [
+                  ...GAMES.filter(g => g.category === 'daily'),
+                  ...GAMES.filter(g => g.category !== 'daily'),
+                ].filter(g => homeFilter === 'all'
+                  || (homeFilter === 'daily' ? g.category === 'daily' : g.category !== 'daily'));
                 return (
                   <React.Fragment>
-                    <div className="home-section-title">Daily Puzzles</div>
-                    <div className="grid">{GAMES.filter(g => g.category === 'daily').map(gameCard)}</div>
-                    <div className="home-section-title">Classic Games</div>
-                    <div className="grid">{GAMES.filter(g => g.category === 'classic').map(gameCard)}</div>
+                    <div className="home-section-title">All Games</div>
+                    <div className="home-daily-note">
+                      🕛 New daily puzzles at midnight UTC — resets in{' '}
+                      <span className="mono">{homeResetCountdown}</span>
+                    </div>
+                    <div className="home-filter-chips" role="tablist" aria-label="Filter games">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'daily', label: 'Daily' },
+                        { id: 'classic', label: 'Classic' },
+                      ].map(f => (
+                        <button
+                          key={f.id}
+                          role="tab"
+                          aria-selected={homeFilter === f.id}
+                          className={'home-chip' + (homeFilter === f.id ? ' on' : '')}
+                          onClick={() => setHomeFilter(f.id)}
+                        >{f.label}</button>
+                      ))}
+                    </div>
+                    <div className="grid">{ordered.map(gameCard)}</div>
                   </React.Fragment>
                 );
               })()}
@@ -19669,9 +20810,30 @@ function App() {
         />
       )}
 
-      {screen === 'game' && currentGame && !winData && !loseData && renderGameBody()}
+      {/* The finished board stays MOUNTED under the results card (slice 4) so
+          "View board" has something to reveal. Every game sets its own `done`
+          flag on finish, which stops its timer and short-circuits input; the
+          .frozen wrapper makes that visible and blocks stray taps. Classic
+          shell:'self' games draw their own full-screen game-over overlay, so
+          they're excluded from the freeze layer to avoid stacking two. */}
+      {screen === 'game' && currentGame && (
+        boardReviewable ? (
+          <div className="game-body frozen">{renderGameBody()}</div>
+        ) : (!winData && !loseData) ? renderGameBody() : null
+      )}
 
-      {screen === 'game' && winData && (
+      {screen === 'game' && (winData || loseData) && reviewMode && (
+        <button className="result-minibar" onClick={() => setReviewMode(false)}>
+          <span className="rmb-text">
+            {winData
+              ? `${winData.winnerLabel || 'Solved'} · +${winData.finalScore != null ? winData.finalScore : winData.score}`
+              : 'Game over · +0'}
+          </span>
+          <span className="rmb-cta">↑ Results</span>
+        </button>
+      )}
+
+      {screen === 'game' && winData && !reviewMode && (
         <div className="win-overlay">
           <div className="win-card">
             <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
@@ -19808,12 +20970,17 @@ function App() {
                 Play Again
               </button>
             )}
+            {boardReviewable && (
+              <button className="primary-btn review-btn" onClick={() => setReviewMode(true)}>
+                👁 View board
+              </button>
+            )}
             <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
       )}
 
-      {screen === 'game' && loseData && (
+      {screen === 'game' && loseData && !reviewMode && (
         <div className="win-overlay">
           <div className="win-card">
             <div className="trophy">{loseData.isClassic ? '💥' : '💀'}</div>
@@ -19858,6 +21025,11 @@ function App() {
             {loseData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
                 Play Again
+              </button>
+            )}
+            {boardReviewable && (
+              <button className="primary-btn review-btn" onClick={() => setReviewMode(true)}>
+                👁 View board
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>

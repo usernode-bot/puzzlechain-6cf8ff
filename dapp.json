@@ -621,6 +621,10 @@
       "expectSelector": "canvas.ng-canvas"
     }
   ],
+  "visibility": {
+    "build": "public",
+    "view": "public"
+  },
   "admins": [
     "evan"
   ]

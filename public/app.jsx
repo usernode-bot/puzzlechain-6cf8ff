@@ -568,6 +568,80 @@ body {
   margin: 0 auto;
   aspect-ratio: 1;
 }
+.sudoku.s9 .scell { font-size: 1.02rem; }
+.sdk-choose { max-width: 380px; margin: 1.5rem auto; text-align: center; }
+.sdk-choose-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.35rem; }
+.sdk-choose-sub { color: ${C.muted}; font-size: 0.82rem; margin-bottom: 1.1rem; }
+.sdk-choice {
+  display: block; width: 100%; margin-bottom: 0.7rem; padding: 0.9rem 1rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
+  cursor: pointer; text-align: left; font-family: inherit; color: inherit;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.sdk-choice:hover { border-color: ${C.accent}; transform: translateY(-1px); }
+.sdk-choice-name { display: block; font-size: 1.05rem; font-weight: 700; }
+.sdk-choice-note { display: block; color: ${C.muted}; font-size: 0.78rem; margin-top: 0.15rem; }
+/* ---- Word Sprint (daily Boggle-style word grid) ---- */
+.wspr-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  max-width: 320px; margin: 0 auto; aspect-ratio: 1;
+}
+.wspr-tile {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
+  cursor: pointer; user-select: none; position: relative;
+}
+.wspr-tile.onpath { background: ${C.accent}; color: #fff; border-color: ${C.accent}; }
+.wspr-tile.pathlast { box-shadow: 0 0 0 3px ${C.gold}; }
+.wspr-tile.dim { opacity: 0.45; cursor: default; }
+.wspr-word {
+  text-align: center; font-family: 'JetBrains Mono', monospace; letter-spacing: 2px;
+  font-size: 1.15rem; font-weight: 700; min-height: 1.6rem; margin: 0.7rem 0 0.4rem;
+}
+.wspr-msg { text-align: center; font-size: 0.8rem; min-height: 1.1rem; color: ${C.muted}; }
+.wspr-msg.good { color: ${GA.lime}; }
+.wspr-msg.bad { color: ${C.rose}; }
+.wspr-actions { display: flex; gap: 0.5rem; justify-content: center; margin: 0.5rem 0 0.8rem; }
+.wspr-btn {
+  padding: 0.55rem 1.4rem; border-radius: 10px; border: 1px solid ${C.border};
+  background: ${C.card}; color: inherit; font-family: inherit; font-weight: 700; cursor: pointer;
+}
+.wspr-btn.primary { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.wspr-btn:disabled { opacity: 0.45; cursor: default; }
+.wspr-found {
+  display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: center; max-width: 360px; margin: 0 auto;
+}
+.wspr-found span {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
+  padding: 0.15rem 0.6rem; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;
+}
+/* ---- Daily Snake / Daily Bounce (seeded daily arcade variants) ---- */
+.dsnk-board {
+  display: grid; gap: 1px; background: ${C.border}; border: 2px solid ${C.border};
+  border-radius: 10px; overflow: hidden; max-width: 340px; margin: 0 auto; aspect-ratio: 1;
+  touch-action: none;
+}
+.dsnk-cell { background: ${C.card}; }
+.dsnk-cell.body { background: ${GA.lime}; }
+.dsnk-cell.head { background: ${C.accent}; }
+.dsnk-cell.food { background: ${C.rose}; border-radius: 50%; }
+.dsnk-hint { text-align: center; color: ${C.muted}; font-size: 0.8rem; margin-top: 0.6rem; }
+.dbnc-wrap { display: flex; justify-content: center; }
+.dbnc-canvas {
+  border: 2px solid ${C.border}; border-radius: 10px; background: #10131c;
+  touch-action: none; max-width: 100%;
+}
+/* ---- Ludo seats 3/4 (2–4 player boards) ---- */
+.ludo-cell.home3 { background: ${C.gold}22; }
+.ludo-cell.home4 { background: ${GA.teal}22; }
+.ludo-cell.base3 { background: ${C.gold}33; border-color: ${C.gold}; }
+.ludo-cell.base4 { background: ${GA.teal}33; border-color: ${GA.teal}; }
+.ludo-cell.start3 { background: ${C.gold}2e; }
+.ludo-cell.start4 { background: ${GA.teal}2e; }
+.ludo-token.p3 { background: ${C.gold}; }
+.ludo-token.p4 { background: ${GA.teal}; }
+.ludo-token.forfeited { opacity: 0.35; }
 .scell {
   background: ${C.card};
   display: flex;
@@ -5792,11 +5866,15 @@ const CHANGELOG = [
     id: 'w2026-07-20',
     weekOf: 'Week of July 20, 2026',
     items: [
+      'New daily: Word Sprint — trace neighboring letters, find every word you can in 90 seconds.',
+      'Sudoku goes full-size: pick 9×9 Classic (double points) or keep the 6×6 Mini.',
+      'Daily Snake and Daily Bounce join the daily rotation — same run for everyone, once a day.',
+      'Ludo tables now seat 2–4 players.',
+      'Fresh names, same games: Snakes & Ladders, Block Fit, Word Search, and Mine Finder Classic.',
       'PuzzleChain is now Game Corner — same games, one name everywhere.',
       'Streaks now follow the Game of the Day: finish the featured game to keep your streak (every day you already earned still counts).',
       'Share cards include your rank on today’s board.',
       'Online matches now time out — 48 quiet hours forfeits the turn.',
-      'Marble Loop (was Zuma) and Daily Cipher (was Crypto Wordle) — new names, same games.',
       'The Community Feed retired; game chat, share cards, and Friends leaderboards are the social corner now.',
     ],
   },
@@ -6032,24 +6110,109 @@ function generateSudoku6(rng = Math.random) {
   return { solution: sol, puzzle };
 }
 
-const boxAt = (r, c) => Math.floor(r / 2) * 2 + Math.floor(c / 3);
+// Box index for either board size: 6×6 uses 2×3 boxes, 9×9 uses 3×3.
+const boxAt = (r, c, size = 6) => size === 9
+  ? Math.floor(r / 3) * 3 + Math.floor(c / 3)
+  : Math.floor(r / 2) * 2 + Math.floor(c / 3);
+
+// ---- 9×9 generator (difficulty 'classic' — spec change-list item 7) --------
+// Full seeded backtracking fill, then dig cells in seeded order keeping the
+// solution UNIQUE (solution-count solver capped at 2, MRV + bitmasks so the
+// whole generation stays well under ~100ms).
+function sdk9CountSolutions(g, cap = 2) {
+  const rows = new Array(9).fill(0), cols = new Array(9).fill(0), boxes = new Array(9).fill(0);
+  const empties = [];
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const v = g[r][c];
+    const b = boxAt(r, c, 9);
+    if (v) { const bit = 1 << v; rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit; }
+    else empties.push(r * 9 + c);
+  }
+  let count = 0;
+  const rec = () => {
+    if (count >= cap) return;
+    let bestI = -1, bestOpts = 10;
+    for (let i = 0; i < empties.length; i++) {
+      const e = empties[i];
+      if (e < 0) continue;
+      const r = (e / 9) | 0, c = e % 9;
+      const used = rows[r] | cols[c] | boxes[boxAt(r, c, 9)];
+      let opts = 0;
+      for (let v = 1; v <= 9; v++) if (!(used & (1 << v))) opts++;
+      if (opts === 0) return;
+      if (opts < bestOpts) { bestOpts = opts; bestI = i; if (opts === 1) break; }
+    }
+    if (bestI === -1) { count++; return; }
+    const e = empties[bestI];
+    empties[bestI] = -1;
+    const r = (e / 9) | 0, c = e % 9, b = boxAt(r, c, 9);
+    for (let v = 1; v <= 9; v++) {
+      const bit = 1 << v;
+      if ((rows[r] | cols[c] | boxes[b]) & bit) continue;
+      rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit;
+      rec();
+      rows[r] &= ~bit; cols[c] &= ~bit; boxes[b] &= ~bit;
+      if (count >= cap) break;
+    }
+    empties[bestI] = e;
+  };
+  rec();
+  return count;
+}
+
+function generateSudoku9(rng) {
+  const g = Array.from({ length: 9 }, () => new Array(9).fill(0));
+  const okay = (r, c, v) => {
+    for (let k = 0; k < 9; k++) if (g[r][k] === v || g[k][c] === v) return false;
+    const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+    for (let rr = br; rr < br + 3; rr++) for (let cc = bc; cc < bc + 3; cc++) if (g[rr][cc] === v) return false;
+    return true;
+  };
+  const fill = (pos) => {
+    if (pos === 81) return true;
+    const r = (pos / 9) | 0, c = pos % 9;
+    for (const v of shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], rng)) {
+      if (okay(r, c, v)) {
+        g[r][c] = v;
+        if (fill(pos + 1)) return true;
+        g[r][c] = 0;
+      }
+    }
+    return false;
+  };
+  fill(0);
+  const solution = g.map(row => row.slice());
+  const puzzle = solution.map(row => row.slice());
+  const order = shuffle(Array.from({ length: 81 }, (_, i) => i), rng);
+  let removed = 0;
+  for (const idx of order) {
+    if (removed >= 41) break; // 40 givens left — a fair mid-weight daily
+    const r = (idx / 9) | 0, c = idx % 9;
+    const keep = puzzle[r][c];
+    puzzle[r][c] = 0;
+    if (sdk9CountSolutions(puzzle) !== 1) puzzle[r][c] = keep;
+    else removed++;
+  }
+  return { solution, puzzle };
+}
 
 // Real-Sudoku conflict marking: a filled cell is in error if its value repeats
-// elsewhere in its row, column, or 2×3 box. Returns the set of "r,c" keys in
-// conflict — no hidden "correct answer" comparison.
+// elsewhere in its row, column, or box. Size-aware (6×6 and 9×9). Returns the
+// set of "r,c" keys in conflict — no hidden "correct answer" comparison.
 function sudokuConflicts(grid) {
+  const size = grid.length;
   const errs = new Set();
-  for (let r = 0; r < 6; r++) {
-    for (let c = 0; c < 6; c++) {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       const v = grid[r][c];
       if (!v) continue;
-      for (let k = 0; k < 6; k++) {
+      for (let k = 0; k < size; k++) {
         if (k !== c && grid[r][k] === v) errs.add(`${r},${c}`);
         if (k !== r && grid[k][c] === v) errs.add(`${r},${c}`);
       }
-      for (let rr = 0; rr < 6; rr++) {
-        for (let cc = 0; cc < 6; cc++) {
-          if ((rr !== r || cc !== c) && boxAt(rr, cc) === boxAt(r, c) && grid[rr][cc] === v) {
+      for (let rr = 0; rr < size; rr++) {
+        for (let cc = 0; cc < size; cc++) {
+          if ((rr !== r || cc !== c) && boxAt(rr, cc, size) === boxAt(r, c, size) && grid[rr][cc] === v) {
             errs.add(`${r},${c}`);
           }
         }
@@ -6060,25 +6223,101 @@ function sudokuConflicts(grid) {
 }
 
 // Win = fully filled with zero conflicts (every row/col/box a permutation of
-// 1–6). The true Sudoku rule, decoupled from any single generated solution.
+// 1–N). The true Sudoku rule, decoupled from any single generated solution.
 function sudokuSolved(grid) {
-  for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) if (!grid[r][c]) return false;
+  const size = grid.length;
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (!grid[r][c]) return false;
   return sudokuConflicts(grid).size === 0;
 }
 
-function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
-  const init = useRef(generateSudoku6(dailyRng(offset, 'sudoku'))).current;
-  const { puzzle, solution } = init;
-  const dayNum = useRef(utcDayNum(offset)).current;
+// One Sudoku entry, two board sizes (spec §8: "one entry, not two"). 'mini'
+// is the original 6×6, byte-identical to the pre-change daily; 'classic' is
+// the new 9×9 at ×2 points. The chooser renders BEFORE the board mounts, so
+// the timer never ticks while the player decides; the pick is persisted into
+// progress so a resumed attempt reopens the same board.
+const SUDOKU_MULT = { mini: 1, classic: 2 };
 
-  // Hydrate from a resumed attempt when the saved board is for today's puzzle.
-  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const resumedDiff = savedProgress && savedProgress.dayNum === dayNum &&
+    (savedProgress.difficulty === 'classic' || savedProgress.difficulty === 'mini')
+    ? savedProgress.difficulty
+    : (savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid) && savedProgress.grid.length === 6
+      ? 'mini' // pre-difficulty saves were always the 6×6 board
+      : null);
+  const [difficulty, setDifficulty] = useState(resumedDiff);
+  const boardsRef = useRef({});
+  const getBoard = (diff) => {
+    if (!boardsRef.current[diff]) {
+      if (diff === 'mini') {
+        boardsRef.current[diff] = generateSudoku6(dailyRng(offset, 'sudoku'));
+      } else {
+        // Second deterministic stream derived from the same server-anchored
+        // daily seed, so everyone's 9×9 matches without a new seed row.
+        const draw = dailyRng(offset, 'sudoku');
+        boardsRef.current[diff] = generateSudoku9(mulberry32(((draw() * 4294967296) ^ 0x9E3779B9) >>> 0));
+      }
+    }
+    return boardsRef.current[diff];
+  };
+
+  const pick = (diff) => {
+    const b = getBoard(diff);
+    setDifficulty(diff);
+    // Persist the pick immediately so a resumed attempt reopens this board.
+    onSaveProgress && onSaveProgress(
+      { dayNum, grid: b.puzzle.map(row => row.slice()), hintedCells: [], difficulty: diff },
+      savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0,
+      savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0
+    );
+  };
+
+  if (!difficulty) {
+    return (
+      <div className="sdk-choose">
+        <div className="sdk-choose-title">Choose your board</div>
+        <div className="sdk-choose-sub">One daily attempt either way — the clock starts after you pick.</div>
+        <button className="sdk-choice" onClick={() => pick('classic')}>
+          <span className="sdk-choice-name">9×9 Classic</span>
+          <span className="sdk-choice-note">The full-size grid · ×2 points</span>
+        </button>
+        <button className="sdk-choice" onClick={() => pick('mini')}>
+          <span className="sdk-choice-name">6×6 Mini</span>
+          <span className="sdk-choice-note">Quick board · standard points</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <SudokuBoard
+      key={difficulty}
+      difficulty={difficulty}
+      board={getBoard(difficulty)}
+      dayNum={dayNum}
+      savedProgress={savedProgress}
+      onWin={onWin}
+      onStepChange={onStepChange}
+      onSaveProgress={onSaveProgress}
+    />
+  );
+}
+
+function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProgress, onSaveProgress }) {
+  const { puzzle, solution } = board;
+  const size = puzzle.length;
+  const mult = SUDOKU_MULT[difficulty] || 1;
+
+  // Hydrate from a resumed attempt when the saved board is for today's puzzle
+  // AND the same board size (a mismatched save is ignored, not corrupted).
+  const resumed = savedProgress && savedProgress.dayNum === dayNum &&
+    Array.isArray(savedProgress.grid) && savedProgress.grid.length === size
     ? savedProgress
     : null;
   const [grid, setGrid] = useState(() =>
     resumed ? resumed.grid.map(row => row.slice()) : puzzle.map(row => row.slice())
   );
-  // Cells revealed by a paid hint — locked like givens, persisted across resume.
+  // Cells revealed by a hint — locked like givens, persisted across resume.
   const [hintedCells, setHintedCells] = useState(() =>
     new Set(resumed && Array.isArray(resumed.hintedCells) ? resumed.hintedCells : [])
   );
@@ -6091,16 +6330,22 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
 
-  const cellKey = (r, c) => r * 6 + c;
+  const cellKey = (r, c) => r * size + c;
   const isGiven = (r, c) => puzzle[r][c] !== 0;
   const isLocked = (r, c) => isGiven(r, c) || hintedCells.has(cellKey(r, c));
+  const finalScore = (ns, sc) => {
+    const base = size === 9
+      ? Math.max(1600 - ns * 10 - sc * 2, 300)
+      : Math.max(1200 - ns * 15 - sc * 2, 200);
+    return Math.round(base * mult);
+  };
 
-  // Paid hints: total empty cells in the puzzle is the per-day cap.
+  // Free hints: total empty cells in the puzzle is the per-day cap.
   const totalEmpty = useRef(puzzle.flat().filter(v => v === 0).length).current;
   const hints = useDailyHints({ gameId: 'sudoku', maxHints: totalEmpty });
   const emptyCells = () => {
     const out = [];
-    for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) if (grid[r][c] === 0) out.push([r, c]);
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (grid[r][c] === 0) out.push([r, c]);
     return out;
   };
   const noEmpty = grid.flat().every(v => v !== 0);
@@ -6111,14 +6356,14 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   useAutosave(
     onSaveProgress,
     () => ({
-      progress: { dayNum, grid: stateRef.current.grid, hintedCells: [...stateRef.current.hintedCells] },
+      progress: { dayNum, grid: stateRef.current.grid, hintedCells: [...stateRef.current.hintedCells], difficulty },
       steps: stateRef.current.steps, secs: stateRef.current.secs,
     }),
     !done
   );
 
   const saveNow = (ng, ns, hc) =>
-    onSaveProgress && onSaveProgress({ dayNum, grid: ng, hintedCells: [...hc] }, ns, secs);
+    onSaveProgress && onSaveProgress({ dayNum, grid: ng, hintedCells: [...hc], difficulty }, ns, secs);
 
   // Reveal one correct cell — the selected empty cell if any, else a random one.
   const buyHint = () => {
@@ -6142,8 +6387,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
       saveNow(ng, steps, hc);
       if (sudokuSolved(ng)) {
         setDone(true);
-        const score = Math.max(1200 - steps * 15 - secs * 2, 200);
-        onWin(score, steps, secs);
+        onWin(finalScore(steps, secs), steps, secs);
       }
       return true;
     });
@@ -6171,13 +6415,14 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     // win check — fully filled and no conflicts
     if (sudokuSolved(ng)) {
       setDone(true);
-      const score = Math.max(1200 - newSteps * 15 - secs * 2, 200);
-      onWin(score, newSteps, secs);
+      onWin(finalScore(newSteps, secs), newSteps, secs);
     }
   };
 
   const selKey = selected ? `${selected[0]},${selected[1]}` : null;
-  const selBox = selected ? boxAt(selected[0], selected[1]) : -1;
+  const selBox = selected ? boxAt(selected[0], selected[1], size) : -1;
+  const boldRight = (c) => size === 9 ? (c === 2 || c === 5) : c === 2;
+  const boldBottom = (r) => size === 9 ? (r === 2 || r === 5) : (r === 1 || r === 3);
 
   return (
     <div className="fit-col">
@@ -6193,13 +6438,19 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
         <div className="pill">
           <div className="plabel">Filled</div>
           <div className="pvalue">
-            {grid.flat().filter(v => v !== 0).length}/36
+            {grid.flat().filter(v => v !== 0).length}/{size * size}
           </div>
+        </div>
+        <div className="pill">
+          <div className="plabel">Board</div>
+          <div className="pvalue" style={{ fontSize: '0.82rem' }}>{size === 9 ? '9×9 ×2' : '6×6'}</div>
         </div>
       </div>
 
-      <div className="fit-scale-box">
-      <div className="sudoku">
+      <div
+        className={'sudoku' + (size === 9 ? ' s9' : '')}
+        style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, maxWidth: size === 9 ? 420 : 360 }}
+      >
         {grid.map((row, r) =>
           row.map((v, c) => {
             const key = `${r},${c}`;
@@ -6208,7 +6459,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
             const locked = given || hinted;
             const isSel = selKey === key;
             const isHl = !isSel && selected &&
-              (selected[0] === r || selected[1] === c || boxAt(r, c) === selBox);
+              (selected[0] === r || selected[1] === c || boxAt(r, c, size) === selBox);
             const isErr = errors.has(key);
             const cls = ['scell'];
             if (given) cls.push('given'); else if (hinted) cls.push('hinted'); else if (v !== 0) cls.push('user');
@@ -6219,8 +6470,8 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
                 key={key}
                 className={cls.join(' ')}
                 style={{
-                  borderRight: c === 2 ? `2px solid ${C.border}` : undefined,
-                  borderBottom: (r === 1 || r === 3) ? `2px solid ${C.border}` : undefined,
+                  borderRight: boldRight(c) ? `2px solid ${C.border}` : undefined,
+                  borderBottom: boldBottom(r) ? `2px solid ${C.border}` : undefined,
                 }}
                 onClick={() => !locked && !done && setSelected([r, c])}
               >
@@ -6229,7 +6480,6 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
             );
           })
         )}
-      </div>
       </div>
 
       {!done && (
@@ -6243,8 +6493,8 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
         />
       )}
 
-      <div className="numpad">
-        {[1, 2, 3, 4, 5, 6].map(n => (
+      <div className="numpad" style={size === 9 ? { gridTemplateColumns: 'repeat(9, 1fr)' } : undefined}>
+        {Array.from({ length: size }, (_, i) => i + 1).map(n => (
           <button key={n} className="numkey" onClick={() => place(n)}>{n}</button>
         ))}
       </div>
@@ -7856,7 +8106,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
-      const shareText = `Minesweeper ${entry.date} — 💥 Game Over · ${safeRevealed}/54 safe · ${secs}s · +0 pts`;
+      const shareText = `Mine Finder Classic ${entry.date} — 💥 Game Over · ${safeRevealed}/54 safe · ${secs}s · +0 pts`;
       onLose(newSteps, secs, { share: shareText });
       return;
     }
@@ -7878,7 +8128,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
-      const shareText = `Minesweeper ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secs}s · +${baseScore} pts`;
+      const shareText = `Mine Finder Classic ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secs}s · +${baseScore} pts`;
       submitClassicScore('minesweeper', baseScore, { safeRevealed: newSafeRevealed, timeSecs: secs });
       onWin(baseScore, newSteps, secs, { share: shareText, cashOut: false });
     }
@@ -7898,7 +8148,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     };
     msSaveEntry(entry);
     setGameHistory(msLoadHistory());
-    const shareText = `Minesweeper ${dateStr} — 🔒×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
+    const shareText = `Mine Finder Classic ${dateStr} — 🔒×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
     submitClassicScore('minesweeper', finalScore, { safeRevealed, timeSecs: secs });
     onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
   };
@@ -11224,7 +11474,7 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
           resetKey={boardKey}
           onEnd={(sc, placed, secs) => {
             submitClassicScore('blockblast', sc);
-            onWin(sc, placed, secs, { winnerLabel: 'Game Over', share: `🧱 Block Blast — ${sc} pts` });
+            onWin(sc, placed, secs, { winnerLabel: 'Game Over', share: `🧱 Block Fit — ${sc} pts` });
           }}
         />
       </div>
@@ -15625,7 +15875,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
         const finalRolls = rollsRef.current;
         const finalSecs = secsRef.current;
         const score = Math.max(50, 300 - finalRolls * 5);
-        const share = `🪜 Chutes & Ladders — ${pLabel(who)} won in ${finalRolls} rolls!`;
+        const share = `🪜 Snakes & Ladders — ${pLabel(who)} won in ${finalRolls} rolls!`;
         winTimerRef.current = setTimeout(() => {
           winTimerRef.current = null;
           onWin(score, finalRolls, finalSecs, { winner: who, winnerLabel: label, share });
@@ -15987,7 +16237,7 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
     const youWin = room.winner === String(myPlayerNum);
     const rolls = (room.state && room.state.rolls) || 0;
     const score = youWin ? Math.max(50, 300 - rolls * 5) : 0;
-    const share = `🪜 Chutes & Ladders Online — ${youWin ? 'I won' : 'good game'} in ${rolls} rolls!`;
+    const share = `🪜 Snakes & Ladders Online — ${youWin ? 'I won' : 'good game'} in ${rolls} rolls!`;
     onWin(score, movesRef.current, secsRef.current, { winnerLabel: youWin ? 'You win! 🎉' : 'Opponent wins', share });
   }, [room && room.status]);
 
@@ -16120,11 +16370,18 @@ function OnlineRoomSetup({ gameId, onReady }) {
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Ludo seats 2–4 players (change-list item 10); every other board game is
+  // strictly head-to-head.
+  const multiSeat = gameId === 'ludo';
+  const [players, setPlayers] = useState(2);
 
   const start = async () => {
     if (action === 'create') {
       setBusy(true);
-      const { ok, body } = await api(`/api/classic/${gameId}/rooms`, { method: 'POST' });
+      const { ok, body } = await api(`/api/classic/${gameId}/rooms`, {
+        method: 'POST',
+        body: JSON.stringify(multiSeat ? { players } : {}),
+      });
       setBusy(false);
       if (ok && body) onReady(body.id, 1);
       else setError('Could not create room. Try again.');
@@ -16132,9 +16389,9 @@ function OnlineRoomSetup({ gameId, onReady }) {
       const code = joinCode.trim().toUpperCase();
       if (code.length < 4) { setError('Enter a valid room code.'); return; }
       setBusy(true);
-      const { ok, status } = await api(`/api/classic/${gameId}/rooms/${code}/join`, { method: 'POST' });
+      const { ok, status, body } = await api(`/api/classic/${gameId}/rooms/${code}/join`, { method: 'POST' });
       setBusy(false);
-      if (ok) onReady(code, 2);
+      if (ok) onReady(code, (body && body.yourPlayerNum) || 2);
       else if (status === 404) setError('Room not found. Check the code.');
       else if (status === 409) setError('Room is full or you created it.');
       else setError('Could not join. Try again.');
@@ -16144,13 +16401,27 @@ function OnlineRoomSetup({ gameId, onReady }) {
   return (
     <div className="mnc-mode-select">
       <div className="brg-intro">
-        🌐 Online head-to-head — play a friend via room code. Wins count on the <strong>Ladder</strong>.
+        {multiSeat
+          ? <>🌐 Online Ludo — 2, 3, or 4 players via room code. 2-player wins count on the <strong>Ladder</strong>.</>
+          : <>🌐 Online head-to-head — play a friend via room code. Wins count on the <strong>Ladder</strong>.</>}
       </div>
       <div className="mnc-online-actions">
         <div className="mnc-mode-sub">
           <button className={'mnc-difficulty-pill' + (action === 'create' ? ' active' : '')} onClick={() => { setAction('create'); setError(''); }}>Create Room</button>
           <button className={'mnc-difficulty-pill' + (action === 'join' ? ' active' : '')} onClick={() => { setAction('join'); setError(''); }}>Join Room</button>
         </div>
+        {multiSeat && action !== 'join' && (
+          <div className="mnc-mode-sub" style={{ marginTop: '0.5rem' }}>
+            <span style={{ alignSelf: 'center', color: C.muted, fontSize: '0.78rem', marginRight: '0.3rem' }}>Players:</span>
+            {[2, 3, 4].map(n => (
+              <button
+                key={n}
+                className={'mnc-difficulty-pill' + (players === n ? ' active' : '')}
+                onClick={() => setPlayers(n)}
+              >{n} players</button>
+            ))}
+          </div>
+        )}
         {action === 'join' && (
           <div className="mnc-join-form">
             <input
@@ -16293,9 +16564,18 @@ const LUDO_RING_XY = [
 const LUDO_HOME_XY = {
   1: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
   2: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
+  3: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+  4: [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
 };
-const LUDO_BASE_XY = { 1: [[2,2],[4,2],[2,4],[4,4]], 2: [[10,10],[12,10],[10,12],[12,12]] };
-const LUDO_START_ABS = { 1: 0, 2: 26 };
+const LUDO_BASE_XY = {
+  1: [[2,2],[4,2],[2,4],[4,4]],
+  2: [[10,10],[12,10],[10,12],[12,12]],
+  3: [[10,2],[12,2],[10,4],[12,4]],
+  4: [[2,10],[4,10],[2,12],[4,12]],
+};
+// Ring entry offsets — mirrors LUDO_START in lib/board-rules.js.
+const LUDO_START_ABS = { 1: 0, 2: 26, 3: 13, 4: 39 };
+const LUDO_SEAT_COLORS = { 1: C.accent, 2: C.rose, 3: C.gold, 4: GA.teal };
 
 function ludoTokenXY(player, pos, tokenIdx) {
   if (pos === -1) return LUDO_BASE_XY[player][tokenIdx];
@@ -16304,9 +16584,16 @@ function ludoTokenXY(player, pos, tokenIdx) {
   return LUDO_RING_XY[(LUDO_START_ABS[player] + pos) % 52];
 }
 
+// Seats map with legacy fallback: pre-multi-seat states carry only p1/p2.
+function ludoSeatsOf(st) {
+  if (st.seats) return { n: st.nPlayers || 2, seats: st.seats, forfeited: st.forfeited || [] };
+  return { n: 2, seats: { 1: st.p1 || [], 2: st.p2 || [] }, forfeited: [] };
+}
+
 function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const phase = st.phase || 'roll';
-  const myTokens = (myPlayerNum === 1 ? st.p1 : st.p2) || [];
+  const { n: nPlayers, seats, forfeited } = ludoSeatsOf(st);
+  const seatList = Array.from({ length: nPlayers }, (_, i) => i + 1);
   const canMoveToken = (pos) => {
     if (phase !== 'move' || !isMyTurn || st.die == null) return false;
     if (pos >= 57) return false;
@@ -16314,17 +16601,17 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     return pos + st.die <= 57;
   };
   const cells = [];
-  // Ring
+  // Ring — a start cell is safe (and tinted) only for seats actually playing.
   LUDO_RING_XY.forEach(([x, y], i) => {
-    const safe = i === 0 || i === 26;
-    const startOwner = i === 0 ? 1 : i === 26 ? 2 : 0;
+    const startOwner = seatList.find(p => LUDO_START_ABS[p] === i) || 0;
+    const safe = i === 0 || i === 13 || i === 26 || i === 39;
     cells.push(
       <div key={'r' + i} className={'ludo-cell ring' + (safe ? ' safe' : '') + (startOwner ? ' start' + startOwner : '')}
            style={{ gridColumn: x + 1, gridRow: y + 1 }}>{safe ? '★' : ''}</div>
     );
   });
-  // Home columns + center + bases
-  for (const p of [1, 2]) {
+  // Home columns + center + bases (only for seats in this match)
+  for (const p of seatList) {
     LUDO_HOME_XY[p].forEach(([x, y], i) => {
       cells.push(<div key={'h' + p + i} className={'ludo-cell home' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
     });
@@ -16335,16 +16622,17 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   cells.push(<div key="center" className="ludo-cell center" style={{ gridColumn: 8, gridRow: 8 }}>🏁</div>);
   // Tokens (offset stacked tokens slightly so pile-ups stay visible)
   const tokens = [];
-  for (const p of [1, 2]) {
-    const toks = (p === 1 ? st.p1 : st.p2) || [];
+  for (const p of seatList) {
+    const toks = seats[p] || [];
+    const out = forfeited.includes(p);
     toks.forEach((pos, i) => {
       const [x, y] = ludoTokenXY(p, pos, i);
       const mine = p === myPlayerNum;
-      const movable = mine && canMoveToken(pos);
+      const movable = mine && !out && canMoveToken(pos);
       tokens.push(
         <div
           key={'t' + p + i}
-          className={'ludo-token p' + p + (movable ? ' movable' : '')}
+          className={'ludo-token p' + p + (movable ? ' movable' : '') + (out ? ' forfeited' : '')}
           style={{
             gridColumn: x + 1, gridRow: y + 1,
             transform: `translate(${(i % 2) * 5 - 2}px, ${Math.floor(i / 2) * 5 - 2}px)`,
@@ -16360,10 +16648,16 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
       <div className="cnl-die"><div className="cnl-die-face">{st.die == null ? '·' : st.die}</div></div>
       {st.lastEvent === 'no-move' && <div className="brg-note">No legal move for that roll — turn passed.</div>}
       {st.lastEvent === 'capture' && <div className="brg-note">💥 Capture! Token sent back to base.</div>}
+      {forfeited.length > 0 && (
+        <div className="brg-note">{forfeited.map(p => `P${p}`).join(', ')} forfeited — the match continues.</div>
+      )}
+      {nPlayers > 2 && !isMyTurn && (
+        <div className="brg-note">Waiting on P{st.currentPlayer || 1}…</div>
+      )}
       <div className="cnl-roll-buttons">
         <button
           className="cnl-roll-btn"
-          style={{ background: myPlayerNum === 1 ? C.accent : C.rose }}
+          style={{ background: LUDO_SEAT_COLORS[myPlayerNum] || C.accent }}
           onClick={() => submit({ type: 'roll' })}
           disabled={!isMyTurn || phase !== 'roll'}
         >
@@ -16402,8 +16696,9 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
     const name = (GAMES.find(g => g.id === gameId) || {}).name || gameId;
     const draw = room.winner === 'draw';
     const youWin = room.winner === String(myPlayerNum);
+    const multi = (room.maxPlayers || 2) > 2;
     onWin(youWin ? 200 : 0, movesRef.current, secsRef.current, {
-      winnerLabel: draw ? "It's a draw 🤝" : youWin ? 'You win! 🎉' : 'Opponent wins',
+      winnerLabel: draw ? "It's a draw 🤝" : youWin ? 'You win! 🎉' : (multi ? `Player ${room.winner} wins` : 'Opponent wins'),
       share: `♟️ ${name} online — ${draw ? 'we drew!' : youWin ? 'I won!' : 'good game!'}`,
     });
   }, [room && room.status]);
@@ -16415,9 +16710,14 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
     return <div style={{ textAlign: 'center', padding: '1.5rem', color: C.rose }}>Room not found.</div>;
   }
   if (room && room.status === 'waiting') {
+    const maxP = room.maxPlayers || 2;
     return (
       <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-        <div style={{ color: C.muted, marginBottom: '0.6rem', fontSize: '0.85rem' }}>Waiting for opponent to join…</div>
+        <div style={{ color: C.muted, marginBottom: '0.6rem', fontSize: '0.85rem' }}>
+          {maxP > 2
+            ? `Waiting for players — ${room.seatsFilled || 1}/${maxP} joined…`
+            : 'Waiting for opponent to join…'}
+        </div>
         <div className="mnc-room-code">{roomId}</div>
         <div style={{ color: C.muted, fontSize: '0.78rem', marginTop: '0.4rem' }}>Share this room code</div>
         <div className="mnc-spinner" style={{ margin: '1rem auto 0' }} />
@@ -16427,10 +16727,12 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
 
   const st = room.state || {};
   const isMyTurn = room.status === 'active' && (st.currentPlayer || 1) === myPlayerNum;
-  const myColor = myPlayerNum === 1 ? C.accent : C.rose;
+  const seatColors = { 1: C.accent, 2: C.rose, 3: C.gold, 4: GA.teal };
+  const myColor = seatColors[myPlayerNum] || C.accent;
+  const multiSeat = (room.maxPlayers || 2) > 2;
   const turnLabel = room.status === 'finished'
-    ? (room.winner === 'draw' ? 'Draw' : room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
-    : isMyTurn ? 'Your turn' : "Opponent's turn";
+    ? (room.winner === 'draw' ? 'Draw' : room.winner === String(myPlayerNum) ? 'You win! 🎉' : (multiSeat ? `P${room.winner} wins` : 'Opponent wins'))
+    : isMyTurn ? 'Your turn' : (multiSeat ? `P${st.currentPlayer || 1}'s turn` : "Opponent's turn");
   const View = BOARD_VIEWS[gameId];
   const submit = (move) => {
     movesRef.current += 1;
@@ -18875,29 +19177,755 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
 // server; `howToPlay` card copy lives ONLY here (display strings are the
 // client's). Phase 3's shell-owned pre-game chrome renders these cards; until
 // then they're declarative metadata.
+/* ============================================================
+   Word Sprint — daily Boggle-style timed word grid (change-list item 6).
+   Trace adjacent letters (8 directions, no reuse) on today's seeded 4×4
+   grid and bank as many valid words as you can in 90 seconds. Open
+   vocabulary against the in-file WSPR word set; longer words score more.
+   The countdown ending is the "win" (score may be 0 — an empty sprint
+   still locks the day but never breaks a streak).
+   ============================================================ */
+const WSPR_SECS = 90;
+const WSPR_SIZE = 4;
+// Original letter dice (own distribution — not any published game's):
+// heavy on E/A/I/O/N/R/S/T/L, light on the awkward tail.
+const WSPR_DICE = [
+  'AAEIOU', 'AEINOT', 'ADELRS', 'AEGNRT', 'EILNOS', 'EIORST',
+  'ABCEMP', 'CDEIKT', 'DEHLNR', 'EFGHIY', 'AILMNU', 'BEIOSW',
+  'ACDHOT', 'EGKLNU', 'FIMOPR', 'ESTUVY',
+];
+const WSPR_POINTS = { 3: 30, 4: 60, 5: 120, 6: 200, 7: 300, 8: 400 };
+const wsprPoints = (len) => WSPR_POINTS[Math.min(8, len)] || 0;
+
+// Common-English word set, 3–8 letters. Deliberately generous on short
+// words (the bulk of real finds on a 4×4). Invalid entries can never
+// match a traced path, so the list only ever errs safe.
+const WSPR_WORDS_RAW = `
+ace act add age ago aid ail aim air ale all and ant any ape apt arc are arm art ash ask ate awe axe
+bad bag ban bar bat bay bed bee beg bet bid big bin bit bog bow box boy bud bug bun bus but buy
+cab can cap car cat cob cod cog con cop cot cow cry cub cue cup cut dab dam day den dew did die dig
+dim din dip doe dog don dot dry dub dud due dug duo dye ear eat ebb eel egg ego elf elk elm end era
+eve ewe eye fad fan far fat fed fee few fib fig fin fir fit fix flu fly foe fog for fox fry fun fur
+gag gap gas gel gem get gig gin got gum gun gut guy gym had hag ham has hat hay hem hen her hew hex
+hey hid him hip his hit hoe hog hop hot how hub hue hug hum hut ice icy ill imp ink inn ion ire irk
+its ivy jab jam jar jaw jet jig job jog jot joy jug jut keg key kid kin kit lab lad lag lap law lax
+lay led leg let lid lie lip lit lob log lot low mad man map mar mat maw may men met mid mix mob mop
+mud mug nab nag nap net new nib nil nip nod nor not now nun nut oak oar oat odd ode off oil old one
+ore our out owe owl own pad pal pan par pat paw pay pea peg pen pet pew pie pig pin pit ply pod pop
+pot pro pry pub pun pup put rag ram ran rap rat raw ray red rib rid rig rim rip rob rod roe rot row
+rub rue rug rum run rut rye sad sag sap sat saw say sea set sew she shy sin sip sir sit six ski sky
+sly sob sod son sow soy spa spy sty sub sue sum sun tab tag tan tap tar tax tea ten the tie tin tip
+toe ton top tot tow toy try tub tug two urn use van vat vet vex via vie vow wad wag war was wax way
+web wed wet who wig win wit woe wok won woo wow yak yam yap yes yet yew you zip zoo
+able ache acid acre aged aide airy ally also alto amid area aria atom aunt auto away axle babe back
+bail bait bake bald bale ball band bane bang bank bare bark barn base bash bask bath bead beak beam
+bean bear beat beef been beer bell belt bend bent best bike bile bill bind bird bite blot blow blue
+blur boar boat body boil bold bolt bond bone book boom boot bore born both bout bowl brag bran brew
+brim brow bulk bull bump burn bury bush bust busy cage cake calf call calm came camp cane cape card
+care cart case cash cast cave cell cent chat chef chew chin chip chop cite city clad clam clan clap
+claw clay clip clog clot club clue coal coat code coil coin cold colt comb come cone cook cool cope
+copy cord core cork corn cost cove cozy crab crag cram crew crib crop crow cube cure curl cute dame
+damp dare dark darn dart dash data date dawn dead deaf deal dean dear debt deck deed deem deep deer
+dent deny desk dial dice diet dime dine dirt dish dive dock does dome done doom door dose dote dour
+dove down doze drag draw drew drip drop drum dual duck duel duet dull dumb dune dusk dust duty each
+earl earn ease east easy echo edge edit envy epic even ever evil exam exit face fact fade fail fair
+fake fall fame fang fare farm fast fate fawn fear feat feed feel fell felt fern feud file fill film
+find fine fire firm fish fist five flag flap flat flaw flea fled flee flew flip flow foam foal foil
+fold folk fond font food fool foot ford fore fork form fort foul four fowl free fret frog from fuel
+full fume fund fuse fuss gain gait gale game gang gape gate gave gaze gear gene gift gill girl give
+glad glee glen glow glue goad goal goat goes gold golf gone gong good gore gown grab gray grew grey
+grid grim grin grip grit grow gulf gull gulp gush gust hail hair hale half hall halt hand hang hard
+hare harm harp hate haul have hawk haze heal heap hear heat heed heel heir held helm help herb herd
+here hero hide high hike hill hind hint hire hive hold hole home hone hood hoof hook hoop hope horn
+hose host hour howl huge hull hunt hurl hurt hush hymn icon idea idle idol inch into iron isle item
+jade jail jest join joke jolt jury just keen keep kelp kept kick kiln kind king kiss kite knee knew
+knit knob knot know lace lack lady laid lain lair lake lamb lame lamp land lane lard lark last late
+lava lawn lazy lead leaf leak lean leap left lend lens lent less lest levy liar lice lick lied lien
+life lift like limb lime limp line link lint lion list live load loaf loan lobe lock loft logo lone
+long look loom loop loot lord lore lose loss lost loud love luck lull lung lure lurk lush lute made
+maid mail main make male mall malt mane many mare mark mash mask mast mate math maze meal mean meat
+meek meet meld melt memo mend menu mere mesh mess mice mild mile milk mill mind mine mint mire miss
+mist mite moan moat mock mode mold mole molt monk mood moon moor more morn moss most moth move much
+mule muse mush must mute myth nail name nape navy near neat neck need nest news next nice nick nine
+node none noon norm nose note noun numb oath obey ogle ogre oily omen omit once only onto opal open
+oral oven over pace pack pact page paid pail pain pair pale palm pane pang pant park part pass past
+path pave pawn peak peal pear peat peck peel peer pelt perk pest pier pike pile pill pine pink pint
+pipe pity plan play plea plot plow ploy plug plum plus poem poet pole poll pond pony pool poor pope
+pore pork port pose post pour pout pray prey prim prod prop prow pull pulp pump punt pure push quit
+quiz race rack raft rage raid rail rain rake ramp rang rank rant rare rash rate rave read real ream
+reap rear reed reef reel rein rely rend rent rest rice rich ride rife rift rind ring rink riot ripe
+rise risk rite road roam roar robe rock rode role roll roof rook room root rope rose rosy rote rout
+rove rude ruin rule rung runt ruse rush rust sack safe sage said sail sake sale salt same sand sane
+sang sank sash save scan scar seal seam sear seat sect seed seek seem seen seep self sell send sent
+shed shin ship shoe shop shot show shun shut sick side sift sigh sign silk sill silo sing sink sire
+site size skew skid skim skin skip slab slam slap slat sled slew slid slim slip slit slot slow slug
+slum smog smug snag snap snip snob snow soak soap soar sock soda sofa soft soil sold sole solo some
+song soon soot sore sort soul soup sour sown span spar spat sped spin spit spot spun spur stab stag
+star stay stem step stew stir stop stow stub stud stun such suit sulk sung sunk sure surf swab swam
+swan swap sway swim tack tail take tale talk tall tame tank tape tart task teal team tear tell tend
+tent term test text than that thaw them then they thin this thud thus tick tide tidy tier tile till
+tilt time tint tiny tire toad toil told toll tomb tone took tool tore torn toss tour town trap tray
+tree trek trim trio trip trot true tuck tuft tuna tune turf turn tusk twig twin type ugly undo unit
+unto upon urge used user vain vane vase vast veal veer veil vein vent verb very vest veto vice view
+vine visa void vole vote wade waft wage wail wait wake walk wall wand wane want ward ware warm warn
+warp wart wary wash wasp wave wavy weak wean wear weed week weep weld well welt went wept were west
+what when whim whip whom wick wide wife wild will wilt wind wine wing wink wipe wire wise wish with
+wolf wood wool word wore work worm worn wove wrap wren yard yarn yawn year yell yelp yoga yoke yolk
+your zeal zero zest zone
+about actor acute admit adopt adult after again agent agree ahead alarm alert alike alive alley
+allow alone along aloud alter amend ample angel anger angle ankle apart apple apply arena argue
+arise armor aroma arrow aside asset audio avoid awake award aware badge baker banjo barge basic
+basil baton beach beard beast began begin being belly below bench berry birth black blade blame
+bland blank blast blaze bleak blend bless blind block bloom blown blunt board boast bonus boost
+booth bound brace braid brain brake brand brave bread break breed brick bride brief bring brink
+brisk broad broke brook broom brown brush build built bunch burnt burst cabin cable camel canal
+candy canoe cargo carol carry carve catch cause cease cedar chain chair chalk charm chart chase
+cheap check cheek cheer chess chest chief child chill choir chose chunk churn cider cigar civic
+civil claim clash clasp clean clear clerk click cliff climb cling cloak clock close cloth cloud
+clown coach coast cocoa color comet comic coral couch could count court cover crack craft crane
+crash crate crawl crazy cream creek crept crest crime crisp cross crowd crown crumb crush curve
+cycle daily dairy dance dealt debut decay decor delay delta dense depth diary dirty ditch diver
+dodge doing donor doubt dough dozen draft drain drama drank dream dress dried drift drill drink
+drive drone drove dusty dwell eager eagle early earth easel eaten eight elbow elder elect elite
+empty enemy enjoy enter entry equal error essay event every exact exert exist extra fable faint
+fairy faith false fancy fatal fault favor feast fence ferry fetch fever fiber field fiery fifth
+fifty fight final first flair flake flame flash fleet flesh flick fling flint float flock flood
+floor flora flour fluid flush focus foggy force forge forth forty forum found frame frank fraud
+fresh front frost fruit fudge fully funny gauge ghost giant given giver glade gland glare glass
+gleam glide globe gloom glory glove gnome going grace grade grain grand grant grape graph grasp
+grass grave graze great greed green greet grief grill grind groan groom grove growl grown guard
+guess guest guide guild habit hairy handy happy hardy haste hasty hatch haunt haven hazel heard
+heart heavy hedge hefty hello hence hobby hoist holly honey honor horse hotel hound house hover
+human humid humor hurry ideal image imply index inner input irony issue ivory jelly jewel joint
+jolly judge juice juicy kneel knife knock known label labor lance large laser latch later laugh
+layer learn lease least leave ledge legal lemon level lever light limit linen liner liver lobby
+local lodge logic loose loser lousy lover lower loyal lucid lucky lunar lunch lyric magic major
+maker mango manor maple march marsh match mayor meant medal media melon mercy merge merit merry
+metal meter midst might miner minor minus mirth model moist money month moral mossy motel motor
+mound mount mourn mouse mouth mover movie mural music nasty naval nerve never newer newly night
+noble noise noisy north notch noted novel nurse occur ocean offer often olive onion onset opera
+orbit order organ other otter ought ounce outer owner oxide ozone paint panel panic paper party
+pasta paste patch patio pause peace peach pearl pedal penny perch peril petal phase phone photo
+piano piece pilot pinch pitch pivot pixel place plaid plain plane plank plant plate plaza plead
+pluck plumb plume point polar porch pouch pound power press price pride prime print prior prize
+probe prone proof prose proud prove prune pulse punch pupil puppy purse queen query quest queue
+quick quiet quilt quota quote radar radio rainy raise rally ranch range rapid ratio raven reach
+react ready realm rebel refer reign relax relay renew repay reply resin rhyme rider ridge rifle
+right rigid rinse ripen risen risky rival river roast robin robot rocky rogue roost rotor rough
+round route royal ruler rumor rural rusty sadly salad salty sandy satin sauce scale scalp scare
+scarf scene scent scoop scope score scout scrap screw scrub seize sense serve setup seven shade
+shaft shake shall shame shape share shark sharp shave shear sheep sheer sheet shelf shell shift
+shine shiny shirt shock shoot shore short shout shove shown shrub shrug sight silky since siren
+sixth sixty skate skill skirt skull slack slain slant slate sleek sleep sleet slept slice slick
+slide slime slope small smart smash smell smile smoke snack snail snake snare sneak snore snout
+snowy sober solar solid solve sonar sonic sorry sound south space spade spare spark spawn speak
+spear speed spell spend spent spice spicy spike spill spine spite split spoil spoke spoon sport
+spout spray spree stack staff stage stain stair stake stale stalk stall stamp stand stare stark
+start state steak steal steam steel steep steer stern stick stiff still sting stock stole stomp
+stone stony stood stool stoop store stork storm story stout stove strap straw stray strip stuck
+study stump stung style sugar suite sunny super surge swamp swarm swear sweat sweep sweet swell
+swept swift swing sword syrup table taken talon tango taste teach tempo tenor tense tenth thank
+theft their theme there these thick thief thigh thing think third thorn those three threw throw
+thumb tidal tiger tight timer title toast today token tonic tooth topic torch total touch tough
+towel tower toxic trace track trade trail train trait trash tread treat trend trial tribe trick
+tried troop trout truce truck truly trunk trust truth tulip tumor tunic tutor twice twist ultra
+uncle under union unite unity until upper upset urban usage usher usual utter vague valid valor
+value valve vapor vault venue verse video vigor vinyl virus visit vital vivid vocal voice vowel
+wagon waist waive waltz waste watch water weary weave wedge weigh weird whale wheat wheel where
+which while whirl white whole whose widen widow width wince windy wiser witch woken woman women
+worse worst worth would wound woven wrist wrong yacht yeast yield young youth zebra zesty
+absorb accent access accuse across action active actual advice advise afford agenda almost always
+amount animal annual answer anthem anyone appeal appear arctic around arrive artist aspect assist
+assume attack attend author autumn avenue bakery bamboo banana banner barrel basket battle beacon
+beauty become before behind belief belong beside better beyond bishop bitter bottle bounce branch
+breath breeze bridge bright broken bronze bubble bucket budget bundle burden butter button camera
+campus candle cannon canvas canyon carbon career carpet carrot castle casual cattle caught cellar
+center cereal change chapel charge cherry choice choose chorus church circle circus clever client
+closet coffee collar column combat comedy coming common copper corner cotton county couple course
+cousin cradle crayon create credit crisis critic crunch custom dagger damage danger debate decade
+decent decide defeat defend define degree demand depend desert design desire detail detect device
+dinner direct divide doctor dollar domain donkey double dragon drawer driven driver during easily
+eating editor effect effort either eleven emerge empire enable ending energy engine enough ensure
+entire escape estate exceed except excuse exotic expand expect expert extend fabric falcon family
+famous farmer father fellow female fierce figure filter finger finish flavor flight flower follow
+forest forget formal former fossil foster fourth freeze friend frozen future galaxy garage garden
+garlic gather gentle global golden gospel gossip ground growth guitar hammer handle happen harbor
+hardly hazard health heaven height helmet herald hidden hollow honest horror humble hunger hunter
+impact import income indeed indoor infant inform injury insect inside intact intend invest island
+jacket jargon jungle junior kernel kettle kidney kitten ladder lagoon lately launch lawyer leader
+league legacy legend length lesson letter likely liquid listen little living lizard locker lonely
+longer losing lovely luxury magnet mainly mammal manage manner mantle marble margin marine marker
+market master matter meadow medium member memory mental mentor merely method middle mighty mirror
+mobile modern modest module moment monkey mosaic mostly mother motion murmur muscle museum mutual
+myself mystic narrow nation native nature nearby nearly nectar nephew nickel nimble nobody normal
+notice notion number nutmeg object oblige obtain occupy offend office online option orange orchid
+origin orphan outfit output oyster palace parade parcel pardon parent patrol peanut pebble pencil
+people pepper period permit person phrase picnic pigeon pillar pillow pirate pistol planet please
+pledge plenty pocket poetry police policy polish porter postal potato powder praise prayer prefer
+pretty priest prince prison profit prompt proper public puddle pulley puppet purple pursue puzzle
+rabbit racket random rarely rather reason recall recent recipe record reduce reform refuse regard
+region regret relate relief remain remark remedy remind remote render rental repair repeat report
+rescue resort result retain return reveal review reward rhythm ribbon riddle rising ritual robust
+rocket rotate rubber rustic sacred saddle safari safety salmon sample saying scheme school scream
+screen script search season second secret sector secure seldom select senior sequel serene sermon
+settle severe shadow shaken shovel shower shrine signal silent silver simple simply singer single
+sister sketch slight smooth soccer social socket sodium solemn sonnet sorrow source speech sphere
+spider spirit spread spring sprout square squash stable stance staple statue steady sticky stitch
+stolen strain strand streak stream street stress strict stride strike string stripe stroke strong
+studio submit subtle sudden suffer summer summit sunset supper supply surely survey switch symbol
+system tackle tailor talent target temple tender tennis theory thirty thread threat thrive throne
+tissue tomato tongue toward travel treaty tremor trench tribal triple trophy tunnel turkey turtle
+twelve twenty unfold unique unless unrest unveil update upward urgent useful vacuum valley velvet
+vendor verify vessel victim violet violin virtue vision visual volume voyage waffle wallet walnut
+wander wealth weapon weekly weight window winner winter wisdom within wizard wonder wooden worthy
+writer yellow yonder zenith zigzag zodiac
+ability absence academy account achieve acquire address advance adverse advice against airline
+alcohol already amateur amazing ancient anxiety anybody applied arrange article assault athlete
+attempt attract auction average balance balloon banquet bargain battery bedroom believe beneath
+benefit besides between bicycle billion biology blanket blossom breathe brother cabinet caption
+capture careful carrier caution ceiling century certain chamber channel chapter charity charter
+chicken chimney classic climate clothes collect college combine comfort command comment common
+company compare compete complex concept concern concert conduct confirm connect consist contact
+contain content contest context control convert correct cottage council counter country courage
+crystal culture curious current curtain custody dessert destroy develop diagram diamond digital
+dignity discuss disease display distant drawing eastern economy edition element embrace emotion
+enhance evening exactly examine example excited exhibit expense explain explore express factory
+faculty fashion feature federal fiction fifteen finance finding fitness foreign forever formula
+fortune forward freedom further gallery general genuine gesture greater grocery habitat halfway
+harvest heading healthy hearing heavily herself highway himself history holiday horizon hundred
+husband imagine improve include initial inquiry insight inspire instead journal journey justice
+kitchen landing largely lasting laundry leather lecture liberty library licence lighter limited
+machine manager mansion massive maximum meaning measure medical meeting mention message million
+mineral minister? mission mistake mixture monster morning musical mystery natural neither nervous
+network nothing nowhere obvious offense officer opening operate opinion organic outcome outdoor
+outside overall package painter parking partner passage passion patient pattern payment penalty
+percent perfect perform perhaps physics picture pioneer plastic pleased popular portion poverty
+prairie precise predict premium prepare present prevent primary printer privacy private problem
+process produce product profile program project promise protect protein provide purpose pursuit
+quality quarter radical readily reality receipt receive recover reflect regular related release
+remains removal replace request require reserve resolve respect respond restore retreat reunion
+revenue reverse routine running satisfy science section segment serious service session setting
+seventy several shelter silence similar sixteen society somehow speaker special species sponsor
+stadium station stomach storage strange stretch student subject success suggest summary support
+supreme surface surgery surplus survive suspect sustain teacher theatre therapy thought through
+tonight totally tourist traffic trouble typical uniform unknown unusual upgrade utility variety
+vehicle venture version veteran victory village vintage visible visitor waiting warmth? warrior
+weather website weekend welcome welfare western whether willing without witness wondrous? wording
+`;
+let wsprWordSetCache = null;
+function wsprWordSet() {
+  if (!wsprWordSetCache) {
+    wsprWordSetCache = new Set(
+      WSPR_WORDS_RAW.split(/\s+/).map(w => w.replace(/[^a-z]/g, '')).filter(w => w.length >= 3).map(w => w.toUpperCase())
+    );
+  }
+  return wsprWordSetCache;
+}
+
+function wsprGrid(rng) {
+  const dice = ceShuffle(WSPR_DICE.slice(), rng);
+  return dice.map(d => d[Math.floor(rng() * d.length)]);
+}
+
+function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+  const dayNum = useRef(utcDayNum(offset)).current;
+  const letters = useRef(null);
+  if (!letters.current) letters.current = wsprGrid(dailyRng(offset, 'wordsprint'));
+  const L = letters.current;
+
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.found)
+    ? savedProgress
+    : null;
+  const [found, setFound] = useState(() => (resumed ? resumed.found.filter(w => wsprWordSet().has(w)) : []));
+  const [path, setPath] = useState([]); // cell indices in trace order
+  const [msg, setMsg] = useState(null); // { kind: 'good'|'bad', text }
+  const [done, setDone] = useState(false);
+  const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs)
+    ? Math.min(savedProgress.elapsedSecs, WSPR_SECS) : 0;
+  const { secs } = useTimer(!done, initialSecs);
+  const remaining = Math.max(0, WSPR_SECS - secs);
+
+  const score = found.reduce((s, w) => s + wsprPoints(w.length), 0);
+  const scoreRef = useRef(score); scoreRef.current = score;
+  const foundRef = useRef(found); foundRef.current = found;
+  const doneRef = useRef(false);
+
+  // Idle/leave autosave; per-word saves happen in submit(). Disabled for the
+  // final seconds so no progress write can race the timer-end finish call
+  // (a racing write 409s against the finished row — the shared no-save-on-
+  // the-winning-move rule, adapted for a clock-driven finish).
+  const stateRef = useRef({});
+  stateRef.current = { found, secs };
+  useAutosave(
+    onSaveProgress,
+    () => ({ progress: { dayNum, found: stateRef.current.found }, steps: stateRef.current.found.length, secs: stateRef.current.secs }),
+    !done && remaining > 3
+  );
+
+  // The countdown hitting zero IS the finish. Deliberately no progress save
+  // on the finishing tick — the finish call closes the attempt (409 rule).
+  useEffect(() => {
+    if (remaining > 0 || doneRef.current) return;
+    doneRef.current = true;
+    setDone(true);
+    const words = foundRef.current;
+    const sc = scoreRef.current;
+    const best = words.reduce((m, w) => (w.length > m.length ? w : m), '');
+    onWin(sc, words.length, WSPR_SECS, {
+      share: `🔠 Word Sprint — ${words.length} words · ${sc} pts${best ? ` · best "${best.toLowerCase()}"` : ''}`,
+    });
+  }, [remaining]);
+
+  const adjacent = (a, b) => {
+    const ar = Math.floor(a / WSPR_SIZE), ac = a % WSPR_SIZE;
+    const br = Math.floor(b / WSPR_SIZE), bc = b % WSPR_SIZE;
+    return Math.abs(ar - br) <= 1 && Math.abs(ac - bc) <= 1 && a !== b;
+  };
+
+  const word = path.map(i => L[i]).join('');
+
+  const submit = () => {
+    if (done) return;
+    const w = word;
+    setPath([]);
+    if (w.length < 3) { setMsg({ kind: 'bad', text: 'Words need 3+ letters' }); return; }
+    if (found.includes(w)) { setMsg({ kind: 'bad', text: `Already found ${w}` }); return; }
+    if (!wsprWordSet().has(w)) { setMsg({ kind: 'bad', text: `${w} isn't in the word list` }); return; }
+    const nf = [...found, w];
+    setFound(nf);
+    setMsg({ kind: 'good', text: `+${wsprPoints(w.length)} · ${w}` });
+    onStepChange(nf.length);
+    // Skip the save in the final seconds — the finish call is about to close
+    // the attempt and a racing progress write would 409.
+    if (remaining > 3) onSaveProgress && onSaveProgress({ dayNum, found: nf }, nf.length, secs);
+  };
+
+  const tap = (i) => {
+    if (done) return;
+    setMsg(null);
+    if (path.length === 0) { setPath([i]); return; }
+    const last = path[path.length - 1];
+    if (i === last) { submit(); return; } // tap the last tile again to submit
+    const pos = path.indexOf(i);
+    if (pos !== -1) { setPath(path.slice(0, pos + 1)); return; } // backtrack
+    if (!adjacent(last, i)) return;
+    setPath([...path, i]);
+  };
+
+  const fmtLeft = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill">
+          <div className="plabel">Left</div>
+          <div className="pvalue time" style={remaining <= 10 ? { color: C.rose } : undefined}>{fmtLeft}</div>
+        </div>
+        <div className="pill"><div className="plabel">Words</div><div className="pvalue">{found.length}</div></div>
+        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
+      </div>
+
+      <div className="wspr-grid">
+        {L.map((ch, i) => {
+          const onPath = path.includes(i);
+          const isLast = path.length > 0 && path[path.length - 1] === i;
+          const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
+          return (
+            <div
+              key={i}
+              className={'wspr-tile' + (onPath ? ' onpath' : '') + (isLast ? ' pathlast' : '') + (!selectable ? ' dim' : '')}
+              onClick={() => selectable && tap(i)}
+            >{ch}</div>
+          );
+        })}
+      </div>
+
+      <div className="wspr-word">{word || ' '}</div>
+      <div className={'wspr-msg' + (msg ? ' ' + msg.kind : '')}>{msg ? msg.text : ' '}</div>
+
+      <div className="wspr-actions">
+        <button className="wspr-btn" onClick={() => { setPath([]); setMsg(null); }} disabled={done || path.length === 0}>Clear</button>
+        <button className="wspr-btn primary" onClick={submit} disabled={done || word.length < 3}>Submit</button>
+      </div>
+
+      {found.length > 0 && (
+        <div className="wspr-found">
+          {found.slice().reverse().map(w => <span key={w}>{w.toLowerCase()} +{wsprPoints(w.length)}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Daily Snake — seeded, bounded daily variant (change-list item 8).
+   Same 13×13 run for everyone: the apple SEQUENCE comes from today's
+   seed, speed ramps deterministically, and the session is bounded —
+   eat 20 apples to win, crash to lose the day. Real-time, so there is
+   deliberately NO mid-run resume: leaving restarts the run.
+   ============================================================ */
+const DSNK_N = 13;
+const DSNK_TARGET = 20;
+
+function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
+  const [, render] = useState(0);
+  const [started, setStarted] = useState(false);
+  const [done, setDone] = useState(false);
+  const [eaten, setEaten] = useState(0);
+  const boardRef = useRef(null);
+  const st = useRef(null);
+  const doneRef = useRef(false);
+  const { secs } = useTimer(started && !done, 0);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  // Today's apple sequence — everyone gets the same ordered list; a cell
+  // occupied by the snake is skipped (deterministically) to the next entry.
+  const foodSeq = useRef(null);
+  if (!foodSeq.current) {
+    const rng = dailyRng(offset, 'snakedaily');
+    foodSeq.current = Array.from({ length: 600 }, () => Math.floor(rng() * DSNK_N * DSNK_N));
+  }
+
+  const spawnFood = (snake, ptr) => {
+    const seq = foodSeq.current;
+    for (let k = ptr; k < seq.length; k++) {
+      const cell = seq[k];
+      const x = cell % DSNK_N, y = Math.floor(cell / DSNK_N);
+      if (!snake.some(s => s.x === x && s.y === y)) return { food: { x, y }, ptr: k + 1 };
+    }
+    // Sequence exhausted (practically unreachable) — linear scan fallback.
+    for (let i = 0; i < DSNK_N * DSNK_N; i++) {
+      const x = i % DSNK_N, y = Math.floor(i / DSNK_N);
+      if (!snake.some(s => s.x === x && s.y === y)) return { food: { x, y }, ptr };
+    }
+    return { food: { x: 0, y: 0 }, ptr };
+  };
+
+  if (!st.current) {
+    const m = Math.floor(DSNK_N / 2);
+    const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
+    const sp = spawnFood(snake, 0);
+    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: sp.food, ptr: sp.ptr, eaten: 0 };
+  }
+
+  const finish = (won) => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    setDone(true);
+    const s = st.current;
+    if (won) {
+      const score = Math.max(1800 - secsRef.current * 5, 600);
+      onWin(score, DSNK_TARGET, secsRef.current, { share: `🐍 Daily Snake — all ${DSNK_TARGET} apples in ${secsRef.current}s` });
+    } else {
+      onLose && onLose(s.eaten, secsRef.current, { share: `🐍 Daily Snake — ${s.eaten}/${DSNK_TARGET} apples` });
+    }
+  };
+
+  const step = () => {
+    const s = st.current;
+    if (!s || doneRef.current) return;
+    s.dir = s.nextDir;
+    const head = s.snake[0];
+    const nx = head.x + s.dir.x, ny = head.y + s.dir.y;
+    if (nx < 0 || ny < 0 || nx >= DSNK_N || ny >= DSNK_N ||
+        s.snake.some((seg, i) => i < s.snake.length - 1 && seg.x === nx && seg.y === ny)) {
+      finish(false);
+      return;
+    }
+    s.snake.unshift({ x: nx, y: ny });
+    if (nx === s.food.x && ny === s.food.y) {
+      s.eaten++;
+      setEaten(s.eaten);
+      onStepChange && onStepChange(s.eaten);
+      if (s.eaten >= DSNK_TARGET) { finish(true); return; }
+      const sp = spawnFood(s.snake, s.ptr);
+      s.food = sp.food; s.ptr = sp.ptr;
+    } else {
+      s.snake.pop();
+    }
+    render(n => n + 1);
+  };
+
+  useEffect(() => {
+    if (done || !started) return;
+    let raf, last = 0, alive = true;
+    const loop = (ts) => {
+      if (!alive) return;
+      const speed = Math.max(115, 205 - st.current.eaten * 5);
+      if (ts - last >= speed) { last = ts; step(); }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { alive = false; cancelAnimationFrame(raf); };
+  }, [done, started]);
+
+  const turn = (dir) => {
+    const s = st.current;
+    if (!s || doneRef.current) return;
+    const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+    const nd = map[dir]; if (!nd) return;
+    if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
+    s.nextDir = nd;
+    if (!started) setStarted(true);
+  };
+  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started && !done) setStarted(true); } });
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
+      if (k) { e.preventDefault(); turn(k); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [started]);
+
+  const s = st.current;
+  const occ = {};
+  s.snake.forEach((seg, i) => { occ[seg.y * DSNK_N + seg.x] = i === 0 ? 'head' : 'body'; });
+  const fi = s.food.y * DSNK_N + s.food.x;
+  const cells = [];
+  for (let i = 0; i < DSNK_N * DSNK_N; i++) {
+    cells.push(<div key={i} className={'dsnk-cell' + (occ[i] ? ' ' + occ[i] : '') + (i === fi ? ' food' : '')} />);
+  }
+  const fmt = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Apples</div><div className="pvalue">{eaten}/{DSNK_TARGET}</div></div>
+        <div className="pill"><div className="plabel">Length</div><div className="pvalue">{s.snake.length}</div></div>
+      </div>
+      <div
+        className="dsnk-board"
+        ref={boardRef}
+        style={{ gridTemplateColumns: `repeat(${DSNK_N}, 1fr)`, gridTemplateRows: `repeat(${DSNK_N}, 1fr)` }}
+      >
+        {cells}
+      </div>
+      <div className="dsnk-hint">
+        {done ? 'Run over' : started ? `Eat ${DSNK_TARGET} apples — one crash ends the day` : 'Swipe (or arrow keys) to start — everyone gets the same apple trail today'}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Daily Bounce — seeded, bounded brick-breaker daily (change-list item 9).
+   One wall for everyone from today's seed; 3 balls. Clear the wall to
+   win, run out of balls to lose the day. Real-time — no mid-run resume.
+   ============================================================ */
+const DBNC_W = 320, DBNC_H = 430, DBNC_COLS = 8, DBNC_ROWS = 6;
+const DBNC_PADDLE_W = 64, DBNC_PADDLE_H = 10, DBNC_PADDLE_Y = DBNC_H - 26, DBNC_BALL_R = 6;
+const DBNC_BALLS = 3;
+
+function dbncBuildBricks(rng) {
+  const bricks = [];
+  const cellW = DBNC_W / DBNC_COLS, cellH = 20, top = 44;
+  for (let r = 0; r < DBNC_ROWS; r++) {
+    for (let c = 0; c < DBNC_COLS; c++) {
+      const roll = rng();
+      if (roll < 0.15) continue; // gap
+      const hp = roll < 0.6 ? 1 : roll < 0.88 ? 2 : 3;
+      bricks.push({ x: c * cellW + 2, y: top + r * cellH + 2, w: cellW - 4, h: cellH - 4, hp });
+    }
+  }
+  return bricks;
+}
+
+function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
+  const canvasRef = useRef(null);
+  const [started, setStarted] = useState(false);
+  const [done, setDone] = useState(false);
+  const [balls, setBalls] = useState(DBNC_BALLS);
+  const [score, setScore] = useState(0);
+  const { secs } = useTimer(started && !done, 0);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const st = useRef(null);
+  if (!st.current) {
+    st.current = {
+      bricks: dbncBuildBricks(dailyRng(offset, 'bouncedaily')),
+      paddle: DBNC_W / 2,
+      ball: { x: DBNC_W / 2, y: DBNC_PADDLE_Y - DBNC_BALL_R - 1, vx: 0, vy: 0 },
+      launched: false, balls: DBNC_BALLS, score: 0, broken: 0, done: false,
+    };
+    st.current.total = st.current.bricks.length;
+  }
+  const onWinRef = useRef(onWin); onWinRef.current = onWin;
+  const onLoseRef = useRef(onLose); onLoseRef.current = onLose;
+  const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
+
+  const finish = (won) => {
+    const s = st.current;
+    if (s.done) return;
+    s.done = true;
+    setDone(true);
+    if (won) {
+      const total = s.score + 150 * (s.balls - 1) + Math.max(0, 500 - secsRef.current * 2);
+      onWinRef.current(total, s.broken, secsRef.current, { share: `🧱 Daily Bounce — wall cleared in ${secsRef.current}s` });
+    } else {
+      onLoseRef.current && onLoseRef.current(s.broken, secsRef.current, { share: `🧱 Daily Bounce — ${s.broken}/${s.total} bricks` });
+    }
+  };
+
+  const launch = () => {
+    const s = st.current;
+    if (s.done || s.launched) return;
+    s.launched = true;
+    if (!started) setStarted(true);
+    s.ball.vx = 150; s.ball.vy = -240;
+  };
+
+  // Simulation + paint loop (refs only; React state just mirrors the HUD).
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let raf, lastTs = null, alive = true;
+
+    const tick = (ts) => {
+      if (!alive) return;
+      const s = st.current;
+      const dt = lastTs == null ? 0 : Math.min(0.033, (ts - lastTs) / 1000);
+      lastTs = ts;
+
+      if (!s.done && s.launched) {
+        const b = s.ball;
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.x < DBNC_BALL_R) { b.x = DBNC_BALL_R; b.vx = Math.abs(b.vx); }
+        if (b.x > DBNC_W - DBNC_BALL_R) { b.x = DBNC_W - DBNC_BALL_R; b.vx = -Math.abs(b.vx); }
+        if (b.y < DBNC_BALL_R) { b.y = DBNC_BALL_R; b.vy = Math.abs(b.vy); }
+        // Paddle
+        if (b.vy > 0 && b.y + DBNC_BALL_R >= DBNC_PADDLE_Y && b.y + DBNC_BALL_R <= DBNC_PADDLE_Y + DBNC_PADDLE_H + 6 &&
+            Math.abs(b.x - s.paddle) <= DBNC_PADDLE_W / 2 + DBNC_BALL_R) {
+          const off = (b.x - s.paddle) / (DBNC_PADDLE_W / 2); // -1..1
+          const speed = Math.min(360, Math.hypot(b.vx, b.vy) * 1.015);
+          const angle = off * 1.05; // radians off vertical
+          b.vx = speed * Math.sin(angle);
+          b.vy = -Math.abs(speed * Math.cos(angle));
+          b.y = DBNC_PADDLE_Y - DBNC_BALL_R;
+        }
+        // Bricks (one hit per frame is plenty at this speed)
+        for (let i = 0; i < s.bricks.length; i++) {
+          const br = s.bricks[i];
+          if (b.x + DBNC_BALL_R < br.x || b.x - DBNC_BALL_R > br.x + br.w ||
+              b.y + DBNC_BALL_R < br.y || b.y - DBNC_BALL_R > br.y + br.h) continue;
+          const fromSide = Math.min(Math.abs(b.x - br.x), Math.abs(b.x - (br.x + br.w))) <
+                           Math.min(Math.abs(b.y - br.y), Math.abs(b.y - (br.y + br.h)));
+          if (fromSide) b.vx = -b.vx; else b.vy = -b.vy;
+          br.hp -= 1;
+          s.score += 20;
+          if (br.hp <= 0) {
+            s.bricks.splice(i, 1);
+            s.broken += 1;
+            onStepRef.current && onStepRef.current(s.broken);
+          }
+          setScore(s.score);
+          if (s.bricks.length === 0) finish(true);
+          break;
+        }
+        // Lost ball
+        if (b.y - DBNC_BALL_R > DBNC_H) {
+          s.balls -= 1;
+          setBalls(s.balls);
+          if (s.balls <= 0) finish(false);
+          else {
+            s.launched = false;
+            s.ball = { x: s.paddle, y: DBNC_PADDLE_Y - DBNC_BALL_R - 1, vx: 0, vy: 0 };
+          }
+        }
+        if (!s.launched && !s.done) { s.ball.x = s.paddle; }
+      } else if (!s.launched) {
+        s.ball.x = s.paddle;
+      }
+
+      // Paint
+      ctx.clearRect(0, 0, DBNC_W, DBNC_H);
+      ctx.fillStyle = '#10131c';
+      ctx.fillRect(0, 0, DBNC_W, DBNC_H);
+      const hpColors = { 1: '#71A122', 2: '#C9A227', 3: '#CD4B3A' };
+      for (const br of s.bricks) {
+        ctx.fillStyle = hpColors[br.hp] || '#71A122';
+        ctx.fillRect(br.x, br.y, br.w, br.h);
+      }
+      ctx.fillStyle = '#e8e4da';
+      ctx.fillRect(s.paddle - DBNC_PADDLE_W / 2, DBNC_PADDLE_Y, DBNC_PADDLE_W, DBNC_PADDLE_H);
+      ctx.beginPath();
+      ctx.arc(s.ball.x, s.ball.y, DBNC_BALL_R, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { alive = false; cancelAnimationFrame(raf); };
+  }, []);
+
+  // Paddle drag (pointer events cover mouse + touch) + tap/click to launch.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const toX = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      return (e.clientX - rect.left) * (DBNC_W / rect.width);
+    };
+    const move = (e) => {
+      const s = st.current;
+      s.paddle = Math.max(DBNC_PADDLE_W / 2, Math.min(DBNC_W - DBNC_PADDLE_W / 2, toX(e)));
+      if (e.pointerType === 'touch') e.preventDefault();
+    };
+    const down = (e) => { move(e); launch(); };
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerdown', down);
+    return () => {
+      canvas.removeEventListener('pointermove', move);
+      canvas.removeEventListener('pointerdown', down);
+    };
+  }, []);
+
+  const fmt = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  const s = st.current;
+
+  return (
+    <div>
+      <div className="status-bar">
+        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
+        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
+        <div className="pill"><div className="plabel">Balls</div><div className="pvalue">{'●'.repeat(Math.max(0, balls))}{'○'.repeat(DBNC_BALLS - Math.max(0, balls))}</div></div>
+        <div className="pill"><div className="plabel">Bricks</div><div className="pvalue">{s.total - s.bricks.length}/{s.total}</div></div>
+      </div>
+      <div className="dbnc-wrap">
+        <canvas ref={canvasRef} className="dbnc-canvas" width={DBNC_W} height={DBNC_H} />
+      </div>
+      <div className="dsnk-hint">
+        {done ? 'Run over' : started ? 'Drag to move the paddle' : 'Tap the board to launch — everyone breaks the same wall today'}
+      </div>
+    </div>
+  );
+}
+
 const GAMES = [
   {
     id: 'sudoku',
-    name: 'Mini Sudoku',
+    name: 'Sudoku',
     icon: '🔢',
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Fill the 6×6 grid so every row, column, and box has 1–6.',
+    desc: 'Pick your board — full 9×9 Classic (×2 points) or the quick 6×6 Mini.',
     tag: 'Logic',
     tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
     fitShell: true,
     howToPlay: [
-      { title: 'Fill the grid', body: 'Tap a cell, then pick a number 1–6. Every row, column, and 2×3 box must contain each number exactly once.' },
-      { title: 'Change your mind freely', body: 'Tap a filled cell to overwrite it — wrong entries cost steps, not the game.' },
-      { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone gets the same board today.' },
+      { title: 'Pick a board', body: 'Choose 9×9 Classic (worth double points) or the quick 6×6 Mini. The clock only starts once you pick.' },
+      { title: 'Fill the grid', body: 'Tap a cell, then pick a number. Every row, column, and box must contain each number exactly once. Overwrite freely — mistakes cost steps, not the game.' },
+      { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone gets the same boards today.' },
     ],
     component: SudokuGame,
   },
   {
     id: 'wordhunt',
-    name: 'Word Hunt',
+    name: 'Word Search',
     icon: '🔤',
     category: 'daily',
     shell: 'daily',
@@ -18935,7 +19963,7 @@ const GAMES = [
   },
   {
     id: 'minesweeper',
-    name: 'Minesweeper',
+    name: 'Mine Finder Classic',
     icon: '💣',
     category: 'classic',
     shell: 'classic',
@@ -18969,16 +19997,16 @@ const GAMES = [
   },
   {
     id: 'chutes-ladders',
-    name: 'Chutes & Ladders',
+    name: 'Snakes & Ladders',
     icon: '🪜',
     category: 'classic',
     shell: 'classic',
-    desc: 'Race up the board — climb ladders, dodge chutes. 2-player hotseat.',
+    desc: 'Race up the board — climb ladders, dodge slides. 2-player hotseat.',
     tag: 'Board',
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; chutes drop you back.' },
+      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; slides drop you back.' },
       { title: 'First to 100 wins', body: 'Play the bot, a hotseat friend, or online via room code. Win streaks climb the leaderboard.' },
     ],
     component: ChutesLaddersGame,
@@ -19041,7 +20069,7 @@ const GAMES = [
   },
   {
     id: 'blockblast',
-    name: 'Block Blast',
+    name: 'Block Fit',
     icon: '🧱',
     category: 'classic',
     shell: 'self',
@@ -19423,6 +20451,60 @@ const GAMES = [
     ],
     component: DropStackGame,
   },
+  {
+    id: 'wordsprint',
+    name: 'Word Sprint',
+    icon: '🔠',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: 'Trace neighboring letters and find every word you can in 90 seconds.',
+    tag: 'Word',
+    tagColor: GA.sky,
+    manifest: { scoreDirection: 'higher', tieBreak: 'score-then-time', sessionLength: 'short', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Trace a word', body: 'Tap letters that touch — sideways or diagonally — to spell a word. Tap the last letter again (or Submit) to bank it.' },
+      { title: 'Rack up words', body: '3+ letters, no reusing a tile within one word. Longer words score much more: 3 letters is 30, 7 letters is 300.' },
+      { title: 'Beat the clock', body: '90 seconds on the clock. Everyone gets the same grid today — most points wins the board.' },
+    ],
+    component: WordSprintGame,
+  },
+  {
+    id: 'snakedaily',
+    name: 'Daily Snake',
+    icon: '🐍',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: "Today's apple trail — eat 20 apples without crashing. One run per day.",
+    tag: 'Arcade',
+    tagColor: GA.lime,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    howToPlay: [
+      { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. The apples appear in the same order for everyone today.' },
+      { title: 'Eat 20 to win', body: 'Reach 20 apples and the day is yours — faster runs score higher. Hit a wall or your tail and the day is lost.' },
+      { title: 'One run', body: 'This is the daily challenge — no restarts. Warm up in the free-play Snake first if you like.' },
+    ],
+    component: DailySnakeGame,
+  },
+  {
+    id: 'bouncedaily',
+    name: 'Daily Bounce',
+    icon: '🧱',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    desc: "Today's brick wall, three balls — clear it faster than everyone else.",
+    tag: 'Arcade',
+    tagColor: GA.coral,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag', undo: 'none' },
+    howToPlay: [
+      { title: 'Keep it up', body: 'Drag to move the paddle; tap to launch. Everyone plays the exact same wall today.' },
+      { title: 'Clear the wall', body: 'Green bricks take one hit, gold two, red three. Clear every brick to win — spare balls and speed boost your score.' },
+      { title: 'Three balls', body: 'Lose all three and the day is lost. Warm up in free-play Bounce first if you like.' },
+    ],
+    component: DailyBounceGame,
+  },
 ];
 
 /* ============================================================
@@ -19708,7 +20790,7 @@ function App() {
       score: 905, bonus: 0, finalScore: 905, steps: 21, timeSecs: 95,
       multiplier: 1, effectiveStreak: 0,
       guest: true, guestSaved: false, gameId: 'sudoku',
-      share: `Game Corner Mini Sudoku — solved today's board in 01:35!\nPlay the same board (no login): ${window.location.origin}/?game=sudoku`,
+      share: `Game Corner Sudoku — solved today's board in 01:35!\nPlay the same board (no login): ${window.location.origin}/?game=sudoku`,
     });
     api('/api/public/daily/sudoku/rank-preview?timeSecs=95&steps=21')
       .then(({ ok, body }) => {
@@ -20118,7 +21200,7 @@ function App() {
         });
         try {
           const { ok, body } = await api(
-            `/api/public/daily/${gameId}/rank-preview?timeSecs=${Math.round(timeSecs || 0)}&steps=${Math.round(steps || 0)}`
+            `/api/public/daily/${gameId}/rank-preview?timeSecs=${Math.round(timeSecs || 0)}&steps=${Math.round(steps || 0)}&score=${Math.round(score || 0)}`
           );
           if (ok && body && Number.isFinite(body.rank)) {
             // Would-be rank into the CTA and the share card's rank line alike.

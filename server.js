@@ -125,19 +125,19 @@ let migrationsReady = false;
 //   undo           — undo policy: 'none' | 'free' (unlimited take-backs) |
 //                    'booster' (limited, counted uses).
 const GAME_REGISTRY = {
-  sudoku:            { name: 'Mini Sudoku',       category: 'daily',   tier: 'A',
+  sudoku:            { name: 'Sudoku',            category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
-  wordhunt:          { name: 'Word Hunt',         category: 'daily',   tier: 'A',
+  wordhunt:          { name: 'Word Search',       category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag',     undo: 'none' } },
   cryptowordle:      { name: 'Daily Cipher',     category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' } },
   tilematchingdaily: { name: 'Daily Tile Match Puzzle', category: 'daily', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'booster' } },
-  minesweeper:       { name: 'Minesweeper',       category: 'classic', tier: 'A',
+  minesweeper:       { name: 'Mine Finder Classic', category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   mancala:           { name: 'Mancala',           category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
-  'chutes-ladders':  { name: 'Chutes & Ladders',  category: 'classic', tier: 'A',
+  'chutes-ladders':  { name: 'Snakes & Ladders',  category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   '2048':            { name: '2048',              category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'swipe',    undo: 'none' } },
@@ -145,7 +145,7 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   snake:             { name: 'Snake',             category: 'classic', tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
-  blockblast:        { name: 'Block Blast',       category: 'classic', tier: 'A',
+  blockblast:        { name: 'Block Fit',         category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'drag',     undo: 'none' } },
   diamondrush:       { name: 'Diamond Rush',      category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
@@ -181,6 +181,17 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   dropstack:         { name: 'Drop Stack',        category: 'daily',   tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag',      undo: 'none' } },
+  // Spec change-list items 6, 8, 9 — Word Sprint (the Boggle-style launch
+  // game, fresh id since `wordhunt` is the word search) plus seeded daily
+  // variants of Snake and Bounce. Being category 'daily' automatically
+  // enrolls all three in GAME_IDS → server seeds, locks, resume, streaks,
+  // per-game leaderboards, and the GotD rotation (weight 1).
+  wordsprint:        { name: 'Word Sprint',       category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'score-then-time', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  snakedaily:        { name: 'Daily Snake',       category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+  bouncedaily:       { name: 'Daily Bounce',      category: 'daily',   tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'drag',     undo: 'none' } },
   // Phase 5 board games — server-authoritative rules modules (lib/board-rules.js)
   // over classic_rooms; online head-to-head only, rated on the ladder. Tier C:
   // the server IS the referee, so no replay validation is needed.
@@ -1463,6 +1474,14 @@ async function migrate() {
   await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS p2_score INTEGER`);
   await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS p1_finished_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS p2_finished_at TIMESTAMPTZ`);
+  // Multi-seat columns (Ludo 2–4P — spec change-list item 10). Every existing
+  // room keeps max_players = 2 and NULL seats 3/4, so the 2P paths (including
+  // rating) behave exactly as before. Idempotent ADD COLUMN per convention.
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS player3_id TEXT`);
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS player3_name TEXT`);
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS player4_id TEXT`);
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS player4_name TEXT`);
+  await pool.query(`ALTER TABLE classic_rooms ADD COLUMN IF NOT EXISTS max_players INTEGER NOT NULL DEFAULT 2`);
 
   // Stale-room cleanup — classic_rooms has no TTL, so abandoned waiting rooms
   // and old finished races accumulate. Prune them on boot (idempotent, cheap).
@@ -3664,6 +3683,27 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed (Ludo 2–4P): a WAITING 3-seat Ludo room with two
+    // fake players already seated, so a tester who joins with code DEMOL4
+    // fills the last seat, activates the room, and moves immediately
+    // (currentPlayer starts at 3 — the seat the tester lands in). Re-arms on
+    // repeat hits; strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'ludo4') {
+      const l4Init = boardRules.getRules('ludo').initialState(3);
+      l4Init.currentPlayer = 3;
+      await pool.query(
+        `INSERT INTO classic_rooms
+           (id, game_id, player1_id, player1_name, player2_id, player2_name, state, status, max_players)
+         VALUES ('DEMOL4', 'ludo', 'staging-demo-ludo-1', 'Staging demo Rook', 'staging-demo-ludo-2', 'Staging demo Pawn', $1::jsonb, 'waiting', 3)
+         ON CONFLICT (id) DO UPDATE
+           SET player2_id = 'staging-demo-ludo-2', player2_name = 'Staging demo Pawn',
+               player3_id = NULL, player3_name = NULL, player4_id = NULL, player4_name = NULL,
+               state = EXCLUDED.state, status = 'waiting', max_players = 3,
+               move_seq = 0, winner = NULL, last_move_at = now()`,
+        [JSON.stringify(l4Init)]
+      );
+    }
+
     // Staging-only demo seed (phase 7): ~6 fake finished attempts for TODAY'S
     // featured game, so the Game of the Day hero's leaderboard preview has
     // rows on a fresh staging DB. Idempotent; strict no-op in prod.
@@ -4393,16 +4433,29 @@ app.get('/api/public/daily/:gameId/rank-preview', async (req, res) => {
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   const t = Number.parseInt(req.query.timeSecs, 10);
   const s = Number.parseInt(req.query.steps, 10);
+  const sc = Number.parseInt(req.query.score, 10);
   if (!Number.isFinite(t)) return res.status(400).json({ error: 'timeSecs required' });
+  // Score-ranked boards (Word Sprint) preview against score; the rest against
+  // time-then-steps — mirrors the per-game leaderboard's tieBreak dispatch.
+  const scoreRanked = (GAME_REGISTRY[gameId] && GAME_REGISTRY[gameId].manifest || {}).tieBreak === 'score-then-time';
   try {
     const { rows } = await pool.query(
-      `SELECT COUNT(*)::int AS total,
-              COUNT(*) FILTER (WHERE time_secs < $2 OR (time_secs = $2 AND steps <= $3))::int AS ahead
-         FROM daily_attempts
-        WHERE game_id = $1
-          AND attempt_date = (now() AT TIME ZONE 'utc')::date
-          AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
-      [gameId, t, Number.isFinite(s) ? s : 2147483647]
+      scoreRanked
+        ? `SELECT COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE score >= $2)::int AS ahead
+             FROM daily_attempts
+            WHERE game_id = $1
+              AND attempt_date = (now() AT TIME ZONE 'utc')::date
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`
+        : `SELECT COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE time_secs < $2 OR (time_secs = $2 AND steps <= $3))::int AS ahead
+             FROM daily_attempts
+            WHERE game_id = $1
+              AND attempt_date = (now() AT TIME ZONE 'utc')::date
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
+      scoreRanked
+        ? [gameId, Number.isFinite(sc) ? sc : 0]
+        : [gameId, t, Number.isFinite(s) ? s : 2147483647]
     );
     res.json({
       rank: rows[0].ahead + 1,
@@ -4462,11 +4515,19 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   // Anonymous callers have no follow graph — return an empty board.
   const friendsScope = req.query.scope === 'friends';
   if (friendsScope && !req.user) return res.json({ entries: [], me: null, total: 0 });
+  // The ORDER BY is the manifest's symbolic tieBreak rule (phase 2 note:
+  // "parameterize the SQL off it when the daily pool widens beyond
+  // fastest-solve games"). Word Sprint is fixed-duration, so its board ranks
+  // by score; everything else stays fastest-solve.
+  const tieBreak = (GAME_REGISTRY[gameId] && GAME_REGISTRY[gameId].manifest || {}).tieBreak;
+  const orderBy = tieBreak === 'score-then-time'
+    ? 'score DESC, time_secs ASC, finished_at ASC'
+    : 'time_secs ASC, steps ASC, finished_at ASC';
   try {
     const { rows } = await pool.query(
       `SELECT user_id, username, score, steps, time_secs,
               ROW_NUMBER() OVER (
-                ORDER BY time_secs ASC, steps ASC, finished_at ASC
+                ORDER BY ${orderBy}
               ) AS rank
          FROM daily_attempts
         WHERE game_id = $1
@@ -4777,7 +4838,8 @@ app.get('/api/rooms/mine', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT * FROM classic_rooms
-        WHERE status = 'active' AND (player1_id = $1 OR player2_id = $1)
+        WHERE status = 'active'
+          AND (player1_id = $1 OR player2_id = $1 OR player3_id = $1 OR player4_id = $1)
         ORDER BY last_move_at DESC LIMIT 10`,
       [req.user.id]
     );
@@ -4788,14 +4850,17 @@ app.get('/api/rooms/mine', async (req, res) => {
       // and drops off the your-turn row.
       r = await expireStaleClassicRoom(r);
       if (r.status !== 'active') continue;
-      const myPlayerNum = r.player1_id === req.user.id ? 1 : 2;
+      const myPlayerNum = roomSeatOf(r, req.user.id) || 1;
       const cur = r.state && Number(r.state.currentPlayer);
+      const others = [
+        [1, r.player1_name], [2, r.player2_name], [3, r.player3_name], [4, r.player4_name],
+      ].filter(([s, n]) => s !== myPlayerNum && s <= roomMaxPlayers(r) && n).map(([, n]) => n);
       rooms.push({
         id: r.id,
         gameId: r.game_id,
         myPlayerNum,
         myTurn: cur === myPlayerNum,
-        opponentName: (myPlayerNum === 1 ? r.player2_name : r.player1_name) || 'opponent',
+        opponentName: others.length > 1 ? `${others[0]} +${others.length - 1}` : (others[0] || 'opponent'),
         lastMoveAt: r.last_move_at,
         turnTimeoutHours: TURN_TIMEOUT_HOURS,
       });
@@ -4820,6 +4885,21 @@ const BOARD_RULE_GAME_IDS = new Set(
   Object.keys(boardRules.boardRules).filter((id) => id !== 'mancala')
 );
 
+// Seat helpers (multi-seat rooms — today only Ludo sets max_players > 2).
+function roomMaxPlayers(r) { return Math.min(4, Math.max(2, Number(r.max_players) || 2)); }
+function roomSeatIdCols(r) { return [r.player1_id, r.player2_id, r.player3_id, r.player4_id]; }
+function roomSeatOf(r, userId) {
+  const ids = roomSeatIdCols(r);
+  for (let s = 1; s <= roomMaxPlayers(r); s++) if (ids[s - 1] === userId) return s;
+  return 0;
+}
+function roomSeatsFilled(r) {
+  const ids = roomSeatIdCols(r);
+  let n = 0;
+  for (let s = 1; s <= roomMaxPlayers(r); s++) if (ids[s - 1]) n++;
+  return n;
+}
+
 function shapeClassicRoom(r) {
   return {
     id: r.id,
@@ -4828,6 +4908,12 @@ function shapeClassicRoom(r) {
     player2Id: r.player2_id,
     player1Name: r.player1_name,
     player2Name: r.player2_name,
+    player3Id: r.player3_id || null,
+    player3Name: r.player3_name || null,
+    player4Id: r.player4_id || null,
+    player4Name: r.player4_name || null,
+    maxPlayers: roomMaxPlayers(r),
+    seatsFilled: roomSeatsFilled(r),
     state: r.state || {},
     moveSeq: r.move_seq,
     status: r.status,
@@ -4858,6 +4944,29 @@ function roomIsStale(r) {
 
 async function expireStaleClassicRoom(r) {
   if (!roomIsStale(r)) return r;
+  // Multi-seat rooms (Ludo 3–4P) forfeit the seat to move and CONTINUE with
+  // the remaining players; only a last-seat-standing ends the room. Unrated
+  // by design (only 2P matches settle Elo).
+  if (roomMaxPlayers(r) > 2 && r.game_id === 'ludo') {
+    const seat = Number(r.state && r.state.currentPlayer) || 1;
+    try {
+      const ff = boardRules.ludoForfeitSeat(r.state || {}, seat);
+      const { rows } = await pool.query(
+        `UPDATE classic_rooms
+           SET state = $3::jsonb, status = $4, winner = COALESCE(winner, $5),
+               move_seq = move_seq + 1, last_move_at = now()
+         WHERE id = $1 AND game_id = $2 AND status = 'active'
+           AND last_move_at < now() - make_interval(hours => $6)
+         RETURNING *`,
+        [r.id, r.game_id, JSON.stringify(ff.state), ff.gameOver ? 'finished' : 'active',
+         ff.gameOver ? ff.winner : null, TURN_TIMEOUT_HOURS]
+      );
+      return rows[0] || r;
+    } catch (e) {
+      console.warn('[rooms] multi-seat expiry failed (non-fatal):', e.message);
+      return r;
+    }
+  }
   // Turn-based rooms forfeit the player to move; score races forfeit the side
   // that never submitted (both absent → the joiner is treated as absent).
   let loser;
@@ -4916,16 +5025,21 @@ async function expireStaleMancalaRoom(r) {
   }
 }
 
-// Create an open room. Body: nothing needed; gameId is the path param.
+// Create an open room. Body: optional { players: 2..4 } for games whose
+// rules module declares maxPlayers (today: Ludo); everything else is 2-seat.
 app.post('/api/classic/:gameId/rooms', async (req, res) => {
   const { gameId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   const rules = boardRules.getRules(gameId);
-  // Room options from the create body (today: Chutes & Ladders' board variant).
-  // Each rules module validates what it understands and ignores the rest, so an
-  // unknown/malformed value can never produce an unplayable room.
+  const seatCap = rules && rules.maxPlayers ? rules.maxPlayers : 2;
+  const wanted = Number((req.body || {}).players) || 2;
+  const maxPlayers = Math.min(seatCap, Math.max(2, wanted));
+  // Room options from the create body (today: Chutes & Ladders' board variant;
+  // Ludo's multi-seat player count instead, since its rules module declares
+  // maxPlayers). Each rules module validates what it understands and ignores
+  // the rest, so an unknown/malformed value can never produce an unplayable room.
   const initState = BOARD_RULE_GAME_IDS.has(gameId) && rules
-    ? rules.initialState(req.body || {})
+    ? (rules.maxPlayers ? rules.initialState(maxPlayers) : rules.initialState(req.body || {}))
     : CLASSIC_RACE_GAME_IDS.has(gameId)
     ? { mode: 'race' }
     : {};
@@ -4933,9 +5047,9 @@ app.post('/api/classic/:gameId/rooms', async (req, res) => {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const { rows } = await pool.query(
-        `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state)
-         VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING *`,
-        [roomId, gameId, req.user.id, req.user.username || null, JSON.stringify(initState)]
+        `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state, max_players)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING *`,
+        [roomId, gameId, req.user.id, req.user.username || null, JSON.stringify(initState), maxPlayers]
       );
       return res.json(shapeClassicRoom(rows[0]));
     } catch (err) {
@@ -4947,28 +5061,45 @@ app.post('/api/classic/:gameId/rooms', async (req, res) => {
   res.status(500).json({ error: 'Failed to generate unique room ID' });
 });
 
-// Join an existing waiting room as player 2.
+// Join an existing waiting room in the next free seat (seat 2 for classic
+// 2-player rooms; seats 2→3→4 for multi-seat Ludo rooms). The room flips to
+// 'active' when the last seat fills. The response carries `yourPlayerNum` so
+// the client knows which seat it landed in.
 app.post('/api/classic/:gameId/rooms/:roomId/join', async (req, res) => {
   const { gameId, roomId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   try {
-    const { rows } = await pool.query(
-      `UPDATE classic_rooms
-         SET player2_id = $1, player2_name = $2, status = 'active', last_move_at = now()
-       WHERE id = $3 AND game_id = $4 AND status = 'waiting' AND player2_id IS NULL
-         AND player1_id != $1
-       RETURNING *`,
-      [req.user.id, req.user.username || null, roomId, gameId]
-    );
-    if (rows.length === 0) {
-      const existing = await pool.query('SELECT id, status, player1_id FROM classic_rooms WHERE id = $1', [roomId]);
-      if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
-      if (existing.rows[0].player1_id === req.user.id) {
-        return res.status(409).json({ error: 'You created this room — share the code with a friend' });
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { rows: cur } = await pool.query(
+        'SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]
+      );
+      if (cur.length === 0) return res.status(404).json({ error: 'Room not found' });
+      const r = cur[0];
+      const already = roomSeatOf(r, req.user.id);
+      if (already === 1) return res.status(409).json({ error: 'You created this room — share the code with a friend' });
+      if (already > 1) {
+        // Re-join (e.g. after a reload of a still-waiting multi-seat room).
+        return res.json({ ...shapeClassicRoom(r), yourPlayerNum: already });
       }
-      return res.status(409).json({ error: 'Room is already full or finished' });
+      if (r.status !== 'waiting') return res.status(409).json({ error: 'Room is already full or finished' });
+      const ids = roomSeatIdCols(r);
+      let seat = 0;
+      for (let s = 2; s <= roomMaxPlayers(r); s++) if (!ids[s - 1]) { seat = s; break; }
+      if (!seat) return res.status(409).json({ error: 'Room is already full or finished' });
+      const lastSeat = roomSeatsFilled(r) + 1 >= roomMaxPlayers(r);
+      const col = seat === 2 ? 'player2' : seat === 3 ? 'player3' : 'player4';
+      const { rows } = await pool.query(
+        `UPDATE classic_rooms
+           SET ${col}_id = $1, ${col}_name = $2,
+               status = $5, last_move_at = now()
+         WHERE id = $3 AND game_id = $4 AND status = 'waiting' AND ${col}_id IS NULL
+         RETURNING *`,
+        [req.user.id, req.user.username || null, roomId, gameId, lastSeat ? 'active' : 'waiting']
+      );
+      if (rows.length === 0) continue; // seat raced away — retry
+      return res.json({ ...shapeClassicRoom(rows[0]), yourPlayerNum: seat });
     }
-    res.json(shapeClassicRoom(rows[0]));
+    res.status(409).json({ error: 'Room is already full or finished' });
   } catch (err) {
     console.error('[classic] join room failed:', err.message);
     res.status(500).json({ error: 'Failed to join room' });
@@ -5012,8 +5143,7 @@ app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
     if (r.move_seq !== moveSeq - 1) return res.status(409).json({ error: 'Stale move_seq', serverMoveSeq: r.move_seq });
 
     const player = (r.state && r.state.currentPlayer) || 1;
-    if (player === 1 && req.user.id !== r.player1_id) return res.status(403).json({ error: 'Not your turn' });
-    if (player === 2 && req.user.id !== r.player2_id) return res.status(403).json({ error: 'Not your turn' });
+    if (roomSeatOf(r, req.user.id) !== player) return res.status(403).json({ error: 'Not your turn' });
 
     let newState, gameOver, winner;
     try {
@@ -5033,7 +5163,9 @@ app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
     );
     if (updated.length === 0) return res.status(409).json({ error: 'Concurrent update conflict' });
     // Ladder: the CAS above guarantees this game-over transition fires once.
-    if (gameOver && r.player2_id) {
+    // Only 2-player matches are rated (3–4P Ludo is unrated for now — the
+    // pairwise Elo math doesn't extend to multi-seat).
+    if (gameOver && r.player2_id && roomMaxPlayers(r) === 2) {
       rateMatch(gameId,
         { id: r.player1_id, name: r.player1_name },
         { id: r.player2_id, name: r.player2_name }, winner);
@@ -5046,22 +5178,46 @@ app.post('/api/classic/:gameId/rooms/:roomId/move', async (req, res) => {
 });
 
 // Mark a room finished early (forfeit / opponent left). Idempotent.
+// Multi-seat Ludo rooms forfeit only the CALLER's seat: the match continues
+// for the remaining players and ends when one seat is left standing.
 app.post('/api/classic/:gameId/rooms/:roomId/finish', async (req, res) => {
   const { gameId, roomId } = req.params;
   const { winner } = req.body || {};
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   try {
+    const { rows: pre } = await pool.query(
+      'SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]
+    );
+    if (pre.length === 0) return res.status(404).json({ error: 'Room not found' });
+    const preRoom = pre[0];
+    if (gameId === 'ludo' && roomMaxPlayers(preRoom) > 2 && preRoom.status === 'active') {
+      const seat = roomSeatOf(preRoom, req.user.id);
+      if (!seat) return res.status(403).json({ error: 'Not a player in this room' });
+      const ff = boardRules.ludoForfeitSeat(preRoom.state || {}, seat);
+      const { rows: updatedMulti } = await pool.query(
+        `UPDATE classic_rooms
+           SET state = $3::jsonb, status = $4, winner = COALESCE(winner, $5),
+               move_seq = move_seq + 1, last_move_at = now()
+         WHERE id = $1 AND game_id = $2 AND status = 'active' AND move_seq = $6
+         RETURNING *`,
+        [roomId, gameId, JSON.stringify(ff.state), ff.gameOver ? 'finished' : 'active',
+         ff.gameOver ? ff.winner : null, preRoom.move_seq]
+      );
+      if (updatedMulti.length > 0) return res.json(shapeClassicRoom(updatedMulti[0]));
+      // Raced with a move — fall through to the idempotent echo below.
+    }
     // Rate the forfeit only on the actual active→finished transition (the
     // endpoint stays idempotent for repeat calls, which just echo the room).
     const { rows: transitioned } = await pool.query(
       `UPDATE classic_rooms
          SET status = 'finished', winner = COALESCE(winner, $3), last_move_at = now()
        WHERE id = $1 AND game_id = $2 AND status <> 'finished'
+         AND NOT (game_id = 'ludo' AND max_players > 2 AND status = 'active')
        RETURNING *`,
       [roomId, gameId, winner != null ? String(winner) : null]
     );
     let room = transitioned[0];
-    if (room && room.status === 'finished' && room.winner && room.player2_id) {
+    if (room && room.status === 'finished' && room.winner && room.player2_id && roomMaxPlayers(room) === 2) {
       rateMatch(gameId,
         { id: room.player1_id, name: room.player1_name },
         { id: room.player2_id, name: room.player2_name }, room.winner);

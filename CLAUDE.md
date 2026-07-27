@@ -628,6 +628,55 @@ record but silently settle as `disputed`, losing the Verified badge.
   `demo=yourturn` (re-arms active checkers room `DEMOYT` with the viewer as
   player 2 to move, so the your-turn card renders).
 
+## Launch-set alignment pass (spec-v0.11 gap close — July 2026)
+
+One PR closed the gap analysis against the Game Corner build spec v0.11:
+
+- **Rename sweep (display names only; ids/storage keys never change):**
+  `chutes-ladders` → "Snakes & Ladders" (Hasbro mark), `blockblast` →
+  "Block Fit" (Hungry Studio's live title), `wordhunt` → "Word Search"
+  (it IS a word search; frees the Word-Hunt mechanic name), `minesweeper`
+  → "Mine Finder Classic" (family consistency with the daily), and
+  `sudoku` → "Sudoku" (it now hosts both board sizes). Share strings and
+  in-game copy were swept too; the CHANGELOG strip credits the renames
+  and no longer references the old Zuma/Crypto Wordle marks.
+- **`wordsprint` — Word Sprint** (the spec's Boggle-style launch game,
+  new id because `wordhunt` was taken): 4×4 seeded letter grid
+  (`WSPR_DICE`, own distribution), trace adjacent tiles, 90-second
+  countdown (`WSPR_SECS`), open vocabulary against the in-file
+  `WSPR_WORDS_RAW` set, per-length points (`WSPR_POINTS`). The countdown
+  ending IS the win (score may be 0 — locks the day, never breaks a
+  streak). **Its manifest `tieBreak` is `'score-then-time'`** — the daily
+  per-game leaderboard and the public rank-preview both dispatch their
+  ORDER BY / counting off that symbolic rule now (first non-fastest-solve
+  daily). Progress `{ dayNum, found }`; autosave and per-word saves stop
+  in the final 3 seconds so nothing races the clock-driven finish (409
+  rule).
+- **Sudoku difficulty (one entry, two boards):** an in-game chooser
+  (before the timer starts) offers **9×9 Classic (×2 points)** or the
+  original **6×6 Mini** (byte-identical board/stream to before). The 9×9
+  derives a second stream from the same daily seed and generates with a
+  uniqueness-checked dig (`generateSudoku9`/`sdk9CountSolutions`, 40
+  givens). Progress gains `difficulty`; saves without it hydrate as mini.
+  `boxAt`/`sudokuConflicts`/`sudokuSolved` are size-aware.
+- **`snakedaily` / `bouncedaily`** — seeded, bounded daily variants of
+  the free-play classics (which are untouched): Daily Snake eats a
+  seeded apple SEQUENCE (skip-if-occupied), win at 20 apples, crash =
+  `onLose`; Daily Bounce is one seeded brick wall, 3 balls, clear = win.
+  Both are real-time and deliberately have **no mid-run resume** (a
+  claimed unfinished attempt restarts the run; nothing is autosaved).
+- **Ludo 2–4P:** `classic_rooms` grew `player3_*`/`player4_*`/
+  `max_players` (default 2); the ludo rules module is seat-generic
+  (`nPlayers`, `seats`, `forfeited`, legacy `{p1,p2}` states normalized
+  in and mirrored back out), start offsets {1:0, 2:26, 3:13, 4:39}, all
+  four start cells safe. Join fills seats 2→3→4 and activates when full
+  (response carries `yourPlayerNum`); a multi-seat forfeit/expiry drops
+  only that seat (`ludoForfeitSeat`) and the match continues —
+  last-seat-standing wins. **Only 2P matches are rated**; 3–4P is
+  unrated until multi-player Elo math is chosen. Staging fixture
+  `demo=ludo4` re-arms a WAITING 3-seat room `DEMOL4` (two fake seats)
+  so a tester who joins moves immediately.
+
 ## Post-launch spec-audit changes (do not undo)
 
 - **48h correspondence turn timer:** active two-player rooms auto-forfeit

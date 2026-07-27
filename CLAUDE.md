@@ -534,16 +534,78 @@ Shared card/tile engine + Lane A daily games"):
   Keep it that way when touching copy.
 - **Determinism quirks:** `cratepush` picks one of ten hand-authored
   always-solvable rooms (`CP_LEVELS`) via the daily seed; `dropstack`
-  derives a fixed 40-piece bag sequence; `anagrams` picks 2×5 + 2×6 +
+  derives a fixed **200**-piece bag sequence; `anagrams` picks 2×5 + 2×6 +
   1×7 words from in-file pools. Progress shapes: klondike/spider
   `{ dayNum, st }` (full serialized deal state), mahjongsol
   `{ dayNum, faces, removed, shuffles, pairs }`, nonogram
   `{ dayNum, grid }`, minefinder `{ dayNum, revealed, flags }`,
   anagrams `{ dayNum, solved }`, cratepush `{ dayNum, player, crates,
-  moves }`, dropstack `{ dayNum, grid, pieceIdx, lines, points }`.
+  moves }`, dropstack `{ dayNum, grid, pieceIdx, lines, points, level,
+  hold }` (the last two added by the phase-9 rebuild; hydration still
+  accepts the old shape and derives `level` from `lines`).
 - The single-file `app.jsx` (~19k lines) is still esbuild-compiled in
   one pass; the spec's deferred file-split remains available if it
   grows past comfortable, but was not needed for this phase.
+
+### What makes a good Daily Tile Match board (issue #116)
+
+Recorded here because the original board was **trivial** and the reason
+was structural, not cosmetic. The pre-phase-9 daily dealt 72 tiles as
+8 icons × 3 triples into a **fixed stack** (40 bottom / 28 middle /
+4 top) — the same silhouette every single day, with only the icons
+moving. About 22 tiles were tappable at once across just 8 types, so a
+matching triple was nearly always available, and with 7 tray slots
+against 8 types you essentially **could not be trapped**. There was no
+dead end to avoid and no ordering decision that mattered; the only
+variable was how fast you could tap 72 times. Winning always paid a
+flat 150 points.
+
+Three properties make one of these boards actually a puzzle, in order
+of importance:
+
+1. **Solvable but not trivially solvable.** A winning order must always
+   exist, but plenty of orders must lose — otherwise nothing you do is
+   a decision. `tmDealSolvable` guarantees the first half by dealing
+   with **reverse-removal**: it fills slots in a random linear
+   extension of the coverage order (a slot may only be filled once
+   everything beneath it is filled), then chunks that fill order into
+   triples. Removing in the reverse of the fill order is therefore
+   always legal. This is the same technique `mjDeal` uses for Mahjong
+   Solitaire, and it becomes **mandatory** once a board is tight enough
+   to lose on.
+2. **Type count is what makes the tray bind.** This was the surprise:
+   difficulty is governed far more by the number of icon types than by
+   how many tiles are free. 12 types against 7 slots means you can
+   genuinely fill the tray with junk; 8 types cannot.
+3. **Triples split across layers.** Chunking the fill order into
+   triples naturally straddles layer boundaries, so a set's third tile
+   is often buried under tiles you'd otherwise clear first — which is
+   what punishes greedy top-first play.
+
+**Balance note — a deliberate deviation from the original plan.** The
+plan called for reducing the free-tile count to 8–14. Measured against
+a competent solver, that combination (12 types AND ~10 free tiles) was
+near-unwinnable at roughly 3%: with no choice of tile you cannot steer
+away from a jam. The free-tile count is therefore left in the 30s and
+the difficulty ladder is set by layout shape instead. `TM_LAYOUTS` is
+ordered gentlest-first by **measured** solver win rate (Courtyard ~46%
+down to Fortress ~20%), and `TM_WEEK` maps each weekday onto a window
+of that ladder — Monday gentlest, weekend hardest. Those rates come
+from a boosterless solver with no lookahead, so real players (3 undos,
+2 shuffles, 1 clear) do better. **If you retune the layouts, re-measure
+rather than eyeballing the shape** — free-tile count alone predicts
+difficulty poorly.
+
+**Tier-A coupling — the sharp edge.** `tilematchingdaily` is tier A, so
+every finish is re-simulated by `lib/dapp.js`'s engine. That engine
+models only the tray, so layouts are free to change, but the **type and
+set counts** (`TM_DAILY_TYPES` / `TM_DAILY_SETS` ↔ `TM_CONFIG`) and the
+**score ceiling** (`tmDailyScore` ↔ `tmDailyCeiling`) must be mirrored
+across the two files in the same commit. `validateSession` rejects a
+claimed score above the recomputed one, so the engine returns the
+*ceiling* (zero elapsed time, every booster unspent) and the client
+formula only ever subtracts from it. Get this wrong and finishes still
+record but silently settle as `disputed`, losing the Verified badge.
 
 ## Game Corner phase 7 — Game of the Day, home reorg, per-game chat
 
@@ -608,6 +670,55 @@ Shared card/tile engine + Lane A daily games"):
   **checkers** so tests have a stable `?chat=checkers` target), and
   `demo=yourturn` (re-arms active checkers room `DEMOYT` with the viewer as
   player 2 to move, so the your-turn card renders).
+
+## Launch-set alignment pass (spec-v0.11 gap close — July 2026)
+
+One PR closed the gap analysis against the Game Corner build spec v0.11:
+
+- **Rename sweep (display names only; ids/storage keys never change):**
+  `chutes-ladders` → "Snakes & Ladders" (Hasbro mark), `blockblast` →
+  "Block Fit" (Hungry Studio's live title), `wordhunt` → "Word Search"
+  (it IS a word search; frees the Word-Hunt mechanic name), `minesweeper`
+  → "Mine Finder Classic" (family consistency with the daily), and
+  `sudoku` → "Sudoku" (it now hosts both board sizes). Share strings and
+  in-game copy were swept too; the CHANGELOG strip credits the renames
+  and no longer references the old Zuma/Crypto Wordle marks.
+- **`wordsprint` — Word Sprint** (the spec's Boggle-style launch game,
+  new id because `wordhunt` was taken): 4×4 seeded letter grid
+  (`WSPR_DICE`, own distribution), trace adjacent tiles, 90-second
+  countdown (`WSPR_SECS`), open vocabulary against the in-file
+  `WSPR_WORDS_RAW` set, per-length points (`WSPR_POINTS`). The countdown
+  ending IS the win (score may be 0 — locks the day, never breaks a
+  streak). **Its manifest `tieBreak` is `'score-then-time'`** — the daily
+  per-game leaderboard and the public rank-preview both dispatch their
+  ORDER BY / counting off that symbolic rule now (first non-fastest-solve
+  daily). Progress `{ dayNum, found }`; autosave and per-word saves stop
+  in the final 3 seconds so nothing races the clock-driven finish (409
+  rule).
+- **Sudoku difficulty (one entry, two boards):** an in-game chooser
+  (before the timer starts) offers **9×9 Classic (×2 points)** or the
+  original **6×6 Mini** (byte-identical board/stream to before). The 9×9
+  derives a second stream from the same daily seed and generates with a
+  uniqueness-checked dig (`generateSudoku9`/`sdk9CountSolutions`, 40
+  givens). Progress gains `difficulty`; saves without it hydrate as mini.
+  `boxAt`/`sudokuConflicts`/`sudokuSolved` are size-aware.
+- **`snakedaily` / `bouncedaily`** — seeded, bounded daily variants of
+  the free-play classics (which are untouched): Daily Snake eats a
+  seeded apple SEQUENCE (skip-if-occupied), win at 20 apples, crash =
+  `onLose`; Daily Bounce is one seeded brick wall, 3 balls, clear = win.
+  Both are real-time and deliberately have **no mid-run resume** (a
+  claimed unfinished attempt restarts the run; nothing is autosaved).
+- **Ludo 2–4P:** `classic_rooms` grew `player3_*`/`player4_*`/
+  `max_players` (default 2); the ludo rules module is seat-generic
+  (`nPlayers`, `seats`, `forfeited`, legacy `{p1,p2}` states normalized
+  in and mirrored back out), start offsets {1:0, 2:26, 3:13, 4:39}, all
+  four start cells safe. Join fills seats 2→3→4 and activates when full
+  (response carries `yourPlayerNum`); a multi-seat forfeit/expiry drops
+  only that seat (`ludoForfeitSeat`) and the match continues —
+  last-seat-standing wins. **Only 2P matches are rated**; 3–4P is
+  unrated until multi-player Elo math is chosen. Staging fixture
+  `demo=ludo4` re-arms a WAITING 3-seat room `DEMOL4` (two fake seats)
+  so a tester who joins moves immediately.
 
 ## Post-launch spec-audit changes (do not undo)
 

@@ -1,6 +1,8 @@
 {
   "name": "Game Corner",
-  "icon": { "emoji": "🕹️" },
+  "icon": {
+    "emoji": "🕹️"
+  },
   "secrets": [
     {
       "key": "APP_PUBKEY",
@@ -34,9 +36,9 @@
       "expectText": "resets in"
     },
     {
-      "name": "Word Hunt card in lobby",
+      "name": "Word Search card in lobby",
       "path": "/",
-      "expectText": "Word Hunt"
+      "expectText": "Word Search"
     },
     {
       "name": "Daily Cipher card in lobby",
@@ -61,7 +63,7 @@
     {
       "name": "Leaderboard seed boots cleanly",
       "path": "/?demo=leaderboard",
-      "expectText": "Daily Puzzles"
+      "expectText": "All Games"
     },
     {
       "name": "In-progress resume card in lobby",
@@ -74,9 +76,9 @@
       "expectText": "Game Corner"
     },
     {
-      "name": "Minesweeper card in Classic Games tab",
+      "name": "Mine Finder Classic card in Classic Games tab",
       "path": "/?tab=classic",
-      "expectText": "Minesweeper"
+      "expectText": "Mine Finder Classic"
     },
     {
       "name": "Mancala card in Classic Games tab",
@@ -84,9 +86,9 @@
       "expectText": "Mancala"
     },
     {
-      "name": "Chutes & Ladders card in Classic Games tab",
+      "name": "Snakes & Ladders card in Classic Games tab",
       "path": "/?tab=classic",
-      "expectText": "Chutes & Ladders"
+      "expectText": "Snakes & Ladders"
     },
     {
       "name": "2048 card in Classic Games tab",
@@ -104,9 +106,9 @@
       "expectText": "Snake"
     },
     {
-      "name": "Block Blast card in Classic Games tab",
+      "name": "Block Fit card in Classic Games tab",
       "path": "/?tab=classic",
-      "expectText": "Block Blast"
+      "expectText": "Block Fit"
     },
     {
       "name": "Tile Match Puzzle card in Classic Games tab",
@@ -159,7 +161,7 @@
       "expectText": "Online Race"
     },
     {
-      "name": "Block Blast mode modal offers Online Race",
+      "name": "Block Fit mode modal offers Online Race",
       "path": "/?game=blockblast",
       "expectText": "Online Race"
     },
@@ -269,12 +271,12 @@
       "expectText": "Daily Cipher"
     },
     {
-      "name": "Mini Sudoku shows Hint bar",
+      "name": "Sudoku difficulty chooser renders",
       "path": "/?game=sudoku&play=1",
-      "expectText": "Hint"
+      "expectText": "9×9 Classic"
     },
     {
-      "name": "Word Hunt shows Hint bar",
+      "name": "Word Search shows Hint bar",
       "path": "/?game=wordhunt&play=1",
       "expectText": "Hint"
     },
@@ -309,12 +311,12 @@
       "expectText": "Daily Challenge"
     },
     {
-      "name": "Chutes & Ladders mode select offers Versus Bot",
+      "name": "Snakes & Ladders mode select offers Versus Bot",
       "path": "/?game=chutes-ladders",
       "expectText": "Versus Bot"
     },
     {
-      "name": "Chutes & Ladders mode select offers Online Multiplayer",
+      "name": "Snakes & Ladders mode select offers Online Multiplayer",
       "path": "/?game=chutes-ladders",
       "expectText": "Online Multiplayer"
     },
@@ -439,6 +441,21 @@
       "expectText": "Mine Finder"
     },
     {
+      "name": "Mine Finder canvas board renders in-game",
+      "path": "/?game=minefinder&play=1",
+      "expectSelector": "canvas.mf-canvas"
+    },
+    {
+      "name": "Mine Finder Dig/Flag mode control renders",
+      "path": "/?game=minefinder&play=1",
+      "expectText": "Mode: Dig"
+    },
+    {
+      "name": "Mine Finder resumes into the canvas board from a claimed attempt",
+      "path": "/?demo=minefinder&game=minefinder&play=1",
+      "expectSelector": ".mf-mode-btn"
+    },
+    {
       "name": "Anagram Sprint pre-game screen",
       "path": "/?game=anagrams",
       "expectText": "Anagram Sprint"
@@ -451,12 +468,12 @@
     {
       "name": "Nonogram board renders in-game",
       "path": "/?game=nonogram&play=1",
-      "expectSelector": ".ng-grid"
+      "expectSelector": "canvas.ng-canvas"
     },
     {
       "name": "Drop Stack well renders in-game",
       "path": "/?game=dropstack&play=1",
-      "expectSelector": ".ds-grid"
+      "expectSelector": "canvas.ds-canvas"
     },
     {
       "name": "New dailies get server-issued seeds",
@@ -469,9 +486,9 @@
       "expectText": "GAME OF THE DAY"
     },
     {
-      "name": "Home shows the all-games sections",
+      "name": "Home shows the merged all-games grid",
       "path": "/",
-      "expectText": "Classic Games"
+      "expectText": "All Games"
     },
     {
       "name": "Today's Top Scores shows seeded GotD solvers",
@@ -572,6 +589,138 @@
       "name": "Dark theme renders a per-game leaderboard",
       "path": "/?demo=leaderboard&theme=dark&game=sudoku",
       "expectText": "Mini Sudoku"
+    },
+    {
+      "name": "Word Sprint pre-game screen",
+      "path": "/?game=wordsprint",
+      "expectText": "Word Sprint"
+    },
+    {
+      "name": "Word Sprint letter grid renders in-game",
+      "path": "/?game=wordsprint&play=1",
+      "expectSelector": ".wspr-grid"
+    },
+    {
+      "name": "Daily Snake pre-game screen",
+      "path": "/?game=snakedaily",
+      "expectText": "Daily Snake"
+    },
+    {
+      "name": "Daily Snake board renders in-game",
+      "path": "/?game=snakedaily&play=1",
+      "expectSelector": ".dsnk-board"
+    },
+    {
+      "name": "Daily Bounce pre-game screen",
+      "path": "/?game=bouncedaily",
+      "expectText": "Daily Bounce"
+    },
+    {
+      "name": "Daily Bounce canvas renders in-game",
+      "path": "/?game=bouncedaily&play=1",
+      "expectSelector": ".dbnc-canvas"
+    },
+    {
+      "name": "New dailies issued server seeds (wordsprint)",
+      "path": "/api/public/daily",
+      "expectText": "wordsprint"
+    },
+    {
+      "name": "Ludo setup offers 2-4 player rooms",
+      "path": "/?game=ludo&play=1",
+      "expectText": "4 players"
+    },
+    {
+      "name": "Multi-seat Ludo demo room seeds cleanly",
+      "path": "/?demo=ludo4",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "Changelog credits the rename sweep",
+      "path": "/",
+      "expectText": "Snakes & Ladders"
+    },
+    {
+      "name": "Merged grid shows the NEW TODAY daily indicator",
+      "path": "/?demo=homegrid",
+      "expectText": "NEW TODAY"
+    },
+    {
+      "name": "Merged grid shows a played daily indicator",
+      "path": "/?demo=homegrid",
+      "expectText": "PLAYED"
+    },
+    {
+      "name": "Home filter chips render",
+      "path": "/?tab=classic",
+      "expectSelector": ".home-filter-chips"
+    },
+    {
+      "name": "Home daily reset countdown renders",
+      "path": "/",
+      "expectText": "New daily puzzles at midnight UTC"
+    },
+    {
+      "name": "Nonogram canvas board renders in-game",
+      "path": "/?game=nonogram&play=1",
+      "expectSelector": "canvas.ng-canvas"
+    },
+    {
+      "name": "Nonogram fill/mark controls render",
+      "path": "/?game=nonogram&play=1",
+      "expectText": "Mark"
+    },
+    {
+      "name": "Drop Stack canvas well renders in-game",
+      "path": "/?game=dropstack&play=1",
+      "expectSelector": "canvas.ds-canvas"
+    },
+    {
+      "name": "Drop Stack shows the Hold slot",
+      "path": "/?game=dropstack&play=1",
+      "expectSelector": ".ds-hold"
+    },
+    {
+      "name": "Drop Stack resumes a seeded run",
+      "path": "/?demo=dropstack&game=dropstack&play=1",
+      "expectSelector": ".ds-queue"
+    },
+    {
+      "name": "Chutes & Ladders board-style pills render",
+      "path": "/?game=chutes-ladders",
+      "expectText": "Moksha Patam"
+    },
+    {
+      "name": "Chutes & Ladders board style label renders",
+      "path": "/?game=chutes-ladders",
+      "expectSelector": ".cnl-variant-block"
+    },
+    {
+      "name": "Moksha demo room seeds cleanly",
+      "path": "/?demo=moksha",
+      "expectText": "Game Corner"
+    },
+    {
+      "name": "Daily Tile Match shows the day difficulty label",
+      "path": "/?game=tilematchingdaily&play=1",
+      "expectSelector": ".tm-daylabel"
+    },
+    {
+      "name": "Daily Tile Match resumes a seeded run",
+      "path": "/?demo=tilematch&game=tilematchingdaily&play=1",
+      "expectSelector": ".tm-board-container"
+    },
+    {
+      "name": "Review demo seeds the nonogram board",
+      "path": "/?demo=review&game=nonogram&play=1",
+      "expectSelector": "canvas.ng-canvas"
     }
+  ],
+  "visibility": {
+    "build": "public",
+    "view": "public"
+  },
+  "admins": [
+    "evan"
   ]
 }

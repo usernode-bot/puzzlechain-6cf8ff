@@ -546,6 +546,51 @@
       "expectText": "streak"
     },
     {
+      "name": "Settings sheet opens via ?settings=1",
+      "path": "/?settings=1",
+      "expectSelector": ".settings-panel"
+    },
+    {
+      "name": "Settings sheet carries the game-feedback prefs",
+      "path": "/?settings=1",
+      "expectText": "Reduced motion"
+    },
+    {
+      "name": "Theme picker offers System / Light / Dark",
+      "path": "/?settings=1",
+      "expectSelector": ".theme-seg-btn.active"
+    },
+    {
+      "name": "System theme is the default and follows the device",
+      "path": "/?settings=1",
+      "expectText": "Following your device"
+    },
+    {
+      "name": "Dark theme applies to the whole shell",
+      "path": "/?theme=dark&settings=1",
+      "expectSelector": "html[data-theme=\"dark\"] .theme-seg"
+    },
+    {
+      "name": "Light theme can be pinned over the device setting",
+      "path": "/?theme=light&settings=1",
+      "expectSelector": "html[data-theme=\"light\"] .theme-seg"
+    },
+    {
+      "name": "Nav carries a settings gear",
+      "path": "/",
+      "expectSelector": ".nav-settings-btn"
+    },
+    {
+      "name": "Dark theme renders the daily lobby",
+      "path": "/?theme=dark",
+      "expectText": "Daily Puzzles"
+    },
+    {
+      "name": "Dark theme renders a per-game leaderboard",
+      "path": "/?demo=leaderboard&theme=dark&game=sudoku",
+      "expectText": "Mini Sudoku"
+    },
+    {
       "name": "Word Sprint pre-game screen",
       "path": "/?game=wordsprint",
       "expectText": "Word Sprint"

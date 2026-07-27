@@ -7,21 +7,122 @@ const { useState, useEffect, useRef } = React;
    hairlines, white card surfaces, and brass reserved for streaks /
    wins / medals. Same token names as before so every ${C.*} in the
    stylesheet re-themes in place.
+   ------------------------------------------------------------
+   THEMING (light/dark/system): the palette is no longer baked into
+   the stylesheet as hex. `PALETTES` holds the raw values for both
+   themes; they are emitted as CSS custom properties on :root (light)
+   and :root[data-theme="dark"] (dark) by `paletteVars()` below, and
+   `C` interpolates `var(--c-*)` references — so all ~900 ${C.*} sites
+   in `css` re-theme at runtime with no rebuild. Two escape hatches:
+   - `ca('gold','1f')` for the hex-alpha idiom (`var()` can't be
+     string-concatenated with an alpha byte), and
+   - `PAL.*`, a live plain object mirroring the RESOLVED palette, for
+     the handful of <canvas> sites that need a real colour value.
    ============================================================ */
-const C = {
-  bg:      '#FAF6EE', // ivory paper
-  surface: '#F3EDDF', // deeper paper — nav, wells, sheets
-  card:    '#FFFFFF', // card-weight white surfaces
-  border:  '#E7DFCC', // warm hairline
-  accent:  '#2D5FAE', // editorial ink-blue — shell links/buttons/tabs
-  gold:    '#C9A227', // brass — reserved for streaks, wins, medals
-  emerald: '#1E8F63', // deep green (success, live states)
-  violet:  '#7B5CD6',
-  rose:    '#CD4B3A', // warm coral-red (errors, danger)
-  text:    '#1F2B47', // ink navy
-  muted:   '#5E6A87', // muted ink
-  dim:     '#A9A38F', // faded newsprint — faint text, dashed rules
+const PALETTES = {
+  light: {
+    bg:      '#FAF6EE', // ivory paper
+    surface: '#F3EDDF', // deeper paper — nav, wells, sheets
+    card:    '#FFFFFF', // card-weight white surfaces
+    border:  '#E7DFCC', // warm hairline
+    accent:  '#2D5FAE', // editorial ink-blue — shell links/buttons/tabs
+    gold:    '#C9A227', // brass — reserved for streaks, wins, medals
+    emerald: '#1E8F63', // deep green (success, live states)
+    violet:  '#7B5CD6',
+    rose:    '#CD4B3A', // warm coral-red (errors, danger)
+    text:    '#1F2B47', // ink navy
+    muted:   '#5E6A87', // muted ink
+    dim:     '#A9A38F', // faded newsprint — faint text, dashed rules
+  },
+  // The deep neutral-dark scheme this app shipped with before the
+  // "Daily Page, Warmed" retheme — designed against this same stylesheet.
+  dark: {
+    bg:      '#0A0D14',
+    surface: '#12161F',
+    card:    '#181D29',
+    border:  '#2A3342',
+    accent:  '#6366F1',
+    gold:    '#FBBF24',
+    emerald: '#34D399',
+    violet:  '#A78BFA',
+    rose:    '#FB7185',
+    text:    '#ECEFF6',
+    muted:   '#8B95A8',
+    dim:     '#39424F',
+  },
 };
+
+/* Derived, semantically-named tokens: the shadow/scrim/well/hover values
+   that used to be hardcoded warm-brown rgba() literals (invisible on a dark
+   page) or hand-darkened hues. One knob per theme instead of ~30 literals. */
+const DERIVED = {
+  light: {
+    'shadow-sm':     'rgba(63,51,24,0.06)',
+    'shadow-md':     'rgba(63,51,24,0.14)',
+    'shadow-lg':     'rgba(63,51,24,0.22)',
+    'scrim':         'rgba(38,33,18,0.52)',
+    'well':          'rgba(0,0,0,0.035)',
+    'well-strong':   'rgba(0,0,0,0.055)',
+    'accent-hover':  '#234C8E',
+    'emerald-hover': '#059669',
+    'gold-hover':    '#A8871C',
+  },
+  dark: {
+    'shadow-sm':     'rgba(0,0,0,0.45)',
+    'shadow-md':     'rgba(0,0,0,0.5)',
+    'shadow-lg':     'rgba(0,0,0,0.6)',
+    'scrim':         'rgba(4,6,12,0.66)',
+    'well':          'rgba(255,255,255,0.045)',
+    'well-strong':   'rgba(255,255,255,0.07)',
+    'accent-hover':  '#7C7FF5',
+    'emerald-hover': '#6EE7B7',
+    'gold-hover':    '#FCD34D',
+  },
+};
+
+/* Every ${C.x} in `css` (and in inline style objects) resolves through a
+   custom property, so one attribute flip on <html> re-themes everything. */
+const C = Object.keys(PALETTES.light).reduce((o, k) => {
+  o[k] = 'var(--c-' + k + ')';
+  return o;
+}, {});
+
+/* Live mirror of the RESOLVED palette, kept in sync by applyTheme(). Canvas
+   games read real hex from here — ctx.fillStyle = 'var(--c-bg)' draws nothing. */
+const PAL = Object.assign({}, PALETTES.light);
+
+function hexToRgbTriplet(hex) {
+  const h = hex.replace('#', '');
+  const v = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  return [
+    parseInt(v.slice(0, 2), 16),
+    parseInt(v.slice(2, 4), 16),
+    parseInt(v.slice(4, 6), 16),
+  ].join(' ');
+}
+
+/* The hex-alpha escape hatch: `${C.gold}1f` used to concatenate an alpha byte
+   onto a hex literal, which a var() reference can't do. `ca('gold','1f')`
+   emits rgb(var(--c-gold-rgb) / 12%) instead — same result, theme-aware, and
+   far wider browser support than color-mix(). */
+function ca(token, hh) {
+  const pct = Math.round((parseInt(hh, 16) / 255) * 1000) / 10;
+  return 'rgb(var(--c-' + token + '-rgb) / ' + pct + '%)';
+}
+
+/* Emit one theme's tokens as a custom-property block body. */
+function paletteVars(theme) {
+  const p = PALETTES[theme];
+  const d = DERIVED[theme];
+  const lines = [];
+  for (const k of Object.keys(p)) {
+    lines.push('  --c-' + k + ': ' + p[k] + ';');
+    lines.push('  --c-' + k + '-rgb: ' + hexToRgbTriplet(p[k]) + ';');
+  }
+  for (const k of Object.keys(d)) lines.push('  --c-' + k + ': ' + d[k] + ';');
+  lines.push('  color-scheme: ' + theme + ';');
+  return lines.join('\n');
+}
 
 /* One bright accent per game (Appendix A: coral / sky / lime / violet /
    teal family). Assigned to each GAMES entry's tagColor, which already
@@ -43,7 +144,21 @@ const GA = {
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,500..900;1,9..144,500..900&display=swap');
 
+/* ---- Theme tokens ----
+   Light is the :root default; dark is one attribute flip away. The inline
+   boot script in index.html sets data-theme before first paint, so a
+   dark-mode player never sees an ivory flash. */
+:root {
+${paletteVars('light')}
+}
+:root[data-theme="dark"] {
+${paletteVars('dark')}
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
+html { background: ${C.bg}; }
 
 body {
   font-family: 'Space Grotesk', system-ui, sans-serif;
@@ -102,8 +217,8 @@ body {
   font-size: 0.62rem;
   font-weight: 600;
   color: ${C.gold};
-  background: ${C.gold}1f;
-  border: 1px solid ${C.gold}40;
+  background: ${ca('gold','1f')};
+  border: 1px solid ${ca('gold','40')};
   border-radius: 999px;
   padding: 0.05rem 0.35rem;
   vertical-align: middle;
@@ -136,15 +251,15 @@ body {
 }
 .badge-chip .badge-chip-icon { font-size: 1rem; line-height: 1; }
 .badge-chip.locked { opacity: 0.35; }
-.badge-chip.active { border-color: ${C.emerald}; color: ${C.emerald}; background: ${C.emerald}14; }
+.badge-chip.active { border-color: ${C.emerald}; color: ${C.emerald}; background: ${ca('emerald','14')}; }
 /* Win-overlay "milestone unlocked" flourish */
 .badge-unlock {
   margin: 0.4rem 0 0.9rem;
   padding: 0.7rem 0.9rem;
   border-radius: 12px;
   text-align: center;
-  background: linear-gradient(135deg, ${C.emerald}22, ${C.gold}22);
-  border: 1px solid ${C.emerald}55;
+  background: linear-gradient(135deg, ${ca('emerald','22')}, ${ca('gold','22')});
+  border: 1px solid ${ca('emerald','55')};
   animation: badgePop 0.5s ease;
 }
 .badge-unlock .bu-icon { font-size: 1.8rem; line-height: 1; }
@@ -227,8 +342,8 @@ body {
   font-size: 0.82rem;
   text-align: center;
   color: ${C.gold};
-  background: ${C.gold}14;
-  border: 1px solid ${C.gold}55;
+  background: ${ca('gold','14')};
+  border: 1px solid ${ca('gold','55')};
 }
 .win-sync-note button {
   margin-top: 0.4rem;
@@ -292,6 +407,9 @@ body {
    Friends button lives in the top bar instead. */
 @media (min-width: 561px) {
   .account-connections { display: none; }
+  /* …except the Settings entry, which has no desktop equivalent elsewhere
+     on the profile (the nav gear is the other entry point). */
+  .account-connections.account-connections-always { display: block; }
   /* Force badge accordion always-open on desktop/tablet regardless of JS state */
   .badge-strip-body { max-height: none !important; opacity: 1 !important; overflow: visible !important; }
   .badge-strip-trigger { cursor: default; pointer-events: none; }
@@ -362,7 +480,7 @@ body {
 .card:hover {
   transform: translateY(-3px);
   border-color: var(--accent, ${C.accent});
-  box-shadow: 0 10px 26px rgba(63,51,24,0.14);
+  box-shadow: 0 10px 26px var(--c-shadow-md);
 }
 .card.done {
   opacity: 0.55;
@@ -657,9 +775,9 @@ body {
 }
 .scell.given { color: ${C.text}; cursor: default; }
 .scell.user { color: ${C.accent}; }
-.scell.sel { background: ${C.accent}33; }
-.scell.hl { background: ${C.accent}0a; }
-.scell.err { color: ${C.rose}; background: ${C.rose}1a; }
+.scell.sel { background: ${ca('accent','33')}; }
+.scell.hl { background: ${ca('accent','0a')}; }
+.scell.err { color: ${C.rose}; background: ${ca('rose','1a')}; }
 
 .numpad {
   display: grid;
@@ -680,14 +798,14 @@ body {
   cursor: pointer;
   transition: border-color 0.1s ease, background 0.1s ease;
 }
-.numkey:hover { border-color: ${C.accent}; background: ${C.accent}1a; }
+.numkey:hover { border-color: ${C.accent}; background: ${ca('accent','1a')}; }
 .numkey.erase { color: ${C.rose}; font-size: 1rem; }
 
 /* ---- Win overlay ---- */
 .win-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(38,33,18,0.52);
+  background: var(--c-scrim);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
@@ -704,7 +822,7 @@ body {
   text-align: center;
   max-width: 360px;
   width: 100%;
-  box-shadow: 0 20px 50px rgba(63,51,24,0.22);
+  box-shadow: 0 20px 50px var(--c-shadow-lg);
   max-height: calc(100vh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   max-height: calc(100dvh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
@@ -742,7 +860,7 @@ body {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-.primary-btn:hover { background: #234C8E; }
+.primary-btn:hover { background: var(--c-accent-hover); }
 
 /* ---- Locked screen ---- */
 .locked-card {
@@ -753,7 +871,7 @@ body {
   text-align: center;
   max-width: 420px;
   margin: 1rem auto 0;
-  box-shadow: 0 12px 34px rgba(63,51,24,0.18);
+  box-shadow: 0 12px 34px var(--c-shadow-md);
 }
 .locked-card .lock-icon { font-size: 2.6rem; }
 .locked-card h2 { font-size: 1.4rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
@@ -822,8 +940,8 @@ body {
 }
 .pregame-stat .v { font-weight: 700; font-size: 1rem; }
 .pregame-deal {
-  font-size: 0.82rem; color: ${C.text}; background: ${C.accent}14;
-  border: 1px solid ${C.accent}44; border-radius: 10px;
+  font-size: 0.82rem; color: ${C.text}; background: ${ca('accent','14')};
+  border: 1px solid ${ca('accent','44')}; border-radius: 10px;
   padding: 0.6rem 0.8rem; margin-bottom: 1rem;
 }
 .pregame-resume-note {
@@ -840,7 +958,7 @@ body {
 
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
-  position: fixed; inset: 0; background: rgba(38,33,18,0.55); z-index: 220;
+  position: fixed; inset: 0; background: var(--c-scrim); z-index: 220;
   display: flex; align-items: center; justify-content: center; padding: 1rem;
 }
 .howto-card {
@@ -857,7 +975,7 @@ body {
 .howto-step { display: flex; gap: 0.7rem; align-items: flex-start; }
 .howto-step-num {
   flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%;
-  background: ${C.accent}22; color: ${C.accent}; font-weight: 700;
+  background: ${ca('accent','22')}; color: ${C.accent}; font-weight: 700;
   display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
 }
 .howto-step-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.15rem; }
@@ -913,8 +1031,8 @@ body {
 .ladder-games { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 .ladder-note { font-size: 0.78rem; color: ${C.muted}; margin-bottom: 0.8rem; line-height: 1.45; }
 .ladder-movers {
-  font-size: 0.8rem; color: ${C.text}; background: ${C.emerald}14;
-  border: 1px solid ${C.emerald}44; border-radius: 8px;
+  font-size: 0.8rem; color: ${C.text}; background: ${ca('emerald','14')};
+  border: 1px solid ${ca('emerald','44')}; border-radius: 8px;
   padding: 0.45rem 0.7rem; margin-bottom: 0.7rem;
 }
 .ladder-streak { min-width: 2.6rem; text-align: right; color: ${C.gold}; font-size: 0.8rem; }
@@ -968,7 +1086,7 @@ body {
 .lrow .lname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lrow .ltime { color: ${C.text}; font-size: 0.78rem; }
 .lrow .lsteps { color: ${C.muted}; font-size: 0.74rem; }
-.lrow.me { background: ${C.accent}22; }
+.lrow.me { background: ${ca('accent','22')}; }
 .lrow.me .lrank, .lrow.me .lname { color: ${C.accent}; font-weight: 600; }
 .lrow.pinned { margin-top: 0.3rem; border-top: 1px dashed ${C.border}; padding-top: 0.5rem; }
 
@@ -1000,8 +1118,8 @@ body {
   transition: background 0.08s ease, color 0.08s ease;
   aspect-ratio: 1;
 }
-.wcell.found { background: ${C.emerald}33; color: ${C.emerald}; cursor: default; }
-.wcell.sel { background: ${C.accent}55; color: #fff; }
+.wcell.found { background: ${ca('emerald','33')}; color: ${C.emerald}; cursor: default; }
+.wcell.sel { background: ${ca('accent','55')}; color: #fff; }
 
 .word-list {
   display: flex;
@@ -1025,7 +1143,7 @@ body {
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 .word-chip.found {
-  background: ${C.emerald}1a;
+  background: ${ca('emerald','1a')};
   border-color: ${C.emerald};
   color: ${C.emerald};
   text-decoration: line-through;
@@ -1132,10 +1250,10 @@ body {
 .scell.hinted {
   color: ${C.gold};
   font-weight: 700;
-  background: ${C.gold}1a;
+  background: ${ca('gold','1a')};
 }
 .wcell.hinted {
-  background: ${C.gold}33;
+  background: ${ca('gold','33')};
   outline: 2px solid ${C.gold};
   outline-offset: -2px;
   border-radius: 4px;
@@ -1267,11 +1385,11 @@ body {
   background: ${C.card};
 }
 .ms-cell.ms-hidden { background: ${C.card}; }
-.ms-cell.ms-hidden:hover { background: ${C.accent}26; }
+.ms-cell.ms-hidden:hover { background: ${ca('accent','26')}; }
 .ms-cell.ms-revealed { background: ${C.surface}; cursor: default; }
 .ms-cell.ms-flagged { background: ${C.card}; cursor: default; }
-.ms-cell.ms-mine-dead { background: ${C.rose}40; cursor: default; }
-.ms-cell.ms-exploded { background: ${C.rose}99; cursor: default; }
+.ms-cell.ms-mine-dead { background: ${ca('rose','40')}; cursor: default; }
+.ms-cell.ms-exploded { background: ${ca('rose','99')}; cursor: default; }
 .ms-n1 { color: ${C.accent}; }
 .ms-n2 { color: ${C.emerald}; }
 .ms-n3 { color: ${C.rose}; }
@@ -1281,8 +1399,8 @@ body {
 .ms-n7 { color: #be123c; }
 .ms-n8 { color: ${C.muted}; }
 @keyframes ms-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 ${C.emerald}40; }
-  50% { box-shadow: 0 0 0 6px ${C.emerald}00; }
+  0%, 100% { box-shadow: 0 0 0 0 ${ca('emerald','40')}; }
+  50% { box-shadow: 0 0 0 6px ${ca('emerald','00')}; }
 }
 .ms-cashout-btn {
   width: 100%;
@@ -1298,7 +1416,7 @@ body {
   transition: background 0.12s ease;
   animation: ms-pulse 1.8s ease infinite;
 }
-.ms-cashout-btn:hover { background: #059669; }
+.ms-cashout-btn:hover { background: var(--c-emerald-hover); }
 .ms-cashout-btn.disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -1383,7 +1501,7 @@ body {
   transition: border-color 0.12s, color 0.12s, opacity 0.12s;
 }
 .ms-action-row .ms-music-btn:hover:not(:disabled) { border-color: ${C.accent}; }
-.ms-action-row .ms-music-btn.paused { color: ${C.gold}; border-color: ${C.gold}66; }
+.ms-action-row .ms-music-btn.paused { color: ${C.gold}; border-color: ${ca('gold','66')}; }
 .ms-action-row .ms-music-btn.off { opacity: 0.5; cursor: default; }
 .ms-action-row .ms-music-btn:disabled { cursor: default; }
 .ms-bottom-nav {
@@ -1427,8 +1545,8 @@ body {
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
 }
-.ms-outcome-chip.win { background: ${C.emerald}22; color: ${C.emerald}; border: 1px solid ${C.emerald}44; }
-.ms-outcome-chip.loss { background: ${C.rose}22; color: ${C.rose}; border: 1px solid ${C.rose}44; }
+.ms-outcome-chip.win { background: ${ca('emerald','22')}; color: ${C.emerald}; border: 1px solid ${ca('emerald','44')}; }
+.ms-outcome-chip.loss { background: ${ca('rose','22')}; color: ${C.rose}; border: 1px solid ${ca('rose','44')}; }
 .ms-leaderboard-row {
   display: flex;
   align-items: center;
@@ -1544,7 +1662,7 @@ body {
 }
 @keyframes mnc-capture-flash {
   0%   { background: #4A1E09; }
-  40%  { background: ${C.rose}22; border-color: ${C.rose}; }
+  40%  { background: ${ca('rose','22')}; border-color: ${C.rose}; }
   100% { background: #4A1E09; }
 }
 .mnc-pit-stones {
@@ -1577,8 +1695,8 @@ body {
   font-weight: 600;
   color: ${C.gold};
   padding: 0.4rem 0.6rem;
-  background: ${C.gold}1a;
-  border: 1px solid ${C.gold}33;
+  background: ${ca('gold','1a')};
+  border: 1px solid ${ca('gold','33')};
   border-radius: 8px;
   margin: 0.6rem 0 0;
   min-height: 2.1rem;
@@ -1653,9 +1771,9 @@ body {
   border-radius: 999px;
   flex-shrink: 0;
 }
-.mnc-outcome-chip.p1win { background: ${C.accent}22; color: ${C.accent}; border: 1px solid ${C.accent}44; }
-.mnc-outcome-chip.p2win { background: ${C.rose}22; color: ${C.rose}; border: 1px solid ${C.rose}44; }
-.mnc-outcome-chip.draw { background: ${C.muted}22; color: ${C.muted}; border: 1px solid ${C.muted}44; }
+.mnc-outcome-chip.p1win { background: ${ca('accent','22')}; color: ${C.accent}; border: 1px solid ${ca('accent','44')}; }
+.mnc-outcome-chip.p2win { background: ${ca('rose','22')}; color: ${C.rose}; border: 1px solid ${ca('rose','44')}; }
+.mnc-outcome-chip.draw { background: ${ca('muted','22')}; color: ${C.muted}; border: 1px solid ${ca('muted','44')}; }
 .mnc-stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1716,8 +1834,8 @@ body {
   gap: 0.9rem;
   width: 100%;
 }
-.mnc-mode-btn:hover { border-color: ${C.gold}; background: ${C.gold}08; }
-.mnc-mode-btn.active { border-color: ${C.gold}; background: ${C.gold}14; }
+.mnc-mode-btn:hover { border-color: ${C.gold}; background: ${ca('gold','08')}; }
+.mnc-mode-btn.active { border-color: ${C.gold}; background: ${ca('gold','14')}; }
 .mnc-mode-icon { font-size: 1.7rem; flex-shrink: 0; }
 .mnc-mode-text { display: flex; flex-direction: column; gap: 0.1rem; }
 .mnc-mode-name { font-weight: 600; font-size: 1rem; }
@@ -1748,7 +1866,7 @@ body {
   text-align: center;
 }
 .mnc-difficulty-pill:hover { border-color: ${C.gold}; color: ${C.text}; }
-.mnc-difficulty-pill.active { border-color: ${C.gold}; color: ${C.gold}; background: ${C.gold}14; font-weight: 600; }
+.mnc-difficulty-pill.active { border-color: ${C.gold}; color: ${C.gold}; background: ${ca('gold','14')}; font-weight: 600; }
 .mnc-daily-header {
   display: flex; align-items: center; justify-content: space-between;
   gap: 0.5rem; flex-wrap: wrap;
@@ -1758,15 +1876,15 @@ body {
 .mnc-daily-pills { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
 .mnc-record-pill {
   font-size: 0.74rem; font-weight: 700;
-  background: ${C.gold}14; color: ${C.gold};
-  border: 1px solid ${C.gold}55;
+  background: ${ca('gold','14')}; color: ${C.gold};
+  border: 1px solid ${ca('gold','55')};
   border-radius: 999px; padding: 0.18rem 0.55rem;
   white-space: nowrap;
 }
 .mnc-streak-chip {
   font-size: 0.74rem; font-weight: 700;
-  background: ${C.rose}1f; color: ${C.rose};
-  border: 1px solid ${C.rose}55;
+  background: ${ca('rose','1f')}; color: ${C.rose};
+  border: 1px solid ${ca('rose','55')};
   border-radius: 999px; padding: 0.18rem 0.55rem;
   white-space: nowrap;
 }
@@ -1783,7 +1901,7 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.mnc-mode-start-btn:hover { background: #d97706; }
+.mnc-mode-start-btn:hover { background: var(--c-gold-hover); }
 .mnc-online-actions { display: flex; gap: 0.5rem; }
 .mnc-online-actions button {
   flex: 1;
@@ -1798,7 +1916,7 @@ body {
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s;
 }
-.mnc-online-actions button:hover { border-color: ${C.gold}; background: ${C.gold}0d; }
+.mnc-online-actions button:hover { border-color: ${C.gold}; background: ${ca('gold','0d')}; }
 
 /* ---- Mancala online waiting / join screen ---- */
 .mnc-room-waiting { max-width: 480px; margin: 0 auto; text-align: center; }
@@ -1808,8 +1926,8 @@ body {
   font-weight: 700;
   letter-spacing: 0.18em;
   color: ${C.gold};
-  background: ${C.gold}14;
-  border: 2px solid ${C.gold}44;
+  background: ${ca('gold','14')};
+  border: 2px solid ${ca('gold','44')};
   border-radius: 14px;
   padding: 0.75rem 1.25rem;
   margin: 0.85rem 0;
@@ -1907,7 +2025,7 @@ body {
   aspect-ratio: 1;
   border-radius: 8px;
   background: ${C.bg};
-  border: 1px solid ${C.border}44;
+  border: 1px solid ${ca('border','44')};
 }
 .t2048-tile {
   aspect-ratio: 1;
@@ -2026,8 +2144,8 @@ body {
   border-radius: 999px;
   flex-shrink: 0;
 }
-.t2048-outcome-chip.win  { background: ${C.emerald}22; color: ${C.emerald}; border: 1px solid ${C.emerald}44; }
-.t2048-outcome-chip.loss { background: ${C.rose}22;    color: ${C.rose};    border: 1px solid ${C.rose}44; }
+.t2048-outcome-chip.win  { background: ${ca('emerald','22')}; color: ${C.emerald}; border: 1px solid ${ca('emerald','44')}; }
+.t2048-outcome-chip.loss { background: ${ca('rose','22')};    color: ${C.rose};    border: 1px solid ${ca('rose','44')}; }
 .t2048-stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2063,7 +2181,7 @@ body {
 .t2048-overlay {
   position: absolute;
   inset: 0;
-  background: ${C.bg}ee;
+  background: ${ca('bg','ee')};
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -2127,8 +2245,8 @@ body {
   background: ${C.bg};
 }
 .snake-cell.snake-body { background: ${C.emerald}; border-radius: 3px; }
-.snake-cell.snake-head { background: ${C.emerald}; border-radius: 4px; box-shadow: 0 0 8px ${C.emerald}aa; }
-.snake-cell.snake-food { background: ${C.gold}; border-radius: 50%; box-shadow: 0 0 8px ${C.gold}aa; }
+.snake-cell.snake-head { background: ${C.emerald}; border-radius: 4px; box-shadow: 0 0 8px ${ca('emerald','aa')}; }
+.snake-cell.snake-food { background: ${C.gold}; border-radius: 50%; box-shadow: 0 0 8px ${ca('gold','aa')}; }
 .snake-controls {
   display: flex;
   gap: 0.5rem;
@@ -2176,7 +2294,7 @@ body {
 .snake-start-overlay {
   position: absolute;
   inset: 0;
-  background: ${C.bg}cc;
+  background: ${ca('bg','cc')};
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -2199,7 +2317,7 @@ body {
   padding: 0.55rem 0.3rem;
   font-size: 0.85rem;
 }
-.snake-lb-row.snake-lb-me { background: ${C.accent}1a; border-radius: 8px; }
+.snake-lb-row.snake-lb-me { background: ${ca('accent','1a')}; border-radius: 8px; }
 .snake-lb-row .snake-lb-rank {
   font-family: 'JetBrains Mono', monospace;
   color: ${C.muted};
@@ -2214,7 +2332,7 @@ body {
 .snake-pause-overlay {
   position: absolute;
   inset: 0;
-  background: ${C.bg}cc;
+  background: ${ca('bg','cc')};
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -2250,7 +2368,7 @@ body {
 .bounce-start-overlay {
   position: absolute;
   inset: 0;
-  background: ${C.bg}cc;
+  background: ${ca('bg','cc')};
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -2372,8 +2490,8 @@ body {
   transition: background 0.08s ease;
 }
 .bb-cell.occupied { background: var(--bb-color); }
-.bb-cell.ghost-valid { background: ${C.accent}66; }
-.bb-cell.ghost-invalid { background: ${C.rose}44; }
+.bb-cell.ghost-valid { background: ${ca('accent','66')}; }
+.bb-cell.ghost-invalid { background: ${ca('rose','44')}; }
 .bb-score-delta {
   position: absolute;
   top: -1.4rem;
@@ -2412,7 +2530,7 @@ body {
   min-height: 56px;
 }
 .bb-piece-btn:hover { border-color: ${C.accent}; }
-.bb-piece-btn.selected { border-color: ${C.accent}; background: ${C.accent}1a; }
+.bb-piece-btn.selected { border-color: ${C.accent}; background: ${ca('accent','1a')}; }
 .bb-piece-btn.used { opacity: 0.2; pointer-events: none; }
 .bb-piece-grid {
   display: grid;
@@ -2523,7 +2641,7 @@ body {
 .tm-bar.bar-full { animation: tm-bar-flash 0.4s ease; border-color: ${C.rose}; }
 @keyframes tm-bar-flash {
   0%, 100% { border-color: ${C.rose}; }
-  50%  { border-color: ${C.rose}; box-shadow: 0 0 12px ${C.rose}66; }
+  50%  { border-color: ${C.rose}; box-shadow: 0 0 12px ${ca('rose','66')}; }
 }
 .tm-slot {
   width: 44px;
@@ -2537,17 +2655,17 @@ body {
   transition: border-color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
-.tm-slot.filled { border-style: solid; border-color: ${C.accent}33; background: ${C.card}; }
+.tm-slot.filled { border-style: solid; border-color: ${ca('accent','33')}; background: ${C.card}; }
 .tm-slot.clear-target {
   cursor: pointer;
   border-color: ${C.rose};
-  background: ${C.rose}1a;
+  background: ${ca('rose','1a')};
   animation: tm-slot-pulse 0.7s ease infinite alternate;
 }
-.tm-slot.clear-target:hover { background: ${C.rose}33; }
+.tm-slot.clear-target:hover { background: ${ca('rose','33')}; }
 @keyframes tm-slot-pulse {
-  from { box-shadow: 0 0 0 0 ${C.rose}44; }
-  to   { box-shadow: 0 0 0 4px ${C.rose}00; }
+  from { box-shadow: 0 0 0 0 ${ca('rose','44')}; }
+  to   { box-shadow: 0 0 0 4px ${ca('rose','00')}; }
 }
 .tm-bar-label {
   text-align: center;
@@ -2581,9 +2699,9 @@ body {
   align-items: center;
   gap: 0.1rem;
 }
-.tm-booster-btn:hover:not(:disabled) { border-color: ${C.accent}; background: ${C.accent}10; }
+.tm-booster-btn:hover:not(:disabled) { border-color: ${C.accent}; background: ${ca('accent','10')}; }
 .tm-booster-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.tm-booster-btn.active { border-color: ${C.rose}; background: ${C.rose}15; }
+.tm-booster-btn.active { border-color: ${C.rose}; background: ${ca('rose','15')}; }
 .tm-booster-icon { font-size: 1rem; }
 .tm-booster-count {
   font-family: 'JetBrains Mono', monospace;
@@ -2625,9 +2743,9 @@ body {
   padding: 0;
 }
 .tm-level-btn:hover { border-color: ${C.accent}; color: ${C.text}; }
-.tm-level-btn.selected { border-color: ${C.accent}; background: ${C.accent}22; color: ${C.accent}; }
-.tm-level-btn.done { border-color: ${C.emerald}44; color: ${C.emerald}; }
-.tm-level-btn.done.selected { border-color: ${C.emerald}; background: ${C.emerald}22; }
+.tm-level-btn.selected { border-color: ${C.accent}; background: ${ca('accent','22')}; color: ${C.accent}; }
+.tm-level-btn.done { border-color: ${ca('emerald','44')}; color: ${C.emerald}; }
+.tm-level-btn.done.selected { border-color: ${C.emerald}; background: ${ca('emerald','22')}; }
 .tm-level-btn .tm-check {
   position: absolute;
   top: 1px; right: 2px;
@@ -2648,10 +2766,10 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.tm-play-btn:hover { background: #234C8E; }
+.tm-play-btn:hover { background: var(--c-accent-hover); }
 .tm-level-won {
   background: ${C.card};
-  border: 1px solid ${C.emerald}55;
+  border: 1px solid ${ca('emerald','55')};
   border-radius: 16px;
   padding: 1.5rem;
   text-align: center;
@@ -2687,7 +2805,7 @@ body {
   cursor: pointer;
   transition: background 0.12s;
 }
-.tm-next-btn:hover { background: #059669; }
+.tm-next-btn:hover { background: var(--c-emerald-hover); }
 .tm-end-btn {
   flex: 1;
   background: ${C.card};
@@ -2707,13 +2825,13 @@ body {
   transition: background 0.3s, color 0.3s;
 }
 .tm-timer-pill.warning {
-  background: ${C.rose}22 !important;
+  background: ${ca('rose','22')} !important;
   color: ${C.rose} !important;
   animation: tm-timer-pulse 0.9s ease infinite alternate;
 }
 @keyframes tm-timer-pulse {
-  from { box-shadow: 0 0 0 0 ${C.rose}33; }
-  to   { box-shadow: 0 0 0 5px ${C.rose}00; }
+  from { box-shadow: 0 0 0 0 ${ca('rose','33')}; }
+  to   { box-shadow: 0 0 0 5px ${ca('rose','00')}; }
 }
 /* Tier overview */
 .tm-tier-overview {
@@ -2731,7 +2849,7 @@ body {
   transition: border-color 0.12s, background 0.12s;
   text-align: left;
 }
-.tm-tier-card:hover { border-color: ${C.accent}; background: ${C.accent}0a; }
+.tm-tier-card:hover { border-color: ${C.accent}; background: ${ca('accent','0a')}; }
 .tm-tier-card-name {
   font-size: 0.88rem;
   font-weight: 600;
@@ -2829,7 +2947,7 @@ body {
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 .cg-btn:hover { border-color: ${C.accent}; }
-.cg-btn:active { background: ${C.accent}22; }
+.cg-btn:active { background: ${ca('accent','22')}; }
 .cg-stage {
   flex: 1;
   min-height: 0;
@@ -2864,7 +2982,7 @@ body {
 .cg-sheet-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(38,33,18,0.45);
+  background: var(--c-scrim);
   z-index: 45;
   opacity: 0;
   pointer-events: none;
@@ -2911,6 +3029,72 @@ body {
 }
 .cg-setting-row:last-child { border-bottom: none; }
 .cg-setting-row .name { font-size: 0.9rem; }
+.cg-settings-h4-spaced { margin-top: 1.15rem; }
+
+/* ---- Theme picker (light / dark / system) ---- */
+.theme-choice { margin: 0.35rem 0 0.2rem; }
+.theme-seg {
+  display: flex;
+  gap: 0.35rem;
+  background: ${C.surface};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.25rem;
+}
+.theme-seg-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: ${C.muted};
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.45rem 0.3rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.theme-seg-btn:hover { color: ${C.text}; }
+.theme-seg-btn.active {
+  background: ${C.card};
+  border-color: ${C.accent};
+  color: ${C.accent};
+}
+.theme-seg-icon { font-size: 0.95rem; line-height: 1; }
+.theme-caption {
+  margin-top: 0.5rem;
+  font-size: 0.74rem;
+  color: ${C.muted};
+  line-height: 1.35;
+}
+
+/* ---- Global Settings sheet ---- */
+.settings-panel { height: min(58vh, 460px); }
+.settings-list { padding: 0.9rem 1.1rem 1.4rem; }
+.settings-list h4 {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: ${C.muted};
+  margin-bottom: 0.5rem;
+}
+/* Icon-only nav gear. Deliberately NOT in the mobile-hide rule that hides
+   .nav-friends-btn — the theme control must stay reachable on phones. */
+.nav-settings-btn {
+  background: transparent;
+  border: 1px solid ${C.border};
+  color: ${C.muted};
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.nav-settings-btn:hover { color: ${C.text}; border-color: ${C.accent}; }
 .cg-toggle {
   width: 2.8rem;
   height: 1.5rem;
@@ -2972,9 +3156,9 @@ body {
   flex: 0 0 auto;
   font-size: 0.62rem;
   font-weight: 600;
-  background: ${C.accent}22;
+  background: ${ca('accent','22')};
   color: ${C.accent};
-  border: 1px solid ${C.accent}55;
+  border: 1px solid ${ca('accent','55')};
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
   margin-left: 0.4rem;
@@ -2987,8 +3171,8 @@ body {
   gap: 0.6rem;
   width: var(--cg-board);
   max-width: 94vw;
-  background: ${C.gold}14;
-  border: 1px solid ${C.gold}55;
+  background: ${ca('gold','14')};
+  border: 1px solid ${ca('gold','55')};
   border-radius: 10px;
   padding: 0.5rem 0.7rem;
   font-size: 0.82rem;
@@ -3062,8 +3246,8 @@ body {
 }
 .bb-cell { background: ${C.bg}; border-radius: 4px; aspect-ratio: 1; transition: background 0.1s ease; }
 .bb-cell.filled { background: ${C.accent}; }
-.bb-cell.preview { background: ${C.accent}66; }
-.bb-cell.invalid { background: ${C.rose}55; }
+.bb-cell.preview { background: ${ca('accent','66')}; }
+.bb-cell.invalid { background: ${ca('rose','55')}; }
 .bb-tray {
   display: flex;
   gap: 0.8rem;
@@ -3108,7 +3292,7 @@ body {
   user-select: none;
   transition: transform 0.1s ease, background 0.1s ease, opacity 0.18s ease;
 }
-.tm-grid .tm-tile.sel { background: ${C.accent}44; border-color: ${C.accent}; transform: scale(0.92); }
+.tm-grid .tm-tile.sel { background: ${ca('accent','44')}; border-color: ${C.accent}; transform: scale(0.92); }
 .tm-grid .tm-tile.gone { opacity: 0; pointer-events: none; }
 
 /* ---- Diamond Rush ---- */
@@ -3185,8 +3369,8 @@ body {
   flex: 1;
   max-width: 90px;
 }
-.dr-powerup-btn.owned:not(:disabled) { border-color: ${C.accent}; background: ${C.accent}14; }
-.dr-powerup-btn.owned:not(:disabled):hover { border-color: ${C.gold}; background: ${C.gold}22; }
+.dr-powerup-btn.owned:not(:disabled) { border-color: ${C.accent}; background: ${ca('accent','14')}; }
+.dr-powerup-btn.owned:not(:disabled):hover { border-color: ${C.gold}; background: ${ca('gold','22')}; }
 .dr-powerup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .dr-powerup-btn .icon { font-size: 1.4rem; line-height: 1; }
 .dr-powerup-btn .count { font-size: 0.65rem; color: ${C.muted}; }
@@ -3236,9 +3420,9 @@ body {
 }
 .kt-cell.kt-light { background: ${C.surface}; }
 .kt-cell.kt-dark  { background: ${C.card}; }
-.kt-cell.kt-valid { background: ${C.accent}33; cursor: pointer; }
-.kt-cell.kt-valid:hover { background: ${C.accent}55; }
-.kt-cell.kt-current { background: ${C.accent}22; outline: 2px solid ${C.accent}; outline-offset: -2px; }
+.kt-cell.kt-valid { background: ${ca('accent','33')}; cursor: pointer; }
+.kt-cell.kt-valid:hover { background: ${ca('accent','55')}; }
+.kt-cell.kt-current { background: ${ca('accent','22')}; outline: 2px solid ${C.accent}; outline-offset: -2px; }
 .kt-cell.kt-visited { cursor: default; }
 .kt-knight { font-size: 1.35rem; line-height: 1; user-select: none; }
 .kt-num { font-size: 0.58rem; color: ${C.muted}; font-weight: 600; line-height: 1; }
@@ -3263,7 +3447,7 @@ body {
   padding: 0.7rem;
   background: ${C.surface};
   color: ${C.rose};
-  border: 1px solid ${C.rose}44;
+  border: 1px solid ${ca('rose','44')};
   border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 600;
@@ -3280,9 +3464,9 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.6rem 0.5rem;
-  border-bottom: 1px solid ${C.border}22;
+  border-bottom: 1px solid ${ca('border','22')};
 }
-.kt-history-row.kt-row-new { background: ${C.accent}11; border-radius: 6px; }
+.kt-history-row.kt-row-new { background: ${ca('accent','11')}; border-radius: 6px; }
 .kt-rank { font-size: 0.75rem; color: ${C.muted}; font-family: 'JetBrains Mono', monospace; min-width: 2rem; }
 .kt-best { font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.75rem; text-align: center; font-weight: 600; }
 .kt-empty { color: ${C.muted}; text-align: center; padding: 2.5rem 0; font-size: 0.9rem; }
@@ -3317,7 +3501,7 @@ body {
   transition: border-color 0.12s ease, transform 0.08s ease;
 }
 .dr-level-btn:not(.locked):hover { border-color: ${C.gold}; transform: translateY(-2px); }
-.dr-level-btn.selected { border-color: ${C.gold}; box-shadow: 0 0 0 2px ${C.gold}55; }
+.dr-level-btn.selected { border-color: ${C.gold}; box-shadow: 0 0 0 2px ${ca('gold','55')}; }
 .dr-level-btn.locked { opacity: 0.4; cursor: not-allowed; }
 .dr-level-btn.done { border-color: ${C.emerald}; }
 .dr-level-meta { font-size: 0.62rem; font-weight: 500; color: ${C.muted}; font-family: 'JetBrains Mono', monospace; }
@@ -3348,8 +3532,8 @@ body {
   font-size: clamp(14px, 5vw, 26px); line-height: 1;
 }
 .dr-cell.wall { background: ${C.dim}; }
-.dr-cell.exit { background: ${C.accent}33; }
-.dr-cell.trap { background: ${C.rose}22; }
+.dr-cell.exit { background: ${ca('accent','33')}; }
+.dr-cell.trap { background: ${ca('rose','22')}; }
 .dr-cell.floor { background: ${C.surface}; }
 .dr-sprite { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .dr-hero { z-index: 3; }
@@ -3373,7 +3557,7 @@ body {
 .dr-overlay-panel {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 0.8rem;
-  background: ${C.bg}cc; border-radius: 12px; z-index: 5;
+  background: ${ca('bg','cc')}; border-radius: 12px; z-index: 5;
 }
 .dr-board-shell { position: relative; }
 .dr-paused-msg { font-weight: 700; font-size: 1.1rem; color: ${C.gold}; }
@@ -3416,14 +3600,14 @@ body {
   padding: 0.3rem 0.7rem; font-family: inherit; font-size: 0.8rem;
   font-weight: 500; color: ${C.muted}; cursor: pointer; transition: all 0.12s;
 }
-.tm-lb-sub-tab.active { background: ${C.accent}18; border-color: ${C.accent}; color: ${C.accent}; font-weight: 600; }
+.tm-lb-sub-tab.active { background: ${ca('accent','18')}; border-color: ${C.accent}; color: ${C.accent}; font-weight: 600; }
 .tm-lb-row {
   display: flex; align-items: center; gap: 0.5rem;
   padding: 0.45rem 0.5rem; border-radius: 8px;
   font-size: 0.84rem; transition: background 0.1s;
 }
 .tm-lb-row:hover { background: ${C.surface}; }
-.tm-lb-row.me { background: ${C.accent}12; border: 1px solid ${C.accent}30; margin-top: 0.4rem; }
+.tm-lb-row.me { background: ${ca('accent','12')}; border: 1px solid ${ca('accent','30')}; margin-top: 0.4rem; }
 .tm-lb-rank { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${C.gold}; min-width: 1.8rem; font-size: 0.78rem; }
 .tm-lb-name { flex: 1; color: ${C.text}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm-lb-stat { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: ${C.accent}; font-weight: 600; }
@@ -3443,7 +3627,7 @@ body {
   padding: 0.45rem 0.85rem; font-family: inherit; font-size: 0.83rem;
   font-weight: 600; cursor: pointer; transition: background 0.12s;
 }
-.tm-duel-find-btn:hover:not(:disabled) { background: #234C8E; }
+.tm-duel-find-btn:hover:not(:disabled) { background: var(--c-accent-hover); }
 .tm-duel-find-btn:disabled { opacity: 0.35; cursor: not-allowed; background: ${C.muted}; }
 .tm-duel-matchmaking {
   text-align: center; padding: 2rem 1rem;
@@ -3451,7 +3635,7 @@ body {
 }
 .tm-duel-pulse {
   width: 3rem; height: 3rem; border-radius: 50%;
-  background: ${C.accent}33; border: 2px solid ${C.accent};
+  background: ${ca('accent','33')}; border: 2px solid ${C.accent};
   animation: tm-duel-pulse-anim 1.2s ease-in-out infinite;
 }
 @keyframes tm-duel-pulse-anim {
@@ -3491,7 +3675,7 @@ body {
   padding: 0.3rem 0.75rem; font-family: inherit; font-size: 0.8rem;
   font-weight: 600; cursor: pointer; transition: background 0.12s;
 }
-.tm-task-claim-btn:hover:not(:disabled) { background: #059669; }
+.tm-task-claim-btn:hover:not(:disabled) { background: var(--c-emerald-hover); }
 .tm-task-claim-btn:disabled { opacity: 0.4; cursor: not-allowed; background: ${C.muted}; }
 .tm-task-claimed { font-size: 0.8rem; color: ${C.emerald}; font-weight: 600; }
 .tm-tasks-all-done {
@@ -3527,20 +3711,20 @@ body {
 .dapp-badge {
   display: inline-flex; align-items: center; gap: 0.4rem; width: 100%;
   justify-content: center; margin: 0.6rem 0; padding: 0.5rem 0.7rem;
-  background: ${C.emerald}1a; border: 1px solid ${C.emerald}66; color: ${C.emerald};
+  background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','66')}; color: ${C.emerald};
   border-radius: 0.6rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
 }
-.dapp-badge.disputed { background: ${C.rose}1a; border-color: ${C.rose}66; color: ${C.rose}; }
+.dapp-badge.disputed { background: ${ca('rose','1a')}; border-color: ${ca('rose','66')}; color: ${C.rose}; }
 .dapp-badge-arrow { margin-left: auto; opacity: 0.7; }
 .dapp-badge-dot { font-size: 0.9rem; }
 .dapp-verified-pill {
   font-size: 0.62rem; font-weight: 600; color: ${C.emerald};
-  background: ${C.emerald}1a; border: 1px solid ${C.emerald}55; border-radius: 999px;
+  background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','55')}; border-radius: 999px;
   padding: 0.05rem 0.45rem; margin-left: 0.4rem; vertical-align: middle;
 }
 .dapp-verdict { border-radius: 0.6rem; padding: 0.7rem 0.85rem; font-weight: 600; font-size: 0.88rem; margin-bottom: 0.85rem; }
-.dapp-verdict.ok  { background: ${C.emerald}1a; border: 1px solid ${C.emerald}66; color: ${C.emerald}; }
-.dapp-verdict.bad { background: ${C.rose}1a; border: 1px solid ${C.rose}66; color: ${C.rose}; }
+.dapp-verdict.ok  { background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','66')}; color: ${C.emerald}; }
+.dapp-verdict.bad { background: ${ca('rose','1a')}; border: 1px solid ${ca('rose','66')}; color: ${C.rose}; }
 .dapp-verdict-reason { font-weight: 400; font-size: 0.76rem; color: ${C.muted}; margin-top: 0.35rem; }
 .dapp-kv { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem; padding: 0.2rem 0; color: ${C.text}; }
 .dapp-kv span:first-child { color: ${C.muted}; }
@@ -3552,17 +3736,17 @@ body {
 .dapp-lrow { width: 100%; background: none; border: none; cursor: pointer; text-align: left; }
 .dapp-identity-badge {
   display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 600;
-  color: ${C.emerald}; background: ${C.emerald}1a; border: 1px solid ${C.emerald}55;
+  color: ${C.emerald}; background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','55')};
   border-radius: 999px; padding: 0.15rem 0.55rem; margin-left: 0.5rem;
 }
-.dapp-identity-badge.unproven { color: ${C.muted}; background: ${C.dim}33; border-color: ${C.dim}; }
+.dapp-identity-badge.unproven { color: ${C.muted}; background: ${ca('dim','33')}; border-color: ${C.dim}; }
 .dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
 
 /* ---- Badge progress pills (profile BadgeStrip + win overlay) ---- */
 .badge-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }
 .badge-progress-pill {
   font-size: 0.72rem; font-weight: 600; color: ${C.muted};
-  background: ${C.gold}0d; border: 1px solid ${C.gold}33;
+  background: ${ca('gold','0d')}; border: 1px solid ${ca('gold','33')};
   border-radius: 999px; padding: 0.2rem 0.55rem;
   display: inline-flex; gap: 0.3rem; align-items: center; white-space: nowrap;
 }
@@ -3570,8 +3754,8 @@ body {
 .win-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin: 0.6rem 0; }
 /* ---- Phase 5 board games (Checkers / Reversi / Four in a Row / Gomoku / Ludo) ---- */
 .brg-intro {
-  font-size: 0.85rem; color: ${C.text}; background: ${C.accent}14;
-  border: 1px solid ${C.accent}44; border-radius: 10px;
+  font-size: 0.85rem; color: ${C.text}; background: ${ca('accent','14')};
+  border: 1px solid ${ca('accent','44')}; border-radius: 10px;
   padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; text-align: center;
 }
 .brg-note {
@@ -3622,7 +3806,7 @@ body {
   background: #22335e; border-radius: 12px;
 }
 .fir-cell {
-  aspect-ratio: 1; background: ${C.bg || '#0a0e1a'}; border-radius: 50%;
+  aspect-ratio: 1; background: ${C.bg}; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .fir-cell.last { box-shadow: 0 0 0 2px ${C.gold}; }
@@ -3655,13 +3839,13 @@ body {
 }
 .ludo-cell.ring { background: ${C.card}; border: 1px solid ${C.border}; }
 .ludo-cell.ring.safe { color: ${C.gold}; }
-.ludo-cell.ring.start1 { background: ${C.accent}33; border-color: ${C.accent}; }
-.ludo-cell.ring.start2 { background: ${C.rose}33; border-color: ${C.rose}; }
-.ludo-cell.home1 { background: ${C.accent}22; border: 1px dashed ${C.accent}66; }
-.ludo-cell.home2 { background: ${C.rose}22; border: 1px dashed ${C.rose}66; }
-.ludo-cell.base1 { background: ${C.accent}18; border: 1px solid ${C.accent}55; border-radius: 50%; }
-.ludo-cell.base2 { background: ${C.rose}18; border: 1px solid ${C.rose}55; border-radius: 50%; }
-.ludo-cell.center { background: ${C.gold}22; border: 1px solid ${C.gold}; font-size: 0.8rem; }
+.ludo-cell.ring.start1 { background: ${ca('accent','33')}; border-color: ${C.accent}; }
+.ludo-cell.ring.start2 { background: ${ca('rose','33')}; border-color: ${C.rose}; }
+.ludo-cell.home1 { background: ${ca('accent','22')}; border: 1px dashed ${ca('accent','66')}; }
+.ludo-cell.home2 { background: ${ca('rose','22')}; border: 1px dashed ${ca('rose','66')}; }
+.ludo-cell.base1 { background: ${ca('accent','18')}; border: 1px solid ${ca('accent','55')}; border-radius: 50%; }
+.ludo-cell.base2 { background: ${ca('rose','18')}; border: 1px solid ${ca('rose','55')}; border-radius: 50%; }
+.ludo-cell.center { background: ${ca('gold','22')}; border: 1px solid ${C.gold}; font-size: 0.8rem; }
 .ludo-token {
   z-index: 2; width: 85%; height: 85%; border-radius: 50%; align-self: center; justify-self: center;
   display: flex; align-items: center; justify-content: center;
@@ -3708,7 +3892,7 @@ body {
   user-select: none;
 }
 .cnl-cell.alt { background: ${C.surface}; }
-.cnl-cell.cnl-goal { background: ${C.gold}22; color: ${C.gold}; }
+.cnl-cell.cnl-goal { background: ${ca('gold','22')}; color: ${C.gold}; }
 .cnl-cell-mark {
   position: absolute; bottom: 0; right: 1px;
   font-size: 0.72rem; line-height: 1;
@@ -3806,7 +3990,7 @@ body {
 /* ---- Pre-launch Game Mode Modal ---- */
 .gm-modal-backdrop {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(38,33,18,0.5); backdrop-filter: blur(4px);
+  background: var(--c-scrim); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; padding: 1rem;
   animation: gmFade 0.18s ease-out;
 }
@@ -3814,7 +3998,7 @@ body {
 .gm-modal {
   position: relative; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto;
   background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 50px rgba(63,51,24,0.22);
+  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 50px var(--c-shadow-lg);
 }
 .gm-modal-close {
   position: absolute; top: 0.75rem; right: 0.75rem; width: 2rem; height: 2rem;
@@ -3881,10 +4065,10 @@ body {
 }
 .p6-btn:hover { border-color: ${C.accent}; }
 .p6-btn:disabled { opacity: .4; cursor: default; }
-.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgba(45,95,174,.14); }
+.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgb(var(--c-accent-rgb) / 14%); }
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
 .p6-banner {
-  background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.4); color: ${C.gold};
+  background: rgb(var(--c-gold-rgb) / 12%); border: 1px solid rgb(var(--c-gold-rgb) / 40%); color: ${C.gold};
   border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
 }
 
@@ -3906,7 +4090,7 @@ body {
 .ce-card.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; }
 .ce-card.dim { opacity: .5; }
 .ce-card.ce-slot {
-  background: rgba(255,255,255,.04); border: 1.5px dashed ${C.dim}; box-shadow: none;
+  background: var(--c-well); border: 1.5px dashed ${C.dim}; box-shadow: none;
   color: ${C.dim}; font-size: 18px;
 }
 
@@ -4003,8 +4187,8 @@ body {
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: ${C.text};
 }
-.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgba(45,95,174,.10); }
-.an-slots.bad .an-slot.has { border-color: ${C.rose}; background: rgba(251,113,133,.12); animation: an-shake .4s; }
+.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgb(var(--c-accent-rgb) / 10%); }
+.an-slots.bad .an-slot.has { border-color: ${C.rose}; background: rgb(var(--c-rose-rgb) / 12%); animation: an-shake .4s; }
 @keyframes an-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .an-rack { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
 .an-tile {
@@ -4023,7 +4207,7 @@ body {
   font-size: 20px; user-select: none;
 }
 .cp-cell.wall { background: ${C.dim}; border-radius: 2px; }
-.cp-cell.goal { background: rgba(30,143,99,.14); box-shadow: inset 0 0 0 2px rgba(30,143,99,.45); }
+.cp-cell.goal { background: rgb(var(--c-emerald-rgb) / 14%); box-shadow: inset 0 0 0 2px rgb(var(--c-emerald-rgb) / 45%); }
 .cp-crate.ongoal { filter: hue-rotate(60deg) brightness(1.2); }
 .cp-pad {
   display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; margin-bottom: 10px;
@@ -4095,7 +4279,7 @@ body {
 
 /* Phase 8 — anonymous play + "make it count" */
 .guest-cta {
-  border: 1px solid ${C.accent}66; background: rgba(45,95,174,0.08);
+  border: 1px solid ${ca('accent','66')}; background: rgb(var(--c-accent-rgb) / 8%);
   border-radius: 12px; padding: 12px 14px; margin-bottom: 0.9rem; text-align: left;
 }
 .guest-rank { font-size: 15px; margin-bottom: 6px; }
@@ -4103,7 +4287,7 @@ body {
 .guest-note { color: ${C.muted}; font-size: 12.5px; line-height: 1.5; }
 .guest-note strong { color: ${C.text}; }
 .commit-notice {
-  border: 1px solid ${C.emerald}66; background: rgba(30,143,99,0.09); color: ${C.text};
+  border: 1px solid ${ca('emerald','66')}; background: rgb(var(--c-emerald-rgb) / 9%); color: ${C.text};
   border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem; font-size: 13.5px;
   cursor: pointer;
 }
@@ -4114,7 +4298,7 @@ body {
   border: 1px solid ${C.border}; background: ${C.card};
   border-left: 3px solid ${C.gold};
   border-radius: 12px; margin-bottom: 1rem; overflow: hidden;
-  box-shadow: 0 1px 2px rgba(63,51,24,0.06);
+  box-shadow: 0 1px 2px var(--c-shadow-sm);
 }
 .wn-strip-body {
   flex: 1; text-align: left; background: none; border: none; cursor: pointer;
@@ -4161,7 +4345,7 @@ body {
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
 
 .chat-overlay {
-  position: fixed; inset: 0; background: rgba(38,33,18,0.5); z-index: 240;
+  position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;
   display: flex; align-items: flex-end; justify-content: center;
 }
 .chat-panel {
@@ -4181,7 +4365,7 @@ body {
 .chat-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 .chat-empty { color: ${C.muted}; font-size: 13px; text-align: center; margin-top: 24px; }
 .chat-msg { background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px; padding: 8px 10px; max-width: 88%; }
-.chat-msg.mine { align-self: flex-end; border-color: ${C.accent}55; background: rgba(45,95,174,0.08); }
+.chat-msg.mine { align-self: flex-end; border-color: ${ca('accent','55')}; background: rgb(var(--c-accent-rgb) / 8%); }
 .chat-msg.hidden-msg { background: none; border-style: dashed; }
 .chat-tombstone { color: ${C.dim}; font-size: 12px; }
 .chat-msg-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
@@ -4286,9 +4470,9 @@ body {
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
 .lboard, .howto-card, .gm-modal {
-  box-shadow: 0 1px 2px rgba(63,51,24,0.06), 0 6px 18px rgba(63,51,24,0.07);
+  box-shadow: 0 1px 2px var(--c-shadow-sm), 0 6px 18px var(--c-shadow-sm);
 }
-.win-card, .howto-card, .gm-modal { box-shadow: 0 20px 50px rgba(63,51,24,0.22); }
+.win-card, .howto-card, .gm-modal { box-shadow: 0 20px 50px var(--c-shadow-lg); }
 
 /* GotD hero reads as the front-page lead story. */
 .gotd-hero { background: ${C.card}; }
@@ -4312,7 +4496,7 @@ body {
 .pregame-card { border-top: 3px solid var(--accent, ${C.accent}); }
 
 /* Buttons: crisp editorial edges. */
-.primary-btn { box-shadow: 0 1px 2px rgba(63,51,24,0.18); }
+.primary-btn { box-shadow: 0 1px 2px var(--c-shadow-md); }
 
 /* Wins are brass moments. */
 .win-card .trophy { filter: none; }
@@ -4326,6 +4510,7 @@ body {
 const CG_SOUND_KEY   = 'puzzlechain_cg_sound';
 const CG_HAPTICS_KEY = 'puzzlechain_cg_haptics';
 const CG_MOTION_KEY  = 'puzzlechain_cg_motion';
+const PREF_KEYS = { sound: CG_SOUND_KEY, haptics: CG_HAPTICS_KEY, motion: CG_MOTION_KEY };
 
 // Module-level prefs read by cgSound/cgHaptic without prop threading.
 const cgPrefs = {
@@ -4335,12 +4520,89 @@ const cgPrefs = {
 };
 function cgSetPref(key, val) {
   cgPrefs[key] = val;
+  try { localStorage.setItem(PREF_KEYS[key] || CG_MOTION_KEY, val ? '1' : '0'); } catch {}
+}
+
+/* ============================================================
+   Theme preference — light / dark / system (default system)
+   ------------------------------------------------------------
+   Device-local, like every other pref in this app (there is no
+   server-side prefs table). The stored value is the PREFERENCE
+   ('system' | 'light' | 'dark'); the RESOLVED theme is what lands on
+   <html data-theme>. The same key + resolution logic is duplicated in
+   index.html's inline boot script so the first paint is already
+   correct — keep the two in sync if either changes.
+   ============================================================ */
+const THEME_KEY = 'puzzlechain_theme';
+const THEME_PREFS = ['system', 'light', 'dark'];
+
+function readThemePref() {
   try {
-    localStorage.setItem(
-      key === 'sound' ? CG_SOUND_KEY : key === 'haptics' ? CG_HAPTICS_KEY : CG_MOTION_KEY,
-      val ? '1' : '0'
-    );
+    const v = localStorage.getItem(THEME_KEY);
+    return THEME_PREFS.indexOf(v) >= 0 ? v : 'system';
+  } catch { return 'system'; }
+}
+
+function systemPrefersDark() {
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+  catch { return false; }
+}
+
+function resolveTheme(pref) {
+  if (pref === 'light' || pref === 'dark') return pref;
+  return systemPrefersDark() ? 'dark' : 'light';
+}
+
+const themeState = { pref: readThemePref(), resolved: 'light' };
+const themeSubscribers = new Set();
+
+/* Single source of truth for "make the DOM match this preference". */
+function applyTheme(pref, persist) {
+  themeState.pref = THEME_PREFS.indexOf(pref) >= 0 ? pref : 'system';
+  themeState.resolved = resolveTheme(themeState.pref);
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, themeState.pref); } catch {}
+  }
+  try {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', themeState.resolved);
+    root.setAttribute('data-theme-pref', themeState.pref);
+    // Canvas games need real hex, not var() references.
+    Object.assign(PAL, PALETTES[themeState.resolved]);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', PALETTES[themeState.resolved].bg);
   } catch {}
+  themeSubscribers.forEach(fn => { try { fn(); } catch {} });
+}
+
+applyTheme(themeState.pref, false);
+
+/* Live OS reaction: only meaningful while the pref is 'system'. Registered
+   once at module scope (not per-component) so it survives every navigation. */
+(() => {
+  try {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => { if (themeState.pref === 'system') applyTheme('system', false); };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange); // Safari < 14
+  } catch {}
+})();
+
+/* Components that display the theme (the segmented control, Minesweeper's
+   board) subscribe so an OS-driven flip re-renders them too. */
+function useTheme() {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const fn = () => force(n => n + 1);
+    themeSubscribers.add(fn);
+    return () => { themeSubscribers.delete(fn); };
+  }, []);
+  return {
+    pref: themeState.pref,
+    resolved: themeState.resolved,
+    setPref: (p) => applyTheme(p, true),
+  };
 }
 
 let _cgAudioCtx = null;
@@ -4596,12 +4858,48 @@ function CgToggle({ on, onClick }) {
   return <button className={'cg-toggle' + (on ? ' on' : '')} onClick={onClick} aria-pressed={on} />;
 }
 
+/* Light / Dark / System segmented control. Shared by the global Settings
+   sheet and the in-game ☰ → Settings tab, so both always agree. */
+const THEME_OPTIONS = [
+  { id: 'system', label: 'System', icon: '🖥' },
+  { id: 'light',  label: 'Light',  icon: '☀' },
+  { id: 'dark',   label: 'Dark',   icon: '🌙' },
+];
+
+function ThemeChoice() {
+  const { pref, resolved, setPref } = useTheme();
+  return (
+    <div className="theme-choice">
+      <div className="theme-seg" role="group" aria-label="Theme">
+        {THEME_OPTIONS.map(o => (
+          <button
+            key={o.id}
+            type="button"
+            className={'theme-seg-btn' + (pref === o.id ? ' active' : '')}
+            aria-pressed={pref === o.id}
+            onClick={() => { setPref(o.id); cgSound('click'); }}
+          >
+            <span className="theme-seg-icon">{o.icon}</span>{o.label}
+          </button>
+        ))}
+      </div>
+      <div className="theme-caption">
+        {pref === 'system'
+          ? `Following your device — currently ${resolved === 'dark' ? 'Dark' : 'Light'}.`
+          : `Always ${pref === 'dark' ? 'Dark' : 'Light'}, whatever your device says.`}
+      </div>
+    </div>
+  );
+}
+
 function CgSettings({ tick }) {
   const [, force] = useState(0);
   const flip = (key) => { cgSetPref(key, !cgPrefs[key]); force(n => n + 1); };
   return (
     <div>
-      <h4>Settings</h4>
+      <h4>Appearance</h4>
+      <ThemeChoice />
+      <h4 className="cg-settings-h4-spaced">Game feedback</h4>
       <div className="cg-setting-row"><span className="name">Sound</span><CgToggle on={cgPrefs.sound} onClick={() => flip('sound')} /></div>
       <div className="cg-setting-row"><span className="name">Haptics</span><CgToggle on={cgPrefs.haptics} onClick={() => flip('haptics')} /></div>
       <div className="cg-setting-row"><span className="name">Reduced motion</span><CgToggle on={cgPrefs.motion} onClick={() => flip('motion')} /></div>
@@ -5915,6 +6213,25 @@ function WhatsNewSheet({ onClose }) {
               </ul>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* App-wide Settings sheet. Same bottom-sheet chrome as the chat / what's-new
+   sheets; reuses CgSettings so the theme + feedback prefs are defined once and
+   rendered identically here and in a classic game's ☰ → Settings tab. */
+function SettingsSheet({ onClose }) {
+  return (
+    <div className="chat-overlay" onClick={onClose}>
+      <div className="chat-panel settings-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-head">
+          <div className="chat-title">⚙ Settings</div>
+          <button className="chat-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="chat-list settings-list">
+          <CgSettings />
         </div>
       </div>
     </div>
@@ -8008,7 +8325,10 @@ function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
 }
 
 function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
-  const [theme, setTheme] = useState('dark');
+  // The board follows the APP theme now (its own light/dark button is gone —
+  // one control, in Settings). Base .ms-* rules are dark and
+  // [data-ms-theme="light"] overrides them, so the resolved value maps directly.
+  const { resolved: theme } = useTheme();
   const [activeTab, setActiveTab] = useState('game');
   const [mineSet, setMineSet] = useState(null);
   const [adjacency, setAdjacency] = useState(null);
@@ -8312,12 +8632,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
           </div>
           <div className="ms-settings-section">
             <h4>Appearance</h4>
-            <div className="ms-settings-row">
-              <span className="ms-settings-label">Theme</span>
-              <button className="ms-theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-                {theme === 'dark' ? '🌙 Dark' : '☀ Light'}
-              </button>
-            </div>
+            <ThemeChoice />
           </div>
         </div>
       )}
@@ -9159,8 +9474,8 @@ function MncLeaderboard() {
               <div key={i} style={{
                 display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem',
                 padding: '0.4rem 0.25rem', fontSize: '0.82rem',
-                borderBottom: `1px solid ${C.border}22`,
-                background: isMe ? C.accent + '18' : 'transparent',
+                borderBottom: `1px solid ${ca('border','22')}`,
+                background: isMe ? ca('accent','18') : 'transparent',
                 borderRadius: isMe ? '6px' : '0',
               }}>
                 <span style={{ color: row.rank <= 3 ? C.gold : C.muted, fontWeight: row.rank <= 3 ? 700 : 400 }}>{row.rank}</span>
@@ -9176,7 +9491,7 @@ function MncLeaderboard() {
               <div style={{
                 display: 'grid', gridTemplateColumns: '2rem 1fr auto auto', gap: '0 0.5rem',
                 padding: '0.4rem 0.25rem', fontSize: '0.82rem',
-                background: C.accent + '18', borderRadius: '6px',
+                background: ca('accent','18'), borderRadius: '6px',
               }}>
                 <span style={{ color: C.accent, fontWeight: 600 }}>{data.me.rank}</span>
                 <span style={{ color: C.accent, fontWeight: 600 }}>{data.me.username || 'You'}</span>
@@ -9227,8 +9542,8 @@ function MncDailyLeaderboard({ refreshKey }) {
     <div style={{
       display: 'grid', gridTemplateColumns: cols, gap: '0 0.5rem',
       padding: '0.4rem 0.25rem', fontSize: '0.82rem',
-      borderBottom: `1px solid ${C.border}22`,
-      background: me ? C.accent + '18' : 'transparent',
+      borderBottom: `1px solid ${ca('border','22')}`,
+      background: me ? ca('accent','18') : 'transparent',
       borderRadius: me ? '6px' : '0',
     }}>
       <span style={{ color: r.rank <= 3 ? C.gold : C.muted, fontWeight: r.rank <= 3 ? 700 : 400 }}>{r.rank}</span>
@@ -10317,7 +10632,7 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline, onSelect
           <span className="mnc-mode-text">
             <span className="mnc-mode-name">
               {m.name}
-              {m.ranked && <span style={{ marginLeft: '0.4rem', fontSize: '0.68rem', background: C.gold + '33', color: C.gold, border: `1px solid ${C.gold}55`, borderRadius: '999px', padding: '0.1rem 0.4rem', verticalAlign: 'middle', fontWeight: 700 }}>🏆 Ranked</span>}
+              {m.ranked && <span style={{ marginLeft: '0.4rem', fontSize: '0.68rem', background: ca('gold','33'), color: C.gold, border: `1px solid ${ca('gold','55')}`, borderRadius: '999px', padding: '0.1rem 0.4rem', verticalAlign: 'middle', fontWeight: 700 }}>🏆 Ranked</span>}
             </span>
             <span className="mnc-mode-desc">{m.desc}{m.ranked ? ' — wins post to leaderboard' : ''}</span>
           </span>
@@ -11042,7 +11357,7 @@ function SnakeGameModeSelect({ onSelectDifficulty }) {
     <div className="mnc-mode-select">
       <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
         <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>Choose Difficulty</h3>
-        <p style={{ color: 'var(--cg-muted, #999)', fontSize: '0.9rem', margin: '0 0 1.5rem 0' }}>Affects starting speed and acceleration</p>
+        <p style={{ color: 'var(--c-muted)', fontSize: '0.9rem', margin: '0 0 1.5rem 0' }}>Affects starting speed and acceleration</p>
       </div>
       <div className="mnc-difficulty-row">
         {['easy', 'normal', 'hard'].map(d => (
@@ -12002,7 +12317,7 @@ function TileMatchLeaderboard({ user }) {
         </div>
       )}
       {!me && sub === 'global' && user && (
-        <div className="tm-lb-row me" style={{ color: 'var(--c-muted,#888)' }}>
+        <div className="tm-lb-row me" style={{ color: 'var(--c-muted)' }}>
           <span className="tm-lb-rank">—</span>
           <span className="tm-lb-name">{user.username} (you)</span>
           <span className="tm-lb-stat">not ranked yet</span>
@@ -12279,7 +12594,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
       // 'play' tab — existing level selector
       if (tierPage === null) return (
         <div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--c-muted,#888)', marginBottom: '1rem' }}>Click tiles off the layered board into your 7-slot bar — match three to clear them.</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--c-muted)', marginBottom: '1rem' }}>Click tiles off the layered board into your 7-slot bar — match three to clear them.</p>
           <div className="tm-tier-overview">
             {TM_TIER_LABELS.map((tier, idx) => {
               const doneCount = Array.from(completedLevels).filter(l => l >= tier.start + 1 && l <= tier.end + 1).length;
@@ -12299,7 +12614,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
       return (
         <div>
           <button className="tm-tier-back-btn" onClick={() => setTierPage(null)}>← Tiers</button>
-          <div className="tm-tier-page-title">{tier.label} <span style={{color:'var(--c-muted,#888)',fontWeight:400,fontSize:'0.85rem'}}>L{tier.start+1}–{tier.end+1}</span></div>
+          <div className="tm-tier-page-title">{tier.label} <span style={{color:'var(--c-muted)',fontWeight:400,fontSize:'0.85rem'}}>L{tier.start+1}–{tier.end+1}</span></div>
           <div className="tm-level-grid">
             {Array.from({ length: 100 }, (_, i) => {
               const lvl = tier.start + i + 1;
@@ -13548,7 +13863,10 @@ const BOUNCE_MUSIC_URL = '/audio/bounce-bg.mp3';
 
 // Points by row (top rows are harder to reach, so worth more); fallback 10.
 const BOUNCE_ROW_POINTS = [50, 50, 30, 30, 20, 10, 10, 10];
-const BOUNCE_ROW_COLORS = [C.rose, C.gold, C.emerald, C.violet, C.accent];
+/* Palette TOKEN NAMES, not hex: bricks are drawn on a canvas, so their colour
+   is resolved from the live PAL at draw time and a theme flip recolours them
+   mid-game without rebuilding the level. */
+const BOUNCE_ROW_COLORS = ['rose', 'gold', 'emerald', 'violet', 'accent'];
 
 function bounceClamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
@@ -13977,13 +14295,13 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     const ctx = ctxRef.current;
     if (!ctx) return;
     ctx.clearRect(0, 0, BOUNCE_W, BOUNCE_H);
-    ctx.fillStyle = C.bg;
+    ctx.fillStyle = PAL.bg;
     ctx.fillRect(0, 0, BOUNCE_W, BOUNCE_H);
     const bricks = bricksRef.current;
     for (let i = 0; i < bricks.length; i++) {
       const b = bricks[i];
       if (!b.alive) continue;
-      ctx.fillStyle = b.color;
+      ctx.fillStyle = PAL[b.color] || b.color;
       ctx.fillRect(b.x, b.y, b.w, b.h);
     }
 
@@ -14006,13 +14324,13 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
       ctx.fill();
     }
 
-    ctx.fillStyle = C.text;
+    ctx.fillStyle = PAL.text;
     const px = paddleRef.current;
     const paddleW = basePaddleWRef.current * (1 + activePowerupsRef.current.filter(p => p.type === 'larger-paddle').reduce((a, p) => a + 0.5 * p.stacks, 0));
     ctx.fillRect(px - paddleW / 2, BOUNCE_PADDLE_Y, paddleW, BOUNCE_PADDLE_H);
 
     const balls = ballsRef.current;
-    ctx.fillStyle = C.gold;
+    ctx.fillStyle = PAL.gold;
     for (let i = 0; i < balls.length; i++) {
       const ball = balls[i];
       ctx.beginPath();
@@ -14021,7 +14339,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     }
 
     if (startedRef.current && !launchedRef.current && !doneRef.current) {
-      ctx.fillStyle = C.text;
+      ctx.fillStyle = PAL.text;
       ctx.font = '600 14px "Space Grotesk", system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Tap or press Space to launch', BOUNCE_W / 2, BOUNCE_H / 2);
@@ -14135,7 +14453,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
               const elapsed = now - ap.startedAt;
               const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
               return (
-                <div key={idx} className="pill" style={{ background: C.emerald + '22', border: `1px solid ${C.emerald}` }}>
+                <div key={idx} className="pill" style={{ background: ca('emerald','22'), border: `1px solid ${C.emerald}` }}>
                   <div className="plabel" style={{ fontSize: '0.75rem' }}>
                     {POWERUP_ICONS[ap.type]} {remaining}s {ap.stacks > 1 ? `×${ap.stacks}` : ''}
                   </div>
@@ -14412,7 +14730,7 @@ function VerifiedLeaderboard({ gameId, onOpenReceipt }) {
    Social Components — Profile & Friends
    ============================================================ */
 
-function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends }) {
+function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOpenSettings }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -14574,6 +14892,21 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends }) {
               onClick={onOpenFriends}
             >
               👥 Friends
+              <span className="chev">›</span>
+            </button>
+          </div>
+        )}
+
+        {/* Settings entry — own profile only, but shown on every viewport
+            (unlike Friends, whose desktop home is the nav bar). */}
+        {isOwnProfile && onOpenSettings && (
+          <div className="account-connections account-connections-always">
+            <button
+              type="button"
+              className="account-connection-row"
+              onClick={onOpenSettings}
+            >
+              ⚙ Settings
               <span className="chev">›</span>
             </button>
           </div>
@@ -14977,7 +15310,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
       const ctx = canvas.getContext('2d');
       ctx.save();
       ctx.scale(dpr, dpr);
-      ctx.fillStyle = C.bg;
+      ctx.fillStyle = PAL.bg;
       ctx.fillRect(0, 0, ZUMA_W, ZUMA_H);
 
       const pd = pathDataRef.current;
@@ -15276,7 +15609,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
             const now = Date.now();
             const elapsed = now - ap.startedAt;
             const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
-            return React.createElement('div', { key: idx, className: 'pill', style: { background: C.emerald + '22', border: `1px solid ${C.emerald}` } },
+            return React.createElement('div', { key: idx, className: 'pill', style: { background: ca('emerald','22'), border: `1px solid ${C.emerald}` } },
               React.createElement('div', { className: 'plabel', style: { fontSize: '0.75rem' } },
                 POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '')
               )
@@ -20603,6 +20936,7 @@ function App() {
   // strip for this visit only, and it reappears on the next refresh — the
   // strip's "See all ›" is the only entry point to the weekly sheet.
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [wnDismissed, setWnDismissed] = useState(false);
   const dismissWhatsNew = () => setWnDismissed(true);
   // Incremented to trigger MinesweeperGame reset on Play Again
@@ -20811,6 +21145,18 @@ function App() {
     const g = GAMES.find((x) => x.id === cid);
     if (g) setChatGame(g);
   }, [loading]);
+
+  // Theme test hooks (also useful as share/deep links):
+  //   ?theme=light|dark|system — applies + persists the preference
+  //   ?settings=1              — opens the Settings sheet
+  // Read once on mount; the theme applier already ran at module scope, so this
+  // only overrides an explicit request.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const t = q.get('theme');
+    if (t && THEME_PREFS.indexOf(t) >= 0) applyTheme(t, true);
+    if (q.get('settings') === '1') setSettingsOpen(true);
+  }, []);
 
 
   // Midnight UTC reached — reload state so everything unlocks.
@@ -21645,6 +21991,16 @@ function App() {
               👥 Friends
             </button>
           )}
+          {/* Outside the authOk guard on purpose: a signed-out visitor should
+              still be able to pick a theme. */}
+          <button
+            className="nav-settings-btn"
+            title="Settings"
+            aria-label="Settings"
+            onClick={() => setSettingsOpen(true)}
+          >
+            ⚙
+          </button>
           <AccountChip
             loading={loading}
             authOk={authOk}
@@ -21662,6 +22018,7 @@ function App() {
           user={user}
           onBack={() => { setScreen('lobby'); setSelectedUserId(null); }}
           onOpenFriends={() => setScreen('friends')}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
       )}
 
@@ -22120,6 +22477,8 @@ function App() {
       )}
 
       {whatsNewOpen && <WhatsNewSheet onClose={() => setWhatsNewOpen(false)} />}
+
+      {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
 
       {chatGame && (
         <ChatPanel

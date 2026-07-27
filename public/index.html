@@ -1,8 +1,38 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FAF6EE">
+
+  <script>
+  // Theme pre-paint applier. Runs BEFORE any style block so a dark-mode
+  // player never sees an ivory flash. Deliberately duplicates the key name
+  // and resolution rule from app.jsx's theme module (THEME_KEY /
+  // resolveTheme) — keep the two in sync if either changes.
+  (function () {
+    try {
+      var pref = null;
+      try { pref = localStorage.getItem('puzzlechain_theme'); } catch (_) {}
+      if (pref !== 'light' && pref !== 'dark' && pref !== 'system') pref = 'system';
+      var resolved = pref;
+      if (pref === 'system') {
+        var dark = false;
+        try {
+          dark = !!(window.matchMedia &&
+                    window.matchMedia('(prefers-color-scheme: dark)').matches);
+        } catch (_) {}
+        resolved = dark ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', resolved);
+      document.documentElement.setAttribute('data-theme-pref', pref);
+      if (resolved === 'dark') {
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', '#0A0D14');
+      }
+    } catch (_) {}
+  })();
+  </script>
 
   <script>
   // usernode-dev-console@1
@@ -114,6 +144,25 @@
       width: 100%; box-sizing: border-box; margin-top: 0.9rem; height: 5.5rem; resize: vertical;
       background: #F3EDDF; color: #5E6A87; border: 1px solid #E7DFCC; border-radius: 0.5rem;
       padding: 0.5rem; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.72rem;
+    }
+
+    /* Dark boot shell. Hex values are duplicated from app.jsx's PALETTES.dark
+       on purpose: this block must still work when app.jsx fails to load, so it
+       cannot depend on the app's design system. */
+    html[data-theme="dark"] { color-scheme: dark; }
+    html[data-theme="dark"] body { background: #0A0D14; color: #ECEFF6; }
+    html[data-theme="dark"] #boot-loader .pc-spinner {
+      border-color: rgba(99,102,241,0.24); border-top-color: #6366F1;
+    }
+    html[data-theme="dark"] #boot-loader .pc-loading-text { color: #8B95A8; }
+    html[data-theme="dark"] .pc-boot-error .card { background: #181D29; border-color: #2A3342; }
+    html[data-theme="dark"] .pc-boot-error h1 { color: #ECEFF6; }
+    html[data-theme="dark"] .pc-boot-error p { color: #8B95A8; }
+    html[data-theme="dark"] .pc-boot-error .primary { background: #6366F1; color: #fff; }
+    html[data-theme="dark"] .pc-boot-error .secondary { color: #8B95A8; border-color: #2A3342; }
+    html[data-theme="dark"] .pc-boot-error .secondary.done { color: #34D399; border-color: #2f6b52; }
+    html[data-theme="dark"] .pc-boot-error textarea {
+      background: #12161F; color: #8B95A8; border-color: #2A3342;
     }
   </style>
 

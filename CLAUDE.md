@@ -777,3 +777,142 @@ The DApp-Mode verification framework (`lib/dapp.js`, `game_sessions` /
 `session_states`, session receipts, the Verified leaderboard) is NOT
 part of the retirement — it stays and is the seed of Game Corner's
 anti-cheat harness.
+
+## Cross-cutting remediation pass (#120–#145 — July 2026)
+
+One PR closed all 26 open issues, in eight phases. The phases are ordered
+because later ones use primitives the earlier ones build. **Four repo-wide
+rules came out of it — break any of them and a self-test fails the build.**
+
+### 1. Canvas colour: read `PAL`, never `C`
+
+`C.x` is the string `'var(--c-x)'`. Assigning it to `ctx.fillStyle` is
+**invalid, and the canvas silently keeps its previous colour** — which is
+black on the first frame and "last frame's colour" thereafter. That single
+mistake was issues #126 (black Nonogram), #127 (black Mine Finder) and #140
+("Drop Stack's background keeps changing"). Rules now:
+
+- Canvas code reads **`PAL`** (the live plain-object palette). For colours
+  captured at module scope, store palette **token names** and resolve through
+  **`palOf(name)`** / `PAL[name]` at draw time (`MF_NUM_COLORS`,
+  `BOUNCE_ROW_COLORS`) so a theme flip recolours mid-game.
+- **`guardCanvasCtx(ctx)`** wraps every one of the seven canvas contexts. It
+  swallows a `var(...)` colour and logs a console error — deliberately NOT
+  env-gated, so the bug class can never silently return.
+- `useCanvasBoard` redraws on theme change (`useThemeVersion`), and the four
+  hand-rolled loops (bounce, zuma, hashrush, bouncedaily) all cap DPR through
+  **`canvasDpr()`** (max 3), matching the hook.
+- **Intrinsic game art still stays hardcoded** — Drop Stack pieces, the Daily
+  Bounce well/bricks/paddle, Hash Rush's miner/tokens/hazards, 2048 tiles,
+  cards, Mahjong ivory. Only *chrome* re-themes. Hash Rush's background and
+  lane markings moved to `PAL` because they were near-white and invisible in
+  the light palette.
+
+### 2. Tap targets: the allowlist is load-bearing
+
+The `touch-action: manipulation` selector list (near the top of `css`) is now
+registry-wide, and **`registry-touch-action` in `runClientSelfTests()` fails
+if any listed class computes to `touch-action: auto`**. A game whose tappable
+element is missing from that list pays ~300 ms per tap on touch.
+
+- Use **`tapProps(onTap)`** on board cells: it sets `data-pressed` on
+  `pointerdown` (feedback on finger-DOWN, not on the delayed click) and fires
+  the action on `pointerup` for touch, falling through to `onClick` for mouse.
+- Add press feedback for every new tappable class. `:hover` is not feedback —
+  a finger never fires it. The app had 8 `:active` rules against 69 `:hover`
+  rules before this pass.
+- **Two boards are too dense to fix with feedback alone**, and their solutions
+  are the pattern to copy: **Gomoku** (15×15 ⇒ ~24 px) uses ghost-then-confirm,
+  and **Ludo** (tokens smaller than their cell, stacked 5 px apart) lists the
+  legal moves as full-size buttons under the board. Both are built in the
+  `BOARD_VIEWS` renderer, so online / pass-and-play / bot inherit them, and
+  neither changes the move payload.
+
+### 3. Nothing scrolls during play
+
+- **`useScrollLock(active)`** locks the *document* while a run is live. That is
+  what makes the guarantee hold for all 33 games — `fitShell` only covers
+  dailies that opted in, and `shell: 'self'` games bypass it entirely.
+- **Every `category: 'daily'` game MUST set `fitShell: true`** — asserted by
+  the `registry-fitshell` self-test — **and its root must carry `.fit-col`**.
+  `fitShell` without `.fit-col` *clips* instead of fitting: that was Daily
+  Cipher's bug (its keyboard fell off the bottom), and `wordsprint` /
+  `snakedaily` / `bouncedaily` had neither.
+- In a fit column, everything except the board is `flex: 0 0 auto` (see that
+  selector list). A board sized by `aspect-ratio` must give it up there
+  (`.fit-col .cw-tile`) or it overflows its row track.
+- Growing lists (`.wspr-found`, `.an-solved`, `.word-list`) get their own
+  `max-height` + `overflow-y: auto` scroll strip.
+- `.cg-stage` keeps `.cg-scroll` **on purpose** — making it `overflow: hidden`
+  would clip a tall setup screen. The five phase-5 board games instead honour
+  the `--cg-board` viewport cap, the same way `.ms-grid` / `.t2048-board-wrap`
+  / `.mnc-board` already did.
+
+### 4. The freeze layer must not eat the chrome
+
+`.game-body.frozen { pointer-events: none }` wrapped the whole reviewed
+subtree **including the header inside it** — that was #134, and it silently
+killed the entire `.cg-topbar` (exit, ☰, ?, 💬) of all 14 in-frame classic
+games too. `.game-head`, `.cg-topbar` and `.result-minibar` are re-enabled
+inside `.frozen`. Keep any new chrome in that list.
+
+### Also worth knowing
+
+- **Browser history exists now.** A single reducer pushes one entry per
+  navigable state and a `popstate` listener *derives* state from the event
+  (never navigates imperatively); `navLock` stops a pop from pushing again.
+  Every deep-link param must survive a push — the URL keeps its query string.
+- **`lib/board-rules.js` is dual-mode.** It runs in Node (`module.exports`) and
+  in the browser (`window.boardRules`, served by `GET /board-rules.js` and
+  loaded from `index.html` before the app). The whole file is wrapped in an
+  IIFE because in the browser it shares global scope with `app.js`, which
+  declares its own `CNL_LADDERS` etc. — without the wrapper the app fails to
+  parse. Local pass-and-play and Versus Bot referee with these exact functions;
+  **never reimplement the rules client-side.** Bots validate candidate moves by
+  calling the real `applyMove` and catching its throw.
+- **Local board modes are unrated by construction** — `applyMatchRating` only
+  runs in the four server finish paths, and local modes never call the server.
+  They also skip `submitClassicScore`.
+- **`finish` can carry a final board snapshot.** `POST /api/daily/:gameId/finish`
+  accepts optional `progress` and writes it in the **same UPDATE** as
+  `score/steps/finished_at`, which is why the *no-autosave-on-the-winning-move*
+  rule is untouched (a separate write would 409 against the row the finish just
+  closed). That snapshot is what the locked-day review board (#122) renders;
+  real-time dailies with no resume legitimately have nothing to snapshot.
+- **Practice replays (#133) must stay inert.** `practiceMode` short-circuits
+  `handleWin`/`handleLose` before any endpoint, and suppresses `dailyRunLog`,
+  `savedProgress` and `onSaveProgress`. That early return is the only thing
+  guaranteeing "play again for fun" can't move a streak or a leaderboard.
+- **Daily Cipher's rotation is a partition, not a sample.** Each theme is
+  shuffled once with a fixed seed and cut into 5-word blocks; day N takes block
+  `(N/4) mod blocks`. That gives a **sliding** no-repeat guarantee over
+  `CW_CYCLE_LEN` (36) days, which reshuffling per cycle did NOT (a window
+  straddling two shuffles could repeat). Verified by `cipher-rotation`.
+- **Mahjong layouts are measured, not eyeballed.** `MJ_LAYOUTS` is ordered by a
+  boosterless solver's win rate over 1200 seeded deals (Courtyard 35.8% →
+  Bridge 27.3%). Note how weakly the silhouette predicts it: 5-layer Tower ties
+  2-layer Courtyard. **Re-measure after any retune**, and keep every layout at
+  exactly 60 slots (`mahjong-layouts` asserts it) or resume hydrates wrong.
+- **Daily Bounce power-ups are pre-assigned at deal time**, not rolled on
+  break — `spawnPowerup` uses `Math.random()`/`Date.now()` and would make a
+  supposedly-fair daily differ per player. Two people playing today get
+  identical drops from identical bricks.
+- **Match 3 had three separate bugs that made it unplayable**, all found while
+  giving it its design-system pass: its API routes were registered *after* the
+  `app.get('*')` catch-all (so `/api/match3/progress` returned HTML and the
+  campaign screen said "Loading..." forever); the unlock gate was
+  `p.id <= highestPuzzle`, which locks all 50 puzzles for a new player; and
+  `startPuzzle` sent a GET to a POST-only route. **Every real route must be
+  registered above the catch-all.**
+- **`usernode-native` is adopted for chrome only** (hosted tags in
+  `index.html`, `unNative.alert` for destructive confirms). Do **not** apply
+  native motion to boards, cells, cards or canvases — the kit's own fidelity
+  rules forbid animating high-frequency interactions, and it fights the tap
+  primitive.
+- **Reduce-motion coverage is now app-wide.** The old query covered four
+  selectors, one of which (`.tm-grid`) was dead CSS. Add new animations to it.
+- **New staging fixtures:** `demo=solvedboard` (finished nonogram + solved-grid
+  snapshot, for the review screen) and `demo=myroom` (the viewer's own waiting
+  + active rooms across reversi/gomoku/ludo, for the Your-rooms list). New deep
+  links: `?review=1`, `?practice=1`, `?rooms=mine`, `?mode=bot|2p`,
+  `?syncfail=1`.

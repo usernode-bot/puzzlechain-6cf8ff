@@ -576,7 +576,32 @@ body {
 .fit-col .cw-hint-bar, .fit-col .p6-banner, .fit-col .word-theme,
 .fit-col .an-dots, .fit-col .an-slots, .fit-col .an-rack,
 .fit-col .tm-daylabel, .fit-col .ds-pad, .fit-col .mf-controls,
-.fit-col .ng-modes { flex: 0 0 auto; }
+.fit-col .ng-modes,
+/* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
+   plus 3-row keyboard was CLIPPED by the fit shell's overflow:hidden rather
+   than fitted; players lost sight of Enter on long words. Everything except the
+   board is fixed-size so only the board flexes. Word Sprint / Anagram Sprint
+   growing lists get their own scroll strip below. */
+.fit-col .cw-tracker, .fit-col .cw-clue, .fit-col .cw-kbd,
+.fit-col .cw-alldone, .fit-col .wspr-found, .fit-col .an-solved,
+.fit-col .dsnk-hint, .fit-col .dbnc-effects, .fit-col .wspr-actions,
+.fit-col .mj-controls { flex: 0 0 auto; }
+/* Growing lists must never push the board off screen (#131, #130). */
+.fit-col .wspr-found, .fit-col .an-solved, .fit-col .word-list {
+  max-height: 5.2rem; overflow-y: auto; overscroll-behavior: contain;
+}
+/* PHASE 3 — no page scroll while a run is live. useScrollLock() owns the
+   document; these kill the inner rubber-band / pull-to-refresh on the boards
+   the finger actually drags across. */
+.cg-stage, .game-wrap, .dbnc-wrap, .dsnk-board, .fit-scale-box,
+.wordsearch, .tm-stage, .bb-board-wrap, .dr-board {
+  overscroll-behavior: contain;
+}
+html.un-scroll-locked, body.un-scroll-locked {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+}
 .fit-col .numpad { margin-top: 0; }
 /* Fluid square grids (Sudoku, Word Hunt) fit BOTH axes natively — no
    transform needed, so their pointer-drag selection math is untouched. */
@@ -595,14 +620,71 @@ body {
 .fit-scale-content { transform-origin: center center; flex: 0 0 auto; }
 
 /* Interactive board cells must never wait on double-tap-to-zoom detection —
-   that browser delay is most of the "laggy clicking" in the daily grids. */
+   that browser delay is most of the "laggy clicking" in the daily grids.
+   PHASE 2: this list is now registry-wide. An audit of all 33 games found the
+   delay on ~20 of them; a game whose tappable element is NOT in this list (or
+   does not carry .tappable) pays ~300ms per tap on touch. The registry sweep
+   self-test asserts that, so adding a game means adding its cell class here. */
 .mf-cell, .ng-cell, .ds-cell, .cp-cell, .an-tile, .an-slot, .p6-btn,
-.mf-canvas, .board-canvas {
+.mf-canvas, .board-canvas,
+.mj-tile, .wspr-tile, .ce-card, .kl-col, .sp-col, .scell, .numkey,
+.wcell, .cw-key, .ms-cell, .mnc-pit, .kt-cell,
+.ck-cell, .rv-cell, .fir-cell, .gmk-cell, .ludo-token,
+.an-rack button, .tm-tile, .m3-tile, .tappable {
   touch-action: manipulation;
 }
 /* Canvases that own their own drag/long-press recognizer take the pointer
    stream outright, so the browser never scrolls or zooms out from under it. */
 .board-canvas { touch-action: none; display: block; }
+
+/* PHASE 2 — the one press idiom. Generalised from .ng-mode-btn/.mf-mode-btn,
+   which were the only correct examples in the file. Before this, the app had 8
+   :active rules against 69 :hover rules, and a finger never fires :hover —
+   which is the whole "I tapped and nothing happened" complaint. Set
+   [data-pressed] on pointerdown so the feedback lands on finger-DOWN, not on
+   the delayed click, and clear it on up/cancel/lostpointercapture so it can
+   never stick. */
+.tappable, .mj-tile, .wspr-tile, .ce-card, .scell, .numkey, .wcell,
+.cw-key, .ms-cell, .mnc-pit, .kt-cell, .ck-cell, .rv-cell, .fir-cell,
+.gmk-cell, .ludo-token, .an-tile, .an-slot, .tm-tile, .m3-tile {
+  -webkit-tap-highlight-color: transparent;
+}
+.tappable:active, .tappable[data-pressed],
+.mj-tile:active, .mj-tile[data-pressed],
+.wspr-tile:not(.dim):active, .wspr-tile[data-pressed],
+.ce-card:active, .ce-card[data-pressed],
+.scell:not(.given):active, .scell[data-pressed],
+.numkey:active, .numkey[data-pressed],
+.wcell:not(.found):active, .wcell[data-pressed],
+.cw-key:active, .cw-key[data-pressed],
+.ms-cell.ms-hidden:active, .ms-cell[data-pressed],
+.mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
+.kt-cell:active, .kt-cell[data-pressed],
+.ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
+.ludo-token.movable:active, .an-tile:active, .an-slot:active,
+.tm-tile.available:active, .m3-tile:active {
+  filter: brightness(0.9);
+  transform: scale(0.96);
+}
+/* A press must never look "stuck on" for a disabled/decorative cell. */
+.wspr-tile.dim:active, .scell.given:active, .ms-cell.ms-revealed:active,
+.tm-tile.locked:active, .ce-card.face-down:active {
+  filter: none; transform: none;
+}
+/* Selected-card affordance — tapping a card gave no sign it landed (#123). */
+.ce-card.selected {
+  outline: 3px solid ${C.accent};
+  outline-offset: -1px;
+  box-shadow: 0 0 0 2px ${ca('accent', '55')}, 0 4px 10px var(--c-shadow-md);
+  transform: translateY(-3px);
+}
+/* A blocked Mahjong tile now says so instead of silently ignoring the tap. */
+@keyframes un-nudge {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+.mj-tile.nudge { animation: un-nudge 0.22s ease; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -613,6 +695,16 @@ body {
    minibar is what the card collapses into. */
 .game-body.frozen { pointer-events: none; filter: saturate(0.85); }
 .game-body.frozen .game-wrap { padding-bottom: 5.5rem; }
+/* PHASE 4 (#134) — the freeze used to kill the whole reviewed subtree, INCLUDING
+   the header the shell renders inside it. That is why Back stopped working after
+   "View board", and it hit every in-frame classic game's whole topbar (exit, ☰,
+   ?, 💬) too, not just the dailies. Chrome stays live; only the board goes
+   inert. */
+.game-body.frozen .game-head,
+.game-body.frozen .game-head *,
+.game-body.frozen .cg-topbar,
+.game-body.frozen .cg-topbar *,
+.game-body.frozen .result-minibar { pointer-events: auto; }
 .review-btn {
   margin-bottom: 0.6rem; background: ${C.surface};
   border: 1px solid ${C.border}; color: ${C.text};
@@ -727,8 +819,12 @@ body {
 }
 .wspr-btn.primary { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
 .wspr-btn:disabled { opacity: 0.45; cursor: default; }
+/* PHASE 3 (#131) — this list was unbounded and grew the document as you played,
+   pushing the grid off screen. Own scroll strip, fixed height. */
 .wspr-found {
-  display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: center; max-width: 360px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: center;
+  max-width: 360px; margin: 0 auto;
+  max-height: 5.2rem; overflow-y: auto; overscroll-behavior: contain;
 }
 .wspr-found span {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
@@ -1093,7 +1189,8 @@ body {
 /* ---- Word Hunt ---- */
 .wordsearch {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  /* Kept in lockstep with WS_SIZE (#139). */
+  grid-template-columns: repeat(10, 1fr);
   background: ${C.border};
   border: 2px solid ${C.border};
   border-radius: 10px;
@@ -1273,6 +1370,21 @@ body {
   gap: 0.4rem;
   max-width: 330px;
   margin: 0 auto;
+  width: 100%;
+}
+/* PHASE 3 — inside the fit column the board is the ONE flexible child: an
+   8-row grid for a 7-letter word shrinks its rows instead of pushing the
+   keyboard off the bottom of the screen (which is what #3's clipping was).
+   The tiles must give up their aspect-ratio here — it forces height from width
+   and would otherwise overflow the row tracks straight over the keyboard. */
+.fit-col .cw-board {
+  flex: 1 1 auto; min-height: 0; overflow: hidden;
+  align-content: center;
+}
+.fit-col .cw-row { min-height: 0; }
+.fit-col .cw-tile {
+  aspect-ratio: auto; min-height: 0; min-width: 0;
+  font-size: clamp(0.9rem, 4.2vw, 1.5rem);
 }
 .cw-row {
   display: grid;
@@ -1312,10 +1424,13 @@ body {
   flex-direction: column;
   gap: 0.4rem;
 }
-.cw-kbd-row { display: flex; gap: 0.35rem; justify-content: center; }
+.cw-kbd-row { display: flex; gap: 0.22rem; justify-content: center; }
+/* PHASE 2 — the worst tap surface in the app: ~34×41px keys with hover-only
+   feedback on a game where typing IS the interaction. */
 .cw-key {
   flex: 1 1 auto;
-  min-width: 1.5rem;
+  min-width: 2rem;
+  min-height: 46px;
   padding: 0.85rem 0.2rem;
   background: ${C.border};
   border: none;
@@ -2010,6 +2125,7 @@ body {
   margin: 0 auto;
 }
 .t2048-grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
@@ -2027,8 +2143,27 @@ body {
   background: ${C.bg};
   border: 1px solid ${ca('border','44')};
 }
+/* PHASE 6 (#142) — tiles used to be grid children, so they teleported between
+   cells and you could not see what a swipe did. They are now absolutely
+   positioned over the (unchanged) 4x4 cell backdrop and animate their transform
+   from the previous position to the new one. Input is NEVER gated on the
+   animation: executeMove stays synchronous and the visual catches up.
+   The slide (outer, transform) and the pop (inner, scale) are on SEPARATE
+   elements on purpose — one transform property cannot carry both. */
+.t2048-layer {
+  position: absolute; inset: 8px;
+  pointer-events: none;
+}
 .t2048-tile {
-  aspect-ratio: 1;
+  position: absolute;
+  top: 0; left: 0;
+  width: calc((100% - 18px) / 4);
+  height: calc((100% - 18px) / 4);
+  transition: transform 100ms ease-out;
+  will-change: transform;
+}
+.t2048-tile-inner {
+  position: absolute; inset: 0;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -2036,10 +2171,10 @@ body {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
 }
-.t2048-tile.is-new {
+.t2048-tile.is-new .t2048-tile-inner {
   animation: t2048-pop-in 120ms ease both;
 }
-.t2048-tile.is-merged {
+.t2048-tile.is-merged .t2048-tile-inner {
   animation: t2048-merge-pop 150ms ease both;
 }
 @keyframes t2048-pop-in {
@@ -3208,6 +3343,17 @@ body {
 .cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
 .cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
 .cg-stage .ms-bottom-nav, .cg-stage .mnc-bottom-nav, .cg-stage .t2048-bottom-nav { display: none; }
+/* PHASE 3 — the five phase-5 board games hardcoded width: min(92vw, 340–380px)
+   and ignored --cg-board, so board + status + legend + leaderboard was always
+   taller than a phone and you had to scroll to see whose turn it was. Same
+   pattern the three older classics above already used. */
+.cg-stage .ck-board, .cg-stage .rv-board, .cg-stage .gmk-board,
+.cg-stage .ludo-board { max-width: min(380px, var(--cg-board)) !important; }
+.cg-stage .fir-board { max-width: min(340px, var(--cg-board)) !important; }
+/* The board-game rooms stack status + board + legend + leaderboard, so cap the
+   text chrome too — the board fitting is only half of "no scrolling to see
+   whose turn it is". */
+.brg-legend { font-size: 0.74rem; }
 
 /* ---- Snake ---- */
 .snake-board {
@@ -3271,29 +3417,77 @@ body {
 .bb-drag-ghost { position: fixed; z-index: 60; pointer-events: none; display: grid; gap: 2px; opacity: 0.9; }
 .bb-drag-ghost .bb-pcell.on { background: ${C.gold}; }
 
-/* ---- Tile Match ---- */
-.tm-grid {
+/* ---- Match 3 (PHASE 8) ----
+   These rules existed under a .tm-grid prefix and were DEAD — nothing in the
+   app ever rendered that class. Match 3 was the only game in the registry with
+   no design system at all: hand-written inline styles, plain coloured blocks,
+   a bare Bar: label. Renamed to .m3-* and actually wired up, which also earns
+   it the Phase 2 touch-action/press rules and the Phase 3 fit sizing. */
+.m3-grid {
   width: var(--cg-board);
   max-width: 94vw;
   display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: clamp(3px, 1vw, 6px);
   touch-action: manipulation;
 }
-.tm-grid .tm-tile {
+.m3-tile {
   aspect-ratio: 1;
   background: ${C.card};
   border: 1px solid ${C.border};
-  border-radius: 8px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(1rem, 5vw, 1.7rem);
+  font-size: clamp(1.1rem, 5vw, 1.8rem);
   cursor: pointer;
   user-select: none;
+  -webkit-user-select: none;
+  padding: 0;
+  font-family: inherit;
   transition: transform 0.1s ease, background 0.1s ease, opacity 0.18s ease;
 }
-.tm-grid .tm-tile.sel { background: ${ca('accent','44')}; border-color: ${C.accent}; transform: scale(0.92); }
-.tm-grid .tm-tile.gone { opacity: 0; pointer-events: none; }
+.m3-tile.sel { background: ${ca('accent','44')}; border-color: ${C.accent}; transform: scale(0.92); }
+.m3-tile.gone { opacity: 0.22; pointer-events: none; cursor: default; }
+.m3-bar {
+  width: var(--cg-board);
+  max-width: 94vw;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.7rem;
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+}
+.m3-bar.full { border-color: ${C.rose}; }
+.m3-bar-label {
+  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: ${C.muted}; font-weight: 700; margin-right: 0.2rem;
+}
+.m3-bar-label.full { color: ${C.rose}; }
+.m3-bar-tile {
+  width: 34px; height: 34px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.05rem;
+}
+.m3-bar-empty { color: ${C.muted}; font-size: 0.82rem; }
+.m3-level {
+  padding: 0.85rem 0.6rem; min-height: 62px;
+  background: ${C.card}; color: ${C.text};
+  border: 1px solid ${C.border}; border-radius: 12px;
+  font-family: inherit; cursor: pointer; text-align: center;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.m3-level:active { transform: scale(0.98); }
+.m3-level.solved { border-color: ${C.emerald}; color: ${C.emerald}; }
+.m3-level.locked { opacity: 0.45; cursor: not-allowed; color: ${C.muted}; }
+.m3-level.locked:active { transform: none; }
+.m3-level-id { font-weight: 700; font-size: 1rem; }
+.m3-level-name { font-size: 0.72rem; margin-top: 0.2rem; color: ${C.muted}; }
 
 /* ---- Diamond Rush ---- */
 .dr-grid {
@@ -3393,8 +3587,29 @@ body {
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cg-sheet, .tm-grid .tm-tile, .dr-gem, .snake-cell { transition: none !important; }
+  .cg-sheet, .m3-tile, .dr-gem, .snake-cell { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
+  /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)
+     was dead CSS. A player who asks their phone to calm animations down now
+     actually gets that everywhere, including the two animations this phase
+     adds (the 2048 tile slide and the Marble Loop insertion, which falls back
+     to the old instant splice). */
+  .t2048-tile, .t2048-tile.is-new, .t2048-tile.is-merged,
+  .tm-tile, .tm-tile.flash, .cw-row.shake,
+  .mnc-pit.mnc-flash, .mnc-pit.mnc-capture-flash,
+  .tm-bar.bar-full, .mj-tile, .mj-tile.nudge, .ce-card,
+  .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* Keep the colour half of a press (the affordance) and drop the movement. */
+  .tappable:active, .tappable[data-pressed],
+  .mj-tile:active, .wspr-tile:active, .ce-card:active, .scell:active,
+  .numkey:active, .wcell:active, .cw-key:active, .ms-cell:active,
+  .mnc-pit:active, .kt-cell:active, .ck-cell:active, .rv-cell:active,
+  .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
+  .an-slot:active, .tm-tile:active, .m3-tile:active { transform: none !important; }
+  .ce-card.selected { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
@@ -3855,6 +4070,117 @@ body {
 .ludo-token.p1 { background: ${C.accent}; }
 .ludo-token.p2 { background: ${C.rose}; }
 .ludo-token.movable { cursor: pointer; box-shadow: 0 0 0 2px ${C.gold}, 0 1px 3px rgba(0,0,0,0.5); animation: ludoPulse 0.9s ease-in-out infinite; }
+/* PHASE 2 — a 15x15 board puts each Ludo token inside a ~25px cell, and tokens
+   sharing a square overlap almost completely (5px offset). The board tap stays
+   as a shortcut; this pad is the unambiguous, full-size way to move. */
+.ludo-token::after {
+  content: ''; position: absolute; inset: -8px; /* hit slop, no layout change */
+}
+.brd-movelist {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  width: min(92vw, 380px); margin: 0.7rem auto 0;
+}
+.brd-movelist-label {
+  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: ${C.muted}; font-weight: 700;
+}
+.brd-move-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  min-height: 48px; padding: 0.5rem 0.85rem;
+  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
+  color: ${C.text}; font-family: inherit; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; text-align: left; width: 100%;
+}
+.brd-move-btn .brd-move-sub { font-size: 0.74rem; color: ${C.muted}; font-weight: 500; }
+.brd-move-btn.primary { border-color: ${C.accent}; background: ${ca('accent', '14')}; }
+/* PHASE 2 — Gomoku ghost-confirm. 15x15 in 380px is ~24px per intersection and
+   a mis-tap used to place a stone permanently. */
+.gmk-cell .gmk-ghost {
+  width: 62%; height: 62%; border-radius: 50%;
+  border: 2px dashed ${C.gold}; box-sizing: border-box;
+}
+.brd-confirm-bar {
+  display: flex; gap: 0.5rem; width: min(92vw, 380px); margin: 0.6rem auto 0;
+}
+.brd-confirm-bar button {
+  flex: 1 1 auto; min-height: 48px; border-radius: 12px;
+  font-family: inherit; font-size: 0.92rem; font-weight: 700; cursor: pointer;
+  border: 1.5px solid ${C.border}; background: ${C.card}; color: ${C.text};
+}
+.brd-confirm-bar button.go { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
+.brd-confirm-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+/* PHASE 7 — "Your rooms": a room you hosted was invisible once you left it. */
+.brd-myrooms { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.9rem; }
+.brd-myrooms-label {
+  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: ${C.muted}; font-weight: 700;
+}
+.brd-myroom {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 0.55rem 0.7rem; background: ${C.card};
+  border: 1px solid ${C.border}; border-radius: 12px;
+}
+.brd-myroom-meta { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.brd-myroom-code { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.92rem; }
+.brd-myroom-sub { font-size: 0.72rem; color: ${C.muted}; }
+.brd-myroom-sub.yourturn { color: ${C.emerald}; font-weight: 600; }
+.brd-myroom button {
+  min-height: 40px; padding: 0 0.85rem; border-radius: 10px; flex: 0 0 auto;
+  background: ${C.accent}; border: none; color: #fff;
+  font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+}
+.brd-myroom button.ghost { background: transparent; color: ${C.muted}; border: 1px solid ${C.border}; }
+.brd-endgame {
+  min-height: 44px; padding: 0 1rem; margin: 0.7rem auto 0; display: block;
+  background: transparent; border: 1px solid ${C.rose}; border-radius: 12px;
+  color: ${C.rose}; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+/* PHASE 8 — Mahjong controls (undo / hint / shuffle) + Daily Bounce effects. */
+.mj-controls, .wspr-actions {
+  display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
+}
+.mj-controls button {
+  min-height: 44px; min-width: 84px; padding: 0 0.8rem; border-radius: 12px;
+  background: ${C.card}; border: 1.5px solid ${C.border}; color: ${C.text};
+  font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.mj-controls button:active { transform: scale(0.98); }
+.mj-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+.mj-warn { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; text-align: center; }
+.dbnc-effects { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
+.dbnc-effect {
+  font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.5rem;
+  border-radius: 999px; background: ${ca('gold', '22')}; color: ${C.gold};
+  text-transform: capitalize;
+}
+/* PHASE 5 — card drag ghost, modelled on Block Fit's existing .bb-drag-ghost. */
+.ce-drag-ghost {
+  position: fixed; z-index: 70; pointer-events: none; opacity: 0.92;
+  transform: translate(-50%, -50%); display: flex; flex-direction: column;
+}
+.ce-drag-ghost .ce-card { box-shadow: 0 6px 18px var(--c-shadow-lg); }
+.kl-empty-hint {
+  position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; font-family: 'JetBrains Mono', monospace;
+  font-size: 20px; font-weight: 700; color: ${C.dim}; pointer-events: none;
+}
+.kl-note {
+  text-align: center; font-size: 0.8rem; font-weight: 600; color: ${C.rose};
+  min-height: 1.1rem;
+}
+/* PHASE 4 — practice replay ribbon (#133). */
+.practice-ribbon {
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.35rem 0.7rem; border-radius: 999px;
+  background: ${ca('violet', '1f')}; color: ${C.violet};
+  font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.reset-line {
+  text-align: center; font-size: 0.8rem; color: ${C.muted}; margin-top: 0.5rem;
+}
+.practice-note { font-weight: 500; opacity: 0.75; font-size: 0.82em; }
 @keyframes ludoPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 
 /* ---- Chutes & Ladders ---- */
@@ -4098,26 +4424,35 @@ body {
 .kl-top { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
 .kl-gap { width: 14px; }
 .kl-tab { display: flex; gap: 6px; justify-content: center; }
-.kl-col { position: relative; width: 44px; }
+/* PHASE 2/5 (#123) — 44px columns exposing a 14–20px sliver of each buried
+   card was the "cards are tiny" complaint. Wider column, and KL_STACK_STEP
+   (JS) raises the exposed strip so the whole strip is aimable. */
+.kl-col { position: relative; width: 52px; }
+.kl-col .ce-card { width: 52px; }
 
 .sp-game { max-width: 420px; margin: 0 auto; }
 .sp-game .status-bar { flex-wrap: wrap; align-items: center; gap: 8px; }
 .sp-tab { display: flex; gap: 3px; justify-content: center; }
-.sp-col { position: relative; width: 34px; }
-.sp-col .ce-card { width: 34px; height: 46px; border-radius: 5px; }
-.sp-col .ce-card .ce-rank { font-size: 12px; }
-.sp-col .ce-card .ce-suit { font-size: 10px; margin-top: 1px; }
-.sp-col .ce-card.ce-slot.sm { font-size: 12px; }
+.sp-col { position: relative; width: 44px; }
+.sp-col .ce-card { width: 44px; height: 54px; border-radius: 5px; }
+.sp-col .ce-card .ce-rank { font-size: 13px; }
+.sp-col .ce-card .ce-suit { font-size: 11px; margin-top: 1px; }
+.sp-col .ce-card.ce-slot.sm { font-size: 13px; }
 
 .mj-game { display: flex; flex-direction: column; align-items: center; }
 .mj-game .status-bar { align-items: center; gap: 8px; }
 .mj-board { position: relative; margin: 4px auto 0; }
+/* PHASE 2 (#120) — 36×46 was well under a fingertip, and FitScale shrank it
+   further. 44×56 with the shared press state; the layout offsets below scale
+   from MJ_TW/MJ_TH so the whole board stays inside FitScale. */
 .mj-tile {
-  position: absolute; width: 36px; height: 46px; border-radius: 6px; cursor: pointer;
+  position: absolute; width: 44px; height: 56px; border-radius: 6px; cursor: pointer;
   background: linear-gradient(180deg, #F8FAFF, #DDE4F2); border: 1px solid #B7C2D8;
   border-bottom-width: 3px; display: flex; align-items: center; justify-content: center;
-  font-size: 19px; user-select: none; box-shadow: 2px 3px 4px rgba(0,0,0,.45);
+  font-size: 23px; user-select: none; box-shadow: 2px 3px 4px rgba(0,0,0,.45);
+  transition: transform 0.1s ease, filter 0.1s ease;
 }
+.mj-tile.hinted { box-shadow: 0 0 0 3px ${C.gold}, 2px 3px 4px rgba(0,0,0,.45); }
 .mj-tile.blocked { filter: brightness(.62); cursor: default; }
 .mj-tile.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; filter: brightness(1.08); }
 .mj-tile.up1 { border-color: #A3B0CB; }
@@ -4181,9 +4516,10 @@ body {
 }
 .an-dot.solved { border-color: ${C.emerald}; color: ${C.emerald}; }
 .an-dot.cur { border-color: ${C.accent}; color: ${C.text}; }
-.an-slots { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; }
+.an-slots { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+/* PHASE 2 (#129) — up from 40×48 / 44×52; both had hover-only feedback. */
 .an-slot {
-  width: 40px; height: 48px; border-radius: 8px; border: 1.5px dashed ${C.dim};
+  width: 48px; height: 54px; border-radius: 8px; border: 1.5px dashed ${C.dim};
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: ${C.text};
 }
@@ -4553,13 +4889,14 @@ function resolveTheme(pref) {
   return systemPrefersDark() ? 'dark' : 'light';
 }
 
-const themeState = { pref: readThemePref(), resolved: 'light' };
+const themeState = { pref: readThemePref(), resolved: 'light', version: 0 };
 const themeSubscribers = new Set();
 
 /* Single source of truth for "make the DOM match this preference". */
 function applyTheme(pref, persist) {
   themeState.pref = THEME_PREFS.indexOf(pref) >= 0 ? pref : 'system';
   themeState.resolved = resolveTheme(themeState.pref);
+  themeState.version += 1;
   if (persist) {
     try { localStorage.setItem(THEME_KEY, themeState.pref); } catch {}
   }
@@ -4603,6 +4940,102 @@ function useTheme() {
     resolved: themeState.resolved,
     setPref: (p) => applyTheme(p, true),
   };
+}
+
+/* Phase 1 — canvas colour correctness.
+   `C.x` is the string 'var(--c-x)'. Assigning that to ctx.fillStyle is
+   INVALID: the 2D context silently keeps its previous value, and because the
+   context object persists across frames the stale colour leaks between draws
+   (black on frame 1, "last frame's piece colour" thereafter). Canvas code MUST
+   read real values from PAL. These helpers make that cheap and make a
+   regression loud instead of silent. */
+
+// Subscribe a canvas game to theme flips so a Light↔Dark toggle repaints.
+function useThemeVersion() {
+  const [v, setV] = useState(themeState.version);
+  useEffect(() => {
+    const fn = () => setV(themeState.version);
+    themeSubscribers.add(fn);
+    fn();
+    return () => { themeSubscribers.delete(fn); };
+  }, []);
+  return v;
+}
+
+// Resolve a palette token name (or pass a literal colour straight through).
+// Storing token NAMES and resolving at draw time is what lets a theme flip
+// recolour mid-game (the BOUNCE_ROW_COLORS precedent).
+function palOf(nameOrLiteral, fallback) {
+  if (!nameOrLiteral) return fallback || PAL.text;
+  if (typeof nameOrLiteral !== 'string') return fallback || PAL.text;
+  if (PAL[nameOrLiteral] != null) return PAL[nameOrLiteral];
+  return nameOrLiteral;
+}
+
+const CANVAS_COLOR_PROPS = ['fillStyle', 'strokeStyle', 'shadowColor'];
+let _canvasGuardWarned = 0;
+
+/* Guard: a `var(--…)` colour reaching a canvas is the bug class this phase
+   fixes, so make it loud AND harmless — the assignment is swallowed so the
+   stale-colour leak can never happen again, and the first few occurrences log
+   a console error (which trips the platform's no-console-errors check).
+   Deliberately NOT env-gated: identical code path in staging and production. */
+function guardCanvasCtx(ctx) {
+  if (!ctx || typeof Proxy === 'undefined') return ctx;
+  if (ctx.__unGuarded) return ctx;
+  try {
+    const p = new Proxy(ctx, {
+      get(t, k) {
+        const v = t[k];
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+      set(t, k, v) {
+        if (CANVAS_COLOR_PROPS.indexOf(k) >= 0 && typeof v === 'string' && /^var\(/.test(v)) {
+          if (_canvasGuardWarned < 12) {
+            _canvasGuardWarned += 1;
+            console.error(
+              '[canvas-color] invalid canvas colour ' + JSON.stringify(v) + ' assigned to ctx.' + k +
+              ' — canvas cannot resolve CSS custom properties. Read from PAL instead of C.'
+            );
+          }
+          return true; // swallow: never let the stale-colour leak happen
+        }
+        t[k] = v;
+        return true;
+      },
+    });
+    try { Object.defineProperty(ctx, '__unGuarded', { value: true, enumerable: false }); } catch {}
+    return p;
+  } catch { return ctx; }
+}
+
+/* Load-time self-test: every PAL key must be a colour the canvas actually
+   accepts, and every C token must be a var() reference (so nobody "fixes" the
+   theming by inlining hex and breaking re-theming). */
+function canvasColorSelfTest() {
+  const problems = [];
+  try {
+    const probe = document.createElement('canvas').getContext('2d');
+    if (!probe) return true;
+    for (const k of Object.keys(PAL)) {
+      const want = PAL[k];
+      if (typeof want !== 'string') { problems.push(k + ': not a string'); continue; }
+      probe.fillStyle = '#000000';
+      probe.fillStyle = want;
+      // An invalid value leaves fillStyle at the previous colour.
+      if (probe.fillStyle === '#000000' && want.toLowerCase() !== '#000000' && want.toLowerCase() !== '#000') {
+        problems.push('PAL.' + k + ' = ' + want + ' is not a valid canvas colour');
+      }
+    }
+    for (const k of Object.keys(C)) {
+      if (!/^var\(--c-/.test(C[k])) problems.push('C.' + k + ' is not a var() token: ' + C[k]);
+    }
+  } catch { return true; }
+  if (problems.length) {
+    console.error('[canvas-color] self-test failed:\n  ' + problems.join('\n  '));
+    return false;
+  }
+  return true;
 }
 
 let _cgAudioCtx = null;
@@ -5702,6 +6135,9 @@ function useCanvasBoard(canvasRef, { width, height, draw, deps = [] }) {
   const drawRef = useRef(draw);
   drawRef.current = draw;
   const rafRef = useRef(0);
+  // A Light↔Dark flip must repaint immediately — canvas colours come from PAL,
+  // which re-themes without any React state changing on its own.
+  const themeV = useThemeVersion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -5719,14 +6155,209 @@ function useCanvasBoard(canvasRef, { width, height, draw, deps = [] }) {
       rafRef.current = 0;
       const c = canvasRef.current;
       if (!c) return;
-      const ctx = c.getContext('2d');
+      const ctx = guardCanvasCtx(c.getContext('2d'));
       if (!ctx) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
       drawRef.current(ctx, { w: width, h: height, dpr });
     });
     return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; } };
-  }, [canvasRef, width, height, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canvasRef, width, height, themeV, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// Shared DPR cap for the hand-rolled canvas loops (bounce, zuma, hashrush,
+// bouncedaily) so they match useCanvasBoard instead of allocating a 4x backing
+// store on high-density Androids.
+function canvasDpr() { return Math.min(window.devicePixelRatio || 1, 3); }
+
+/* PHASE 3 — no page scroll while a run is live.
+   `fitShell` only covers dailies that opted in; shell:'self' games bypass it
+   entirely, and a drag on a board could always pull the document. This locks
+   the document itself, so it holds for all 33 games. Reference-counted: two
+   overlapping locks (game + open sheet) must not fight over the restore. */
+let _scrollLockCount = 0;
+function useScrollLock(active) {
+  useEffect(() => {
+    if (!active) return;
+    _scrollLockCount += 1;
+    const root = document.documentElement;
+    if (_scrollLockCount === 1) {
+      root.classList.add('un-scroll-locked');
+      document.body.classList.add('un-scroll-locked');
+    }
+    return () => {
+      _scrollLockCount = Math.max(0, _scrollLockCount - 1);
+      if (_scrollLockCount === 0) {
+        root.classList.remove('un-scroll-locked');
+        document.body.classList.remove('un-scroll-locked');
+      }
+    };
+  }, [active]);
+}
+
+/* PHASE 2 — the shared tap primitive.
+   Spread onto any tappable board element. Two jobs:
+     1. Press feedback on finger-DOWN (`data-pressed`), not on the browser's
+        delayed click — this is the "I tapped and nothing happened" fix.
+     2. Fire the action from pointerdown/pointerup instead of click, so a tap
+        never waits on double-tap-to-zoom detection.
+   `data-pressed` is cleared on up/cancel/lostpointercapture so it can never
+   stick. Mouse and keyboard paths are preserved (onClick still fires for
+   non-touch, guarded against double-firing). */
+function tapProps(onTap, { disabled = false } = {}) {
+  if (disabled) return {};
+  let handledPointer = false;
+  return {
+    onPointerDown: (e) => {
+      if (e.currentTarget.setAttribute) e.currentTarget.setAttribute('data-pressed', '1');
+    },
+    onPointerUp: (e) => {
+      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+      // Touch/pen act on release-in-place; mouse falls through to onClick so
+      // text selection and drag handlers elsewhere keep working.
+      if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+        handledPointer = true;
+        onTap && onTap(e);
+      }
+    },
+    onPointerCancel: (e) => {
+      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+    },
+    onPointerLeave: (e) => {
+      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+    },
+    onClick: (e) => {
+      if (handledPointer) { handledPointer = false; return; }
+      onTap && onTap(e);
+    },
+  };
+}
+
+/* ============================================================
+   Load-time self-tests (mirrors the server's boot self-tests).
+   These run once on load and log a console error on failure, which trips the
+   platform's no-console-errors proposal check — so a regression in any of these
+   invariants blocks a merge instead of silently shipping.
+   ============================================================ */
+function runClientSelfTests() {
+  const fails = [];
+  const check = (name, fn) => {
+    try { if (fn() !== true) fails.push(name); }
+    catch (e) { fails.push(name + ': ' + e.message); }
+  };
+
+  // Phase 1 — canvas colours.
+  check('canvas-colors', canvasColorSelfTest);
+
+  // Phase 5 (#143) — 2048 vertical swipes were inverted. A lone tile at the
+  // bottom row swiped 'up' must reach row 0, and vice versa.
+  check('t2048-up', () => {
+    const g = [[null, null, null, null], [null, null, null, null],
+               [null, null, null, null], [t2048_newTile(2), null, null, null]];
+    const r = t2048_move(g, 'up');
+    return !!(r.grid[0][0] && !r.grid[3][0]);
+  });
+  check('t2048-down', () => {
+    const g = [[t2048_newTile(2), null, null, null], [null, null, null, null],
+               [null, null, null, null], [null, null, null, null]];
+    const r = t2048_move(g, 'down');
+    return !!(r.grid[3][0] && !r.grid[0][0]);
+  });
+  check('t2048-left', () => {
+    const g = [[null, null, null, t2048_newTile(2)], [null, null, null, null],
+               [null, null, null, null], [null, null, null, null]];
+    const r = t2048_move(g, 'left');
+    return !!(r.grid[0][0] && !r.grid[0][3]);
+  });
+
+  // Phase 5 (#139) — Word Search must place every word on the bigger grid.
+  check('wordsearch-placement', () => {
+    for (let seed = 1; seed <= 120; seed++) {
+      const rng = mulberry32(seed * 7919);
+      const b = generateWordSearch(rng);
+      for (const w of b.words) if (!locateWord(b.letters, w)) return false;
+    }
+    return true;
+  });
+
+  // Phase 5 (#138) — Daily Cipher must not repeat a word inside ANY window of
+  // CW_CYCLE_LEN consecutive days (a sliding guarantee, not just an aligned
+  // one), and every day must deal a full round set. Repeats inside a week are
+  // what made every day feel identical.
+  check('cipher-rotation', () => {
+    for (let base = 0; base < 240; base++) {
+      const seen = new Map();
+      for (let d = base; d < base + CW_CYCLE_LEN; d++) {
+        const rs = cwRoundsForDay(d);
+        if (rs.length !== CW_ROUNDS_PER_DAY) {
+          throw new Error('day ' + d + ' dealt ' + rs.length + ' words');
+        }
+        for (const def of rs) {
+          if (seen.has(def.word)) {
+            throw new Error(def.word + ' repeats on days ' + seen.get(def.word) + ' and ' + d);
+          }
+          seen.set(def.word, d);
+        }
+      }
+    }
+    return true;
+  });
+
+  // Phase 8 (#121) — every Mahjong layout must have the same slot count, or a
+  // resumed board hydrates against the wrong shape.
+  check('mahjong-layouts', () => {
+    const bad = MJ_LAYOUTS.filter(l => l.pos.length !== 60).map(l => l.name + '=' + l.pos.length);
+    if (bad.length) throw new Error('layouts not 60 slots: ' + bad.join(', '));
+    // And every day must resolve to a real layout.
+    for (let d = 0; d < 70; d++) if (!mjLayoutForDay(d)) throw new Error('no layout for day ' + d);
+    return true;
+  });
+
+  // Phase 3 — every daily must opt into the one-viewport column, or it scrolls
+  // (or clips) during play. This is the standing guarantee behind the audit.
+  check('registry-fitshell', () => {
+    const missing = GAMES.filter(g => g.category === 'daily' && !g.fitShell).map(g => g.id);
+    if (missing.length) throw new Error('dailies missing fitShell: ' + missing.join(', '));
+    return true;
+  });
+
+  // Phase 2 — a tappable class that isn't in the touch-action allowlist pays
+  // the browser's double-tap delay on every tap.
+  check('registry-touch-action', () => {
+    const CLASSES = [
+      'mj-tile', 'wspr-tile', 'ce-card', 'scell', 'numkey', 'wcell', 'cw-key',
+      'ms-cell', 'mnc-pit', 'kt-cell', 'ck-cell', 'rv-cell', 'fir-cell',
+      'gmk-cell', 'ludo-token', 'tm-tile', 'm3-tile', 'tappable',
+    ];
+    const probe = document.createElement('div');
+    probe.style.position = 'fixed';
+    probe.style.left = '-9999px';
+    document.body.appendChild(probe);
+    const bad = [];
+    try {
+      for (const cls of CLASSES) {
+        probe.className = cls;
+        const ta = getComputedStyle(probe).touchAction;
+        if (ta === 'auto') bad.push(cls);
+      }
+    } finally { probe.remove(); }
+    if (bad.length) throw new Error('touch-action:auto on ' + bad.join(', '));
+    return true;
+  });
+
+  // Phase 7 — the rules registry must be reachable from the browser now that
+  // local/bot modes share it with the server.
+  check('board-rules', () => {
+    if (!window.boardRules) return true; // script not loaded (standalone) — skip
+    return window.boardRules.selfTest() === true;
+  });
+
+  if (fails.length) {
+    console.error('[self-test] client self-tests FAILED:\n  ' + fails.join('\n  '));
+    return false;
+  }
+  console.log('[self-test] client self-tests passed (' + '8 groups' + ')');
+  return true;
 }
 
 // Pointer gestures over a board element, reported in element-local CSS pixels.
@@ -6160,6 +6791,28 @@ const STREAK_TIERS = [
    entry id in localStorage, like the how-to first-open state).
    ============================================================ */
 const CHANGELOG = [
+  {
+    id: 'w2026-07-27',
+    weekOf: 'Week of July 27, 2026',
+    items: [
+      'Nonogram, Mine Finder and Drop Stack now draw properly on mobile — no more black boards.',
+      'Taps land instantly across every game, with a visible press the moment your finger touches down.',
+      'Nothing scrolls while you play any more, and the Daily Cipher keyboard always stays on screen.',
+      'Back works everywhere — including your phone’s back gesture, and after viewing a finished board.',
+      'Come back to a game you finished and you get your result and the board you solved, not just a countdown.',
+      'Play any daily again for fun — shown but never scored.',
+      '2048 swipes the right way up, and tiles slide instead of teleporting.',
+      'Mine Finder Classic gains a flag button and tap-a-number-to-clear.',
+      'Hash Rush is drag-to-steer. Klondike and Spider can be dragged, and can be given up.',
+      'Daily Cipher spans four themes and 180 words — no repeats for over a month.',
+      'Word Search grows to a 10×10 grid with more words to find.',
+      'Checkers, Reversi, Four in a Row, Gomoku and Ludo gain Versus Bot and pass-and-play.',
+      'Lost an online room? Your rooms are listed with one-tap Rejoin, and every match can be ended.',
+      'Mahjong Solitaire gains undos, hints, a safe shuffle and six rotating board shapes.',
+      'Daily Bounce gains power-ups — the same drops from the same bricks for everyone, every day.',
+      'Match-3 is playable again and looks like the rest of the app.',
+    ],
+  },
   {
     id: 'w2026-07-20',
     weekOf: 'Week of July 20, 2026',
@@ -6790,7 +7443,7 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
                   borderRight: boldRight(c) ? `2px solid ${C.border}` : undefined,
                   borderBottom: boldBottom(r) ? `2px solid ${C.border}` : undefined,
                 }}
-                onClick={() => !locked && !done && setSelected([r, c])}
+                {...tapProps(() => !locked && !done && setSelected([r, c]))}
               >
                 {v !== 0 ? v : ''}
               </div>
@@ -6812,11 +7465,11 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
 
       <div className="numpad" style={size === 9 ? { gridTemplateColumns: 'repeat(9, 1fr)' } : undefined}>
         {Array.from({ length: size }, (_, i) => i + 1).map(n => (
-          <button key={n} className="numkey" onClick={() => place(n)}>{n}</button>
+          <button key={n} className="numkey" {...tapProps(() => place(n))}>{n}</button>
         ))}
       </div>
       <div className="numpad" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-        <button className="numkey erase" onClick={() => place(0)}>Erase</button>
+        <button className="numkey erase" {...tapProps(() => place(0))}>Erase</button>
       </div>
     </div>
   );
@@ -7276,6 +7929,19 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
             );
           }
           const expH = roomExpiresInHours(it.room);
+          // #145 — a room still waiting for an opponent now surfaces here too.
+          // Previously /api/rooms/mine only returned ACTIVE rooms, so a room you
+          // created and left simply vanished from your side of the app.
+          if (it.room.waiting) {
+            return (
+              <div key={'r-' + it.room.id} className="inprog-card room" onClick={() => onOpenRoom(it.room)}>
+                <div className="ip-icon">{it.game.icon}</div>
+                <div className="ip-name">{it.game.name}</div>
+                <div className="ip-sub">⏳ Waiting for opponent</div>
+                <div className="ip-sub resume mono">code {it.room.id}</div>
+              </div>
+            );
+          }
           return (
             <div key={'r-' + it.room.id} className="inprog-card room" onClick={() => onOpenRoom(it.room)}>
               <div className="ip-icon">{it.game.icon}</div>
@@ -7476,7 +8142,13 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
   );
 }
 
-function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) {
+/* PHASE 4 (#122) — a finished day is a RESULT screen, not a countdown screen.
+   The lock icon and a giant "next puzzle in" clock was all you got for coming
+   back; the reset time is now one line and the emphasis is your result, your
+   personal best, today's board, and (new) a practice replay. Games that can
+   snapshot their solved board also get a "View board" button — the review layer
+   the win overlay already uses — wired by the caller through onReview. */
+function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack, best, onReview, onPractice }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const hasResult = attempt && attempt.score != null;
   const solved = !!(attempt && attempt.score != null && attempt.score > 0);
@@ -7484,13 +8156,9 @@ function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) 
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   return (
     <div className="locked-card">
-      <div className="lock-icon">🔒</div>
-      <h2>You've played today</h2>
-      <div className="sub">{game.name} — one attempt per day</div>
-      <div className="countdown-block">
-        <div className="clabel">Next puzzle in</div>
-        <div className="ctime mono">{countdown}</div>
-      </div>
+      <div className="trophy">{solved ? '🏆' : '🎯'}</div>
+      <h2>{solved ? "Today's result" : 'You played today'}</h2>
+      <div className="sub">{game.name}</div>
       {hasResult && (
         <div className="locked-result">
           <div className="score-row"><span className="k">Score</span><span className="v">+{attempt.score}</span></div>
@@ -7500,9 +8168,21 @@ function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) 
           {attempt.timeSecs != null && (
             <div className="score-row"><span className="k">Time</span><span className="v">{fmtTime(attempt.timeSecs)}</span></div>
           )}
+          {best && best.score != null && (
+            <div className="score-row"><span className="k">Personal best</span><span className="v">+{best.score}</span></div>
+          )}
         </div>
       )}
       <Leaderboard gameId={game.id} solved={solved} />
+      {onReview && (
+        <button className="primary-btn review-btn" onClick={onReview}>👁 View board</button>
+      )}
+      {onPractice && (
+        <button className="primary-btn review-btn" onClick={onPractice}>
+          🎲 Play again for fun <span className="practice-note">(not scored)</span>
+        </button>
+      )}
+      <div className="reset-line">Next puzzle in <span className="mono">{countdown}</span></div>
       <button className="primary-btn" onClick={onBack}>Back to Lobby</button>
     </div>
   );
@@ -7511,7 +8191,12 @@ function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack }) 
 /* ============================================================
    Game 2 — Word Hunt (8×8 word search)
    ============================================================ */
-const WS_SIZE = 8;
+// #139 — 8x8 with 8 short words was a glance, not a search: half the grid was
+// filler and the words were findable at a look. 10x10 with 10 words per theme
+// keeps the cell at ~42px in the 420px fit box (still above a fingertip) while
+// roughly doubling the space to scan. Everything below derives from WS_SIZE, so
+// this is the only size knob. Verified by the wordsearch-placement self-test.
+const WS_SIZE = 10;
 
 // 8 directions: horizontal, vertical, and both diagonals (forwards + backwards).
 const WS_DIRS = [
@@ -7520,12 +8205,15 @@ const WS_DIRS = [
 ];
 
 // Themed word sets. Words are <= 6 letters so they always place on an 8×8 grid.
+// 10 words per theme, max length 10 so every word fits any axis of the grid.
 const WORD_SETS = [
-  { theme: 'Space',   words: ['COMET', 'ORBIT', 'PLANET', 'GALAXY', 'NEBULA', 'ROCKET', 'STAR', 'MARS'] },
-  { theme: 'Ocean',   words: ['CORAL', 'WHALE', 'SHARK', 'TIDE', 'PEARL', 'SQUID', 'WAVE', 'REEF'] },
-  { theme: 'Kitchen', words: ['SPOON', 'WHISK', 'KNIFE', 'PLATE', 'KETTLE', 'GRATER', 'OVEN', 'BOWL'] },
-  { theme: 'Forest',  words: ['CEDAR', 'MAPLE', 'BIRCH', 'WILLOW', 'ACORN', 'FERN', 'MOSS', 'PINE'] },
-  { theme: 'Music',   words: ['TEMPO', 'CHORD', 'PIANO', 'VIOLIN', 'MELODY', 'FLUTE', 'DRUM', 'BANJO'] },
+  { theme: 'Space',   words: ['COMET', 'ORBIT', 'PLANET', 'GALAXY', 'NEBULA', 'ROCKET', 'STAR', 'MARS', 'ECLIPSE', 'METEOR'] },
+  { theme: 'Ocean',   words: ['CORAL', 'WHALE', 'SHARK', 'TIDE', 'PEARL', 'SQUID', 'WAVE', 'REEF', 'LAGOON', 'DOLPHIN'] },
+  { theme: 'Kitchen', words: ['SPOON', 'WHISK', 'KNIFE', 'PLATE', 'KETTLE', 'GRATER', 'OVEN', 'BOWL', 'SKILLET', 'LADLE'] },
+  { theme: 'Forest',  words: ['CEDAR', 'MAPLE', 'BIRCH', 'WILLOW', 'ACORN', 'FERN', 'MOSS', 'PINE', 'THICKET', 'CANOPY'] },
+  { theme: 'Music',   words: ['TEMPO', 'CHORD', 'PIANO', 'VIOLIN', 'MELODY', 'FLUTE', 'DRUM', 'BANJO', 'HARMONY', 'OCTAVE'] },
+  { theme: 'Weather', words: ['CLOUD', 'THUNDER', 'BREEZE', 'FROST', 'DRIZZLE', 'HAIL', 'GUST', 'MIST', 'RAINBOW', 'SLEET'] },
+  { theme: 'Garden',  words: ['TULIP', 'HEDGE', 'TROWEL', 'COMPOST', 'SEEDLING', 'PETAL', 'VINE', 'BLOOM', 'ORCHID', 'SPADE'] },
 ];
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -7535,9 +8223,11 @@ const wsRandLetter = (rng = Math.random) => ALPHABET[Math.floor(rng() * 26)];
 // or null if any word couldn't be placed (caller retries with a new grid).
 function placeWords(words, rng = Math.random) {
   const grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
-  for (const word of words) {
+  // Longest first: a 10-letter word on a 10x10 grid has very few legal
+  // placements, and trying it after the grid is half-full wastes retries.
+  for (const word of words.slice().sort((a, b) => b.length - a.length)) {
     let placed = false;
-    for (let attempt = 0; attempt < 250 && !placed; attempt++) {
+    for (let attempt = 0; attempt < 400 && !placed; attempt++) {
       const [dr, dc] = WS_DIRS[Math.floor(rng() * WS_DIRS.length)];
       const r0 = Math.floor(rng() * WS_SIZE);
       const c0 = Math.floor(rng() * WS_SIZE);
@@ -7563,7 +8253,9 @@ function generateWordSearch(rng = Math.random) {
   const set = WORD_SETS[Math.floor(rng() * WORD_SETS.length)];
   const words = set.words.slice();
   let grid = null;
-  for (let attempt = 0; attempt < 60 && !grid; attempt++) grid = placeWords(words, rng);
+  // Raised from 60: a 10-word set on a 10x10 grid needs more retries than an
+  // 8-word set on 8x8, and a fallback blank grid would be an unsolvable board.
+  for (let attempt = 0; attempt < 400 && !grid; attempt++) grid = placeWords(words, rng);
   if (!grid) grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
   // Fill the empty cells with seeded filler letters.
   const letters = grid.map(row => row.map(ch => ch || wsRandLetter(rng)));
@@ -7868,7 +8560,224 @@ const CW_WORDS = [
   { word: 'DIVIDEND', clue: 'A share of profits paid out to holders',             hints: ['A payout to shareholders', 'Profit shared with holders'] },
   { word: 'CURRENCY', clue: 'Money in a particular form, digital or fiat',        hints: ['A medium of exchange', 'Dollars and bitcoin both qualify'] },
   { word: 'CONTRACT', clue: 'Self-running code that enforces an agreement',       hints: ['Self-executing code on a chain', 'Smart ones run on Ethereum'] },
+  { word: 'CUSTODY',  clue: 'Who actually holds the keys to your assets',          hints: ['Self- or third-party', 'Not your keys, not your coins'] },
+  { word: 'LIQUID',   clue: 'Easy to buy or sell without moving the price',        hints: ['A deep order book is this', 'The opposite of thinly traded'] },
+  { word: 'ROLLUP',   clue: 'A layer that batches transactions off the main chain', hints: ['Optimistic or zero-knowledge', 'Cuts fees by bundling'] },
 ];
+
+/* ============================================================
+   #138 — "Daily cipher is the same every day".
+   The seeding was fine (consecutive-day PRNG streams are well separated); the
+   pool was the problem: 42 words, ONE theme, 4–7 drawn per day, no cross-day
+   memory. Two words recurring inside a week is what made it feel identical.
+
+   Fix: three more themed pools (≥180 entries total) plus a deterministic
+   ROTATION that partitions a seeded shuffle into day-sized blocks, so a word
+   cannot recur inside a full cycle. Verified by the cipher-rotation self-test.
+   ============================================================ */
+const CW_SCIENCE = [
+  { word: 'ATOM',     clue: 'The smallest unit of an element',                    hints: ['Has a nucleus and electrons', 'Building block of matter'] },
+  { word: 'CELL',     clue: 'The basic unit of every living thing',               hints: ['Has a membrane and a nucleus', 'You are made of trillions'] },
+  { word: 'GENE',     clue: 'A stretch of DNA coding one trait',                  hints: ['Inherited from your parents', 'Lives on a chromosome'] },
+  { word: 'MASS',     clue: 'How much matter something contains',                 hints: ['Measured in kilograms', 'Not the same as weight'] },
+  { word: 'HEAT',     clue: 'Energy flowing from hot to cold',                     hints: ['Measured in joules', 'Flows down a temperature gradient'] },
+  { word: 'IONS',     clue: 'Atoms carrying an electric charge',                  hints: ['Formed by losing or gaining electrons', 'Carry current through a solution'] },
+  { word: 'ACID',     clue: 'A substance with a pH below seven',                  hints: ['Turns litmus paper red', 'Donates protons'] },
+  { word: 'ORBIT',    clue: 'The curved path one body takes around another',      hints: ['The Moon does this to Earth', 'Kepler described its shape'] },
+  { word: 'LASER',    clue: 'A beam of light amplified in one direction',          hints: ['An acronym for stimulated emission', 'Coherent, single-wavelength light'] },
+  { word: 'PRISM',    clue: 'Glass that splits white light into colours',          hints: ['Newton used one on sunlight', 'Makes a rainbow indoors'] },
+  { word: 'ALLOY',    clue: 'A metal blended from two or more elements',           hints: ['Brass and steel are examples', 'Stronger than its parts'] },
+  { word: 'FORCE',    clue: 'A push or pull that changes motion',                 hints: ['Mass times acceleration', 'Measured in newtons'] },
+  { word: 'PLANT',    clue: 'An organism that makes food from sunlight',          hints: ['Uses chlorophyll', 'Roots, stem, leaves'] },
+  { word: 'NERVE',    clue: 'A fibre carrying signals through the body',          hints: ['Sends electrical impulses', 'Bundled into the spinal cord'] },
+  { word: 'SOLAR',    clue: 'Relating to the Sun',                                hints: ['As in panels, or a system', 'From the Latin for sun'] },
+  { word: 'FOSSIL',   clue: 'Preserved remains of ancient life',                  hints: ['Found in sedimentary rock', 'How we know about dinosaurs'] },
+  { word: 'ENZYME',   clue: 'A protein that speeds up a reaction',                hints: ['A biological catalyst', 'Names usually end in -ase'] },
+  { word: 'PHOTON',   clue: 'A single particle of light',                         hints: ['Has no mass', 'Both a particle and a wave'] },
+  { word: 'GRAVITY',  clue: 'The force pulling masses toward each other',         hints: ['Keeps you on the ground', 'Newton and Einstein both explained it'] },
+  { word: 'NEURON',   clue: 'A single brain cell that fires signals',             hints: ['Has dendrites and an axon', 'Billions of them in your head'] },
+  { word: 'PLASMA',   clue: 'Ionised gas, the fourth state of matter',            hints: ['What stars are made of', 'Also the liquid part of blood'] },
+  { word: 'MAGNET',   clue: 'Something with a north and south pole',              hints: ['Attracts iron', 'Has a field around it'] },
+  { word: 'CARBON',   clue: 'Element number six, the basis of life',              hints: ['Diamonds and graphite are both this', 'Symbol C'] },
+  { word: 'OXYGEN',   clue: 'The element every breath depends on',                hints: ['About a fifth of the air', 'Symbol O'] },
+  { word: 'PROTON',   clue: 'The positively charged nucleus particle',            hints: ['Its count is the atomic number', 'Opposite of an electron'] },
+  { word: 'ORGANIC',  clue: 'Chemistry built around carbon compounds',            hints: ['Also a food label', 'The chemistry of living things'] },
+  { word: 'MINERAL',  clue: 'A naturally occurring solid with fixed structure',    hints: ['Quartz and calcite qualify', 'Rocks are made of them'] },
+  { word: 'GLACIER',  clue: 'A slow river of ice',                                hints: ['Carves valleys as it moves', 'Retreating in a warming world'] },
+  { word: 'ECOLOGY',  clue: 'The study of how organisms relate to their habitat',  hints: ['Food webs and niches', 'From the Greek for household'] },
+  { word: 'ISOTOPE',  clue: 'A variant of an element with extra neutrons',        hints: ['Carbon-14 is one', 'Same element, different mass'] },
+  { word: 'VACCINE',  clue: 'A preparation that trains immunity',                 hints: ['Teaches your body to recognise a pathogen', 'Jenner made the first'] },
+  { word: 'NEUTRON',  clue: 'The uncharged particle in a nucleus',                hints: ['Has mass but no charge', 'Discovered by Chadwick'] },
+  { word: 'ECLIPSE',  clue: 'When one body blocks the light of another',           hints: ['Solar or lunar', 'Needs three bodies in a line'] },
+  { word: 'BIOLOGY',  clue: 'The science of living things',                       hints: ['Cells, genes, ecosystems', 'From the Greek for life'] },
+  { word: 'CLIMATE',  clue: "A region's long-term weather pattern",               hints: ['Weather averaged over decades', 'Not the same as weather'] },
+  { word: 'MOLECULE', clue: 'Two or more atoms bonded together',                  hints: ['Water is a famous one', 'Smaller than a cell, bigger than an atom'] },
+  { word: 'ELECTRON', clue: 'The negatively charged particle orbiting a nucleus',  hints: ['Carries electric current', 'Tiny compared to a proton'] },
+  { word: 'GRAVITON', clue: 'The hypothetical carrier of gravity',                hints: ['Never observed', 'Would be the force particle for mass'] },
+  { word: 'PROTEIN',  clue: 'A chain of amino acids doing a cellular job',        hints: ['Folded into a shape that matters', 'Built from a gene recipe'] },
+  { word: 'SPECTRUM', clue: 'The full range of wavelengths in radiation',          hints: ['Visible light is one slice', 'A prism reveals it'] },
+  { word: 'PARTICLE', clue: 'A very small constituent of matter',                 hints: ['Physics has a whole zoo of them', 'Colliders smash them together'] },
+  { word: 'PRESSURE', clue: 'Force spread over an area',                          hints: ['Measured in pascals', 'Rises as you dive deeper'] },
+  { word: 'MOMENTUM', clue: 'Mass times velocity — the tendency to keep going',    hints: ['Conserved in a collision', 'Hard to stop a heavy fast thing'] },
+  { word: 'HABITAT',  clue: 'The natural home of a species',                       hints: ['Where an animal lives', 'Loss of it drives extinction'] },
+  { word: 'MICROBE',  clue: 'An organism too small to see unaided',                hints: ['Needs a microscope', 'Bacteria are examples'] },
+  { word: 'MAGNETIC', clue: 'Having the properties of a magnet',                   hints: ['As in a field, or the north pole', 'Iron responds to it'] },
+];
+
+const CW_GEOGRAPHY = [
+  { word: 'BAY',      clue: 'A wide inlet where the sea bends into land',         hints: ['Smaller than a gulf', 'Ships shelter in one'] },
+  { word: 'CAPE',     clue: 'A headland jutting into the sea',                    hints: ['Horn and Good Hope are two', 'A pointed piece of coast'] },
+  { word: 'DUNE',     clue: 'A hill of wind-blown sand',                          hints: ['Shifts with the wind', 'Deserts and beaches have them'] },
+  { word: 'FJORD',    clue: 'A deep sea inlet carved by a glacier',               hints: ['Norway is famous for them', 'Steep cliffs on both sides'] },
+  { word: 'DELTA',    clue: 'The fan of land where a river meets the sea',        hints: ['The Nile has a famous one', 'Named after a Greek letter'] },
+  { word: 'ATOLL',    clue: 'A ring-shaped coral island',                         hints: ['Encircles a lagoon', 'Common in the Pacific'] },
+  { word: 'STEPPE',   clue: 'A vast dry grassland plain',                          hints: ['Stretches across Central Asia', 'Too dry for forest'] },
+  { word: 'TUNDRA',   clue: 'Treeless ground frozen most of the year',            hints: ['Permafrost underneath', 'Found in the far north'] },
+  { word: 'CANYON',   clue: 'A deep gorge cut by a river',                        hints: ['Arizona has a Grand one', 'Steep walls, river below'] },
+  { word: 'ISLAND',   clue: 'Land completely surrounded by water',                hints: ['Smaller than a continent', 'You need a boat'] },
+  { word: 'STRAIT',   clue: 'A narrow channel joining two seas',                  hints: ['Gibraltar and Bering are two', 'Ships queue to pass'] },
+  { word: 'LAGOON',   clue: 'Shallow water cut off by a reef or sandbar',         hints: ['Often inside an atoll', 'Calm and shallow'] },
+  { word: 'SAVANNA',  clue: 'Tropical grassland with scattered trees',            hints: ['Where lions hunt', 'Wet and dry seasons'] },
+  { word: 'PLATEAU',  clue: 'A raised area of flat land',                         hints: ['Tibet has the largest', 'High but level'] },
+  { word: 'ESTUARY',  clue: 'Where a river tide mixes with the sea',              hints: ['Brackish water', 'Rich in birdlife'] },
+  { word: 'ISTHMUS',  clue: 'A narrow strip of land joining two larger areas',     hints: ['Panama has a famous one', 'A land bridge'] },
+  { word: 'SUMMIT',   clue: 'The highest point of a mountain',                     hints: ['Climbers aim for it', 'Also a meeting of leaders'] },
+  { word: 'VOLCANO',  clue: 'A vent where magma reaches the surface',              hints: ['Erupts lava and ash', 'Vesuvius is one'] },
+  { word: 'GLACIAL',  clue: 'Relating to ice sheets, or extremely slow',           hints: ['As in a pace, or a valley', 'Carved by ice'] },
+  { word: 'MONSOON',  clue: 'A seasonal wind bringing heavy rain',                hints: ['Defines South Asian summers', 'Reverses direction each year'] },
+  { word: 'PRAIRIE',  clue: 'The tall-grass plains of North America',              hints: ['Bison country', 'Flat and grassy'] },
+  { word: 'CRATER',   clue: 'A bowl-shaped hollow from an impact or eruption',      hints: ['The Moon is covered in them', 'Left by a meteorite or a volcano'] },
+  { word: 'RAVINE',   clue: 'A narrow steep-sided valley',                        hints: ['Smaller than a canyon', 'Carved by runoff'] },
+  { word: 'MARSH',    clue: 'Low wet ground thick with grasses',                   hints: ['Wetland without trees', 'Squelchy underfoot'] },
+  { word: 'OASIS',    clue: 'A fertile spot in a desert',                          hints: ['Fed by groundwater', 'Palm trees and a pool'] },
+  { word: 'TROPIC',   clue: 'One of two latitude lines flanking the equator',       hints: ['Cancer and Capricorn', 'Marks the sun overhead'] },
+  { word: 'MERIDIAN', clue: 'A line of longitude running pole to pole',            hints: ['Greenwich has the prime one', 'Vertical on a map'] },
+  { word: 'EQUATOR',  clue: 'The zero-degree line around the middle of Earth',     hints: ['Splits the hemispheres', 'Longest line of latitude'] },
+  { word: 'HEADLAND', clue: 'A cliff of land reaching into the sea',               hints: ['A high point on the coast', 'Lighthouses stand on them'] },
+  { word: 'MOORLAND', clue: 'Open upland covered in heather',                      hints: ['Windswept and treeless', 'Heather and peat'] },
+  { word: 'WATERWAY', clue: 'A river or canal that boats can travel',              hints: ['Navigable by barge', 'Carries freight inland'] },
+  { word: 'FOOTHILL', clue: 'A low hill at the base of a mountain',                hints: ['Where the climb begins', 'Below the real peaks'] },
+  { word: 'BASIN',    clue: 'A large depression that collects drainage',            hints: ['The Amazon has a huge one', 'All water flows to its middle'] },
+  { word: 'GORGE',    clue: 'A deep narrow passage between cliffs',                hints: ['A river usually runs through it', 'Also means to eat greedily'] },
+  { word: 'LEVEE',    clue: 'An embankment holding back a river',                  hints: ['Protects a floodplain', 'The Mississippi has many'] },
+  { word: 'CURRENT',  clue: 'A steady flow of water through the sea',              hints: ['The Gulf Stream is one', 'Carries heat around the globe'] },
+  { word: 'LATITUDE', clue: 'How far north or south a place sits',                 hints: ['Measured in degrees from the equator', 'Horizontal on a map'] },
+  { word: 'ALTITUDE', clue: 'Height above sea level',                             hints: ['Thins the air as it rises', 'Pilots watch it closely'] },
+  { word: 'LOWLAND',  clue: 'Ground lying near sea level',                         hints: ['The opposite of highland', 'Flat and often fertile'] },
+  { word: 'WETLAND',  clue: 'Ground saturated with water year-round',              hints: ['Marshes and bogs', 'A haven for birds'] },
+  { word: 'CASCADE',  clue: 'A small steep waterfall in a series',                 hints: ['Water tumbling down steps', 'Also a mountain range'] },
+  { word: 'SEDIMENT', clue: 'Particles that settle out of water',                  hints: ['Builds up in a delta', 'Becomes rock over time'] },
+  { word: 'HARBOUR',  clue: 'A sheltered place where ships moor',                   hints: ['Sydney has a famous one', 'Protected from open sea'] },
+  { word: 'TERRAIN',  clue: 'The shape and features of the ground',                hints: ['Rough or smooth', 'What a map contour shows'] },
+  { word: 'PLAINS',   clue: 'Broad stretches of flat low ground',                  hints: ['Great ones cross America', 'Few hills in sight'] },
+];
+
+const CW_EVERYDAY = [
+  { word: 'KEYS',     clue: 'What you pat your pocket for on the way out',        hints: ['They jingle', 'One opens your front door'] },
+  { word: 'LAMP',     clue: 'A light you switch on beside a chair',               hints: ['Has a shade', 'Sits on a side table'] },
+  { word: 'SOAP',     clue: 'What you lather at the sink',                        hints: ['Twenty seconds, they say', 'Comes as a bar or a pump'] },
+  { word: 'FORK',     clue: 'The tined one in the cutlery drawer',                hints: ['Sits left of the plate', 'Also a split in the road'] },
+  { word: 'CLOCK',    clue: 'What you glance at when you are late',               hints: ['Two hands, twelve numbers', 'Ticks'] },
+  { word: 'KETTLE',   clue: 'What you fill and switch on for tea',                hints: ['Whistles or clicks off', 'Boils water'] },
+  { word: 'MIRROR',   clue: 'The thing you check before leaving',                 hints: ['Reflects you', 'On the wall, or in the car'] },
+  { word: 'PURSE',    clue: 'The small bag coins go in',                          hints: ['Snaps shut', 'Also means to pucker your lips'] },
+  { word: 'LADDER',   clue: 'What you climb to reach the gutter',                 hints: ['Has rungs', 'Lean it against a wall'] },
+  { word: 'BUCKET',   clue: 'What you fill to wash the car',                      hints: ['Has a handle', 'Also a to-do list'] },
+  { word: 'PILLOW',   clue: 'What your head lands on',                            hints: ['Comes with a case', 'Sits at the head of the bed'] },
+  { word: 'BLANKET',  clue: 'What you pull up when it gets cold',                 hints: ['Woollen, usually', 'Also means covering everything'] },
+  { word: 'CURTAIN',  clue: 'What you draw at dusk',                              hints: ['Hangs on a rail', 'Also falls at the end of a play'] },
+  { word: 'CUSHION',  clue: 'The soft square on the sofa',                        hints: ['You plump it', 'Also means to soften a blow'] },
+  { word: 'TOASTER',  clue: 'The appliance that browns your bread',               hints: ['Pops up when done', 'Crumbs collect in the tray'] },
+  { word: 'UMBRELLA', clue: 'What you open when the sky turns',                   hints: ['Has ribs and a canopy', 'Always left on the train'] },
+  { word: 'SCISSORS', clue: 'The two-bladed thing in the drawer',                 hints: ['Always plural', 'Cuts paper and ribbon'] },
+  { word: 'HANGER',   clue: 'What a shirt hangs on in the wardrobe',              hints: ['Wire, wood or plastic', 'Hooks over a rail'] },
+  { word: 'BOTTLE',   clue: 'What you refill and carry around',                    hints: ['Has a neck and a cap', 'Glass or plastic'] },
+  { word: 'CANDLE',   clue: 'What you light when the power goes',                  hints: ['Has a wick', 'Drips wax'] },
+  { word: 'BASKET',   clue: 'What you carry the shopping in',                      hints: ['Woven, often', 'Also on a bicycle'] },
+  { word: 'SPOON',    clue: 'The rounded one you stir with',                       hints: ['Tea or table size', 'Sits right of the plate'] },
+  { word: 'TOWEL',    clue: 'What you reach for stepping out of the shower',       hints: ['Hangs on a rail', 'Fluffy when new'] },
+  { word: 'BRUSH',    clue: 'What you drag through your hair',                     hints: ['Has bristles', 'Also for paint'] },
+  { word: 'DRAWER',   clue: 'The sliding compartment in a chest',                  hints: ['You pull it out', 'Where odd things accumulate'] },
+  { word: 'CARPET',   clue: 'The soft floor covering underfoot',                   hints: ['Fitted wall to wall', 'Vacuumed weekly'] },
+  { word: 'WINDOW',   clue: 'What you open to let the air in',                     hints: ['Has a pane and a latch', 'Also on a computer'] },
+  { word: 'LAUNDRY',  clue: 'The pile that never quite ends',                     hints: ['Sorted by colour', 'Washed, dried, folded'] },
+  { word: 'KITCHEN',  clue: 'The room with the kettle in it',                      hints: ['Where meals get made', 'Sink, hob, fridge'] },
+  { word: 'CUPBOARD', clue: 'The closed shelf unit where plates live',            hints: ['Has doors', 'Skeletons optionally included'] },
+  { word: 'MATTRESS', clue: 'The padded slab you sleep on',                        hints: ['Springs or foam', 'Sits on a bed frame'] },
+  { word: 'DOORBELL', clue: 'What a visitor presses',                              hints: ['Chimes or buzzes', 'By the front door'] },
+  { word: 'ENVELOPE', clue: 'What a letter goes into',                              hints: ['You lick the flap', 'Needs a stamp'] },
+  { word: 'NOTEBOOK', clue: 'Where you jot things you then forget',                 hints: ['Lined pages, spiral bound', 'Also a small laptop'] },
+  { word: 'BLENDER',  clue: 'The appliance that purées a soup',                    hints: ['Whirring blades', 'Makes smoothies'] },
+  { word: 'DOORMAT',  clue: 'What you wipe your feet on',                          hints: ['Says WELCOME, sometimes', 'Lies at the threshold'] },
+  { word: 'SLIPPERS', clue: 'What you swap your shoes for indoors',                hints: ['Soft-soled', 'Kept by the door'] },
+  { word: 'ARMCHAIR', clue: 'The comfortable seat with sides',                     hints: ['You sink into it', 'Has arms, unlike a stool'] },
+  { word: 'SANDWICH', clue: 'Lunch between two slices',                            hints: ['Named after an earl', 'Cut on the diagonal'] },
+  { word: 'BACKPACK', clue: 'What you sling over both shoulders',                   hints: ['Two straps', 'For school or a hike'] },
+  { word: 'CHARGER',  clue: 'The cable you can never find',                        hints: ['Plugs into the wall', 'Your phone needs it'] },
+  { word: 'STAPLER',  clue: 'The desk tool that binds pages',                      hints: ['Jams at the worst moment', 'Loads with a strip'] },
+  { word: 'TROLLEY',  clue: 'What you push around a supermarket',                   hints: ['One wheel always squeaks', 'Needs a coin sometimes'] },
+  { word: 'RADIATOR', clue: 'The metal panel that warms a room',                    hints: ['Bled when it gurgles', 'Under the window'] },
+  { word: 'CALENDAR', clue: 'What tells you which day it is',                       hints: ['Twelve pages', 'Hangs in the kitchen'] },
+];
+
+/* Themes are DISJOINT word sets, so the rotation only has to avoid repeats
+   within a theme to avoid them globally. Order is fixed — theme choice is
+   `dayNum % CW_THEMES.length`, which also spreads themes evenly. */
+const CW_THEMES = [
+  { name: 'Crypto & finance', words: CW_WORDS },
+  { name: 'Science',          words: CW_SCIENCE },
+  { name: 'Geography',        words: CW_GEOGRAPHY },
+  { name: 'Everyday objects', words: CW_EVERYDAY },
+];
+// Fixed rounds per day: a varying count made the cycle maths unverifiable, and
+// 5 is the middle of the old 4–7 range.
+const CW_ROUNDS_PER_DAY = 5;
+// Blocks available in the smallest theme — the binding constraint on the cycle.
+const CW_BLOCKS = Math.min(...CW_THEMES.map(t => Math.floor(t.words.length / CW_ROUNDS_PER_DAY)));
+// Days before ANY word can recur — a SLIDING guarantee, not just an aligned one
+// (see cwRoundsForDay). 4 themes x 9 blocks = 36 days.
+const CW_CYCLE_LEN = CW_BLOCKS * CW_THEMES.length;
+
+// Fisher-Yates over the shared mulberry32 family — same PRNG as every other
+// daily, so this is reproducible on any device without server state.
+function cwSeededShuffle(arr, seed) {
+  const out = arr.slice();
+  const rng = mulberry32(seed >>> 0);
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = out[i]; out[i] = out[j]; out[j] = t;
+  }
+  return out;
+}
+
+/* The day's words, purely from the UTC day number.
+
+   PARTITION, not sampling. Each theme is shuffled ONCE (fixed seed) and cut
+   into CW_ROUNDS_PER_DAY-sized blocks; day N takes block (N/nThemes) mod
+   blocks. Because the slot index just walks the blocks cyclically, ANY window
+   of CW_CYCLE_LEN consecutive days touches each theme's blocks at most once —
+   a *sliding* no-repeat guarantee, which is what a player actually experiences.
+
+   An earlier version reshuffled per cycle to also vary which words appear
+   together. That broke the sliding property at every cycle boundary (a window
+   straddling two shuffles could repeat a word days apart), so it was dropped:
+   the fixed partition is the property worth having, and the visible fix for
+   #138 is the 180-word four-theme pool. */
+function cwRoundsForDay(dayNum) {
+  const n = CW_THEMES.length;
+  const themeIdx = ((dayNum % n) + n) % n;
+  const theme = CW_THEMES[themeIdx];
+  const dayInTheme = Math.floor(dayNum / n);
+  const blocks = Math.max(1, Math.floor(theme.words.length / CW_ROUNDS_PER_DAY));
+  const slot = ((dayInTheme % blocks) + blocks) % blocks;
+  const shuffled = cwSeededShuffle(theme.words, hashStr('cw-rotation:' + themeIdx));
+  return shuffled.slice(slot * CW_ROUNDS_PER_DAY, slot * CW_ROUNDS_PER_DAY + CW_ROUNDS_PER_DAY);
+}
+
+function cwThemeForDay(dayNum) {
+  const n = CW_THEMES.length;
+  return CW_THEMES[((dayNum % n) + n) % n].name;
+}
 
 
 // Guesses allowed for a given word length: one more than the length, so a
@@ -7905,9 +8814,9 @@ function cwScoreGuess(guess, answer) {
   return res;
 }
 
-// Multi-word daily puzzle: each UTC day is a deterministic stack of 4–7
-// independent words drawn from CW_WORDS via the shared seeded PRNG, so every
-// player faces the identical set. Tunable knobs.
+// Multi-word daily puzzle: each UTC day is a deterministic stack of independent
+// words, identical for every player. Count is now fixed (CW_ROUNDS_PER_DAY) and
+// the words come from the themed rotation above — see the #138 note there.
 const CW_MIN_ROWS = 4;
 const CW_MAX_ROWS = 7;
 
@@ -7919,19 +8828,11 @@ const cwRoundPoints = (wordLen, attemptsUsed) =>
 // The day's ordered list of word entries ({ word, clue, hints }). Deterministic
 // from the server-anchored UTC day, so it's identical for everyone (fair board).
 function cwDailyRounds(offset) {
-  const rng = dailyRng(offset, 'cryptowordle');
-  const R = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
-  const picked = [];
-  const used = new Set();
-  let guard = 0;
-  while (picked.length < R && guard < 1000) {
-    guard++;
-    const idx = Math.floor(rng() * CW_WORDS.length);
-    if (used.has(idx)) continue;
-    used.add(idx);
-    picked.push(CW_WORDS[idx]);
-  }
-  return picked;
+  // Anchored to the server-issued UTC day, not the daily PRNG stream: the
+  // rotation IS the fairness guarantee (everyone on day N gets block N), and
+  // deriving it from the day number is what makes "no repeat within a cycle"
+  // provable rather than probabilistic.
+  return cwRoundsForDay(cwDayNum(offset));
 }
 
 function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
@@ -8135,7 +9036,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const boardWidth = Math.min(wordLen * 52, 440);
 
   return (
-    <div>
+    // PHASE 3 — this root was a bare <div> despite the game carrying
+    // fitShell: true, so .game-wrap.fit's overflow:hidden CLIPPED the board +
+    // keyboard on long words instead of fitting them. .fit-col makes the board
+    // the one flexible child; the keyboard/clue/tracker are pinned in the
+    // flex: 0 0 auto list.
+    <div className="fit-col">
       <div className="status-bar">
         <div className="pill">
           <div className="plabel">Time</div>
@@ -8154,6 +9060,9 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           <div className="pvalue">{totalScore}</div>
         </div>
       </div>
+
+      {/* #138 — naming the theme is half the "it feels different today" fix. */}
+      <div className="word-theme">Today's theme: <b>{cwThemeForDay(dayNum)}</b></div>
 
       <div className="cw-tracker">
         {roundState.map((r, i) => {
@@ -8199,6 +9108,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
             />
           )}
 
+          {/* The guess grid is the one flexible region: it shrinks so the
+              keyboard, clue and tracker (all flex: 0 0 auto) keep their place.
+              Deliberately NOT wrapped in fit-scale-box — that box is width-free,
+              which collapses a percentage-sized grid to min-content. */}
           <div
             className="cw-board"
             style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
@@ -8228,17 +9141,17 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           <div className="cw-kbd">
             {CW_KEYS.map((row, ri) => (
               <div key={ri} className="cw-kbd-row">
-                {ri === 2 && <button className="cw-key wide" onClick={submit}>Enter</button>}
+                {ri === 2 && <button className="cw-key wide" {...tapProps(submit)}>Enter</button>}
                 {row.split('').map(ch => (
                   <button
                     key={ch}
                     className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
-                    onClick={() => typeLetter(ch)}
+                    {...tapProps(() => typeLetter(ch))}
                   >
                     {ch}
                   </button>
                 ))}
-                {ri === 2 && <button className="cw-key wide" onClick={backspace}>⌫</button>}
+                {ri === 2 && <button className="cw-key wide" {...tapProps(backspace)}>⌫</button>}
               </div>
             ))}
           </div>
@@ -8482,9 +9395,98 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     });
   };
 
-  // Long-press flagging
+  /* #136 — chording. Tapping a revealed number used to do nothing at all.
+     When its adjacent flag count equals the number, clear every unflagged
+     neighbour; a wrong flag loses the game, exactly like tapping a mine.
+     Ported from the daily Mine Finder, which already had both this and the
+     flag-mode toggle below. */
+  const handleChord = (idx) => {
+    if (done || !mineSet || !adjacency) return false;
+    if (!revealed.has(idx)) return false;
+    const n = adjacency[idx];
+    if (!(n > 0)) return false;
+    const r = Math.floor(idx / MS_COLS), c = idx % MS_COLS;
+    const neigh = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < MS_ROWS && cc >= 0 && cc < MS_COLS) neigh.push(rr * MS_COLS + cc);
+    }
+    const flags = neigh.filter(i => flagged.has(i));
+    if (flags.length !== n) return false;
+    const toOpen = neigh.filter(i => !flagged.has(i) && !revealed.has(i));
+    if (!toOpen.length) return false;
+
+    const newSteps = steps + 1;
+    setSteps(newSteps);
+    onStepChange(newSteps);
+
+    // A misplaced flag means one of these is a mine — same loss path as a tap.
+    const boom = toOpen.find(i => mineSet.has(i));
+    if (boom != null) {
+      setGameOverMine(boom);
+      setDone(true);
+      cgSound('lose'); cgHaptic([20, 40, 20]);
+      const entry = {
+        id: String(Date.now()),
+        date: new Date().toISOString().slice(0, 10),
+        outcome: 'loss', score: 0, steps: newSteps, secs, safeRevealed, cashOut: false, cashoutMultiplier: null,
+      };
+      msSaveEntry(entry);
+      setGameHistory(msLoadHistory());
+      onLose(newSteps, secs, {
+        share: `Mine Finder Classic ${entry.date} — 💥 Game Over · ${safeRevealed}/54 safe · ${secs}s · +0 pts`,
+      });
+      return true;
+    }
+
+    let next = revealed;
+    for (const i of toOpen) next = floodReveal(i, adjacency, mineSet, next, flagged);
+    setRevealed(next);
+    cgSound('move');
+
+    const newSafe = Array.from(next).filter(i => !mineSet.has(i)).length;
+    if (newSafe >= MS_SAFE) {
+      setDone(true);
+      cgSound('win'); cgHaptic([15, 30, 15]);
+      const baseScore = Math.max(newSafe * 30 - secs * 2, 100) + 200;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const entry = {
+        id: String(Date.now()), date: dateStr,
+        outcome: 'win', score: baseScore, steps: newSteps, secs, safeRevealed: newSafe, cashOut: false, cashoutMultiplier: 1.0,
+      };
+      msSaveEntry(entry);
+      setGameHistory(msLoadHistory());
+      submitClassicScore('minesweeper', baseScore, { safeRevealed: newSafe, timeSecs: secs });
+      onWin(baseScore, newSteps, secs, {
+        share: `Mine Finder Classic ${dateStr} — ✅ Full Clear · ${newSafe}/54 safe · ${secs}s · +${baseScore} pts`,
+        cashOut: false,
+      });
+    }
+    return true;
+  };
+
+  /* #136 — a real flag/dig toggle. Long-press was previously the ONLY way to
+     flag, which is undiscoverable and awkward one-handed. Per-run state, not
+     localStorage: it's a choice about this board, not a preference. */
+  const [flagMode, setFlagMode] = useState(false);
+
+  // One dispatcher: chord a revealed number, flag or dig a covered cell.
+  const handleCellTap = (idx) => {
+    if (done) return;
+    if (revealed.has(idx)) { handleChord(idx); return; }
+    if (flagMode) { handleFlag(idx); return; }
+    handleReveal(idx);
+  };
+
+  // Long-press stays as the INVERSE of the current mode, so both gestures work.
   const onPointerDown = (idx) => {
-    flagTimerRef.current = setTimeout(() => { handleFlag(idx); flagTimerRef.current = null; }, 500);
+    flagTimerRef.current = setTimeout(() => {
+      flagTimerRef.current = null;
+      if (revealed.has(idx)) return;
+      if (flagMode) handleReveal(idx); else handleFlag(idx);
+      cgHaptic(12);
+    }, 500);
   };
   const onPointerUp = () => { if (flagTimerRef.current) { clearTimeout(flagTimerRef.current); flagTimerRef.current = null; } };
 
@@ -8510,6 +9512,31 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               <div className="plabel">Safe Revealed</div>
               <div className="pvalue">{safeRevealed}/{MS_SAFE}</div>
             </div>
+          </div>
+
+          {/* #136 — flag/dig toggle. Mirrors the daily Mine Finder's
+              .mf-mode-btn pair so the two mine games read the same. */}
+          <div className="mf-controls" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+            <button
+              className={'mf-mode-btn' + (flagMode ? '' : ' on')}
+              onClick={() => setFlagMode(false)}
+              aria-pressed={!flagMode}
+            >
+              ⛏️ Dig<span className="mf-mode-label">tap to reveal</span>
+            </button>
+            <button
+              className={'mf-mode-btn flag' + (flagMode ? ' on' : '')}
+              onClick={() => setFlagMode(true)}
+              aria-pressed={flagMode}
+            >
+              🚩 Flag<span className="mf-mode-label">tap to mark</span>
+            </button>
+          </div>
+          {/* #136 — chording was completely undiscoverable: tapping a revealed
+              number simply did nothing, with no hint that it ever would. */}
+          <div className="p6-hint" style={{ textAlign: 'center' }}>
+            Long-press does the opposite of the current mode.
+            Tap a number whose flags all match to clear around it.
           </div>
 
           <div
@@ -8543,7 +9570,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
                 <div
                   key={idx}
                   className={cls}
-                  onClick={() => !done && !isFlagged && handleReveal(idx)}
+                  onClick={() => handleCellTap(idx)}
                   onContextMenu={e => { e.preventDefault(); handleFlag(idx); }}
                   onPointerDown={() => onPointerDown(idx)}
                   onPointerUp={onPointerUp}
@@ -10488,6 +11515,11 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
         <div className="mnc-room-code">{roomId}</div>
         <div style={{ color: C.muted, fontSize: '0.78rem', marginTop: '0.4rem' }}>Share this room code</div>
         <div className="mnc-spinner" style={{ margin: '1rem auto 0' }} />
+        {/* #145 — close a room nobody joined. No opponent, so the server can't
+            rate it: it just goes finished and stops showing in Your rooms. */}
+        <button className="brd-endgame" onClick={() => endGame(true)} disabled={ending}>
+          {ending ? 'Closing…' : 'Close this room'}
+        </button>
       </div>
     );
   }
@@ -10832,11 +11864,23 @@ function t2048_rotateCCW(g) {
 }
 function t2048_rot180(g) { return t2048_rotateCW(t2048_rotateCW(g)); }
 
+/* #143 — vertical swipes were INVERTED (up moved tiles down and vice versa),
+   including the arrow keys, which share this function through executeMove.
+   The gesture math was fine: useGestures (shared with Snake and Daily Snake)
+   reports the right direction. The bug was here.
+
+   Everything slides LEFT after rotation, so the rotation has to put the
+   direction of travel at index 0 of each row:
+     rotateCCW row i = [g[0][3-i] … g[3][3-i]]  — a column TOP→BOTTOM  ⇒ 'up'
+     rotateCW  row i = [g[3][i]   … g[0][i]  ]  — a column BOTTOM→TOP  ⇒ 'down'
+   The code had those two swapped (and the un-rotation swapped to match, which
+   is why the board stayed self-consistent and the bug looked like a gesture
+   problem). Covered by the t2048-up / t2048-down load-time self-tests. */
 function t2048_move(grid, dir) {
   let g = grid;
   if (dir === 'right') g = t2048_rot180(g);
-  else if (dir === 'up')   g = t2048_rotateCW(g);
-  else if (dir === 'down') g = t2048_rotateCCW(g);
+  else if (dir === 'up')   g = t2048_rotateCCW(g);
+  else if (dir === 'down') g = t2048_rotateCW(g);
   let totalDelta = 0, anyMoved = false;
   const next = g.map(row => {
     const { row: nr, delta, moved } = t2048_slideRowLeft(row);
@@ -10846,8 +11890,8 @@ function t2048_move(grid, dir) {
   });
   let result = next;
   if (dir === 'right') result = t2048_rot180(next);
-  else if (dir === 'up')   result = t2048_rotateCCW(next);
-  else if (dir === 'down') result = t2048_rotateCW(next);
+  else if (dir === 'up')   result = t2048_rotateCW(next);
+  else if (dir === 'down') result = t2048_rotateCCW(next);
   return { grid: result, delta: totalDelta, moved: anyMoved };
 }
 
@@ -11162,24 +12206,35 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
             onTouchEnd={handleTouchEnd}
           >
             <div className="t2048-grid">
-              {grid.flat().map((cell, i) => {
-                if (!cell) return <div key={'c' + i} className="t2048-cell" />;
-                const { bg, color } = t2048_tileStyle(cell.value);
-                return (
-                  <div
-                    key={'t' + cell.id}
-                    className={'t2048-tile' + (cell.isNew ? ' is-new' : '') + (cell.isMerged ? ' is-merged' : '')}
-                    style={{
-                      background: bg,
-                      color,
-                      fontSize: t2048_tileFontSize(cell.value),
-                      boxShadow: cell.value === 2048 ? '0 0 14px #F59E0B88' : 'none',
-                    }}
-                  >
-                    {cell.value}
-                  </div>
-                );
-              })}
+              {/* Static 4x4 backdrop. */}
+              {Array.from({ length: 16 }, (_, i) => <div key={'c' + i} className="t2048-cell" />)}
+              {/* Tiles ride above it, keyed by id so DOM identity survives a
+                  move and the browser can transition the transform (#142). */}
+              <div className="t2048-layer">
+                {grid.flatMap((row, r) => row.map((cell, c) => {
+                  if (!cell) return null;
+                  const { bg, color } = t2048_tileStyle(cell.value);
+                  return (
+                    <div
+                      key={'t' + cell.id}
+                      className={'t2048-tile' + (cell.isNew ? ' is-new' : '') + (cell.isMerged ? ' is-merged' : '')}
+                      style={{ transform: `translate(calc(${c} * (100% + 6px)), calc(${r} * (100% + 6px)))` }}
+                    >
+                      <div
+                        className="t2048-tile-inner"
+                        style={{
+                          background: bg,
+                          color,
+                          fontSize: t2048_tileFontSize(cell.value),
+                          boxShadow: cell.value === 2048 ? '0 0 14px #F59E0B88' : 'none',
+                        }}
+                      >
+                        {cell.value}
+                      </div>
+                    </div>
+                  );
+                })).filter(Boolean)}
+              </div>
             </div>
 
             {victoryVisible && (
@@ -14352,10 +15407,10 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     if (!loopRunning) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = canvasDpr();
     canvas.width = BOUNCE_W * dpr;
     canvas.height = BOUNCE_H * dpr;
-    const ctx = canvas.getContext('2d');
+    const ctx = guardCanvasCtx(canvas.getContext('2d'));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctxRef.current = ctx;
     lastTsRef.current = null;
@@ -15302,12 +16357,12 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = canvasDpr();
     canvas.width = Math.round(ZUMA_W * dpr);
     canvas.height = Math.round(ZUMA_H * dpr);
 
     function drawFrame() {
-      const ctx = canvas.getContext('2d');
+      const ctx = guardCanvasCtx(canvas.getContext('2d'));
       ctx.save();
       ctx.scale(dpr, dpr);
       ctx.fillStyle = PAL.bg;
@@ -15753,7 +16808,11 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
 
   // Start a puzzle
   const startPuzzle = async (puzzleId) => {
-    const { ok, body } = await api(`/api/match3/start/${puzzleId}`);
+    /* PHASE 8 — this was a GET against a POST-only route
+       (app.post('/api/match3/start/:puzzleId')), so it fell through to the
+       catch-all, came back as the HTML shell, and JSON parsing failed — the
+       third reason Match 3 could never actually be played. */
+    const { ok, body } = await api(`/api/match3/start/${puzzleId}`, { method: 'POST' });
     if (ok && body) {
       setPuzzleConfig(body);
       setBoardSeed(body.boardSeed);
@@ -15908,28 +16967,28 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
             'div',
             { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.75rem' } },
             puzzles.map(p => {
+              /* PHASE 8 — the unlock gate was `p.id <= highestPuzzle`, i.e. you
+                 could only replay puzzles you had ALREADY solved. With
+                 highestPuzzle: 0 on a new player that locked all 50, so nobody
+                 could ever start the game — the second half of why Match 3 was
+                 unplayable rather than merely unstyled (the first being its API
+                 routes sitting after the catch-all, see server.js). The next
+                 unsolved puzzle must be playable. */
               const isSolved = p.id <= userProgress.highestPuzzle;
+              const isUnlocked = p.id <= userProgress.highestPuzzle + 1;
               return React.createElement(
                 'button',
-                {
-                  key: p.id,
-                  onClick: () => isSolved && startPuzzle(p.id),
-                  disabled: !isSolved,
-                  style: {
-                    padding: '1rem',
-                    background: isSolved ? C.card : C.surface,
-                    color: isSolved ? C.text : C.muted,
-                    border: `1px solid ${isSolved ? C.accent : C.border}`,
-                    borderRadius: '0.375rem',
-                    cursor: isSolved ? 'pointer' : 'not-allowed',
-                    opacity: isSolved ? 1 : 0.5,
-                    transition: 'all 0.2s',
+                Object.assign(
+                  {
+                    key: p.id,
+                    disabled: !isUnlocked,
+                    className: 'm3-level' + (isSolved ? ' solved' : '') + (isUnlocked ? '' : ' locked'),
+                    'aria-label': `Puzzle ${p.id}: ${p.name}${isSolved ? ' (solved)' : isUnlocked ? '' : ' (locked)'}`,
                   },
-                  onMouseEnter: (e) => { if (isSolved) e.target.style.background = C.border; },
-                  onMouseLeave: (e) => { e.target.style.background = isSolved ? C.card : C.surface; }
-                },
-                React.createElement('div', { style: { fontWeight: 700 } }, isSolved ? '✓' : p.id),
-                React.createElement('div', { style: { fontSize: '0.75rem', marginTop: '0.25rem' } }, p.name)
+                  tapProps(() => startPuzzle(p.id), { disabled: !isUnlocked })
+                ),
+                React.createElement('div', { className: 'm3-level-id' }, isSolved ? '✓' : isUnlocked ? p.id : '🔒'),
+                React.createElement('div', { className: 'm3-level-name' }, p.name)
               );
             })
           )
@@ -15938,74 +16997,60 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
     );
   }
 
+  /* PHASE 8 — Match 3 was the only game in the registry with no design system:
+     hand-written inline styles, plain coloured blocks with padding: 2rem, a bare
+     "Bar:" label, `minHeight: 100vh` inside an already-fitted stage, and no CSS
+     classes at all — so it also missed every registry-wide fix (Phase 2's
+     touch-action/press state, Phase 3's fit sizing). Rebuilt on the same
+     CgStatus / .m3-* / tray idiom the two Tile Match games use.
+     Gameplay, scoring and MATCH3_PUZZLES are untouched: markup and CSS only. */
   if (phase === 'playing' && puzzleConfig) {
+    const M3_ICONS = ['🔴', '🟠', '🟢', '🔵', '🟣'];
+    const M3_COLORS = [C.rose, C.gold, C.emerald, C.accent, C.violet];
+    const barFull = bar.length >= 6;
     return React.createElement(
       'div',
-      { style: { padding: '1rem', background: C.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column' } },
+      { className: 'm3-wrap fit-col', style: { alignItems: 'center', gap: '0.75rem' } },
+      React.createElement(CgStatus, {
+        items: [
+          { l: 'Score', v: `${score} / ${puzzleConfig.targetScore}` },
+          { l: 'Moves', v: `${moves} / ${puzzleConfig.moveLimit}` },
+          { l: 'Time', v: `${secs}s` },
+        ],
+      }),
       React.createElement(
         'div',
-        { className: 'status-bar', style: { marginBottom: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'space-between' } },
-        React.createElement('div', { className: 'pill', style: { background: C.card, padding: '0.5rem 1rem', borderRadius: '999px' } },
-          React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted } }, 'Score'),
-          React.createElement('span', { style: { marginLeft: '0.5rem', fontWeight: 700 } }, `${score} / ${puzzleConfig.targetScore}`)
-        ),
-        React.createElement('div', { className: 'pill', style: { background: C.card, padding: '0.5rem 1rem', borderRadius: '999px' } },
-          React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted } }, 'Moves'),
-          React.createElement('span', { style: { marginLeft: '0.5rem', fontWeight: 700 } }, `${moves} / ${puzzleConfig.moveLimit}`)
-        ),
-        React.createElement('div', { className: 'pill', style: { background: C.card, padding: '0.5rem 1rem', borderRadius: '999px' } },
-          React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted } }, 'Time'),
-          React.createElement('span', { style: { marginLeft: '0.5rem', fontWeight: 700 } }, `${secs}s`)
-        )
-      ),
-      React.createElement(
-        'div',
-        { style: { flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' } },
-        tiles.map(t => {
-          const colors = [C.rose, C.amber, C.emerald, C.accent, C.violet];
-          return React.createElement(
-            'button',
+        { className: 'm3-grid' },
+        tiles.map(t => React.createElement(
+          'button',
+          Object.assign(
             {
               key: t.id,
-              onClick: () => selectTile(t.id),
+              className: 'm3-tile' + (t.removed ? ' gone' : '') + (bar.indexOf(t.id) >= 0 ? ' sel' : ''),
               disabled: t.removed || done,
-              style: {
-                padding: '2rem',
-                background: t.removed ? C.surface : colors[t.type % 5],
-                border: 'none',
-                borderRadius: '0.375rem',
-                cursor: t.removed ? 'default' : 'pointer',
-                opacity: t.removed ? 0.2 : 1,
-                fontSize: '2rem',
-                transition: 'all 0.2s',
-              }
+              style: { background: t.removed ? C.surface : M3_COLORS[t.type % 5] },
+              'aria-label': `Tile ${t.type + 1}` + (t.removed ? ', cleared' : ''),
             },
-            t.removed ? '✓' : '●'
-          );
-        })
+            tapProps(() => selectTile(t.id), { disabled: t.removed || done })
+          ),
+          t.removed ? '✓' : M3_ICONS[t.type % 5]
+        ))
       ),
       React.createElement(
         'div',
-        { style: { marginTop: '1.5rem', padding: '1rem', background: C.card, borderRadius: '0.5rem', minHeight: '60px', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' } },
-        React.createElement('span', { style: { fontSize: '0.75rem', color: C.muted, marginRight: '0.5rem' } }, 'Bar:'),
-        bar.length > 0 ? bar.map(id => {
-          const t = tiles.find(tile => tile.id === id);
-          const colors = [C.rose, C.amber, C.emerald, C.accent, C.violet];
-          return React.createElement('div', {
-            key: id,
-            style: {
-              width: '40px',
-              height: '40px',
-              background: colors[t.type % 5],
-              borderRadius: '0.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              color: C.bg,
-            }
-          }, t.type);
-        }) : React.createElement('span', { style: { color: C.muted } }, '(empty)')
+        { className: 'm3-bar' + (barFull ? ' full' : '') },
+        React.createElement('span', { className: 'm3-bar-label' + (barFull ? ' full' : '') }, 'Tray'),
+        bar.length > 0
+          ? bar.map(id => {
+              const t = tiles.find(tile => tile.id === id);
+              if (!t) return null;
+              return React.createElement(
+                'div',
+                { key: id, className: 'm3-bar-tile', style: { background: M3_COLORS[t.type % 5] } },
+                M3_ICONS[t.type % 5]
+              );
+            })
+          : React.createElement('span', { className: 'm3-bar-empty' }, 'Match three of a kind to clear them')
       )
     );
   }
@@ -16708,6 +17753,34 @@ function OnlineRoomSetup({ gameId, onReady }) {
   const multiSeat = gameId === 'ludo';
   const [players, setPlayers] = useState(2);
 
+  /* #145 — "Your rooms".
+     A room you hosted and then left (backgrounded the app, phone slept) used to
+     be unreachable: it wasn't listed anywhere, and typing your own code came
+     back "Room is full or you created it" with no way forward. /api/rooms/mine
+     now returns WAITING rooms as well as active ones, and Rejoin goes through
+     the same onReady pre-seating the home in-progress row already uses. */
+  const [myRooms, setMyRooms] = useState(null); // null = still loading
+  const [closing, setClosing] = useState(null);
+
+  const loadMine = async () => {
+    const { ok, body } = await api('/api/rooms/mine');
+    setMyRooms(ok && body && Array.isArray(body.rooms)
+      ? body.rooms.filter(r => r.gameId === gameId) : []);
+  };
+  useEffect(() => { loadMine(); }, [gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close a room nobody ever joined. Same guarded forfeit endpoint as an
+  // in-match concede — with no opponent it can't touch the ladder (the server
+  // only rates on an active→finished transition WITH a player 2).
+  const closeRoom = async (room) => {
+    setClosing(room.id);
+    await api(`/api/classic/${gameId}/rooms/${room.id}/finish`, {
+      method: 'POST', body: JSON.stringify({}),
+    });
+    setClosing(null);
+    loadMine();
+  };
+
   const start = async () => {
     if (action === 'create') {
       setBusy(true);
@@ -16724,15 +17797,46 @@ function OnlineRoomSetup({ gameId, onReady }) {
       setBusy(true);
       const { ok, status, body } = await api(`/api/classic/${gameId}/rooms/${code}/join`, { method: 'POST' });
       setBusy(false);
-      if (ok) onReady(code, (body && body.yourPlayerNum) || 2);
-      else if (status === 404) setError('Room not found. Check the code.');
-      else if (status === 409) setError('Room is full or you created it.');
+      if (ok) { onReady(code, (body && body.yourPlayerNum) || 2); return; }
+      if (status === 404) setError('Room not found. Check the code.');
+      // #145 — your own code is no longer a dead end: rejoin it.
+      else if (status === 409 && body && body.ownRoom) {
+        onReady(code, body.yourPlayerNum || 1);
+      }
+      else if (status === 409) setError('That room is already full or finished.');
       else setError('Could not join. Try again.');
     }
   };
 
   return (
     <div className="mnc-mode-select">
+      {myRooms && myRooms.length > 0 && (
+        <div className="brd-myrooms">
+          <div className="brd-myrooms-label">Your rooms</div>
+          {myRooms.map(r => (
+            <div key={r.id} className="brd-myroom">
+              <div className="brd-myroom-meta">
+                <span className="brd-myroom-code mono">{r.id}</span>
+                <span className={'brd-myroom-sub' + (r.myTurn ? ' yourturn' : '')}>
+                  {r.waiting
+                    ? `Waiting for ${r.maxPlayers > 2 ? `${r.maxPlayers - r.seatsFilled} more player(s)` : 'an opponent'}`
+                    : r.myTurn ? 'Your turn' : `${r.opponentName}'s turn`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                {r.waiting && (
+                  <button
+                    className="ghost"
+                    onClick={() => closeRoom(r)}
+                    disabled={closing === r.id}
+                  >{closing === r.id ? '…' : 'Close'}</button>
+                )}
+                <button onClick={() => onReady(r.id, r.myPlayerNum)}>Rejoin</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="brg-intro">
         {multiSeat
           ? <>🌐 Online Ludo — 2, 3, or 4 players via room code. 2-player wins count on the <strong>Ladder</strong>.</>
@@ -16804,7 +17908,7 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
           const dark = (r + c) % 2 === 1;
           const owner = ckOwnerOf(v);
           return (
-            <div key={i} className={'ck-cell' + (dark ? ' dark' : '') + (sel === i ? ' sel' : '')} onClick={() => dark && click(i)}>
+            <div key={i} className={'ck-cell' + (dark ? ' dark' : '') + (sel === i ? ' sel' : '')} {...tapProps(() => dark && click(i))}>
               {owner !== 0 && (
                 <div className={'ck-piece p' + owner + (v > 2 ? ' king' : '')}>{v > 2 ? '♛' : ''}</div>
               )}
@@ -16833,7 +17937,7 @@ function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
       </div>
       <div className="rv-board">
         {board.map((v, i) => (
-          <div key={i} className="rv-cell" onClick={() => isMyTurn && v === 0 && submit({ cell: i })}>
+          <div key={i} className="rv-cell" {...tapProps(() => isMyTurn && v === 0 && submit({ cell: i }))}>
             {v !== 0 && <div className={'rv-disc d' + v} />}
           </div>
         ))}
@@ -16851,7 +17955,7 @@ function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
           <div
             key={i}
             className={'fir-cell' + (st.lastMove === i ? ' last' : '')}
-            onClick={() => isMyTurn && submit({ col: i % 7 })}
+            {...tapProps(() => isMyTurn && submit({ col: i % 7 }))}
           >
             {v !== 0 && <div className={'fir-disc d' + v} />}
           </div>
@@ -16866,8 +17970,35 @@ function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
   );
 }
 
+/* PHASE 2 — Gomoku ghost-confirm.
+   15x15 inside min(92vw, 380px) is ~24px per intersection — about a quarter of a
+   fingertip — and the old single onClick committed a PERMANENT stone on the first
+   tap. Now the first tap only places a ghost; you can slide it around and then
+   confirm. The move payload and the server's applyMove contract are unchanged
+   (only WHEN submit fires), so online, pass-and-play and bot modes all behave
+   identically and lib/board-rules.js needed no change. */
 function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
+  const [pending, setPending] = useState(null);
+
+  // Never leave a ghost hanging over the opponent's turn or a filled cell.
+  useEffect(() => {
+    if (!isMyTurn || (pending != null && board[pending] !== 0)) setPending(null);
+  }, [isMyTurn, st.lastMove]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const place = () => {
+    if (pending == null || !isMyTurn) return;
+    submit({ cell: pending });
+    setPending(null);
+  };
+  const pick = (i) => {
+    if (!isMyTurn || board[i] !== 0) return;
+    // Tapping the same intersection twice is a shortcut for Place.
+    if (pending === i) { place(); return; }
+    setPending(i);
+  };
+
+  const rc = pending == null ? null : [Math.floor(pending / 15) + 1, (pending % 15) + 1];
   return (
     <div className="gmk-scroll">
       <div className="gmk-board">
@@ -16875,12 +18006,21 @@ function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
           <div
             key={i}
             className={'gmk-cell' + (st.lastMove === i ? ' last' : '')}
-            onClick={() => isMyTurn && v === 0 && submit({ cell: i })}
+            {...tapProps(() => pick(i))}
           >
             {v !== 0 && <div className={'gmk-stone s' + v} />}
+            {v === 0 && pending === i && <div className="gmk-ghost" />}
           </div>
         ))}
       </div>
+      {isMyTurn && (
+        <div className="brd-confirm-bar">
+          <button onClick={() => setPending(null)} disabled={pending == null}>Cancel</button>
+          <button className="go" onClick={place} disabled={pending == null}>
+            {pending == null ? 'Tap a point' : `Place stone (row ${rc[0]}, col ${rc[1]})`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -16970,14 +18110,47 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
             gridColumn: x + 1, gridRow: y + 1,
             transform: `translate(${(i % 2) * 5 - 2}px, ${Math.floor(i / 2) * 5 - 2}px)`,
           }}
-          onClick={() => movable && submit({ type: 'move', token: i })}
+          {...tapProps(() => movable && submit({ type: 'move', token: i }))}
         >{i + 1}</div>
       );
     });
   }
+
+  /* PHASE 2 — the movable-token pad.
+     The board tap targets a token INSIDE a ~25px cell, and tokens sharing a
+     square are offset by only 5px, so two of them overlap almost entirely —
+     there was no reliable way to pick the one you meant (and no accessible way
+     at all). This list is the unambiguous, full-size path; the board tap stays
+     as a shortcut. Same { type: 'move', token } payload either way. */
+  const myTokens = (seats[myPlayerNum] || []);
+  const movableList = phase === 'move' && isMyTurn && st.die != null
+    ? myTokens.map((pos, i) => ({ i, pos })).filter(t => canMoveToken(t.pos))
+    : [];
+  const describe = (pos) => {
+    if (pos === -1) return 'in base — a 6 brings it out';
+    if (pos >= 51) return `home column, ${57 - pos} to finish`;
+    const dest = pos + st.die;
+    return `step ${pos} → ${dest >= 51 ? 'home column' : dest}`;
+  };
+
   return (
     <div>
       <div className="ludo-board">{cells}{tokens}</div>
+      {movableList.length > 0 && (
+        <div className="brd-movelist">
+          <div className="brd-movelist-label">Your moves · rolled {st.die}</div>
+          {movableList.map(t => (
+            <button
+              key={t.i}
+              className="brd-move-btn"
+              {...tapProps(() => submit({ type: 'move', token: t.i }))}
+            >
+              <span>Token {t.i + 1}</span>
+              <span className="brd-move-sub">{describe(t.pos)}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="cnl-die"><div className="cnl-die-face">{st.die == null ? '·' : st.die}</div></div>
       {st.lastEvent === 'no-move' && <div className="brg-note">No legal move for that roll — turn passed.</div>}
       {st.lastEvent === 'capture' && <div className="brg-note">💥 Capture! Token sent back to base.</div>}
@@ -17019,6 +18192,36 @@ const BOARD_VIEWS = {
 function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
   const { room, pollingError, opponentDisconnected, submitMove } = useClassicRoom(gameId, roomId);
   const winCalledRef = useRef(false);
+  // #145 — concede / close. Declared up here so both the waiting-room branch and
+  // the live-match branch below can reach it (they return early).
+  const [ending, setEnding] = useState(false);
+  const endGame = async (isWaitingRoom) => {
+    const other = myPlayerNum === 1 ? 2 : 1;
+    const msg = isWaitingRoom
+      ? 'Close this room? Nobody has joined yet, so nothing is rated.'
+      : 'End this game? Your opponent wins and it counts on the Ladder.';
+    if (window.unNative && window.unNative.alert) {
+      const r = await window.unNative.alert({
+        title: isWaitingRoom ? 'Close room' : 'End game',
+        message: msg,
+        buttons: [
+          { label: 'Cancel', style: 'cancel' },
+          { label: isWaitingRoom ? 'Close' : 'End game', style: 'destructive' },
+        ],
+      });
+      if (!r || !r.button || r.button.style !== 'destructive') return;
+    } else if (!window.confirm(msg)) {
+      return;
+    }
+    setEnding(true);
+    // A waiting room has no winner to declare; a concede hands it to the other
+    // seat. The server ignores `winner` unless it makes the transition.
+    await api(`/api/classic/${gameId}/rooms/${roomId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify(isWaitingRoom ? {} : { winner: String(other) }),
+    });
+    setEnding(false);
+  };
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
   const secsRef = useRef(0); secsRef.current = secs;
   const movesRef = useRef(0);
@@ -17093,12 +18296,348 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
         ) : null;
       })()}
       <View st={st} myPlayerNum={myPlayerNum} isMyTurn={isMyTurn} submit={submit} />
+      {/* #145 — there was NO way to end a match once it started; the only exit
+          was to abandon it and let the 48h turn timer settle it. Concedes
+          through the existing guarded forfeit endpoint, which rates the match
+          exactly once on the active→finished transition and is idempotent. */}
+      {room.status === 'active' && (
+        <button className="brd-endgame" onClick={() => endGame(false)} disabled={ending}>
+          {ending ? 'Ending…' : '🏳️ End game'}
+        </button>
+      )}
     </div>
   );
 }
 
 // Top-level component per board game: create/join setup, then the room.
-function BoardRoomGame({ gameId, onWin, onStepChange, resetKey, gameModeOpts }) {
+/* ============================================================
+   PHASE 7 (#144) — local pass-and-play + Versus Bot for the five board games.
+
+   These were online-only, so if nobody joined you couldn't play at all. The
+   rules come from window.boardRules — the SAME pure module server.js referees
+   with (served at /board-rules.js, see its footer) — so an offline game and an
+   online game can never disagree about a legal move.
+
+   Unrated by construction: applyMatchRating only ever runs in the four server
+   finish paths, and these modes never call the server. We also skip
+   submitClassicScore so the all-time board stays comparable.
+   ============================================================ */
+
+// A bot is a pure function (state, player) -> move | null. One strength per
+// game; difficulty tiers are deferred. Each is deliberately beatable.
+const BOARD_BOTS = {
+  // Reversi: positional weights (corners high, X-squares poisonous) with a
+  // 1-ply lookahead over the flip count.
+  reversi: (rules, state, me) => {
+    const W = [
+      120, -20, 20, 5, 5, 20, -20, 120,
+      -20, -40, -5, -5, -5, -5, -40, -20,
+      20, -5, 15, 3, 3, 15, -5, 20,
+      5, -5, 3, 3, 3, 3, -5, 5,
+      5, -5, 3, 3, 3, 3, -5, 5,
+      20, -5, 15, 3, 3, 15, -5, 20,
+      -20, -40, -5, -5, -5, -5, -40, -20,
+      120, -20, 20, 5, 5, 20, -20, 120,
+    ];
+    let best = null, bestScore = -Infinity;
+    for (let i = 0; i < 64; i++) {
+      if ((state.board || [])[i] !== 0) continue;
+      let r;
+      try { r = rules.applyMove(state, me, { cell: i }); } catch { continue; }
+      const mine = (r.state.board || []).filter(x => x === me).length;
+      const sc = W[i] + mine * 2;
+      if (sc > bestScore) { bestScore = sc; best = { cell: i }; }
+    }
+    return best;
+  },
+
+  // Four in a Row: shallow negamax over a threat heuristic.
+  fourinarow: (rules, state, me) => boardNegamax(rules, state, me, 4, firScore, firMoves),
+
+  // Gomoku: the same search, shallower (15x15 branching is 225 wide) with a
+  // candidate filter to cells near existing stones.
+  gomoku: (rules, state, me) => boardNegamax(rules, state, me, 2, gmkScore, gmkMoves),
+
+  // Checkers: negamax over material + kings + advancement.
+  checkers: (rules, state, me) => boardNegamax(rules, state, me, 3, ckScore, ckMoves),
+
+  // Ludo: pure move ordering — capture > finish > leave base > advance leader.
+  // (No search: the dice make deep lookahead worthless.)
+  ludo: (rules, state, me) => {
+    if ((state.phase || 'roll') === 'roll') return { type: 'roll' };
+    const toks = (state['p' + me] || (state.seats && state.seats[me]) || []);
+    const die = state.die;
+    if (die == null) return { type: 'roll' };
+    const cand = [];
+    for (let i = 0; i < toks.length; i++) {
+      const pos = toks[i];
+      if (pos >= 57) continue;
+      if (pos === -1) { if (die === 6) cand.push({ i, rank: 3 }); continue; }
+      if (pos + die > 57) continue;
+      const dest = pos + die;
+      let rank = 1 + dest / 100;             // advance the leader, gently
+      if (dest === 57) rank = 5;             // finish a token
+      else if (dest >= 51) rank = 4;         // reach the home column
+      cand.push({ i, rank });
+    }
+    if (!cand.length) return null;
+    cand.sort((a, b) => b.rank - a.rank);
+    return { type: 'move', token: cand[0].i };
+  },
+};
+
+// ---- Bot search plumbing (pure; no DOM, no rules duplication) --------------
+// Every candidate move is validated by calling the REAL applyMove and catching
+// its throw, so a bot can never make a move the referee would reject.
+function boardNegamax(rules, state, me, depth, evalFn, movesFn) {
+  const other = me === 1 ? 2 : 1;
+  let best = null, bestScore = -Infinity;
+  for (const mv of movesFn(state, me)) {
+    let r;
+    try { r = rules.applyMove(state, me, mv); } catch { continue; }
+    let sc;
+    if (r.gameOver) sc = r.winner === String(me) ? 1e6 : r.winner === 'draw' ? 0 : -1e6;
+    else if (depth <= 1) sc = evalFn(r.state, me);
+    else sc = -negaValue(rules, r.state, other, me, depth - 1, -Infinity, Infinity, evalFn, movesFn);
+    if (sc > bestScore) { bestScore = sc; best = mv; }
+  }
+  return best;
+}
+
+function negaValue(rules, state, turn, me, depth, alpha, beta, evalFn, movesFn) {
+  if (depth <= 0) return turn === me ? evalFn(state, me) : -evalFn(state, me);
+  const other = turn === 1 ? 2 : 1;
+  let best = -Infinity, any = false;
+  for (const mv of movesFn(state, turn)) {
+    let r;
+    try { r = rules.applyMove(state, turn, mv); } catch { continue; }
+    any = true;
+    let sc;
+    if (r.gameOver) sc = r.winner === String(turn) ? 1e6 : r.winner === 'draw' ? 0 : -1e6;
+    else sc = -negaValue(rules, r.state, other, me, depth - 1, -beta, -alpha, evalFn, movesFn);
+    if (sc > best) best = sc;
+    if (best > alpha) alpha = best;
+    if (alpha >= beta) break;
+  }
+  if (!any) return turn === me ? evalFn(state, me) : -evalFn(state, me);
+  return best;
+}
+
+const firMoves = (state) => {
+  const out = [];
+  for (let c = 0; c < 7; c++) if ((state.board || [])[c] === 0) out.push({ col: c });
+  return out;
+};
+// Count open 2s/3s for both sides; prefer the centre column.
+function firScore(state, me) {
+  const b = state.board || [];
+  const other = me === 1 ? 2 : 1;
+  let s = 0;
+  const lines = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
+    for (const [dr, dc] of lines) {
+      let mine = 0, theirs = 0, ok = true;
+      for (let k = 0; k < 4; k++) {
+        const rr = r + dr * k, cc = c + dc * k;
+        if (rr < 0 || rr >= 6 || cc < 0 || cc >= 7) { ok = false; break; }
+        const v = b[rr * 7 + cc];
+        if (v === me) mine++; else if (v === other) theirs++;
+      }
+      if (!ok) continue;
+      if (mine && !theirs) s += mine * mine;
+      if (theirs && !mine) s -= theirs * theirs * 1.2; // slightly defensive
+    }
+    if (c === 3 && b[r * 7 + 3] === me) s += 3;
+  }
+  return s;
+}
+
+// Only intersections adjacent to an existing stone — 225-wide branching is
+// otherwise hopeless, and an isolated stone is never the best Gomoku move.
+const gmkMoves = (state) => {
+  const b = state.board || [];
+  const out = [];
+  const has = b.some(v => v !== 0);
+  if (!has) return [{ cell: 7 * 15 + 7 }]; // centre opening
+  for (let i = 0; i < 225; i++) {
+    if (b[i] !== 0) continue;
+    const r = Math.floor(i / 15), c = i % 15;
+    let near = false;
+    for (let dr = -2; dr <= 2 && !near; dr++) for (let dc = -2; dc <= 2; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= 15 || cc < 0 || cc >= 15) continue;
+      if (b[rr * 15 + cc] !== 0) { near = true; break; }
+    }
+    if (near) out.push({ cell: i });
+  }
+  return out.slice(0, 40);
+};
+function gmkScore(state, me) {
+  const b = state.board || [];
+  const other = me === 1 ? 2 : 1;
+  let s = 0;
+  const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (let r = 0; r < 15; r++) for (let c = 0; c < 15; c++) {
+    for (const [dr, dc] of dirs) {
+      let mine = 0, theirs = 0, ok = true;
+      for (let k = 0; k < 5; k++) {
+        const rr = r + dr * k, cc = c + dc * k;
+        if (rr < 0 || rr >= 15 || cc < 0 || cc >= 15) { ok = false; break; }
+        const v = b[rr * 15 + cc];
+        if (v === me) mine++; else if (v === other) theirs++;
+      }
+      if (!ok) continue;
+      if (mine && !theirs) s += Math.pow(mine, 3);
+      if (theirs && !mine) s -= Math.pow(theirs, 3) * 1.3;
+    }
+  }
+  return s;
+}
+
+const ckMoves = (state, player) => {
+  const b = state.board || [];
+  const out = [];
+  // Enumerate from-squares owned by `player`; applyMove validates the rest, so
+  // this only has to be a superset of the legal moves.
+  const from = state.mustJumpFrom != null ? [state.mustJumpFrom] : b.map((_, i) => i);
+  for (const f of from) {
+    const v = b[f];
+    if (v === 0) continue;
+    const owner = v === 1 || v === 3 ? 1 : 2;
+    if (owner !== player) continue;
+    const r = Math.floor(f / 8), c = f % 8;
+    for (const dr of [-2, -1, 1, 2]) for (const dc of [-2, -1, 1, 2]) {
+      if (Math.abs(dr) !== Math.abs(dc)) continue;
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= 8 || cc < 0 || cc >= 8) continue;
+      const t = rr * 8 + cc;
+      if (b[t] !== 0) continue;
+      out.push({ from: f, to: t });
+    }
+  }
+  return out;
+};
+function ckScore(state, me) {
+  const b = state.board || [];
+  let s = 0;
+  for (let i = 0; i < 64; i++) {
+    const v = b[i];
+    if (!v) continue;
+    const owner = v === 1 || v === 3 ? 1 : 2;
+    const king = v > 2;
+    const row = Math.floor(i / 8);
+    // Advancement: player 1 moves down the board, player 2 up.
+    const adv = owner === 1 ? row : 7 - row;
+    const val = (king ? 20 : 10) + adv * 0.6;
+    s += owner === me ? val : -val;
+  }
+  return s;
+}
+
+function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
+  const rules = (window.boardRules && window.boardRules.getRules)
+    ? window.boardRules.getRules(gameId) : null;
+  const [state, setState] = useState(() => (rules ? rules.initialState() : null));
+  const [over, setOver] = useState(null); // { winner }
+  const [err, setErr] = useState('');
+  const [thinking, setThinking] = useState(false);
+  const [moves, setMoves] = useState(0);
+  const submittedRef = useRef(false);
+  const onWinRef = useRef(onWin); onWinRef.current = onWin;
+
+  useEffect(() => {
+    if (!rules) return;
+    setState(rules.initialState());
+    setOver(null); setErr(''); setMoves(0); setThinking(false);
+    submittedRef.current = false;
+  }, [resetKey, gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!rules) {
+    return (
+      <div className="brg-intro">
+        Offline play needs the rules module, which didn't load. Try reloading, or
+        use <strong>Online</strong> mode.
+      </div>
+    );
+  }
+
+  const finish = (winner) => {
+    setOver({ winner });
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    const label = winner === 'draw' ? 'Draw'
+      : vsBot ? (winner === '1' ? 'You win! 🎉' : 'Bot wins')
+      : `Player ${winner} wins! 🎉`;
+    // Unrated and unscored on purpose — a local result must not sit on the same
+    // board as online matches (and the ladder is server-side only anyway).
+    onWinRef.current && onWinRef.current(0, moves, 0, { winnerLabel: label, localOnly: true });
+  };
+
+  const apply = (player, move) => {
+    let r;
+    try {
+      r = rules.applyMove(state, player, move);
+    } catch (e) {
+      // The referee's own message — never a second copy of the rules.
+      setErr(e && e.message ? e.message : 'Illegal move');
+      setTimeout(() => setErr(''), 2200);
+      return null;
+    }
+    setErr('');
+    setState(r.state);
+    setMoves(m => { const n = m + 1; onStepChange && onStepChange(n); return n; });
+    if (r.gameOver) finish(r.winner);
+    return r;
+  };
+
+  // Bot turn. Sliced through setTimeout so a deep search never blocks paint,
+  // and re-checked against the CURRENT state so a fast human tap can't race it.
+  const botPlayer = 2;
+  useEffect(() => {
+    if (!vsBot || over || !state) return;
+    if (Number(state.currentPlayer) !== botPlayer) return;
+    let alive = true;
+    setThinking(true);
+    const t = setTimeout(() => {
+      if (!alive) return;
+      setThinking(false);
+      const pick = BOARD_BOTS[gameId];
+      const mv = pick ? pick(rules, state, botPlayer) : null;
+      if (!mv) {
+        // No legal move the bot can find — Ludo rolls again, others concede.
+        if (gameId === 'ludo') apply(botPlayer, { type: 'roll' });
+        return;
+      }
+      apply(botPlayer, mv);
+    }, 350);
+    return () => { alive = false; clearTimeout(t); setThinking(false); };
+  }, [state, vsBot, over]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const View = BOARD_VIEWS[gameId];
+  const cur = Number(state.currentPlayer) || 1;
+  const myTurn = !over && (!vsBot || cur !== botPlayer);
+  const label = (p) => (vsBot ? (p === 1 ? 'You' : 'Bot') : `Player ${p}`);
+
+  return (
+    <div>
+      <div className="brg-intro">
+        {over
+          ? (over.winner === 'draw' ? "It's a draw." : `${label(Number(over.winner))} ${vsBot && over.winner === '1' ? 'win' : 'wins'}! 🎉`)
+          : thinking ? 'Bot is thinking…'
+          : `${label(cur)} to move`}
+      </div>
+      {err && <div className="mnc-join-error">{err}</div>}
+      <View
+        st={state}
+        myPlayerNum={cur}
+        isMyTurn={myTurn}
+        submit={(move) => { if (myTurn) apply(cur, move); }}
+      />
+    </div>
+  );
+}
+
+function BoardRoomGame({ gameId, onWin, onStepChange, resetKey, gameMode, gameModeOpts }) {
   // A pre-seated room (phase 7 in-progress row) skips the create/join setup:
   // the home your-turn card passes { roomId, myPlayerNum } through the classic
   // game-mode opts to land straight back in the live match.
@@ -17112,6 +18651,20 @@ function BoardRoomGame({ gameId, onWin, onStepChange, resetKey, gameModeOpts }) 
     if (mounted.current) setRoomInfo(null);
     else mounted.current = true;
   }, [resetKey]);
+
+  // #144 — mode dispatch. 'bot' and '2p' use the shared rules module locally;
+  // 'online' (and the legacy null default) keep the existing room flow.
+  if (gameMode === 'bot' || gameMode === '2p') {
+    return (
+      <BoardLocalGame
+        gameId={gameId}
+        vsBot={gameMode === 'bot'}
+        onWin={onWin}
+        onStepChange={onStepChange}
+        resetKey={resetKey}
+      />
+    );
+  }
   if (!roomInfo) {
     return <OnlineRoomSetup gameId={gameId} onReady={(roomId, myPlayerNum) => setRoomInfo({ roomId, myPlayerNum })} />;
   }
@@ -17292,17 +18845,53 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
     cgSound('move');
   };
 
-  // Input: tap halves, swipe, arrow keys.
+  // #137 — drag to steer. Tap-halves alone meant you were tapping a target
+  // rather than driving; the miner now tracks the thumb, with tap-halves and
+  // arrow keys still working. .hr-canvas already has touch-action: none, so the
+  // browser never scrolls out from under the drag.
+  const setLane = (lane) => {
+    const s = stateRef.current; if (!s || s.dead) return;
+    const next = Math.max(0, Math.min(HR_LANES - 1, lane));
+    if (next !== s.lane) { s.lane = next; cgSound('move'); }
+  };
+
   useEffect(() => {
     const el = canvasRef.current; if (!el) return;
-    const onPointer = (e) => {
-      if (phase === 'idle') { startGame(); return; }
+    const drag = { active: false, moved: false, startX: 0 };
+    const laneAt = (clientX) => {
       const rect = el.getBoundingClientRect();
-      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-      shift(x < rect.width / 2 ? -1 : 1);
+      const t = (clientX - rect.left) / Math.max(rect.width, 1);
+      return Math.round(t * (HR_LANES - 1));
     };
-    el.addEventListener('pointerdown', onPointer);
-    return () => el.removeEventListener('pointerdown', onPointer);
+    const onDown = (e) => {
+      if (phase === 'idle') { startGame(); return; }
+      drag.active = true; drag.moved = false; drag.startX = e.clientX;
+      if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch {} }
+    };
+    const onMove = (e) => {
+      if (!drag.active) return;
+      if (Math.abs(e.clientX - drag.startX) > 6) drag.moved = true;
+      if (drag.moved) setLane(laneAt(e.clientX));
+    };
+    const onUp = (e) => {
+      if (!drag.active) return;
+      drag.active = false;
+      // A press that never moved keeps the old tap-halves behaviour.
+      if (!drag.moved) {
+        const rect = el.getBoundingClientRect();
+        shift(e.clientX - rect.left < rect.width / 2 ? -1 : 1);
+      }
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+    };
   }, [phase]);
 
   useEffect(() => {
@@ -17342,13 +18931,13 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
   useEffect(() => {
     if (phase !== 'playing') return;
     const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = guardCanvasCtx(canvas.getContext('2d'));
     let running = true;
     lastTsRef.current = 0;
 
     const sizeCanvas = () => {
       const wrap = wrapRef.current; if (!wrap) return;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = canvasDpr();
       const w = wrap.clientWidth, h = wrap.clientHeight;
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
@@ -17409,11 +18998,24 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
 
     const draw = (s, W, H) => {
       ctx.clearRect(0, 0, W, H);
-      // background lanes
+      // Play-area chrome follows the theme (PAL, resolved every frame so a
+      // Light↔Dark flip recolours mid-run). The old near-white lane stripes
+      // were invisible in the light palette. The miner / tokens / hazards below
+      // stay hardcoded — intrinsic arcade art, like the Drop Stack pieces.
+      ctx.fillStyle = PAL.bg;
+      ctx.fillRect(0, 0, W, H);
       const laneW = W / HR_LANES;
       for (let i = 0; i < HR_LANES; i++) {
-        ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)';
+        ctx.fillStyle = i % 2 ? PAL.surface : PAL.card;
         ctx.fillRect(i * laneW, 0, laneW, H);
+      }
+      ctx.strokeStyle = PAL.border;
+      ctx.lineWidth = 1;
+      for (let i = 1; i < HR_LANES; i++) {
+        ctx.beginPath();
+        ctx.moveTo(Math.round(i * laneW) + 0.5, 0);
+        ctx.lineTo(Math.round(i * laneW) + 0.5, H);
+        ctx.stroke();
       }
       // objects
       for (const o of s.objs) {
@@ -17471,7 +19073,7 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
       { val: best, lbl: 'Best score' }, { val: hist.length, lbl: 'Runs' },
     ]),
     cgRulesSection([
-      'Tap the left/right half of the screen (or ← → keys) to change lane.',
+      'Drag across the screen to steer — the miner follows your thumb. Tapping the left/right half (or ← → keys) still nudges one lane.',
       'Collect ⛏️ hash tokens to score — each is worth 10 points.',
       'Grab ⚡ Compute Boost for 5 seconds of 2× scoring.',
       'Dodge 🚫 invalid blocks — three hits and the run ends.',
@@ -17557,14 +19159,22 @@ function ceDeck(nDecks, suits, rng) {
 
 // Shared card renderer. Face-down cards show a patterned back; face-up cards
 // show rank + suit in red/black. `sel` draws the selection ring.
-function CeCard({ card, sel, dim, onClick, style }) {
+function CeCard({ card, sel, dim, onClick, style, onDragStart, dropTarget }) {
   const cls = ['ce-card'];
   if (!card.up) cls.push('down');
   else cls.push(ceIsRed(card) ? 'red' : 'black');
+  if (sel) cls.push('selected'); // Phase 2 — a visible "this one is selected".
   if (sel) cls.push('sel');
   if (dim) cls.push('dim');
+  if (!card.up) cls.push('face-down');
   return (
-    <div className={cls.join(' ')} style={style} onClick={onClick}>
+    <div
+      className={cls.join(' ')}
+      style={style}
+      data-drop={dropTarget}
+      {...(onDragStart ? { onPointerDown: onDragStart } : {})}
+      {...tapProps(onClick)}
+    >
       {card.up && (
         <React.Fragment>
           <div className="ce-rank">{CE_RANK_LABEL[card.r]}</div>
@@ -17576,12 +19186,88 @@ function CeCard({ card, sel, dim, onClick, style }) {
 }
 
 // An empty pile slot (foundation / empty column / stock base).
-function CeSlot({ label, onClick, className }) {
+function CeSlot({ label, onClick, className, dropTarget }) {
   return (
-    <div className={'ce-card ce-slot' + (className ? ' ' + className : '')} onClick={onClick}>
+    <div
+      className={'ce-card ce-slot' + (className ? ' ' + className : '')}
+      data-drop={dropTarget}
+      {...tapProps(onClick)}
+    >
       {label || ''}
     </div>
   );
+}
+
+/* PHASE 5 (#123) — finger drag for the solitaires.
+   Tap-select/tap-destination was the only way to move a card, which is not how
+   anyone expects to play patience. Modelled on Block Fit's existing
+   .bb-drag-ghost rather than inventing a second drag idiom: a fixed-position
+   ghost tracks the pointer 1:1, and the drop target is resolved from
+   `data-drop` under the finger at release. If the pointer never travels past
+   the tolerance it is NOT a drag — the existing tap path runs instead, so both
+   input styles work and nothing regresses for mouse users. */
+const CE_DRAG_TOLERANCE = 8;
+
+function useCardDrag(onDrop) {
+  const [ghost, setGhost] = useState(null); // { cards, x, y }
+  const live = useRef(null);
+  const onDropRef = useRef(onDrop);
+  onDropRef.current = onDrop;
+
+  // Begin a potential drag. `payload` identifies the source; `cards` is what
+  // the ghost renders (a run, for a tableau grab).
+  const begin = (e, payload, cards) => {
+    if (!cards || !cards.length) return;
+    live.current = {
+      payload, cards, startX: e.clientX, startY: e.clientY, moved: false,
+      pointerId: e.pointerId,
+    };
+    // Deliberately NOT setPointerCapture on the card: capture would retarget
+    // every later event to the card and break elementFromPoint's usefulness.
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const d = live.current;
+      if (!d) return;
+      if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < CE_DRAG_TOLERANCE) return;
+      d.moved = true;
+      d.lastX = e.clientX; d.lastY = e.clientY;
+      setGhost({ cards: d.cards, x: e.clientX, y: e.clientY });
+      if (e.cancelable) e.preventDefault();
+    };
+    const onUp = (e) => {
+      const d = live.current;
+      live.current = null;
+      setGhost(null);
+      if (!d || !d.moved) return; // a tap, not a drag — let tapProps handle it
+      // Hide the ghost before hit-testing or it eats the point (it is
+      // pointer-events: none, but elementFromPoint is cheaper to trust this way).
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const target = el && el.closest ? el.closest('[data-drop]') : null;
+      onDropRef.current && onDropRef.current(d.payload, target ? target.getAttribute('data-drop') : null);
+    };
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
+
+  // True while a real drag is in flight — callers suppress their tap handling.
+  const dragging = !!ghost;
+  const ghostEl = ghost ? (
+    <div className="ce-drag-ghost" style={{ left: ghost.x, top: ghost.y }}>
+      {ghost.cards.map((c, i) => (
+        <CeCard key={c.id || i} card={c} style={{ marginTop: i ? -34 : 0 }} />
+      ))}
+    </div>
+  ) : null;
+
+  return { begin, dragging, ghostEl };
 }
 
 /* ---- Klondike Solitaire (daily) -------------------------------------------
@@ -17612,7 +19298,7 @@ function klValidState(st) {
     Array.isArray(st.tab) && st.tab.length === 7 && Number.isFinite(st.moves);
 }
 
-function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const freshDeal = useRef(null);
   if (!freshDeal.current) freshDeal.current = klDeal(dailyRng(offset, 'klondike'));
@@ -17669,10 +19355,33 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     commit(n);
   };
 
+  /* #124 — the empty-column rule. `card.r === 12` means ONLY A KING may start
+     an empty column, and nothing in the UI ever said so: an illegal drop just
+     did nothing, which reads as a broken tap. The rule is now stated three
+     ways — a ghost "K" in every empty column, a how-to-play card, and the
+     inline note below when you actually try it. */
   const canTab = (card, destTop) =>
     destTop ? (ceIsRed(card) !== ceIsRed(destTop) && card.r === destTop.r - 1) : card.r === 12;
   const canFound = (card, f) =>
     f.length ? (card.s === f[f.length - 1].s && card.r === f[f.length - 1].r + 1) : card.r === 0;
+
+  const [note, setNote] = useState('');
+  const noteTimer = useRef(null);
+  const say = (msg) => {
+    setNote(msg);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setNote(''), 2200);
+  };
+  useEffect(() => () => { if (noteTimer.current) clearTimeout(noteTimer.current); }, []);
+
+  // Why a specific move was refused — a silent no-op is indistinguishable from
+  // an unresponsive tap, which is what #123 and #124 were both reporting.
+  const explainTab = (card, destTop) => {
+    if (!destTop) return card.r === 12 ? '' : 'Only a King can start an empty column.';
+    if (ceIsRed(card) === ceIsRed(destTop)) return 'Build down in alternating colours.';
+    if (card.r !== destTop.r - 1) return `That card must go on a ${CE_RANK_LABEL[card.r + 1] || '?'}.`;
+    return '';
+  };
 
   // The selected run (array of cards) plus a mutator that removes it.
   const takeSel = (n, s) => {
@@ -17702,13 +19411,18 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     return true;
   };
 
-  const moveSelToTab = (p) => {
-    const cards = selCards(sel);
+  const moveSelToTab = (p, src) => {
+    const s = src || sel;
+    const cards = selCards(s);
     if (!cards.length) return false;
     const destTop = st.tab[p].length ? st.tab[p][st.tab[p].length - 1] : null;
-    if (!canTab(cards[0], destTop)) return false;
+    if (!canTab(cards[0], destTop)) {
+      const why = explainTab(cards[0], destTop);
+      if (why) say(why);
+      return false;
+    }
     const n = clone();
-    n.tab[p] = n.tab[p].concat(takeSel(n, sel));
+    n.tab[p] = n.tab[p].concat(takeSel(n, s));
     n.moves++;
     commit(n);
     return true;
@@ -17755,7 +19469,52 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     setSel({ z: 'tab', p, i });
   };
 
+  /* #125 — a way out. Without this the only exit from a dead deal was to close
+     the tab, which left a claimed-but-unfinished attempt hanging. onLose is the
+     harness's existing loss path: score 0, day locks, streak NOT broken. */
+  const giveUp = () => {
+    if (done) return;
+    setDone(true);
+    const home = st.found.reduce((a, f) => a + f.length, 0);
+    onLose && onLose(st.moves, secs, {
+      share: `Game Corner Klondike Solitaire — gave up today's deal at ${home}/52 home 🃏`,
+      answer: null,
+    });
+  };
+
+  /* #123 — drag. Grabbing a run and dropping it is the natural gesture; the
+     drop target comes from the data-drop attributes on the piles below. Tap
+     still works untouched (useCardDrag only fires when the pointer travelled). */
+  const drag = useCardDrag((payload, dropId) => {
+    if (done || !dropId) return;
+    const parse = (id) => {
+      const [z, idx] = id.split(':');
+      return { z, idx: idx == null ? null : Number(idx) };
+    };
+    const dest = parse(dropId);
+    const cards = selCards(payload);
+    if (!cards.length) return;
+    if (dest.z === 'tab') {
+      if (payload.z === 'tab' && payload.p === dest.idx) return; // dropped on itself
+      moveSelToTab(dest.idx, payload);
+      return;
+    }
+    if (dest.z === 'found') {
+      if (cards.length !== 1 || !canFound(cards[0], st.found[dest.idx])) {
+        say('Foundations build up by suit from the Ace.');
+        return;
+      }
+      const n = clone();
+      n.found[dest.idx].push({ ...takeSel(n, payload)[0], up: true });
+      n.moves++;
+      commit(n);
+    }
+  });
+
   const maxCol = Math.max(...st.tab.map((c) => c.length), 1);
+  // #123 — the exposed strip of each buried card, raised from 14/20px so the
+  // whole strip is an aimable target. Squeezes only when a column is deep.
+  const step = maxCol > 13 ? 20 : maxCol > 10 ? 24 : 28;
   return (
     <div className="kl-game fit-col">
       <div className="status-bar">
@@ -17770,13 +19529,18 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           ? <CeCard card={{ s: 0, r: 0, up: false }} onClick={tapStock} />
           : <CeSlot label="↻" onClick={tapStock} />}
         {st.waste.length
-          ? <CeCard card={st.waste[st.waste.length - 1]} sel={isSel('waste')} onClick={tapWaste} />
+          ? <CeCard
+              card={st.waste[st.waste.length - 1]}
+              sel={isSel('waste')}
+              onClick={tapWaste}
+              onDragStart={(e) => drag.begin(e, { z: 'waste' }, st.waste.slice(-1))}
+            />
           : <CeSlot />}
         <div className="kl-gap" />
         {st.found.map((f, fi) => (
           f.length
-            ? <CeCard key={fi} card={f[f.length - 1]} sel={isSel('found', fi)} onClick={() => tapFound(fi)} />
-            : <CeSlot key={fi} label={CE_SUIT_GLYPH[fi]} onClick={() => tapFound(fi)} />
+            ? <CeCard key={fi} card={f[f.length - 1]} sel={isSel('found', fi)} onClick={() => tapFound(fi)} dropTarget={'found:' + fi} />
+            : <CeSlot key={fi} label={CE_SUIT_GLYPH[fi]} onClick={() => tapFound(fi)} dropTarget={'found:' + fi} />
         ))}
       </div>
       <div className="kl-tab">
@@ -17784,17 +19548,22 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           <div
             key={p}
             className="kl-col"
-            style={{ height: 62 + (maxCol - 1) * 20 }}
+            data-drop={'tab:' + p}
+            style={{ height: 62 + (maxCol - 1) * step }}
             onClick={(e) => { if (e.target === e.currentTarget) tapTab(p, col.length ? col.length - 1 : null); }}
           >
-            {col.length === 0 && <CeSlot onClick={() => tapTab(p, null)} />}
+            {/* #124 — the rule, on the board. */}
+            {col.length === 0 && <CeSlot onClick={() => tapTab(p, null)} dropTarget={'tab:' + p} />}
+            {col.length === 0 && <div className="kl-empty-hint">K</div>}
             {col.map((c, i) => (
               <CeCard
                 key={c.id}
                 card={c}
                 sel={sel && sel.z === 'tab' && sel.p === p && i >= sel.i}
                 onClick={() => tapTab(p, i)}
-                style={{ position: 'absolute', top: i * (col.length > 12 ? 14 : 20), left: 0, zIndex: i }}
+                onDragStart={c.up ? (e) => drag.begin(e, { z: 'tab', p, i }, col.slice(i)) : undefined}
+                dropTarget={'tab:' + p}
+                style={{ position: 'absolute', top: i * step, left: 0, zIndex: i }}
               />
             ))}
           </div>
@@ -17802,7 +19571,12 @@ function KlondikeGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       </div>
       </div>
       </FitScale>
-      <div className="p6-hint">Tap a card, then its destination. Tap a selected card again to send it home.</div>
+      <div className="kl-note">{note}</div>
+      <div className="p6-hint">Drag a card (or tap it, then its destination). Tap a selected card again to send it home. Only a King starts an empty column.</div>
+      <div className="mj-controls">
+        <button onClick={giveUp} disabled={done}>🏳️ Give up</button>
+      </div>
+      {drag.ghostEl}
     </div>
   );
 }
@@ -17851,7 +19625,7 @@ function spSweep(n) {
   return swept;
 }
 
-function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const freshDeal = useRef(null);
   if (!freshDeal.current) freshDeal.current = spDeal(dailyRng(offset, 'spider'));
@@ -17907,30 +19681,68 @@ function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     commit(n);
   };
 
+  const [note, setNote] = useState('');
+  const noteTimer = useRef(null);
+  const say = (msg) => {
+    setNote(msg);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => setNote(''), 2200);
+  };
+  useEffect(() => () => { if (noteTimer.current) clearTimeout(noteTimer.current); }, []);
+
+  // Shared by tap and drag so both paths refuse a move for the same reason.
+  const moveRun = (fromP, fromI, toP) => {
+    if (fromP === toP) return false;
+    const moving = st.cols[fromP].slice(fromI);
+    if (!moving.length || !runOk(st.cols[fromP], fromI)) return false;
+    const col = st.cols[toP];
+    const destTop = col.length ? col[col.length - 1] : null;
+    if (destTop && destTop.r !== moving[0].r + 1) {
+      say(`That run must go on a ${CE_RANK_LABEL[moving[0].r + 1] || '?'}.`);
+      return false;
+    }
+    const n = clone();
+    const run = n.cols[fromP].splice(fromI);
+    const src = n.cols[fromP];
+    if (src.length && !src[src.length - 1].up) src[src.length - 1] = { ...src[src.length - 1], up: true };
+    n.cols[toP] = n.cols[toP].concat(run);
+    n.moves++;
+    commit(n);
+    return true;
+  };
+
   const tapCol = (p, i) => {
     if (done) return;
     const col = st.cols[p];
     if (sel && sel.p !== p) {
-      // Attempt the move onto column p.
-      const moving = st.cols[sel.p].slice(sel.i);
-      const destTop = col.length ? col[col.length - 1] : null;
-      if (!destTop || destTop.r === moving[0].r + 1) {
-        const n = clone();
-        const run = n.cols[sel.p].splice(sel.i);
-        const src = n.cols[sel.p];
-        if (src.length && !src[src.length - 1].up) src[src.length - 1] = { ...src[src.length - 1], up: true };
-        n.cols[p] = n.cols[p].concat(run);
-        n.moves++;
-        commit(n);
-        return;
-      }
+      if (moveRun(sel.p, sel.i, p)) return;
     }
     if (i == null || !runOk(col, i)) { setSel(null); return; }
     if (sel && sel.p === p && sel.i === i) { setSel(null); return; }
     setSel({ p, i });
   };
 
+  // #125 — same give-up path as Klondike.
+  const giveUp = () => {
+    if (done) return;
+    setDone(true);
+    onLose && onLose(st.moves, secs, {
+      share: `Game Corner Spider Solitaire — gave up today's deal at ${st.done8}/8 runs 🕷️`,
+      answer: null,
+    });
+  };
+
+  // #123 — drag, shared primitive with Klondike.
+  const drag = useCardDrag((payload, dropId) => {
+    if (done || !dropId) return;
+    const [z, idx] = dropId.split(':');
+    if (z !== 'col') return;
+    moveRun(payload.p, payload.i, Number(idx));
+  });
+
   const maxCol = Math.max(...st.cols.map((c) => c.length), 1);
+  // Raised from a fixed 13px so the exposed strip of a buried card is aimable.
+  const step = maxCol > 16 ? 14 : maxCol > 12 ? 18 : 22;
   return (
     <div className="sp-game fit-col">
       <div className="status-bar">
@@ -17947,24 +19759,32 @@ function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
           <div
             key={p}
             className="sp-col"
-            style={{ height: 46 + (maxCol - 1) * 13 }}
+            data-drop={'col:' + p}
+            style={{ height: 54 + (maxCol - 1) * step }}
             onClick={(e) => { if (e.target === e.currentTarget) tapCol(p, col.length ? col.length - 1 : null); }}
           >
-            {col.length === 0 && <CeSlot className="sm" onClick={() => tapCol(p, null)} />}
+            {col.length === 0 && <CeSlot className="sm" onClick={() => tapCol(p, null)} dropTarget={'col:' + p} />}
             {col.map((c, i) => (
               <CeCard
                 key={c.id}
                 card={c}
                 sel={sel && sel.p === p && i >= sel.i}
                 onClick={() => tapCol(p, i)}
-                style={{ position: 'absolute', top: i * 13, left: 0, zIndex: i }}
+                onDragStart={runOk(col, i) ? (e) => drag.begin(e, { p, i }, col.slice(i)) : undefined}
+                dropTarget={'col:' + p}
+                style={{ position: 'absolute', top: i * step, left: 0, zIndex: i }}
               />
             ))}
           </div>
         ))}
       </div>
       </FitScale>
-      <div className="p6-hint">One suit: any descending run moves. Build K→A to clear a run — 8 clears win.</div>
+      <div className="kl-note">{note}</div>
+      <div className="p6-hint">One suit: drag (or tap) any descending run. Build K→A to clear a run — 8 clears win.</div>
+      <div className="mj-controls">
+        <button onClick={giveUp} disabled={done}>🏳️ Give up</button>
+      </div>
+      {drag.ghostEl}
     </div>
   );
 }
@@ -17974,28 +19794,108 @@ function SpiderGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
    left or right side is open. The deal is generated by reverse-removal, so
    today's board is always solvable in at least one order. */
 
-const MJ_LAYOUT = (() => {
-  const pos = [];
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 8; c++) pos.push({ x: c * 2, y: r * 2, z: 0 });
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) pos.push({ x: 2 + c * 2, y: 1 + r * 2, z: 1 });
-  for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) pos.push({ x: 4 + c * 2, y: 2 + r * 2, z: 2 });
-  pos.push({ x: 6, y: 3, z: 3 });
-  pos.push({ x: 8, y: 3, z: 3 });
-  return pos; // 32 + 18 + 8 + 2 = 60 slots
-})();
+/* PHASE 8 (#121) — Mahjong needed something to think about.
+   The single fixed silhouette meant the only variable was tapping speed. Six
+   layouts now rotate by weekday, ordered gentlest-first by MEASURED solver win
+   rate (see MJ_LAYOUTS below), exactly as TM_LAYOUTS/TM_WEEK do for Daily Tile
+   Match. Every layout has EXACTLY 60 slots so the resume shape (faces/removed
+   arrays of length 60) is unchanged across layouts.
+
+   Difficulty here comes from STRUCTURE — how many tiles sit under other tiles
+   and how deep the stacks go — not from the tile count. If you retune these,
+   RE-MEASURE with the solver rather than eyeballing the shape; free-tile count
+   alone predicts difficulty poorly (the lesson recorded for issue #116). */
+function mjRect(z, x0, y0, cols, rows) {
+  const out = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    out.push({ x: x0 + c * 2, y: y0 + r * 2, z });
+  }
+  return out;
+}
+
+/* Ordered GENTLEST-FIRST BY MEASUREMENT, not by how the shape looks. Win rates
+   are from a boosterless greedy solver (no lookahead, no undo/hint/shuffle) over
+   1200 seeded deals per layout — the "careless player" baseline:
+
+     Courtyard 35.8%   Tower 35.7%   Fortress 31.7%
+     Terrace   30.3%   Pyramid 30.2%   Bridge 27.3%
+
+   Note how weakly the shape predicts the rate: Tower (5 layers) ties Courtyard
+   (2 layers), and Fortress beats Pyramid. That is the same trap recorded for
+   issue #116 — RE-MEASURE after any retune instead of trusting the silhouette.
+   Real players do considerably better than these numbers: they get 3 undos, 3
+   hints and a solvability-preserving shuffle.
+   Every layout has EXACTLY 60 slots (asserted by the mahjong-layouts self-test)
+   so the saved faces/removed arrays are layout-independent. */
+const MJ_LAYOUTS = [
+  // Broad and shallow — most tiles are open from the start.
+  { name: 'Courtyard', pos: [].concat(mjRect(0, 0, 0, 8, 6), mjRect(1, 2, 1, 6, 2)) },
+  { name: 'Tower',     pos: [].concat(mjRect(0, 0, 0, 7, 4), mjRect(1, 2, 1, 6, 3), mjRect(2, 4, 2, 4, 2), mjRect(3, 4, 3, 2, 2), [{ x: 8, y: 5, z: 4 }, { x: 6, y: 5, z: 4 }]) },
+  { name: 'Fortress',  pos: [].concat(mjRect(0, 0, 0, 6, 4), mjRect(1, 0, 1, 5, 4), mjRect(2, 2, 2, 3, 3), mjRect(3, 4, 3, 2, 2), [{ x: 6, y: 5, z: 4 }, { x: 4, y: 5, z: 4 }, { x: 8, y: 5, z: 4 }]) },
+  { name: 'Terrace',   pos: [].concat(mjRect(0, 0, 0, 8, 5), mjRect(1, 2, 1, 6, 3), [{ x: 6, y: 3, z: 2 }, { x: 8, y: 3, z: 2 }]) },
+  // The original shipped silhouette.
+  { name: 'Pyramid',   pos: [].concat(mjRect(0, 0, 0, 8, 4), mjRect(1, 2, 1, 6, 3), mjRect(2, 4, 2, 4, 2), [{ x: 6, y: 3, z: 3 }, { x: 8, y: 3, z: 3 }]) },
+  // Hardest measured: a wide flat base with a narrow bridge over it.
+  { name: 'Bridge',    pos: [].concat(mjRect(0, 0, 0, 9, 4), mjRect(1, 2, 1, 6, 3), mjRect(2, 6, 2, 2, 2), [{ x: 8, y: 3, z: 3 }, { x: 10, y: 3, z: 3 }]) },
+];
+
+// Weekday → window of the ladder. Monday gentlest, weekend hardest — the same
+// shape of progression Daily Tile Match uses.
+const MJ_WEEK = [
+  [2, 4], // Sun
+  [0, 2], // Mon
+  [0, 3], // Tue
+  [1, 3], // Wed
+  [2, 4], // Thu
+  [3, 5], // Fri
+  [4, 5], // Sat
+];
+
+// Pick today's layout deterministically from the day number (so every player
+// gets the same silhouette) within that weekday's difficulty window.
+function mjLayoutForDay(dayNum) {
+  // Day 0 (1970-01-01) was a Thursday; +4 aligns weekday 0 to Sunday.
+  const weekday = (((dayNum + 4) % 7) + 7) % 7;
+  const [lo, hi] = MJ_WEEK[weekday];
+  const span = hi - lo + 1;
+  const rng = mulberry32(hashStr('mj-layout:' + dayNum));
+  return MJ_LAYOUTS[lo + Math.floor(rng() * span) % span];
+}
+
+// Back-compat default (the original 'Pyramid' silhouette) for any caller that
+// hasn't been threaded a layout yet — every slot count is 60 either way.
+const MJ_LAYOUT = MJ_LAYOUTS[4].pos;
+
+/* Balance knobs (#121). All three are costs, so the score stays bounded and
+   MONOTONE — mahjongsol is tier B, and settleDailySession's plausibility check
+   marks a run `disputed` if a claimed score can exceed the recomputable ceiling.
+   Ceiling = MJ_BASE + layer + chain bonuses at zero time with nothing spent. */
+const MJ_UNDOS = 3;
+const MJ_HINTS = 3;
+const MJ_SHUFFLES = 1;
+const MJ_BASE = 1500;
+function mjScore(secs, shufflesLeft, undosLeft, layerPts, chainPts) {
+  const spentShuffles = MJ_SHUFFLES - shufflesLeft;
+  const spentUndos = MJ_UNDOS - undosLeft;
+  return Math.max(
+    MJ_BASE - secs * 2 - spentShuffles * 150 - spentUndos * 60 + layerPts + chainPts,
+    300
+  );
+}
 const MJ_FACES = ['🌸', '🎋', '🌊', '🔥', '⛰️', '🌙', '☀️', '⭐', '🐉', '🐢', '🦅', '🎐', '🍂', '❄️', '🌈', '🪷'];
 
-function mjIsFree(i, removed) {
-  const p = MJ_LAYOUT[i];
-  for (let j = 0; j < MJ_LAYOUT.length; j++) {
+function mjIsFree(i, removed, layout) {
+  const L = layout || MJ_LAYOUT;
+  const p = L[i];
+  for (let j = 0; j < L.length; j++) {
     if (j === i || removed[j]) continue;
-    const q = MJ_LAYOUT[j];
+    const q = L[j];
     if (q.z === p.z + 1 && Math.abs(q.x - p.x) < 2 && Math.abs(q.y - p.y) < 2) return false;
   }
   let left = false, right = false;
-  for (let j = 0; j < MJ_LAYOUT.length; j++) {
+  for (let j = 0; j < L.length; j++) {
     if (j === i || removed[j]) continue;
-    const q = MJ_LAYOUT[j];
+    const q = L[j];
     if (q.z !== p.z || Math.abs(q.y - p.y) >= 2) continue;
     if (q.x === p.x - 2) left = true;
     if (q.x === p.x + 2) right = true;
@@ -18003,18 +19903,32 @@ function mjIsFree(i, removed) {
   return !(left && right);
 }
 
+/* All currently-free indices in ONE pass instead of an O(n^2) mjIsFree per tile
+   per render. On a 60-tile board the old pattern ran ~7200 comparisons every
+   render (plus another pass for mjHasMove), which is the render-cost half of
+   "tiles don't respond" in #120. */
+function mjFreeSet(removed, layout) {
+  const L = layout || MJ_LAYOUT;
+  const free = new Set();
+  for (let i = 0; i < L.length; i++) {
+    if (!removed[i] && mjIsFree(i, removed, L)) free.add(i);
+  }
+  return free;
+}
+
 // Reverse-deal: repeatedly pick two currently-free slots and give them the
 // same face, then remove them. Playing back in that order solves the board,
 // so the deal is guaranteed winnable. Conceptual sibling of lib/dapp.js's
 // tileBoard (same layered-board model, solvability added).
-function mjDeal(rng, present) {
-  const faces = new Array(MJ_LAYOUT.length).fill(-1);
-  const removed = MJ_LAYOUT.map((_, i) => !present[i]);
+function mjDeal(rng, present, layout) {
+  const L = layout || MJ_LAYOUT;
+  const faces = new Array(L.length).fill(-1);
+  const removed = L.map((_, i) => !present[i]);
   let remaining = present.filter(Boolean).length;
   let pairIdx = 0;
   while (remaining >= 2) {
     const free = [];
-    for (let i = 0; i < MJ_LAYOUT.length; i++) if (!removed[i] && mjIsFree(i, removed)) free.push(i);
+    for (let i = 0; i < L.length; i++) if (!removed[i] && mjIsFree(i, removed, L)) free.push(i);
     let a, b;
     if (free.length >= 2) {
       const ai = Math.floor(rng() * free.length);
@@ -18035,16 +19949,22 @@ function mjDeal(rng, present) {
   return faces;
 }
 
-// Any free matching pair left on the board?
-function mjHasMove(faces, removed) {
-  const free = [];
-  for (let i = 0; i < MJ_LAYOUT.length; i++) if (!removed[i] && mjIsFree(i, removed)) free.push(i);
+// The first free matching pair, or null. Also serves as the "show me a pair"
+// hint (#121) so the hint and the stuck-detection can never disagree.
+function mjFindPair(faces, removed, layout, freeSet) {
+  const L = layout || MJ_LAYOUT;
+  const free = freeSet ? Array.from(freeSet) : Array.from(mjFreeSet(removed, L));
   for (let a = 0; a < free.length; a++) {
     for (let b = a + 1; b < free.length; b++) {
-      if (faces[free[a]] === faces[free[b]]) return true;
+      if (faces[free[a]] === faces[free[b]]) return [free[a], free[b]];
     }
   }
-  return false;
+  return null;
+}
+
+// Any free matching pair left on the board?
+function mjHasMove(faces, removed, layout, freeSet) {
+  return !!mjFindPair(faces, removed, layout, freeSet);
 }
 
 function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
@@ -18054,66 +19974,122 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     const srv = serverDailySeed('mahjongsol');
     seedBase.current = srv != null ? srv : ((utcDayNum(offset) + hashStr('mahjongsol')) >>> 0);
   }
+  // PHASE 8 — today's silhouette. Saved progress carries the layout name so a
+  // resumed board is the one you left, even if the ladder is retuned later.
+  const layout = useRef(null);
+  if (!layout.current) {
+    const saved = savedProgress && savedProgress.dayNum === dayNum && savedProgress.layout
+      ? MJ_LAYOUTS.find(l => l.name === savedProgress.layout) : null;
+    layout.current = saved || mjLayoutForDay(dayNum);
+  }
+  const L = layout.current.pos;
+
   const resumed = savedProgress && savedProgress.dayNum === dayNum &&
-    Array.isArray(savedProgress.faces) && savedProgress.faces.length === MJ_LAYOUT.length &&
+    Array.isArray(savedProgress.faces) && savedProgress.faces.length === L.length &&
     Array.isArray(savedProgress.removed)
     ? savedProgress : null;
 
   const [faces, setFaces] = useState(() =>
-    resumed ? resumed.faces.slice() : mjDeal(mulberry32(seedBase.current), MJ_LAYOUT.map(() => true))
+    resumed ? resumed.faces.slice() : mjDeal(mulberry32(seedBase.current), L.map(() => true), L)
   );
   const [removed, setRemoved] = useState(() =>
-    resumed ? resumed.removed.map(Boolean) : MJ_LAYOUT.map(() => false)
+    resumed ? resumed.removed.map(Boolean) : L.map(() => false)
   );
-  const [shuffles, setShuffles] = useState(resumed && Number.isFinite(resumed.shuffles) ? resumed.shuffles : 2);
+  // #121 — 1 SAFE shuffle (re-dealt with reverse-removal, so it is guaranteed to
+  // leave the board solvable) replaces 2 blind ones, plus 3 undos and a capped
+  // hint. Old saves carrying shuffles: 2 clamp down.
+  const [shuffles, setShuffles] = useState(
+    resumed && Number.isFinite(resumed.shuffles) ? Math.min(resumed.shuffles, MJ_SHUFFLES) : MJ_SHUFFLES
+  );
+  const [undos, setUndos] = useState(
+    resumed && Number.isFinite(resumed.undos) ? resumed.undos : MJ_UNDOS
+  );
   const [sel, setSel] = useState(null);
   const [pairs, setPairs] = useState(resumed && Number.isFinite(resumed.pairs) ? resumed.pairs : 0);
   const [done, setDone] = useState(false);
+  // Scoring inputs (#121): reward clearing buried/high tiles and hint-free
+  // chains rather than raw tapping speed.
+  const [layerPts, setLayerPts] = useState(resumed && Number.isFinite(resumed.layerPts) ? resumed.layerPts : 0);
+  const [chainPts, setChainPts] = useState(resumed && Number.isFinite(resumed.chainPts) ? resumed.chainPts : 0);
+  const [chain, setChain] = useState(0);
+  const [hintPair, setHintPair] = useState(null);
+  const [warn, setWarn] = useState('');
+  const history = useRef([]); // undo stack: { sel, i, faces? }
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
 
+  const hints = useDailyHints({ gameId: 'mahjongsol', maxHints: MJ_HINTS });
+
   const remaining = removed.filter((r) => !r).length;
-  const stuck = !done && remaining > 0 && !mjHasMove(faces, removed);
+  // #120 — ONE free-set computation per render, shared by the tile renderer, the
+  // tap handler, the hint and the stuck check. This used to be an O(n^2) scan
+  // per tile plus a second full scan for mjHasMove, every render.
+  const freeSet = React.useMemo(() => mjFreeSet(removed, L), [removed, L]);
+  const stuck = !done && remaining > 0 && !mjHasMove(faces, removed, L, freeSet);
 
   const stateRef = useRef({});
-  stateRef.current = { faces, removed, shuffles, pairs, secs };
+  stateRef.current = { faces, removed, shuffles, pairs, secs, undos, layerPts, chainPts };
   const buildProgress = () => ({
     dayNum,
+    layout: layout.current.name,
     faces: stateRef.current.faces,
     removed: stateRef.current.removed.map((r) => (r ? 1 : 0)),
     shuffles: stateRef.current.shuffles,
     pairs: stateRef.current.pairs,
+    undos: stateRef.current.undos,
+    layerPts: stateRef.current.layerPts,
+    chainPts: stateRef.current.chainPts,
   });
   useAutosave(
     onSaveProgress,
     () => ({ progress: buildProgress(), steps: stateRef.current.pairs, secs: stateRef.current.secs }),
     !done
   );
-  const saveNow = (f, rm, sh, pr) =>
+  const saveNow = (over) =>
     onSaveProgress && onSaveProgress(
-      { dayNum, faces: f, removed: rm.map((r) => (r ? 1 : 0)), shuffles: sh, pairs: pr },
-      pr, secs
+      Object.assign(buildProgress(), over || {}),
+      (over && over.pairs) != null ? over.pairs : pairs,
+      secs
     );
 
   const tap = (i) => {
-    if (done || removed[i] || !mjIsFree(i, removed)) return;
+    if (done || removed[i] || !freeSet.has(i)) {
+      // #120 — a blocked tile used to absorb the tap silently, which is
+      // indistinguishable from an unresponsive board. Now it says so.
+      if (!done && !removed[i]) {
+        const el = document.querySelector(`[data-mj="${i}"]`);
+        if (el) { el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); }
+        setWarn('That tile is covered or blocked on both sides.');
+        setTimeout(() => setWarn(''), 1600);
+      }
+      return;
+    }
+    setHintPair(null);
     if (sel === i) { setSel(null); return; }
     if (sel != null && faces[sel] === faces[i]) {
       const rm = removed.slice();
       rm[sel] = true;
       rm[i] = true;
       const pr = pairs + 1;
-      setRemoved(rm);
-      setSel(null);
-      setPairs(pr);
+      // Layer bonus: a pair pulled off the upper layers was harder to reach.
+      const lp = layerPts + (L[sel].z + L[i].z) * 12;
+      // Chain bonus: consecutive matches with no hint and no undo in between.
+      const ch = chain + 1;
+      const cp = chainPts + Math.min(ch, 6) * 8;
+      history.current.push({ a: sel, b: i });
+      setRemoved(rm); setSel(null); setPairs(pr);
+      setLayerPts(lp); setChainPts(cp); setChain(ch);
       onStepChange(pr);
       const won = rm.every(Boolean);
-      if (!won) saveNow(faces, rm, shuffles, pr);
+      // Win-move autosave is deliberately skipped — the finish call closes the
+      // attempt and a racing progress write 409s against the finished row.
+      if (!won) {
+        saveNow({ removed: rm.map(r => (r ? 1 : 0)), pairs: pr, layerPts: lp, chainPts: cp });
+      }
       if (won) {
         setDone(true);
-        const score = Math.max(1500 - secs * 2 - (2 - shuffles) * 150, 300);
-        onWin(score, pr, secs, {
-          share: `Game Corner Mahjong Solitaire — cleared today's board in ${fmt} 🀄`,
+        onWin(mjScore(secs, shuffles, undos, lp, cp), pr, secs, {
+          share: `Game Corner Mahjong Solitaire — cleared today's ${layout.current.name} in ${fmt} 🀄`,
         });
       }
       return;
@@ -18121,18 +20097,48 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     setSel(i);
   };
 
+  // #121 — undo. Puts the last cleared pair back; breaks the chain bonus and
+  // costs points at the end, so it is a real decision rather than a free rewind.
+  const doUndo = () => {
+    if (done || undos <= 0 || !history.current.length) return;
+    const last = history.current.pop();
+    const rm = removed.slice();
+    rm[last.a] = false;
+    rm[last.b] = false;
+    const pr = Math.max(0, pairs - 1);
+    const u = undos - 1;
+    setRemoved(rm); setPairs(pr); setUndos(u); setSel(null); setChain(0); setHintPair(null);
+    onStepChange(pr);
+    saveNow({ removed: rm.map(r => (r ? 1 : 0)), pairs: pr, undos: u });
+  };
+
+  // #121 — hint. Counted server-side through the shared daily_hints cap, like
+  // Word Search's, so it can't be reset by reloading.
+  const buyHint = async () => {
+    if (done) return;
+    const pair = mjFindPair(faces, removed, L, freeSet);
+    if (!pair) { setWarn('No free pair right now — try a shuffle.'); setTimeout(() => setWarn(''), 1800); return; }
+    const ok = await hints.buy();
+    if (!ok) return;
+    setHintPair(pair);
+    setChain(0); // a hinted match doesn't extend the chain bonus
+  };
+
   const doShuffle = () => {
     if (done || shuffles <= 0 || remaining === 0) return;
-    // Re-deal the remaining slots with a fresh (still deterministic-ish) seed;
-    // the reverse-deal keeps the rest of the board solvable.
+    // Reverse-removal re-deal of the REMAINING slots: the shuffle is guaranteed
+    // to leave the board solvable from here, which a blind re-deal was not.
     const rng = mulberry32((seedBase.current + remaining * 7919 + shuffles * 104729) >>> 0);
-    const nf = mjDeal(rng, removed.map((r) => !r));
+    const nf = mjDeal(rng, removed.map((r) => !r), L);
     const merged = faces.map((f, i) => (removed[i] ? f : nf[i]));
     const sh = shuffles - 1;
     setFaces(merged);
     setShuffles(sh);
     setSel(null);
-    saveNow(merged, removed, sh, pairs);
+    setHintPair(null);
+    setChain(0);
+    history.current = []; // the pre-shuffle board no longer exists to undo into
+    saveNow({ faces: merged, shuffles: sh });
   };
 
   // Out of moves and out of shuffles → the day is lost.
@@ -18140,46 +20146,60 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     if (stuck && shuffles <= 0 && !done) {
       setDone(true);
       onLose && onLose(pairs, secs, {
-        share: `Game Corner Mahjong Solitaire — today's board got the better of me 🀄`,
+        share: `Game Corner Mahjong Solitaire — today's ${layout.current.name} got the better of me 🀄`,
         answer: `${remaining} tiles were left with no free pair.`,
       });
     }
   }, [stuck, shuffles, done]);
 
-  const TW = 36, TH = 46;
-  const boardW = 15 * (TW / 2) + TW;
-  const boardH = 7 * (TH / 2) + TH + 12;
+  const TW = 44, TH = 56; // Phase 2 — up from 36x46.
+  const maxX = L.reduce((m, p) => Math.max(m, p.x), 0);
+  const maxY = L.reduce((m, p) => Math.max(m, p.y), 0);
+  const boardW = maxX * (TW / 2) + TW + 8;
+  const boardH = maxY * (TH / 2) + TH + 16;
   return (
     <div className="mj-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Tiles</div><div className="pvalue">{remaining}/60</div></div>
-        <button className="p6-btn" onClick={doShuffle} disabled={shuffles <= 0}>🔀 Shuffle ({shuffles})</button>
+        <div className="pill"><div className="plabel">Tiles</div><div className="pvalue">{remaining}/{L.length}</div></div>
+        <div className="pill"><div className="plabel">Chain</div><div className="pvalue">×{Math.min(chain, 6)}</div></div>
+        <div className="pill"><div className="plabel">Board</div><div className="pvalue">{layout.current.name}</div></div>
       </div>
       {stuck && shuffles > 0 && (
-        <div className="p6-banner">No free pair left — use a shuffle to keep going.</div>
+        <div className="p6-banner">No free pair left — use your shuffle to keep going.</div>
       )}
+      {warn && <div className="mj-warn">{warn}</div>}
       <FitScale>
       <div className="mj-board" style={{ width: boardW, height: boardH }}>
-        {MJ_LAYOUT.map((p, i) => {
+        {L.map((p, i) => {
           if (removed[i]) return null;
-          const free = mjIsFree(i, removed);
+          const free = freeSet.has(i);
+          const hinted = hintPair && (hintPair[0] === i || hintPair[1] === i);
           return (
             <div
               key={i}
-              className={'mj-tile' + (free ? '' : ' blocked') + (sel === i ? ' sel' : '') + (p.z > 0 ? ' up' + p.z : '')}
+              data-mj={i}
+              className={'mj-tile' + (free ? '' : ' blocked') + (sel === i ? ' sel' : '') + (hinted ? ' hinted' : '') + (p.z > 0 ? ' up' + p.z : '')}
               style={{
                 left: p.x * (TW / 2),
                 top: p.y * (TH / 2) - p.z * 5,
                 zIndex: p.z * 100 + p.y,
               }}
-              onClick={() => tap(i)}
+              {...tapProps(() => tap(i))}
             >{MJ_FACES[faces[i]]}</div>
           );
         })}
       </div>
       </FitScale>
-      <div className="p6-hint">Tap two matching free tiles (uncovered, with an open side) to clear them.</div>
+      <div className="mj-controls">
+        <button onClick={doUndo} disabled={undos <= 0 || !history.current.length || done}>↶ Undo ({undos})</button>
+        <button onClick={buyHint} disabled={done || hints.exhausted || hints.buying}>💡 Hint ({hints.hintsLeft})</button>
+        <button onClick={doShuffle} disabled={shuffles <= 0 || done}>🔀 Shuffle ({shuffles})</button>
+      </div>
+      <div className="p6-hint">
+        Tap two matching free tiles (uncovered, with an open side). Upper-layer clears and
+        hint-free chains are worth more — undos and shuffles cost points.
+      </div>
     </div>
   );
 }
@@ -18333,7 +20353,8 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       ctx.textBaseline = 'middle';
 
       // Column clues, bottom-aligned in the top gutter.
-      ctx.fillStyle = C.muted;
+      // PAL (not C) — canvas cannot resolve var() custom properties.
+      ctx.fillStyle = PAL.muted;
       ctx.font = `${clueFont}px 'JetBrains Mono', monospace`;
       colClues.forEach((cl, c) => {
         const x = gutter + c * cellStep + cell / 2;
@@ -18356,19 +20377,19 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
         else ctx.rect(x, y, cell, cell);
-        ctx.fillStyle = v === 1 ? C.accent : C.card;
+        ctx.fillStyle = v === 1 ? PAL.accent : PAL.card;
         ctx.fill();
         ctx.lineWidth = 1;
-        ctx.strokeStyle = v === 1 ? C.accent : C.border;
+        ctx.strokeStyle = v === 1 ? PAL.accent : PAL.border;
         ctx.stroke();
         if (v === 2) {
-          ctx.fillStyle = C.dim;
+          ctx.fillStyle = PAL.dim;
           ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
           ctx.fillText('✗', x + cell / 2, y + cell / 2 + 1);
         }
       }
       // Major separators every 4 cells — replaces the old :nth-child CSS hack.
-      ctx.strokeStyle = C.dim;
+      ctx.strokeStyle = PAL.dim;
       ctx.lineWidth = 1.5;
       for (const k of [0, 4, 8]) {
         const off = gutter + k * cellStep - NG_GAP / 2;
@@ -18455,8 +20476,11 @@ function mfFlood(startIdx, counts) {
 }
 
 // Adjacency-digit palette, matching the classic Minesweeper .ms-nN rules so
-// both mine games read the same. Index = digit.
-const MF_NUM_COLORS = [null, C.accent, C.emerald, C.rose, C.violet, C.gold, '#06b6d4', '#be123c', C.muted];
+// both mine games read the same. Index = digit. These are palette TOKEN NAMES,
+// resolved through PAL at draw time (the BOUNCE_ROW_COLORS pattern) — capturing
+// C.* here would bake in unusable var() strings at module scope AND freeze the
+// colours against a theme flip. The two hex entries have no palette token.
+const MF_NUM_COLORS = [null, 'accent', 'emerald', 'rose', 'violet', 'gold', '#06b6d4', '#be123c', 'muted'];
 const MF_GAP = 3;
 
 // Neighbour indices of a cell on the 9×9 field.
@@ -18656,11 +20680,12 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
         const isRev = revealed.has(i);
         const isMine = mines.has(i);
 
-        let fill = C.card, stroke = C.border;
-        if (isRev) { fill = C.surface; stroke = C.border; }
-        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = C.rose; }
-        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = C.rose; }
-        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = C.gold; }
+        // PAL, not C — see the canvas-colour note on guardCanvasCtx.
+        let fill = PAL.card, stroke = PAL.border;
+        if (isRev) { fill = PAL.surface; stroke = PAL.border; }
+        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; }
+        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; }
+        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; }
 
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
@@ -18677,7 +20702,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
           ctx.fillText('💣', cx, cy + 1);
         } else if (isRev && counts[i] > 0) {
           ctx.font = `700 ${Math.round(cell * 0.52)}px 'JetBrains Mono', monospace`;
-          ctx.fillStyle = MF_NUM_COLORS[counts[i]] || C.text;
+          ctx.fillStyle = palOf(MF_NUM_COLORS[counts[i]], PAL.text);
           ctx.fillText(String(counts[i]), cx, cy + 1);
         } else if (!isRev && flags.has(i)) {
           ctx.font = `${Math.round(cell * 0.58)}px system-ui, sans-serif`;
@@ -19419,7 +21444,10 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
       };
       for (let r = 0; r < DS_H; r++) for (let c = 0; c < DS_W; c++) {
         const v = grid[r][c];
-        box(c * cellStep, r * cellStep, v ? DS_SHAPES[v - 1].color : C.card, v ? null : C.border);
+        // Empty-cell chrome comes from PAL; the tetromino palette is intrinsic
+        // art and stays hardcoded. Passing C.card here was what made the whole
+        // well repaint in the previous frame's piece colour.
+        box(c * cellStep, r * cellStep, v ? DS_SHAPES[v - 1].color : PAL.card, v ? null : PAL.border);
       }
       if (!done && pieceIdx < DS_PIECES) {
         const color = DS_SHAPES[shapeIdx].color;
@@ -19848,7 +21876,9 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
   const fmtLeft = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
 
   return (
-    <div>
+    // PHASE 3 (#131) — .fit-col + fitShell: true stops the page scrolling as the
+    // found-words list grows (that list now has its own scroll strip).
+    <div className="fit-col">
       <div className="status-bar">
         <div className="pill">
           <div className="plabel">Left</div>
@@ -19867,7 +21897,7 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
             <div
               key={i}
               className={'wspr-tile' + (onPath ? ' onpath' : '') + (isLast ? ' pathlast' : '') + (!selectable ? ' dim' : '')}
-              onClick={() => selectable && tap(i)}
+              {...tapProps(() => selectable && tap(i))}
             >{ch}</div>
           );
         })}
@@ -20022,7 +22052,8 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
   const fmt = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 
   return (
-    <div>
+    // PHASE 3 — fit column so a swipe on the board never pulls the page.
+    <div className="fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Apples</div><div className="pvalue">{eaten}/{DSNK_TARGET}</div></div>
@@ -20051,6 +22082,15 @@ const DBNC_W = 320, DBNC_H = 430, DBNC_COLS = 8, DBNC_ROWS = 6;
 const DBNC_PADDLE_W = 64, DBNC_PADDLE_H = 10, DBNC_PADDLE_Y = DBNC_H - 26, DBNC_BALL_R = 6;
 const DBNC_BALLS = 3;
 
+// Phase 8 (#135) — power-ups are PRE-ASSIGNED to bricks from the daily seed,
+// not rolled when a brick breaks. `spawnPowerup` uses Math.random()/Date.now(),
+// which would make an ostensibly-fair daily differ per player; baking the drop
+// into the deal means two people playing today get identical drops from
+// identical bricks without touching the physics loop.
+const DBNC_PU_RATE = 0.1;
+const DBNC_PU_TYPES = POWERUP_TYPES.bounce;
+const DBNC_PU_DUR = POWERUP_DURATION_MS;
+
 function dbncBuildBricks(rng) {
   const bricks = [];
   const cellW = DBNC_W / DBNC_COLS, cellH = 20, top = 44;
@@ -20059,10 +22099,28 @@ function dbncBuildBricks(rng) {
       const roll = rng();
       if (roll < 0.15) continue; // gap
       const hp = roll < 0.6 ? 1 : roll < 0.88 ? 2 : 3;
-      bricks.push({ x: c * cellW + 2, y: top + r * cellH + 2, w: cellW - 4, h: cellH - 4, hp });
+      // Two extra draws per surviving brick — order is fixed by the loop, so
+      // the whole wall (bricks AND drops) is a pure function of the seed.
+      const carries = rng() < DBNC_PU_RATE;
+      const puType = DBNC_PU_TYPES[Math.floor(rng() * DBNC_PU_TYPES.length) % DBNC_PU_TYPES.length];
+      bricks.push({
+        x: c * cellW + 2, y: top + r * cellH + 2, w: cellW - 4, h: cellH - 4, hp,
+        powerup: carries ? puType : null,
+      });
     }
   }
   return bricks;
+}
+
+// A dropped power-up capsule. Deterministic: no Math.random, no Date.now.
+function dbncDropPowerup(br) {
+  return {
+    type: br.powerup,
+    x: br.x + br.w / 2,
+    y: br.y + br.h / 2,
+    vy: 90,
+    r: 9,
+  };
 }
 
 function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
@@ -20081,9 +22139,13 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
       paddle: DBNC_W / 2,
       ball: { x: DBNC_W / 2, y: DBNC_PADDLE_Y - DBNC_BALL_R - 1, vx: 0, vy: 0 },
       launched: false, balls: DBNC_BALLS, score: 0, broken: 0, done: false,
+      // Phase 8 — falling capsules + timed effects (all seeded, see above).
+      drops: [], effects: {}, extraBalls: [], paddleW: DBNC_PADDLE_W,
+      lasers: [], laserCooldown: 0, picked: 0,
     };
     st.current.total = st.current.bricks.length;
   }
+  const [effectLabels, setEffectLabels] = useState([]);
   const onWinRef = useRef(onWin); onWinRef.current = onWin;
   const onLoseRef = useRef(onLose); onLoseRef.current = onLose;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
@@ -20094,7 +22156,7 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
     s.done = true;
     setDone(true);
     if (won) {
-      const total = s.score + 150 * (s.balls - 1) + Math.max(0, 500 - secsRef.current * 2);
+      const total = s.score + 150 * (s.balls - 1) + Math.max(0, 500 - secsRef.current * 2) + s.picked * 25;
       onWinRef.current(total, s.broken, secsRef.current, { share: `🧱 Daily Bounce — wall cleared in ${secsRef.current}s` });
     } else {
       onLoseRef.current && onLoseRef.current(s.broken, secsRef.current, { share: `🧱 Daily Bounce — ${s.broken}/${s.total} bricks` });
@@ -20113,8 +22175,29 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = guardCanvasCtx(canvas.getContext('2d'));
     let raf, lastTs = null, alive = true;
+
+    // Phase 1 — DPR-correct backing store. DBNC_W/DBNC_H stay the LOGICAL
+    // coordinate space (the physics is untouched); only the device-pixel
+    // resolution changes, which is what made the board look soft on a phone.
+    const sizeCanvas = () => {
+      const dpr = canvasDpr();
+      const pw = Math.round(DBNC_W * dpr), ph = Math.round(DBNC_H * dpr);
+      if (canvas.width !== pw || canvas.height !== ph) {
+        canvas.width = pw;
+        canvas.height = ph;
+      }
+      canvas.style.width = DBNC_W + 'px';
+      canvas.style.height = DBNC_H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    sizeCanvas();
+    window.addEventListener('resize', sizeCanvas);
+
+    // Timed power-up effects. `until` is a monotonic ms timestamp from the rAF
+    // clock, never Date.now(), so a backgrounded tab can't silently expire them.
+    const effectOn = (type) => !!(st.current.effects[type] > 0);
 
     const tick = (ts) => {
       if (!alive) return;
@@ -20122,23 +22205,19 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
       const dt = lastTs == null ? 0 : Math.min(0.033, (ts - lastTs) / 1000);
       lastTs = ts;
 
-      if (!s.done && s.launched) {
-        const b = s.ball;
-        b.x += b.vx * dt; b.y += b.vy * dt;
-        if (b.x < DBNC_BALL_R) { b.x = DBNC_BALL_R; b.vx = Math.abs(b.vx); }
-        if (b.x > DBNC_W - DBNC_BALL_R) { b.x = DBNC_W - DBNC_BALL_R; b.vx = -Math.abs(b.vx); }
-        if (b.y < DBNC_BALL_R) { b.y = DBNC_BALL_R; b.vy = Math.abs(b.vy); }
-        // Paddle
-        if (b.vy > 0 && b.y + DBNC_BALL_R >= DBNC_PADDLE_Y && b.y + DBNC_BALL_R <= DBNC_PADDLE_Y + DBNC_PADDLE_H + 6 &&
-            Math.abs(b.x - s.paddle) <= DBNC_PADDLE_W / 2 + DBNC_BALL_R) {
-          const off = (b.x - s.paddle) / (DBNC_PADDLE_W / 2); // -1..1
-          const speed = Math.min(360, Math.hypot(b.vx, b.vy) * 1.015);
-          const angle = off * 1.05; // radians off vertical
-          b.vx = speed * Math.sin(angle);
-          b.vy = -Math.abs(speed * Math.cos(angle));
-          b.y = DBNC_PADDLE_Y - DBNC_BALL_R;
+      // Decay active effects.
+      let labelsDirty = false;
+      for (const k of Object.keys(s.effects)) {
+        if (s.effects[k] > 0) {
+          s.effects[k] -= dt * 1000;
+          if (s.effects[k] <= 0) { s.effects[k] = 0; labelsDirty = true; }
         }
-        // Bricks (one hit per frame is plenty at this speed)
+      }
+      s.paddleW = effectOn('larger-paddle') ? DBNC_PADDLE_W * 1.6 : DBNC_PADDLE_W;
+
+      // One brick-collision resolver, shared by the primary ball and any
+      // multi-ball clones so a power-up ball scores and drops identically.
+      const hitBricks = (b) => {
         for (let i = 0; i < s.bricks.length; i++) {
           const br = s.bricks[i];
           if (b.x + DBNC_BALL_R < br.x || b.x - DBNC_BALL_R > br.x + br.w ||
@@ -20149,22 +22228,104 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
           br.hp -= 1;
           s.score += 20;
           if (br.hp <= 0) {
+            if (br.powerup) s.drops.push(dbncDropPowerup(br));
             s.bricks.splice(i, 1);
             s.broken += 1;
             onStepRef.current && onStepRef.current(s.broken);
           }
           setScore(s.score);
           if (s.bricks.length === 0) finish(true);
-          break;
+          return true;
         }
-        // Lost ball
+        return false;
+      };
+
+      const speedScale = effectOn('slower-ball') ? 0.6 : 1;
+
+      const stepBall = (b) => {
+        b.x += b.vx * dt * speedScale; b.y += b.vy * dt * speedScale;
+        if (b.x < DBNC_BALL_R) { b.x = DBNC_BALL_R; b.vx = Math.abs(b.vx); }
+        if (b.x > DBNC_W - DBNC_BALL_R) { b.x = DBNC_W - DBNC_BALL_R; b.vx = -Math.abs(b.vx); }
+        if (b.y < DBNC_BALL_R) { b.y = DBNC_BALL_R; b.vy = Math.abs(b.vy); }
+        const halfW = s.paddleW / 2;
+        if (b.vy > 0 && b.y + DBNC_BALL_R >= DBNC_PADDLE_Y && b.y + DBNC_BALL_R <= DBNC_PADDLE_Y + DBNC_PADDLE_H + 6 &&
+            Math.abs(b.x - s.paddle) <= halfW + DBNC_BALL_R) {
+          const off = (b.x - s.paddle) / halfW; // -1..1
+          const speed = Math.min(360, Math.hypot(b.vx, b.vy) * 1.015);
+          const angle = off * 1.05; // radians off vertical
+          b.vx = speed * Math.sin(angle);
+          b.vy = -Math.abs(speed * Math.cos(angle));
+          b.y = DBNC_PADDLE_Y - DBNC_BALL_R;
+        }
+        hitBricks(b);
+      };
+
+      if (!s.done && s.launched) {
+        const b = s.ball;
+        stepBall(b);
+
+        // Multi-ball clones live and die without costing a life.
+        for (let i = s.extraBalls.length - 1; i >= 0; i--) {
+          const eb = s.extraBalls[i];
+          stepBall(eb);
+          if (eb.y - DBNC_BALL_R > DBNC_H) s.extraBalls.splice(i, 1);
+        }
+
+        // Laser: a slow auto-fire that clears a brick straight overhead.
+        if (effectOn('laser')) {
+          s.laserCooldown -= dt * 1000;
+          if (s.laserCooldown <= 0) {
+            s.laserCooldown = 550;
+            s.lasers.push({ x: s.paddle, y: DBNC_PADDLE_Y - 4 });
+          }
+        }
+        for (let i = s.lasers.length - 1; i >= 0; i--) {
+          const lz = s.lasers[i];
+          lz.y -= 420 * dt;
+          const hit = hitBricks({ x: lz.x, y: lz.y, vx: 0, vy: -1 });
+          if (hit || lz.y < 0) s.lasers.splice(i, 1);
+        }
+
+        // Falling capsules — caught on the paddle, otherwise off the bottom.
+        for (let i = s.drops.length - 1; i >= 0; i--) {
+          const d = s.drops[i];
+          d.y += d.vy * dt;
+          const halfW = s.paddleW / 2;
+          if (d.y + d.r >= DBNC_PADDLE_Y && d.y - d.r <= DBNC_PADDLE_Y + DBNC_PADDLE_H + 4 &&
+              Math.abs(d.x - s.paddle) <= halfW + d.r) {
+            s.drops.splice(i, 1);
+            s.picked += 1;
+            s.score += 25;
+            setScore(s.score);
+            cgSound('clear');
+            if (d.type === 'multi-ball') {
+              // Two clones, mirrored — deterministic, no random spread.
+              const sp = Math.max(200, Math.hypot(b.vx, b.vy));
+              s.extraBalls.push({ x: b.x, y: b.y, vx: sp * 0.5, vy: -sp * 0.87 });
+              s.extraBalls.push({ x: b.x, y: b.y, vx: -sp * 0.5, vy: -sp * 0.87 });
+            } else {
+              s.effects[d.type] = DBNC_PU_DUR;
+              if (d.type === 'laser') s.laserCooldown = 0;
+            }
+            labelsDirty = true;
+          } else if (d.y - d.r > DBNC_H) {
+            s.drops.splice(i, 1);
+          }
+        }
+
+        // Lost primary ball — a life only when no clones are still in play.
         if (b.y - DBNC_BALL_R > DBNC_H) {
-          s.balls -= 1;
-          setBalls(s.balls);
-          if (s.balls <= 0) finish(false);
-          else {
-            s.launched = false;
-            s.ball = { x: s.paddle, y: DBNC_PADDLE_Y - DBNC_BALL_R - 1, vx: 0, vy: 0 };
+          if (s.extraBalls.length) {
+            s.ball = s.extraBalls.shift();
+          } else {
+            s.balls -= 1;
+            setBalls(s.balls);
+            if (s.balls <= 0) finish(false);
+            else {
+              s.launched = false;
+              s.ball = { x: s.paddle, y: DBNC_PADDLE_Y - DBNC_BALL_R - 1, vx: 0, vy: 0 };
+              s.drops = []; s.lasers = [];
+            }
           }
         }
         if (!s.launched && !s.done) { s.ball.x = s.paddle; }
@@ -20172,7 +22333,13 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
         s.ball.x = s.paddle;
       }
 
-      // Paint
+      if (labelsDirty) {
+        setEffectLabels(Object.keys(s.effects).filter(k => s.effects[k] > 0));
+      }
+
+      // Paint. Brick/paddle/ball/well colours are intrinsic arcade art and stay
+      // hardcoded (CLAUDE.md rule) — this game's Phase 1 fix was the missing
+      // device-pixel scaling above, not the palette.
       ctx.clearRect(0, 0, DBNC_W, DBNC_H);
       ctx.fillStyle = '#10131c';
       ctx.fillRect(0, 0, DBNC_W, DBNC_H);
@@ -20180,17 +22347,46 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
       for (const br of s.bricks) {
         ctx.fillStyle = hpColors[br.hp] || '#71A122';
         ctx.fillRect(br.x, br.y, br.w, br.h);
+        if (br.powerup) {
+          // A tiny pip marks a brick that carries a drop — the same brick for
+          // every player today.
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.beginPath();
+          ctx.arc(br.x + br.w / 2, br.y + br.h / 2, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // Lasers
+      ctx.fillStyle = '#8ad2ff';
+      for (const lz of s.lasers) ctx.fillRect(lz.x - 1.5, lz.y - 8, 3, 12);
+      // Capsules
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '12px system-ui, sans-serif';
+      for (const d of s.drops) {
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fill();
+        ctx.fillStyle = '#10131c';
+        ctx.fillText(POWERUP_ICONS[d.type] || '?', d.x, d.y + 1);
       }
       ctx.fillStyle = '#e8e4da';
-      ctx.fillRect(s.paddle - DBNC_PADDLE_W / 2, DBNC_PADDLE_Y, DBNC_PADDLE_W, DBNC_PADDLE_H);
-      ctx.beginPath();
-      ctx.arc(s.ball.x, s.ball.y, DBNC_BALL_R, 0, Math.PI * 2);
+      ctx.fillRect(s.paddle - s.paddleW / 2, DBNC_PADDLE_Y, s.paddleW, DBNC_PADDLE_H);
       ctx.fillStyle = '#fff';
-      ctx.fill();
+      for (const b2 of [s.ball].concat(s.extraBalls)) {
+        ctx.beginPath();
+        ctx.arc(b2.x, b2.y, DBNC_BALL_R, 0, Math.PI * 2);
+        ctx.fill();
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => { alive = false; cancelAnimationFrame(raf); };
+    return () => {
+      alive = false;
+      window.removeEventListener('resize', sizeCanvas);
+      cancelAnimationFrame(raf);
+    };
   }, []);
 
   // Paddle drag (pointer events cover mouse + touch) + tap/click to launch.
@@ -20203,7 +22399,8 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
     };
     const move = (e) => {
       const s = st.current;
-      s.paddle = Math.max(DBNC_PADDLE_W / 2, Math.min(DBNC_W - DBNC_PADDLE_W / 2, toX(e)));
+      const half = s.paddleW / 2;
+      s.paddle = Math.max(half, Math.min(DBNC_W - half, toX(e)));
       if (e.pointerType === 'touch') e.preventDefault();
     };
     const down = (e) => { move(e); launch(); };
@@ -20219,18 +22416,25 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
   const s = st.current;
 
   return (
-    <div>
+    <div className="fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
         <div className="pill"><div className="plabel">Balls</div><div className="pvalue">{'●'.repeat(Math.max(0, balls))}{'○'.repeat(DBNC_BALLS - Math.max(0, balls))}</div></div>
         <div className="pill"><div className="plabel">Bricks</div><div className="pvalue">{s.total - s.bricks.length}/{s.total}</div></div>
       </div>
+      {effectLabels.length > 0 && (
+        <div className="dbnc-effects">
+          {effectLabels.map(t => (
+            <span key={t} className="dbnc-effect">{POWERUP_ICONS[t] || '✨'} {t.replace(/-/g, ' ')}</span>
+          ))}
+        </div>
+      )}
       <div className="dbnc-wrap">
-        <canvas ref={canvasRef} className="dbnc-canvas" width={DBNC_W} height={DBNC_H} />
+        <canvas ref={canvasRef} className="dbnc-canvas" />
       </div>
       <div className="dsnk-hint">
-        {done ? 'Run over' : started ? 'Drag to move the paddle' : 'Tap the board to launch — everyone breaks the same wall today'}
+        {done ? 'Run over' : started ? 'Drag to move the paddle · catch the capsules' : 'Tap the board to launch — everyone breaks the same wall, with the same power-ups, today'}
       </div>
     </div>
   );
@@ -20305,7 +22509,8 @@ const GAMES = [
     tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Clear the field', body: 'Tap to reveal a cell; numbers tell you how many mines touch it. Long-press to flag suspected mines.' },
+      { title: 'Clear the field', body: 'Tap to reveal a cell; numbers tell you how many mines touch it. Switch to Flag mode to mark mines — long-press always does the opposite of the current mode.' },
+      { title: 'Clear around a number', body: "Once a number's mines are all flagged, tap the number to open every remaining square around it in one go." },
       { title: 'Lock in or push on', body: 'Lock In early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
     ],
     component: MinesweeperGame,
@@ -20535,7 +22740,11 @@ const GAMES = [
       { title: 'Crown kings', body: 'Reach the far row to crown a king — kings move and capture in all four diagonals. Take every enemy piece (or leave them no move) to win.' },
     ],
     component: CheckersGame,
-    modes: ['online'],
+    // #144 — local pass-and-play and Versus Bot alongside Online. Both local
+    // modes referee with the SERVER'S rules module (window.boardRules) and are
+    // deliberately unrated: only online head-to-head touches the ladder.
+    modes: ['bot', '2p', 'online'],
+    preLaunchModal: true,
   },
   {
     id: 'reversi',
@@ -20553,7 +22762,11 @@ const GAMES = [
       { title: 'Majority wins', body: 'When neither player can move, the most discs on the board wins.' },
     ],
     component: ReversiGame,
-    modes: ['online'],
+    // #144 — local pass-and-play and Versus Bot alongside Online. Both local
+    // modes referee with the SERVER'S rules module (window.boardRules) and are
+    // deliberately unrated: only online head-to-head touches the ladder.
+    modes: ['bot', '2p', 'online'],
+    preLaunchModal: true,
   },
   {
     id: 'fourinarow',
@@ -20570,7 +22783,11 @@ const GAMES = [
       { title: 'Line up four', body: 'Four of your discs in a row — across, down, or diagonally — wins. A full board with no line is a draw.' },
     ],
     component: FourInARowGame,
-    modes: ['online'],
+    // #144 — local pass-and-play and Versus Bot alongside Online. Both local
+    // modes referee with the SERVER'S rules module (window.boardRules) and are
+    // deliberately unrated: only online head-to-head touches the ladder.
+    modes: ['bot', '2p', 'online'],
+    preLaunchModal: true,
   },
   {
     id: 'gomoku',
@@ -20583,11 +22800,15 @@ const GAMES = [
     tagColor: GA.violet,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Take turns placing stones', body: 'Tap any empty intersection to place a stone. Stones never move once placed.' },
+      { title: 'Take turns placing stones', body: 'Tap an intersection to line up a stone, slide to adjust, then Place it. Stones never move once placed, so nothing commits until you confirm.' },
       { title: 'Five in a row wins', body: 'First to line up five (or more) stones — across, down, or diagonally — wins the game.' },
     ],
     component: GomokuGame,
-    modes: ['online'],
+    // #144 — local pass-and-play and Versus Bot alongside Online. Both local
+    // modes referee with the SERVER'S rules module (window.boardRules) and are
+    // deliberately unrated: only online head-to-head touches the ladder.
+    modes: ['bot', '2p', 'online'],
+    preLaunchModal: true,
   },
   {
     id: 'ludo',
@@ -20600,12 +22821,16 @@ const GAMES = [
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Roll, then move', body: 'Roll the die, then tap a highlighted token. You need a 6 to leave base — and a 6 earns another roll.' },
+      { title: 'Roll, then move', body: 'Roll the die, then pick a token — tap it on the board, or use the list of your legal moves below it. You need a 6 to leave base — and a 6 earns another roll.' },
       { title: 'Capture and stay safe', body: "Land on an opponent's token to send it back to base. Star cells are safe — no captures there." },
       { title: 'Bring all four home', body: 'Race around the board into your home column. You need an exact roll to finish each token; first with all four home wins.' },
     ],
     component: LudoGame,
-    modes: ['online'],
+    // #144 — local pass-and-play and Versus Bot alongside Online. Both local
+    // modes referee with the SERVER'S rules module (window.boardRules) and are
+    // deliberately unrated: only online head-to-head touches the ladder.
+    modes: ['bot', '2p', 'online'],
+    preLaunchModal: true,
   },
   {
     id: 'tilematchingdaily',
@@ -20643,9 +22868,10 @@ const GAMES = [
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
     fitShell: true,
     howToPlay: [
-      { title: 'Build down, alternate colors', body: 'Tap a face-up card, then its destination. Tableau piles build downward in alternating colors; only a King moves to an empty column.' },
+      { title: 'Build down, alternate colors', body: 'Drag a card (or tap it, then its destination). Tableau piles build downward in alternating colors; only a King moves to an empty column — empty columns show a faint K. An illegal move tells you why.' },
       { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
       { title: 'Score', body: 'Fill all four foundations to win. Fewer moves and faster solves score higher — same deal for everyone today.' },
+      { title: 'Stuck?', body: 'Give up closes the day at zero and reveals the deal. It does NOT break your streak.' },
     ],
     component: KlondikeGame,
   },
@@ -20662,9 +22888,10 @@ const GAMES = [
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long', input: 'tap', undo: 'none' },
     fitShell: true,
     howToPlay: [
-      { title: 'Move descending runs', body: 'Tap a face-up card to pick up it and the run below, then tap a column whose top card is one rank higher (or any empty column).' },
+      { title: 'Move descending runs', body: 'Drag a face-up card (or tap it, then its destination) to move it and the run below onto a column whose top card is one rank higher, or any empty column.' },
       { title: 'Complete runs', body: 'A full King-to-Ace run clears off the board. Clear eight runs to win. Deal a fresh row of ten from the stock when you\'re stuck.' },
       { title: 'Score', body: 'Fewer moves and faster clears score higher. Everyone gets the same 104-card deal today.' },
+      { title: 'Stuck?', body: 'Give up closes the day at zero and reveals the deal. It does NOT break your streak.' },
     ],
     component: SpiderGame,
   },
@@ -20681,9 +22908,10 @@ const GAMES = [
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'booster' },
     fitShell: true,
     howToPlay: [
-      { title: 'Pair free tiles', body: 'A tile is free when nothing rests on top of it and its left or right side is open. Tap two matching free tiles to clear them.' },
-      { title: 'Plan your order', body: 'Today\'s deal is always solvable in at least one order — but a careless order can dead-end you. Two shuffles are your safety net.' },
-      { title: 'Score', body: 'Clear all 60 tiles to win. Faster clears with unused shuffles score higher; run out of moves and shuffles and the day is lost.' },
+      { title: 'Pair free tiles', body: 'A tile is free when nothing rests on top of it and its left or right side is open. Tap two matching free tiles to clear them — a blocked tile shakes to say so.' },
+      { title: 'Plan your order', body: 'Today\'s deal is always solvable in at least one order — but a careless order can dead-end you. The board shape rotates through the week, gentlest on Monday and hardest at the weekend.' },
+      { title: 'Three lifelines', body: 'Three undos, three hints and one shuffle. The shuffle is guaranteed to leave the board solvable from where you are — but every lifeline costs points at the end.' },
+      { title: 'Score', body: 'Clear all 60 tiles to win. Clearing upper-layer tiles is worth more, and consecutive matches with no hint build a chain bonus. Run out of moves with no shuffle left and the day is lost.' },
     ],
     component: MahjongSolitaireGame,
   },
@@ -20795,6 +23023,7 @@ const GAMES = [
     tag: 'Word',
     tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'score-then-time', sessionLength: 'short', input: 'tap', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Trace a word', body: 'Tap letters that touch — sideways or diagonally — to spell a word. Tap the last letter again (or Submit) to bank it.' },
       { title: 'Rack up words', body: '3+ letters, no reusing a tile within one word. Longer words score much more: 3 letters is 30, 7 letters is 300.' },
@@ -20813,6 +23042,7 @@ const GAMES = [
     tag: 'Arcade',
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. The apples appear in the same order for everyone today.' },
       { title: 'Eat 20 to win', body: 'Reach 20 apples and the day is yours — faster runs score higher. Hit a wall or your tail and the day is lost.' },
@@ -20831,9 +23061,11 @@ const GAMES = [
     tag: 'Arcade',
     tagColor: GA.coral,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag', undo: 'none' },
+    fitShell: true,
     howToPlay: [
       { title: 'Keep it up', body: 'Drag to move the paddle; tap to launch. Everyone plays the exact same wall today.' },
       { title: 'Clear the wall', body: 'Green bricks take one hit, gold two, red three. Clear every brick to win — spare balls and speed boost your score.' },
+      { title: 'Catch the power-ups', body: 'Bricks marked with a white pip drop a capsule: 🔄 multi-ball, ⬆️ wider paddle, 🐢 slower ball, ⚡ laser. Same bricks drop the same capsules for everyone today.' },
       { title: 'Three balls', body: 'Lose all three and the day is lost. Warm up in free-play Bounce first if you like.' },
     ],
     component: DailyBounceGame,
@@ -20914,7 +23146,26 @@ function App() {
   });
   // End-screen board review (slice 4): true while the results card is tucked
   // into its minibar and the finished board is on show underneath.
-  const [reviewMode, setReviewMode] = useState(false);
+  const [reviewMode, setReviewMode] = useState(() =>
+    new URLSearchParams(window.location.search).get('review') === '1'
+  );
+  /* PHASE 4 (#133) — practice replay. Replays TODAY'S exact puzzle with the
+     score shown but never recorded: no /start, no /finish, no /progress, no
+     dailyRunLog entry, and handleWin/handleLose bail out early so streak,
+     badges, bests and leaderboards cannot move. */
+  const [practiceMode, setPracticeMode] = useState(() =>
+    new URLSearchParams(window.location.search).get('practice') === '1'
+  );
+  const [practiceResult, setPracticeResult] = useState(null);
+  // #122 — is the locked-day review board on show (vs the result card)?
+  const [lockedReview, setLockedReview] = useState(() =>
+    new URLSearchParams(window.location.search).get('review') === '1'
+  );
+  // PHASE 4 (#132) — force the offline-sync card so its reworded copy is
+  // reachable by a screenshot/proposal test without unplugging the network.
+  const [syncFailDemo] = useState(() =>
+    new URLSearchParams(window.location.search).get('syncfail') === '1'
+  );
   // Merged-grid filter (slice 2). The retired ?tab=daily / ?tab=classic deep
   // links now preselect the matching chip instead of being ignored, which is
   // also what keeps the existing "/?tab=classic" proposal checks meaningful.
@@ -20969,6 +23220,88 @@ function App() {
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  /* ============================================================
+     PHASE 4 (#134, part two) — browser/platform history.
+     There was NO pushState / replaceState / popstate anywhere in this file, so
+     the device back gesture exited the app instead of unwinding a screen — from
+     a game, a profile, the Friends list, the Ladder, and every overlay. One
+     reducer owns it:
+       • every navigable state pushes one entry;
+       • popstate DERIVES state from the event (never navigates imperatively),
+         so back unwinds review → results → screen → home one step at a time;
+       • a change caused BY a pop must not push again (navLock);
+       • existing deep-link params survive — the URL keeps them so a mid-flow
+         reload lands in the same place.
+     ============================================================ */
+  const navLock = useRef(false);
+  const navReady = useRef(false);
+
+  // The single description of "where am I", used for both push and restore.
+  const navState = {
+    screen,
+    gameId: currentGame ? currentGame.id : null,
+    lobbyTab,
+    selectedUserId,
+    reviewMode,
+    practiceMode,
+    overlay: settingsOpen ? 'settings' : howToGame ? 'howto' : chatGame ? 'chat' : whatsNewOpen ? 'whatsnew' : null,
+    overlayArg: howToGame ? howToGame.id : chatGame ? (chatGame.id || chatGame) : null,
+  };
+  const navKey = JSON.stringify(navState);
+
+  useEffect(() => {
+    if (navLock.current) { navLock.current = false; return; }
+    try {
+      // Keep the query string intact so ?game=, ?tab=, ?theme=, ?chat= … all
+      // still work after a reload mid-flow.
+      const url = window.location.pathname + window.location.search + window.location.hash;
+      if (!navReady.current) {
+        navReady.current = true;
+        window.history.replaceState({ un: navState }, '', url);
+      } else {
+        window.history.pushState({ un: navState }, '', url);
+      }
+    } catch {}
+  }, [navKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onPop = (e) => {
+      const s = e.state && e.state.un;
+      navLock.current = true;
+      if (!s) {
+        // Popped past our first entry — land on home rather than a blank state.
+        setScreen('lobby'); setCurrentGame(null); setReviewMode(false);
+        setSettingsOpen(false); setHowToGame(null); setChatGame(null); setWhatsNewOpen(false);
+        return;
+      }
+      // Overlays first: closing one is the cheapest back step.
+      setSettingsOpen(s.overlay === 'settings');
+      setWhatsNewOpen(s.overlay === 'whatsnew');
+      setHowToGame(s.overlay === 'howto' ? (GAMES.find(g => g.id === s.overlayArg) || null) : null);
+      setChatGame(s.overlay === 'chat' ? (GAMES.find(g => g.id === s.overlayArg) || null) : null);
+      setLobbyTab(s.lobbyTab || 'home');
+      setSelectedUserId(s.selectedUserId || null);
+      setReviewMode(!!s.reviewMode);
+      setPracticeMode(!!s.practiceMode);
+      if (s.screen === 'game' || s.screen === 'pregame' || s.screen === 'locked') {
+        const g = GAMES.find(x => x.id === s.gameId);
+        if (g) { setCurrentGame(g); setScreen(s.screen); }
+        else { setCurrentGame(null); setScreen('lobby'); }
+      } else {
+        setCurrentGame(null);
+        setScreen(s.screen || 'lobby');
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  /* PHASE 3 — document-level scroll lock while a run is live. `fitShell` only
+     covers dailies that opted in and shell:'self' games bypass it entirely, so
+     locking the document is what makes "nothing scrolls during play" true for
+     all 33 games. Released the moment a result screen appears (that scrolls). */
+  useScrollLock(screen === 'game' && !!currentGame && !winData && !loseData && !practiceResult);
 
   // Per-run daily move log (phase 2). Every daily game feeds move events with
   // client timestamps into this ref — the Daily Tile Match via its native
@@ -21273,7 +23606,13 @@ function App() {
     const g = GAMES.find(x => x.id === gid);
     if (!g) return;
     deepLinkedRef.current = true;
-    const mmode = params.get('mmode');
+    // ?mode= / ?mmode= both pin a classic game's mode (#144: land straight in a
+    // bot or pass-and-play match without a second account, which is also how the
+    // proposal tests screenshot the Gomoku ghost-confirm and Ludo token pad).
+    // ?rooms=mine implies Online — it must skip the mode modal, or the deep link
+    // lands on a chooser instead of the "Your rooms" list it names (#145).
+    const wantsRooms = params.get('rooms') === 'mine';
+    const mmode = params.get('mmode') || params.get('mode') || (wantsRooms ? 'online' : null);
     // Multi-mode classic games open the pre-launch modal unless a mode is
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
@@ -21285,6 +23624,23 @@ function App() {
       if (g.daily) { startDailyRun(g); return; }
       launchGame(g);
       setHowToGame(null); // suppress the classic first-open auto-show too
+      return;
+    }
+    // #133 — ?practice=1 mounts today's puzzle as an unscored replay. No /start
+    // claim, so it works whether or not the day has been played.
+    if (params.get('practice') === '1' && g.daily) {
+      startPractice(g);
+      setHowToGame(null);
+      return;
+    }
+    // #145 — ?rooms=mine lands on the online setup with the "Your rooms" list
+    // showing, which is otherwise only reachable by picking Online in the modal.
+    if (wantsRooms) {
+      setClassicGameMode('online');
+      setClassicGameModeOpts(null);
+      setPreLaunchGame(null);
+      launchGame(g);
+      setHowToGame(null);
       return;
     }
     launchGame(g);
@@ -21358,6 +23714,9 @@ function App() {
 
   const handleSaveProgress = (progress, steps, secs) => {
     if (!currentGame) return;
+    // #122 — remember the latest snapshot even for guests / blocked queues, so
+    // the finish can attach it as the reviewable final board.
+    lastProgressRef.current = { gameId: currentGame.id, progress };
     // Guests have no server attempt row to save into — the POST would just
     // 401 and log console errors. A guest run lives only until its finish.
     if (!authOk) return;
@@ -21407,6 +23766,13 @@ function App() {
     return lines.join('\n');
   };
 
+  /* The last in-play progress payload a game handed us, kept so the finish can
+     carry a final board snapshot for the locked-day review screen (#122).
+     Read from the SAME coalesced autosave path the games already use — we never
+     ask a game to save on its winning move (that write 409s against the row the
+     finish is closing), so this is the freshest legal snapshot available. */
+  const lastProgressRef = useRef({ gameId: null, progress: null });
+
   const submitDailyFinish = async (gameId, finalScore, steps, timeSecs) => {
     let ok = false, body = null;
     try {
@@ -21422,6 +23788,9 @@ function App() {
           score: finalScore, steps, timeSecs,
           moves,
           replay: log.replayOk && moves.some(m => Number.isInteger(m.tileType)),
+          // #122 — final board snapshot, written in the same UPDATE server-side.
+          progress: lastProgressRef.current.gameId === gameId
+            ? lastProgressRef.current.progress : null,
         }),
       });
       ok = res.ok; body = res.body;
@@ -21491,6 +23860,14 @@ function App() {
     // can't land on the row the finish is about to close (a 409 + console
     // error that would trip the no-console-errors check).
     cancelProgressSave();
+    /* PHASE 4 (#133) — a practice replay is scored LOCALLY and stops here.
+       No endpoint call, no streak, no badges, no bests, no leaderboard, no
+       dailyRunLog submission. This early return is the single guarantee that
+       "play again for fun" can never touch a real record. */
+    if (practiceMode) {
+      setPracticeResult({ score, steps, timeSecs, share: meta && meta.share, won: true });
+      return;
+    }
     try {
       // Non-daily games skip the server, streak, and totalScore nav update.
       if (currentGame && !currentGame.daily) {
@@ -21634,8 +24011,9 @@ function App() {
     }
   };
 
-  // Retry the finish submission for the current win (used by the overlay's
-  // "couldn't sync — retrying" button).
+  // Retry the finish submission for the current win. PHASE 4 (#132): this is now
+  // a FALLBACK — the effect below retries automatically when connectivity comes
+  // back, so the reworded card is a reassurance rather than a chore.
   const retryDailyFinish = () => {
     if (!winData || winData.isClassic) return;
     const gameId = winData.gameId || (currentGame && currentGame.id);
@@ -21644,12 +24022,30 @@ function App() {
     submitDailyFinish(gameId, winData.finalScore, winData.steps, winData.timeSecs)
       .finally(() => setWinData(prev => prev ? { ...prev, syncing: false } : prev));
   };
+  const retryRef = useRef(retryDailyFinish);
+  retryRef.current = retryDailyFinish;
+
+  // #132 — automatic re-send. Fires the moment the browser reports it is back
+  // online while an unsynced result is on screen.
+  useEffect(() => {
+    if (!winData || winData.isClassic || !winData.syncError) return;
+    const go = () => retryRef.current();
+    window.addEventListener('online', go);
+    // Also try once on a short delay: `online` doesn't fire if we were never
+    // formally offline (a transient 5xx / captive portal looks the same to us).
+    const t = setTimeout(go, 8000);
+    return () => { window.removeEventListener('online', go); clearTimeout(t); };
+  }, [winData && winData.syncError, winData && winData.gameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
   // finished row with score 0 so the day stays locked, but does NOT touch the
   // streak. Existing win-only games never call this.
   const handleLose = async (steps, timeSecs, meta) => {
     cancelProgressSave(); // same finish-race guard as handleWin
+    if (practiceMode) { // #133 — practice losses are local too
+      setPracticeResult({ score: 0, steps, timeSecs, share: meta && meta.share, answer: meta && meta.answer, won: false });
+      return;
+    }
     try {
       // Non-daily games skip the server entirely.
       if (currentGame && !currentGame.daily) {
@@ -21710,6 +24106,8 @@ function App() {
     setScreen('lobby');
     setCurrentGame(null);
     setReviewMode(false);
+    setPracticeMode(false);
+    setPracticeResult(null);
     setWinData(null);
     setLoseData(null);
     setClassicGameMode(null);
@@ -21717,6 +24115,25 @@ function App() {
     setClassicLastResult(null);
     setPreLaunchGame(null);
     if (tab) setLobbyTab(tab);
+  };
+
+  /* PHASE 4 (#133) — "Play again for fun".
+     Mounts the SAME component with the SAME dailyRng seed (so it is genuinely
+     today's puzzle, not a random one) and a bumped resetKey, but with
+     practiceMode on: handleWin/handleLose bail out before any endpoint, and no
+     /start claim happens because we never call startDailyRun. */
+  const startPractice = (game) => {
+    if (!game) return;
+    setCurrentGame(game);
+    setPracticeMode(true);
+    setPracticeResult(null);
+    setLockedReview(false);
+    setWinData(null);
+    setLoseData(null);
+    setReviewMode(false);
+    setStepCount(0);
+    setPlayAgainKey(k => k + 1);
+    setScreen('game');
   };
 
   const playAgain = () => {
@@ -21829,6 +24246,13 @@ function App() {
               ? () => setHowToGame(currentGame) : undefined}
             onChat={authOk ? () => setChatGame(currentGame) : undefined}
           >
+            {/* PHASE 3 — the classic stage keeps .cg-scroll DELIBERATELY: making
+                it overflow:hidden would CLIP a tall setup screen rather than fit
+                it, which is the exact failure Daily Cipher had. What stops the
+                scrolling is upstream — useScrollLock owns the document while a
+                run is live, and the five phase-5 board games now honour the
+                --cg-board viewport cap (see the .ck-board/.rv-board/... rules),
+                so board + status + legend fit at 390x844 without moving. */}
             <div className="cg-stage cg-scroll">
               <GameComponent
                 onWin={handleWin}
@@ -21881,17 +24305,22 @@ function App() {
                 >?</button>
               )}
             </div>
+            {/* PHASE 4 (#133) — an unmissable practice marker. */}
+            {practiceMode && (
+              <div className="practice-ribbon">🎲 Practice — not scored</div>
+            )}
             <GameComponent
               onWin={handleWin}
               onLose={handleLose}
               onStepChange={logsOwnMoves ? setStepCount : (n) => {
-                recordDailyMove({ k: 'step' });
+                // A practice run must never contribute to the verification log.
+                if (!practiceMode) recordDailyMove({ k: 'step' });
                 setStepCount(n);
               }}
-              onMoveTile={logsOwnMoves ? recordDailyMove : undefined}
+              onMoveTile={logsOwnMoves && !practiceMode ? recordDailyMove : undefined}
               offset={offset}
-              savedProgress={progressFor(attempts[currentGame.id])}
-              onSaveProgress={handleSaveProgress}
+              savedProgress={practiceMode ? null : progressFor(attempts[currentGame.id])}
+              onSaveProgress={practiceMode ? null : handleSaveProgress}
               resetKey={playAgainKey}
             />
           </div>
@@ -21934,8 +24363,18 @@ function App() {
   // in the app ticks off one clock.
   const homeResetCountdown = useCountdown(nextResetUtc, offset, onReset);
 
-  const fitActive = screen === 'game' && !!currentGame && !!currentGame.fitShell
-    && (!winData && !loseData || reviewMode);
+  const fitActive = (screen === 'game' && !!currentGame && !!currentGame.fitShell
+    && (!winData && !loseData || reviewMode))
+    || (screen === 'locked' && !!currentGame && !!currentGame.fitShell && lockedReview);
+
+  /* PHASE 4 (#122) — a locked day can show the solved board only if the finished
+     attempt carries a snapshot. `finish` now writes one in the SAME UPDATE as
+     score/steps/finished_at (no second request, so the no-save-on-the-winning-
+     move rule is untouched), and /api/daily returns it for finished rows.
+     Real-time dailies with no resume (Daily Snake, Daily Bounce, Word Sprint)
+     legitimately have nothing to snapshot — stated behaviour, not a bug. */
+  const lockedAttempt = screen === 'locked' && currentGame ? attempts[currentGame.id] : null;
+  const lockedReviewable = !!(lockedAttempt && lockedAttempt.finishedAt && lockedAttempt.progress);
 
   // Whether the finished board can be shown under the results card (slice 4).
   // Guarded on the result belonging to the CURRENTLY mounted game, so a stale
@@ -22217,21 +24656,49 @@ function App() {
       )}
 
       {screen === 'locked' && currentGame && (
-        <div className="game-wrap">
+        <div className={'game-wrap' + (lockedReviewable ? ' fit' : '')}>
           <div className="game-head">
             <button className="back-btn" onClick={backToLobby}>← Back</button>
             <div className="game-title">
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
           </div>
-          <LockedScreen
-            game={currentGame}
-            attempt={attempts[currentGame.id]}
-            nextResetUtc={nextResetUtc}
-            offset={offset}
-            onReset={onReset}
-            onBack={backToLobby}
-          />
+          {/* PHASE 4 (#122) — when the finished attempt carries a board snapshot,
+              re-mount the game read-only under the result card so "View board"
+              shows the puzzle you actually solved. Games that can't snapshot
+              (real-time dailies with no resume) fall through to result-only. */}
+          {lockedReviewable && lockedReview ? (
+            <div className="game-body frozen">
+              {React.createElement(currentGame.component, {
+                onWin: () => {}, onLose: () => {}, onStepChange: () => {},
+                offset,
+                savedProgress: attempts[currentGame.id].progress,
+                onSaveProgress: null,
+                readOnly: true,
+                resetKey: 0,
+              })}
+            </div>
+          ) : (
+            <LockedScreen
+              game={currentGame}
+              attempt={attempts[currentGame.id]}
+              nextResetUtc={nextResetUtc}
+              offset={offset}
+              onReset={onReset}
+              onBack={backToLobby}
+              best={bests[currentGame.id]}
+              onReview={lockedReviewable ? () => setLockedReview(true) : null}
+              onPractice={() => startPractice(currentGame)}
+            />
+          )}
+          {lockedReviewable && lockedReview && (
+            <button className="result-minibar" onClick={() => setLockedReview(false)}>
+              <span className="rmb-text">
+                {`Today's result · +${attempts[currentGame.id].score}`}
+              </span>
+              <span className="rmb-cta">↑ Results</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -22377,12 +24844,19 @@ function App() {
                 </div>
               );
             })()}
-            {!winData.isClassic && winData.syncError && (
+            {/* PHASE 4 (#132) — the old wording ("Couldn't sync your result —
+                your puzzle is still locked for today") read like the win had
+                been thrown away, and used "locked" to describe a FAILURE, which
+                collides with the daily lock the same word means everywhere else.
+                The run is already saved in pc_pending_runs_v1 and retries
+                automatically; the button is a fallback, not the only path. */}
+            {!winData.isClassic && (winData.syncError || syncFailDemo) && (
               <div className="win-sync-note">
-                Couldn't sync your result — your puzzle is still locked for today.
+                ✔ Saved on this device — we'll send your result automatically as
+                soon as you're back online. Your score and streak are safe.
                 <br />
                 <button onClick={retryDailyFinish} disabled={winData.syncing}>
-                  {winData.syncing ? 'Retrying…' : 'Retry sync'}
+                  {winData.syncing ? 'Sending…' : 'Send now'}
                 </button>
               </div>
             )}
@@ -22412,6 +24886,13 @@ function App() {
             {boardReviewable && (
               <button className="primary-btn review-btn" onClick={() => setReviewMode(true)}>
                 👁 View board
+              </button>
+            )}
+            {/* PHASE 4 (#133) — replay today's exact puzzle, scored but not
+                recorded. Daily games only: a classic already has Play Again. */}
+            {!winData.isClassic && currentGame && (
+              <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
+                🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
@@ -22471,7 +24952,43 @@ function App() {
                 👁 View board
               </button>
             )}
+            {!loseData.isClassic && currentGame && (
+              <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
+                🎲 Play again for fun <span className="practice-note">(not scored)</span>
+              </button>
+            )}
             <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+          </div>
+        </div>
+      )}
+
+      {/* PHASE 4 (#133) — practice result. Deliberately NOT the win overlay: no
+          streak row, no leaderboard, no Verified badge, no share-to-board CTA —
+          nothing that implies the run counted. */}
+      {screen === 'game' && practiceMode && practiceResult && (
+        <div className="win-overlay">
+          <div className="win-card">
+            <div className="trophy">🎲</div>
+            <h2>{practiceResult.won ? 'Solved — practice run' : 'Practice run over'}</h2>
+            <div className="sub">{currentGame && currentGame.name}</div>
+            <div className="practice-ribbon">Not scored — your real result for today stands</div>
+            <div className="score-breakdown">
+              <div className="score-row">
+                <span className="k">Practice score</span>
+                <span className="v mono">{practiceResult.score}</span>
+              </div>
+              <div className="score-row">
+                <span className="k">Steps · Time</span>
+                <span className="v mono">{practiceResult.steps} · {fmtTime(practiceResult.timeSecs)}</span>
+              </div>
+            </div>
+            {practiceResult.answer && (
+              <div className="sub">{practiceResult.answer}</div>
+            )}
+            <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
+              🎲 Another practice run
+            </button>
+            <button className="primary-btn" onClick={() => backToLobby()}>Back to Lobby</button>
           </div>
         </div>
       )}
@@ -22502,3 +25019,25 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 // Signal to the boot-shell watchdog (index.html) that React has mounted, so
 // it clears the "taking longer than usual" timer and never flashes the card.
 window.__puzzlechainMounted = true;
+
+/* Load-time self-tests (mirrors the server's boot self-tests). Wrapped so a
+   throw can never take the app down — a failure logs a console error, which
+   trips the platform's no-console-errors check and blocks the merge. That is the
+   point: every invariant these phases established is now enforced, not just
+   documented.
+
+   Scheduling matters: the touch-action sweep reads COMPUTED style, so it has to
+   wait until React has actually committed App's <style> element. One rAF is not
+   enough under React 18's concurrent render (the first attempt here reported
+   every class as touch-action:auto because no stylesheet existed yet), so poll
+   for the stylesheet with a bounded retry rather than guessing a delay. */
+(function scheduleSelfTests(tries) {
+  const ready = Array.from(document.querySelectorAll('style'))
+    .some(s => s.textContent && s.textContent.indexOf('.fit-scale-content') >= 0);
+  if (!ready && (tries || 0) < 60) {
+    requestAnimationFrame(() => scheduleSelfTests((tries || 0) + 1));
+    return;
+  }
+  try { runClientSelfTests(); }
+  catch (e) { console.error('[self-test] harness threw:', e && e.message); }
+})(0);

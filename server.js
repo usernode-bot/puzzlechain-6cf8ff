@@ -245,6 +245,46 @@ const CLASSIC_LB_LIMIT = 20;
 // the knob to switch to unpredictable per-day seeds — change it only at a UTC
 // boundary.
 
+/* PHASE 4 (#122) — the staging `demo=solvedboard` fixture needs a REAL solved
+   nonogram grid, not a plausible-looking fake, so the review screen a tester
+   sees is the puzzle the client would actually have generated. Mirrors
+   mulberry32 + ngGenerate in public/app.jsx exactly; used ONLY by that
+   IS_STAGING fixture, never by gameplay or validation. Keep in sync with
+   ngGenerate if the generator changes. */
+function srvMulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function srvNonogramSolution(seed) {
+  const rng = srvMulberry32(seed >>> 0);
+  let g = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    g = [];
+    let filled = 0;
+    for (let r = 0; r < 8; r++) {
+      const row = [];
+      for (let c = 0; c < 8; c++) {
+        const v = rng() < 0.55 ? 1 : 0;
+        row.push(v);
+        filled += v;
+      }
+      g.push(row);
+    }
+    if (filled < 22 || filled > 44) continue;
+    const rowsOk = g.every((row) => row.some((v) => v === 1));
+    const colsOk = g[0].every((_, c) => g.some((row) => row[c] === 1));
+    if (rowsOk && colsOk) return g;
+  }
+  return g;
+}
+
 // FNV-1a string hash — byte-for-byte mirror of hashStr in public/app.jsx.
 function srvHashStr(s) {
   let h = 2166136261 >>> 0;
@@ -3123,6 +3163,31 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    /* Staging-only demo seed (PHASE 4 / #122): a finished nonogram attempt for
+       TODAY carrying a solved-grid `progress` snapshot, which is what the new
+       locked-day review screen renders. Uses nonogram, not sudoku, on purpose:
+       demo=locked and demo=streak both finish the viewer's sudoku row for today
+       and proposal checks share one staging DB, so a second sudoku fixture would
+       collide. The grid is derived the same way the client derives it — from the
+       day's seed — so "View board" shows a real solved puzzle rather than a
+       plausible-looking fake. Idempotent; strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'solvedboard') {
+      const ngSeed = await ensureDailySeed('nonogram');
+      const ngSolved = srvNonogramSolution(ngSeed);
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, steps, time_secs,
+            progress, elapsed_secs, finished_at)
+         VALUES ($1, $2, 'nonogram', (now() AT TIME ZONE 'utc')::date, 910, 34, 148,
+                 $3::jsonb, 148, now())
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET score = 910, steps = 34, time_secs = 148,
+               progress = EXCLUDED.progress, elapsed_secs = 148, finished_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user',
+         JSON.stringify({ dayNum: Math.floor(Date.now() / 86400000), grid: ngSolved })]
+      );
+    }
+
     // Staging-only demo seed: gives the current viewer a 10-day consecutive
     // streak (finished sudoku attempts for the last 10 UTC days BEFORE today)
     // so the multiplier tier UI is demonstrable — nav badge, lobby next-tier
@@ -3683,6 +3748,50 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    /* Staging-only demo seed (PHASE 7 / #145): rooms the VIEWER hosts.
+       The lost-room fix widened /api/rooms/mine to include waiting rooms, and it
+       lands on all five board games (the endpoint loops BOARD_RULE_GAME_IDS), so
+       this seeds one WAITING room the viewer created (Rejoin + Close), one
+       ACTIVE room where it's their turn (Rejoin into a live match), plus waiting
+       gomoku/ludo rooms — the Gomoku ghost-confirm and Ludo token pad both need
+       a reachable live board to screenshot. Idempotent; no-op in prod. */
+    if (IS_STAGING && req.query.demo === 'myroom') {
+      const me = req.user.id;
+      const myName = req.user.username || 'staging-demo-user';
+      const mkWaiting = async (code, gid, maxP) => {
+        const init = boardRules.getRules(gid).initialState(maxP || undefined);
+        await pool.query(
+          `INSERT INTO classic_rooms (id, game_id, player1_id, player1_name, state, status, max_players)
+           VALUES ($1, $2, $3, $4, $5::jsonb, 'waiting', $6)
+           ON CONFLICT (id) DO UPDATE
+             SET player1_id = EXCLUDED.player1_id, player1_name = EXCLUDED.player1_name,
+                 player2_id = NULL, player2_name = NULL,
+                 player3_id = NULL, player3_name = NULL,
+                 player4_id = NULL, player4_name = NULL,
+                 state = EXCLUDED.state, status = 'waiting', move_seq = 0,
+                 winner = NULL, last_move_at = now()`,
+          [code, gid, me, myName, JSON.stringify(init), maxP || 2]
+        );
+      };
+      await mkWaiting('DEMOMY', 'reversi', 2);
+      await mkWaiting('DEMOGO', 'gomoku', 2);
+      await mkWaiting('DEMOLD', 'ludo', 2);
+      // An ACTIVE room with a fake opponent, viewer to move.
+      const rvActive = boardRules.getRules('reversi').initialState();
+      rvActive.currentPlayer = 1;
+      await pool.query(
+        `INSERT INTO classic_rooms
+           (id, game_id, player1_id, player1_name, player2_id, player2_name, state, status)
+         VALUES ('DEMORJ', 'reversi', $1, $2, 'staging-demo-rival', 'Staging demo Rival', $3::jsonb, 'active')
+         ON CONFLICT (id) DO UPDATE
+           SET player1_id = EXCLUDED.player1_id, player1_name = EXCLUDED.player1_name,
+               player2_id = 'staging-demo-rival', player2_name = 'Staging demo Rival',
+               state = EXCLUDED.state, status = 'active', move_seq = 0,
+               winner = NULL, last_move_at = now()`,
+        [me, myName, JSON.stringify(rvActive)]
+      );
+    }
+
     // Staging-only demo seed (Ludo 2–4P): a WAITING 3-seat Ludo room with two
     // fake players already seated, so a tester who joins with code DEMOL4
     // fills the last seat, activates the room, and moves immediately
@@ -4114,7 +4223,7 @@ async function settleDailySession({ user, gameId, score, steps, timeSecs, moves,
 // achievements, recomputes the streak, and settles the validation session.
 // Returns the finish response payload, or null when there is no claimed,
 // unfinished attempt today (callers map that to 409). Throws on DB errors.
-async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, moves, replay }) {
+async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, moves, replay, progress }) {
 
   // Read the player's previous best for this game BEFORE today's finish is
   // committed, so it naturally excludes the in-flight attempt (its
@@ -4129,14 +4238,21 @@ async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, move
   );
   const prevBest = bestRows.length > 0 ? bestRows[0].max_score : null;
 
+  /* PHASE 4 (#122) — the final board snapshot rides along INSIDE this UPDATE.
+     A separate POST /progress after the finish would 409 against the now-finished
+     row (harmless but logs a console error, which trips the no-console-errors
+     check) — that is exactly why the "never autosave on the winning move" rule
+     exists. COALESCE keeps whatever the last in-play autosave wrote when the
+     client sends nothing, so resumable games still have something to review. */
   const { rows } = await pool.query(
     `UPDATE daily_attempts
-       SET score = $3, steps = $4, time_secs = $5, finished_at = now()
+       SET score = $3, steps = $4, time_secs = $5, finished_at = now(),
+           progress = COALESCE($6::jsonb, progress)
      WHERE user_id = $1 AND game_id = $2
        AND attempt_date = (now() AT TIME ZONE 'utc')::date
        AND finished_at IS NULL
      RETURNING *`,
-    [user.id, gameId, score, steps, timeSecs]
+    [user.id, gameId, score, steps, timeSecs, progress ? JSON.stringify(progress) : null]
   );
   if (rows.length === 0) {
     // No claimed, unfinished attempt today (client out of sync, or this
@@ -4350,6 +4466,8 @@ app.post('/api/daily/:gameId/finish', async (req, res) => {
       score, steps, timeSecs,
       moves: Array.isArray(req.body.moves) ? req.body.moves.slice(0, 800) : [],
       replay: req.body.replay === true,
+      // Optional final-board snapshot for the locked-day review screen (#122).
+      progress: req.body.progress && typeof req.body.progress === 'object' ? req.body.progress : null,
     });
     if (!result) {
       // No claimed, unfinished attempt today (client out of sync, or this
@@ -4836,20 +4954,32 @@ app.post('/api/chat/messages/:id/report', async (req, res) => {
 // module games (which include chutes-ladders) are listed.
 app.get('/api/rooms/mine', async (req, res) => {
   try {
+    /* #145 — WAITING rooms are included now.
+       The filter was status = 'active' only, so a room you created and then
+       left (backgrounded the app, phone slept) was invisible EVERYWHERE: not in
+       the in-progress row, not in the online setup screen, and your own code
+       came back "room is full or you created it" with no way to recover it. The
+       endpoint already loops BOARD_RULE_GAME_IDS, so widening the status filter
+       fixes lost rooms for all five board games plus Snakes & Ladders at once —
+       Reversi is just where the reporter happened to hit it. */
     const { rows } = await pool.query(
       `SELECT * FROM classic_rooms
-        WHERE status = 'active'
+        WHERE status IN ('active', 'waiting')
           AND (player1_id = $1 OR player2_id = $1 OR player3_id = $1 OR player4_id = $1)
-        ORDER BY last_move_at DESC LIMIT 10`,
+        ORDER BY last_move_at DESC NULLS LAST, created_at DESC LIMIT 12`,
       [req.user.id]
     );
     const rooms = [];
     for (let r of rows) {
       if (!BOARD_RULE_GAME_IDS.has(r.game_id)) continue;
-      // Lazy turn-timer enforcement: a stale room settles as a forfeit here
-      // and drops off the your-turn row.
-      r = await expireStaleClassicRoom(r);
-      if (r.status !== 'active') continue;
+      const waiting = r.status === 'waiting';
+      if (!waiting) {
+        // Lazy turn-timer enforcement: a stale room settles as a forfeit here
+        // and drops off the your-turn row. Only ACTIVE rooms can go stale — a
+        // waiting room has no side to move, so there is nothing to forfeit.
+        r = await expireStaleClassicRoom(r);
+        if (r.status !== 'active') continue;
+      }
       const myPlayerNum = roomSeatOf(r, req.user.id) || 1;
       const cur = r.state && Number(r.state.currentPlayer);
       const others = [
@@ -4859,8 +4989,13 @@ app.get('/api/rooms/mine', async (req, res) => {
         id: r.id,
         gameId: r.game_id,
         myPlayerNum,
-        myTurn: cur === myPlayerNum,
-        opponentName: others.length > 1 ? `${others[0]} +${others.length - 1}` : (others[0] || 'opponent'),
+        waiting,
+        myTurn: !waiting && cur === myPlayerNum,
+        seatsFilled: roomSeatsFilled(r),
+        maxPlayers: roomMaxPlayers(r),
+        opponentName: waiting
+          ? null
+          : (others.length > 1 ? `${others[0]} +${others.length - 1}` : (others[0] || 'opponent')),
         lastMoveAt: r.last_move_at,
         turnTimeoutHours: TURN_TIMEOUT_HOURS,
       });
@@ -5076,12 +5211,24 @@ app.post('/api/classic/:gameId/rooms/:roomId/join', async (req, res) => {
       if (cur.length === 0) return res.status(404).json({ error: 'Room not found' });
       const r = cur[0];
       const already = roomSeatOf(r, req.user.id);
-      if (already === 1) return res.status(409).json({ error: 'You created this room — share the code with a friend' });
+      /* #145 — distinguish "your own room" from "full". The client used to get
+         one 409 for both cases and rendered "Room is full or you created it",
+         which is exactly the dead end the reporter hit. `ownRoom` lets it offer
+         Rejoin instead of an error, and the seat number comes back so the rejoin
+         goes straight into the room. */
+      if (already === 1) {
+        return res.status(409).json({
+          error: 'That\'s your own room — rejoin it instead of joining',
+          ownRoom: true,
+          yourPlayerNum: 1,
+          room: shapeClassicRoom(r),
+        });
+      }
       if (already > 1) {
         // Re-join (e.g. after a reload of a still-waiting multi-seat room).
         return res.json({ ...shapeClassicRoom(r), yourPlayerNum: already });
       }
-      if (r.status !== 'waiting') return res.status(409).json({ error: 'Room is already full or finished' });
+      if (r.status !== 'waiting') return res.status(409).json({ error: 'Room is already full or finished', full: true });
       const ids = roomSeatIdCols(r);
       let seat = 0;
       for (let s = 2; s <= roomMaxPlayers(r); s++) if (!ids[s - 1]) { seat = s; break; }
@@ -5217,6 +5364,10 @@ app.post('/api/classic/:gameId/rooms/:roomId/finish', async (req, res) => {
       [roomId, gameId, winner != null ? String(winner) : null]
     );
     let room = transitioned[0];
+    // #145 — closing a WAITING room (nobody ever joined) must not touch the
+    // ladder. Already guaranteed by the player2_id condition: there is no
+    // opponent to rate against, so `rateMatch` is skipped and the room simply
+    // goes finished. Same endpoint, no special case needed on the client.
     if (room && room.status === 'finished' && room.winner && room.player2_id && roomMaxPlayers(room) === 2) {
       rateMatch(gameId,
         { id: room.player1_id, name: room.player1_name },
@@ -6773,6 +6924,21 @@ app.post('/api/integration/sign', (req, res) => {
 
 // ---- Static + HTML shell -------------------------------------------------
 
+/* Phase 7 (#144) — serve the turn-based rules registry to the browser.
+   lib/board-rules.js lives OUTSIDE the public/ static root on purpose (it is
+   server code first), so it needs an explicit route. It is not under /api/, so
+   the deny-by-default auth middleware doesn't apply — and it carries no user
+   data, only pure game rules, so anonymous access is correct: the signed-out
+   lobby can already reach the games list. Loading it in the browser is what lets
+   local pass-and-play and Versus Bot share the SERVER'S rules instead of a
+   reimplementation that would eventually drift (see the file's own footer). */
+app.get('/board-rules.js', (req, res) => {
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, 'lib', 'board-rules.js'), (err) => {
+    if (err && !res.headersSent) res.status(500).end();
+  });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated, otherwise an "open in Usernode"
@@ -7186,20 +7352,11 @@ app.get('/api/dapp/leaderboard/:gameId', async (req, res) => {
   }
 });
 
-// landing page so stray visits to the staging URL don't reveal the app.
-app.get('*', (req, res) => {
-  if (!req.user) {
-    return res.status(401).send(`<!doctype html><meta charset=utf-8><title>Open in Usernode</title>
-<body style="font-family:system-ui;background:#09090b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
-  <div style="max-width:24rem;padding:2rem;text-align:center">
-    <h1 style="font-size:1.25rem;margin:0 0 0.5rem">Open this app inside Usernode</h1>
-    <p style="color:#a1a1aa;font-size:0.9rem;margin:0 0 1.25rem">This page is served via the platform; direct visits aren't authenticated.</p>
-    <a href="https://social-vibecoding.usernodelabs.org" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
-  </div>
-</body>`);
-  }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+/* NOTE: every real route MUST be registered above the app.get('*') catch-all
+   below. The Match-3 API used to sit AFTER it, so `/api/match3/progress`
+   returned index.html instead of JSON and the campaign screen was stuck on
+   "Loading..." forever — the game was unreachable, not merely unstyled. Found
+   while giving Match 3 its design-system pass (phase 8); moved up here. */
 
 // ---- Match-3 Campaign API (/api/match3/*) --------------------------------
 
@@ -7464,6 +7621,21 @@ app.get('/api/match3/leaderboard', async (req, res) => {
   }
 });
 
+
+// landing page so stray visits to the staging URL don't reveal the app.
+app.get('*', (req, res) => {
+  if (!req.user) {
+    return res.status(401).send(`<!doctype html><meta charset=utf-8><title>Open in Usernode</title>
+<body style="font-family:system-ui;background:#09090b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
+  <div style="max-width:24rem;padding:2rem;text-align:center">
+    <h1 style="font-size:1.25rem;margin:0 0 0.5rem">Open this app inside Usernode</h1>
+    <p style="color:#a1a1aa;font-size:0.9rem;margin:0 0 1.25rem">This page is served via the platform; direct visits aren't authenticated.</p>
+    <a href="https://social-vibecoding.usernodelabs.org" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
+  </div>
+</body>`);
+  }
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 // Fail fast if the DApp hash/replay contract regresses (cross-runtime
 // determinism is the framework's highest-risk dependency).
 try {

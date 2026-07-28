@@ -272,17 +272,17 @@
     },
     {
       "name": "Sudoku difficulty chooser renders",
-      "path": "/?game=sudoku&play=1",
+      "path": "/?game=sudoku&practice=1",
       "expectText": "9×9 Classic"
     },
     {
       "name": "Word Search shows Hint bar",
-      "path": "/?game=wordhunt&play=1",
+      "path": "/?game=wordhunt&practice=1",
       "expectText": "Hint"
     },
     {
       "name": "Daily Tile Match shows Hint bar",
-      "path": "/?game=tilematchingdaily&play=1",
+      "path": "/?game=tilematchingdaily&practice=1",
       "expectText": "Hint"
     },
     {
@@ -342,7 +342,7 @@
     },
     {
       "name": "Snake leaderboard renders seeded scores",
-      "path": "/?game=snake&demo=classic-scores",
+      "path": "/?game=snake&demo=classic-scores&sheet=leaderboard",
       "expectText": "Staging demo Ada"
     },
     {
@@ -352,12 +352,12 @@
     },
     {
       "name": "Diamond Rush leaderboard renders seeded scores",
-      "path": "/?game=diamondrush&demo=classic-scores",
+      "path": "/?game=diamondrush&demo=classic-scores&sheet=leaderboard",
       "expectText": "Staging demo Ada"
     },
     {
       "name": "Chutes Ladders leaderboard renders seeded scores",
-      "path": "/?game=chutes-ladders&demo=classic-scores",
+      "path": "/?game=chutes-ladders&demo=classic-scores&sheet=leaderboard",
       "expectText": "Staging demo Ada"
     },
     {
@@ -442,12 +442,12 @@
     },
     {
       "name": "Mine Finder canvas board renders in-game",
-      "path": "/?game=minefinder&play=1",
+      "path": "/?game=minefinder&practice=1",
       "expectSelector": "canvas.mf-canvas"
     },
     {
       "name": "Mine Finder Dig/Flag mode control renders",
-      "path": "/?game=minefinder&play=1",
+      "path": "/?game=minefinder&practice=1",
       "expectText": "Mode: Dig"
     },
     {
@@ -467,12 +467,12 @@
     },
     {
       "name": "Nonogram board renders in-game",
-      "path": "/?game=nonogram&play=1",
+      "path": "/?game=nonogram&practice=1",
       "expectSelector": "canvas.ng-canvas"
     },
     {
       "name": "Drop Stack well renders in-game",
-      "path": "/?game=dropstack&play=1",
+      "path": "/?game=dropstack&practice=1",
       "expectSelector": "canvas.ds-canvas"
     },
     {
@@ -583,12 +583,14 @@
     {
       "name": "Dark theme renders the daily lobby",
       "path": "/?theme=dark",
-      "expectText": "Daily Puzzles"
+      "expectText": "All Games",
+      "expectSelector": "html[data-theme=\"dark\"] .home-filter-chips"
     },
     {
       "name": "Dark theme renders a per-game leaderboard",
-      "path": "/?demo=leaderboard&theme=dark&game=sudoku",
-      "expectText": "Mini Sudoku"
+      "path": "/?demo=locked&theme=dark&game=sudoku",
+      "expectText": "Today's leaderboard",
+      "expectSelector": "html[data-theme=\"dark\"] .lboard"
     },
     {
       "name": "Word Sprint pre-game screen",
@@ -597,7 +599,7 @@
     },
     {
       "name": "Word Sprint letter grid renders in-game",
-      "path": "/?game=wordsprint&play=1",
+      "path": "/?game=wordsprint&practice=1",
       "expectSelector": ".wspr-grid"
     },
     {
@@ -607,7 +609,7 @@
     },
     {
       "name": "Daily Snake board renders in-game",
-      "path": "/?game=snakedaily&play=1",
+      "path": "/?game=snakedaily&practice=1",
       "expectSelector": ".dsnk-board"
     },
     {
@@ -617,7 +619,7 @@
     },
     {
       "name": "Daily Bounce canvas renders in-game",
-      "path": "/?game=bouncedaily&play=1",
+      "path": "/?game=bouncedaily&practice=1",
       "expectSelector": ".dbnc-canvas"
     },
     {
@@ -662,22 +664,22 @@
     },
     {
       "name": "Nonogram canvas board renders in-game",
-      "path": "/?game=nonogram&play=1",
+      "path": "/?game=nonogram&practice=1",
       "expectSelector": "canvas.ng-canvas"
     },
     {
       "name": "Nonogram fill/mark controls render",
-      "path": "/?game=nonogram&play=1",
+      "path": "/?game=nonogram&practice=1",
       "expectText": "Mark"
     },
     {
       "name": "Drop Stack canvas well renders in-game",
-      "path": "/?game=dropstack&play=1",
+      "path": "/?game=dropstack&practice=1",
       "expectSelector": "canvas.ds-canvas"
     },
     {
       "name": "Drop Stack shows the Hold slot",
-      "path": "/?game=dropstack&play=1",
+      "path": "/?game=dropstack&practice=1",
       "expectSelector": ".ds-hold"
     },
     {
@@ -702,7 +704,7 @@
     },
     {
       "name": "Daily Tile Match shows the day difficulty label",
-      "path": "/?game=tilematchingdaily&play=1",
+      "path": "/?game=tilematchingdaily&practice=1",
       "expectSelector": ".tm-daylabel"
     },
     {
@@ -929,6 +931,16 @@
       "name": "Gomoku offers pass-and-play from the picker",
       "path": "/?game=gomoku",
       "expectText": "2 Players"
+    },
+    {
+      "name": "Classic sheet is URL-reachable via ?sheet=",
+      "path": "/?game=diamondrush&sheet=leaderboard",
+      "expectSelector": ".cg-sheet.open"
+    },
+    {
+      "name": "Snake leaderboard reachable before picking a difficulty",
+      "path": "/?game=snake&sheet=leaderboard",
+      "expectSelector": ".cg-sheet.open"
     }
   ],
   "visibility": {

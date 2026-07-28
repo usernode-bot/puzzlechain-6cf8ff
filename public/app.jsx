@@ -5671,9 +5671,20 @@ function ClassicResumeBanner({ onResume, onDismiss }) {
 
 // game: { icon, name }; onExit/onNewGame callbacks; sheetSections: [{ id, label, render }]
 // menuConfig (optional): wires the first "Menu" tab — New Game / Save / Post to Feed.
+/* `?sheet=<sectionId>` — screenshot-state deep link for the ClassicShell ☰ sheet.
+   The sheet holds real screens (the classic all-time Leaderboard, History,
+   Stats) that plain navigation could not reach: they only exist after a tap, so
+   before/after screenshots and proposal tests both landed on the game board
+   instead. Reading the param at mount makes each tab addressable. Pure UI state
+   — no writes — so it works in every environment, per the conventions. */
+function classicSheetDeepLink() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('sheet');
+    return v ? String(v).toLowerCase() : null;
+  } catch { return null; }
+}
+
 function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig, onHowTo, onChat }) {
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [, force] = useState(0);
   const sections = [
     ...(menuConfig ? [{
       id: 'menu', label: 'Menu',
@@ -5682,7 +5693,15 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
     ...(sheetSections || []),
     { id: 'settings', label: 'Settings', render: () => <CgSettings /> },
   ];
-  const [active, setActive] = useState(sections[0].id);
+  // Only honour ?sheet= when this game actually has that section, so a stray
+  // param can't open an empty sheet.
+  const deepSection = (() => {
+    const want = classicSheetDeepLink();
+    return want && sections.some(s => s.id === want) ? want : null;
+  })();
+  const [sheetOpen, setSheetOpen] = useState(!!deepSection);
+  const [, force] = useState(0);
+  const [active, setActive] = useState(deepSection || sections[0].id);
   const open = (id) => { setActive(id || sections[0].id); setSheetOpen(true); cgSound('click'); };
   const toggleSound = () => { cgSetPref('sound', !cgPrefs.sound); force(n => n + 1); if (cgPrefs.sound) cgSound('click'); };
   const cur = sections.find(s => s.id === active) || sections[0];
@@ -5831,7 +5850,13 @@ function ClassicLeaderboard({ gameId, url, valueLabel = 'Score', valueFmt }) {
   const scopeTabs = !url && <LbScopeTabs scope={scope} onChange={setScope} />;
   if (loading) return <div><h4>Leaderboard</h4>{scopeTabs}<div className="cg-sheet-empty">Loading…</div></div>;
   if (error) return <div><h4>Leaderboard</h4>{scopeTabs}<div className="cg-sheet-empty">Couldn't load leaderboard.</div></div>;
-  const entries = (data && data.entries) || [];
+  /* The generic classic endpoint returns `{ entries }`; the per-game boards
+     reached through `url` (Snake's /api/snake/leaderboard) return `{ top }`.
+     This only ever read `entries`, so Snake's sheet Leaderboard rendered
+     "No scores yet — play to rank!" no matter how many scores existed — the
+     stale "Snake leaderboard renders seeded scores" test was asserting against a
+     screen that could never show a row. Accept either key. */
+  const entries = (data && (data.entries || data.top)) || [];
   const me = data && data.me;
   const meInTop = me && entries.some(e => e.rank === me.rank);
   if (entries.length === 0) {
@@ -12599,7 +12624,17 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) 
 
   if (!difficulty) {
     return (
-      <ClassicShell game={game} onExit={onBack} sheetSections={[]} menuConfig={menuConfig}>
+      // The difficulty chooser used to pass sheetSections={[]}, so Snake's
+      // all-time leaderboard was unreachable until you had already committed to
+      // a difficulty — the one moment you'd most want to see the board. Carry
+      // the same section here; it's the only sheet tab that makes sense before
+      // a run has started (History/Stats belong to a chosen difficulty).
+      <ClassicShell
+        game={game}
+        onExit={onBack}
+        sheetSections={[cgLeaderboardSection('snake', { url: '/api/snake/leaderboard' })]}
+        menuConfig={menuConfig}
+      >
         <div className="cg-stage">
           <SnakeGameModeSelect onSelectDifficulty={(d) => setDifficulty(d)} />
         </div>
@@ -23517,7 +23552,12 @@ function App() {
       setScreen('game');
       // Classic games mount immediately, so the first-open how-to overlays
       // the running game (none of the in-scope classics are hard-timed).
-      if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
+      // Suppressed when ?sheet= asked for a specific sheet tab: the player named
+      // the screen they wanted, so covering it with an unrequested modal is
+      // wrong (and it hid the leaderboard in the deep link's screenshot).
+      if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id) && !classicSheetDeepLink()) {
+        setHowToGame(game);
+      }
       return;
     }
     const existing = attempts[game.id];

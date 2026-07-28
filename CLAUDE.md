@@ -916,3 +916,45 @@ inside `.frozen`. Keep any new chrome in that list.
   + active rooms across reversi/gomoku/ludo, for the Your-rooms list). New deep
   links: `?review=1`, `?practice=1`, `?rooms=mine`, `?mode=bot|2p`,
   `?syncfail=1`.
+
+### Proposal tests: two traps this repo keeps falling into
+
+Fixing five stale assertions (July 2026) turned up the same two causes each time.
+
+**1. A test whose route is a `&play=1` daily is ORDER-DEPENDENT.** The whole
+suite runs against one staging DB as one viewer, and several fixtures finish a
+daily for that viewer — `demo=locked` and `demo=streak` finish `sudoku`,
+`demo=solvedboard` finishes `nonogram`. Any test that later loads
+`?game=<that game>&play=1` lands on the locked result screen and its board
+assertion fails, depending purely on declaration order. **Point in-game daily
+assertions at `?practice=1` instead**: it mounts the same board with the same
+seed, claims nothing, and is not blocked by a finished day. `&play=1` is still
+right for a route that specifically needs a *claimed* attempt (`demo=review`
+seeds one on purpose).
+
+**2. A screen reachable only by a tap is invisible to tests AND screenshots.**
+Three merged tests asserted on the classic all-time leaderboard behind
+ClassicShell's ☰ sheet, which navigation cannot open — so they had never actually
+been checking a leaderboard. `?sheet=<sectionId>` now deep-links any sheet tab
+(`menu`, `leaderboard`, `history`, `stats`, `settings`, ignored when the game has
+no such section). Add a deep link rather than retargeting the assertion at
+whatever the route happens to render.
+
+Two real bugs were hiding behind those stale tests, which is the argument for
+not just deleting them:
+
+- **`ClassicLeaderboard` only read `data.entries`.** The per-game boards reached
+  through `url` return `{ top }` (`/api/snake/leaderboard`), so Snake's sheet
+  leaderboard rendered "No scores yet — play to rank!" however many scores
+  existed. It now accepts either key.
+- **Snake's difficulty chooser passed `sheetSections={[]}`**, so the leaderboard
+  was unreachable until you had already committed to a difficulty — the one
+  moment you'd most want it. It now carries that one section.
+
+Also stale, and worth knowing when writing assertions: the phase-7 home reorg
+deleted the "Daily Puzzles" / "Classic Games" section titles (it is one merged
+**All Games** grid with filter chips now), and the rename sweep made "Mini
+Sudoku" just **Sudoku**. Prefer `expectSelector` for structure and reserve
+`expectText` for copy that is genuinely part of the product's voice — and note
+that `innerText` reflects `text-transform`, so a `.plabel` reading "Board" in the
+source matches "BOARD" at runtime.

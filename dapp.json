@@ -941,6 +941,61 @@
       "name": "Snake leaderboard reachable before picking a difficulty",
       "path": "/?game=snake&sheet=leaderboard",
       "expectSelector": ".cg-sheet.open"
+    },
+    {
+      "name": "Merged cards offer two play buttons",
+      "path": "/",
+      "expectSelector": ".card.paired .card-modes"
+    },
+    {
+      "name": "Merged card carries a free-play and a daily button",
+      "path": "/",
+      "expectSelector": ".card.paired .card-mode-btn.daily.fresh"
+    },
+    {
+      "name": "Paired cards appear under the Daily filter",
+      "path": "/?tab=daily",
+      "expectSelector": ".card.paired .card-mode-btn.regular"
+    },
+    {
+      "name": "Paired cards appear under the Classic filter",
+      "path": "/?tab=classic",
+      "expectSelector": ".card.paired .card-mode-btn.daily"
+    },
+    {
+      "name": "A finished daily mutes only its own button",
+      "path": "/?demo=dualmode",
+      "expectSelector": ".card.paired .card-mode-btn.daily.played"
+    },
+    {
+      "name": "Free play stays live after the daily is done",
+      "path": "/?demo=dualmode",
+      "expectSelector": ".card.paired:not(.done) .card-mode-btn.regular"
+    },
+    {
+      "name": "An unfinished daily offers Resume on the card",
+      "path": "/?demo=dualmode",
+      "expectSelector": ".card.paired .card-mode-btn.daily.resume"
+    },
+    {
+      "name": "Mine Finder card names both versions",
+      "path": "/",
+      "expectText": "Mine Finder Classic"
+    },
+    {
+      "name": "Mancala card surfaces the Daily Challenge",
+      "path": "/",
+      "expectText": "Daily Challenge"
+    },
+    {
+      "name": "Single-mode cards render unchanged",
+      "path": "/",
+      "expectSelector": ".card:not(.paired) .tag"
+    },
+    {
+      "name": "Merged card in dark theme",
+      "path": "/?theme=dark",
+      "expectSelector": "html[data-theme=\"dark\"] .card.paired .card-mode-btn.daily"
     }
   ],
   "visibility": {

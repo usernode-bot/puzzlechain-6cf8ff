@@ -452,6 +452,11 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
+  /* #146 — dual-mode cards are ~140px taller than a single-mode card (they
+     carry two mode buttons). Default grid stretch would blow every card in
+     their row up to that height, leaving big empty voids under the short
+     ones; let each card hug its own content instead. */
+  align-items: start;
 }
 
 @media (max-width: 380px) {
@@ -1109,6 +1114,53 @@ html.un-scroll-locked, body.un-scroll-locked {
   align-items: center;
   gap: 0.4rem;
 }
+
+/* ---- Dual-mode (paired) lobby card (#146) ----
+   A game that exists in BOTH an endless free-play form and a once-a-day form
+   gets ONE card with two buttons instead of two near-duplicate cards. The card
+   itself is never dimmed/locked — only the daily button changes state, so
+   finishing today's daily can't make the free-play half look unavailable. */
+.card.paired { cursor: default; }
+.card.paired:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
+.card-modes {
+  display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.8rem;
+}
+.card-mode-btn {
+  display: block; width: 100%; text-align: left;
+  font-family: inherit; color: ${C.text};
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.cmb-label { display: block; font-size: 0.82rem; font-weight: 700; line-height: 1.25; }
+.cmb-caption {
+  display: block; font-size: 0.72rem; line-height: 1.3; margin-top: 0.1rem;
+  color: ${C.muted};
+}
+.card-mode-btn.regular:hover { border-color: var(--accent, ${C.accent}); }
+.card-mode-btn.regular:hover .cmb-label { color: var(--accent, ${C.accent}); }
+.card-mode-btn.daily.fresh {
+  background: var(--accent, ${C.accent});
+  border-color: var(--accent, ${C.accent});
+}
+.card-mode-btn.daily.fresh .cmb-label { color: #fff; }
+.card-mode-btn.daily.fresh .cmb-caption { color: rgba(255,255,255,0.85); }
+.card-mode-btn.daily.fresh:hover { filter: brightness(0.9); }
+.card-mode-btn.daily.resume {
+  background: ${ca('gold', '16')};
+  border-color: ${ca('gold', '35')};
+}
+.card-mode-btn.daily.resume .cmb-label { color: ${C.gold}; }
+.card-mode-btn.daily.played {
+  background: ${ca('emerald', '14')};
+  border-color: ${ca('emerald', '30')};
+}
+.card-mode-btn.daily.played .cmb-label { color: ${C.emerald}; }
+.card-mode-btn.daily.played .cmb-caption { font-family: 'JetBrains Mono', monospace; }
 
 /* ---- Leaderboard scope tabs + rating ladder (phase 4) ---- */
 .lb-scope-tabs { display: flex; gap: 0.35rem; margin: 0.5rem 0 0.6rem; flex-wrap: wrap; }
@@ -6370,6 +6422,34 @@ function runClientSelfTests() {
     return true;
   });
 
+  // #146 — a merged dual-mode card is assembled by id, so a rename that misses
+  // GAME_PAIRS would silently DROP both halves from the home grid (the walk
+  // would never match the pair, and the pair's card would never be emitted).
+  check('registry-pairs', () => {
+    const ids = new Set(GAMES.map(g => g.id));
+    const seen = new Set();
+    for (const p of GAME_PAIRS) {
+      if (ids.has(p.key)) throw new Error('pair key collides with a game id: ' + p.key);
+      for (const side of ['regular', 'daily']) {
+        const d = p[side];
+        if (!ids.has(d.gameId)) throw new Error(p.key + '.' + side + ' → unknown game ' + d.gameId);
+      }
+      // The daily half must really be a daily — except the Mancala form, whose
+      // daily is an in-component mode of a classic entry.
+      if (!p.daily.startMode) {
+        const dg = GAMES.find(g => g.id === p.daily.gameId);
+        if (dg.category !== 'daily') throw new Error(p.key + '.daily is not category daily');
+        const rg = GAMES.find(g => g.id === p.regular.gameId);
+        if (rg.category === 'daily') throw new Error(p.key + '.regular must not be a daily');
+      }
+      for (const id of new Set([p.regular.gameId, p.daily.gameId])) {
+        if (seen.has(id)) throw new Error('game in more than one pair: ' + id);
+        seen.add(id);
+      }
+    }
+    return true;
+  });
+
   // Phase 7 — the rules registry must be reachable from the browser now that
   // local/bot modes share it with the server.
   check('board-rules', () => {
@@ -6381,7 +6461,7 @@ function runClientSelfTests() {
     console.error('[self-test] client self-tests FAILED:\n  ' + fails.join('\n  '));
     return false;
   }
-  console.log('[self-test] client self-tests passed (' + '8 groups' + ')');
+  console.log('[self-test] client self-tests passed (' + '9 groups' + ')');
   return true;
 }
 
@@ -6816,6 +6896,14 @@ const STREAK_TIERS = [
    entry id in localStorage, like the how-to first-open state).
    ============================================================ */
 const CHANGELOG = [
+  {
+    id: 'w2026-08-03',
+    weekOf: 'Week of August 3, 2026',
+    items: [
+      'Snake, Bounce, Tile Match, Mine Finder and Mancala are one card each now — one button for free play, one for today’s challenge.',
+      'Finishing a daily no longer greys out the whole game: the free-play button stays live, and the daily button shows your score and the countdown.',
+    ],
+  },
   {
     id: 'w2026-07-27',
     weekOf: 'Week of July 27, 2026',
@@ -11745,9 +11833,15 @@ function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline, onSelect
 /* ============================================================
    Game 5 — Mancala wrapper (delegates to mode sub-components)
    ============================================================ */
-function MancalaGame({ onWin, onStepChange, resetKey, gameMode, onModeChange, offset }) {
+function MancalaGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onModeChange, offset }) {
+  // #146 — the merged lobby card's "🗓️ Daily Challenge" button pre-seats this
+  // mode through gameModeOpts.startMode. Deliberately NOT via classicGameMode:
+  // that prop's documented values are 'bot' | '2p' | 'online' | null and the
+  // ClassicShell mode pill reads it. ?mmode=daily keeps working unchanged.
   const [mode, setMode]               = useState(() =>
-    new URLSearchParams(window.location.search).get('mmode') === 'daily' ? 'daily' : null);
+    (gameModeOpts && gameModeOpts.startMode === 'daily')
+      || new URLSearchParams(window.location.search).get('mmode') === 'daily'
+      ? 'daily' : null);
   const [difficulty, setDifficulty]   = useState(null);
   const [roomId, setRoomId]           = useState(null);
   const [myPlayerNum, setMyPlayerNum] = useState(null);
@@ -23108,6 +23202,193 @@ const GAMES = [
 ];
 
 /* ============================================================
+   #146 — dual-mode pairing (CLIENT-ONLY, purely presentational)
+   ============================================================
+   Five games exist in BOTH an endless free-play form and a once-a-day form,
+   and until now each pair took two near-duplicate cards on the home grid —
+   with nothing on either card saying the other existed. Worse: finishing
+   today's daily dimmed its card to 55% and printed "🔒 … resets in", which
+   reads as "this whole game is gone until tomorrow" even though the endless
+   version was sitting right there under a different name.
+
+   This table merges each pair into ONE card with two buttons. It is
+   deliberately NOT a field on the GAMES entries: GAMES is kept in sync with
+   server.js's GAME_REGISTRY by id/category/manifest, and nothing about this
+   merge is server-visible. Every route, seed, lock, leaderboard and streak
+   still keys off the real registry ids below.
+
+   Shape: { key, name, icon, tag, tagColor, desc, regular, daily }, where each
+   mode descriptor is { gameId, label, caption }. `daily.startMode` marks the
+   Mancala form — its Daily Challenge is an in-component mode backed by its own
+   /api/mancala/daily routes, NOT a daily_attempts row, so that card gets no
+   played/resume badge (its own screen shows the lock state on open).
+   ============================================================ */
+const GAME_PAIRS = [
+  {
+    key: 'pair:tilematch',
+    name: 'Tile Match Puzzle',
+    icon: '🀄',
+    tag: 'Puzzle',
+    tagColor: GA.violet,
+    desc: 'Clear layered tile boards into a 7-slot tray — three of a kind clears.',
+    regular: {
+      gameId: 'tilematching',
+      label: '▶ Free Play',
+      caption: 'Endless boards — replay as much as you like',
+    },
+    daily: {
+      gameId: 'tilematchingdaily',
+      label: '🗓️ Daily Puzzle',
+      caption: "Daily Tile Match Puzzle — today's shape, one attempt",
+    },
+  },
+  {
+    key: 'pair:minefinder',
+    name: 'Mine Finder',
+    icon: '💣',
+    tag: 'Risk',
+    tagColor: GA.coral,
+    desc: 'Sweep a minefield using the numbers — one wrong tap ends the run.',
+    regular: {
+      gameId: 'minesweeper',
+      label: '▶ Free Play',
+      caption: 'Mine Finder Classic — 8×8, Lock In to bank a multiplier',
+    },
+    daily: {
+      gameId: 'minefinder',
+      label: "🗓️ Today's Field",
+      caption: 'One run, same board for everyone',
+    },
+  },
+  {
+    key: 'pair:snake',
+    name: 'Snake',
+    icon: '🐍',
+    tag: 'Arcade',
+    tagColor: GA.lime,
+    desc: "Steer, eat, grow — don't hit a wall or your own tail.",
+    regular: {
+      gameId: 'snake',
+      label: '▶ Free Play',
+      caption: 'Endless free play — pick your speed',
+    },
+    daily: {
+      gameId: 'snakedaily',
+      label: '🗓️ Daily Snake',
+      caption: "Today's apple trail, 20 to win",
+    },
+  },
+  {
+    key: 'pair:bounce',
+    name: 'Bounce',
+    icon: '🧱',
+    tag: 'Arcade',
+    tagColor: GA.coral,
+    desc: 'Smash every brick with a bouncing ball.',
+    regular: {
+      gameId: 'bounce',
+      label: '▶ Free Play',
+      caption: 'Endless walls — chase a high score',
+    },
+    daily: {
+      gameId: 'bouncedaily',
+      label: '🗓️ Daily Bounce',
+      caption: "Today's wall, three balls",
+    },
+  },
+  {
+    key: 'pair:mancala',
+    name: 'Mancala',
+    icon: '🫘',
+    tag: 'Strategy',
+    tagColor: GA.amber,
+    desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
+    regular: {
+      gameId: 'mancala',
+      label: '▶ Play',
+      caption: 'Bot, pass-and-play, or online',
+    },
+    daily: {
+      gameId: 'mancala',
+      startMode: 'daily',
+      label: '🗓️ Daily Challenge',
+      caption: 'One puzzle a day',
+    },
+  },
+];
+
+// id → pair lookups for the grid walk. The Mancala pair appears in the regular
+// map only (both its halves are the same registry entry).
+const PAIR_BY_REGULAR_ID = {};
+const PAIR_BY_DAILY_ID = {};
+for (const p of GAME_PAIRS) {
+  PAIR_BY_REGULAR_ID[p.regular.gameId] = p;
+  if (!p.daily.startMode) PAIR_BY_DAILY_ID[p.daily.gameId] = p;
+}
+
+/* One merged lobby card: shared identity, then a button per mode. The card is
+   NEVER given .done/.locked/.inprogress — only the daily button carries the
+   per-day state, which is the entire point of the merge. */
+function PairedGameCard({ pair, attempts, nextResetUtc, offset, loading, onPlayRegular, onPlayDaily }) {
+  // Mancala's daily lives outside daily_attempts, so it has no card state.
+  const a = pair.daily.startMode ? null : attempts[pair.daily.gameId];
+  const finished = !!(a && a.finishedAt);
+  const inProgress = !!a && !finished;
+  const dailyState = finished ? 'played' : inProgress ? 'resume' : 'fresh';
+  const dailyLabel = finished
+    ? `✓ Played · +${a.score != null ? a.score : 0} pts`
+    : inProgress
+      ? '▶ Resume today’s run'
+      : pair.daily.label;
+  const dailyCaption = finished
+    ? `resets in ${fmtCountdown((nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}`
+    : inProgress
+      ? 'Pick up where you left off'
+      : pair.daily.caption;
+  return (
+    <div
+      className="card paired"
+      style={{ '--accent': pair.tagColor }}
+      role="group"
+      aria-label={pair.name}
+    >
+      {!pair.daily.startMode && (
+        <span className={'card-daily-badge' + (finished ? ' done' : inProgress ? ' resume' : ' fresh')}>
+          {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}
+        </span>
+      )}
+      <div className="card-icon">{pair.icon}</div>
+      <div className="card-name">{pair.name}</div>
+      <div className="card-desc">{pair.desc}</div>
+      <span
+        className="tag mono"
+        style={{ background: pair.tagColor + '22', color: pair.tagColor }}
+      >
+        {pair.tag}
+      </span>
+      <div className="card-modes">
+        <button
+          className="card-mode-btn tappable regular"
+          aria-label={`${pair.name} — ${pair.regular.label.replace(/^[^A-Za-z]+/, '')}`}
+          {...tapProps(() => { if (!loading) onPlayRegular(pair); })}
+        >
+          <span className="cmb-label">{pair.regular.label}</span>
+          <span className="cmb-caption">{pair.regular.caption}</span>
+        </button>
+        <button
+          className={`card-mode-btn tappable daily ${dailyState}`}
+          aria-label={`${pair.name} — ${dailyLabel.replace(/^[^A-Za-z]+/, '')}`}
+          {...tapProps(() => { if (!loading) onPlayDaily(pair); })}
+        >
+          <span className="cmb-label">{dailyLabel}</span>
+          <span className="cmb-caption">{dailyCaption}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Root app
    ============================================================ */
 // Next-milestone progress hints so a player who finished today sees concrete
@@ -24635,11 +24916,62 @@ function App() {
                 // within each group and dailies lead, so the fresh puzzles are
                 // what a player meets first; the corner badge, not a section
                 // heading, is what marks a card as a daily.
-                const ordered = [
+                const registryOrder = [
                   ...GAMES.filter(g => g.category === 'daily'),
                   ...GAMES.filter(g => g.category !== 'daily'),
-                ].filter(g => homeFilter === 'all'
-                  || (homeFilter === 'daily' ? g.category === 'daily' : g.category !== 'daily'));
+                ];
+                /* #146 — walk the registry order ONCE, emitting a merged card
+                   the first time either half of a pair is met and skipping the
+                   other half. Because dailies lead, each merged card lands at
+                   its daily half's position (Mancala, whose pair has no daily
+                   registry entry, lands at its classic position).
+
+                   Filtering happens AFTER the merge on purpose: a merged card
+                   is both daily and classic, so it passes every chip. Filtering
+                   GAMES first would break the walk under the 'classic' chip
+                   (the daily half would be gone and the card would move). */
+                const emittedPairs = new Set();
+                const items = [];
+                for (const g of registryOrder) {
+                  const pair = PAIR_BY_DAILY_ID[g.id] || PAIR_BY_REGULAR_ID[g.id];
+                  if (pair) {
+                    if (emittedPairs.has(pair.key)) continue;
+                    emittedPairs.add(pair.key);
+                    items.push({ pair });
+                  } else {
+                    items.push({ game: g });
+                  }
+                }
+                const ordered = items.filter(it => it.pair
+                  || homeFilter === 'all'
+                  || (homeFilter === 'daily'
+                    ? it.game.category === 'daily'
+                    : it.game.category !== 'daily'));
+                // Launch the free-play half of a pair (same path the plain card takes).
+                const playPairRegular = (pair) => {
+                  const g = GAMES.find(x => x.id === pair.regular.gameId);
+                  if (!g) return;
+                  if (g.preLaunchModal) { setPreLaunchGame(g); return; }
+                  setClassicGameMode(null);
+                  setClassicGameModeOpts(null);
+                  launchGame(g);
+                };
+                // Launch the daily half. For registry-backed dailies launchGame
+                // already routes finished → locked result screen and everything
+                // else → pre-game (so the day's attempt is still only claimed by
+                // the pre-game Play button). Mancala pre-seats its in-component
+                // Daily Challenge mode through gameModeOpts instead.
+                const playPairDaily = (pair) => {
+                  const g = GAMES.find(x => x.id === pair.daily.gameId);
+                  if (!g) return;
+                  if (pair.daily.startMode) {
+                    setClassicGameMode(null);
+                    setClassicGameModeOpts({ startMode: pair.daily.startMode });
+                    launchGame(g);
+                    return;
+                  }
+                  launchGame(g);
+                };
                 return (
                   <React.Fragment>
                     <div className="home-section-title">All Games</div>
@@ -24662,7 +24994,20 @@ function App() {
                         >{f.label}</button>
                       ))}
                     </div>
-                    <div className="grid">{ordered.map(gameCard)}</div>
+                    <div className="grid">
+                      {ordered.map(it => it.pair ? (
+                        <PairedGameCard
+                          key={it.pair.key}
+                          pair={it.pair}
+                          attempts={attempts}
+                          nextResetUtc={nextResetUtc}
+                          offset={offset}
+                          loading={loading}
+                          onPlayRegular={playPairRegular}
+                          onPlayDaily={playPairDaily}
+                        />
+                      ) : gameCard(it.game))}
+                    </div>
                   </React.Fragment>
                 );
               })()}

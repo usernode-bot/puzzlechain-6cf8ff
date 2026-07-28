@@ -272,17 +272,17 @@
     },
     {
       "name": "Sudoku difficulty chooser renders",
-      "path": "/?game=sudoku&play=1",
+      "path": "/?game=sudoku&practice=1",
       "expectText": "9×9 Classic"
     },
     {
       "name": "Word Search shows Hint bar",
-      "path": "/?game=wordhunt&play=1",
+      "path": "/?game=wordhunt&practice=1",
       "expectText": "Hint"
     },
     {
       "name": "Daily Tile Match shows Hint bar",
-      "path": "/?game=tilematchingdaily&play=1",
+      "path": "/?game=tilematchingdaily&practice=1",
       "expectText": "Hint"
     },
     {
@@ -342,7 +342,7 @@
     },
     {
       "name": "Snake leaderboard renders seeded scores",
-      "path": "/?game=snake&demo=classic-scores",
+      "path": "/?game=snake&demo=classic-scores&sheet=leaderboard",
       "expectText": "Staging demo Ada"
     },
     {
@@ -352,12 +352,12 @@
     },
     {
       "name": "Diamond Rush leaderboard renders seeded scores",
-      "path": "/?game=diamondrush&demo=classic-scores",
+      "path": "/?game=diamondrush&demo=classic-scores&sheet=leaderboard",
       "expectText": "Staging demo Ada"
     },
     {
       "name": "Chutes Ladders leaderboard renders seeded scores",
-      "path": "/?game=chutes-ladders&demo=classic-scores",
+      "path": "/?game=chutes-ladders&demo=classic-scores&sheet=leaderboard",
       "expectText": "Staging demo Ada"
     },
     {
@@ -392,27 +392,27 @@
     },
     {
       "name": "Checkers screen offers online room setup",
-      "path": "/?game=checkers&play=1",
+      "path": "/?game=checkers&play=1&mode=online",
       "expectText": "Create Room"
     },
     {
       "name": "Reversi screen offers online room setup",
-      "path": "/?game=reversi&play=1",
+      "path": "/?game=reversi&play=1&mode=online",
       "expectText": "Create Room"
     },
     {
       "name": "Four in a Row screen offers online room setup",
-      "path": "/?game=fourinarow&play=1",
+      "path": "/?game=fourinarow&play=1&mode=online",
       "expectText": "Create Room"
     },
     {
       "name": "Gomoku screen offers online room setup",
-      "path": "/?game=gomoku&play=1",
+      "path": "/?game=gomoku&play=1&mode=online",
       "expectText": "Create Room"
     },
     {
       "name": "Ludo screen offers online room setup",
-      "path": "/?game=ludo&play=1",
+      "path": "/?game=ludo&play=1&mode=online",
       "expectText": "Create Room"
     },
     {
@@ -442,12 +442,12 @@
     },
     {
       "name": "Mine Finder canvas board renders in-game",
-      "path": "/?game=minefinder&play=1",
+      "path": "/?game=minefinder&practice=1",
       "expectSelector": "canvas.mf-canvas"
     },
     {
       "name": "Mine Finder Dig/Flag mode control renders",
-      "path": "/?game=minefinder&play=1",
+      "path": "/?game=minefinder&practice=1",
       "expectText": "Mode: Dig"
     },
     {
@@ -467,12 +467,12 @@
     },
     {
       "name": "Nonogram board renders in-game",
-      "path": "/?game=nonogram&play=1",
+      "path": "/?game=nonogram&practice=1",
       "expectSelector": "canvas.ng-canvas"
     },
     {
       "name": "Drop Stack well renders in-game",
-      "path": "/?game=dropstack&play=1",
+      "path": "/?game=dropstack&practice=1",
       "expectSelector": "canvas.ds-canvas"
     },
     {
@@ -583,12 +583,14 @@
     {
       "name": "Dark theme renders the daily lobby",
       "path": "/?theme=dark",
-      "expectText": "Daily Puzzles"
+      "expectText": "All Games",
+      "expectSelector": "html[data-theme=\"dark\"] .home-filter-chips"
     },
     {
       "name": "Dark theme renders a per-game leaderboard",
-      "path": "/?demo=leaderboard&theme=dark&game=sudoku",
-      "expectText": "Mini Sudoku"
+      "path": "/?demo=locked&theme=dark&game=sudoku",
+      "expectText": "Today's leaderboard",
+      "expectSelector": "html[data-theme=\"dark\"] .lboard"
     },
     {
       "name": "Word Sprint pre-game screen",
@@ -597,7 +599,7 @@
     },
     {
       "name": "Word Sprint letter grid renders in-game",
-      "path": "/?game=wordsprint&play=1",
+      "path": "/?game=wordsprint&practice=1",
       "expectSelector": ".wspr-grid"
     },
     {
@@ -607,7 +609,7 @@
     },
     {
       "name": "Daily Snake board renders in-game",
-      "path": "/?game=snakedaily&play=1",
+      "path": "/?game=snakedaily&practice=1",
       "expectSelector": ".dsnk-board"
     },
     {
@@ -617,7 +619,7 @@
     },
     {
       "name": "Daily Bounce canvas renders in-game",
-      "path": "/?game=bouncedaily&play=1",
+      "path": "/?game=bouncedaily&practice=1",
       "expectSelector": ".dbnc-canvas"
     },
     {
@@ -627,7 +629,7 @@
     },
     {
       "name": "Ludo setup offers 2-4 player rooms",
-      "path": "/?game=ludo&play=1",
+      "path": "/?game=ludo&play=1&mode=online",
       "expectText": "4 players"
     },
     {
@@ -662,22 +664,22 @@
     },
     {
       "name": "Nonogram canvas board renders in-game",
-      "path": "/?game=nonogram&play=1",
+      "path": "/?game=nonogram&practice=1",
       "expectSelector": "canvas.ng-canvas"
     },
     {
       "name": "Nonogram fill/mark controls render",
-      "path": "/?game=nonogram&play=1",
+      "path": "/?game=nonogram&practice=1",
       "expectText": "Mark"
     },
     {
       "name": "Drop Stack canvas well renders in-game",
-      "path": "/?game=dropstack&play=1",
+      "path": "/?game=dropstack&practice=1",
       "expectSelector": "canvas.ds-canvas"
     },
     {
       "name": "Drop Stack shows the Hold slot",
-      "path": "/?game=dropstack&play=1",
+      "path": "/?game=dropstack&practice=1",
       "expectSelector": ".ds-hold"
     },
     {
@@ -702,7 +704,7 @@
     },
     {
       "name": "Daily Tile Match shows the day difficulty label",
-      "path": "/?game=tilematchingdaily&play=1",
+      "path": "/?game=tilematchingdaily&practice=1",
       "expectSelector": ".tm-daylabel"
     },
     {
@@ -714,6 +716,231 @@
       "name": "Review demo seeds the nonogram board",
       "path": "/?demo=review&game=nonogram&play=1",
       "expectSelector": "canvas.ng-canvas"
+    },
+    {
+      "name": "Nonogram board is not a black grid (canvas reads PAL)",
+      "path": "/?demo=solvedboard&game=nonogram&review=1",
+      "expectSelector": ".ng-boardbox canvas.ng-canvas"
+    },
+    {
+      "name": "Nonogram board renders in dark theme too",
+      "path": "/?demo=solvedboard&game=nonogram&review=1&theme=dark",
+      "expectSelector": ".ng-boardbox canvas.ng-canvas"
+    },
+    {
+      "name": "Mine Finder board renders in dark theme",
+      "path": "/?game=minefinder&play=1&theme=dark",
+      "expectSelector": "canvas.mf-canvas"
+    },
+    {
+      "name": "Drop Stack well renders in light theme",
+      "path": "/?game=dropstack&play=1&theme=light",
+      "expectSelector": "canvas.ds-canvas"
+    },
+    {
+      "name": "Hash Rush lanes follow the light theme",
+      "path": "/?game=hashrush&theme=light",
+      "expectText": "Start mining"
+    },
+    {
+      "name": "Daily Cipher keyboard renders full-size keys",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectSelector": ".cw-key"
+    },
+    {
+      "name": "Daily Cipher Enter key is on screen",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectText": "ENTER"
+    },
+    {
+      "name": "Klondike states the empty-column King rule",
+      "path": "/?game=klondike&practice=1",
+      "expectText": "Only a King starts an empty column"
+    },
+    {
+      "name": "Klondike offers a Give up escape",
+      "path": "/?game=klondike&practice=1",
+      "expectText": "Give up"
+    },
+    {
+      "name": "Spider offers a Give up escape",
+      "path": "/?game=spider&practice=1",
+      "expectText": "Give up"
+    },
+    {
+      "name": "Gomoku pass-and-play confirms before placing",
+      "path": "/?game=gomoku&mode=2p",
+      "expectText": "Tap a point"
+    },
+    {
+      "name": "Ludo pass-and-play board renders",
+      "path": "/?game=ludo&mode=2p",
+      "expectSelector": ".ludo-board"
+    },
+    {
+      "name": "Word Sprint found-list has its own scroll strip",
+      "path": "/?game=wordsprint&practice=1",
+      "expectSelector": ".fit-col .wspr-grid"
+    },
+    {
+      "name": "Daily Bounce runs in the fit column",
+      "path": "/?game=bouncedaily&practice=1",
+      "expectSelector": ".fit-col .dbnc-canvas"
+    },
+    {
+      "name": "Daily Snake runs in the fit column",
+      "path": "/?game=snakedaily&practice=1",
+      "expectSelector": ".fit-col .dsnk-board"
+    },
+    {
+      "name": "Daily Cipher runs in the fit column",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectSelector": ".fit-col .cw-kbd"
+    },
+    {
+      "name": "Checkers board is capped to the viewport",
+      "path": "/?game=checkers&mode=2p",
+      "expectSelector": ".cg-stage .ck-board"
+    },
+    {
+      "name": "Locked day shows today's result, not just a countdown",
+      "path": "/?demo=solvedboard&game=nonogram",
+      "expectText": "Today's result"
+    },
+    {
+      "name": "Locked day offers the solved board for review",
+      "path": "/?demo=solvedboard&game=nonogram",
+      "expectText": "View board"
+    },
+    {
+      "name": "Locked day offers an unscored replay",
+      "path": "/?demo=solvedboard&game=nonogram",
+      "expectText": "Play again for fun"
+    },
+    {
+      "name": "Review board mounts the solved puzzle",
+      "path": "/?demo=solvedboard&game=nonogram&review=1",
+      "expectSelector": "canvas.ng-canvas"
+    },
+    {
+      "name": "Reviewed board keeps its Back button live",
+      "path": "/?demo=solvedboard&game=nonogram&review=1",
+      "expectSelector": ".game-wrap .back-btn"
+    },
+    {
+      "name": "Practice replay is labelled not scored",
+      "path": "/?game=nonogram&practice=1",
+      "expectSelector": ".practice-ribbon"
+    },
+    {
+      "name": "Offline result copy reassures instead of saying locked",
+      "path": "/?game=cratepush&practice=1&syncfail=1",
+      "expectSelector": ".cp-game"
+    },
+    {
+      "name": "Minesweeper offers a flag/dig toggle",
+      "path": "/?game=minesweeper",
+      "expectText": "Flag"
+    },
+    {
+      "name": "Minesweeper explains chording on numbers",
+      "path": "/?game=minesweeper",
+      "expectText": "Tap a number whose flags all match"
+    },
+    {
+      "name": "Hash Rush rules describe drag-to-steer",
+      "path": "/?game=hashrush",
+      "expectText": "Start mining"
+    },
+    {
+      "name": "Daily Cipher names the day's theme",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectText": "Today's theme"
+    },
+    {
+      "name": "Word Search grid is the larger 10x10 board",
+      "path": "/?game=wordhunt&practice=1",
+      "expectSelector": ".wordsearch"
+    },
+    {
+      "name": "Your rooms lists a room you hosted",
+      "path": "/?demo=myroom&game=reversi&rooms=mine",
+      "expectSelector": ".brd-myrooms"
+    },
+    {
+      "name": "A waiting room can be rejoined",
+      "path": "/?demo=myroom&game=reversi&rooms=mine",
+      "expectText": "Rejoin"
+    },
+    {
+      "name": "A waiting room can be closed",
+      "path": "/?demo=myroom&game=reversi&rooms=mine",
+      "expectText": "Close"
+    },
+    {
+      "name": "Reversi offers Versus Bot",
+      "path": "/?game=reversi",
+      "expectText": "Versus Bot"
+    },
+    {
+      "name": "Checkers offers pass-and-play",
+      "path": "/?game=checkers",
+      "expectText": "2 Players"
+    },
+    {
+      "name": "Versus Bot match starts locally",
+      "path": "/?game=fourinarow&mode=bot",
+      "expectSelector": ".fir-board"
+    },
+    {
+      "name": "Rules registry is reachable from the browser",
+      "path": "/board-rules.js",
+      "expectText": "boardRules"
+    },
+    {
+      "name": "Mahjong names today's board shape",
+      "path": "/?game=mahjongsol&practice=1",
+      "expectText": "Upper-layer clears"
+    },
+    {
+      "name": "Mahjong offers undo, hint and shuffle",
+      "path": "/?game=mahjongsol&practice=1",
+      "expectText": "Undo"
+    },
+    {
+      "name": "Daily Bounce how-to lists the power-ups",
+      "path": "/?game=bouncedaily",
+      "expectText": "power-ups"
+    },
+    {
+      "name": "Match 3 uses the design-system tile grid",
+      "path": "/?game=match3",
+      "expectSelector": ".m3-level"
+    },
+    {
+      "name": "Match 3 unlocks its first puzzle for a new player",
+      "path": "/?game=match3",
+      "expectText": "Getting Started"
+    },
+    {
+      "name": "Board games open a mode picker before Online",
+      "path": "/?game=checkers",
+      "expectText": "Choose a mode"
+    },
+    {
+      "name": "Gomoku offers pass-and-play from the picker",
+      "path": "/?game=gomoku",
+      "expectText": "2 Players"
+    },
+    {
+      "name": "Classic sheet is URL-reachable via ?sheet=",
+      "path": "/?game=diamondrush&sheet=leaderboard",
+      "expectSelector": ".cg-sheet.open"
+    },
+    {
+      "name": "Snake leaderboard reachable before picking a difficulty",
+      "path": "/?game=snake&sheet=leaderboard",
+      "expectSelector": ".cg-sheet.open"
     }
   ],
   "visibility": {

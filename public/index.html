@@ -166,9 +166,25 @@
     }
   </style>
 
+  <!-- Phase 8 (#128) — usernode-native UI kit. Centrally hosted, NEVER vendored:
+       fixes ship platform-side and propagate on the next page load. Sets
+       html.un-ios / .un-android / .un-desktop and exposes window.unNative.
+       Scope of adoption is CHROME ONLY (sheets, dialogs, toasts, safe areas,
+       screen transitions) — no native motion on boards, cells, cards or
+       canvases, because the kit's own fidelity rules forbid animating
+       high-frequency interactions and it would fight the tap primitive.
+       The viewport meta above already carries viewport-fit=cover. -->
+  <link rel="stylesheet" href="https://social-vibecoding.usernodelabs.org/usernode-native/v1/native.css">
+  <script src="https://social-vibecoding.usernodelabs.org/usernode-native/v1/native.js"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://social-vibecoding.usernodelabs.org/usernode-bridge/v1/bridge.js"></script>
+  <!-- Phase 7 (#144) — the SERVER'S turn-based rules registry, served verbatim
+       from lib/board-rules.js and published as window.boardRules. Loaded BEFORE
+       the app bootstrap so local pass-and-play / Versus Bot can referee with the
+       exact same pure functions the online rooms use, instead of a client-side
+       reimplementation that would eventually disagree about a legal move. -->
+  <script src="/board-rules.js"></script>
   <script src="/usernode-loading.js"></script>
   <script src="/usernode-usernames.js"></script>
 </head>

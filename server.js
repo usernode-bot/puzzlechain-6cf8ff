@@ -3415,6 +3415,46 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    // Staging-only demo seed (#146): the merged dual-mode cards need their two
+    // interesting daily states visible at once — a FINISHED daily (so the card
+    // shows "✓ Played" on the daily button while its free-play button stays
+    // fully live) and a CLAIMED-BUT-UNFINISHED one (the "▶ Resume today's run"
+    // button). NEW TODAY is the default state and needs no fixture.
+    //
+    // Game choice is deliberate, for the same reason demo=homegrid documents:
+    // the whole check suite runs against ONE staging DB in declaration order,
+    // so finishing a game breaks any later check that opens it.
+    //   • snakedaily is FINISHED — its only routes are ?game=snakedaily (which
+    //     asserts the text "Daily Snake", also rendered by the locked result
+    //     screen) and a ?practice=1 route, so finishing it is safe.
+    //   • bouncedaily is CLAIMED, NOT finished — a later check asserts
+    //     "power-ups" from its auto-shown how-to, which launchGame skips for a
+    //     FINISHED daily; a claimed-unfinished row still routes to pre-game.
+    //   • minefinder / tilematchingdaily are left alone: they own &play=1
+    //     checks and are re-seeded by demo=minefinder / demo=tilematch.
+    // Idempotent; today only; strict no-op in prod.
+    if (IS_STAGING && req.query.demo === 'dualmode') {
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+         VALUES ($1, $2, 'snakedaily', (now() AT TIME ZONE 'utc')::date, 610, 20, 74, now())
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET score = EXCLUDED.score, steps = EXCLUDED.steps,
+               time_secs = EXCLUDED.time_secs, finished_at = now()`,
+        [req.user.id, req.user.username || 'staging-demo-user']
+      );
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'bouncedaily', (now() AT TIME ZONE 'utc')::date, 3, 41, $3::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL, score = NULL, time_secs = NULL,
+               steps = EXCLUDED.steps, elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [req.user.id, req.user.username || 'staging-demo-user', JSON.stringify({ dualmodeDemo: true })]
+      );
+    }
+
     // Staging-only demo seed (slice 4): a claimed, unfinished NONOGRAM row so a
     // tester can land a few taps, finish, and exercise the results card's
     // "View board" against a real board. No dayNum in the payload, so the

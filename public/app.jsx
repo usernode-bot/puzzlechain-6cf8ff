@@ -607,13 +607,27 @@ html.un-scroll-locked, body.un-scroll-locked {
   overscroll-behavior: none;
   touch-action: pan-x pan-y;
 }
-.fit-col .numpad { margin-top: 0; }
+/* #149 — an AUTO CROSS-AXIS MARGIN OPTS A FLEX ITEM OUT OF align-items:stretch,
+   collapsing it to its fit-content size. Every one of these boards carries
+   "margin: … auto" for centering outside the fit column, and inside it that
+   silently shrank them: at 390px (a 361px column) sudoku rendered 220px, the
+   numpad 121px (tall thin ovals instead of digit keys), word search 224px,
+   word sprint 150px — and Daily Snake 16px, i.e. unplayable.
+   "width: 100%" makes the cross size DEFINITE again, so the autos resolve to 0
+   (or centre the board within its own max-width) instead of driving the size.
+   The fitcol-auto-margin self-test guards the whole class of bug. */
+.fit-col .numpad { margin-top: 0; width: 100%; }
 /* Fluid square grids (Sudoku, Word Hunt) fit BOTH axes natively — no
    transform needed, so their pointer-drag selection math is untouched. */
 .fit-col .sudoku, .fit-col .wordsearch {
-  width: auto; height: auto; max-width: 100%; max-height: 100%;
+  width: 100%; height: auto; max-width: 100%; max-height: 100%;
   margin: 0 auto; aspect-ratio: 1;
 }
+/* Same collapse, same cure: Word Sprint's 4×4 grid and Daily Snake's board
+   keep their own max-width caps (320 / 340) and centre within the column. */
+.fit-col .wspr-grid, .fit-col .dsnk-board { width: 100%; }
+/* Sudoku's difficulty chooser is a fixed-size card, not a board. */
+.fit-col .sdk-choose { flex: 0 0 auto; width: 100%; }
 .kl-inner { display: flex; flex-direction: column; }
 
 /* Scale-to-fit board wrapper (slice 5). The box is the flexible region; the
@@ -776,6 +790,10 @@ html.un-scroll-locked, body.un-scroll-locked {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   background: ${C.border};
+  /* #149 — the "background: border" idiom only shows as gridlines if the grid
+     actually has a gap. Without it the cells sat flush and no separators ever
+     rendered, which is what made the 9×9 board hard to read. */
+  gap: 1px;
   border: 2px solid ${C.border};
   border-radius: 10px;
   overflow: hidden;
@@ -846,17 +864,21 @@ html.un-scroll-locked, body.un-scroll-locked {
 .dsnk-cell.head { background: ${C.accent}; }
 .dsnk-cell.food { background: ${C.rose}; border-radius: 50%; }
 .dsnk-hint { text-align: center; color: ${C.muted}; font-size: 0.8rem; margin-top: 0.6rem; }
-.dbnc-wrap { display: flex; justify-content: center; }
+/* #149 — this is the flexible region of Daily Bounce's fit column, and its
+   measured box is what sizeCanvas() reads to scale the canvas. Before, the
+   canvas was pinned to its logical 320×430 and left ~135px of dead space. */
+.dbnc-wrap { display: flex; justify-content: center; align-items: center; }
+.fit-col .dbnc-wrap { flex: 1 1 auto; min-height: 0; min-width: 0; }
 .dbnc-canvas {
   border: 2px solid ${C.border}; border-radius: 10px; background: #10131c;
   touch-action: none; max-width: 100%;
 }
 /* ---- Ludo seats 3/4 (2–4 player boards) ---- */
-.ludo-cell.home3 { background: ${C.gold}22; }
+.ludo-cell.home3 { background: ${ca('gold','22')}; }
 .ludo-cell.home4 { background: ${GA.teal}22; }
-.ludo-cell.base3 { background: ${C.gold}33; border-color: ${C.gold}; }
+.ludo-cell.base3 { background: ${ca('gold','33')}; border-color: ${C.gold}; }
 .ludo-cell.base4 { background: ${GA.teal}33; border-color: ${GA.teal}; }
-.ludo-cell.start3 { background: ${C.gold}2e; }
+.ludo-cell.start3 { background: ${ca('gold','2e')}; }
 .ludo-cell.start4 { background: ${GA.teal}2e; }
 .ludo-token.p3 { background: ${C.gold}; }
 .ludo-token.p4 { background: ${GA.teal}; }
@@ -1244,6 +1266,7 @@ html.un-scroll-locked, body.un-scroll-locked {
   /* Kept in lockstep with WS_SIZE (#139). */
   grid-template-columns: repeat(10, 1fr);
   background: ${C.border};
+  gap: 1px; /* #149 — see .sudoku: no gap meant no gridlines ever rendered. */
   border: 2px solid ${C.border};
   border-radius: 10px;
   overflow: hidden;
@@ -4890,6 +4913,20 @@ html.un-scroll-locked, body.un-scroll-locked {
 .win-card .trophy { filter: none; }
 .win-card h2 { color: ${C.text}; }
 .score-row.total .v { color: ${C.gold}; }
+
+/* AppErrorBoundary fallback (#150). The stylesheet is mounted OUTSIDE the
+   boundary precisely so this panel can be styled when App's tree is gone. */
+.err-fallback {
+  max-width: 420px; margin: 4rem auto; padding: 2rem 1.5rem;
+  text-align: center; background: ${C.card};
+  border: 1px solid ${C.border}; border-radius: 16px;
+  box-shadow: 0 2px 10px var(--c-shadow-md);
+}
+.err-fallback .err-icon { font-size: 2.4rem; margin-bottom: 0.6rem; }
+.err-fallback h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+.err-fallback p {
+  color: ${C.muted}; font-size: 0.9rem; line-height: 1.5; margin: 0 0 1.4rem;
+}
 `;
 
 /* ============================================================
@@ -6316,12 +6353,42 @@ function tapProps(onTap, { disabled = false } = {}) {
    platform's no-console-errors proposal check — so a regression in any of these
    invariants blocks a merge instead of silently shipping.
    ============================================================ */
-function runClientSelfTests() {
+/* #150 — the barrier that keeps navState serializable. Every field of the
+   history reducer's nav state passes through here, because ONE DOM-bearing
+   value (React hands a SyntheticEvent to a bare `onClick={backToLobby}`)
+   made JSON.stringify throw "Converting circular structure to JSON" — and with
+   no error boundary above it, that unmounted the entire React root, stylesheet
+   included. Asserted by the nav-state-primitives self-test. */
+function navPrimitive(v) {
+  if (v == null) return null;
+  const t = typeof v;
+  if (t === 'string' || t === 'number' || t === 'boolean') return v;
+  return null; // objects/functions/symbols can never reach the serializer
+}
+
+/* `styleReady` is passed false when scheduleSelfTests() exhausted its retry
+   budget without ever seeing the app's <style> element. In that state EVERY
+   computed-style probe returns the UA default, so the touch-action sweep used
+   to report all 18 tappable classes as broken — which is exactly how #149 was
+   filed against the tap-target registry when the real cause was a crash that
+   unmounted the stylesheet (#150). One honest `stylesheet-missing` failure
+   beats 18 phantom ones, so the computed-style checks are SKIPPED instead. */
+function runClientSelfTests(styleReady) {
   const fails = [];
   const check = (name, fn) => {
+    ran++;
     try { if (fn() !== true) fails.push(name); }
     catch (e) { fails.push(name + ': ' + e.message); }
   };
+  let ran = 0;
+  const styleOk = styleReady !== false;
+  // Only runs when the stylesheet is actually live; otherwise it would report
+  // a layout/computed-style bug that doesn't exist.
+  const checkStyled = (name, fn) => { if (styleOk) check(name, fn); };
+  if (!styleOk) {
+    fails.push('stylesheet-missing: the app stylesheet never mounted, so ' +
+      'computed-style checks were skipped (they would all report the UA default)');
+  }
 
   // Phase 1 — canvas colours.
   check('canvas-colors', canvasColorSelfTest);
@@ -6392,15 +6459,121 @@ function runClientSelfTests() {
 
   // Phase 3 — every daily must opt into the one-viewport column, or it scrolls
   // (or clips) during play. This is the standing guarantee behind the audit.
+  // #149 — extended past the FLAG: fitShell without a .fit-col root CLIPS
+  // instead of fitting, so when a daily is actually mounted, assert the class
+  // is really on the tree. (Real-time dailies that render their own shell are
+  // out of scope; every category:'daily' game here uses shell:'daily'.)
   check('registry-fitshell', () => {
     const missing = GAMES.filter(g => g.category === 'daily' && !g.fitShell).map(g => g.id);
     if (missing.length) throw new Error('dailies missing fitShell: ' + missing.join(', '));
+    const wrap = document.querySelector('.game-wrap.fit');
+    if (wrap && !wrap.querySelector('.fit-col')) {
+      throw new Error('a fitShell daily is mounted with no .fit-col root — it will clip, not fit');
+    }
+    return true;
+  });
+
+  /* #149 — the collapse itself, measured. An auto cross-axis margin opts a
+     flex item out of `align-items: stretch`, so a board inside .fit-col
+     silently shrank to fit-content (Daily Snake rendered at 16px). Assert the
+     mounted board fills its column, up to its own max-width cap. */
+  checkStyled('fitcol-fill', () => {
+    const col = document.querySelector('.fit-col');
+    if (!col) return true; // no daily mounted right now
+    const BOARDS = '.sudoku, .wordsearch, .wspr-grid, .dsnk-board';
+    const board = col.querySelector(BOARDS);
+    if (!board) return true;
+    const colW = col.getBoundingClientRect().width;
+    if (colW < 40) return true; // laid out off-screen / mid-mount
+    const cs = getComputedStyle(board);
+    const cap = parseFloat(cs.maxWidth);
+    const want = Number.isFinite(cap) ? Math.min(colW, cap) : colW;
+    const got = board.getBoundingClientRect().width;
+    if (got < want - 4) {
+      throw new Error(board.className + ' is ' + Math.round(got) + 'px in a '
+        + Math.round(colW) + 'px column (expected ~' + Math.round(want) + 'px)');
+    }
+    return true;
+  });
+
+  /* #149, statically — fires even for a game that isn't mounted. A board rule
+     that sets an auto SIDE margin without a definite width is the bug class;
+     inside .fit-col that always collapses the board. */
+  check('fitcol-auto-margin', () => {
+    const BOARDS = ['sudoku', 'wordsearch', 'wspr-grid', 'dsnk-board', 'numpad'];
+    const bad = [];
+    for (const cls of BOARDS) {
+      // Grab the .fit-col-scoped rule bodies for this class.
+      const re = new RegExp('\\.fit-col[^{}]*\\.' + cls + '\\b[^{}]*\\{([^}]*)\\}', 'g');
+      let m, sawRule = false;
+      while ((m = re.exec(css))) {
+        sawRule = true;
+        const body = m[1];
+        /* A DEFINITE width is what re-enables stretch. Read the declared value
+           and compare it, rather than a `(?!auto)` lookahead — `\s*` backtracks
+           to zero width there, so `width: auto` would slip past and make this
+           whole check vacuous. `max-width` is not matched: the char before
+           `width` must be `;`/whitespace/start, never `-`. */
+        let hasWidth = false, wm;
+        const wre = /(^|[;\s])width\s*:([^;]+)/g;
+        while ((wm = wre.exec(body))) {
+          if (wm[2].trim().toLowerCase() !== 'auto') hasWidth = true;
+        }
+        const autoSide = /(^|[;\s])margin\s*:[^;]*\bauto\b/.test(body)
+          || /margin-(left|right|inline-start|inline-end|inline)\s*:\s*auto/.test(body);
+        if (autoSide && !hasWidth) bad.push('.fit-col .' + cls);
+      }
+      if (!sawRule) bad.push('.fit-col .' + cls + ' (no fit-col override at all)');
+    }
+    if (bad.length) throw new Error('auto side margin without a definite width: ' + bad.join(', '));
+    return true;
+  });
+
+  /* #149 — the CSS half of the token mistake guardCanvasCtx catches on canvas.
+     `C.x` is the string 'var(--c-x)', so `${C.gold}22` emits `var(--c-gold)22`,
+     which is invalid and computes to transparent. Use ca('gold','22') instead.
+     This caught three dead Ludo seat-3 tints. */
+  check('token-alpha-concat', () => {
+    const bad = [];
+    const re = /var\(--c-[a-z0-9-]+\)([0-9a-fA-F]{2,8})\b/g;
+    let m;
+    while ((m = re.exec(css))) {
+      const at = Math.max(0, m.index - 60);
+      bad.push(css.slice(at, m.index + m[0].length).split('\n').pop().trim());
+    }
+    if (bad.length) {
+      throw new Error('hex alpha concatenated onto a var() token (use ca()): ' + bad.join(' | '));
+    }
+    return true;
+  });
+
+  /* #150 — navState is JSON.stringify'd every render, so ONE non-primitive
+     field (a SyntheticEvent handed to backToLobby as `tab`) threw
+     "Converting circular structure to JSON" and unmounted the whole root.
+     This is the mechanical form of that invariant: navPrimitive must reject
+     everything a serializer can choke on. */
+  check('nav-state-primitives', () => {
+    const el = document.createElement('button');
+    const circular = { self: null }; circular.self = circular;
+    for (const hostile of [el, circular, { a: 1 }, [1, 2], () => {}, Symbol('x')]) {
+      if (navPrimitive(hostile) !== null) {
+        throw new Error('navPrimitive let through ' + typeof hostile);
+      }
+    }
+    for (const ok of ['home', 7, true, false]) {
+      if (navPrimitive(ok) !== ok) throw new Error('navPrimitive dropped a primitive: ' + String(ok));
+    }
+    if (navPrimitive(null) !== null || navPrimitive(undefined) !== null) {
+      throw new Error('navPrimitive must map null/undefined to null');
+    }
+    // And the whole shape must survive a round-trip.
+    JSON.stringify({ screen: navPrimitive(el), lobbyTab: navPrimitive('home') });
     return true;
   });
 
   // Phase 2 — a tappable class that isn't in the touch-action allowlist pays
   // the browser's double-tap delay on every tap.
-  check('registry-touch-action', () => {
+  checkStyled('registry-touch-action', () => {
     const CLASSES = [
       'mj-tile', 'wspr-tile', 'ce-card', 'scell', 'numkey', 'wcell', 'cw-key',
       'ms-cell', 'mnc-pit', 'kt-cell', 'ck-cell', 'rv-cell', 'fir-cell',
@@ -6461,7 +6634,7 @@ function runClientSelfTests() {
     console.error('[self-test] client self-tests FAILED:\n  ' + fails.join('\n  '));
     return false;
   }
-  console.log('[self-test] client self-tests passed (' + '9 groups' + ')');
+  console.log('[self-test] client self-tests passed (' + ran + ' checks)');
   return true;
 }
 
@@ -7320,6 +7493,17 @@ function sudokuSolved(grid) {
 // progress so a resumed attempt reopens the same board.
 const SUDOKU_MULT = { mini: 1, classic: 2 };
 
+/* ?sdk=9 → the 9×9 Classic board, ?sdk=6 → the 6×6 Mini board. Anything else
+   (including no param) means "show the chooser", the normal flow. */
+function sdkDeepLinkDifficulty() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('sdk');
+    if (v === '9' || v === 'classic') return 'classic';
+    if (v === '6' || v === 'mini') return 'mini';
+  } catch {}
+  return null;
+}
+
 function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const resumedDiff = savedProgress && savedProgress.dayNum === dayNum &&
@@ -7328,7 +7512,16 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     : (savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid) && savedProgress.grid.length === 6
       ? 'mini' // pre-difficulty saves were always the 6×6 board
       : null);
-  const [difficulty, setDifficulty] = useState(resumedDiff);
+  /* ?sdk=9 / ?sdk=6 preselects a board so the grid itself is URL-reachable
+     (#149 regression coverage). The chooser renders BEFORE the board, so
+     without this no deep link lands on a Sudoku grid at all and dapp.json
+     tests — which cannot click — could never assert on it. A resumed
+     difficulty still wins, and this deliberately does NOT write progress:
+     it only seeds the initial view. */
+  const [difficulty, setDifficulty] = useState(() => {
+    if (resumedDiff) return resumedDiff;
+    return sdkDeepLinkDifficulty();
+  });
   const boardsRef = useRef({});
   const getBoard = (diff) => {
     if (!boardsRef.current[diff]) {
@@ -7356,7 +7549,10 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   };
 
   if (!difficulty) {
+    // .fit-col even on the chooser: the game is fitShell:true, and fitShell
+    // WITHOUT .fit-col clips instead of fitting. Asserted by registry-fitshell.
     return (
+      <div className="fit-col">
       <div className="sdk-choose">
         <div className="sdk-choose-title">Choose your board</div>
         <div className="sdk-choose-sub">One daily attempt either way — the clock starts after you pick.</div>
@@ -7368,6 +7564,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
           <span className="sdk-choice-name">6×6 Mini</span>
           <span className="sdk-choice-note">Quick board · standard points</span>
         </button>
+      </div>
       </div>
     );
   }
@@ -7552,9 +7749,13 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
               <div
                 key={key}
                 className={cls.join(' ')}
+                /* Box separators must out-read the 1px cell gridlines the grid's
+                   own gap now draws (#149) — in C.border, the same colour, the
+                   3×3 structure was invisible on the 9×9 board. C.muted is the
+                   next step up the palette's contrast ladder and re-themes. */
                 style={{
-                  borderRight: boldRight(c) ? `2px solid ${C.border}` : undefined,
-                  borderBottom: boldBottom(r) ? `2px solid ${C.border}` : undefined,
+                  borderRight: boldRight(c) ? `2px solid ${C.muted}` : undefined,
+                  borderBottom: boldBottom(r) ? `2px solid ${C.muted}` : undefined,
                 }}
                 {...tapProps(() => !locked && !done && setSelected([r, c]))}
               >
@@ -22307,22 +22508,48 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
     const ctx = guardCanvasCtx(canvas.getContext('2d'));
     let raf, lastTs = null, alive = true;
 
-    // Phase 1 — DPR-correct backing store. DBNC_W/DBNC_H stay the LOGICAL
-    // coordinate space (the physics is untouched); only the device-pixel
-    // resolution changes, which is what made the board look soft on a phone.
+    /* Phase 1 — DPR-correct backing store. DBNC_W/DBNC_H stay the LOGICAL
+       coordinate space (the physics is untouched); only the device-pixel
+       resolution changes, which is what made the board look soft on a phone.
+
+       #149 — the CSS size used to be pinned to the LOGICAL size (320×430),
+       which left ~135px of dead space at the bottom of the fit column on a
+       phone. It is now driven by the measured wrapper box, preserving the
+       aspect ratio. Scaling via the backing store rather than a CSS transform
+       keeps the canvas CRISP (a transform would scale rasterized pixels), and
+       the pointer mapping is getBoundingClientRect-based already, so the
+       physics and input math are untouched at any size. */
     const sizeCanvas = () => {
       const dpr = canvasDpr();
-      const pw = Math.round(DBNC_W * dpr), ph = Math.round(DBNC_H * dpr);
+      const wrap = canvas.parentElement;
+      const availW = wrap ? wrap.clientWidth : DBNC_W;
+      const availH = wrap ? wrap.clientHeight : DBNC_H;
+      // Never upscale past the logical size on a desktop-wide column, and never
+      // fall below a playable floor if the box is measured mid-layout as 0.
+      const fit = (availW > 0 && availH > 0)
+        ? Math.min(availW / DBNC_W, availH / DBNC_H, 1.6)
+        : 1;
+      const scale = Math.max(0.5, fit);
+      const cssW = Math.round(DBNC_W * scale), cssH = Math.round(DBNC_H * scale);
+      const pw = Math.round(cssW * dpr), ph = Math.round(cssH * dpr);
       if (canvas.width !== pw || canvas.height !== ph) {
         canvas.width = pw;
         canvas.height = ph;
       }
-      canvas.style.width = DBNC_W + 'px';
-      canvas.style.height = DBNC_H + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+      // One transform maps the untouched 320×430 logical space onto the
+      // device-pixel backing store.
+      const k = dpr * scale;
+      ctx.setTransform(k, 0, 0, k, 0, 0);
     };
     sizeCanvas();
     window.addEventListener('resize', sizeCanvas);
+    let dbncRO = null;
+    if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) {
+      dbncRO = new ResizeObserver(() => sizeCanvas());
+      dbncRO.observe(canvas.parentElement);
+    }
 
     // Timed power-up effects. `until` is a monotonic ms timestamp from the rAF
     // clock, never Date.now(), so a backgrounded tab can't silently expire them.
@@ -22514,6 +22741,7 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
     return () => {
       alive = false;
       window.removeEventListener('resize', sizeCanvas);
+      if (dbncRO) dbncRO.disconnect();
       cancelAnimationFrame(raf);
     };
   }, []);
@@ -23553,16 +23781,21 @@ function App() {
   const navLock = useRef(false);
   const navReady = useRef(false);
 
-  // The single description of "where am I", used for both push and restore.
+  /* The single description of "where am I", used for both push and restore.
+     EVERY field must be a primitive: this object is JSON.stringify'd on each
+     render, and one DOM-bearing value (a stray SyntheticEvent — see #150)
+     throws "Converting circular structure to JSON", which with no error
+     boundary above it unmounted the entire root. `navPrimitive` is the
+     barrier; the `nav-state-primitives` self-test asserts it holds. */
   const navState = {
-    screen,
-    gameId: currentGame ? currentGame.id : null,
-    lobbyTab,
-    selectedUserId,
-    reviewMode,
-    practiceMode,
+    screen: navPrimitive(screen),
+    gameId: currentGame ? navPrimitive(currentGame.id) : null,
+    lobbyTab: navPrimitive(lobbyTab),
+    selectedUserId: navPrimitive(selectedUserId),
+    reviewMode: !!reviewMode,
+    practiceMode: !!practiceMode,
     overlay: settingsOpen ? 'settings' : howToGame ? 'howto' : chatGame ? 'chat' : whatsNewOpen ? 'whatsnew' : null,
-    overlayArg: howToGame ? howToGame.id : chatGame ? (chatGame.id || chatGame) : null,
+    overlayArg: navPrimitive(howToGame ? howToGame.id : chatGame ? (chatGame.id || chatGame) : null),
   };
   const navKey = JSON.stringify(navState);
 
@@ -24423,6 +24656,16 @@ function App() {
     }
   };
 
+  /* Exit any game screen back to the home lobby.
+     `tab` is OPTIONAL and must be a STRING. Several call sites used to pass
+     this straight to onClick/onBack, so React handed it a SyntheticEvent —
+     which then landed in `lobbyTab`, and the next render's
+     JSON.stringify(navState) threw "Converting circular structure to JSON",
+     unmounting the whole root (#150). Two barriers now: the typeof guard
+     here, and primitive coercion in navState below.
+     Only 'ladder'/'home' are real lobby views — a game CATEGORY ('daily' /
+     'classic') is a home-grid filter chip, so it routes to setHomeFilter.
+     Writing it to lobbyTab (as before) was a no-op nothing ever read. */
   const backToLobby = (tab) => {
     setScreen('lobby');
     setCurrentGame(null);
@@ -24435,7 +24678,9 @@ function App() {
     setClassicGameModeOpts(null);
     setClassicLastResult(null);
     setPreLaunchGame(null);
-    if (tab) setLobbyTab(tab);
+    if (typeof tab !== 'string' || !tab) return;
+    if (tab === 'daily' || tab === 'classic') { setLobbyTab('home'); setHomeFilter(tab); }
+    else if (tab === 'ladder' || tab === 'home') setLobbyTab(tab);
   };
 
   /* PHASE 4 (#133) — "Play again for fun".
@@ -24605,7 +24850,7 @@ function App() {
         return (
           <div className={'game-wrap' + (currentGame.fitShell ? ' fit' : '')}>
             <div className="game-head">
-              <button className="back-btn" onClick={backToLobby}>← Back</button>
+              <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
               <div className="game-title">
                 <span>{currentGame.icon}</span> {currentGame.name}
               </div>
@@ -24706,10 +24951,14 @@ function App() {
     && currentGame.shell !== 'self'
     && (!resultData.gameId || resultData.gameId === currentGame.id);
 
+  /* NOTE: <style>{css}</style> is deliberately NOT rendered here any more — it
+     is a sibling ABOVE AppErrorBoundary at the root mount (see the bottom of
+     this file). When a render threw, React unmounted this whole subtree and
+     took the stylesheet with it, so the failure mode was a *styled* blank page
+     followed by an unstyled one (#150). Keeping the stylesheet outside the
+     boundary is what lets the fallback panel render styled. */
   return (
     <div className={'app' + (fitActive ? ' app-fit' : '')}>
-      <style>{css}</style>
-
       <nav className="nav">
         <div className="nav-brand"><span className="logo">⬢</span> Game Corner</div>
         <div className="nav-right">
@@ -25019,7 +25268,7 @@ function App() {
       {screen === 'pregame' && currentGame && (
         <div className="game-wrap">
           <div className="game-head">
-            <button className="back-btn" onClick={backToLobby}>← Back</button>
+            <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
             <div className="game-title">
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
@@ -25043,7 +25292,7 @@ function App() {
       {screen === 'locked' && currentGame && (
         <div className={'game-wrap' + (lockedReviewable ? ' fit' : '')}>
           <div className="game-head">
-            <button className="back-btn" onClick={backToLobby}>← Back</button>
+            <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
             <div className="game-title">
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
@@ -25070,7 +25319,7 @@ function App() {
               nextResetUtc={nextResetUtc}
               offset={offset}
               onReset={onReset}
-              onBack={backToLobby}
+              onBack={() => backToLobby()}
               best={bests[currentGame.id]}
               onReview={lockedReviewable ? () => setLockedReview(true) : null}
               onPractice={() => startPractice(currentGame)}
@@ -25400,7 +25649,61 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+/* ============================================================
+   Error boundary (#150) — never strand a player on a blank page.
+
+   A throw during render in React 18 unmounts the ENTIRE root. Before this
+   existed, one bad value in navState blanked the app with no way back except
+   a browser reload. The boundary catches it and renders a small recovery
+   panel instead; "Back to Home" strips deep-link params (so the param that
+   caused it can't immediately re-trigger) and remounts App under a fresh key,
+   which is the reset-to-lobby the spec asks for.
+
+   The stylesheet is mounted as a SIBLING above this boundary, so the fallback
+   is styled even though App's subtree is gone.
+   ============================================================ */
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { err: null, resetKey: 0 };
+  }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) {
+    // Deliberately not env-gated: this must always reach the dev console.
+    console.error('[app] render error caught by boundary:', err && err.message,
+      info && info.componentStack ? String(info.componentStack).split('\n')[1] : '');
+  }
+  handleReset = () => {
+    try {
+      // Drop the query string — a deep-link param may be what threw.
+      window.history.replaceState({}, '', window.location.pathname);
+    } catch {}
+    this.setState(s => ({ err: null, resetKey: s.resetKey + 1 }));
+  };
+  render() {
+    if (this.state.err) {
+      return (
+        <div className="app">
+          <div className="err-fallback">
+            <div className="err-icon">⚠️</div>
+            <h2>Something went wrong</h2>
+            <p>That screen hit an unexpected error. Your streak and today's
+              results are safe — nothing was lost.</p>
+            <button className="primary-btn" onClick={this.handleReset}>Back to Home</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children(this.state.resetKey);
+  }
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.Fragment>
+    <style>{css}</style>
+    <AppErrorBoundary>{(k) => <App key={k} />}</AppErrorBoundary>
+  </React.Fragment>
+);
 // Signal to the boot-shell watchdog (index.html) that React has mounted, so
 // it clears the "taking longer than usual" timer and never flashes the card.
 window.__puzzlechainMounted = true;
@@ -25412,10 +25715,11 @@ window.__puzzlechainMounted = true;
    documented.
 
    Scheduling matters: the touch-action sweep reads COMPUTED style, so it has to
-   wait until React has actually committed App's <style> element. One rAF is not
-   enough under React 18's concurrent render (the first attempt here reported
-   every class as touch-action:auto because no stylesheet existed yet), so poll
-   for the stylesheet with a bounded retry rather than guessing a delay. */
+   wait until React has actually committed the root's <style> element (a sibling
+   of AppErrorBoundary since #150). One rAF is not enough under React 18's
+   concurrent render (the first attempt here reported every class as
+   touch-action:auto because no stylesheet existed yet), so poll for the
+   stylesheet with a bounded retry rather than guessing a delay. */
 (function scheduleSelfTests(tries) {
   const ready = Array.from(document.querySelectorAll('style'))
     .some(s => s.textContent && s.textContent.indexOf('.fit-scale-content') >= 0);
@@ -25423,6 +25727,11 @@ window.__puzzlechainMounted = true;
     requestAnimationFrame(() => scheduleSelfTests((tries || 0) + 1));
     return;
   }
-  try { runClientSelfTests(); }
+  /* #149 — pass the readiness verdict through instead of running the sweep
+     regardless. Exhausting the budget used to be reported as "touch-action:auto
+     on <all 18 classes>", which pointed the bug report at the tap-target
+     registry when the actual cause was a crash that took the stylesheet with
+     it. Now it reports `stylesheet-missing` once and skips those checks. */
+  try { runClientSelfTests(ready); }
   catch (e) { console.error('[self-test] harness threw:', e && e.message); }
 })(0);

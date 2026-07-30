@@ -1046,6 +1046,51 @@
       "name": "Pre-game screen Back control is present",
       "path": "/?game=nonogram",
       "expectSelector": ".back-btn"
+    },
+    {
+      "name": "Lost run keeps its final board behind the results card",
+      "path": "/?game=2048&result=1",
+      "expectSelector": ".game-body.frozen .t2048-grid"
+    },
+    {
+      "name": "Lost run reports the score it reached",
+      "path": "/?game=2048&result=1",
+      "expectText": "Highest tile"
+    },
+    {
+      "name": "Loss card offers View board",
+      "path": "/?game=2048&result=1",
+      "expectSelector": ".win-overlay .review-btn"
+    },
+    {
+      "name": "Snake keeps its board behind the results card",
+      "path": "/?game=snake&result=1&snake=normal",
+      "expectSelector": ".game-body.frozen .snake-board"
+    },
+    {
+      "name": "Results card collapses into a minibar",
+      "path": "/?game=snake&result=1&snake=normal&review=1",
+      "expectSelector": ".result-minibar"
+    },
+    {
+      "name": "Reviewed board is revealed under the minibar",
+      "path": "/?game=2048&result=1&review=1",
+      "expectSelector": ".game-body.frozen .t2048-grid"
+    },
+    {
+      "name": "Practice result offers View board",
+      "path": "/?game=nonogram&result=1",
+      "expectSelector": ".win-overlay .review-btn"
+    },
+    {
+      "name": "Practice result is still labelled not scored",
+      "path": "/?game=nonogram&result=1",
+      "expectSelector": ".win-card .practice-ribbon"
+    },
+    {
+      "name": "Snake board is deep-linkable by difficulty",
+      "path": "/?game=snake&snake=normal",
+      "expectSelector": ".snake-board"
     }
   ],
   "visibility": {

@@ -970,6 +970,99 @@ definite width; the caps (`max-width`) still centre the board.
   links: `?review=1`, `?practice=1`, `?rooms=mine`, `?mode=bot|2p`,
   `?syncfail=1`.
 
+## End-of-run screen + tap-target registry (#158–#163, phases 1–3)
+
+Four standing rules came out of the shared end-of-run pass. Three are enforced
+by self-tests; the fourth is the kind of bug only a mounted browser shows.
+
+### 1. `TAPPABLE_CLASSES` is the single source of truth for fast taps
+
+`TAPPABLE_CLASSES` (top of `app.jsx`, above `css`) is the ONE list. Both
+`touch-action: manipulation` and `-webkit-tap-highlight-color` are **generated**
+from it (`emitTouchActionRules()` / `emitTapHighlightRules()`), and the
+`registry-touch-action` self-test probes that same array. **Adding a game means
+adding its cell class there — never to the stylesheet by hand**, or the two
+drift (the old hand-copied probe list was missing 8 classes the CSS covered).
+
+- Rules are emitted **one per class**, deliberately. A comma-separated selector
+  list is all-or-nothing: one selector an engine rejects drops the whole rule,
+  which is the only mechanism that yields the reported "touch-action:auto on
+  <all 18 classes>" with the stylesheet present. Per-class rules make a bad
+  entry cost exactly one class, and the test names that class.
+- **The canary is the diagnosis.** `.un-selftest-canary` comes from the same
+  generator; `tapCanaryApplied()` probes it first. Canary `auto` ⇒ ONE
+  `stylesheet-not-applied` failure (with `document.styleSheets` counts and the
+  app sheet's `cssRules` length) and every computed-style check is SKIPPED.
+  That distinction is the whole point: #149 and #163 were both filed against
+  the tap-target registry when the stylesheet was the actual suspect.
+- `scheduleSelfTests` gates on the canary's **computed value**, not a text scan
+  of `<style>` contents ("in the DOM" is strictly weaker than "applying"), and
+  alternates rAF with `setTimeout` — rAF does not fire in a hidden/throttled
+  tab, which silently skipped the whole suite.
+- `touch-action-rules-emitted` is the static half: it fails even when the sheet
+  is dead, proving the array and the emitted CSS are the same list.
+
+### 2. The `.game-body` wrapper is UNCONDITIONAL — never toggle it in/out
+
+`{screen==='game' && <div className={'game-body' + (boardReviewable ? ' frozen'
+: '')}>{renderGameBody()}</div>}`. It used to swap between a wrapped and an
+unwrapped branch, which changes the element at that position, so **React
+unmounted and remounted the entire game at the exact moment the run ended**.
+2048 came back as a fresh 2-tile board (its mount reads the saved-board key the
+loss had just cleared) — i.e. "the final board" was a brand new one. Keep one
+stable element and change only its class. `.game-body` carries
+`display:flex; flex-direction:column; flex:1 1 auto; min-height:0` so it is
+layout-transparent (measured identical to the unwrapped baseline); **not**
+`display:contents`, which generates no box and would drop `.frozen`'s
+`filter`/`pointer-events`.
+
+### 3. Every ending is a `resultData`
+
+`resultData = winData || loseData || practiceResultData` drives the frozen
+board, the minibar, the backdrop dismiss and "👁 View board" from one value.
+Consequences:
+
+- **`boardReviewable` no longer excludes `shell:'self'`.** Its old comment
+  claimed Snake/Block Fit/Diamond Rush/Hash Rush draw their own game-over
+  overlay; only **Hash Rush** does, and it now takes a `resultShown` prop and
+  stands down (its panel is absolute-positioned over its own canvas, so leaving
+  it up hides the board "View board" exists to reveal).
+- Practice results carry a `gameId` so the "result belongs to the mounted game"
+  guard still holds. The practice card was the one with no way back at all —
+  no View board, no minibar, no dismiss (#158).
+- Backdrop dismiss is `onPointerDown` with an `e.target === e.currentTarget`
+  check (finger-DOWN, like `tapProps`), plus an `Escape` listener.
+- **The daily `<Leaderboard>` renders only for `currentGame.daily`.**
+  `/api/daily/:gameId/leaderboard` validates against `GAME_IDS` and 400s on a
+  classic id — a console error that fails the no-console-errors check. Classics
+  reach their all-time board via ClassicShell's ☰ sheet.
+
+### 4. `meta.score` on the loss path is opt-in, per game
+
+`handleLose(steps, timeSecs, meta)` takes `meta.score` (default 0) plus optional
+`meta.scoreLabel`/`meta.scoreValue` for a headline-stat row. Games where a high
+score IS the result pass it: **2048** (`Highest tile`) and **Diamond Rush**.
+Snake and Bounce already route their game-over through `onWin` with
+`winnerLabel: 'Game Over'`, so their score was never lost — leave them.
+
+**Pass/fail dailies must keep score 0** (`cryptowordle`, `minefinder`,
+`mahjongsol`, `dropstack`, `snakedaily`, `bouncedaily`): the daily leaderboard
+filters `score > 0`, so a non-zero loss would put a FAILED run on the board.
+Streaks are unaffected either way — `computeStreak` keys off `finished_at`.
+
+### New deep links
+
+`?result=1` mounts a game and opens a representative results card over its
+frozen board (`&review=1` lands collapsed into the minibar instead). It writes
+NOTHING — dailies go through the inert `practiceMode` path, classics set local
+`loseData` only — so it is deliberately **not** staging-gated and needs no seed
+data (the "before" screenshot comes from production). It is checked **before**
+the `preLaunchModal` branch in the deep-link effect, or 2048/Block Fit would
+surface the mode chooser instead. `?snake=easy|normal|hard` preselects Snake's
+difficulty so the board itself is URL-reachable (same role as `?sdk=9`); note
+`SnakeGame`'s reset-to-chooser effect now skips its mount pass, which would
+otherwise clobber the deep link immediately.
+
 ### Proposal tests: two traps this repo keeps falling into
 
 Fixing five stale assertions (July 2026) turned up the same two causes each time.

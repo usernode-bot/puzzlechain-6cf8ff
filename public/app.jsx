@@ -138,6 +138,60 @@ const GA = {
   amber:  '#D97E23',
 };
 
+/* PHASE 2 (#163) — the ONE registry of tappable board-cell classes.
+   This array is the single source of truth for three things that used to be
+   maintained by hand and had already drifted apart:
+     1. the `touch-action: manipulation` rules in `css`,
+     2. the `-webkit-tap-highlight-color: transparent` rules in `css`,
+     3. the `registry-touch-action` self-test's probe list.
+   They are now all GENERATED from this array, so the test can never disagree
+   with the stylesheet about which classes are supposed to be covered.
+
+   Crucially the rules are emitted ONE PER CLASS rather than as a single
+   30-selector comma list. A comma list is all-or-nothing: one selector an
+   engine rejects drops the WHOLE rule, which is the only mechanism that
+   produces the reported "touch-action:auto on <all 18 classes>" signature with
+   the stylesheet present. Per-class rules make a bad entry cost exactly one
+   class, and the self-test then names that one class. */
+const TAPPABLE_CLASSES = [
+  'tappable',
+  'mf-cell', 'ng-cell', 'ds-cell', 'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
+  'mf-canvas', 'board-canvas',
+  'mj-tile', 'wspr-tile', 'ce-card', 'kl-col', 'sp-col', 'scell', 'numkey',
+  'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
+  'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
+  'tm-tile', 'm3-tile',
+];
+
+/* The subset that also suppresses the grey iOS tap flash. Descendant selectors
+   (.an-rack button) can't live in TAPPABLE_CLASSES — that array is probed with
+   a bare class name — so they're appended verbatim by the emitters below. */
+const TAP_HIGHLIGHT_EXTRA_SELECTORS = ['.an-rack button'];
+
+/* The canary is emitted from the SAME generator as the real rules, so probing
+   it answers "is this stylesheet applying at all?" independently of whether any
+   individual game class is healthy. Without it, a sheet that never applied
+   reported 18 phantom class failures — which is how #149 got filed against the
+   tap-target registry when the real cause was elsewhere (#150). */
+const TAP_CANARY_CLASS = 'un-selftest-canary';
+
+function emitTouchActionRules() {
+  const out = [TAP_CANARY_CLASS].concat(TAPPABLE_CLASSES)
+    .map((c) => '.' + c + ' { touch-action: manipulation; }');
+  for (const sel of TAP_HIGHLIGHT_EXTRA_SELECTORS) {
+    out.push(sel + ' { touch-action: manipulation; }');
+  }
+  return out.join('\n');
+}
+
+function emitTapHighlightRules() {
+  return TAPPABLE_CLASSES.concat([])
+    .map((c) => '.' + c + ' { -webkit-tap-highlight-color: transparent; }')
+    .concat(TAP_HIGHLIGHT_EXTRA_SELECTORS.map(
+      (sel) => sel + ' { -webkit-tap-highlight-color: transparent; }'))
+    .join('\n');
+}
+
 /* ============================================================
    Global stylesheet (injected via <style>)
    ============================================================ */
@@ -642,18 +696,18 @@ html.un-scroll-locked, body.un-scroll-locked {
    that browser delay is most of the "laggy clicking" in the daily grids.
    PHASE 2: this list is now registry-wide. An audit of all 33 games found the
    delay on ~20 of them; a game whose tappable element is NOT in this list (or
-   does not carry .tappable) pays ~300ms per tap on touch. The registry sweep
-   self-test asserts that, so adding a game means adding its cell class here. */
-.mf-cell, .ng-cell, .ds-cell, .cp-cell, .an-tile, .an-slot, .p6-btn,
-.mf-canvas, .board-canvas,
-.mj-tile, .wspr-tile, .ce-card, .kl-col, .sp-col, .scell, .numkey,
-.wcell, .cw-key, .ms-cell, .mnc-pit, .kt-cell,
-.ck-cell, .rv-cell, .fir-cell, .gmk-cell, .ludo-token,
-.an-rack button, .tm-tile, .m3-tile, .tappable {
-  touch-action: manipulation;
-}
+   does not carry .tappable) pays ~300ms per tap on touch.
+
+   #163 — GENERATED from TAPPABLE_CLASSES, one rule per class, and the same
+   generator emits the .${TAP_CANARY_CLASS} probe rule. A comma list was
+   all-or-nothing: one selector the engine rejects drops every class with it,
+   which is exactly the failure that was being reported. Adding a game means
+   adding its cell class to TAPPABLE_CLASSES — the CSS and the self-test both
+   follow automatically. */
+${emitTouchActionRules()}
 /* Canvases that own their own drag/long-press recognizer take the pointer
-   stream outright, so the browser never scrolls or zooms out from under it. */
+   stream outright, so the browser never scrolls or zooms out from under it.
+   Emitted AFTER the generated block so it wins on source order. */
 .board-canvas { touch-action: none; display: block; }
 
 /* PHASE 2 — the one press idiom. Generalised from .ng-mode-btn/.mf-mode-btn,
@@ -663,11 +717,7 @@ html.un-scroll-locked, body.un-scroll-locked {
    [data-pressed] on pointerdown so the feedback lands on finger-DOWN, not on
    the delayed click, and clear it on up/cancel/lostpointercapture so it can
    never stick. */
-.tappable, .mj-tile, .wspr-tile, .ce-card, .scell, .numkey, .wcell,
-.cw-key, .ms-cell, .mnc-pit, .kt-cell, .ck-cell, .rv-cell, .fir-cell,
-.gmk-cell, .ludo-token, .an-tile, .an-slot, .tm-tile, .m3-tile {
-  -webkit-tap-highlight-color: transparent;
-}
+${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
 .mj-tile:active, .mj-tile[data-pressed],
 .wspr-tile:not(.dim):active, .wspr-tile[data-pressed],
@@ -712,8 +762,20 @@ html.un-scroll-locked, body.un-scroll-locked {
 /* End-screen board review (slice 4). The finished board stays mounted under
    the results card; .frozen makes it inert and visually settled, and the
    minibar is what the card collapses into. */
+/* PHASE 1 — the wrapper is now ALWAYS rendered (see the render note in App), so
+   it must be layout-transparent: without this the fit column's flex: 1 1 auto
+   would resolve against a plain block instead of .app.app-fit and collapse.
+   A flex pass-through, NOT display:contents — contents generates no box, so
+   .frozen's filter/pointer-events below would have nothing to apply to.
+   NOTE: no backticks in this block (see the stylesheet warning above). */
+.game-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .game-body.frozen { pointer-events: none; filter: saturate(0.85); }
 .game-body.frozen .game-wrap { padding-bottom: 5.5rem; }
+/* PHASE 1 (#157/#160) — shell:'self' classics (Snake, Block Fit, Diamond Rush,
+   Hash Rush) are frozen behind the results card now too. Their ClassicShell is
+   a fixed full-viewport layer, so the fixed minibar would sit on top of the
+   bottom of the stage; reserve the same gutter .game-wrap already gets. */
+.game-body.frozen .cg-stage { padding-bottom: 5.5rem; }
 /* PHASE 4 (#134) — the freeze used to kill the whole reviewed subtree, INCLUDING
    the header the shell renders inside it. That is why Back stopped working after
    "View board", and it hit every in-frame classic game's whole topbar (exit, ☰,
@@ -6366,13 +6428,65 @@ function navPrimitive(v) {
   return null; // objects/functions/symbols can never reach the serializer
 }
 
+/* PHASE 2 (#163) — one reusable off-screen probe for touch-action computed
+   values. Created once per sweep; `read(cls)` swaps the class and re-reads, and
+   getComputedStyle flushes style recalc so the value is always current. */
+function tapActionProbe() {
+  const probe = document.createElement('div');
+  probe.style.position = 'fixed';
+  probe.style.left = '-9999px';
+  probe.style.top = '0';
+  document.body.appendChild(probe);
+  return {
+    read(cls) {
+      probe.className = cls;
+      return getComputedStyle(probe).touchAction;
+    },
+    destroy() { try { probe.remove(); } catch (_) {} },
+  };
+}
+
+/* THE CANARY. `.un-selftest-canary` is emitted by the SAME generator as every
+   real touch-action rule, so if it computes to `manipulation` the app
+   stylesheet is genuinely APPLYING — not merely sitting in the DOM with its
+   text present, which is all the old readiness check could tell. When it reads
+   `auto`, every per-class probe below would report the UA default, and
+   reporting 18 phantom class failures is what pointed #149 (and now #163) at
+   the tap-target registry instead of at the stylesheet. */
+function tapCanaryApplied() {
+  try {
+    const p = tapActionProbe();
+    try { return p.read(TAP_CANARY_CLASS) === 'manipulation'; }
+    finally { p.destroy(); }
+  } catch (_) { return false; }
+}
+
+/* Diagnostics for a stylesheet that is present but not applying — enough to
+   tell "no sheet at all" from "sheet blocked / cross-origin / empty". */
+function describeAppStylesheet() {
+  try {
+    const sheets = Array.from(document.styleSheets || []);
+    const mine = sheets.find((s) => {
+      try {
+        return s.ownerNode && s.ownerNode.textContent
+          && s.ownerNode.textContent.indexOf('.fit-scale-content') >= 0;
+      } catch (_) { return false; }
+    });
+    if (!mine) return 'sheets=' + sheets.length + ', appSheet=absent';
+    let rules = 'unreadable';
+    try { rules = String((mine.cssRules || []).length); } catch (e) { rules = 'blocked(' + e.name + ')'; }
+    return 'sheets=' + sheets.length + ', appSheetRules=' + rules
+      + ', disabled=' + !!mine.disabled;
+  } catch (e) { return 'introspection-failed(' + (e && e.message) + ')'; }
+}
+
 /* `styleReady` is passed false when scheduleSelfTests() exhausted its retry
-   budget without ever seeing the app's <style> element. In that state EVERY
+   budget without ever seeing the app's stylesheet APPLY. In that state EVERY
    computed-style probe returns the UA default, so the touch-action sweep used
    to report all 18 tappable classes as broken — which is exactly how #149 was
    filed against the tap-target registry when the real cause was a crash that
-   unmounted the stylesheet (#150). One honest `stylesheet-missing` failure
-   beats 18 phantom ones, so the computed-style checks are SKIPPED instead. */
+   unmounted the stylesheet (#150). One honest `stylesheet-*` failure beats 18
+   phantom ones, so the computed-style checks are SKIPPED instead. */
 function runClientSelfTests(styleReady) {
   const fails = [];
   const check = (name, fn) => {
@@ -6381,13 +6495,22 @@ function runClientSelfTests(styleReady) {
     catch (e) { fails.push(name + ': ' + e.message); }
   };
   let ran = 0;
-  const styleOk = styleReady !== false;
+  // Two independent gates. `styleReady` says the scheduler saw the sheet land;
+  // the canary says it is actually painting. Either one failing means every
+  // computed-style probe below is measuring the UA default, not this app.
+  const canaryOk = tapCanaryApplied();
+  const styleOk = styleReady !== false && canaryOk;
   // Only runs when the stylesheet is actually live; otherwise it would report
   // a layout/computed-style bug that doesn't exist.
   const checkStyled = (name, fn) => { if (styleOk) check(name, fn); };
   if (!styleOk) {
-    fails.push('stylesheet-missing: the app stylesheet never mounted, so ' +
-      'computed-style checks were skipped (they would all report the UA default)');
+    fails.push(canaryOk
+      ? 'stylesheet-missing: the app stylesheet never mounted, so ' +
+        'computed-style checks were skipped (they would all report the UA default)'
+      : 'stylesheet-not-applied: the generated .' + TAP_CANARY_CLASS + ' canary rule ' +
+        'does not apply, so computed-style checks were skipped — this is a ' +
+        'stylesheet problem, NOT a tap-target registry problem (' +
+        describeAppStylesheet() + ')');
   }
 
   // Phase 1 — canvas colours.
@@ -6571,27 +6694,45 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
-  // Phase 2 — a tappable class that isn't in the touch-action allowlist pays
-  // the browser's double-tap delay on every tap.
+  /* Phase 2 (#163) — a tappable class that isn't covered pays the browser's
+     double-tap delay on every tap. The probe list is TAPPABLE_CLASSES itself,
+     the same array the CSS is generated from, so the test and the stylesheet
+     can no longer drift (the old hand-copied list omitted 8 classes the CSS
+     covered). Each failure now says WHETHER the rule exists in `css`, which is
+     what separates "someone deleted a class" from "the sheet isn't applying". */
   checkStyled('registry-touch-action', () => {
-    const CLASSES = [
-      'mj-tile', 'wspr-tile', 'ce-card', 'scell', 'numkey', 'wcell', 'cw-key',
-      'ms-cell', 'mnc-pit', 'kt-cell', 'ck-cell', 'rv-cell', 'fir-cell',
-      'gmk-cell', 'ludo-token', 'tm-tile', 'm3-tile', 'tappable',
-    ];
-    const probe = document.createElement('div');
-    probe.style.position = 'fixed';
-    probe.style.left = '-9999px';
-    document.body.appendChild(probe);
+    const probe = tapActionProbe();
     const bad = [];
     try {
-      for (const cls of CLASSES) {
-        probe.className = cls;
-        const ta = getComputedStyle(probe).touchAction;
-        if (ta === 'auto') bad.push(cls);
+      // Defensive re-read of the canary: styleOk gated on it a moment ago, but
+      // a sheet can be swapped between checks. One honest line, not N phantoms.
+      if (probe.read(TAP_CANARY_CLASS) === 'auto') {
+        throw new Error('stylesheet-not-applied — the .' + TAP_CANARY_CLASS +
+          ' canary reads auto, so the per-class sweep was skipped (' +
+          describeAppStylesheet() + ')');
       }
-    } finally { probe.remove(); }
+      for (const cls of TAPPABLE_CLASSES) {
+        if (probe.read(cls) !== 'auto') continue;
+        const declared = css.indexOf('.' + cls + ' { touch-action') >= 0;
+        bad.push(cls + (declared ? ' (rule emitted, not applied)' : ' (NO RULE EMITTED)'));
+      }
+    } finally { probe.destroy(); }
     if (bad.length) throw new Error('touch-action:auto on ' + bad.join(', '));
+    return true;
+  });
+
+  /* The generator's own contract: every probed class must actually produce a
+     rule in `css`. A static check, so it fails even when the sheet is dead —
+     it is what proves TAPPABLE_CLASSES and the emitted CSS are the same list. */
+  check('touch-action-rules-emitted', () => {
+    const missing = TAPPABLE_CLASSES
+      .filter((c) => css.indexOf('.' + c + ' { touch-action: manipulation; }') < 0);
+    if (missing.length) {
+      throw new Error('TAPPABLE_CLASSES entries with no emitted rule: ' + missing.join(', '));
+    }
+    if (css.indexOf('.' + TAP_CANARY_CLASS + ' { touch-action: manipulation; }') < 0) {
+      throw new Error('the ' + TAP_CANARY_CLASS + ' canary rule is not emitted');
+    }
     return true;
   });
 
@@ -12416,7 +12557,15 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
       t2048ClearBoard();
       if (onRaceEnd) { onRaceEnd(newScore); return; }
       submitClassicScore('2048', newScore, { highTile: maxT });
+      /* PHASE 3 (#161) — the jammed board's score is the run's result. It was
+         already going to /api/classic/2048/score on the line above, but the
+         end screen hard-coded "Earned +0", so a 20-minute run read as worth
+         nothing. `score` is what the card shows; scoreLabel/scoreValue add the
+         highest-tile row next to it. */
       onLose && onLose(newMoves, elapsedSecs, {
+        score: newScore,
+        scoreLabel: 'Highest tile',
+        scoreValue: maxT,
         share: t2048_toShareText(newScore, newMoves, elapsedSecs, maxT),
         answer: String(maxT),
       });
@@ -12905,13 +13054,32 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   );
 }
 
+/* `?snake=easy|normal|hard` preselects a difficulty so the BOARD itself is
+   URL-reachable, exactly like Sudoku's `?sdk=9`. Without it every snake deep
+   link lands on the difficulty chooser, so no navigation-only test or
+   screenshot can ever see a snake board (which is what the end-of-run board
+   review needs to assert on). */
+function snakeDeepLinkDifficulty() {
+  try {
+    const d = new URLSearchParams(window.location.search).get('snake');
+    return (d === 'easy' || d === 'normal' || d === 'hard') ? d : null;
+  } catch (_) { return null; }
+}
+
 /* ---- Snake — Wrapper (mode selector + gameplay) ---- */
 function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
-  const [difficulty, setDifficulty] = useState(null);
+  const [difficulty, setDifficulty] = useState(snakeDeepLinkDifficulty);
   const diffRef = useRef(difficulty);
   diffRef.current = difficulty;
+  // This effect sends the player back to the chooser on a New Game. It must NOT
+  // fire on MOUNT: with `?snake=` preselecting a difficulty, diffRef is already
+  // non-null on the first pass and the mount run would immediately clobber the
+  // deep link back to the chooser. (Before the deep link existed the initial
+  // value was always null, so the mount pass was a silent no-op.)
+  const diffMounted = useRef(false);
 
   useEffect(() => {
+    if (!diffMounted.current) { diffMounted.current = true; return; }
     if (diffRef.current !== null) {
       setDifficulty(null);
     }
@@ -13395,7 +13563,14 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       onWin(sc, START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc} pts!` });
     } else {
       grantPowerUp('extraTime');
-      onLose(START_MOVES - mv, secsRef.current, { share: `💎 Diamond Rush — ${sc}/${TARGET}` });
+      // PHASE 3 (#161) — carry the gems actually collected; submitClassicScore
+      // on the line above already banked exactly this number.
+      onLose(START_MOVES - mv, secsRef.current, {
+        score: sc,
+        scoreLabel: 'Target',
+        scoreValue: `${sc} / ${TARGET}`,
+        share: `💎 Diamond Rush — ${sc}/${TARGET}`,
+      });
     }
   };
   const adjacent = (a, b) => {
@@ -19138,7 +19313,13 @@ const HR_BOOST_MULT = 2;
 const HR_BOOST_SECS = 5;
 const HR_LIVES = 3;
 
-function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
+/* `resultShown` (phase 1, #160) — true once App's shared results card owns this
+   run's ending. Hash Rush is the ONE shell:'self' classic that draws its own
+   end panel, and that panel is absolute-positioned over its canvas: leaving it
+   up would hide the very board "View board" exists to reveal, and would repeat
+   the score the shared card is already showing. Every other self-shell game
+   (Snake, Block Fit, Diamond Rush) has no end panel and needs nothing. */
+function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, resultShown }) {
   const [phase, setPhase] = useState('idle'); // idle | playing | dead
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(HR_LIVES);
@@ -19431,7 +19612,7 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig 
               <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Start mining</button>
             </div>
           )}
-          {phase === 'dead' && (
+          {phase === 'dead' && !resultShown && (
             <div className="hr-overlay">
               <div className="hr-overlay-title">Game Over</div>
               <div className="hr-overlay-score">{score} pts</div>
@@ -24167,6 +24348,20 @@ function App() {
     // lands on a chooser instead of the "Your rooms" list it names (#145).
     const wantsRooms = params.get('rooms') === 'mine';
     const mmode = params.get('mmode') || params.get('mode') || (wantsRooms ? 'online' : null);
+    /* PHASE 1 — ?result=1 mounts the game and opens a representative results
+       card over its frozen board. The end-of-run screen is otherwise reachable
+       only by finishing a run, which navigation-only screenshots and proposal
+       checks cannot do. Records nothing (see openResultDemo).
+
+       Checked BEFORE the pre-launch modal on purpose: 2048 and Block Fit carry
+       preLaunchModal, so anything below that branch would surface the mode
+       chooser instead of the screen the link names. openResultDemo pins solo
+       mode itself. */
+    if (params.get('result') === '1') {
+      openResultDemo(g);
+      setHowToGame(null);
+      return;
+    }
     // Multi-mode classic games open the pre-launch modal unless a mode is
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
@@ -24419,7 +24614,12 @@ function App() {
        dailyRunLog submission. This early return is the single guarantee that
        "play again for fun" can never touch a real record. */
     if (practiceMode) {
-      setPracticeResult({ score, steps, timeSecs, share: meta && meta.share, won: true });
+      // `gameId` so the shared boardReviewable guard can confirm the result
+      // belongs to the game that is actually mounted (phase 1).
+      setPracticeResult({
+        score, steps, timeSecs, share: meta && meta.share, won: true,
+        gameId: currentGame ? currentGame.id : null,
+      });
       return;
     }
     try {
@@ -24591,13 +24791,30 @@ function App() {
     return () => { window.removeEventListener('online', go); clearTimeout(t); };
   }, [winData && winData.syncError, winData && winData.gameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
-  // finished row with score 0 so the day stays locked, but does NOT touch the
-  // streak. Existing win-only games never call this.
+  /* Loss path (used by games that can be lost, e.g. Crypto Wordle). Records a
+     finished row so the day stays locked, but does NOT touch the streak.
+     Existing win-only games never call this.
+
+     PHASE 3 (#161) — `meta.score` carries the score the run actually REACHED.
+     It defaults to 0, so every game that doesn't pass one behaves exactly as
+     before; the games where a high score IS the result (2048, Bounce, Snake,
+     Diamond Rush) pass it and stop reporting "Earned +0" for a run whose score
+     had already been sent to the leaderboard.
+
+     Deliberately NOT passed by pass/fail dailies (Daily Cipher, Mine Finder,
+     Mahjong, Drop Stack, Daily Snake, Daily Bounce): the daily leaderboard
+     filters `score > 0`, so a non-zero loss would put a FAILED run on the
+     board. Streaks are unaffected either way — computeStreak keys off
+     finished_at, not score. */
   const handleLose = async (steps, timeSecs, meta) => {
     cancelProgressSave(); // same finish-race guard as handleWin
+    const lostScore = meta && Number.isFinite(meta.score) ? Math.max(0, Math.round(meta.score)) : 0;
     if (practiceMode) { // #133 — practice losses are local too
-      setPracticeResult({ score: 0, steps, timeSecs, share: meta && meta.share, answer: meta && meta.answer, won: false });
+      setPracticeResult({
+        score: lostScore, steps, timeSecs,
+        share: meta && meta.share, answer: meta && meta.answer, won: false,
+        gameId: currentGame ? currentGame.id : null,
+      });
       return;
     }
     try {
@@ -24606,12 +24823,18 @@ function App() {
         setLoseData({
           steps,
           timeSecs,
+          score: lostScore,
+          finalScore: lostScore,
+          scoreLabel: meta && meta.scoreLabel,
+          scoreValue: meta && meta.scoreValue,
           share: meta && meta.share,
           answer: meta && meta.answer,
           isClassic: true,
+          gameId: currentGame.id,
         });
-        // A loss can still be posted ("Game Over" result). score 0.
-        setClassicLastResult({ gameId: currentGame.id, score: 0, steps, timeSecs });
+        // A loss can still be posted ("Game Over" result) — with the score the
+        // run reached, which is the same number submitClassicScore already sent.
+        setClassicLastResult({ gameId: currentGame.id, score: lostScore, steps, timeSecs });
         return;
       }
       const gameId = currentGame.id;
@@ -24621,27 +24844,39 @@ function App() {
       if (!authOk) {
         setLoseData({
           steps, timeSecs,
+          score: lostScore,
+          finalScore: lostScore,
+          scoreLabel: meta && meta.scoreLabel,
+          scoreValue: meta && meta.scoreValue,
           share: meta && meta.share,
           answer: meta && meta.answer,
           guest: true,
+          gameId,
         });
         return;
       }
       setLoseData({
         steps,
         timeSecs,
+        score: lostScore,
+        finalScore: lostScore,
+        scoreLabel: meta && meta.scoreLabel,
+        scoreValue: meta && meta.scoreValue,
         share: meta && meta.share,
         answer: meta && meta.answer,
         hintsUsed: meta && meta.hintsUsed,
         wordsSolved: meta && meta.wordsSolved,
         wordsTotal: meta && meta.wordsTotal,
+        gameId,
       });
+      // A scored loss adds to the nav total, same as a win would.
+      if (lostScore > 0) setTotalScore(t => t + lostScore);
 
       let ok = false, body = null;
       try {
         const res = await api(`/api/daily/${gameId}/finish`, {
           method: 'POST',
-          body: JSON.stringify({ score: 0, steps, timeSecs }),
+          body: JSON.stringify({ score: lostScore, steps, timeSecs }),
         });
         ok = res.ok; body = res.body;
       } catch (e) {
@@ -24649,7 +24884,7 @@ function App() {
       }
       const stored = ok && body && body.attempt
         ? body.attempt
-        : { gameId, score: 0, steps, timeSecs, finishedAt: new Date().toISOString() };
+        : { gameId, score: lostScore, steps, timeSecs, finishedAt: new Date().toISOString() };
       setAttempts(prev => ({ ...prev, [gameId]: stored }));
     } catch (e) {
       console.error('[daily] handleLose failed:', e && e.message);
@@ -24709,6 +24944,57 @@ function App() {
     setStepCount(0);
     setPlayAgainKey(k => k + 1);
     // Keep classicLastResult for the Game Menu.
+  };
+
+  /* PHASE 1 — `?result=1` screenshot-state deep link.
+     The whole point of this phase is a screen that only exists AFTER a run
+     ends, and neither the proposal checks nor the before/after screenshots can
+     play a game to get there. This mounts a game and puts a representative
+     results card over its (frozen, still-mounted) board, so the card, the
+     "👁 View board" button, the collapsed minibar and the backdrop dismiss are
+     all reachable by URL.
+
+     Writes NOTHING: for a daily it uses the inert practiceMode path (#133's
+     guarantee), and for a classic it only sets local `loseData` UI state — no
+     endpoint is called on either path, which is why this link is deliberately
+     NOT staging-gated (the "before" screenshot comes from production). */
+  const RESULT_DEMO = { score: 8432, steps: 214, timeSecs: 372, tile: 512 };
+  const openResultDemo = (game) => {
+    if (!game) return;
+    setCurrentGame(game);
+    setLockedReview(false);
+    // `&review=1` alongside `?result=1` lands with the card already collapsed
+    // into its minibar — i.e. the "View board" state, which is the other half
+    // of this phase and equally unreachable without clicking.
+    setReviewMode(new URLSearchParams(window.location.search).get('review') === '1');
+    setWinData(null);
+    setLoseData(null);
+    setPracticeResult(null);
+    setPreLaunchGame(null);
+    setClassicGameMode(null);
+    setClassicGameModeOpts(null);
+    setStepCount(0);
+    setScreen('game');
+    if (game.daily) {
+      setPracticeMode(true);
+      setPracticeResult({
+        score: RESULT_DEMO.score, steps: RESULT_DEMO.steps,
+        timeSecs: RESULT_DEMO.timeSecs, won: false, gameId: game.id,
+      });
+      return;
+    }
+    setPracticeMode(false);
+    setLoseData({
+      steps: RESULT_DEMO.steps,
+      timeSecs: RESULT_DEMO.timeSecs,
+      score: RESULT_DEMO.score,
+      finalScore: RESULT_DEMO.score,
+      scoreLabel: game.id === '2048' ? 'Highest tile' : 'Best run',
+      scoreValue: game.id === '2048' ? RESULT_DEMO.tile : RESULT_DEMO.score,
+      share: `Game Corner ${game.name} — ${RESULT_DEMO.score} pts`,
+      isClassic: true,
+      gameId: game.id,
+    });
   };
 
   // Game Menu "New Game": optionally re-mount the current classic game in a
@@ -24789,6 +25075,10 @@ function App() {
             onLose={handleLose}
             onStepChange={setStepCount}
             offset={offset}
+            /* Phase 1 (#160) — these games are now kept MOUNTED and frozen
+               behind the shared results card, so any per-game end panel must
+               stand down (only Hash Rush has one). */
+            resultShown={!!winData || !!loseData || !!practiceResult}
             resetKey={playAgainKey}
             menuConfig={classicMenuConfig}
             gameMode={classicGameMode}
@@ -24929,8 +25219,18 @@ function App() {
   // in the app ticks off one clock.
   const homeResetCountdown = useCountdown(nextResetUtc, offset, onReset);
 
+  /* PHASE 1 (#158/#160/#162) — one `resultData` for every kind of ending, so
+     the frozen board, the minibar, the backdrop dismiss and "View board" all
+     key off the same value instead of three near-copies of the same condition.
+     A practice result is a result: it used to leave winData/loseData null,
+     which is precisely why the practice overlay had no way back to the board. */
+  const practiceResultData = (practiceMode && practiceResult)
+    ? { ...practiceResult, isPractice: true }
+    : null;
+  const resultData = winData || loseData || practiceResultData;
+
   const fitActive = (screen === 'game' && !!currentGame && !!currentGame.fitShell
-    && (!winData && !loseData || reviewMode))
+    && (!resultData || reviewMode))
     || (screen === 'locked' && !!currentGame && !!currentGame.fitShell && lockedReview);
 
   /* PHASE 4 (#122) — a locked day can show the solved board only if the finished
@@ -24942,14 +25242,54 @@ function App() {
   const lockedAttempt = screen === 'locked' && currentGame ? attempts[currentGame.id] : null;
   const lockedReviewable = !!(lockedAttempt && lockedAttempt.finishedAt && lockedAttempt.progress);
 
-  // Whether the finished board can be shown under the results card (slice 4).
-  // Guarded on the result belonging to the CURRENTLY mounted game, so a stale
-  // board can never be presented as this run's. shell:'self' classics draw
-  // their own game-over overlay and are excluded.
-  const resultData = winData || loseData;
+  /* Whether the finished board can be shown under the results card (slice 4).
+     Guarded on the result belonging to the CURRENTLY mounted game, so a stale
+     board can never be presented as this run's.
+
+     PHASE 1 (#157/#160) — the `shell !== 'self'` exclusion is GONE. Its comment
+     claimed those classics draw their own game-over overlay; they do not
+     (SnakeGameplay has only a `paused` overlay), so the exclusion just made the
+     render below unmount the body and put the results card over a blank page.
+     Snake, Block Fit, Diamond Rush and Hash Rush now keep their final board
+     frozen behind the card like every other game. */
   const boardReviewable = screen === 'game' && !!currentGame && !!resultData
-    && currentGame.shell !== 'self'
     && (!resultData.gameId || resultData.gameId === currentGame.id);
+
+  /* #162 — dismissing a results card reveals the board behind it. One handler
+     for all three overlays: only a press on the SCRIM itself counts (a press on
+     the card bubbles to the same node, hence the target check), and it fires on
+     pointerdown so it lands on finger-DOWN like the shared tap primitive. */
+  const dismissResultCard = (e) => {
+    if (e && e.target !== e.currentTarget) return;
+    if (!boardReviewable) return;
+    setReviewMode(true);
+  };
+
+  // Escape does the same thing, for keyboard/desktop players.
+  useEffect(() => {
+    if (!resultData || reviewMode || !boardReviewable) return;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setReviewMode(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [resultData, reviewMode, boardReviewable]);
+
+  // What the collapsed minibar says, per result kind.
+  const resultMinibarLabel = () => {
+    if (winData) {
+      return `${winData.winnerLabel || 'Solved'} · +${winData.finalScore != null ? winData.finalScore : winData.score}`;
+    }
+    if (loseData) {
+      return `Game over · +${loseData.finalScore != null ? loseData.finalScore : 0}`;
+    }
+    if (practiceResultData) {
+      return `${practiceResultData.won ? 'Practice solve' : 'Practice run over'} · ${practiceResultData.score}`;
+    }
+    return 'Result';
+  };
 
   /* NOTE: <style>{css}</style> is deliberately NOT rendered here any more — it
      is a sibling ABOVE AppErrorBoundary at the root mount (see the bottom of
@@ -25353,28 +25693,35 @@ function App() {
       {/* The finished board stays MOUNTED under the results card (slice 4) so
           "View board" has something to reveal. Every game sets its own `done`
           flag on finish, which stops its timer and short-circuits input; the
-          .frozen wrapper makes that visible and blocks stray taps. Classic
-          shell:'self' games draw their own full-screen game-over overlay, so
-          they're excluded from the freeze layer to avoid stacking two. */}
+          .frozen wrapper makes that visible and blocks stray taps.
+
+          PHASE 1 (#157/#158/#160) — this now covers EVERY ending: wins, losses,
+          practice runs, and shell:'self' classics. The old `: null` branch is
+          what unmounted Snake's board the instant it crashed, leaving the
+          results card floating over an empty page with nothing to go back to.
+
+          The wrapper is rendered UNCONDITIONALLY and only its class changes.
+          Swapping between `<div class="game-body frozen">{body}</div>` and a
+          bare `{body}` changes the element at this position, so React unmounted
+          and REMOUNTED the whole game at the exact moment the run ended: 2048
+          came back as a fresh 2-tile board (its mount reads the saved-board key
+          that the loss had just cleared), so "the final board" was a brand new
+          one. Keeping one stable element preserves the subtree's state. */}
       {screen === 'game' && currentGame && (
-        boardReviewable ? (
-          <div className="game-body frozen">{renderGameBody()}</div>
-        ) : (!winData && !loseData) ? renderGameBody() : null
+        <div className={'game-body' + (boardReviewable ? ' frozen' : '')}>
+          {renderGameBody()}
+        </div>
       )}
 
-      {screen === 'game' && (winData || loseData) && reviewMode && (
+      {screen === 'game' && resultData && reviewMode && (
         <button className="result-minibar" onClick={() => setReviewMode(false)}>
-          <span className="rmb-text">
-            {winData
-              ? `${winData.winnerLabel || 'Solved'} · +${winData.finalScore != null ? winData.finalScore : winData.score}`
-              : 'Game over · +0'}
-          </span>
+          <span className="rmb-text">{resultMinibarLabel()}</span>
           <span className="rmb-cta">↑ Results</span>
         </button>
       )}
 
       {screen === 'game' && winData && !reviewMode && (
-        <div className="win-overlay">
+        <div className="win-overlay" onPointerDown={dismissResultCard}>
           <div className="win-card">
             <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
             <h2>{winData.winnerLabel || (winData.cashOut ? 'Locked In! 🔒' : 'Solved!')}</h2>
@@ -25510,7 +25857,11 @@ function App() {
               </div>
             )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
-            {currentGame && <Leaderboard gameId={currentGame.id} solved={true} />}
+            {/* DAILY board only. `/api/daily/:gameId/leaderboard` validates
+                :gameId against GAME_IDS and 400s on a classic id, and a 400 is
+                a console error the no-console-errors check fails on. Classics
+                reach their all-time board through ClassicShell's ☰ sheet. */}
+            {currentGame && currentGame.daily && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             {winData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
@@ -25535,7 +25886,7 @@ function App() {
       )}
 
       {screen === 'game' && loseData && !reviewMode && (
-        <div className="win-overlay">
+        <div className="win-overlay" onPointerDown={dismissResultCard}>
           <div className="win-card">
             <div className="trophy">{loseData.isClassic ? '💥' : '💀'}</div>
             <h2>{loseData.isClassic ? 'Game Over' : 'Out of guesses'}</h2>
@@ -25557,15 +25908,27 @@ function App() {
                 <span className="k">{loseData.isClassic ? 'Steps' : 'Guesses'} · Time</span>
                 <span className="v mono">{loseData.steps} · {fmtTime(loseData.timeSecs)}</span>
               </div>
+              {/* PHASE 3 (#161) — the run's own headline stat (2048's highest
+                  tile, Diamond Rush's gems). Only rendered by games that pass
+                  one, so pass/fail dailies are unchanged. */}
+              {loseData.scoreLabel && loseData.scoreValue != null && (
+                <div className="score-row">
+                  <span className="k">{loseData.scoreLabel}</span>
+                  <span className="v mono">{loseData.scoreValue}</span>
+                </div>
+              )}
               {loseData.hintsUsed > 0 && (
                 <div className="score-row">
                   <span className="k">💡 Hints used</span>
                   <span className="v mono">{loseData.hintsUsed}</span>
                 </div>
               )}
+              {/* PHASE 3 (#161) — a lost run that still scored says so. This was
+                  hard-coded "+0" even though the score had ALREADY been sent to
+                  the leaderboard, which read as "that run counted for nothing". */}
               <div className="score-row total">
                 <span className="k">Earned</span>
-                <span className="v mono">+0</span>
+                <span className="v mono">+{loseData.finalScore != null ? loseData.finalScore : 0}</span>
               </div>
             </div>
             {loseData.guest && (
@@ -25574,7 +25937,8 @@ function App() {
                 and appear on daily boards.
               </div>
             )}
-            {currentGame && <Leaderboard gameId={currentGame.id} solved={false} />}
+            {/* Daily board only — see the note on the win card above. */}
+            {currentGame && currentGame.daily && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
@@ -25599,8 +25963,8 @@ function App() {
       {/* PHASE 4 (#133) — practice result. Deliberately NOT the win overlay: no
           streak row, no leaderboard, no Verified badge, no share-to-board CTA —
           nothing that implies the run counted. */}
-      {screen === 'game' && practiceMode && practiceResult && (
-        <div className="win-overlay">
+      {screen === 'game' && practiceMode && practiceResult && !reviewMode && (
+        <div className="win-overlay" onPointerDown={dismissResultCard}>
           <div className="win-card">
             <div className="trophy">🎲</div>
             <h2>{practiceResult.won ? 'Solved — practice run' : 'Practice run over'}</h2>
@@ -25618,6 +25982,15 @@ function App() {
             </div>
             {practiceResult.answer && (
               <div className="sub">{practiceResult.answer}</div>
+            )}
+            {/* PHASE 1 (#158) — the practice card had NO way back to the board:
+                no View board, no minibar, no backdrop dismiss. That was the
+                whole "there is some practice run screen you can't go back to
+                view board after" report. */}
+            {boardReviewable && (
+              <button className="primary-btn review-btn" onClick={() => setReviewMode(true)}>
+                👁 View board
+              </button>
             )}
             <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
               🎲 Another practice run
@@ -25721,10 +26094,21 @@ window.__puzzlechainMounted = true;
    touch-action:auto because no stylesheet existed yet), so poll for the
    stylesheet with a bounded retry rather than guessing a delay. */
 (function scheduleSelfTests(tries) {
-  const ready = Array.from(document.querySelectorAll('style'))
-    .some(s => s.textContent && s.textContent.indexOf('.fit-scale-content') >= 0);
-  if (!ready && (tries || 0) < 60) {
-    requestAnimationFrame(() => scheduleSelfTests((tries || 0) + 1));
+  /* #163 — readiness is now the CANARY'S COMPUTED VALUE, not a text scan of
+     <style> contents. The text scan answered "is the CSS in the DOM", which is
+     strictly weaker than "is the CSS applying" — a sheet present but inert
+     passed the old gate and then reported every tappable class as broken.
+
+     The retry ladder also no longer relies on rAF alone: requestAnimationFrame
+     does not fire in a hidden or throttled tab (headless screenshot runs and
+     background tabs both hit this), which would silently skip the entire
+     suite. Alternate rAF with a setTimeout so progress is guaranteed. */
+  const ready = tapCanaryApplied();
+  const n = tries || 0;
+  if (!ready && n < 60) {
+    const again = () => scheduleSelfTests(n + 1);
+    if (n % 2 === 0 && typeof requestAnimationFrame === 'function') requestAnimationFrame(again);
+    else setTimeout(again, 16);
     return;
   }
   /* #149 — pass the readiness verdict through instead of running the sweep

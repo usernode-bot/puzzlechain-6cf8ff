@@ -856,6 +856,59 @@ killed the entire `.cg-topbar` (exit, ☰, ?, 💬) of all 14 in-frame classic
 games too. `.game-head`, `.cg-topbar` and `.result-minibar` are re-enabled
 inside `.frozen`. Keep any new chrome in that list.
 
+### 5. Never pass `backToLobby` (or any state setter) as a bare handler
+
+`onClick={backToLobby}` hands React's SyntheticEvent to the function's first
+parameter. That put a DOM-bearing object into `lobbyTab`, and the next render's
+`JSON.stringify(navState)` threw `Converting circular structure to JSON` —
+which, with no error boundary, **unmounted the entire React root**, stylesheet
+included. That was #150, and the resulting missing stylesheet is what made the
+`registry-touch-action` sweep report all 18 tappable classes as broken, which
+is how #149 got filed against the tap-target registry. Three standing rules:
+
+- **Always wrap**: `onClick={() => backToLobby()}`. `backToLobby` also ignores
+  a non-string `tab` now, and a game **category** (`'daily'`/`'classic'`)
+  routes to `setHomeFilter` — `lobbyTab` is only ever `'home'`/`'ladder'`.
+- **Every `navState` field goes through `navPrimitive()`** — asserted by the
+  `nav-state-primitives` self-test. If you add a field, coerce it.
+- **`<style>{css}</style>` lives at the root mount, OUTSIDE `AppErrorBoundary`**
+  (a sibling of `<App/>`), so the boundary's "Something went wrong / Back to
+  Home" panel renders *styled*. Don't move it back inside `App`.
+
+### 6. In a fit column, a board needs `width: 100%`, not just `margin: 0 auto`
+
+**An auto cross-axis margin opts a flex item out of `align-items: stretch`**,
+collapsing it to fit-content. Every board carries `margin: … auto` for
+centering outside the fit column, and inside `.fit-col` that silently shrank
+them — at 390px (a 361px column) sudoku rendered 220px, the numpad 121px, word
+search 224px, word sprint 150px, and **Daily Snake 16px** (#149). The fix is a
+definite width; the caps (`max-width`) still centre the board.
+
+- New board in a `.fit-col`? Add it to the `.fit-col … { width: 100% }` rules.
+  `fitcol-auto-margin` (static scan of `css`) and `fitcol-fill` (measures the
+  mounted board) both fail the build otherwise. **`max-width` alone does NOT
+  count as a definite width** — it can't restore stretch.
+- The `background: ${C.border}` gridline idiom **needs a matching `gap`** or no
+  separator ever renders (that was `.sudoku`/`.wordsearch` since commit one).
+  When you add the gap, box separators must out-read it: sudoku's 3×3 borders
+  moved from `C.border` to `C.muted` for exactly that reason.
+- **Canvas boards fit by scaling the BACKING STORE, not a CSS transform** — see
+  Daily Bounce's `sizeCanvas`: it measures `.dbnc-wrap` (the flexible region),
+  keeps the logical 320×430 coordinate space untouched, and sets
+  `ctx.setTransform(dpr * scale, …)`. A transform would scale rasterized pixels
+  and go soft. Pointer math stays `getBoundingClientRect`-relative, so it is
+  scale-free.
+- `token-alpha-concat` scans `css` for `var(--c-…)` followed by hex digits —
+  the CSS half of the mistake `guardCanvasCtx` catches on canvas. It found
+  three dead Ludo seat-3 tints (`${C.gold}22` → `ca('gold','22')`).
+- When the stylesheet genuinely never mounts, `runClientSelfTests(false)`
+  reports **one** `stylesheet-missing` failure and skips the computed-style
+  checks. Don't "fix" that by running them anyway — that's what sent #149 at
+  the wrong subsystem.
+- **`?sdk=9` / `?sdk=6`** deep-links Sudoku's 9×9 / 6×6 board past the
+  difficulty chooser. It exists because `dapp.json` tests cannot click, so
+  without it no route reached a Sudoku grid at all.
+
 ### Also worth knowing
 
 - **Browser history exists now.** A single reducer pushes one entry per

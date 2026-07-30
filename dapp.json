@@ -996,6 +996,56 @@
       "name": "Merged card in dark theme",
       "path": "/?theme=dark",
       "expectSelector": "html[data-theme=\"dark\"] .card.paired .card-mode-btn.daily"
+    },
+    {
+      "name": "Sudoku 9x9 board is deep-linkable and fills its column",
+      "path": "/?game=sudoku&practice=1&sdk=9",
+      "expectSelector": ".sudoku.s9 .scell"
+    },
+    {
+      "name": "Sudoku 9x9 keypad renders full-width digit keys",
+      "path": "/?game=sudoku&practice=1&sdk=9",
+      "expectSelector": ".numpad .numkey"
+    },
+    {
+      "name": "Sudoku 6x6 Mini board is deep-linkable",
+      "path": "/?game=sudoku&practice=1&sdk=6",
+      "expectSelector": ".sudoku .scell"
+    },
+    {
+      "name": "Sudoku difficulty chooser still renders without ?sdk",
+      "path": "/?game=sudoku&practice=1",
+      "expectSelector": ".fit-col .sdk-choose .sdk-choice"
+    },
+    {
+      "name": "Word Search board renders",
+      "path": "/?game=wordhunt&practice=1",
+      "expectSelector": ".wordsearch .wcell"
+    },
+    {
+      "name": "Daily Snake board renders",
+      "path": "/?game=snakedaily&practice=1",
+      "expectSelector": ".dsnk-board"
+    },
+    {
+      "name": "Word Sprint grid renders",
+      "path": "/?game=wordsprint&practice=1",
+      "expectSelector": ".wspr-grid .wspr-tile"
+    },
+    {
+      "name": "Daily Bounce canvas fits its column",
+      "path": "/?game=bouncedaily&practice=1",
+      "expectSelector": ".fit-col .dbnc-wrap .dbnc-canvas"
+    },
+    {
+      "name": "Daily in-game Back control is present",
+      "path": "/?game=nonogram&practice=1",
+      "expectSelector": ".game-head .back-btn"
+    },
+    {
+      "name": "Pre-game screen Back control is present",
+      "path": "/?game=nonogram",
+      "expectSelector": ".back-btn"
     }
   ],
   "visibility": {

@@ -2384,6 +2384,13 @@ function shapeAttempt(row) {
 
 app.use(express.json());
 
+// Browsers request /favicon.ico on every page load. The app ships no icon
+// file, so the request used to fall through express.static into the
+// app.get('*') catch-all and 401 — a console error on every load. Answer it
+// with 204 No Content here, ABOVE the auth middleware, so it never reaches
+// the gate.
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // ---- Social feature helpers -----------------------------------------------
 
 // Lazy init: ensure a user row exists, creating if needed.
@@ -2416,7 +2423,7 @@ async function ensureUser(userId, username, usernode_pubkey) {
 // anything not explicitly marked public. The iframe adds `?token=…`
 // on load; the frontend script forwards the token via `x-usernode-token`
 // on subsequent fetches.
-const PUBLIC_API_PATHS = new Set(['/health']);
+const PUBLIC_API_PATHS = new Set(['/health', '/favicon.ico']);
 const PUBLIC_PREFIXES = ['/explorer-api/'];
 
 // GET-only public read allowlist (phase 2 / spec §6.10): the anonymous-play

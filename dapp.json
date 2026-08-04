@@ -1091,6 +1091,21 @@
       "name": "Snake board is deep-linkable by difficulty",
       "path": "/?game=snake&snake=normal",
       "expectSelector": ".snake-board"
+    },
+    {
+      "name": "Games grid renders game cards",
+      "path": "/",
+      "expectSelector": ".grid > .card"
+    },
+    {
+      "name": "Game card clamps its blurb instead of growing",
+      "path": "/",
+      "expectSelector": ".grid > .card .card-desc"
+    },
+    {
+      "name": "Paired card mode buttons render side by side",
+      "path": "/",
+      "expectSelector": ".grid > .card .card-modes .card-mode-btn"
     }
   ],
   "visibility": {

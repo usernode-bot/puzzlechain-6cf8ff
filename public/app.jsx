@@ -506,11 +506,19 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
-  /* #146 — dual-mode cards are ~140px taller than a single-mode card (they
-     carry two mode buttons). Default grid stretch would blow every card in
-     their row up to that height, leaving big empty voids under the short
-     ones; let each card hug its own content instead. */
-  align-items: start;
+  /* #167 — one uniform tile height for the WHOLE grid, not just per row.
+     grid-auto-rows: 1fr makes every implicit row the same height (the tallest
+     card's content sets it) and the default align-items: stretch fills each
+     cell, so the wall reads as even tiles.
+
+     This deliberately REPLACES #146's align-items: start. That rule existed
+     because a dual-mode card stacked two captioned mode buttons and towered
+     over a single-mode card, so stretching left big voids under the short
+     ones. The fix for that is upstream, not here: .card-modes is now a compact
+     SIDE-BY-SIDE pair, which shrinks the difference to a normal amount of tile
+     padding, and every card clamps its own title/desc so no one long string
+     can inflate the entire wall. Undo either half and the voids come back. */
+  grid-auto-rows: 1fr;
 }
 
 @media (max-width: 380px) {
@@ -528,6 +536,15 @@ body {
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
   position: relative;
   overflow: hidden;
+  /* #167 — a column, so the identity block sits at the top and the state footer
+     (tag / lock / resume / mode buttons) is pushed to the bottom by its own
+     margin-top: auto. In a stretched grid cell that is what turns the leftover
+     space into even tile padding instead of a ragged edge. min-height: 0 lets
+     the clamped children actually shrink. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
 }
 .card::before {
   content: '';
@@ -547,9 +564,36 @@ body {
 }
 .card.done:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
 
-.card-icon { font-size: 1.9rem; line-height: 1; margin-bottom: 0.6rem; }
-.card-name { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.2rem; }
-.card-desc { font-size: 0.85rem; color: ${C.muted}; line-height: 1.35; min-height: 2.3em; }
+.card-icon { font-size: 1.9rem; line-height: 1; margin-bottom: 0.6rem; flex: 0 0 auto; }
+/* #167 — clamped, so a long name or blurb can never grow its own tile (and,
+   with grid-auto-rows: 1fr, can never grow the whole wall). The desc keeps a
+   two-line floor as well as its new two-line ceiling, so short and long blurbs
+   push the footer to exactly the same place. */
+.card-name {
+  font-size: 1.15rem; font-weight: 600; margin-bottom: 0.2rem;
+  flex: 0 0 auto;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere;
+}
+.card-desc {
+  font-size: 0.85rem; color: ${C.muted}; line-height: 1.35;
+  min-height: 2.7em; margin-bottom: 0.75rem;
+  flex: 0 0 auto;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* #167 — the state footer. margin-top: auto is what pins it to the bottom of a
+   stretched tile; .card-desc's margin-bottom is the minimum gap above it. .tag
+   is an inline-block pill and a flex item gets blockified, so without
+   align-self it would stretch to the full card width. These .card > X
+   selectors outrank the plain margin-top declarations in .tag / .card-lock /
+   .card-resume / .card-modes by specificity, whatever the source order. */
+.card > .tag,
+.card > .card-lock,
+.card > .card-resume,
+.card > .card-modes { margin-top: auto; flex: 0 0 auto; }
+.card > .tag { align-self: flex-start; }
 
 .tag {
   display: inline-block;
@@ -1206,23 +1250,42 @@ ${emitTapHighlightRules()}
    finishing today's daily can't make the free-play half look unavailable. */
 .card.paired { cursor: default; }
 .card.paired:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
+/* #167 — the two mode buttons sit SIDE BY SIDE, not stacked. Stacked, they made
+   a paired card tower over a single-mode card, which is the whole reason the
+   grid used to let cards hug their content (see .grid). Two equal columns with
+   a clamped label/caption bring the paired card within a tile's padding of a
+   single one, so one uniform height suits both. */
 .card-modes {
-  display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.8rem;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0.4rem; margin-top: 0.7rem;
 }
 .card-mode-btn {
-  display: block; width: 100%; text-align: left;
+  display: flex; flex-direction: column; justify-content: center;
+  width: 100%; min-width: 0; text-align: center;
   font-family: inherit; color: ${C.text};
   background: ${C.card};
   border: 1px solid ${C.border};
   border-radius: 10px;
-  padding: 0.5rem 0.65rem;
+  /* Vertical padding is set so the button clears the 44px minimum tap target
+     even at the smaller side-by-side label/caption sizes. */
+  padding: 0.45rem 0.3rem;
+  min-height: 44px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
-.cmb-label { display: block; font-size: 0.82rem; font-weight: 700; line-height: 1.25; }
+/* One line each, ellipsised. At the grid's narrowest column (200px) the two
+   buttons share ~166px, i.e. ~74px of text each, so anything that wraps costs
+   every OTHER tile in the grid the same height (see .grid). The ellipsis is the
+   safety net, not the plan — keep the label/caption copy in GAME_PAIRS, and the
+   dynamic strings in PairedGameCard, inside that budget. The full captions live
+   on the pre-game screen. */
+.cmb-label, .cmb-caption {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cmb-label { font-size: 0.72rem; font-weight: 700; line-height: 1.25; }
 .cmb-caption {
-  display: block; font-size: 0.72rem; line-height: 1.3; margin-top: 0.1rem;
+  font-size: 0.62rem; line-height: 1.25; margin-top: 0.05rem;
   color: ${C.muted};
 }
 .card-mode-btn.regular:hover { border-color: var(--accent, ${C.accent}); }
@@ -6615,6 +6678,30 @@ function runClientSelfTests(styleReady) {
     if (got < want - 4) {
       throw new Error(board.className + ' is ' + Math.round(got) + 'px in a '
         + Math.round(colW) + 'px column (expected ~' + Math.round(want) + 'px)');
+    }
+    return true;
+  });
+
+  /* #167 — the games grid must read as even tiles. Measured, because every way
+     this regresses is a layout effect no static scan sees: re-adding
+     `align-items: start` to .grid, dropping `grid-auto-rows: 1fr`, an unclamped
+     title/blurb, or a footer that forgets `margin-top: auto`. One tolerance of
+     1px covers sub-pixel row rounding. */
+  checkStyled('grid-uniform-cards', () => {
+    const cards = Array.from(document.querySelectorAll('.grid > .card'));
+    if (cards.length < 2) return true; // grid not mounted (in a game, or filtered to one)
+    const hs = cards.map((c) => c.getBoundingClientRect().height);
+    if (Math.max.apply(null, hs) < 40) return true; // laid out off-screen / mid-mount
+    const lo = Math.min.apply(null, hs);
+    const hi = Math.max.apply(null, hs);
+    if (hi - lo > 1) {
+      const nameOf = (c) => {
+        const n = c.querySelector('.card-name');
+        return n ? n.textContent : '?';
+      };
+      throw new Error('game cards are ragged: ' + Math.round(lo) + 'px ('
+        + nameOf(cards[hs.indexOf(lo)]) + ') vs ' + Math.round(hi) + 'px ('
+        + nameOf(cards[hs.indexOf(hi)]) + ') across ' + cards.length + ' cards');
     }
     return true;
   });
@@ -23642,13 +23729,13 @@ const GAME_PAIRS = [
     desc: 'Clear layered tile boards into a 7-slot tray — three of a kind clears.',
     regular: {
       gameId: 'tilematching',
-      label: '▶ Free Play',
-      caption: 'Endless boards — replay as much as you like',
+      label: 'Free Play',
+      caption: 'Endless',
     },
     daily: {
       gameId: 'tilematchingdaily',
-      label: '🗓️ Daily Puzzle',
-      caption: "Daily Tile Match Puzzle — today's shape, one attempt",
+      label: 'Daily',
+      caption: 'One try',
     },
   },
   {
@@ -23660,13 +23747,13 @@ const GAME_PAIRS = [
     desc: 'Sweep a minefield using the numbers — one wrong tap ends the run.',
     regular: {
       gameId: 'minesweeper',
-      label: '▶ Free Play',
-      caption: 'Mine Finder Classic — 8×8, Lock In to bank a multiplier',
+      label: 'Free Play',
+      caption: '8×8, Lock In',
     },
     daily: {
       gameId: 'minefinder',
-      label: "🗓️ Today's Field",
-      caption: 'One run, same board for everyone',
+      label: 'Daily',
+      caption: 'One run',
     },
   },
   {
@@ -23678,13 +23765,13 @@ const GAME_PAIRS = [
     desc: "Steer, eat, grow — don't hit a wall or your own tail.",
     regular: {
       gameId: 'snake',
-      label: '▶ Free Play',
-      caption: 'Endless free play — pick your speed',
+      label: 'Free Play',
+      caption: 'Any speed',
     },
     daily: {
       gameId: 'snakedaily',
-      label: '🗓️ Daily Snake',
-      caption: "Today's apple trail, 20 to win",
+      label: 'Daily',
+      caption: '20 apples',
     },
   },
   {
@@ -23696,13 +23783,13 @@ const GAME_PAIRS = [
     desc: 'Smash every brick with a bouncing ball.',
     regular: {
       gameId: 'bounce',
-      label: '▶ Free Play',
-      caption: 'Endless walls — chase a high score',
+      label: 'Free Play',
+      caption: 'High score',
     },
     daily: {
       gameId: 'bouncedaily',
-      label: '🗓️ Daily Bounce',
-      caption: "Today's wall, three balls",
+      label: 'Daily',
+      caption: '3 balls',
     },
   },
   {
@@ -23714,14 +23801,14 @@ const GAME_PAIRS = [
     desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
     regular: {
       gameId: 'mancala',
-      label: '▶ Play',
-      caption: 'Bot, pass-and-play, or online',
+      label: 'Play',
+      caption: 'Bot or 2P',
     },
     daily: {
       gameId: 'mancala',
       startMode: 'daily',
-      label: '🗓️ Daily Challenge',
-      caption: 'One puzzle a day',
+      label: 'Daily',
+      caption: 'One a day',
     },
   },
 ];
@@ -23744,15 +23831,18 @@ function PairedGameCard({ pair, attempts, nextResetUtc, offset, loading, onPlayR
   const finished = !!(a && a.finishedAt);
   const inProgress = !!a && !finished;
   const dailyState = finished ? 'played' : inProgress ? 'resume' : 'fresh';
+  // #167 — these read inside HALF a card now (the two mode buttons sit side by
+  // side), so the dynamic strings are kept as short as the static GAME_PAIRS
+  // copy. The corner badge already spells out PLAYED / RESUME in full.
   const dailyLabel = finished
-    ? `✓ Played · +${a.score != null ? a.score : 0} pts`
+    ? `✓ +${a.score != null ? a.score : 0} pts`
     : inProgress
-      ? '▶ Resume today’s run'
+      ? '▶ Resume'
       : pair.daily.label;
   const dailyCaption = finished
-    ? `resets in ${fmtCountdown((nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}`
+    ? `↻ ${fmtCountdown((nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}`
     : inProgress
-      ? 'Pick up where you left off'
+      ? 'Left off'
       : pair.daily.caption;
   return (
     <div

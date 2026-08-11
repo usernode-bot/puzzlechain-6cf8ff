@@ -5118,61 +5118,127 @@ ${emitTapHighlightRules()}
 }
 .sw-upgrade-card button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.cg-stage.sw-battle-stage { gap: 0.35rem; padding: 0.4rem 0.55rem 0.5rem; }
-.sw-battle-head { width: 100%; min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
-.sw-battle-head > div:first-child { min-width: 0; display: flex; align-items: center; gap: 0.5rem; }
-.sw-battle-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Fraunces', Georgia, serif; font-size: 0.9rem; }
-.sw-mission-pill { border-radius: 999px; background: ${ca('rose','18')}; color: ${C.rose}; padding: 0.22rem 0.5rem; font: 700 0.61rem 'JetBrains Mono', monospace; white-space: nowrap; }
-.sw-battle-actions { display: flex; align-items: center; gap: 0.35rem; }
+.cg-stage.sw-battle-stage {
+  width: min(100%, 1220px); gap: 0.38rem; padding: 0.45rem; justify-content: flex-start;
+  border: 0; border-radius: 16px; background: transparent;
+}
+.sw-warbar {
+  width: 100%; min-height: 94px; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: 0.8rem; box-sizing: border-box; padding: 0.55rem 0.65rem;
+  border: 1px solid #725025; border-radius: 13px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.035), transparent 25%, rgba(0,0,0,.14)),
+    repeating-linear-gradient(7deg, rgba(88,53,20,.18) 0 2px, transparent 2px 13px),
+    linear-gradient(180deg, #9a682d, #68421d 57%, #4b2e16);
+  box-shadow: inset 0 2px rgba(255,224,152,.16), inset 0 -3px rgba(31,16,7,.4), 0 4px 12px rgba(0,0,0,.24);
+}
+.sw-training {
+  min-width: 0; display: flex; align-items: flex-start; gap: 0.42rem;
+  overflow-x: auto; padding: 0.15rem 0.1rem 0.2rem; scrollbar-width: thin;
+}
+.sw-training button {
+  flex: 0 0 72px; min-width: 0; display: flex; flex-direction: column; align-items: center;
+  gap: 0.12rem; padding: 0; border: 0; background: transparent; color: #fff5df;
+  cursor: pointer; font-family: inherit; text-shadow: 0 1px 2px #1c1008;
+}
+.sw-training button:not(:disabled):hover .sw-unit-medallion { transform: translateY(-2px); filter: brightness(1.08); }
+.sw-training button:disabled { opacity: 0.42; cursor: not-allowed; filter: saturate(.45); }
+.sw-unit-medallion {
+  position: relative; width: 52px; height: 52px; display: grid; place-items: center;
+  border: 3px solid #2f210f; border-radius: 50%; box-sizing: border-box;
+  background: radial-gradient(circle at 36% 28%, #ffe66e, #e5aa24 62%, #a9650d);
+  box-shadow: inset 0 0 0 2px rgba(255,246,168,.28), 0 2px 0 #211406, 0 4px 8px rgba(0,0,0,.36);
+  transition: transform .12s ease, filter .12s ease;
+}
+.sw-unit-icon {
+  display: grid; place-items: center; width: auto; height: auto; border-radius: 0; background: transparent;
+  color: #15120e; font: 900 1.38rem Georgia, serif; line-height: 1; text-shadow: 0 1px rgba(255,255,255,.22);
+}
+.sw-unit-medallion b {
+  position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); min-width: 34px;
+  padding: 1px 4px; border: 1px solid #24170a; border-radius: 7px; background: #20160c;
+  color: #f6d56b; font: 800 0.52rem 'JetBrains Mono', monospace; text-align: center; text-shadow: none;
+}
+.sw-unit-label { max-width: 72px; margin-top: 0.38rem; overflow: hidden; text-overflow: ellipsis; font-size: 0.56rem; font-weight: 800; white-space: nowrap; }
+.sw-training small { color: #dcc59a; font: 700 0.48rem 'JetBrains Mono', monospace; white-space: nowrap; }
+.sw-resource-cluster { display: grid; grid-template-columns: repeat(3, auto) auto; align-items: center; gap: 0.4rem; }
+.sw-resource {
+  min-width: 66px; min-height: 50px; display: grid; grid-template-columns: 22px auto; grid-template-rows: auto auto;
+  align-items: center; column-gap: 0.28rem; padding: 0.28rem 0.45rem; box-sizing: border-box;
+  border: 1px solid #38230f; border-radius: 8px; background: rgba(25,16,9,.72);
+  box-shadow: inset 0 1px rgba(255,236,177,.08); color: #fff7e6;
+}
+.sw-resource > span { grid-row: 1 / 3; color: #f2c441; font-size: 1.05rem; text-align: center; }
+.sw-resource strong { font: 800 0.82rem 'JetBrains Mono', monospace; line-height: 1; }
+.sw-resource small { color: #bba57c; font: 700 0.46rem 'JetBrains Mono', monospace; letter-spacing: .08em; }
+.sw-battle-actions { display: flex; align-items: center; gap: 0.3rem; }
 .sw-battle-actions button {
-  border: 1px solid ${C.border}; background: ${C.card}; color: ${C.text}; border-radius: 7px;
-  padding: 0.35rem 0.55rem; cursor: pointer; font: 600 0.67rem inherit;
+  min-width: 38px; min-height: 38px; border: 2px solid #33210e; background: #d39b25; color: #1e160c;
+  border-radius: 50%; padding: 0.28rem; cursor: pointer; font: 900 0.6rem inherit;
+  box-shadow: inset 0 1px rgba(255,248,183,.35), 0 2px rgba(28,15,6,.6);
 }
 .sw-battle-actions button:disabled { opacity: 0.4; }
-.sw-rank { color: ${C.gold}; font: 700 0.65rem 'JetBrains Mono', monospace; }
-.sw-battle-stage > .cg-statusbar { width: 100%; max-width: 100%; gap: 0.3rem; }
-.sw-battle-stage > .cg-statusbar .cg-stat { padding: 0.28rem 0.35rem; border-radius: 8px; }
-.sw-battle-stage > .cg-statusbar .cg-stat .v { font-size: clamp(0.7rem, 2.8vw, 0.9rem); }
+.sw-rank { grid-column: 1 / -1; color: #f7d15e; font: 800 0.58rem 'JetBrains Mono', monospace; text-align: right; }
+.sw-queue {
+  width: 100%; min-height: 17px; display: flex; align-items: center; justify-content: flex-start;
+  gap: 0.28rem; padding: 0 0.25rem; box-sizing: border-box; overflow-x: auto;
+}
+.sw-queue span { position: relative; width: 42px; height: 14px; overflow: hidden; border-radius: 4px; background: #21170e; border: 1px solid #68451f; }
+.sw-queue span b { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; color: #f0c655; font-size: 0.58rem; }
+.sw-queue span i { position: absolute; inset: auto auto 0 0; height: 3px; background: #e0ad2d; }
 .sw-arena {
-  position: relative; flex: 1 1 280px; min-height: 210px; width: 100%; overflow: hidden;
-  border: 1px solid ${C.border}; border-radius: 11px; background: #11182a; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+  position: relative; flex: 1 1 310px; width: 100%; min-height: 310px;
+  max-height: min(760px, calc(100dvh - 190px)); overflow: hidden;
+  border: 2px solid #6b4822; border-radius: 12px;
+  background: #342533; box-shadow: inset 0 0 0 1px rgba(255,231,171,.08), 0 4px 14px rgba(0,0,0,.3);
 }
 .sw-canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: crosshair; }
-.sw-battle-notice { min-height: 27px; padding: 0.34rem 0.55rem; font-size: 0.68rem; }
-.sw-training { width: 100%; display: flex; gap: 0.35rem; overflow-x: auto; padding: 1px 0 3px; scrollbar-width: thin; }
-.sw-training button {
-  flex: 1 0 116px; min-width: 0; display: grid; grid-template-columns: 25px 1fr; grid-template-rows: auto auto;
-  column-gap: 0.35rem; align-items: center; text-align: left; color: ${C.text}; background: ${C.card};
-  border: 1px solid ${C.border}; border-radius: 9px; padding: 0.38rem 0.45rem; cursor: pointer; font-family: inherit;
+.sw-mission-banner {
+  position: absolute; z-index: 2; top: 10px; left: 50%; transform: translateX(-50%);
+  max-width: 45%; padding: 0.28rem 0.65rem; border: 1px solid rgba(248,211,125,.35); border-radius: 999px;
+  background: rgba(29,19,13,.78); color: #f8e7c2; backdrop-filter: blur(4px);
+  font: 800 0.58rem 'JetBrains Mono', monospace; letter-spacing: .04em; text-align: center; white-space: nowrap;
 }
-.sw-training button:not(:disabled):hover { border-color: ${C.rose}; }
-.sw-training button:disabled { opacity: 0.42; cursor: not-allowed; }
-.sw-unit-icon { grid-row: 1 / 3; display: grid; place-items: center; width: 25px; height: 29px; border-radius: 7px; background: ${ca('rose','18')}; color: ${C.rose}; font-size: 1rem; }
-.sw-unit-label { font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
-.sw-training small { color: ${C.muted}; font: 600 0.54rem 'JetBrains Mono', monospace; white-space: nowrap; }
-.sw-queue { width: 100%; height: 18px; display: flex; align-items: center; gap: 0.3rem; overflow-x: auto; }
-.sw-queue span { position: relative; width: 44px; height: 15px; overflow: hidden; border-radius: 5px; background: ${C.card}; border: 1px solid ${C.border}; }
-.sw-queue span b { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; font-size: 0.64rem; }
-.sw-queue span i { position: absolute; inset: auto auto 0 0; height: 3px; background: ${C.rose}; }
-.sw-command-row { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; }
+.sw-statue-meter { position: absolute; z-index: 2; top: 12px; width: min(190px, 25%); color: #f4e6ca; text-shadow: 0 1px 2px #000; }
+.sw-statue-meter.player { left: 12px; }
+.sw-statue-meter.enemy { right: 12px; text-align: right; }
+.sw-statue-meter span { display: block; margin-bottom: 3px; font: 800 0.5rem 'JetBrains Mono', monospace; letter-spacing: .08em; }
+.sw-statue-meter i { display: block; height: 6px; border: 2px solid rgba(18,13,10,.8); background: rgba(15,11,8,.75); border-radius: 4px; overflow: hidden; }
+.sw-statue-meter b { display: block; height: 100%; background: linear-gradient(90deg, #45b979, #82db7f); }
+.sw-statue-meter.enemy b { margin-left: auto; background: linear-gradient(90deg, #d86b4f, #f09b55); }
+.sw-battle-notice {
+  position: absolute; z-index: 2; top: 43px; left: 50%; transform: translateX(-50%); width: auto; max-width: 65%;
+  min-height: 0; padding: 0.28rem 0.55rem; border-color: rgba(242,205,125,.22); border-radius: 999px;
+  background: rgba(20,14,10,.66); color: #ead9b7; backdrop-filter: blur(3px); font-size: 0.58rem; text-align: center;
+}
+.sw-command-row {
+  position: absolute; z-index: 3; right: 12px; bottom: 12px; width: 218px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem;
+}
 .sw-command-row button {
-  position: relative; display: flex; align-items: center; justify-content: center; gap: 0.35rem;
-  min-height: 38px; border: 1px solid ${C.border}; border-radius: 9px; background: ${C.card};
-  color: ${C.text}; cursor: pointer; font: 700 0.72rem inherit;
+  position: relative; min-width: 0; min-height: 54px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 0.08rem; border: 2px solid #32200d; border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #f5cf4e, #bf7918 72%); color: #1c150d;
+  cursor: pointer; font: 900 0.55rem inherit; box-shadow: inset 0 1px rgba(255,247,169,.4), 0 3px 8px rgba(0,0,0,.4);
 }
-.sw-command-row button.active { border-color: ${C.rose}; background: ${ca('rose','18')}; color: ${C.rose}; }
+.sw-command-row button > span { font-size: 1.05rem; line-height: 1; }
+.sw-command-row button.active { border-color: #f9df80; background: radial-gradient(circle at 35% 28%, #fff08a, #df9b20 72%); box-shadow: 0 0 0 3px rgba(246,195,62,.26), 0 3px 9px rgba(0,0,0,.45); }
 .sw-command-row button:disabled { opacity: 0.42; }
-.sw-command-row small { position: absolute; right: 7px; color: ${C.dim}; font: 600 0.53rem 'JetBrains Mono', monospace; }
-.sw-direct { width: 100%; border: 1px solid ${ca('gold','66')}; background: ${ca('gold','0d')}; border-radius: 10px; padding: 0.42rem; box-sizing: border-box; }
-.sw-direct-title { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.35rem; font-size: 0.66rem; color: ${C.muted}; }
-.sw-direct-title strong { color: ${C.gold}; }
-.sw-direct-title button { margin-left: auto; border: 0; background: transparent; color: ${C.muted}; cursor: pointer; font: 600 0.6rem inherit; }
+.sw-command-row small { position: absolute; right: 4px; top: 3px; color: rgba(35,22,10,.55); font: 800 0.45rem 'JetBrains Mono', monospace; }
+.sw-direct {
+  position: absolute; z-index: 3; left: 12px; right: 244px; bottom: 12px; width: auto;
+  border: 1px solid rgba(246,202,91,.62); background: rgba(24,16,10,.86); border-radius: 12px;
+  padding: 0.42rem; box-sizing: border-box; backdrop-filter: blur(5px);
+}
+.sw-direct-title { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.35rem; font-size: 0.6rem; color: #cbb995; }
+.sw-direct-title strong { color: #f5ca55; }
+.sw-direct-title button { margin-left: auto; border: 0; background: transparent; color: #cbb995; cursor: pointer; font: 700 0.55rem inherit; }
 .sw-direct-buttons { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 0.35rem; }
 .sw-direct-buttons button {
-  min-height: 42px; border: 1px solid ${C.border}; border-radius: 8px; background: ${C.card}; color: ${C.text};
-  cursor: pointer; touch-action: none; user-select: none; font: 700 0.68rem inherit;
+  min-height: 38px; border: 1px solid #705024; border-radius: 8px; background: #3c2a17; color: #fff2d5;
+  cursor: pointer; touch-action: none; user-select: none; font: 800 0.62rem inherit;
 }
-.sw-direct-buttons button.attack { background: #b54e45; border-color: #d6685e; color: #fff; }
+.sw-direct-buttons button.attack { background: #9d3f2f; border-color: #d77b50; color: #fff; }
 .sw-mission-card:focus-visible, .sw-training button:focus-visible, .sw-command-row button:focus-visible,
 .sw-direct-buttons button:focus-visible, .sw-upgrade-card button:focus-visible, .sw-battle-actions button:focus-visible {
   outline: 3px solid ${ca('accent','66')}; outline-offset: 2px;
@@ -5183,19 +5249,39 @@ ${emitTapHighlightRules()}
   .sw-upgrade-open { align-self: stretch; }
   .sw-mission-card { min-height: 94px; grid-template-columns: 38px 1fr auto; padding: 0.7rem; }
   .sw-upgrade-card { grid-template-columns: 40px 1fr auto; }
-  .sw-battle-head strong { display: none; }
+  .cg-stage.sw-battle-stage { padding: 0.22rem; border-radius: 10px; }
+  .sw-warbar { grid-template-columns: 1fr; gap: 0.25rem; padding: 0.35rem; }
+  .sw-resource-cluster { grid-row: 1; grid-template-columns: repeat(3, 1fr) auto; gap: 0.25rem; }
+  .sw-resource { min-width: 0; min-height: 42px; grid-template-columns: 17px auto; padding: 0.22rem 0.3rem; }
+  .sw-resource > span { font-size: 0.86rem; }
+  .sw-resource strong { font-size: 0.67rem; }
+  .sw-battle-actions button { min-width: 34px; min-height: 34px; font-size: 0.5rem; }
+  .sw-training { grid-row: 2; }
+  .sw-training button { flex-basis: 62px; }
+  .sw-unit-medallion { width: 46px; height: 46px; }
+  .sw-unit-label { max-width: 62px; font-size: 0.5rem; }
   .sw-rank { display: none; }
+  .sw-arena { min-height: 320px; max-height: min(500px, calc(100dvh - 270px)); }
+  .sw-mission-banner { top: 8px; max-width: 48%; font-size: 0.48rem; }
+  .sw-statue-meter { top: 9px; width: 27%; }
+  .sw-battle-notice { top: 39px; max-width: 86%; font-size: 0.5rem; }
+  .sw-command-row { left: 8px; right: 8px; bottom: 8px; width: auto; }
+  .sw-command-row button { min-height: 46px; border-radius: 10px; flex-direction: row; font-size: 0.56rem; }
+  .sw-command-row button > span { font-size: 0.9rem; }
+  .sw-direct { left: 8px; right: 8px; bottom: 62px; }
   .sw-campaign-foot { flex-wrap: wrap; }
   .sw-campaign-foot span { flex-basis: 100%; }
 }
 @media (max-height: 720px) {
-  .cg-stage.sw-battle-stage { gap: 0.22rem; padding-top: 0.25rem; }
-  .sw-battle-head { min-height: 26px; }
-  .sw-arena { min-height: 175px; }
+  .cg-stage.sw-battle-stage { gap: 0.2rem; padding-top: 0.2rem; }
+  .sw-warbar { min-height: 78px; padding-top: 0.3rem; padding-bottom: 0.3rem; }
+  .sw-unit-medallion { width: 43px; height: 43px; }
+  .sw-unit-label { display: none; }
+  .sw-training small { margin-top: 0.35rem; }
+  .sw-arena { min-height: 250px; max-height: calc(100vh - 190px); }
   .sw-battle-notice { display: none; }
-  .sw-training button { padding-top: 0.28rem; padding-bottom: 0.28rem; }
-  .sw-command-row button { min-height: 34px; }
-  .sw-direct-buttons button { min-height: 36px; }
+  .sw-command-row button { min-height: 42px; }
+  .sw-direct-buttons button { min-height: 34px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sw-mission-card { transition: none !important; }
@@ -23269,150 +23355,305 @@ function swWorldX(engine, worldX, width) {
   return pad + (worldX / engine.WORLD_WIDTH) * (width - pad * 2);
 }
 
-function swDrawStatue(ctx, x, ground, team, hpRatio) {
-  const friendly = team === 'player';
-  const color = friendly ? '#4f8df7' : '#ef6a62';
-  ctx.save();
-  ctx.translate(x, ground);
-  ctx.fillStyle = '#40362f';
-  ctx.fillRect(-28, -10, 56, 14);
-  ctx.fillStyle = '#77675c';
-  ctx.fillRect(-19, -55, 38, 48);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.arc(0, -77, 11, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, -66); ctx.lineTo(0, -30); ctx.moveTo(0, -55);
-  ctx.lineTo(friendly ? 18 : -18, -43); ctx.moveTo(0, -30); ctx.lineTo(-12, -11);
-  ctx.moveTo(0, -30); ctx.lineTo(12, -11); ctx.stroke();
-  ctx.fillStyle = '#171922';
-  ctx.fillRect(-27, -103, 54, 6);
-  ctx.fillStyle = hpRatio > 0.5 ? '#48c78e' : hpRatio > 0.2 ? '#f4b942' : '#ef6461';
-  ctx.fillRect(-27, -103, 54 * Math.max(0, hpRatio), 6);
-  ctx.restore();
+function swMissionPalette(mission) {
+  const palettes = [
+    { top: '#281a3e', mid: '#9f3f45', low: '#e49b4d', sun: '#f6cf4e', far: '#704758', near: '#91634f', soil: '#776044', soil2: '#433a2b', pine: '#27392d' },
+    { top: '#172744', mid: '#53617b', low: '#d28e65', sun: '#f4c77a', far: '#667083', near: '#76695c', soil: '#6f624d', soil2: '#3d3a31', pine: '#25382f' },
+    { top: '#101d39', mid: '#243d64', low: '#657891', sun: '#d9d9bf', far: '#34465f', near: '#526171', soil: '#56604c', soil2: '#30382e', pine: '#1e352f' },
+    { top: '#311739', mid: '#824150', low: '#d6784e', sun: '#ffbe49', far: '#654457', near: '#7d544c', soil: '#74543d', soil2: '#402f27', pine: '#2d3728' },
+    { top: '#17243d', mid: '#445c79', low: '#b9a17e', sun: '#e9d58a', far: '#5f6c78', near: '#707265', soil: '#67614d', soil2: '#39382f', pine: '#24352f' },
+    { top: '#170f28', mid: '#4d294e', low: '#b55250', sun: '#efb343', far: '#51364e', near: '#664746', soil: '#654b3d', soil2: '#342b27', pine: '#20312b' },
+  ];
+  return palettes[(Math.max(1, mission || 1) - 1) % palettes.length];
 }
 
-function swDrawMine(ctx, x, ground, team) {
-  ctx.save();
-  ctx.translate(x, ground);
-  ctx.fillStyle = 'rgba(245,184,58,.18)';
-  ctx.beginPath(); ctx.ellipse(0, 0, 42, 12, 0, 0, Math.PI * 2); ctx.fill();
-  const flip = team === 'player' ? 1 : -1;
-  ctx.fillStyle = '#e7b83d';
-  for (let i = 0; i < 4; i++) {
-    const dx = (i - 1.5) * 15;
-    ctx.beginPath();
-    ctx.moveTo(dx - 8, 0); ctx.lineTo(dx, -22 - (i % 2) * 8);
-    ctx.lineTo(dx + 9, 0); ctx.closePath(); ctx.fill();
-  }
-  ctx.fillStyle = '#332a20';
-  ctx.font = '600 9px JetBrains Mono, monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(flip > 0 ? 'GOLD' : 'GOLD', 0, 14);
-  ctx.restore();
-}
-
-function swDrawUnit(ctx, engine, unit, x, ground, selected) {
-  const type = engine.UNIT_TYPES[unit.type];
-  const friendly = unit.team === 'player';
-  const color = friendly ? '#77a8ff' : '#ff8178';
-  const scale = unit.type === 'giant' ? 1.5 : unit.type === 'spear' ? 1.08 : 1;
-  const bob = ((unit.id % 3) - 1) * 3;
-  ctx.save();
-  ctx.translate(x, ground + bob);
-  ctx.scale(scale, scale);
-  if (selected) {
-    ctx.strokeStyle = '#f5c451'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(0, 2, 19, 7, 0, 0, Math.PI * 2); ctx.stroke();
-  }
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = unit.type === 'giant' ? 4.5 : 3;
-  ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.arc(0, -40, unit.type === 'giant' ? 8 : 6, 0, Math.PI * 2); ctx.stroke();
+function swDrawCloud(ctx, x, y, scale, alpha) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+  ctx.fillStyle = `rgba(245,236,220,${alpha})`;
   ctx.beginPath();
-  ctx.moveTo(0, -34); ctx.lineTo(0, -15);
-  ctx.moveTo(0, -29); ctx.lineTo(-10, -20);
-  ctx.moveTo(0, -29); ctx.lineTo(10, -22);
-  ctx.moveTo(0, -15); ctx.lineTo(-9, 0);
-  ctx.moveTo(0, -15); ctx.lineTo(10, 0);
+  ctx.ellipse(-20, 2, 24, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -2, 28, 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(23, 3, 21, 6, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.restore();
+}
+
+function swDrawPine(ctx, x, ground, scale, color) {
+  ctx.save(); ctx.translate(x, ground); ctx.scale(scale, scale);
+  ctx.fillStyle = '#342820'; ctx.fillRect(-1.5, -26, 3, 27);
+  ctx.fillStyle = color;
+  for (let i = 0; i < 3; i++) {
+    const y = -34 + i * 9;
+    const half = 9 + i * 3;
+    ctx.beginPath(); ctx.moveTo(0, y - 12); ctx.lineTo(-half, y + 8); ctx.lineTo(half, y + 8); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function swDrawMountains(ctx, width, ground, palette, front) {
+  const base = ground - (front ? 28 : 50);
+  const peaks = front
+    ? [[-.08,.42],[.11,.24],[.29,.36],[.48,.18],[.67,.34],[.84,.22],[1.08,.4]]
+    : [[-.1,.3],[.08,.08],[.26,.3],[.42,.05],[.6,.27],[.79,.07],[1.08,.32]];
+  ctx.fillStyle = front ? palette.near : palette.far;
+  ctx.beginPath(); ctx.moveTo(0, ground);
+  for (const [px, lift] of peaks) ctx.lineTo(width * px, base - ground * lift);
+  ctx.lineTo(width, ground); ctx.closePath(); ctx.fill();
+  {
+    ctx.fillStyle = front ? 'rgba(224,215,201,.5)' : 'rgba(235,226,210,.76)';
+    for (const [px, lift] of peaks.filter((_, i) => i % 2 === 1)) {
+      const x = width * px, y = base - ground * lift;
+      const depth = front ? .065 : .085;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - width * .035, y + ground * depth);
+      ctx.lineTo(x - width * .008, y + ground * depth * .76); ctx.lineTo(x + width * .01, y + ground * depth * 1.05);
+      ctx.lineTo(x + width * .043, y + ground * depth * 1.05); ctx.closePath(); ctx.fill();
+    }
+  }
+}
+
+function swDrawStatue(ctx, x, ground, team, height) {
+  const friendly = team === 'player';
+  const scale = Math.max(.82, Math.min(1.78, height / 400));
+  ctx.save(); ctx.translate(x, ground); ctx.scale((friendly ? 1 : -1) * scale, scale);
+  ctx.fillStyle = 'rgba(18,12,9,.22)';
+  ctx.beginPath(); ctx.ellipse(0, 3, 58, 11, 0, 0, Math.PI * 2); ctx.fill();
+  const stone = friendly ? '#57595d' : '#5e4c51';
+  const light = friendly ? '#696c72' : '#71585e';
+  const dark = friendly ? '#34373b' : '#382d30';
+  const accent = friendly ? '#d0a63b' : '#a94f3f';
+  ctx.fillStyle = dark; ctx.strokeStyle = '#282527';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-50, 2); ctx.lineTo(-42, -16); ctx.lineTo(-27, -26); ctx.lineTo(-12, -23);
+  ctx.lineTo(-3, -38); ctx.lineTo(16, -35); ctx.lineTo(27, -21); ctx.lineTo(45, -14); ctx.lineTo(53, 2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  ctx.strokeStyle = stone; ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.arc(1, -92, 10, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-3, -43); ctx.lineTo(-15, -8);
+  ctx.moveTo(7, -43); ctx.lineTo(21, -8);
   ctx.stroke();
-  const dir = friendly ? 1 : -1;
-  ctx.strokeStyle = unit.type === 'mage' ? '#b89cff' : '#e5d6b8';
-  ctx.fillStyle = ctx.strokeStyle;
-  ctx.lineWidth = 2;
+
+  ctx.fillStyle = stone; ctx.strokeStyle = dark; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-12, -76); ctx.lineTo(9, -78); ctx.lineTo(18, -64); ctx.lineTo(11, -41);
+  ctx.lineTo(-7, -40); ctx.lineTo(-17, -61); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = light;
+  ctx.beginPath(); ctx.moveTo(-9, -72); ctx.lineTo(6, -74); ctx.lineTo(11, -65); ctx.lineTo(-12, -61); ctx.closePath(); ctx.fill();
+
+  ctx.strokeStyle = stone; ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(9, -68); ctx.lineTo(30, -57); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-8, -68); ctx.lineTo(-25, -53); ctx.stroke();
+
+  ctx.fillStyle = light; ctx.strokeStyle = dark; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -89, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = dark;
+  ctx.beginPath(); ctx.moveTo(-12, -92); ctx.lineTo(12, -92); ctx.lineTo(8, -101); ctx.lineTo(-7, -103); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.moveTo(-5, -102); ctx.quadraticCurveTo(4, -116, 17, -108); ctx.lineTo(6, -101); ctx.closePath(); ctx.fill();
+
+  ctx.strokeStyle = '#302a25'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(29, -57); ctx.lineTo(43, -110); ctx.stroke();
+  ctx.fillStyle = '#aaa498';
+  ctx.beginPath(); ctx.moveTo(44, -113); ctx.lineTo(38, -101); ctx.lineTo(47, -99); ctx.closePath(); ctx.fill();
+
+  ctx.fillStyle = dark; ctx.strokeStyle = accent; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(-24, -54, 10, 15, -.18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-24, -54, 5, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = accent; ctx.fillRect(-18, -34, 38, 6);
+  ctx.restore();
+}
+
+function swDrawMine(ctx, x, ground, height) {
+  const scale = Math.max(.72, Math.min(1.04, height / 440));
+  ctx.save(); ctx.translate(x, ground); ctx.scale(scale, scale);
+  ctx.fillStyle = 'rgba(47,32,19,.3)';
+  ctx.beginPath(); ctx.ellipse(0, 3, 43, 9, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#5d5147';
+  for (let i = 0; i < 7; i++) {
+    const dx = (i - 3) * 10, r = 7 + (i % 3) * 2;
+    ctx.beginPath(); ctx.arc(dx, -r * .3, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const gold = ['#d79520', '#f0bd2f', '#ffd85a', '#c88118'];
+  for (let i = 0; i < 11; i++) {
+    const dx = ((i * 17) % 67) - 33;
+    const dy = -8 - ((i * 13) % 25);
+    ctx.fillStyle = gold[i % gold.length];
+    ctx.save(); ctx.translate(dx, dy); ctx.rotate(((i * 37) % 30 - 15) * Math.PI / 180);
+    ctx.fillRect(-3, -7, 6, 14); ctx.restore();
+  }
+  ctx.restore();
+}
+
+function swUnitLane(unit) {
+  return (((unit.id * 7) % 5) - 2) * 4;
+}
+
+function swDrawUnit(ctx, engine, state, unit, x, ground, selected) {
+  const friendly = unit.team === 'player';
+  const type = engine.UNIT_TYPES[unit.type];
+  const giant = unit.type === 'giant';
+  const scale = giant ? 1.62 : unit.type === 'spear' ? 1.04 : unit.type === 'miner' ? .94 : 1;
+  const lane = swUnitLane(unit);
+  const controlled = friendly && state.direct.unitId === unit.id;
+  const command = friendly ? state.command : state.enemyCommand;
+  const walking = unit.type === 'miner'
+    ? unit.workerPhase !== 'mining'
+    : controlled ? (state.direct.left || state.direct.right) : command === 'attack';
+  const phase = state.tick * .24 + unit.id * 1.7;
+  const gait = walking ? Math.sin(phase) * 5 : 0;
+  const miningSwing = unit.workerPhase === 'mining' ? Math.sin(state.tick * .36 + unit.id) * .65 : -.2;
+  const body = friendly ? '#111113' : '#4b292b';
+  const trim = friendly ? '#d1a02f' : '#b95543';
+  const metal = '#c2b8a1';
+  const y = ground + lane;
+
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(21,13,9,.3)';
+  ctx.beginPath(); ctx.ellipse(0, 2, 14 * scale, 4 * scale, 0, 0, Math.PI * 2); ctx.fill();
+  if (selected) {
+    ctx.strokeStyle = '#ffdd55'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 1, 17 * scale, 6 * scale, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffdd55';
+    ctx.beginPath(); ctx.moveTo(0, -52 * scale); ctx.lineTo(-5, -61 * scale); ctx.lineTo(5, -61 * scale); ctx.closePath(); ctx.fill();
+  }
+  if (unit.hp < unit.maxHp || unit.type !== 'miner') {
+    const ratio = Math.max(0, unit.hp / unit.maxHp);
+    const barW = (giant ? 34 : 26) * scale;
+    ctx.fillStyle = 'rgba(15,11,9,.88)'; ctx.fillRect(-barW / 2 - 1, -49 * scale, barW + 2, 5);
+    ctx.fillStyle = ratio > .5 ? '#45b96f' : ratio > .22 ? '#e4aa32' : '#d34e3e';
+    ctx.fillRect(-barW / 2, -48 * scale, barW * ratio, 3);
+  }
+  ctx.scale((friendly ? 1 : -1) * scale, scale);
+  ctx.strokeStyle = body; ctx.fillStyle = body; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineWidth = giant ? 5 : 3.2;
+  ctx.beginPath(); ctx.arc(0, -35, giant ? 7.5 : 5.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, -29); ctx.lineTo(gait * .12, -13);
+  ctx.moveTo(0, -25); ctx.lineTo(-8 - gait * .4, -18);
+  ctx.moveTo(0, -24); ctx.lineTo(9 + gait * .35, -18);
+  ctx.moveTo(gait * .12, -13); ctx.lineTo(-8 + gait, 0);
+  ctx.moveTo(gait * .12, -13); ctx.lineTo(9 - gait, 0);
+  ctx.stroke();
+
   if (unit.type === 'miner') {
-    ctx.beginPath(); ctx.moveTo(8 * dir, -24); ctx.lineTo(17 * dir, -38);
-    ctx.moveTo(11 * dir, -36); ctx.lineTo(22 * dir, -36); ctx.stroke();
+    ctx.strokeStyle = '#8b6540'; ctx.lineWidth = 3;
+    ctx.save(); ctx.translate(8, -19); ctx.rotate(miningSwing);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(19, -15); ctx.stroke();
+    ctx.strokeStyle = metal; ctx.lineWidth = 2.3;
+    ctx.beginPath(); ctx.moveTo(13, -18); ctx.lineTo(24, -11); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = trim; ctx.fillRect(-5, -31, 11, 3);
     if (unit.carrying > 0) {
-      ctx.fillStyle = '#f5c451'; ctx.beginPath(); ctx.arc(-9 * dir, -17, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d69922'; ctx.beginPath(); ctx.arc(-9, -15, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f6d260'; ctx.beginPath(); ctx.arc(-7, -18, 2, 0, Math.PI * 2); ctx.fill();
     }
   } else if (unit.type === 'swordsman') {
-    ctx.beginPath(); ctx.moveTo(7 * dir, -23); ctx.lineTo(23 * dir, -38);
-    ctx.moveTo(16 * dir, -34); ctx.lineTo(20 * dir, -30); ctx.stroke();
+    ctx.strokeStyle = metal; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(8, -19); ctx.lineTo(25, -37); ctx.stroke();
+    ctx.strokeStyle = '#87642f'; ctx.beginPath(); ctx.moveTo(16, -29); ctx.lineTo(21, -24); ctx.stroke();
+    ctx.fillStyle = trim; ctx.fillRect(-5, -31, 11, 3);
   } else if (unit.type === 'archer') {
-    ctx.beginPath(); ctx.arc(11 * dir, -25, 10, -Math.PI / 2, Math.PI / 2, friendly); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(2 * dir, -25); ctx.lineTo(23 * dir, -25); ctx.stroke();
+    ctx.strokeStyle = '#a66c30'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(12, -21, 12, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+    ctx.strokeStyle = '#d9ccb1'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(12, -33); ctx.lineTo(12, -9); ctx.stroke();
+    ctx.strokeStyle = metal; ctx.beginPath(); ctx.moveTo(1, -21); ctx.lineTo(26, -21); ctx.stroke();
+    ctx.fillStyle = trim; ctx.beginPath(); ctx.moveTo(-5, -40); ctx.lineTo(5, -40); ctx.lineTo(1, -35); ctx.closePath(); ctx.fill();
   } else if (unit.type === 'spear') {
-    ctx.beginPath(); ctx.moveTo(-5 * dir, -20); ctx.lineTo(29 * dir, -33); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(29 * dir, -33); ctx.lineTo(23 * dir, -35); ctx.lineTo(26 * dir, -28); ctx.fill();
-    ctx.strokeStyle = '#9ca3af'; ctx.beginPath(); ctx.arc(-7 * dir, -24, 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#a9a293'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(-8, -13); ctx.lineTo(30, -34); ctx.stroke();
+    ctx.fillStyle = metal; ctx.beginPath(); ctx.moveTo(31, -35); ctx.lineTo(24, -35); ctx.lineTo(28, -29); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#5c5550'; ctx.strokeStyle = trim; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(-6, -21, 8, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = trim; ctx.beginPath(); ctx.moveTo(-5, -42); ctx.lineTo(7, -37); ctx.lineTo(-3, -35); ctx.closePath(); ctx.fill();
   } else if (unit.type === 'mage') {
-    ctx.beginPath(); ctx.moveTo(8 * dir, -22); ctx.lineTo(20 * dir, -39); ctx.stroke();
-    ctx.shadowColor = '#ad8cff'; ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(21 * dir, -41, 4, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(0, -27); ctx.lineTo(-11, 0); ctx.lineTo(12, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#7356a2'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(8, -17); ctx.lineTo(22, -41); ctx.stroke();
+    ctx.fillStyle = '#c58aff'; ctx.shadowColor = '#a85aff'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(23, -43, 4.2, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = trim; ctx.fillRect(-7, -16, 14, 3);
   } else if (unit.type === 'giant') {
-    ctx.lineWidth = 5; ctx.strokeStyle = '#9b7653';
-    ctx.beginPath(); ctx.moveTo(7 * dir, -24); ctx.lineTo(20 * dir, -41); ctx.stroke();
-  }
-  if (unit.hp < unit.maxHp) {
-    const ratio = Math.max(0, unit.hp / unit.maxHp);
-    ctx.fillStyle = '#161820'; ctx.fillRect(-13, -54, 26, 3);
-    ctx.fillStyle = ratio > 0.5 ? '#4fd399' : '#ef6461'; ctx.fillRect(-13, -54, 26 * ratio, 3);
+    ctx.strokeStyle = '#72543a'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(9, -19); ctx.lineTo(24, -39); ctx.stroke();
+    ctx.fillStyle = '#65462f'; ctx.beginPath(); ctx.arc(25, -41, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = trim; ctx.fillRect(-6, -31, 13, 4);
   }
   ctx.restore();
 }
 
 function swDrawBattle(ctx, engine, state, width, height, paused) {
   if (!state || !ctx) return;
-  const ground = Math.max(120, height * 0.76);
+  const palette = swMissionPalette(state.mission);
+  const ground = Math.max(150, height * .76);
   const sky = ctx.createLinearGradient(0, 0, 0, ground);
-  sky.addColorStop(0, '#11182a'); sky.addColorStop(1, '#2d3950');
+  sky.addColorStop(0, palette.top); sky.addColorStop(.52, palette.mid); sky.addColorStop(1, palette.low);
   ctx.fillStyle = sky; ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = 'rgba(244,197,103,.22)';
-  ctx.beginPath(); ctx.arc(width * 0.5, height * 0.2, Math.min(40, width * 0.06), 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#59614c'; ctx.fillRect(0, ground, width, height - ground);
-  ctx.fillStyle = '#434a3b'; ctx.fillRect(0, ground + 10, width, height - ground - 10);
-  ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.setLineDash([4, 8]);
-  ctx.beginPath(); ctx.moveTo(width / 2, 20); ctx.lineTo(width / 2, ground + 8); ctx.stroke(); ctx.setLineDash([]);
 
-  swDrawMine(ctx, swWorldX(engine, 375, width), ground, 'player');
-  swDrawMine(ctx, swWorldX(engine, engine.WORLD_WIDTH - 375, width), ground, 'enemy');
-  swDrawStatue(ctx, swWorldX(engine, 150, width), ground, 'player', state.statues.player.hp / state.statues.player.maxHp);
-  swDrawStatue(ctx, swWorldX(engine, engine.WORLD_WIDTH - 150, width), ground, 'enemy', state.statues.enemy.hp / state.statues.enemy.maxHp);
+  const sunX = width * (.46 + (state.mission % 3) * .035);
+  const sunY = height * .27;
+  const sunR = Math.max(28, Math.min(height * .145, width * .09));
+  ctx.fillStyle = palette.sun; ctx.globalAlpha = .92;
+  ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  swDrawCloud(ctx, width * .18, height * .18, Math.max(.55, width / 1100), .34);
+  swDrawCloud(ctx, width * .77, height * .25, Math.max(.42, width / 1450), .28);
+  swDrawMountains(ctx, width, ground, palette, false);
+  swDrawMountains(ctx, width, ground, palette, true);
 
-  const sorted = state.units.slice().sort((a, b) => a.id - b.id);
+  const treeXs = [.07,.16,.28,.38,.62,.72,.84,.94];
+  for (let i = 0; i < treeXs.length; i++) {
+    const t = treeXs[i];
+    const treeGround = ground - 22 - (i % 3) * 8;
+    swDrawPine(ctx, width * t, treeGround, .48 + (i % 2) * .16, palette.pine);
+  }
+
+  const earth = ctx.createLinearGradient(0, ground - 8, 0, height);
+  earth.addColorStop(0, palette.soil); earth.addColorStop(.2, palette.soil); earth.addColorStop(1, palette.soil2);
+  ctx.fillStyle = earth;
+  ctx.beginPath(); ctx.moveTo(0, ground - 5);
+  ctx.bezierCurveTo(width * .22, ground - 13, width * .36, ground + 1, width * .53, ground - 7);
+  ctx.bezierCurveTo(width * .7, ground - 15, width * .85, ground + 2, width, ground - 6);
+  ctx.lineTo(width, height); ctx.lineTo(0, height); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(42,31,21,.45)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, ground + 4); ctx.lineTo(width, ground + 1); ctx.stroke();
+  for (let i = 0; i < 58; i++) {
+    const tx = (i * 137 + state.mission * 41) % Math.max(1, width);
+    const ty = ground + 10 + ((i * 47) % Math.max(12, height - ground - 15));
+    ctx.fillStyle = i % 3 ? 'rgba(39,29,21,.13)' : 'rgba(220,184,115,.08)';
+    ctx.fillRect(tx, ty, 2 + (i % 4), 1.5);
+  }
+
+  swDrawMine(ctx, swWorldX(engine, 375, width), ground, height);
+  swDrawMine(ctx, swWorldX(engine, engine.WORLD_WIDTH - 375, width), ground, height);
+  swDrawStatue(ctx, swWorldX(engine, 150, width), ground, 'player', height);
+  swDrawStatue(ctx, swWorldX(engine, engine.WORLD_WIDTH - 150, width), ground, 'enemy', height);
+
+  const sorted = state.units.slice().sort((a, b) => swUnitLane(a) - swUnitLane(b) || a.id - b.id);
   for (const unit of sorted) {
-    swDrawUnit(ctx, engine, unit, swWorldX(engine, unit.x, width), ground,
+    swDrawUnit(ctx, engine, state, unit, swWorldX(engine, unit.x, width), ground,
       state.direct.unitId === unit.id);
   }
   for (const shot of state.projectiles) {
     const x = swWorldX(engine, shot.x, width);
-    ctx.fillStyle = shot.splash ? '#b89cff' : '#f3deb1';
-    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = shot.splash ? 9 : 2;
-    ctx.beginPath(); ctx.arc(x, ground - 34, shot.splash ? 5 : 3, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
+    const dir = shot.team === 'player' ? 1 : -1;
+    if (shot.splash) {
+      ctx.fillStyle = '#bd82ef'; ctx.shadowColor = '#a44ee7'; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(x, ground - 38, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = '#ded5c2'; ctx.fillStyle = '#ded5c2'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - dir * 11, ground - 34); ctx.lineTo(x + dir * 10, ground - 34); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + dir * 11, ground - 34); ctx.lineTo(x + dir * 5, ground - 38);
+      ctx.lineTo(x + dir * 6, ground - 31); ctx.closePath(); ctx.fill();
+    }
   }
 
-  ctx.fillStyle = 'rgba(8,10,16,.72)';
-  ctx.fillRect(10, 10, 112, 22); ctx.fillRect(width - 122, 10, 112, 22);
-  ctx.font = '600 9px JetBrains Mono, monospace'; ctx.textAlign = 'center';
-  ctx.fillStyle = '#91b6ff'; ctx.fillText('YOUR STATUE', 66, 25);
-  ctx.fillStyle = '#ff9b94'; ctx.fillText('ENEMY STATUE', width - 66, 25);
+  const shade = ctx.createRadialGradient(width / 2, height / 2, height * .2, width / 2, height / 2, width * .72);
+  shade.addColorStop(0, 'rgba(0,0,0,0)'); shade.addColorStop(1, 'rgba(12,7,6,.28)');
+  ctx.fillStyle = shade; ctx.fillRect(0, 0, width, height);
   if (paused) {
-    ctx.fillStyle = 'rgba(7,9,14,.66)'; ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = '#fff'; ctx.font = '700 20px Space Grotesk, sans-serif';
-    ctx.textAlign = 'center'; ctx.fillText('PAUSED', width / 2, height / 2);
+    ctx.fillStyle = 'rgba(18,11,8,.64)'; ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#f8e6ba'; ctx.font = '800 22px Space Grotesk, sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('BATTLE PAUSED', width / 2, height / 2);
   }
 }
 
@@ -23805,69 +24046,70 @@ function StickWarGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
     <ClassicShell game={game} onExit={returnToCampaign}
       onNewGame={() => startMission(activeMission, demo)} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage sw-stage sw-battle-stage">
-        <div className="sw-battle-head">
-          <div><span className="sw-mission-pill">Mission {activeMission}</span><strong>{mission.name}</strong></div>
-          <div className="sw-battle-actions">
-            {globalRank && <span className="sw-rank">Global #{globalRank}</span>}
-            <button onClick={() => setPaused((value) => !value)} disabled={!state || state.phase !== 'playing'}>{paused ? 'Resume' : 'Pause'}</button>
-            <button onClick={returnToCampaign}>Campaign</button>
+        <div className="sw-warbar">
+          <div className="sw-training" aria-label="Training bar">
+            {unitIds.map((id, index) => {
+              const type = engine.UNIT_TYPES[id];
+              const article = /^[aeiou]/i.test(type.name) ? 'an' : 'a';
+              const blocked = paused || !state || state.phase !== 'playing' || view.gold < type.cost
+                || currentPop + type.pop > engine.POPULATION_CAP;
+              return (
+                <button key={id} disabled={blocked} onClick={() => train(id)} title={`Train ${article} ${type.name} (${type.cost} gold)`}>
+                  <span className="sw-unit-medallion"><span className="sw-unit-icon">{type.icon}</span><b>{type.cost}</b></span>
+                  <span className="sw-unit-label">Train {article} {type.name}</span>
+                  <small>{index + 1} · {type.pop} pop</small>
+                </button>
+              );
+            })}
           </div>
-        </div>
-        <CgStatus items={[
-          { l: 'Gold', v: `◈ ${view ? view.gold : 0}` },
-          { l: 'Army', v: `${currentPop}/${engine.POPULATION_CAP}` },
-          { l: 'Your statue', v: `${statPct}%` },
-          { l: 'Enemy', v: `${enemyPct}%` },
-          { l: 'Time', v: swFmtTime(view && view.elapsedSecs) },
-        ]} />
-        <div className="sw-arena" ref={arenaRef}>
-          <canvas ref={canvasRef} className="sw-canvas" role="img"
-            aria-label="Side-view battlefield. Tap one of your combat units for direct control."
-            aria-describedby="sw-live-status" onPointerDown={selectFromCanvas} />
-          <div id="sw-live-status" className="sr-only" aria-live="polite">Gold {view ? view.gold : 0}. Your statue {statPct} percent. Enemy statue {enemyPct} percent.</div>
-        </div>
-        <div className="sw-notice sw-battle-notice" role="status">{notice || 'Train a Miner, build an army, and destroy the enemy statue.'}</div>
-        <div className="sw-training" aria-label="Training bar">
-          {unitIds.map((id, index) => {
-            const type = engine.UNIT_TYPES[id];
-            const article = /^[aeiou]/i.test(type.name) ? 'an' : 'a';
-            const blocked = paused || !state || state.phase !== 'playing' || view.gold < type.cost
-              || currentPop + type.pop > engine.POPULATION_CAP;
-            return (
-              <button key={id} disabled={blocked} onClick={() => train(id)} title={`Train ${article} ${type.name} (${type.cost} gold)`}>
-                <span className="sw-unit-icon">{type.icon}</span>
-                <span className="sw-unit-label">Train {article} {type.name}</span>
-                <small>{index + 1} · ◈{type.cost} · {type.pop} pop</small>
-              </button>
-            );
-          })}
+          <div className="sw-resource-cluster" aria-label="Battle resources">
+            {globalRank && <span className="sw-rank">Global #{globalRank}</span>}
+            <div className="sw-resource"><span>◆</span><strong>{view ? view.gold : 0}</strong><small>GOLD</small></div>
+            <div className="sw-resource"><span>♟</span><strong>{currentPop}/{engine.POPULATION_CAP}</strong><small>ARMY</small></div>
+            <div className="sw-resource"><span>◷</span><strong>{swFmtTime(view && view.elapsedSecs)}</strong><small>TIME</small></div>
+            <div className="sw-battle-actions">
+              <button onClick={() => setPaused((value) => !value)} disabled={!state || state.phase !== 'playing'}
+                aria-label={paused ? 'Resume battle' : 'Pause battle'} title={paused ? 'Resume battle' : 'Pause battle'}>{paused ? '▶' : 'Ⅱ'}</button>
+              <button onClick={returnToCampaign} aria-label="Return to campaign" title="Return to campaign">⌂</button>
+            </div>
+          </div>
         </div>
         {view && view.queues.player.length > 0 && (
           <div className="sw-queue" aria-label="Training queue">
             {view.queues.player.map((item, index) => <span key={index}><b>{engine.UNIT_TYPES[item.type].icon}</b><i style={{ width: `${Math.round(item.progress * 100)}%` }} /></span>)}
           </div>
         )}
-        <div className="sw-command-row" aria-label="Army commands">
-          {[
-            ['attack', '⚔', 'Attack', 'A'],
-            ['hold', '◆', 'Hold', 'H'],
-            ['garrison', '⌂', 'Garrison', 'G'],
-          ].map(([id, icon, label, key]) => (
-            <button key={id} className={view && view.command === id ? 'active' : ''} onClick={() => issueCommand(id)} disabled={paused || !state || state.phase !== 'playing'}>
-              <span>{icon}</span>{label}<small>{key}</small>
-            </button>
-          ))}
-        </div>
-        {selected && (
-          <div className="sw-direct" aria-label={`Direct control for ${engine.UNIT_TYPES[selected.type].name}`}>
-            <div className="sw-direct-title"><span>Direct control</span><strong>{engine.UNIT_TYPES[selected.type].name}</strong><button onClick={stopDirect}>Release · Esc</button></div>
-            <div className="sw-direct-buttons">
-              <button {...holdHandlers({ left: true }, { left: false })} aria-label="Move controlled unit left">← Move</button>
-              <button className="attack" {...holdHandlers({ attack: true }, { attack: false })} aria-label="Attack with controlled unit">Attack · Space</button>
-              <button {...holdHandlers({ right: true }, { right: false })} aria-label="Move controlled unit right">Move →</button>
-            </div>
+        <div className="sw-arena" ref={arenaRef}>
+          <canvas ref={canvasRef} className="sw-canvas" role="img"
+            aria-label="Side-view battlefield. Tap one of your combat units for direct control."
+            aria-describedby="sw-live-status" onPointerDown={selectFromCanvas} />
+          <div className="sw-mission-banner">Mission {activeMission} · {mission.name}</div>
+          <div className="sw-statue-meter player"><span>ORDER STATUE · {statPct}%</span><i><b style={{ width: `${statPct}%` }} /></i></div>
+          <div className="sw-statue-meter enemy"><span>ENEMY STATUE · {enemyPct}%</span><i><b style={{ width: `${enemyPct}%` }} /></i></div>
+          <div className="sw-notice sw-battle-notice" role="status">{notice || 'Train a Miner, build an army, and destroy the enemy statue.'}</div>
+          <div id="sw-live-status" className="sr-only" aria-live="polite">Gold {view ? view.gold : 0}. Your statue {statPct} percent. Enemy statue {enemyPct} percent.</div>
+          <div className="sw-command-row" aria-label="Army commands">
+            {[
+              ['attack', '⚔', 'Attack', 'A'],
+              ['hold', '◆', 'Hold', 'H'],
+              ['garrison', '⌂', 'Garrison', 'G'],
+            ].map(([id, icon, label, key]) => (
+              <button key={id} className={view && view.command === id ? 'active' : ''} onClick={() => issueCommand(id)} disabled={paused || !state || state.phase !== 'playing'}>
+                <span>{icon}</span>{label}<small>{key}</small>
+              </button>
+            ))}
           </div>
-        )}
+          {selected && (
+            <div className="sw-direct" aria-label={`Direct control for ${engine.UNIT_TYPES[selected.type].name}`}>
+              <div className="sw-direct-title"><span>Direct control</span><strong>{engine.UNIT_TYPES[selected.type].name}</strong><button onClick={stopDirect}>Release · Esc</button></div>
+              <div className="sw-direct-buttons">
+                <button {...holdHandlers({ left: true }, { left: false })} aria-label="Move controlled unit left">← Move</button>
+                <button className="attack" {...holdHandlers({ attack: true }, { attack: false })} aria-label="Attack with controlled unit">Attack · Space</button>
+                <button {...holdHandlers({ right: true }, { right: false })} aria-label="Move controlled unit right">Move →</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </ClassicShell>
   );

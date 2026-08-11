@@ -24574,7 +24574,7 @@ const GAME_PAIRS = [
     regular: {
       gameId: 'minesweeper',
       label: 'Free Play',
-      caption: '8×8, Lock In',
+      caption: 'Mine Finder Classic',
     },
     daily: {
       gameId: 'minefinder',

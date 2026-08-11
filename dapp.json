@@ -156,6 +156,16 @@
       "expectText": "Start mining"
     },
     {
+      "name": "Stick War Legacy card in Classic Games",
+      "path": "/?tab=classic",
+      "expectText": "Stick War: Legacy"
+    },
+    {
+      "name": "Stick War deterministic battlefield boots",
+      "path": "/?game=stickwar&demo=stickwar&play=1",
+      "expectText": "Train a Miner"
+    },
+    {
       "name": "2048 mode modal offers Online Race",
       "path": "/?game=2048",
       "expectText": "Online Race"

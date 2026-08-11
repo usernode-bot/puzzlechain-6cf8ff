@@ -5039,6 +5039,168 @@ ${emitTapHighlightRules()}
 .win-card h2 { color: ${C.text}; }
 .score-row.total .v { color: ${C.gold}; }
 
+/* ---- Stick War: Legacy ----------------------------------------------- */
+.cg-stage.sw-stage {
+  flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  width: min(100%, 1040px); margin: 0 auto; box-sizing: border-box;
+  color: ${C.text};
+}
+.sw-engine-error {
+  margin: auto; max-width: 420px; text-align: center; color: ${C.rose};
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px; padding: 1.2rem;
+}
+.sw-kicker {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.64rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: ${C.rose}; margin-bottom: 0.35rem;
+}
+.sw-campaign-stage, .sw-upgrade-stage { padding: 1rem; gap: 0.8rem; }
+.sw-campaign-head, .sw-upgrade-head {
+  width: 100%; display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; padding: 0.4rem 0 0.8rem; border-bottom: 1px solid ${C.border};
+}
+.sw-campaign-head h2, .sw-upgrade-head h2 {
+  margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: clamp(1.45rem, 5vw, 2.1rem);
+}
+.sw-campaign-head p { max-width: 650px; margin: 0.45rem 0 0; color: ${C.muted}; font-size: 0.88rem; line-height: 1.5; }
+.sw-upgrade-open, .sw-star-bank {
+  flex: 0 0 auto; border: 1px solid ${ca('gold','55')}; background: ${ca('gold','16')};
+  color: ${C.text}; border-radius: 12px; padding: 0.65rem 0.8rem; font: 700 0.78rem inherit;
+}
+.sw-upgrade-open { cursor: pointer; }
+.sw-upgrade-open span, .sw-star-bank { color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
+.sw-notice {
+  width: 100%; box-sizing: border-box; color: ${C.muted}; background: ${C.card};
+  border: 1px solid ${C.border}; border-radius: 9px; padding: 0.48rem 0.65rem;
+  font-size: 0.76rem; line-height: 1.35;
+}
+.sw-mission-grid { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+.sw-mission-card {
+  min-height: 105px; display: grid; grid-template-columns: 42px 1fr auto; align-items: center;
+  gap: 0.75rem; padding: 0.85rem; text-align: left; cursor: pointer;
+  color: ${C.text}; background: ${C.card}; border: 1px solid ${C.border}; border-radius: 13px;
+  font-family: inherit; box-shadow: 0 2px 8px var(--c-shadow-sm);
+  transition: transform .12s ease, border-color .12s ease;
+}
+.sw-mission-card:hover:not(:disabled) { transform: translateY(-1px); border-color: ${C.rose}; }
+.sw-mission-card.locked { opacity: 0.5; cursor: not-allowed; }
+.sw-mission-num {
+  width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%;
+  color: #fff; background: #b54e45; font: 800 0.8rem 'JetBrains Mono', monospace;
+}
+.sw-mission-copy { min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.sw-mission-copy strong { font-family: 'Fraunces', Georgia, serif; font-size: 1rem; }
+.sw-mission-copy span { color: ${C.muted}; font-size: 0.74rem; line-height: 1.35; }
+.sw-mission-copy small { color: ${C.gold}; font-size: 0.66rem; font-weight: 700; }
+.sw-mission-best { color: ${C.rose}; font: 700 0.68rem 'JetBrains Mono', monospace; white-space: nowrap; }
+.sw-campaign-foot { width: 100%; display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; color: ${C.muted}; font-size: 0.73rem; }
+.sw-campaign-foot span { margin-right: auto; }
+.sw-campaign-foot button, .sw-inline-back {
+  border: 1px solid ${C.border}; background: ${C.card}; color: ${C.muted}; border-radius: 8px;
+  padding: 0.42rem 0.65rem; cursor: pointer; font: 600 0.72rem inherit;
+}
+.sw-campaign-foot button.danger { color: ${C.rose}; border-color: ${ca('rose','66')}; }
+.sw-inline-back { align-self: flex-start; }
+.sw-upgrade-grid { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.sw-upgrade-card {
+  display: grid; grid-template-columns: 46px 1fr auto; gap: 0.8rem; align-items: center;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 13px; padding: 0.9rem;
+}
+.sw-upgrade-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 11px; background: ${ca('rose','18')}; font-size: 1.35rem; }
+.sw-upgrade-copy { display: flex; flex-direction: column; gap: 0.25rem; }
+.sw-upgrade-copy strong { font-size: 0.9rem; }
+.sw-upgrade-copy span { color: ${C.muted}; font-size: 0.7rem; line-height: 1.35; }
+.sw-level-pips { display: flex; gap: 4px; margin-top: 0.2rem; }
+.sw-level-pips i { width: 24px; height: 4px; border-radius: 999px; background: ${C.border}; }
+.sw-level-pips i.on { background: ${C.gold}; }
+.sw-upgrade-card button {
+  border: 1px solid ${ca('gold','66')}; background: ${ca('gold','16')}; color: ${C.gold};
+  border-radius: 8px; padding: 0.48rem 0.6rem; cursor: pointer; font: 700 0.69rem inherit;
+}
+.sw-upgrade-card button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.cg-stage.sw-battle-stage { gap: 0.35rem; padding: 0.4rem 0.55rem 0.5rem; }
+.sw-battle-head { width: 100%; min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.sw-battle-head > div:first-child { min-width: 0; display: flex; align-items: center; gap: 0.5rem; }
+.sw-battle-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Fraunces', Georgia, serif; font-size: 0.9rem; }
+.sw-mission-pill { border-radius: 999px; background: ${ca('rose','18')}; color: ${C.rose}; padding: 0.22rem 0.5rem; font: 700 0.61rem 'JetBrains Mono', monospace; white-space: nowrap; }
+.sw-battle-actions { display: flex; align-items: center; gap: 0.35rem; }
+.sw-battle-actions button {
+  border: 1px solid ${C.border}; background: ${C.card}; color: ${C.text}; border-radius: 7px;
+  padding: 0.35rem 0.55rem; cursor: pointer; font: 600 0.67rem inherit;
+}
+.sw-battle-actions button:disabled { opacity: 0.4; }
+.sw-rank { color: ${C.gold}; font: 700 0.65rem 'JetBrains Mono', monospace; }
+.sw-battle-stage > .cg-statusbar { width: 100%; max-width: 100%; gap: 0.3rem; }
+.sw-battle-stage > .cg-statusbar .cg-stat { padding: 0.28rem 0.35rem; border-radius: 8px; }
+.sw-battle-stage > .cg-statusbar .cg-stat .v { font-size: clamp(0.7rem, 2.8vw, 0.9rem); }
+.sw-arena {
+  position: relative; flex: 1 1 280px; min-height: 210px; width: 100%; overflow: hidden;
+  border: 1px solid ${C.border}; border-radius: 11px; background: #11182a; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+}
+.sw-canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: crosshair; }
+.sw-battle-notice { min-height: 27px; padding: 0.34rem 0.55rem; font-size: 0.68rem; }
+.sw-training { width: 100%; display: flex; gap: 0.35rem; overflow-x: auto; padding: 1px 0 3px; scrollbar-width: thin; }
+.sw-training button {
+  flex: 1 0 116px; min-width: 0; display: grid; grid-template-columns: 25px 1fr; grid-template-rows: auto auto;
+  column-gap: 0.35rem; align-items: center; text-align: left; color: ${C.text}; background: ${C.card};
+  border: 1px solid ${C.border}; border-radius: 9px; padding: 0.38rem 0.45rem; cursor: pointer; font-family: inherit;
+}
+.sw-training button:not(:disabled):hover { border-color: ${C.rose}; }
+.sw-training button:disabled { opacity: 0.42; cursor: not-allowed; }
+.sw-unit-icon { grid-row: 1 / 3; display: grid; place-items: center; width: 25px; height: 29px; border-radius: 7px; background: ${ca('rose','18')}; color: ${C.rose}; font-size: 1rem; }
+.sw-unit-label { font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+.sw-training small { color: ${C.muted}; font: 600 0.54rem 'JetBrains Mono', monospace; white-space: nowrap; }
+.sw-queue { width: 100%; height: 18px; display: flex; align-items: center; gap: 0.3rem; overflow-x: auto; }
+.sw-queue span { position: relative; width: 44px; height: 15px; overflow: hidden; border-radius: 5px; background: ${C.card}; border: 1px solid ${C.border}; }
+.sw-queue span b { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; font-size: 0.64rem; }
+.sw-queue span i { position: absolute; inset: auto auto 0 0; height: 3px; background: ${C.rose}; }
+.sw-command-row { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; }
+.sw-command-row button {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+  min-height: 38px; border: 1px solid ${C.border}; border-radius: 9px; background: ${C.card};
+  color: ${C.text}; cursor: pointer; font: 700 0.72rem inherit;
+}
+.sw-command-row button.active { border-color: ${C.rose}; background: ${ca('rose','18')}; color: ${C.rose}; }
+.sw-command-row button:disabled { opacity: 0.42; }
+.sw-command-row small { position: absolute; right: 7px; color: ${C.dim}; font: 600 0.53rem 'JetBrains Mono', monospace; }
+.sw-direct { width: 100%; border: 1px solid ${ca('gold','66')}; background: ${ca('gold','0d')}; border-radius: 10px; padding: 0.42rem; box-sizing: border-box; }
+.sw-direct-title { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.35rem; font-size: 0.66rem; color: ${C.muted}; }
+.sw-direct-title strong { color: ${C.gold}; }
+.sw-direct-title button { margin-left: auto; border: 0; background: transparent; color: ${C.muted}; cursor: pointer; font: 600 0.6rem inherit; }
+.sw-direct-buttons { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 0.35rem; }
+.sw-direct-buttons button {
+  min-height: 42px; border: 1px solid ${C.border}; border-radius: 8px; background: ${C.card}; color: ${C.text};
+  cursor: pointer; touch-action: none; user-select: none; font: 700 0.68rem inherit;
+}
+.sw-direct-buttons button.attack { background: #b54e45; border-color: #d6685e; color: #fff; }
+.sw-mission-card:focus-visible, .sw-training button:focus-visible, .sw-command-row button:focus-visible,
+.sw-direct-buttons button:focus-visible, .sw-upgrade-card button:focus-visible, .sw-battle-actions button:focus-visible {
+  outline: 3px solid ${ca('accent','66')}; outline-offset: 2px;
+}
+@media (max-width: 680px) {
+  .sw-mission-grid, .sw-upgrade-grid { grid-template-columns: 1fr; }
+  .sw-campaign-head { flex-direction: column; }
+  .sw-upgrade-open { align-self: stretch; }
+  .sw-mission-card { min-height: 94px; grid-template-columns: 38px 1fr auto; padding: 0.7rem; }
+  .sw-upgrade-card { grid-template-columns: 40px 1fr auto; }
+  .sw-battle-head strong { display: none; }
+  .sw-rank { display: none; }
+  .sw-campaign-foot { flex-wrap: wrap; }
+  .sw-campaign-foot span { flex-basis: 100%; }
+}
+@media (max-height: 720px) {
+  .cg-stage.sw-battle-stage { gap: 0.22rem; padding-top: 0.25rem; }
+  .sw-battle-head { min-height: 26px; }
+  .sw-arena { min-height: 175px; }
+  .sw-battle-notice { display: none; }
+  .sw-training button { padding-top: 0.28rem; padding-bottom: 0.28rem; }
+  .sw-command-row button { min-height: 34px; }
+  .sw-direct-buttons button { min-height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-mission-card { transition: none !important; }
+}
+
 /* AppErrorBoundary fallback (#150). The stylesheet is mounted OUTSIDE the
    boundary precisely so this panel can be styled when App's tree is gone. */
 .err-fallback {
@@ -23065,6 +23227,652 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
   );
 }
 
+/* ============================================================
+   Stick War: Legacy — original-asset campaign strategy game
+   ============================================================ */
+
+function swLoadCampaign(engine) {
+  if (!engine) return null;
+  try { return engine.sanitizeCampaign(localStorage.getItem(engine.CAMPAIGN_KEY)); }
+  catch (_) { return engine.defaultCampaign(); }
+}
+
+function swSaveCampaign(engine, campaign) {
+  const safe = engine.sanitizeCampaign(campaign);
+  try { localStorage.setItem(engine.CAMPAIGN_KEY, JSON.stringify(safe)); } catch (_) {}
+  return safe;
+}
+
+function swDemoRequested() {
+  try { return new URLSearchParams(window.location.search).get('demo') === 'stickwar'; }
+  catch (_) { return false; }
+}
+
+function swBattleSeed(mission, demo) {
+  if (demo) return (0x5a17c0de ^ (mission * 2654435761)) >>> 0;
+  try {
+    const word = new Uint32Array(1);
+    window.crypto.getRandomValues(word);
+    return (word[0] ^ (mission * 2654435761)) >>> 0;
+  } catch (_) {
+    return (0x91e10da5 ^ (mission * 2654435761)) >>> 0;
+  }
+}
+
+function swFmtTime(secs) {
+  const n = Math.max(0, Math.floor(secs || 0));
+  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+}
+
+function swWorldX(engine, worldX, width) {
+  const pad = Math.max(16, width * 0.025);
+  return pad + (worldX / engine.WORLD_WIDTH) * (width - pad * 2);
+}
+
+function swDrawStatue(ctx, x, ground, team, hpRatio) {
+  const friendly = team === 'player';
+  const color = friendly ? '#4f8df7' : '#ef6a62';
+  ctx.save();
+  ctx.translate(x, ground);
+  ctx.fillStyle = '#40362f';
+  ctx.fillRect(-28, -10, 56, 14);
+  ctx.fillStyle = '#77675c';
+  ctx.fillRect(-19, -55, 38, 48);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(0, -77, 11, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -66); ctx.lineTo(0, -30); ctx.moveTo(0, -55);
+  ctx.lineTo(friendly ? 18 : -18, -43); ctx.moveTo(0, -30); ctx.lineTo(-12, -11);
+  ctx.moveTo(0, -30); ctx.lineTo(12, -11); ctx.stroke();
+  ctx.fillStyle = '#171922';
+  ctx.fillRect(-27, -103, 54, 6);
+  ctx.fillStyle = hpRatio > 0.5 ? '#48c78e' : hpRatio > 0.2 ? '#f4b942' : '#ef6461';
+  ctx.fillRect(-27, -103, 54 * Math.max(0, hpRatio), 6);
+  ctx.restore();
+}
+
+function swDrawMine(ctx, x, ground, team) {
+  ctx.save();
+  ctx.translate(x, ground);
+  ctx.fillStyle = 'rgba(245,184,58,.18)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 42, 12, 0, 0, Math.PI * 2); ctx.fill();
+  const flip = team === 'player' ? 1 : -1;
+  ctx.fillStyle = '#e7b83d';
+  for (let i = 0; i < 4; i++) {
+    const dx = (i - 1.5) * 15;
+    ctx.beginPath();
+    ctx.moveTo(dx - 8, 0); ctx.lineTo(dx, -22 - (i % 2) * 8);
+    ctx.lineTo(dx + 9, 0); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#332a20';
+  ctx.font = '600 9px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(flip > 0 ? 'GOLD' : 'GOLD', 0, 14);
+  ctx.restore();
+}
+
+function swDrawUnit(ctx, engine, unit, x, ground, selected) {
+  const type = engine.UNIT_TYPES[unit.type];
+  const friendly = unit.team === 'player';
+  const color = friendly ? '#77a8ff' : '#ff8178';
+  const scale = unit.type === 'giant' ? 1.5 : unit.type === 'spear' ? 1.08 : 1;
+  const bob = ((unit.id % 3) - 1) * 3;
+  ctx.save();
+  ctx.translate(x, ground + bob);
+  ctx.scale(scale, scale);
+  if (selected) {
+    ctx.strokeStyle = '#f5c451'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 2, 19, 7, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = unit.type === 'giant' ? 4.5 : 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(0, -40, unit.type === 'giant' ? 8 : 6, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, -34); ctx.lineTo(0, -15);
+  ctx.moveTo(0, -29); ctx.lineTo(-10, -20);
+  ctx.moveTo(0, -29); ctx.lineTo(10, -22);
+  ctx.moveTo(0, -15); ctx.lineTo(-9, 0);
+  ctx.moveTo(0, -15); ctx.lineTo(10, 0);
+  ctx.stroke();
+  const dir = friendly ? 1 : -1;
+  ctx.strokeStyle = unit.type === 'mage' ? '#b89cff' : '#e5d6b8';
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineWidth = 2;
+  if (unit.type === 'miner') {
+    ctx.beginPath(); ctx.moveTo(8 * dir, -24); ctx.lineTo(17 * dir, -38);
+    ctx.moveTo(11 * dir, -36); ctx.lineTo(22 * dir, -36); ctx.stroke();
+    if (unit.carrying > 0) {
+      ctx.fillStyle = '#f5c451'; ctx.beginPath(); ctx.arc(-9 * dir, -17, 5, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (unit.type === 'swordsman') {
+    ctx.beginPath(); ctx.moveTo(7 * dir, -23); ctx.lineTo(23 * dir, -38);
+    ctx.moveTo(16 * dir, -34); ctx.lineTo(20 * dir, -30); ctx.stroke();
+  } else if (unit.type === 'archer') {
+    ctx.beginPath(); ctx.arc(11 * dir, -25, 10, -Math.PI / 2, Math.PI / 2, friendly); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2 * dir, -25); ctx.lineTo(23 * dir, -25); ctx.stroke();
+  } else if (unit.type === 'spear') {
+    ctx.beginPath(); ctx.moveTo(-5 * dir, -20); ctx.lineTo(29 * dir, -33); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(29 * dir, -33); ctx.lineTo(23 * dir, -35); ctx.lineTo(26 * dir, -28); ctx.fill();
+    ctx.strokeStyle = '#9ca3af'; ctx.beginPath(); ctx.arc(-7 * dir, -24, 8, 0, Math.PI * 2); ctx.stroke();
+  } else if (unit.type === 'mage') {
+    ctx.beginPath(); ctx.moveTo(8 * dir, -22); ctx.lineTo(20 * dir, -39); ctx.stroke();
+    ctx.shadowColor = '#ad8cff'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(21 * dir, -41, 4, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+  } else if (unit.type === 'giant') {
+    ctx.lineWidth = 5; ctx.strokeStyle = '#9b7653';
+    ctx.beginPath(); ctx.moveTo(7 * dir, -24); ctx.lineTo(20 * dir, -41); ctx.stroke();
+  }
+  if (unit.hp < unit.maxHp) {
+    const ratio = Math.max(0, unit.hp / unit.maxHp);
+    ctx.fillStyle = '#161820'; ctx.fillRect(-13, -54, 26, 3);
+    ctx.fillStyle = ratio > 0.5 ? '#4fd399' : '#ef6461'; ctx.fillRect(-13, -54, 26 * ratio, 3);
+  }
+  ctx.restore();
+}
+
+function swDrawBattle(ctx, engine, state, width, height, paused) {
+  if (!state || !ctx) return;
+  const ground = Math.max(120, height * 0.76);
+  const sky = ctx.createLinearGradient(0, 0, 0, ground);
+  sky.addColorStop(0, '#11182a'); sky.addColorStop(1, '#2d3950');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = 'rgba(244,197,103,.22)';
+  ctx.beginPath(); ctx.arc(width * 0.5, height * 0.2, Math.min(40, width * 0.06), 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#59614c'; ctx.fillRect(0, ground, width, height - ground);
+  ctx.fillStyle = '#434a3b'; ctx.fillRect(0, ground + 10, width, height - ground - 10);
+  ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.setLineDash([4, 8]);
+  ctx.beginPath(); ctx.moveTo(width / 2, 20); ctx.lineTo(width / 2, ground + 8); ctx.stroke(); ctx.setLineDash([]);
+
+  swDrawMine(ctx, swWorldX(engine, 375, width), ground, 'player');
+  swDrawMine(ctx, swWorldX(engine, engine.WORLD_WIDTH - 375, width), ground, 'enemy');
+  swDrawStatue(ctx, swWorldX(engine, 150, width), ground, 'player', state.statues.player.hp / state.statues.player.maxHp);
+  swDrawStatue(ctx, swWorldX(engine, engine.WORLD_WIDTH - 150, width), ground, 'enemy', state.statues.enemy.hp / state.statues.enemy.maxHp);
+
+  const sorted = state.units.slice().sort((a, b) => a.id - b.id);
+  for (const unit of sorted) {
+    swDrawUnit(ctx, engine, unit, swWorldX(engine, unit.x, width), ground,
+      state.direct.unitId === unit.id);
+  }
+  for (const shot of state.projectiles) {
+    const x = swWorldX(engine, shot.x, width);
+    ctx.fillStyle = shot.splash ? '#b89cff' : '#f3deb1';
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = shot.splash ? 9 : 2;
+    ctx.beginPath(); ctx.arc(x, ground - 34, shot.splash ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = 'rgba(8,10,16,.72)';
+  ctx.fillRect(10, 10, 112, 22); ctx.fillRect(width - 122, 10, 112, 22);
+  ctx.font = '600 9px JetBrains Mono, monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#91b6ff'; ctx.fillText('YOUR STATUE', 66, 25);
+  ctx.fillStyle = '#ff9b94'; ctx.fillText('ENEMY STATUE', width - 66, 25);
+  if (paused) {
+    ctx.fillStyle = 'rgba(7,9,14,.66)'; ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#fff'; ctx.font = '700 20px Space Grotesk, sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('PAUSED', width / 2, height / 2);
+  }
+}
+
+function StickWarGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, resultShown }) {
+  const engine = typeof window !== 'undefined' ? window.stickWarEngine : null;
+  if (!engine) {
+    return (
+      <ClassicShell game={game} onExit={onBack} menuConfig={menuConfig}>
+        <div className="cg-stage"><div className="sw-engine-error">The battle engine could not load. Reload to try again.</div></div>
+      </ClassicShell>
+    );
+  }
+
+  const demo = useRef(swDemoRequested()).current;
+  const [campaign, setCampaign] = useState(() => swLoadCampaign(engine));
+  const [panel, setPanel] = useState(demo ? 'battle' : 'campaign');
+  const [activeMission, setActiveMission] = useState(demo ? 3 : 1);
+  const [battleView, setBattleView] = useState(null);
+  const [paused, setPaused] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [globalRank, setGlobalRank] = useState(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const canvasRef = useRef(null);
+  const arenaRef = useRef(null);
+  const stateRef = useRef(null);
+  const rafRef = useRef(null);
+  const reportedRef = useRef(false);
+  const mountedResetRef = useRef(false);
+  const onWinRef = useRef(onWin); onWinRef.current = onWin;
+  const onLoseRef = useRef(onLose); onLoseRef.current = onLose;
+  const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
+
+  const saveCampaign = (next) => {
+    const safe = swSaveCampaign(engine, next);
+    setCampaign(safe);
+    return safe;
+  };
+
+  const startMission = (missionId, asDemo) => {
+    const mission = Math.max(1, Math.min(engine.MISSIONS.length, Number(missionId) || 1));
+    const state = engine.createState({
+      mission,
+      seed: swBattleSeed(mission, !!asDemo),
+      upgrades: campaign.upgrades,
+      demo: !!asDemo,
+    });
+    stateRef.current = state;
+    reportedRef.current = false;
+    setActiveMission(mission);
+    setBattleView(engine.view(state));
+    setGlobalRank(null);
+    setNotice(asDemo ? 'Deterministic demo battle' : 'Build your economy, then break the enemy statue.');
+    setPaused(false);
+    setPanel('battle');
+    // Demo/deep-link boot is not a user gesture; starting WebAudio here makes
+    // Chromium emit autoplay warnings before the staging check can interact.
+    if (!asDemo) cgSound('click');
+  };
+
+  const returnToCampaign = () => {
+    stateRef.current = null;
+    setBattleView(null);
+    setPaused(false);
+    setNotice('');
+    setPanel('campaign');
+  };
+
+  // The staging deep link must mount a populated battlefield without a click.
+  useEffect(() => { if (demo) startMission(3, true); }, []);
+
+  // Shared ClassicShell Play Again / New Game increments resetKey. It resets
+  // the active battle only; campaign erasure remains the confirmed action on
+  // the mission screen.
+  useEffect(() => {
+    if (!mountedResetRef.current) { mountedResetRef.current = true; return; }
+    if (stateRef.current) startMission(activeMission, demo);
+  }, [resetKey]);
+
+  // Backgrounding always pauses. Resuming remains an explicit player action,
+  // so a returning tab cannot advance before the player sees the battlefield.
+  useEffect(() => {
+    const onVisibility = () => { if (document.visibilityState === 'hidden' && stateRef.current) setPaused(true); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  const reportBattle = (state) => {
+    if (reportedRef.current || !state || state.phase === 'playing') return;
+    reportedRef.current = true;
+    const won = state.phase === 'won';
+    const score = engine.calculateScore(state, won);
+    const secs = Math.floor(state.elapsedTicks / engine.TICKS_PER_SECOND);
+    const actions = state.stats.actions;
+    const mission = state.mission;
+    cgSaveHistory(engine.HISTORY_KEY, { won, score, mission, secs, actions, ts: Date.now() });
+    const share = won
+      ? `⚔️ Stick War: Legacy — ${engine.MISSIONS[mission - 1].name} cleared · ${score} pts · ${swFmtTime(secs)}`
+      : `⚔️ Stick War: Legacy — reached Mission ${mission} · ${score} pts`;
+
+    if (won) {
+      const next = saveCampaign(engine.completeMission(campaign, mission, score));
+      cgSound('win'); cgHaptic([20, 45, 30]);
+      submitClassicScore('stickwar', score, {
+        mission,
+        timeSecs: secs,
+        statueHp: Math.round(state.statues.player.hp),
+        survivors: state.units.filter((unit) => unit.team === 'player').length,
+        campaignUnlocked: next.highestUnlocked,
+      }).then((result) => { if (result && result.rank) setGlobalRank(result.rank); });
+      onWinRef.current(score, actions, secs, { share });
+    } else {
+      cgSound('lose'); cgHaptic([30, 50, 30]);
+      onLoseRef.current && onLoseRef.current(actions, secs, {
+        score,
+        scoreLabel: 'Campaign score',
+        scoreValue: `${score} pts`,
+        answer: 'Your statue fell',
+        share,
+      });
+    }
+  };
+
+  // Fixed-step simulation plus DPR-correct canvas painting. React mirrors a
+  // compact HUD view at 10fps; units and projectiles stay in refs at 60fps.
+  useEffect(() => {
+    if (panel !== 'battle' || !stateRef.current) return;
+    const canvas = canvasRef.current;
+    const arena = arenaRef.current;
+    if (!canvas || !arena) return;
+    const ctx = guardCanvasCtx(canvas.getContext('2d'));
+    let alive = true;
+    let last = 0;
+    let accumulator = 0;
+    let hudAt = 0;
+
+    const sizeCanvas = () => {
+      const dpr = canvasDpr();
+      const width = Math.max(280, arena.clientWidth || 280);
+      const height = Math.max(210, arena.clientHeight || 210);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    sizeCanvas();
+    window.addEventListener('resize', sizeCanvas);
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(sizeCanvas); ro.observe(arena);
+    }
+
+    const frame = (ts) => {
+      if (!alive) return;
+      const state = stateRef.current;
+      if (!state) return;
+      if (!last) last = ts;
+      const delta = Math.min(250, ts - last);
+      last = ts;
+      if (!paused && !resultShown && state.phase === 'playing') {
+        accumulator += delta;
+        let steps = 0;
+        while (accumulator >= engine.TICK_MS && steps < 6) {
+          engine.step(state); accumulator -= engine.TICK_MS; steps += 1;
+        }
+        if (steps === 6) accumulator = 0;
+      }
+      swDrawBattle(ctx, engine, state, canvas.clientWidth, canvas.clientHeight, paused);
+      if (ts - hudAt > 100 || state.phase !== 'playing') {
+        hudAt = ts;
+        const nextView = engine.view(state);
+        setBattleView(nextView);
+        onStepRef.current && onStepRef.current(nextView.actions);
+      }
+      if (state.phase !== 'playing') reportBattle(state);
+      rafRef.current = requestAnimationFrame(frame);
+    };
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      alive = false;
+      window.removeEventListener('resize', sizeCanvas);
+      if (ro) ro.disconnect();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [panel, paused, resultShown]);
+
+  const refreshView = () => {
+    if (stateRef.current) setBattleView(engine.view(stateRef.current));
+  };
+
+  const train = (typeId) => {
+    const state = stateRef.current;
+    if (!state || paused || state.phase !== 'playing') return;
+    const result = engine.queueUnit(state, 'player', typeId);
+    setNotice(result.ok ? `${engine.UNIT_TYPES[typeId].name} added to the training queue.` : result.reason);
+    if (result.ok) { cgSound('click'); cgHaptic(8); }
+    else cgSound('error');
+    refreshView();
+  };
+
+  const issueCommand = (command) => {
+    const state = stateRef.current;
+    if (!state || paused || state.phase !== 'playing') return;
+    engine.setCommand(state, command);
+    setNotice(command === 'attack' ? 'Army advancing.' : command === 'hold' ? 'Holding the center line.' : 'Army returning to garrison and healing.');
+    cgSound('click'); cgHaptic(8); refreshView();
+  };
+
+  const selectFromCanvas = (event) => {
+    const state = stateRef.current;
+    const canvas = canvasRef.current;
+    if (!state || !canvas || paused || state.phase !== 'playing') return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = (event.clientX - rect.left) / Math.max(1, rect.width);
+    const worldX = Math.max(0, Math.min(engine.WORLD_WIDTH, ratio * engine.WORLD_WIDTH));
+    let best = null, distance = 75;
+    for (const unit of state.units) {
+      if (unit.team !== 'player' || unit.type === 'miner' || unit.hp <= 0) continue;
+      const d = Math.abs(unit.x - worldX);
+      if (d < distance) { best = unit; distance = d; }
+    }
+    engine.selectUnit(state, best ? best.id : null);
+    setNotice(best ? `Direct control: ${engine.UNIT_TYPES[best.type].name}.` : 'Direct control released.');
+    cgSound('click'); refreshView();
+  };
+
+  const directInput = (patch) => {
+    if (!stateRef.current) return;
+    // Releases must still clear held input while paused; otherwise pressing P
+    // before pointerup/keyup could leave movement latched on resume.
+    if (paused && Object.values(patch).some(Boolean)) return;
+    engine.setDirectInput(stateRef.current, patch);
+    refreshView();
+  };
+
+  useEffect(() => {
+    if (panel !== 'battle') return;
+    const unitKeys = ['miner', 'swordsman', 'archer', 'spear', 'mage', 'giant'];
+    const onKeyDown = (event) => {
+      if (event.repeat && !['ArrowLeft', 'ArrowRight', ' '].includes(event.key)) return;
+      if (event.key >= '1' && event.key <= '6') { event.preventDefault(); train(unitKeys[Number(event.key) - 1]); }
+      else if (event.key.toLowerCase() === 'a') issueCommand('attack');
+      else if (event.key.toLowerCase() === 'h') issueCommand('hold');
+      else if (event.key.toLowerCase() === 'g') issueCommand('garrison');
+      else if (event.key.toLowerCase() === 'p') setPaused((value) => !value);
+      else if (event.key === 'Escape') { engine.selectUnit(stateRef.current, null); refreshView(); }
+      else if (event.key === 'ArrowLeft') { event.preventDefault(); directInput({ left: true }); }
+      else if (event.key === 'ArrowRight') { event.preventDefault(); directInput({ right: true }); }
+      else if (event.key === ' ') { event.preventDefault(); directInput({ attack: true }); }
+    };
+    const onKeyUp = (event) => {
+      if (event.key === 'ArrowLeft') directInput({ left: false });
+      else if (event.key === 'ArrowRight') directInput({ right: false });
+      else if (event.key === ' ') directInput({ attack: false });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [panel, paused]);
+
+  const buy = (key) => {
+    const result = engine.buyUpgrade(campaign, key);
+    if (result.ok) {
+      saveCampaign(result.campaign); setNotice(`${engine.UPGRADES[key].name} upgraded.`);
+      cgSound('clear'); cgHaptic(15);
+    } else {
+      setNotice(result.reason); cgSound('error');
+    }
+  };
+
+  const resetCampaign = () => {
+    if (!confirmReset) { setConfirmReset(true); setNotice('Press Reset campaign again to confirm.'); return; }
+    saveCampaign(engine.defaultCampaign());
+    setConfirmReset(false); setNotice('Campaign progress reset.'); cgSound('click');
+  };
+
+  const hist = cgLoadHistory(engine.HISTORY_KEY);
+  const wins = hist.filter((row) => row && row.won).length;
+  const best = hist.reduce((max, row) => Math.max(max, Number(row && row.score) || 0), 0);
+  const highestCleared = hist.reduce((max, row) => row && row.won ? Math.max(max, Number(row.mission) || 0) : max, 0);
+  const sheet = [
+    cgLeaderboardSection('stickwar'),
+    cgHistorySection(hist, (row) => <><span>{row.won ? 'Victory' : 'Defeat'} · M{row.mission}</span><span className="mono">{row.score} · {swFmtTime(row.secs)}</span></>),
+    cgStatsSection([
+      { val: best, lbl: 'Best score' }, { val: wins, lbl: 'Victories' },
+      { val: highestCleared || '—', lbl: 'Highest mission' }, { val: campaign.starsEarned, lbl: 'Stars earned' },
+    ]),
+    cgRulesSection([
+      'Miners automatically gather gold. Spend it to train an army without exceeding the population cap.',
+      'Attack advances on the enemy statue, Hold protects the center, and Garrison retreats to heal.',
+      'Tap a friendly combat unit for direct control. Use the touch controls or ← → and Space.',
+      'Destroy the enemy statue before yours falls. First clears award one upgrade star.',
+      'Keyboard: 1–6 train units, A/H/G issue commands, P pauses, Esc releases direct control.',
+    ]),
+  ];
+
+  if (panel === 'campaign') {
+    const availableStars = campaign.starsEarned - campaign.starsSpent;
+    return (
+      <ClassicShell game={game} onExit={onBack} sheetSections={sheet} menuConfig={menuConfig}>
+        <div className="cg-stage cg-scroll sw-stage sw-campaign-stage">
+          <div className="sw-campaign-head">
+            <div>
+              <div className="sw-kicker">Single-player campaign</div>
+              <h2>Choose the next battle</h2>
+              <p>Mine gold, train your formation, take direct control, and bring down the opposing statue.</p>
+            </div>
+            <button className="sw-upgrade-open" onClick={() => { setPanel('upgrades'); setNotice(''); }}>
+              <span>★ {availableStars}</span> Upgrades
+            </button>
+          </div>
+          {notice && <div className="sw-notice" role="status">{notice}</div>}
+          <div className="sw-mission-grid">
+            {engine.MISSIONS.map((mission) => {
+              const locked = mission.id > campaign.highestUnlocked;
+              const bestScore = campaign.bestScores[mission.id];
+              const newUnits = Object.keys(engine.UNIT_TYPES).filter((id) => engine.UNIT_TYPES[id].unlockMission === mission.id);
+              return (
+                <button key={mission.id} className={'sw-mission-card' + (locked ? ' locked' : '')}
+                  disabled={locked} onClick={() => startMission(mission.id, false)}>
+                  <span className="sw-mission-num">{locked ? '🔒' : String(mission.id).padStart(2, '0')}</span>
+                  <span className="sw-mission-copy">
+                    <strong>{mission.name}</strong>
+                    <span>{mission.subtitle}</span>
+                    {newUnits.length > 0 && <small>Unlocks {newUnits.map((id) => engine.UNIT_TYPES[id].name).join(' + ')}</small>}
+                  </span>
+                  <span className="sw-mission-best">{bestScore ? `${bestScore} pts` : locked ? 'Locked' : 'Play'}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="sw-campaign-foot">
+            <span>{campaign.starsEarned}/6 mission stars earned</span>
+            <button className={confirmReset ? 'danger' : ''} onClick={resetCampaign}>{confirmReset ? 'Confirm reset' : 'Reset campaign'}</button>
+            {confirmReset && <button onClick={() => { setConfirmReset(false); setNotice('Reset cancelled.'); }}>Cancel</button>}
+          </div>
+        </div>
+      </ClassicShell>
+    );
+  }
+
+  if (panel === 'upgrades') {
+    const availableStars = campaign.starsEarned - campaign.starsSpent;
+    return (
+      <ClassicShell game={game} onExit={() => setPanel('campaign')} sheetSections={sheet} menuConfig={menuConfig}>
+        <div className="cg-stage cg-scroll sw-stage sw-upgrade-stage">
+          <button className="sw-inline-back" onClick={() => { setPanel('campaign'); setNotice(''); }}>← Campaign</button>
+          <div className="sw-upgrade-head"><div><div className="sw-kicker">Permanent campaign bonuses</div><h2>War council</h2></div><div className="sw-star-bank">★ {availableStars} available</div></div>
+          {notice && <div className="sw-notice" role="status">{notice}</div>}
+          <div className="sw-upgrade-grid">
+            {Object.keys(engine.UPGRADES).map((key) => {
+              const item = engine.UPGRADES[key];
+              const level = campaign.upgrades[key];
+              return (
+                <div className="sw-upgrade-card" key={key}>
+                  <div className="sw-upgrade-icon">{item.icon}</div>
+                  <div className="sw-upgrade-copy"><strong>{item.name}</strong><span>{item.description}</span><div className="sw-level-pips">{[1,2,3].map((n) => <i key={n} className={n <= level ? 'on' : ''} />)}</div></div>
+                  <button disabled={level >= 3 || availableStars < 1} onClick={() => buy(key)}>{level >= 3 ? 'Max' : 'Spend ★'}</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </ClassicShell>
+    );
+  }
+
+  const state = stateRef.current;
+  const view = battleView || (state ? engine.view(state) : null);
+  const mission = engine.MISSIONS[(view ? view.mission : activeMission) - 1];
+  const selected = state && state.direct.unitId != null
+    ? state.units.find((unit) => unit.id === state.direct.unitId) : null;
+  const unlocked = state ? state.unlocked : engine.unlockedUnitIds(activeMission);
+  const unitIds = ['miner', 'swordsman', 'archer', 'spear', 'mage', 'giant'].filter((id) => unlocked.includes(id));
+  const currentPop = view ? view.population : 0;
+  const statPct = view ? Math.round((view.playerStatue / view.playerStatueMax) * 100) : 100;
+  const enemyPct = view ? Math.round((view.enemyStatue / view.enemyStatueMax) * 100) : 100;
+  const stopDirect = () => { if (state) { engine.selectUnit(state, null); refreshView(); setNotice('Direct control released.'); } };
+  const holdHandlers = (down, up) => ({
+    onPointerDown: (event) => { event.preventDefault(); directInput(down); },
+    onPointerUp: () => directInput(up),
+    onPointerCancel: () => directInput(up),
+    onPointerLeave: () => directInput(up),
+  });
+
+  return (
+    <ClassicShell game={game} onExit={returnToCampaign}
+      onNewGame={() => startMission(activeMission, demo)} sheetSections={sheet} menuConfig={menuConfig}>
+      <div className="cg-stage sw-stage sw-battle-stage">
+        <div className="sw-battle-head">
+          <div><span className="sw-mission-pill">Mission {activeMission}</span><strong>{mission.name}</strong></div>
+          <div className="sw-battle-actions">
+            {globalRank && <span className="sw-rank">Global #{globalRank}</span>}
+            <button onClick={() => setPaused((value) => !value)} disabled={!state || state.phase !== 'playing'}>{paused ? 'Resume' : 'Pause'}</button>
+            <button onClick={returnToCampaign}>Campaign</button>
+          </div>
+        </div>
+        <CgStatus items={[
+          { l: 'Gold', v: `◈ ${view ? view.gold : 0}` },
+          { l: 'Army', v: `${currentPop}/${engine.POPULATION_CAP}` },
+          { l: 'Your statue', v: `${statPct}%` },
+          { l: 'Enemy', v: `${enemyPct}%` },
+          { l: 'Time', v: swFmtTime(view && view.elapsedSecs) },
+        ]} />
+        <div className="sw-arena" ref={arenaRef}>
+          <canvas ref={canvasRef} className="sw-canvas" role="img"
+            aria-label="Side-view battlefield. Tap one of your combat units for direct control."
+            aria-describedby="sw-live-status" onPointerDown={selectFromCanvas} />
+          <div id="sw-live-status" className="sr-only" aria-live="polite">Gold {view ? view.gold : 0}. Your statue {statPct} percent. Enemy statue {enemyPct} percent.</div>
+        </div>
+        <div className="sw-notice sw-battle-notice" role="status">{notice || 'Train a Miner, build an army, and destroy the enemy statue.'}</div>
+        <div className="sw-training" aria-label="Training bar">
+          {unitIds.map((id, index) => {
+            const type = engine.UNIT_TYPES[id];
+            const article = /^[aeiou]/i.test(type.name) ? 'an' : 'a';
+            const blocked = paused || !state || state.phase !== 'playing' || view.gold < type.cost
+              || currentPop + type.pop > engine.POPULATION_CAP;
+            return (
+              <button key={id} disabled={blocked} onClick={() => train(id)} title={`Train ${article} ${type.name} (${type.cost} gold)`}>
+                <span className="sw-unit-icon">{type.icon}</span>
+                <span className="sw-unit-label">Train {article} {type.name}</span>
+                <small>{index + 1} · ◈{type.cost} · {type.pop} pop</small>
+              </button>
+            );
+          })}
+        </div>
+        {view && view.queues.player.length > 0 && (
+          <div className="sw-queue" aria-label="Training queue">
+            {view.queues.player.map((item, index) => <span key={index}><b>{engine.UNIT_TYPES[item.type].icon}</b><i style={{ width: `${Math.round(item.progress * 100)}%` }} /></span>)}
+          </div>
+        )}
+        <div className="sw-command-row" aria-label="Army commands">
+          {[
+            ['attack', '⚔', 'Attack', 'A'],
+            ['hold', '◆', 'Hold', 'H'],
+            ['garrison', '⌂', 'Garrison', 'G'],
+          ].map(([id, icon, label, key]) => (
+            <button key={id} className={view && view.command === id ? 'active' : ''} onClick={() => issueCommand(id)} disabled={paused || !state || state.phase !== 'playing'}>
+              <span>{icon}</span>{label}<small>{key}</small>
+            </button>
+          ))}
+        </div>
+        {selected && (
+          <div className="sw-direct" aria-label={`Direct control for ${engine.UNIT_TYPES[selected.type].name}`}>
+            <div className="sw-direct-title"><span>Direct control</span><strong>{engine.UNIT_TYPES[selected.type].name}</strong><button onClick={stopDirect}>Release · Esc</button></div>
+            <div className="sw-direct-buttons">
+              <button {...holdHandlers({ left: true }, { left: false })} aria-label="Move controlled unit left">← Move</button>
+              <button className="attack" {...holdHandlers({ attack: true }, { attack: false })} aria-label="Attack with controlled unit">Attack · Space</button>
+              <button {...holdHandlers({ right: true }, { right: false })} aria-label="Move controlled unit right">Move →</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </ClassicShell>
+  );
+}
+
 const GAMES = [
   {
     id: 'sudoku',
@@ -23344,6 +24152,24 @@ const GAMES = [
       { title: 'Survive', body: 'The chain speeds up the longer you last. One collision ends the run.' },
     ],
     component: HashRushGame,
+    leaderboard: true,
+  },
+  {
+    id: 'stickwar',
+    name: 'Stick War: Legacy',
+    icon: '⚔️',
+    category: 'classic',
+    shell: 'self',
+    desc: 'Mine gold, command a stick-figure army, and topple the enemy statue across six missions.',
+    tag: 'Strategy',
+    tagColor: GA.coral,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Build the economy', body: 'Your miners gather gold automatically. Spend it on six distinct unit classes while respecting the training queue and population cap.' },
+      { title: 'Command the formation', body: 'Attack advances, Hold guards the center, and Garrison retreats to heal. Tap a friendly fighter to move and attack with that unit directly.' },
+      { title: 'Win the campaign', body: 'Destroy the opposing statue before yours falls. First clears unlock the next mission and award a permanent upgrade star.' },
+    ],
+    component: StickWarGame,
     leaderboard: true,
   },
   // Phase 5 board games — online head-to-head over classic_rooms; the server

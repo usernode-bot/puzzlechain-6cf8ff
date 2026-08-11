@@ -185,6 +185,9 @@
        exact same pure functions the online rooms use, instead of a client-side
        reimplementation that would eventually disagree about a legal move. -->
   <script src="/board-rules.js"></script>
+  <!-- Pure fixed-step economy/combat engine for Stick War. Like board-rules,
+       this loads before app.js and publishes one browser-safe global. -->
+  <script src="/stickwar-engine.js"></script>
   <script src="/usernode-loading.js"></script>
   <script src="/usernode-usernames.js"></script>
 </head>

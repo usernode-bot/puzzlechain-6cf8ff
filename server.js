@@ -157,6 +157,8 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+  stickwar:          { name: 'Stick War: Legacy', category: 'classic', tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
@@ -223,7 +225,7 @@ const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
-const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
+const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'stickwar', 'diamondrush', 'chutes-ladders']);
 
 // Classic games that support online "race" multiplayer (each player plays
 // their own board; highest final score wins) over classic_rooms.
@@ -6990,6 +6992,16 @@ app.post('/api/integration/sign', (req, res) => {
 app.get('/board-rules.js', (req, res) => {
   res.type('application/javascript');
   res.sendFile(path.join(__dirname, 'lib', 'board-rules.js'), (err) => {
+    if (err && !res.headersSent) res.status(500).end();
+  });
+});
+
+// Stick War's fixed-step simulation is likewise shared by browser gameplay
+// and Node self-tests. Keep it outside public/ so there is one engine source,
+// then expose that pure module before app.js mounts the canvas adapter.
+app.get('/stickwar-engine.js', (req, res) => {
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, 'lib', 'stickwar-engine.js'), (err) => {
     if (err && !res.headersSent) res.status(500).end();
   });
 });

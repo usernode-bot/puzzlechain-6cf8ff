@@ -8,7 +8,8 @@
     "start": "node server.js",
     "build": "esbuild public/app.jsx --bundle=false --outfile=public/app.js",
     "check": "node scripts/check-jsx.js",
-    "test:mnc": "node scripts/mancala-daily-selftest.js"
+    "test:mnc": "node scripts/mancala-daily-selftest.js",
+    "test:stickwar": "node scripts/stickwar-selftest.js"
   },
   "dependencies": {
     "express": "^4.21.0",

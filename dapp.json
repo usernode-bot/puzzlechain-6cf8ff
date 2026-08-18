@@ -758,6 +758,11 @@
       "expectText": "Only a King starts an empty column"
     },
     {
+      "name": "Klondike renders its canvas board (#170)",
+      "path": "/?game=klondike&practice=1",
+      "expectSelector": "canvas.kl-canvas"
+    },
+    {
       "name": "Klondike offers a Give up escape",
       "path": "/?game=klondike&practice=1",
       "expectText": "Give up"

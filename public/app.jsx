@@ -1744,12 +1744,6 @@ ${emitTapHighlightRules()}
   animation: none;
   background: ${C.dim};
 }
-.ms-dev-badge {
-  font-size: 0.6rem;
-  color: ${C.muted};
-  margin-top: 0.2rem;
-  text-align: center;
-}
 .ms-settings-section { margin-bottom: 1.25rem; }
 .ms-settings-section h4 {
   font-size: 0.7rem;
@@ -1888,15 +1882,6 @@ ${emitTapHighlightRules()}
   text-align: center;
   padding: 2rem 0;
   font-size: 0.9rem;
-}
-.ms-dev-label {
-  font-size: 0.72rem;
-  color: ${C.muted};
-  margin-bottom: 0.75rem;
-  padding: 0.3rem 0.6rem;
-  background: ${C.card};
-  border-radius: 8px;
-  display: inline-block;
 }
 /* Light theme overrides for minesweeper board only */
 [data-ms-theme="light"] .ms-cell.ms-hidden { background: #e5e7eb; }
@@ -9824,8 +9809,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [done, setDone] = useState(false);
   const [gameOverMine, setGameOverMine] = useState(null);
   const [steps, setSteps] = useState(0);
-  const [isMock, setIsMock] = useState(false);
-  const [walletAddr, setWalletAddr] = useState(null);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
   // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
   // both SFX and music); `musicPaused` is the player's in-game music pause that
@@ -9868,16 +9851,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     cgSetPref('sound', next);
     setSoundOn(next);
   };
-
-  // Bridge: detect mock mode and fetch wallet address
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-    if (window.usernode && typeof window.usernode.getNodeAddress === 'function') {
-      window.usernode.getNodeAddress().then(addr => { if (addr) setWalletAddr(addr); }).catch(() => {});
-    }
-  }, []);
 
   const safeRevealed = mineSet
     ? Array.from(revealed).filter(i => !mineSet.has(i)).length
@@ -10165,7 +10138,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               >
                 Lock In 🔒 ×{cashoutMultiplier}
               </button>
-              {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
             <button
               className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
@@ -10187,7 +10159,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
       {activeTab === 'history' && (
         <div>
-          {isMock && <div className="ms-dev-label">Local storage — will sync to chain when live</div>}
           <div className="ms-history-list">
             {gameHistory.length === 0
               ? <div className="ms-empty-state">No games recorded yet</div>
@@ -10576,10 +10547,8 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
   const [flashPits, setFlashPits] = useState(() => new Set());
   const [captureFlash, setCaptureFlash] = useState(() => new Set());
   const [bannerMsg, setBannerMsg] = useState('');
-  const [moveStack, setMoveStack] = useState([]);
   const [activeTab, setActiveTab] = useState('game');
   const [history, setHistory]     = useState(() => mncLoadHistory());
-  const [isMock, setIsMock]       = useState(false);
   const [soundOn, setSoundOn]     = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
 
   const animatingRef  = useRef(false);
@@ -10590,12 +10559,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
   secsRef.current = secs;
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   const resetGame = () => {
     // Cancel any in-flight win callback and animation
@@ -10609,7 +10572,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     setFlashPits(new Set());
     setCaptureFlash(new Set());
     setBannerMsg('');
-    setMoveStack([]);
   };
 
   // Reset when parent increments resetKey (Play Again)
@@ -10620,18 +10582,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     setSoundOn(next);
     soundOnRef.current = next;
     try { localStorage.setItem(MNC_SOUND_KEY, next ? '1' : '0'); } catch {}
-  };
-
-  const handleUndo = () => {
-    if (moveStack.length === 0 || done || animatingRef.current) return;
-    const prev = moveStack[moveStack.length - 1];
-    setMoveStack(ms => ms.slice(0, -1));
-    setPits(prev.pits.slice());
-    setPlayer(prev.player);
-    setMoves(prev.moves);
-    setFlashPits(new Set());
-    setCaptureFlash(new Set());
-    setBannerMsg('');
   };
 
   const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
@@ -10692,9 +10642,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     const ownMin = player === 1 ? 0 : 7;
     const ownMax = player === 1 ? 5 : 12;
     if (idx < ownMin || idx > ownMax || pits[idx] === 0) return;
-
-    // Snapshot for undo
-    setMoveStack(ms => [...ms, { pits: pits.slice(), player, moves }]);
 
     const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(pits, idx, player);
     const newMoves = moves + 1;
@@ -10872,11 +10819,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
           <div className="mnc-controls">
             <button onClick={resetGame}>↺ New Game</button>
             <button onClick={resetGame}>⟳ Restart</button>
-            {isMock && (
-              <button onClick={handleUndo} disabled={moveStack.length === 0 || done}>
-                ↩ Undo
-              </button>
-            )}
             <button onClick={toggleSound} title={soundOn ? 'Sound on' : 'Sound off'}>
               {soundOn ? '🔊' : '🔇'}
             </button>
@@ -12548,11 +12490,9 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
   const [done, setDone]               = useState(false);
   const [hasWon, setHasWon]           = useState(() => _saved ? _saved.won || false : false);
   const [victoryVisible, setVictoryVisible] = useState(false);
-  const [isMock, setIsMock]           = useState(false);
   const [activeTab, setActiveTab]     = useState('game');
   const [history, setHistory]         = useState(() => t2048LoadHistory());
   const [bestScore, setBestScore]     = useState(() => t2048LoadBest());
-  const [undoStack, setUndoStack]     = useState([]);
   const [scoreDelta, setScoreDelta]   = useState(null);
 
   const touchStartRef  = useRef(null);
@@ -12566,12 +12506,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
     return () => clearInterval(id);
   }, [gameRunning]);
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   useEffect(() => {
     if (!resetKey) return;
@@ -12620,7 +12554,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     setDone(false);
     setHasWon(false);
     setVictoryVisible(false);
-    setUndoStack([]);
     setScoreDelta(null);
   };
 
@@ -12629,10 +12562,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     const { grid: movedGrid, delta, moved } = t2048_move(grid, dir);
     if (!moved) return;
 
-    const newUndo = isMock
-      ? [{ grid: t2048_stripAnim(grid), score, moves }, ...undoStack].slice(0, 10)
-      : undoStack;
-
     const withTile  = t2048_addRandom(movedGrid);
     const newScore  = score + delta;
     const newMoves  = moves + 1;
@@ -12640,7 +12569,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     setGrid(withTile);
     setScore(newScore);
     setMoves(newMoves);
-    setUndoStack(newUndo);
 
     if (delta > 0) {
       if (deltaTimerRef.current) clearTimeout(deltaTimerRef.current);
@@ -12650,9 +12578,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
     if (newScore > bestScore) { setBestScore(newScore); t2048SaveBest(newScore); }
     t2048SaveBoard(withTile, newScore, elapsedSecs, hasWon, newMoves);
-    if (isMock) {
-      try { localStorage.setItem(T2048_UNDO_KEY, JSON.stringify(newUndo)); } catch {}
-    }
     onStepChange && onStepChange(newMoves);
 
     const maxT = t2048_maxTile(withTile);
@@ -12693,16 +12618,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
   // Keep ref fresh on every render so the keyboard handler always calls the latest closure
   executeMoveRef.current = executeMove;
-
-  const handleUndo = () => {
-    if (!undoStack.length || done) return;
-    const [prev, ...rest] = undoStack;
-    setGrid(prev.grid);
-    setScore(prev.score);
-    setMoves(prev.moves);
-    setUndoStack(rest);
-    try { if (isMock) localStorage.setItem(T2048_UNDO_KEY, JSON.stringify(rest)); } catch {}
-  };
 
   const handleFinish = () => {
     const maxT = t2048_maxTile(grid);
@@ -12758,7 +12673,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
   return (
     <div>
-      {isMock && <div className="t2048-banner">Local storage — will sync to chain when live</div>}
 
       {activeTab === 'game' && (
         <div>
@@ -12841,9 +12755,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
           <div className="t2048-controls">
             <button onClick={handleNewGame}>↺ New Game</button>
-            {isMock && (
-              <button onClick={handleUndo} disabled={undoStack.length === 0 || done}>↩ Undo</button>
-            )}
           </div>
         </div>
       )}
@@ -15637,7 +15548,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const [activeTab, setActiveTab] = useState('game');
   const [bestScore, setBestScore] = useState(() => bounceLoadBest());
   const [elapsedSecs, setElapsedSecs] = useState(0);
-  const [isMock, setIsMock] = useState(false);
   const [activePowerups, setActivePowerups] = useState([]);
   // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
   // both SFX and music); `musicPaused` is the player's in-game music pause
@@ -15689,12 +15599,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const timerRunning = started && !done && activeTab === 'game';
 
   const fmtSecs = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   // Elapsed-time clock (pauses when not actively playing).
   useEffect(() => {
@@ -16102,7 +16006,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
   return (
     <div>
-      {isMock && <div className="t2048-banner">Local best score — leaderboard syncs to your account when live</div>}
 
       {activeTab === 'game' && (
         <div>

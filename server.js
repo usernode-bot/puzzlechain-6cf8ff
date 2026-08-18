@@ -2477,7 +2477,15 @@ app.use((req, res, next) => {
         audience: 'usernode:app:' + process.env.USERNODE_APP_ID,
       });
       // Platform iframe tokens only — reject any other purpose.
-      if (payload && payload.pur === 'iframe') req.user = payload;
+      if (payload && payload.pur === 'iframe') {
+        req.user = payload;
+        // The platform signs `id` as a NUMBER, but every *_id column here is
+        // TEXT, so pg returns strings. SQL params cast fine either way, but
+        // JS-side strict comparisons against row values (roomSeatOf, the
+        // leaderboard me-pinning, isOwnProfile via the echoed /api/daily
+        // user) silently miss on 7 === '7'. Normalize once at the boundary.
+        if (req.user.id != null) req.user.id = String(req.user.id);
+      }
     } catch {}
   }
 

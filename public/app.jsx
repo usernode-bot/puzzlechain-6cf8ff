@@ -951,14 +951,15 @@ ${emitTapHighlightRules()}
 }
 /* ---- Daily Snake / Daily Bounce (seeded daily arcade variants) ---- */
 .dsnk-board {
-  display: grid; gap: 1px; background: ${C.border}; border: 2px solid ${C.border};
+  background: ${C.card}; border: 2px solid ${C.border};
   border-radius: 10px; overflow: hidden; max-width: 340px; margin: 0 auto; aspect-ratio: 1;
   touch-action: none;
 }
-.dsnk-cell { background: ${C.card}; }
-.dsnk-cell.body { background: ${GA.lime}; }
-.dsnk-cell.head { background: ${C.accent}; }
-.dsnk-cell.food { background: ${C.rose}; border-radius: 50%; }
+/* The snake canvas fills whichever board box hosts it (classic or daily). */
+.snake-canvas-fill {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
 .dsnk-hint { text-align: center; color: ${C.muted}; font-size: 0.8rem; margin-top: 0.6rem; }
 /* #149 — this is the flexible region of Daily Bounce's fit column, and its
    measured box is what sizeCanvas() reads to scale the canvas. Before, the
@@ -2527,26 +2528,6 @@ ${emitTapHighlightRules()}
   margin: 0 auto;
   width: 100%;
 }
-.snake-grid {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  background: ${C.card};
-  border: 2px solid ${C.border};
-  border-radius: 12px;
-  padding: 6px;
-  gap: 1px;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.snake-cell {
-  border-radius: 2px;
-  background: ${C.bg};
-}
-.snake-cell.snake-body { background: ${C.emerald}; border-radius: 3px; }
-.snake-cell.snake-head { background: ${C.emerald}; border-radius: 4px; box-shadow: 0 0 8px ${ca('emerald','aa')}; }
-.snake-cell.snake-food { background: ${C.gold}; border-radius: 50%; box-shadow: 0 0 8px ${ca('gold','aa')}; }
 .snake-controls {
   display: flex;
   gap: 0.5rem;
@@ -3503,7 +3484,6 @@ ${emitTapHighlightRules()}
   height: var(--cg-board);
   max-width: 94vw;
   max-height: 94vw;
-  display: grid;
   background: ${C.surface};
   border: 2px solid ${C.border};
   border-radius: 12px;
@@ -3511,10 +3491,6 @@ ${emitTapHighlightRules()}
   touch-action: none;
   position: relative;
 }
-.snake-cell { width: 100%; height: 100%; }
-.snake-cell.body { background: ${C.emerald}; border-radius: 3px; }
-.snake-cell.head { background: ${C.accent}; border-radius: 4px; }
-.snake-cell.food { background: ${C.rose}; border-radius: 50%; transform: scale(0.8); }
 .snake-hint { color: ${C.muted}; font-size: 0.8rem; text-align: center; }
 
 /* ---- Block Blast ---- */
@@ -3729,7 +3705,7 @@ ${emitTapHighlightRules()}
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cg-sheet, .m3-tile, .dr-gem, .snake-cell { transition: none !important; }
+  .cg-sheet, .m3-tile, .dr-gem { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
   /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)
      was dead CSS. A player who asks their phone to calm animations down now
@@ -12831,9 +12807,66 @@ function SnakeGameModeSelect({ onSelectDifficulty }) {
 }
 
 /* ---- Snake — Gameplay ---- */
+/* Snake boards (classic 15×15, daily 13×13) draw to ONE canvas now: the DOM
+   grids re-reconciled 225/169 cell divs on every movement tick, which was the
+   whole cost of the game loop. The outer .snake-board/.dsnk-board boxes stay
+   (their sizing, background, border and the fit-col rules are unchanged, and
+   gestures still bind to them); this fills them with a canvas that redraws
+   once per tick. Colors read PAL — board chrome follows the theme exactly as
+   the DOM cells' C tokens did. */
+function SnakeCanvas({ n, stRef, tick, skin, ariaLabel }) {
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: n, rows: n });
+  const side = Math.min(Math.floor(boxW) || 0, Math.floor(boxH) || Math.floor(boxW) || 0);
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [tick, side, n],
+    draw: (ctx) => {
+      if (side < 40) return;
+      const pad = 6;
+      const cs = (side - pad * 2) / n;
+      const cellRect = (gx, gy, color, r) => {
+        klRR(ctx, pad + gx * cs + 0.5, pad + gy * cs + 0.5, cs - 1, cs - 1, r);
+        ctx.fillStyle = color;
+        ctx.fill();
+      };
+      if (skin === 'classic') {
+        // The classic board's darker empty-cell wash.
+        for (let gy = 0; gy < n; gy++) for (let gx = 0; gx < n; gx++) cellRect(gx, gy, PAL.bg, 2);
+      } else {
+        // The daily board's faint hairline grid.
+        ctx.strokeStyle = PAL.border;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.55;
+        for (let i = 1; i < n; i++) {
+          ctx.beginPath(); ctx.moveTo(pad + i * cs, pad); ctx.lineTo(pad + i * cs, side - pad); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(pad, pad + i * cs); ctx.lineTo(side - pad, pad + i * cs); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      const s = stRef.current;
+      if (!s) return;
+      const bodyColor = skin === 'classic' ? PAL.emerald : GA.lime;
+      for (let i = s.snake.length - 1; i >= 1; i--) cellRect(s.snake[i].x, s.snake[i].y, bodyColor, 3);
+      cellRect(s.snake[0].x, s.snake[0].y, PAL.accent, 4);
+      ctx.beginPath();
+      ctx.arc(pad + s.food.x * cs + cs / 2, pad + s.food.y * cs + cs / 2, cs * 0.38, 0, Math.PI * 2);
+      ctx.fillStyle = PAL.rose;
+      ctx.fill();
+    },
+  });
+  return (
+    <div className="snake-canvas-fill" ref={boxRef}>
+      <canvas ref={canvasRef} className="snake-canvas board-canvas" role="img" aria-label={ariaLabel} />
+    </div>
+  );
+}
+
 function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty, menuConfig }) {
   const N = 15;
-  const [, render] = useState(0);
+  const [tick, render] = useState(0);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState(0);
   const [started, setStarted] = useState(false);
@@ -12930,16 +12963,6 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   }, [started]);
 
   const s = st.current;
-  const cells = [];
-  if (s) {
-    const occ = {};
-    s.snake.forEach((seg, i) => { occ[seg.y * N + seg.x] = i === 0 ? 'head' : 'body'; });
-    const fi = s.food.y * N + s.food.x;
-    for (let i = 0; i < N * N; i++) {
-      const o = occ[i];
-      cells.push(<div key={i} className={'snake-cell' + (o ? ' ' + o : '') + (i === fi ? ' food' : '')} />);
-    }
-  }
   const hist = cgLoadHistory(SNAKE_KEY);
   const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
   const longest = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
@@ -12957,8 +12980,8 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="snake-board-wrap">
-          <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
-            {cells}
+          <div className="snake-board" ref={boardRef}>
+            <SnakeCanvas n={N} stRef={st} tick={tick} skin="classic" ariaLabel={`Snake board — score ${score}, length ${s ? s.snake.length : 0}`} />
           </div>
           {paused && !done && (
             <div className="snake-pause-overlay">
@@ -22906,7 +22929,7 @@ const DSNK_N = 13;
 const DSNK_TARGET = 20;
 
 function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
-  const [, render] = useState(0);
+  const [tick, render] = useState(0);
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
   const [eaten, setEaten] = useState(0);
@@ -23017,13 +23040,6 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
   }, [started]);
 
   const s = st.current;
-  const occ = {};
-  s.snake.forEach((seg, i) => { occ[seg.y * DSNK_N + seg.x] = i === 0 ? 'head' : 'body'; });
-  const fi = s.food.y * DSNK_N + s.food.x;
-  const cells = [];
-  for (let i = 0; i < DSNK_N * DSNK_N; i++) {
-    cells.push(<div key={i} className={'dsnk-cell' + (occ[i] ? ' ' + occ[i] : '') + (i === fi ? ' food' : '')} />);
-  }
   const fmt = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 
   return (
@@ -23034,12 +23050,8 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
         <div className="pill"><div className="plabel">Apples</div><div className="pvalue">{eaten}/{DSNK_TARGET}</div></div>
         <div className="pill"><div className="plabel">Length</div><div className="pvalue">{s.snake.length}</div></div>
       </div>
-      <div
-        className="dsnk-board"
-        ref={boardRef}
-        style={{ gridTemplateColumns: `repeat(${DSNK_N}, 1fr)`, gridTemplateRows: `repeat(${DSNK_N}, 1fr)` }}
-      >
-        {cells}
+      <div className="dsnk-board" ref={boardRef}>
+        <SnakeCanvas n={DSNK_N} stRef={st} tick={tick} skin="daily" ariaLabel={`Daily Snake board — ${eaten}/${DSNK_TARGET} apples`} />
       </div>
       <div className="dsnk-hint">
         {done ? 'Run over' : started ? `Eat ${DSNK_TARGET} apples — one crash ends the day` : 'Swipe (or arrow keys) to start — everyone gets the same apple trail today'}

@@ -2562,27 +2562,6 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   margin: 0 auto;
 }
-.bb-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
-  background: ${C.border};
-  border: 2px solid ${C.border};
-  border-radius: 10px;
-  overflow: hidden;
-  aspect-ratio: 1;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.bb-cell {
-  aspect-ratio: 1;
-  background: ${C.card};
-  transition: background 0.08s ease;
-}
-.bb-cell.occupied { background: var(--bb-color); }
-.bb-cell.ghost-valid { background: ${ca('accent','66')}; }
-.bb-cell.ghost-invalid { background: ${ca('rose','44')}; }
 .bb-score-delta {
   position: absolute;
   top: -1.4rem;
@@ -3273,7 +3252,7 @@ ${emitTapHighlightRules()}
 .cg-onchain-badge:hover { opacity: 1; text-decoration: underline; }
 
 /* Keep existing classic boards fitting inside the shell stage */
-.cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
+.cg-stage .ms-boardbox, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
 .cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
 .cg-stage .ms-bottom-nav, .cg-stage .mnc-bottom-nav, .cg-stage .t2048-bottom-nav { display: none; }
 /* PHASE 3 — the five phase-5 board games hardcoded width: min(92vw, 340–380px)
@@ -3304,24 +3283,20 @@ ${emitTapHighlightRules()}
 .snake-hint { color: ${C.muted}; font-size: 0.8rem; text-align: center; }
 
 /* ---- Block Blast ---- */
+/* The grid is a canvas; the box keeps the panel look and the rect the drag
+   origin math measures. */
 .bb-grid {
   width: var(--cg-board);
   height: var(--cg-board);
   max-width: 94vw;
   max-height: 94vw;
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 3px;
+  display: flex; align-items: center; justify-content: center;
   background: ${C.surface};
   border: 2px solid ${C.border};
   border-radius: 12px;
   padding: 4px;
   touch-action: none;
 }
-.bb-cell { background: ${C.bg}; border-radius: 4px; aspect-ratio: 1; transition: background 0.1s ease; }
-.bb-cell.filled { background: ${C.accent}; }
-.bb-cell.preview { background: ${ca('accent','66')}; }
-.bb-cell.invalid { background: ${ca('rose','55')}; }
 .bb-tray {
   display: flex;
   gap: 0.8rem;
@@ -13062,6 +13037,50 @@ function bbCanPlaceAny(grid, tray) {
 // game-over it calls onEnd(score, placed, secs); the parent decides what to do
 // (solo submits the global score + shows the overlay; the race host posts to
 // the room). The board itself never touches scoring endpoints.
+/* Block Fit's 8×8 well as a canvas (#170 treatment). Pure display: the tray
+   pieces stay DOM drag sources, the floating ghost stays DOM, and the drop
+   origin keeps its getBoundingClientRect math against the same grid box —
+   only the 64 cell divs became one draw pass. Piece colors are intrinsic. */
+function BbGridCanvas({ grid, preview }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 8, rows: 8 });
+  const side = Math.max(0, Math.min(Math.floor(boxW), Math.floor(boxH) || Math.floor(boxW)));
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [grid, preview, side],
+    draw: (ctx) => {
+      if (side < 60) return;
+      const gapPx = 3;
+      const cs = (side - gapPx * 7) / 8;
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = c * (cs + gapPx), y = r * (cs + gapPx);
+        const pv = preview && preview[i];
+        klRR(ctx, x, y, cs, cs, 4);
+        ctx.fillStyle = grid[i] || PAL.bg;
+        ctx.fill();
+        if (pv) {
+          klRR(ctx, x, y, cs, cs, 4);
+          ctx.fillStyle = pv === 'preview' ? 'rgba(58,110,205,0.40)' : 'rgba(205,75,58,0.33)';
+          ctx.fill();
+        }
+      }
+    },
+  });
+  return (
+    <div className="snake-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="bb-canvas board-canvas"
+        role="img"
+        aria-label={`Block Fit board — ${grid.filter(Boolean).length} of 64 cells filled`}
+      />
+    </div>
+  );
+}
+
 function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
   const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
@@ -13177,11 +13196,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
     <>
       <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
       <div className="bb-grid" ref={gridRef}>
-        {grid.map((cell, i) => {
-          const pv = preview && preview[i];
-          return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
-            style={cell ? { background: cell } : undefined} />;
-        })}
+        <BbGridCanvas grid={grid} preview={preview} />
       </div>
       <div className="bb-tray">
         {tray.map((p, idx) => (

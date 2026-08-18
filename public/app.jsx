@@ -160,7 +160,6 @@ const TAPPABLE_CLASSES = [
   'numkey',
   'cw-key', 'mnc-pit',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
-  'm3-tile',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
@@ -774,8 +773,7 @@ ${emitTapHighlightRules()}
 .cw-key:active, .cw-key[data-pressed],
 .mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
 .ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
-.ludo-token.movable:active, .an-tile:active, .an-slot:active,
-.m3-tile:active {
+.ludo-token.movable:active, .an-tile:active, .an-slot:active {
   filter: brightness(0.9);
   transform: scale(0.96);
 }
@@ -3396,32 +3394,13 @@ ${emitTapHighlightRules()}
    no design system at all: hand-written inline styles, plain coloured blocks,
    a bare Bar: label. Renamed to .m3-* and actually wired up, which also earns
    it the Phase 2 touch-action/press rules and the Phase 3 fit sizing. */
+/* The tile board is a canvas; the box keeps the width caps. */
 .m3-grid {
   width: var(--cg-board);
   max-width: 94vw;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: clamp(3px, 1vw, 6px);
-  touch-action: manipulation;
+  display: flex; align-items: center; justify-content: center;
+  touch-action: none;
 }
-.m3-tile {
-  aspect-ratio: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(1.1rem, 5vw, 1.8rem);
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  padding: 0;
-  font-family: inherit;
-  transition: transform 0.1s ease, background 0.1s ease, opacity 0.18s ease;
-}
-.m3-tile.sel { background: ${ca('accent','44')}; border-color: ${C.accent}; transform: scale(0.92); }
-.m3-tile.gone { opacity: 0.22; pointer-events: none; cursor: default; }
 .m3-bar {
   width: var(--cg-board);
   max-width: 94vw;
@@ -3526,7 +3505,7 @@ ${emitTapHighlightRules()}
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cg-sheet, .m3-tile { transition: none !important; }
+  .cg-sheet { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
   /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)
      was dead CSS. A player who asks their phone to calm animations down now
@@ -3545,7 +3524,7 @@ ${emitTapHighlightRules()}
   .numkey:active, .cw-key:active,
   .mnc-pit:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
-  .an-slot:active, .m3-tile:active { transform: none !important; }
+  .an-slot:active { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
@@ -17323,6 +17302,72 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
 }
 
 // ---- Match-3 Campaign Game ----
+/* Match 3's tile board as a canvas (#170 treatment). Self-contained because
+   the game has campaign/loading phases — usePointerCell binds on mount, so
+   the canvas must exist when the hooks run. Tile palette/icons stay the
+   intrinsic M3 set; removed tiles keep their ✓ ghost. */
+function M3BoardCanvas({ tiles, bar, done, onTile }) {
+  const M3_ICONS = ['🔴', '🟠', '🟢', '🔵', '🟣'];
+  const M3_HEX = ['#CD4B3A', '#C9A227', '#2D9F66', '#3A6ECD', '#7C5CD6'];
+  const cols = 5;
+  const rows = Math.max(1, Math.ceil(tiles.length / cols));
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols, rows, minCell: 40, maxCell: 76, gap: 5 });
+  const step = cell + 5;
+  const bw = step * cols - 5, bh = step * rows - 5;
+  const liveRef = useRef({});
+  liveRef.current = { tiles, done, step };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      if (lv.done) return;
+      const c = Math.floor(p.x / lv.step), r = Math.floor(p.y / lv.step);
+      if (c < 0 || c >= cols || r < 0 || r >= rows) return;
+      const t = lv.tiles[r * cols + c];
+      if (t && !t.removed) onTile(t.id);
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: bw,
+    height: bh,
+    deps: [tiles, bar, done, cell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < tiles.length; i++) {
+        const t = tiles[i];
+        const r = Math.floor(i / cols), c = i % cols;
+        const x = c * step, y = r * step;
+        const inBar = bar.indexOf(t.id) >= 0;
+        klRR(ctx, x, y, cell, cell, 10);
+        ctx.fillStyle = t.removed ? PAL.surface : M3_HEX[t.type % 5];
+        ctx.fill();
+        ctx.lineWidth = inBar ? 2.5 : 1;
+        ctx.strokeStyle = inBar ? PAL.accent : PAL.border;
+        ctx.stroke();
+        ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
+        if (t.removed) {
+          ctx.fillStyle = PAL.muted;
+          ctx.fillText('✓', x + cell / 2, y + cell / 2 + 1);
+        } else {
+          ctx.fillText(M3_ICONS[t.type % 5], x + cell / 2, y + cell / 2 + 1);
+        }
+      }
+    },
+  });
+  return (
+    <div className="m3-grid" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="m3-canvas board-canvas"
+        role="grid"
+        aria-label={`Match 3 board — ${tiles.filter((t) => !t.removed).length} tiles left`}
+      />
+    </div>
+  );
+}
+
 function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, resetKey }) {
   const [phase, setPhase] = useState('campaign'); // 'campaign' | 'playing' | 'won' | 'lost'
   const [selectedPuzzle, setSelectedPuzzle] = useState(1);
@@ -17616,24 +17661,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
           { l: 'Time', v: `${secs}s` },
         ],
       }),
-      React.createElement(
-        'div',
-        { className: 'm3-grid' },
-        tiles.map(t => React.createElement(
-          'button',
-          Object.assign(
-            {
-              key: t.id,
-              className: 'm3-tile' + (t.removed ? ' gone' : '') + (bar.indexOf(t.id) >= 0 ? ' sel' : ''),
-              disabled: t.removed || done,
-              style: { background: t.removed ? C.surface : M3_COLORS[t.type % 5] },
-              'aria-label': `Tile ${t.type + 1}` + (t.removed ? ', cleared' : ''),
-            },
-            tapProps(() => selectTile(t.id), { disabled: t.removed || done })
-          ),
-          t.removed ? '✓' : M3_ICONS[t.type % 5]
-        ))
-      ),
+      React.createElement(M3BoardCanvas, { tiles, bar, done, onTile: selectTile }),
       React.createElement(
         'div',
         { className: 'm3-bar' + (barFull ? ' full' : '') },

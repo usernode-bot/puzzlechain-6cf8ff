@@ -4007,44 +4007,12 @@ ${emitTapHighlightRules()}
   position: relative; max-width: 480px; margin: 0 auto;
   aspect-ratio: 1; width: 100%;
 }
-.cnl-board {
+/* The board (cells, connectors, pawns) is one canvas — see CnlBoardCanvas. */
+.cnl-board-canvas-fill {
   position: absolute; inset: 0;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
-  gap: 2px;
-  background: ${C.border};
-  border: 2px solid ${C.border};
-  border-radius: 12px;
-  padding: 2px;
-  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
 }
-.cnl-cell {
-  position: relative;
-  display: flex; align-items: flex-start; justify-content: flex-start;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.5rem;
-  font-weight: 600;
-  color: ${C.muted};
-  background: ${C.card};
-  padding: 1px 2px;
-  user-select: none;
-}
-.cnl-cell.alt { background: ${C.surface}; }
-.cnl-cell.cnl-goal { background: ${ca('gold','22')}; color: ${C.gold}; }
-.cnl-cell-mark {
-  position: absolute; bottom: 0; right: 1px;
-  font-size: 0.72rem; line-height: 1;
-}
-/* ---- Moksha Patam variant (slice 7) ---- */
-.cnl-cell-name {
-  position: absolute; left: 1px; right: 1px; bottom: 0;
-  font-size: 0.36rem; line-height: 1.05; font-weight: 700; letter-spacing: 0.01em;
-  text-align: center; text-transform: uppercase; overflow: hidden; white-space: nowrap;
-  text-overflow: ellipsis; pointer-events: none;
-}
-.cnl-cell-name.up { color: ${C.emerald}; }
-.cnl-cell-name.down { color: ${C.rose}; }
+.cnl-canvas { border-radius: 12px; }
 .cnl-glossary-btn { margin-left: auto; font-size: 0.75rem; }
 .cnl-variant-block { margin-top: 0.5rem; }
 .cnl-variant-label {
@@ -4078,19 +4046,6 @@ ${emitTapHighlightRules()}
 .mok-name em { color: ${C.muted}; font-weight: 400; }
 .mok-dest { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-left: 0.4rem; }
 .mok-blurb { color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; }
-.cnl-svg {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 2;
-}
-.cnl-pawn {
-  position: absolute; z-index: 3;
-  width: 7%; height: 7%;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
-  transform: translate(-50%, -50%);
-  transition: left 0.13s ease, top 0.13s ease;
-}
 .cnl-die {
   display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
   margin: 0.9rem auto 0.2rem; max-width: 480px;
@@ -17830,6 +17785,149 @@ function cnlRowCol(n) {
 
 // Center of a square as a percentage of the board box (for SVG + pawns).
 // Visual row 0 sits at the BOTTOM, so flip for top-origin coordinates.
+/* The Snakes & Ladders board as ONE canvas shared by local and online play
+   (#170 treatment): cells, the connector lines (Moksha's snakes keep their
+   slither curves), the square marks/names, and both pawns — which glide
+   between squares with the same 130ms ease the DOM transition gave them.
+   Display-only: the Roll buttons are the input. Chrome reads PAL; the two
+   pawn colors come from the callers, as before. */
+function CnlBoardCanvas({ V, isMoksha, p1Pos, p2Pos, p1Color, p2Color }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 10, rows: 10 });
+  const side = Math.max(0, Math.floor(boxW));
+
+  // Pawn glide: remember each pawn's previous square and lerp for 130ms.
+  const glideRef = useRef({ p1: { from: p1Pos, to: p1Pos, t0: 0 }, p2: { from: p2Pos, to: p2Pos, t0: 0 } });
+  const [, setGlideFrame] = useState(0);
+  useEffect(() => {
+    const g = glideRef.current;
+    let changed = false;
+    for (const [key, pos] of [['p1', p1Pos], ['p2', p2Pos]]) {
+      if (g[key].to !== pos) { g[key] = { from: g[key].to, to: pos, t0: performance.now() }; changed = true; }
+    }
+    if (!changed) return;
+    let raf = 0;
+    const tick = () => {
+      setGlideFrame((f) => f + 1);
+      const now = performance.now();
+      if (now - g.p1.t0 < 140 || now - g.p2.t0 < 140) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [p1Pos, p2Pos]);
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [p1Pos, p2Pos, V, isMoksha, side],
+    draw: (ctx) => {
+      if (side < 80) return;
+      const pad = 4;
+      const inner = side - pad * 2;
+      const cs = inner / 10;
+      const pct = (p) => [pad + (p.x / 100) * inner, pad + (p.y / 100) * inner];
+      ctx.textBaseline = 'top';
+      for (let visualRow = 0; visualRow < 10; visualRow++) {
+        for (let col = 0; col < 10; col++) {
+          const row = 9 - visualRow;
+          const within = (row % 2 === 0) ? col : (9 - col);
+          const n = row * 10 + within + 1;
+          const x = pad + col * cs, y = pad + visualRow * cs;
+          ctx.fillStyle = n === 100 ? 'rgba(201,162,39,0.13)' : ((row + col) % 2 ? PAL.surface : PAL.card);
+          ctx.fillRect(x + 0.5, y + 0.5, cs - 1, cs - 1);
+          ctx.font = `600 ${Math.max(7, Math.round(cs * 0.24))}px 'JetBrains Mono', monospace`;
+          ctx.textAlign = 'left';
+          ctx.fillStyle = n === 100 ? PAL.gold : PAL.muted;
+          ctx.fillText(String(n), x + 3, y + 2);
+          const isL = V.ladders[n] !== undefined;
+          const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
+          if (mark) {
+            ctx.font = `${Math.round(cs * 0.34)}px system-ui, sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.fillText(mark, x + cs - 2, y + cs - Math.round(cs * 0.38));
+          }
+          const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
+          if (meaning) {
+            ctx.font = `700 ${Math.max(5, Math.round(cs * 0.14))}px 'Space Grotesk', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = isL ? PAL.emerald : PAL.rose;
+            let name = meaning.name.toUpperCase();
+            while (name.length > 2 && ctx.measureText(name).width > cs - 3) name = name.slice(0, -1);
+            ctx.fillText(name, x + cs / 2, y + cs - Math.max(6, Math.round(cs * 0.17)));
+          }
+        }
+      }
+      // Connectors over the cells.
+      for (const k of Object.keys(V.jumps)) {
+        const from = parseInt(k, 10), to = V.jumps[from];
+        const [ax, ay] = pct(cnlCenterPct(from));
+        const [bx, by] = pct(cnlCenterPct(to));
+        const isLadder = V.ladders[from] !== undefined;
+        ctx.strokeStyle = isLadder ? PAL.emerald : PAL.rose;
+        ctx.lineCap = 'round';
+        ctx.globalAlpha = isMoksha && !isLadder ? 0.65 : 0.6;
+        ctx.lineWidth = Math.max(2, side * (isMoksha && !isLadder ? 0.014 : 0.011));
+        ctx.beginPath();
+        if (isMoksha && !isLadder) {
+          const mx = (ax + bx) / 2, my = (ay + by) / 2;
+          const dx = bx - ax, dy = by - ay;
+          const len = Math.max(Math.hypot(dx, dy), 0.001);
+          const off = Math.min(0.09 * side, len * 0.16);
+          const nx = -dy / len * off, ny = dx / len * off;
+          ctx.moveTo(ax, ay);
+          ctx.quadraticCurveTo((ax + mx) / 2 + nx, (ay + my) / 2 + ny, mx, my);
+          ctx.quadraticCurveTo((mx + bx) / 2 - nx, (my + by) / 2 - ny, bx, by);
+        } else {
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // Pawns, gliding between squares; nudged apart when sharing one.
+      const g = glideRef.current;
+      const now = performance.now();
+      const posOf = (gp) => {
+        const p = Math.min(1, (now - gp.t0) / 130);
+        const e = 1 - (1 - p) * (1 - p);
+        const [fx, fy] = pct(cnlCenterPct(gp.from));
+        const [tx, ty] = pct(cnlCenterPct(gp.to));
+        return [fx + (tx - fx) * e, fy + (ty - fy) * e];
+      };
+      let [x1, y1] = posOf(g.p1);
+      let [x2, y2] = posOf(g.p2);
+      if (g.p1.to === g.p2.to) { x1 -= side * 0.024; x2 += side * 0.024; }
+      const rp = side * 0.035;
+      for (const [x, y, color] of [[x1, y1, p1Color], [x2, y2, p2Color]]) {
+        ctx.beginPath();
+        ctx.arc(x, y, rp, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+      }
+      // Outer border.
+      klRR(ctx, 1, 1, side - 2, side - 2, 12);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+    },
+  });
+
+  return (
+    <div className="cnl-board-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="cnl-canvas board-canvas"
+        role="img"
+        aria-label={`Board — player 1 on square ${p1Pos || 0}, player 2 on square ${p2Pos || 0}`}
+      />
+    </div>
+  );
+}
+
 function cnlCenterPct(n) {
   if (n <= 0) return { x: 50, y: 104 }; // off-board: just below the board
   const { row, col } = cnlRowCol(n);
@@ -18010,76 +18108,6 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
     return () => clearTimeout(t);
   }, [vsBot, player, animating, rolling, done, resumeOffer]);
 
-  // Build the 10x10 cells (top row first for natural DOM order).
-  const cells = [];
-  for (let visualRow = 0; visualRow < 10; visualRow++) {
-    for (let col = 0; col < 10; col++) {
-      const row = 9 - visualRow;              // bottom-origin board row
-      const within = (row % 2 === 0) ? col : (9 - col);
-      const n = row * 10 + within + 1;
-      const isL = V.ladders[n] !== undefined;
-      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
-      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
-      cells.push(
-        <div
-          key={n}
-          className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
-          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}
-        >
-          <span>{n}</span>
-          {mark && <span className="cnl-cell-mark">{mark}</span>}
-          {/* On the Moksha board each special square is named on the board
-              itself, so the lesson is legible without opening the glossary. */}
-          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
-        </div>
-      );
-    }
-  }
-
-  // Connectors. Ladders stay straight; Moksha's snakes are drawn as a curve so
-  // they read as snakes rather than as chutes.
-  const lines = Object.keys(V.jumps).map(k => {
-    const from = parseInt(k, 10);
-    const to = V.jumps[from];
-    const a = cnlCenterPct(from);
-    const b = cnlCenterPct(to);
-    const isLadder = V.ladders[from] !== undefined;
-    const stroke = isLadder ? C.emerald : C.rose;
-    if (isMoksha && !isLadder) {
-      // Two opposing arcs through the midpoint give a slither; the control
-      // offset is perpendicular to the run so long snakes bend more.
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const len = Math.max(Math.hypot(dx, dy), 0.001);
-      const off = Math.min(9, len * 0.16);
-      const nx = -dy / len * off, ny = dx / len * off;
-      return (
-        <path
-          key={k}
-          d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`}
-          fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
-        />
-      );
-    }
-    return (
-      <line
-        key={k}
-        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-        stroke={stroke}
-        strokeWidth="1.1"
-        strokeLinecap="round"
-        opacity="0.6"
-      />
-    );
-  });
-
-  const p1c = cnlCenterPct(p1Pos);
-  const p2c = cnlCenterPct(p2Pos);
-  // Nudge pawns apart when sharing a square (incl. both off-board) so both stay visible.
-  const sameCell = p1Pos === p2Pos;
-  const p1x = sameCell ? p1c.x - 2.4 : p1c.x;
-  const p2x = sameCell ? p2c.x + 2.4 : p2c.x;
-
   const bannerActive = !!banner;
   const bannerColor = done ? C.muted : activeColor;
 
@@ -18132,12 +18160,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
       </div>
 
       <div className="cnl-board-wrap">
-        <div className="cnl-board">{cells}</div>
-        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {lines}
-        </svg>
-        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn" />
-        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn" />
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} p1Pos={p1Pos} p2Pos={p2Pos} p1Color={p1Color} p2Color={p2Color} />
       </div>
 
       <div className="cnl-die">
@@ -18322,46 +18345,6 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
     submitMove({ type: 'roll' });
   };
 
-  // Reuse the static board renderer by mapping positions onto pawns.
-  const cells = [];
-  for (let visualRow = 0; visualRow < 10; visualRow++) {
-    for (let col = 0; col < 10; col++) {
-      const row = 9 - visualRow;
-      const within = (row % 2 === 0) ? col : (9 - col);
-      const n = row * 10 + within + 1;
-      const isL = V.ladders[n] !== undefined;
-      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
-      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
-      cells.push(
-        <div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
-          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}>
-          <span>{n}</span>
-          {mark && <span className="cnl-cell-mark">{mark}</span>}
-          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
-        </div>
-      );
-    }
-  }
-  const lines = Object.keys(V.jumps).map(k => {
-    const from = parseInt(k, 10), to = V.jumps[from];
-    const a = cnlCenterPct(from), b = cnlCenterPct(to);
-    const isLadder = V.ladders[from] !== undefined;
-    const stroke = isLadder ? C.emerald : C.rose;
-    if (isMoksha && !isLadder) {
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const len = Math.max(Math.hypot(dx, dy), 0.001);
-      const off = Math.min(9, len * 0.16);
-      const nx = -dy / len * off, ny = dx / len * off;
-      return <path key={k} fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
-        d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`} />;
-    }
-    return <line key={k} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={stroke} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />;
-  });
-  const p1c = cnlCenterPct(st.p1Pos || 0), p2c = cnlCenterPct(st.p2Pos || 0);
-  const same = (st.p1Pos || 0) === (st.p2Pos || 0);
-  const p1x = same ? p1c.x - 2.4 : p1c.x, p2x = same ? p2c.x + 2.4 : p2c.x;
-
   const turnLabel = status === 'finished'
     ? (room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
     : isMyTurn ? 'Your turn' : "Opponent's turn";
@@ -18379,10 +18362,7 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
       </div>
       {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
       <div className="cnl-board-wrap">
-        <div className="cnl-board">{cells}</div>
-        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">{lines}</svg>
-        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} />
-        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} />
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} p1Pos={st.p1Pos || 0} p2Pos={st.p2Pos || 0} p1Color={p1Color} p2Color={p2Color} />
       </div>
       <div className="cnl-die">
         <div className="cnl-die-face" style={{ borderColor: myColor + '88' }}>{st.die == null ? '·' : st.die}</div>

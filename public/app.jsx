@@ -160,7 +160,7 @@ const TAPPABLE_CLASSES = [
   'wspr-tile', 'scell', 'numkey',
   'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
-  'tm-tile', 'm3-tile',
+  'm3-tile',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
@@ -780,13 +780,12 @@ ${emitTapHighlightRules()}
 .kt-cell:active, .kt-cell[data-pressed],
 .ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
 .ludo-token.movable:active, .an-tile:active, .an-slot:active,
-.tm-tile.available:active, .m3-tile:active {
+.m3-tile:active {
   filter: brightness(0.9);
   transform: scale(0.96);
 }
 /* A press must never look "stuck on" for a disabled/decorative cell. */
-.wspr-tile.dim:active, .scell.given:active, .ms-cell.ms-revealed:active,
-.tm-tile.locked:active {
+.wspr-tile.dim:active, .scell.given:active, .ms-cell.ms-revealed:active {
   filter: none; transform: none;
 }
 .sr-only {
@@ -1545,16 +1544,6 @@ ${emitTapHighlightRules()}
   outline: 2px solid ${C.gold};
   outline-offset: -2px;
   border-radius: 4px;
-}
-.tm-tile.hint-target {
-  outline: 3px solid ${C.gold};
-  outline-offset: -1px;
-  animation: tmHintPulse 0.7s ease-in-out infinite;
-  z-index: 999 !important;
-}
-@keyframes tmHintPulse {
-  0%, 100% { box-shadow: 0 0 6px ${C.gold}; }
-  50% { box-shadow: 0 0 16px ${C.gold}; }
 }
 .cw-board {
   display: grid;
@@ -2896,11 +2885,15 @@ ${emitTapHighlightRules()}
 /* ---- Tile Match ---- */
 .tm-wrap { max-width: 400px; margin: 0 auto; }
 .tm-wrap.fit-col { max-width: 520px; }
-.tm-board-container {
-  position: relative;
-  margin: 0 auto;
-  overflow: visible;
+/* The canvas board box (both variants): the daily's carries tm-board-fit so
+   it is the fit column's flexible region; classic takes natural height and
+   the shell scrolls, as it always did. */
+.tm-board-box {
+  position: relative; width: 100%;
+  display: flex; align-items: center; justify-content: center;
 }
+.tm-board-fit { flex: 1 1 auto; min-height: 0; overscroll-behavior: contain; }
+.tm-canvas { border-radius: 8px; }
 /* Today's layout + difficulty band (slice 8), so the shape and the weekly
    curve are legible before the first tap. */
 .tm-daylabel {
@@ -2910,33 +2903,6 @@ ${emitTapHighlightRules()}
 }
 .tm-wrap.fit-col .tm-bar, .tm-wrap.fit-col .tm-bar-label,
 .tm-wrap.fit-col .tm-boosters, .tm-wrap.fit-col .hint-bar { flex: 0 0 auto; }
-.tm-tile {
-  position: absolute;
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.55rem;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-  transition: transform 0.1s ease, opacity 0.12s ease, box-shadow 0.12s ease;
-  border: 2px solid rgba(255,255,255,0.18);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-}
-.tm-tile.available:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-.tm-tile.locked { opacity: 0.35; cursor: default; pointer-events: none; filter: brightness(0.7); }
-.tm-tile.flash {
-  animation: tm-match-flash 0.35s ease forwards;
-}
-@keyframes tm-match-flash {
-  0%   { transform: scale(1);   opacity: 1; }
-  50%  { transform: scale(1.25); opacity: 0.9; }
-  100% { transform: scale(0);   opacity: 0; }
-}
 .tm-bar {
   display: flex;
   gap: 5px;
@@ -3771,7 +3737,7 @@ ${emitTapHighlightRules()}
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
   .t2048-tile, .t2048-tile.is-new, .t2048-tile.is-merged,
-  .tm-tile, .tm-tile.flash, .cw-row.shake,
+  .cw-row.shake,
   .mnc-pit.mnc-flash, .mnc-pit.mnc-capture-flash,
   .tm-bar.bar-full,
   .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
@@ -3784,7 +3750,7 @@ ${emitTapHighlightRules()}
   .numkey:active, .wcell:active, .cw-key:active, .ms-cell:active,
   .mnc-pit:active, .kt-cell:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
-  .an-slot:active, .tm-tile:active, .m3-tile:active { transform: none !important; }
+  .an-slot:active, .m3-tile:active { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
@@ -13730,7 +13696,6 @@ const TM_TIER_LABELS = [
   { label: 'Legend',   start: 900, end: 999 },
 ];
 
-const TM_TILE_STEP = 50; // px per grid unit (48px tile + 2px gap)
 
 function tmGenerateLevel(cfg, seed) {
   const rng = mulberry32(seed);
@@ -13786,6 +13751,132 @@ function tmIsLocked(tile, allTiles) {
 
 function tmSortBar(bar, tilesMap) {
   return bar.slice().sort((a, b) => tilesMap[a].type - tilesMap[b].type);
+}
+
+/* The Tile Match boards are CANVASES now (#170 treatment) — one renderer
+   shared by the classic levels and the daily. The DOM boards positioned
+   every tile absolutely at fixed 50px steps; the daily then FitScale-shrank
+   the whole stack and free-play just overflowed its 400px wrap at the big
+   late-level footprints. Tiles now size from the measured box, and the tap
+   hit-test walks the same painter's order the frame was drawn in, so
+   overlapping layers resolve exactly as they look. Tile art (the per-type
+   colors and icons) is intrinsic and stays hardcoded. */
+function tmGeom(w, h, boardTiles, fitH) {
+  let maxC = 0, maxR = 0;
+  for (const t of boardTiles) { maxC = Math.max(maxC, t.col); maxR = Math.max(maxR, t.row); }
+  const unitsW = maxC + 1, unitsH = maxR + 1;
+  let step = Math.floor((w - 8) / unitsW);
+  if (fitH) step = Math.min(step, Math.floor((h - 8) / unitsH));
+  step = Math.max(20, Math.min(56, step));
+  const bw = unitsW * step, bh = unitsH * step;
+  const ox = Math.floor((w - bw) / 2);
+  const oy = fitH ? Math.max(2, Math.floor((h - bh) / 2)) : 2;
+  return { step, tile: step - 2, ox, oy, bw, bh,
+    at: (t) => [ox + t.col * step, oy + t.row * step] };
+}
+// Paint order: layer ascending (same-layer tiles never overlap); the
+// hit-test walks it in reverse so the topmost tile wins, like the DOM
+// zIndex (layer*10 + 1) did.
+function tmPaintOrder(boardTiles) {
+  return boardTiles.slice().sort((a, b) => a.layer - b.layer);
+}
+function tmHitAt(geo, ordered, x, y) {
+  for (let k = ordered.length - 1; k >= 0; k--) {
+    const t = ordered[k];
+    const [tx, ty] = geo.at(t);
+    if (x >= tx && x < tx + geo.tile && y >= ty && y < ty + geo.tile) return t;
+  }
+  return null;
+}
+function tmDrawTile(ctx, geo, x, y, tt, o) {
+  const s = geo.tile;
+  const r = Math.max(4, Math.round(s * 0.2));
+  ctx.save();
+  if (o && o.locked) ctx.globalAlpha = 0.35; // the DOM .locked opacity
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  klRR(ctx, x, y, s, s, r);
+  ctx.fillStyle = tt.color;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.stroke();
+  ctx.font = Math.round(s * 0.52) + 'px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(tt.icon, x + s / 2, y + s / 2 + 1);
+  ctx.restore();
+  if (o && o.hint) {
+    klRR(ctx, x - 1.5, y - 1.5, s + 3, s + 3, r + 1);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = PAL.gold;
+    ctx.stroke();
+  }
+}
+
+/* The board as a self-contained component so screen-switching parents
+   (classic's level-select ↔ playing) mount it fresh — usePointerCell binds
+   its listeners on mount, so the canvas must exist when the hook runs.
+   `fitH` fits both axes inside a flexible box (the daily's fit column);
+   without it the canvas takes its natural height and the shell scrolls
+   (classic). Tap dispatch goes through the parent's own selectTile, which
+   keeps every rule/guard where it always lived. */
+function TmBoardCanvas({ tiles, hintTileId, fitH, disabled, onTile }) {
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 8, rows: 6 });
+  const W = Math.floor(boxW);
+  const H0 = Math.floor(boxH);
+  const boardTiles = tiles.filter((t) => !t.removed && !t.inBar);
+  const ordered = tmPaintOrder(boardTiles);
+  const geo = W > 60 && (!fitH || H0 > 60) && boardTiles.length
+    ? tmGeom(W, fitH ? H0 : 1e9, boardTiles, fitH) : null;
+  const H = fitH ? H0 : (geo ? geo.bh + 4 : 120);
+  const geoRef = useRef(null); geoRef.current = geo;
+  const ordRef = useRef(null); ordRef.current = ordered;
+  const stRef = useRef(null); stRef.current = { tiles, hintTileId, disabled };
+
+  usePointerCell(canvasRef, {
+    onTap: (pt) => {
+      const g = geoRef.current, s = stRef.current;
+      if (!g || s.disabled) return;
+      const t = tmHitAt(g, ordRef.current, pt.x, pt.y);
+      if (t) onTile(t.id);
+    },
+  }, { moveTolerance: 10 });
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [tiles, hintTileId, W, H],
+    draw: (ctx) => {
+      const g = geoRef.current;
+      if (!g) return;
+      for (const t of ordRef.current) {
+        const [x, y] = g.at(t);
+        tmDrawTile(ctx, g, x, y, TM_TILE_TYPES[t.type % TM_TILE_TYPES.length], {
+          locked: tmIsLocked(t, stRef.current.tiles),
+          hint: stRef.current.hintTileId === t.id,
+        });
+      }
+    },
+  });
+
+  return (
+    <div className={'tm-board-box' + (fitH ? ' tm-board-fit' : '')} ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="tm-canvas board-canvas"
+        role="img"
+        aria-label={`Tile board — ${boardTiles.length} tiles left`}
+      />
+    </div>
+  );
 }
 
 /* ============================================================
@@ -14212,9 +14303,6 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const tilesMap = {};
   tiles.forEach(t => { tilesMap[t.id] = t; });
 
-  const boardW = (cfg.boardCols) * TM_TILE_STEP;
-  const boardH = (cfg.boardRows + cfg.maxLayer * 0.5) * TM_TILE_STEP + 48;
-
   const activeTiles = tiles.filter(t => !t.removed);
   const boardTiles = activeTiles.filter(t => !t.inBar);
   const tilesLeft = boardTiles.length;
@@ -14236,31 +14324,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       </div>
 
-      <div
-        className="tm-board-container"
-        style={{ width: boardW, height: boardH, maxWidth: '100%' }}
-      >
-        {boardTiles.map(tile => {
-          const locked = tmIsLocked(tile, tiles);
-          const isFlash = flashIds.has(tile.id);
-          const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
-          return (
-            <div
-              key={tile.id}
-              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}`}
-              style={{
-                left: tile.col * TM_TILE_STEP,
-                top: tile.row * TM_TILE_STEP,
-                zIndex: tile.layer * 10 + 1,
-                background: tt.color,
-              }}
-              onClick={() => selectTile(tile.id)}
-            >
-              {tt.icon}
-            </div>
-          );
-        })}
-      </div>
+      <TmBoardCanvas tiles={tiles} fitH={false} disabled={done} onTile={selectTile} />
 
       <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
         {Array.from({ length: 7 }, (_, i) => {
@@ -14926,12 +14990,6 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     if (onMoveTile) onMoveTile({ replayBreak: 'clear-slot', tsClient: Date.now() });
   };
 
-  // The board box is sized from the LAYOUT's actual extent, not a fixed
-  // 8x5 assumption — layouts differ in footprint, and FitScale then shrinks
-  // the whole thing to whatever the viewport allows.
-  const slots = dayCfg.layout.slots;
-  const boardW = (Math.max(...slots.map(s => s.col)) + 1) * TM_TILE_STEP;
-  const boardH = (Math.max(...slots.map(s => s.row)) + 1) * TM_TILE_STEP + 24;
   const activeTiles = tiles.filter(t => !t.removed);
   const boardTiles = activeTiles.filter(t => !t.inBar);
   const freeCount = boardTiles.filter(t => !tmIsLocked(t, tiles)).length;
@@ -14960,26 +15018,7 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
         {dayCfg.layout.name} · {dayCfg.difficulty}
       </div>
 
-      <FitScale>
-      <div className="tm-board-container" style={{ width: boardW, height: boardH }}>
-        {boardTiles.map(tile => {
-          const locked = tmIsLocked(tile, tiles);
-          const isFlash = flashIds.has(tile.id);
-          const isHint = hintTileId === tile.id;
-          const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
-          return (
-            <div
-              key={tile.id}
-              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}${isHint ? ' hint-target' : ''}`}
-              style={{ left: tile.col * TM_TILE_STEP, top: tile.row * TM_TILE_STEP, zIndex: tile.layer * 10 + 1, background: tt.color }}
-              onClick={() => selectTile(tile.id)}
-            >
-              {tt.icon}
-            </div>
-          );
-        })}
-      </div>
-      </FitScale>
+      <TmBoardCanvas tiles={tiles} hintTileId={hintTileId} fitH disabled={done} onTile={selectTile} />
 
       <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
         {Array.from({ length: 7 }, (_, i) => {

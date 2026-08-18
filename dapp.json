@@ -327,7 +327,7 @@
     },
     {
       "name": "Minesweeper history tab renamed to My Best Runs",
-      "path": "/?game=minesweeper",
+      "path": "/?game=minesweeper&sheet=history",
       "expectText": "My Best Runs"
     },
     {
@@ -756,6 +756,11 @@
       "name": "Klondike states the empty-column King rule",
       "path": "/?game=klondike&practice=1",
       "expectText": "Only a King starts an empty column"
+    },
+    {
+      "name": "Klondike renders its canvas board (#170)",
+      "path": "/?game=klondike&practice=1",
+      "expectSelector": "canvas.kl-canvas"
     },
     {
       "name": "Klondike offers a Give up escape",

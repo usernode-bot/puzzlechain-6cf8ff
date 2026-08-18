@@ -157,7 +157,7 @@ const TAPPABLE_CLASSES = [
   'tappable',
   'mf-cell', 'ng-cell', 'ds-cell', 'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
-  'mj-tile', 'wspr-tile', 'ce-card', 'kl-col', 'sp-col', 'scell', 'numkey',
+  'mj-tile', 'wspr-tile', 'ce-card', 'sp-col', 'scell', 'numkey',
   'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
   'tm-tile', 'm3-tile',
@@ -688,7 +688,7 @@ body {
 .fit-col .cw-tracker, .fit-col .cw-clue, .fit-col .cw-kbd,
 .fit-col .cw-alldone, .fit-col .wspr-found, .fit-col .an-solved,
 .fit-col .dsnk-hint, .fit-col .dbnc-effects, .fit-col .wspr-actions,
-.fit-col .mj-controls { flex: 0 0 auto; }
+.fit-col .mj-controls, .fit-col .kl-note { flex: 0 0 auto; }
 /* Growing lists must never push the board off screen (#131, #130). */
 .fit-col .wspr-found, .fit-col .an-solved, .fit-col .word-list {
   max-height: 5.2rem; overflow-y: auto; overscroll-behavior: contain;
@@ -726,7 +726,13 @@ html.un-scroll-locked, body.un-scroll-locked {
 .fit-col .wspr-grid, .fit-col .dsnk-board { width: 100%; }
 /* Sudoku's difficulty chooser is a fixed-size card, not a board. */
 .fit-col .sdk-choose { flex: 0 0 auto; width: 100%; }
-.kl-inner { display: flex; flex-direction: column; }
+/* #170 — Klondike's canvas board box is the flexible region (the .dbnc-wrap
+   idiom): useFitBox measures it and the canvas sizes its cards to fill it. */
+.kl-board-box {
+  position: relative; flex: 1 1 auto; min-height: 0; min-width: 0;
+  display: flex; align-items: flex-start; justify-content: center;
+  overscroll-behavior: contain;
+}
 
 /* Scale-to-fit board wrapper (slice 5). The box is the flexible region; the
    content keeps its natural layout size and is scaled as one unit. */
@@ -1738,12 +1744,6 @@ ${emitTapHighlightRules()}
   animation: none;
   background: ${C.dim};
 }
-.ms-dev-badge {
-  font-size: 0.6rem;
-  color: ${C.muted};
-  margin-top: 0.2rem;
-  text-align: center;
-}
 .ms-settings-section { margin-bottom: 1.25rem; }
 .ms-settings-section h4 {
   font-size: 0.7rem;
@@ -1882,15 +1882,6 @@ ${emitTapHighlightRules()}
   text-align: center;
   padding: 2rem 0;
   font-size: 0.9rem;
-}
-.ms-dev-label {
-  font-size: 0.72rem;
-  color: ${C.muted};
-  margin-bottom: 0.75rem;
-  padding: 0.3rem 0.6rem;
-  background: ${C.card};
-  border-radius: 8px;
-  display: inline-block;
 }
 /* Light theme overrides for minesweeper board only */
 [data-ms-theme="light"] .ms-cell.ms-hidden { background: #e5e7eb; }
@@ -4360,11 +4351,6 @@ ${emitTapHighlightRules()}
   transform: translate(-50%, -50%); display: flex; flex-direction: column;
 }
 .ce-drag-ghost .ce-card { box-shadow: 0 6px 18px var(--c-shadow-lg); }
-.kl-empty-hint {
-  position: absolute; inset: 0; display: flex; align-items: center;
-  justify-content: center; font-family: 'JetBrains Mono', monospace;
-  font-size: 20px; font-weight: 700; color: ${C.dim}; pointer-events: none;
-}
 .kl-note {
   text-align: center; font-size: 0.8rem; font-weight: 600; color: ${C.rose};
   min-height: 1.1rem;
@@ -4620,15 +4606,10 @@ ${emitTapHighlightRules()}
   color: ${C.dim}; font-size: 18px;
 }
 
-.kl-game { max-width: 400px; margin: 0 auto; }
-.kl-top { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
-.kl-gap { width: 14px; }
-.kl-tab { display: flex; gap: 6px; justify-content: center; }
-/* PHASE 2/5 (#123) — 44px columns exposing a 14–20px sliver of each buried
-   card was the "cards are tiny" complaint. Wider column, and KL_STACK_STEP
-   (JS) raises the exposed strip so the whole strip is aimable. */
-.kl-col { position: relative; width: 52px; }
-.kl-col .ce-card { width: 52px; }
+/* #170 — the Klondike board is a canvas now (cards are drawn, not DOM), so
+   the column can afford to be wide: cards grow with it, capped in klLayout. */
+.kl-game { max-width: 620px; margin: 0 auto; }
+.kl-canvas { border-radius: 8px; }
 
 .sp-game { max-width: 420px; margin: 0 auto; }
 .sp-game .status-bar { flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -9723,6 +9704,42 @@ const MS_TAB_LABELS = { game: 'Game', history: 'My Best Runs', leaderboard: 'Lea
 function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
 function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
 
+/* Minesweeper's legacy in-game tab strip is hidden inside the classic shell
+   (the `.cg-stage .ms-bottom-nav { display: none }` sweep), which orphaned
+   the renamed "My Best Runs" history — no in-frame surface could reach it at
+   all. The ☰ sheet is the shell's surface for exactly this, so the history
+   lives there now, under the label the rename shipped. Registry-driven via
+   the minesweeper entry's `sheetExtras`; `?sheet=history` deep-links it. */
+function msBestRunsSection() {
+  return {
+    id: 'history',
+    label: 'My Best Runs',
+    render: () => {
+      const rows = msLoadHistory();
+      const fmtD = (d) => { const [y, m, day] = String(d || '').split('-'); return m ? `${m}/${day}/${y.slice(2)}` : ''; };
+      return (
+        <div>
+          <h4>My Best Runs</h4>
+          {rows.length === 0
+            ? <div className="cg-sheet-empty">No games recorded yet — play one!</div>
+            : (
+              <div className="cg-sheet-list">
+                {rows.map((h) => (
+                  <div className="cg-sheet-row" key={h.id}>
+                    <span className={`ms-outcome-chip ${h.outcome}`}>{h.outcome === 'win' ? 'Win' : 'Loss'}</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtD(h.date)}</span>
+                    <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/54 · {h.secs}s</span>
+                  </div>
+                ))}
+              </div>
+            )}
+        </div>
+      );
+    },
+  };
+}
+
 function generateMines(firstR, firstC) {
   const protected_ = new Set();
   for (let dr = -1; dr <= 1; dr++) {
@@ -9792,8 +9809,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [done, setDone] = useState(false);
   const [gameOverMine, setGameOverMine] = useState(null);
   const [steps, setSteps] = useState(0);
-  const [isMock, setIsMock] = useState(false);
-  const [walletAddr, setWalletAddr] = useState(null);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
   // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
   // both SFX and music); `musicPaused` is the player's in-game music pause that
@@ -9836,16 +9851,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     cgSetPref('sound', next);
     setSoundOn(next);
   };
-
-  // Bridge: detect mock mode and fetch wallet address
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-    if (window.usernode && typeof window.usernode.getNodeAddress === 'function') {
-      window.usernode.getNodeAddress().then(addr => { if (addr) setWalletAddr(addr); }).catch(() => {});
-    }
-  }, []);
 
   const safeRevealed = mineSet
     ? Array.from(revealed).filter(i => !mineSet.has(i)).length
@@ -10133,7 +10138,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
               >
                 Lock In 🔒 ×{cashoutMultiplier}
               </button>
-              {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
             </div>
             <button
               className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
@@ -10155,7 +10159,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
       {activeTab === 'history' && (
         <div>
-          {isMock && <div className="ms-dev-label">Local storage — will sync to chain when live</div>}
           <div className="ms-history-list">
             {gameHistory.length === 0
               ? <div className="ms-empty-state">No games recorded yet</div>
@@ -10544,10 +10547,8 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
   const [flashPits, setFlashPits] = useState(() => new Set());
   const [captureFlash, setCaptureFlash] = useState(() => new Set());
   const [bannerMsg, setBannerMsg] = useState('');
-  const [moveStack, setMoveStack] = useState([]);
   const [activeTab, setActiveTab] = useState('game');
   const [history, setHistory]     = useState(() => mncLoadHistory());
-  const [isMock, setIsMock]       = useState(false);
   const [soundOn, setSoundOn]     = useState(() => localStorage.getItem(MNC_SOUND_KEY) !== '0');
 
   const animatingRef  = useRef(false);
@@ -10558,12 +10559,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
   secsRef.current = secs;
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   const resetGame = () => {
     // Cancel any in-flight win callback and animation
@@ -10577,7 +10572,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     setFlashPits(new Set());
     setCaptureFlash(new Set());
     setBannerMsg('');
-    setMoveStack([]);
   };
 
   // Reset when parent increments resetKey (Play Again)
@@ -10588,18 +10582,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     setSoundOn(next);
     soundOnRef.current = next;
     try { localStorage.setItem(MNC_SOUND_KEY, next ? '1' : '0'); } catch {}
-  };
-
-  const handleUndo = () => {
-    if (moveStack.length === 0 || done || animatingRef.current) return;
-    const prev = moveStack[moveStack.length - 1];
-    setMoveStack(ms => ms.slice(0, -1));
-    setPits(prev.pits.slice());
-    setPlayer(prev.player);
-    setMoves(prev.moves);
-    setFlashPits(new Set());
-    setCaptureFlash(new Set());
-    setBannerMsg('');
   };
 
   const finishMove = (newPits, currentPlayer, extraTurn, captureFrom, newMoves) => {
@@ -10660,9 +10642,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     const ownMin = player === 1 ? 0 : 7;
     const ownMax = player === 1 ? 5 : 12;
     if (idx < ownMin || idx > ownMax || pits[idx] === 0) return;
-
-    // Snapshot for undo
-    setMoveStack(ms => [...ms, { pits: pits.slice(), player, moves }]);
 
     const { sequence, pits: newPits, extraTurn, captureFrom } = mncDistribute(pits, idx, player);
     const newMoves = moves + 1;
@@ -10840,11 +10819,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
           <div className="mnc-controls">
             <button onClick={resetGame}>↺ New Game</button>
             <button onClick={resetGame}>⟳ Restart</button>
-            {isMock && (
-              <button onClick={handleUndo} disabled={moveStack.length === 0 || done}>
-                ↩ Undo
-              </button>
-            )}
             <button onClick={toggleSound} title={soundOn ? 'Sound on' : 'Sound off'}>
               {soundOn ? '🔊' : '🔇'}
             </button>
@@ -12516,11 +12490,9 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
   const [done, setDone]               = useState(false);
   const [hasWon, setHasWon]           = useState(() => _saved ? _saved.won || false : false);
   const [victoryVisible, setVictoryVisible] = useState(false);
-  const [isMock, setIsMock]           = useState(false);
   const [activeTab, setActiveTab]     = useState('game');
   const [history, setHistory]         = useState(() => t2048LoadHistory());
   const [bestScore, setBestScore]     = useState(() => t2048LoadBest());
-  const [undoStack, setUndoStack]     = useState([]);
   const [scoreDelta, setScoreDelta]   = useState(null);
 
   const touchStartRef  = useRef(null);
@@ -12534,12 +12506,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
     return () => clearInterval(id);
   }, [gameRunning]);
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   useEffect(() => {
     if (!resetKey) return;
@@ -12588,7 +12554,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     setDone(false);
     setHasWon(false);
     setVictoryVisible(false);
-    setUndoStack([]);
     setScoreDelta(null);
   };
 
@@ -12597,10 +12562,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     const { grid: movedGrid, delta, moved } = t2048_move(grid, dir);
     if (!moved) return;
 
-    const newUndo = isMock
-      ? [{ grid: t2048_stripAnim(grid), score, moves }, ...undoStack].slice(0, 10)
-      : undoStack;
-
     const withTile  = t2048_addRandom(movedGrid);
     const newScore  = score + delta;
     const newMoves  = moves + 1;
@@ -12608,7 +12569,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     setGrid(withTile);
     setScore(newScore);
     setMoves(newMoves);
-    setUndoStack(newUndo);
 
     if (delta > 0) {
       if (deltaTimerRef.current) clearTimeout(deltaTimerRef.current);
@@ -12618,9 +12578,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
     if (newScore > bestScore) { setBestScore(newScore); t2048SaveBest(newScore); }
     t2048SaveBoard(withTile, newScore, elapsedSecs, hasWon, newMoves);
-    if (isMock) {
-      try { localStorage.setItem(T2048_UNDO_KEY, JSON.stringify(newUndo)); } catch {}
-    }
     onStepChange && onStepChange(newMoves);
 
     const maxT = t2048_maxTile(withTile);
@@ -12661,16 +12618,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
   // Keep ref fresh on every render so the keyboard handler always calls the latest closure
   executeMoveRef.current = executeMove;
-
-  const handleUndo = () => {
-    if (!undoStack.length || done) return;
-    const [prev, ...rest] = undoStack;
-    setGrid(prev.grid);
-    setScore(prev.score);
-    setMoves(prev.moves);
-    setUndoStack(rest);
-    try { if (isMock) localStorage.setItem(T2048_UNDO_KEY, JSON.stringify(rest)); } catch {}
-  };
 
   const handleFinish = () => {
     const maxT = t2048_maxTile(grid);
@@ -12726,7 +12673,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
   return (
     <div>
-      {isMock && <div className="t2048-banner">Local storage — will sync to chain when live</div>}
 
       {activeTab === 'game' && (
         <div>
@@ -12809,9 +12755,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
           <div className="t2048-controls">
             <button onClick={handleNewGame}>↺ New Game</button>
-            {isMock && (
-              <button onClick={handleUndo} disabled={undoStack.length === 0 || done}>↩ Undo</button>
-            )}
           </div>
         </div>
       )}
@@ -15605,7 +15548,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const [activeTab, setActiveTab] = useState('game');
   const [bestScore, setBestScore] = useState(() => bounceLoadBest());
   const [elapsedSecs, setElapsedSecs] = useState(0);
-  const [isMock, setIsMock] = useState(false);
   const [activePowerups, setActivePowerups] = useState([]);
   // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
   // both SFX and music); `musicPaused` is the player's in-game music pause
@@ -15657,12 +15599,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const timerRunning = started && !done && activeTab === 'game';
 
   const fmtSecs = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   // Elapsed-time clock (pauses when not actively playing).
   useEffect(() => {
@@ -16070,7 +16006,6 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
   return (
     <div>
-      {isMock && <div className="t2048-banner">Local best score — leaderboard syncs to your account when live</div>}
 
       {activeTab === 'game' && (
         <div>
@@ -19796,7 +19731,8 @@ function CeSlot({ label, onClick, className, dropTarget }) {
   );
 }
 
-/* PHASE 5 (#123) — finger drag for the solitaires.
+/* PHASE 5 (#123) — finger drag for the DOM card games (Spider; Klondike's
+   canvas board hit-tests its own drags in board coordinates now, #170).
    Tap-select/tap-destination was the only way to move a card, which is not how
    anyone expects to play patience. Modelled on Block Fit's existing
    .bb-drag-ghost rather than inventing a second drag idiom: a fixed-position
@@ -19872,7 +19808,19 @@ function useCardDrag(onDrop) {
    Classic single-deck patience: 7 tableau columns, draw-1 stock with
    unlimited recycles, 4 foundations by suit. Tap a face-up card to select
    it (and the run below it), tap a destination to move; tapping the
-   selected card again sends it to a foundation when legal. */
+   selected card again sends it to a foundation when legal.
+
+   #170 — the board is a CANVAS. The DOM board laid its piles out at a fixed
+   400px and FitScale-shrank the whole thing, so on a phone every card (and
+   every tap target) rendered tiny, and drag hit-testing ran elementFromPoint
+   against scaled elements. The canvas sizes cards from the measured column
+   instead — they GROW to fill a phone screen — the tableau fan compresses to
+   fit the measured height, and drag/tap hit-testing is plain coordinate math
+   in the exact layout the frame was drawn from. Game rules, state shape,
+   progress save/resume, scoring and the #123/#124/#125 affordances (drag,
+   the ghost K on empty columns, Give up) are all unchanged. Canvas chrome
+   (slots, hints, selection ring) reads PAL; the card faces/backs are
+   intrinsic art and stay hardcoded like every other deck in the app. */
 
 function klDeal(rng) {
   const deck = ceDeck(1, null, rng);
@@ -19894,6 +19842,174 @@ function klValidState(st) {
   return st && Array.isArray(st.stock) && Array.isArray(st.waste) &&
     Array.isArray(st.found) && st.found.length === 4 &&
     Array.isArray(st.tab) && st.tab.length === 7 && Number.isFinite(st.moves);
+}
+
+/* One geometry object drives BOTH the draw pass and the pointer hit-tests,
+   so what you see is exactly what your finger hits. Card width comes from
+   the measured box (7 columns); the tableau fan steps compress — and then
+   the cards themselves shrink — until the deepest column fits the measured
+   height, so nothing ever scrolls or clips mid-run. */
+function klLayout(w, h, st) {
+  const gap = Math.max(4, Math.min(10, Math.round(w * 0.014)));
+  const build = (cw) => {
+    const ch = Math.round(cw * 1.42);
+    const fontPx = Math.max(10, Math.min(17, Math.round(cw * 0.3)));
+    const totalW = cw * 7 + gap * 6;
+    const x0 = Math.floor((w - totalW) / 2);
+    const tabY = ch + Math.max(8, Math.round(ch * 0.16));
+    let upStep = Math.max(fontPx + 7, Math.round(ch * 0.34));
+    let downStep = Math.max(5, Math.round(ch * 0.14));
+    const needed = (us, ds) => {
+      let need = ch;
+      for (const col of st.tab) {
+        let y = 0;
+        for (let i = 1; i < col.length; i++) y += col[i - 1].up ? us : ds;
+        need = Math.max(need, y + ch);
+      }
+      return need;
+    };
+    const avail = Math.max(0, h - tabY);
+    // Compress the fan before shrinking the cards — a readable top card
+    // beats a taller sliver of a buried one.
+    let guard = 0;
+    while (avail > 0 && needed(upStep, downStep) > avail && guard++ < 60) {
+      if (downStep > 5) downStep -= 1;
+      else if (upStep > 13) upStep -= 1;
+      else break;
+    }
+    const fits = avail === 0 || needed(upStep, downStep) <= avail;
+    return { w, h, gap, cw, ch, fontPx, x0, tabY, upStep, downStep, fits };
+  };
+  let cw = Math.min(76, Math.floor((w - gap * 6) / 7));
+  let ly = build(cw);
+  let guard = 0;
+  while (!ly.fits && cw > 30 && guard++ < 30) { cw -= 2; ly = build(cw); }
+  ly.colX = (p) => ly.x0 + p * (ly.cw + ly.gap);
+  ly.stockX = ly.colX(0);
+  ly.wasteX = ly.colX(1);
+  ly.foundX = [3, 4, 5, 6].map((p) => ly.colX(p));
+  // Absolute y of every tableau card, shared by draw + hit-test.
+  ly.colYs = st.tab.map((col) => {
+    let y = ly.tabY;
+    return col.map((c) => { const yy = y; y += c.up ? ly.upStep : ly.downStep; return yy; });
+  });
+  return ly;
+}
+
+// Topmost thing under a canvas point: stock / waste / a foundation / a
+// tableau card (i null = the empty column itself). Top-row targets are
+// padded out to the gap so finger-sized taps land.
+function klHitAt(ly, st, x, y) {
+  const pad = ly.gap / 2 + 2;
+  const inTop = (rx) => x >= rx - pad && x < rx + ly.cw + pad && y < ly.ch + pad;
+  if (y < ly.tabY) {
+    if (inTop(ly.stockX)) return { z: 'stock' };
+    if (inTop(ly.wasteX)) return { z: 'waste' };
+    for (let fi = 0; fi < 4; fi++) if (inTop(ly.foundX[fi])) return { z: 'found', p: fi };
+    return null;
+  }
+  const p = Math.floor((x - ly.x0 + ly.gap / 2) / (ly.cw + ly.gap));
+  if (p < 0 || p > 6) return null;
+  const col = st.tab[p];
+  for (let i = col.length - 1; i >= 0; i--) {
+    if (y >= ly.colYs[p][i] && y < ly.colYs[p][i] + ly.ch) return { z: 'tab', p, i };
+  }
+  // The column band below the stack still targets the column — same as the
+  // DOM board's tap-the-column-background behaviour.
+  return { z: 'tab', p, i: col.length ? col.length - 1 : null };
+}
+
+// Rounded-rect path helper (roundRect isn't on every mobile 2D context).
+function klRR(ctx, x, y, w, h, r) {
+  if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); return; }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Card faces/backs are intrinsic art (hardcoded, matching the DOM deck the
+// other card games still render); only chrome reads the theme.
+const KL_FACE = '#F4F6FB', KL_FACE_EDGE = '#C9D2E4',
+      KL_RED = '#DC2626', KL_BLACK = '#1E293B',
+      KL_BACK = '#3730A3', KL_BACK_STRIPE = '#4338CA', KL_BACK_EDGE = '#312E81';
+
+function klDrawCard(ctx, ly, x, y, card, opts) {
+  const o = opts || {};
+  const { cw, ch, fontPx } = ly;
+  const r = Math.max(3, Math.round(cw * 0.11));
+  klRR(ctx, x, y, cw, ch, r);
+  if (o.shadow) {
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+  }
+  ctx.fillStyle = card.up ? KL_FACE : KL_BACK;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = card.up ? KL_FACE_EDGE : KL_BACK_EDGE;
+  ctx.stroke();
+  if (!card.up) {
+    // The DOM deck's 135° indigo stripes.
+    ctx.save();
+    klRR(ctx, x + 1, y + 1, cw - 2, ch - 2, r);
+    ctx.clip();
+    ctx.strokeStyle = KL_BACK_STRIPE;
+    ctx.lineWidth = 4;
+    for (let s = -ch; s < cw + ch; s += 9) {
+      ctx.beginPath();
+      ctx.moveTo(x + s, y - 2);
+      ctx.lineTo(x + s + ch + 4, y + ch + 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else {
+    const ink = ceIsRed(card) ? KL_RED : KL_BLACK;
+    const pad = Math.max(2, Math.round(cw * 0.08));
+    ctx.fillStyle = ink;
+    ctx.font = '700 ' + fontPx + 'px "JetBrains Mono", monospace';
+    ctx.textBaseline = 'top';
+    // Corner index (rank left, suit right) so a fanned card reads from its
+    // exposed strip alone — the mobile complaint the canvas exists to fix.
+    ctx.textAlign = 'left';
+    ctx.fillText(CE_RANK_LABEL[card.r], x + pad, y + pad);
+    ctx.textAlign = 'right';
+    ctx.fillText(CE_SUIT_GLYPH[card.s], x + cw - pad, y + pad);
+    // Big centre pip on the lower half (visible on a fully exposed card).
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = Math.round(cw * 0.52) + 'px "JetBrains Mono", monospace';
+    ctx.fillText(CE_SUIT_GLYPH[card.s], x + cw / 2, y + ch - ch * 0.32);
+  }
+  if (o.sel) {
+    klRR(ctx, x - 1.5, y - 1.5, cw + 3, ch + 3, r + 1);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = PAL.gold;
+    ctx.stroke();
+  }
+}
+
+function klDrawSlot(ctx, ly, x, y, label) {
+  const r = Math.max(3, Math.round(ly.cw * 0.11));
+  klRR(ctx, x + 0.75, y + 0.75, ly.cw - 1.5, ly.ch - 1.5, r);
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = PAL.dim;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (label) {
+    ctx.fillStyle = PAL.dim;
+    ctx.font = '700 ' + Math.round(ly.cw * 0.42) + 'px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + ly.cw / 2, y + ly.ch / 2);
+  }
 }
 
 function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
@@ -20025,11 +20141,13 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     commit(n);
     return true;
   };
-  const moveSelToFound = (fi) => {
-    const cards = selCards(sel);
+  // `src` (a drag payload) overrides the tap selection, same as moveSelToTab.
+  const moveSelToFound = (fi, src) => {
+    const s = src || sel;
+    const cards = selCards(s);
     if (cards.length !== 1 || !canFound(cards[0], st.found[fi])) return false;
     const n = clone();
-    n.found[fi].push({ ...takeSel(n, sel)[0], up: true });
+    n.found[fi].push({ ...takeSel(n, s)[0], up: true });
     n.moves++;
     commit(n);
     return true;
@@ -20040,7 +20158,6 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
   const tapWaste = () => {
     if (done || !st.waste.length) return;
     if (isSel('waste')) { if (!tryFoundation(sel)) setSel(null); return; }
-    if (sel) { setSel({ z: 'waste' }); return; }
     setSel({ z: 'waste' });
   };
   const tapFound = (fi) => {
@@ -20080,101 +20197,174 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     });
   };
 
-  /* #123 — drag. Grabbing a run and dropping it is the natural gesture; the
-     drop target comes from the data-drop attributes on the piles below. Tap
-     still works untouched (useCardDrag only fires when the pointer travelled). */
-  const drag = useCardDrag((payload, dropId) => {
-    if (done || !dropId) return;
-    const parse = (id) => {
-      const [z, idx] = id.split(':');
-      return { z, idx: idx == null ? null : Number(idx) };
-    };
-    const dest = parse(dropId);
-    const cards = selCards(payload);
-    if (!cards.length) return;
-    if (dest.z === 'tab') {
-      if (payload.z === 'tab' && payload.p === dest.idx) return; // dropped on itself
-      moveSelToTab(dest.idx, payload);
-      return;
-    }
-    if (dest.z === 'found') {
-      if (cards.length !== 1 || !canFound(cards[0], st.found[dest.idx])) {
-        say('Foundations build up by suit from the Ace.');
-        return;
+  /* #170 — canvas plumbing. The box is the fit column's flexible region;
+     useFitBox re-measures it on resize/rotate and the layout is recomputed
+     from the CURRENT state each render, so the fan tightens as columns grow. */
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 7, rows: 1 });
+  const W = Math.floor(boxW), H = Math.floor(boxH);
+  const ly = W > 80 && H > 80 ? klLayout(W, H, st) : null;
+  const lyRef = useRef(ly);
+  lyRef.current = ly;
+
+  /* #123 — drag, now hit-tested in board coordinates. A press on the waste,
+     a foundation top or a face-up tableau card arms a potential drag; pointer
+     travel past the tolerance turns it into one (otherwise the tap path runs,
+     so both input styles keep working). The authoritative drag lives in a ref
+     — pointer events outrun React renders — and the state copy only schedules
+     repaints. */
+  const [drag, setDrag] = useState(null); // { src, cards, x, y, gx, gy }
+  const dragRef = useRef(null);
+  const pendRef = useRef(null);
+  const setDragBoth = (d) => { dragRef.current = d; setDrag(d); };
+
+  // Resolve a drag release from the same layout the frame was drawn with.
+  // Only foundations live in the top band; anywhere in a column band is a
+  // tableau drop, and illegal drops explain themselves (#123/#124).
+  const dropAt = (src, cards, pt) => {
+    const l = lyRef.current;
+    if (!l || !cards.length) return;
+    if (pt.y < l.tabY) {
+      for (let fi = 0; fi < 4; fi++) {
+        if (pt.x >= l.foundX[fi] - l.gap / 2 && pt.x < l.foundX[fi] + l.cw + l.gap / 2) {
+          if (src.z === 'found' && src.p === fi) return; // dropped on itself
+          if (cards.length !== 1 || !canFound(cards[0], st.found[fi])) {
+            say('Foundations build up by suit from the Ace.');
+            return;
+          }
+          moveSelToFound(fi, src);
+          return;
+        }
       }
-      const n = clone();
-      n.found[dest.idx].push({ ...takeSel(n, payload)[0], up: true });
-      n.moves++;
-      commit(n);
+      return; // stock / waste / dead space — snap back
     }
+    const p = Math.max(0, Math.min(6, Math.floor((pt.x - l.x0 + l.gap / 2) / (l.cw + l.gap))));
+    if (src.z === 'tab' && src.p === p) return; // dropped on itself
+    moveSelToTab(p, src);
+  };
+
+  usePointerCell(canvasRef, {
+    onDown: (pt) => {
+      pendRef.current = null;
+      if (dragRef.current) setDragBoth(null); // a cancelled drag left a ghost
+      const l = lyRef.current;
+      if (done || !l) return;
+      const hit = klHitAt(l, st, pt.x, pt.y);
+      if (!hit) return;
+      if (hit.z === 'waste' && st.waste.length) {
+        pendRef.current = { src: { z: 'waste' }, cards: st.waste.slice(-1), x0: l.wasteX, y0: 0, px: pt.x, py: pt.y };
+      } else if (hit.z === 'found' && st.found[hit.p].length) {
+        pendRef.current = { src: { z: 'found', p: hit.p }, cards: st.found[hit.p].slice(-1), x0: l.foundX[hit.p], y0: 0, px: pt.x, py: pt.y };
+      } else if (hit.z === 'tab' && hit.i != null && st.tab[hit.p][hit.i].up) {
+        pendRef.current = {
+          src: { z: 'tab', p: hit.p, i: hit.i }, cards: st.tab[hit.p].slice(hit.i),
+          x0: l.colX(hit.p), y0: l.colYs[hit.p][hit.i], px: pt.x, py: pt.y,
+        };
+      }
+    },
+    onDrag: (pt, info) => {
+      const pend = pendRef.current;
+      if (done || !pend || !info.moved) return;
+      const d = dragRef.current ||
+        { src: pend.src, cards: pend.cards, gx: pend.px - pend.x0, gy: pend.py - pend.y0 };
+      setDragBoth({ ...d, x: pt.x, y: pt.y });
+    },
+    onUp: (pt) => {
+      pendRef.current = null;
+      const d = dragRef.current;
+      if (!d) return;
+      setDragBoth(null);
+      if (!done) dropAt(d.src, d.cards, pt);
+    },
+    onTap: (pt) => {
+      const l = lyRef.current;
+      if (done || !l) return;
+      const hit = klHitAt(l, st, pt.x, pt.y);
+      if (!hit) { setSel(null); return; }
+      if (hit.z === 'stock') tapStock();
+      else if (hit.z === 'waste') tapWaste();
+      else if (hit.z === 'found') tapFound(hit.p);
+      else tapTab(hit.p, hit.i);
+    },
+  }, { moveTolerance: 8 });
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [st, sel, drag, done, W, H],
+    draw: (ctx) => {
+      const l = lyRef.current;
+      if (!l) return;
+      const dragSrc = drag && drag.src;
+      const hideWaste = dragSrc && dragSrc.z === 'waste' ? 1 : 0;
+      const hideFound = dragSrc && dragSrc.z === 'found' ? dragSrc.p : -1;
+
+      // Stock — face-down top card with a remaining count, or the recycle slot.
+      if (st.stock.length) {
+        klDrawCard(ctx, l, l.stockX, 0, { up: false });
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'; // on the indigo back — intrinsic
+        ctx.font = '700 ' + Math.max(10, l.fontPx - 2) + 'px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(st.stock.length), l.stockX + l.cw / 2, l.ch / 2);
+      } else {
+        klDrawSlot(ctx, l, l.stockX, 0, '↻');
+      }
+
+      // Waste — the top card (or the one beneath it while that's dragged).
+      const wTop = st.waste.length - 1 - hideWaste;
+      if (wTop >= 0) klDrawCard(ctx, l, l.wasteX, 0, st.waste[wTop], { sel: isSel('waste') });
+      else klDrawSlot(ctx, l, l.wasteX, 0);
+
+      // Foundations.
+      for (let fi = 0; fi < 4; fi++) {
+        const f = st.found[fi];
+        const top = f.length - 1 - (hideFound === fi ? 1 : 0);
+        if (top >= 0) klDrawCard(ctx, l, l.foundX[fi], 0, f[top], { sel: isSel('found', fi) });
+        else klDrawSlot(ctx, l, l.foundX[fi], 0, CE_SUIT_GLYPH[fi]);
+      }
+
+      // Tableau. #124 — the ghost K states the empty-column rule on the board.
+      for (let p = 0; p < 7; p++) {
+        const col = st.tab[p];
+        const hideFrom = dragSrc && dragSrc.z === 'tab' && dragSrc.p === p ? dragSrc.i : Infinity;
+        if (!col.length || hideFrom === 0) klDrawSlot(ctx, l, l.colX(p), l.tabY, 'K');
+        for (let i = 0; i < col.length && i < hideFrom; i++) {
+          klDrawCard(ctx, l, l.colX(p), l.colYs[p][i], col[i],
+            { sel: sel && sel.z === 'tab' && sel.p === p && i >= sel.i });
+        }
+      }
+
+      // The dragged run rides the finger, drawn last so it's on top.
+      if (drag) {
+        const dx = drag.x - drag.gx, dy = drag.y - drag.gy;
+        drag.cards.forEach((c, i) => klDrawCard(ctx, l, dx, dy + i * l.upStep, c, { shadow: i === 0 }));
+      }
+    },
   });
 
-  const maxCol = Math.max(...st.tab.map((c) => c.length), 1);
-  // #123 — the exposed strip of each buried card, raised from 14/20px so the
-  // whole strip is an aimable target. Squeezes only when a column is deep.
-  const step = maxCol > 13 ? 20 : maxCol > 10 ? 24 : 28;
+  const home = st.found.reduce((a, f) => a + f.length, 0);
   return (
     <div className="kl-game fit-col">
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
-        <div className="pill"><div className="plabel">Home</div><div className="pvalue">{st.found.reduce((a, f) => a + f.length, 0)}/52</div></div>
+        <div className="pill"><div className="plabel">Home</div><div className="pvalue">{home}/52</div></div>
       </div>
-      <FitScale>
-      <div className="kl-inner">
-      <div className="kl-top">
-        {st.stock.length
-          ? <CeCard card={{ s: 0, r: 0, up: false }} onClick={tapStock} />
-          : <CeSlot label="↻" onClick={tapStock} />}
-        {st.waste.length
-          ? <CeCard
-              card={st.waste[st.waste.length - 1]}
-              sel={isSel('waste')}
-              onClick={tapWaste}
-              onDragStart={(e) => drag.begin(e, { z: 'waste' }, st.waste.slice(-1))}
-            />
-          : <CeSlot />}
-        <div className="kl-gap" />
-        {st.found.map((f, fi) => (
-          f.length
-            ? <CeCard key={fi} card={f[f.length - 1]} sel={isSel('found', fi)} onClick={() => tapFound(fi)} dropTarget={'found:' + fi} />
-            : <CeSlot key={fi} label={CE_SUIT_GLYPH[fi]} onClick={() => tapFound(fi)} dropTarget={'found:' + fi} />
-        ))}
+      <div className="kl-board-box" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="kl-canvas board-canvas"
+          role="img"
+          aria-label={`Klondike board — ${home}/52 home, ${st.stock.length} in stock, ${st.moves} moves`}
+        />
       </div>
-      <div className="kl-tab">
-        {st.tab.map((col, p) => (
-          <div
-            key={p}
-            className="kl-col"
-            data-drop={'tab:' + p}
-            style={{ height: 62 + (maxCol - 1) * step }}
-            onClick={(e) => { if (e.target === e.currentTarget) tapTab(p, col.length ? col.length - 1 : null); }}
-          >
-            {/* #124 — the rule, on the board. */}
-            {col.length === 0 && <CeSlot onClick={() => tapTab(p, null)} dropTarget={'tab:' + p} />}
-            {col.length === 0 && <div className="kl-empty-hint">K</div>}
-            {col.map((c, i) => (
-              <CeCard
-                key={c.id}
-                card={c}
-                sel={sel && sel.z === 'tab' && sel.p === p && i >= sel.i}
-                onClick={() => tapTab(p, i)}
-                onDragStart={c.up ? (e) => drag.begin(e, { z: 'tab', p, i }, col.slice(i)) : undefined}
-                dropTarget={'tab:' + p}
-                style={{ position: 'absolute', top: i * step, left: 0, zIndex: i }}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-      </div>
-      </FitScale>
       <div className="kl-note">{note}</div>
       <div className="p6-hint">Drag a card (or tap it, then its destination). Tap a selected card again to send it home. Only a King starts an empty column.</div>
       <div className="mj-controls">
-        <button onClick={giveUp} disabled={done}>🏳️ Give up</button>
+        <button onClick={() => giveUp()} disabled={done}>🏳️ Give up</button>
       </div>
-      {drag.ghostEl}
     </div>
   );
 }
@@ -20330,7 +20520,7 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
     });
   };
 
-  // #123 — drag, shared primitive with Klondike.
+  // #123 — drag (useCardDrag; Klondike moved to canvas-native dragging, #170).
   const drag = useCardDrag((payload, dropId) => {
     if (done || !dropId) return;
     const [z, idx] = dropId.split(':');
@@ -23138,6 +23328,9 @@ const GAMES = [
       { title: 'Clear around a number', body: "Once a number's mines are all flagged, tap the number to open every remaining square around it in one go." },
       { title: 'Lock in or push on', body: 'Lock In early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
     ],
+    // Extra ☰ sheet sections beyond the registry-standard ones — here the
+    // "My Best Runs" history the hidden legacy tab strip stranded.
+    sheetExtras: () => [msBestRunsSection()],
     component: MinesweeperGame,
   },
   {
@@ -23726,7 +23919,12 @@ const GAME_PAIRS = [
     icon: '🀄',
     tag: 'Puzzle',
     tagColor: GA.violet,
-    desc: 'Clear layered tile boards into a 7-slot tray — three of a kind clears.',
+    // The blurbs LEAD with the variant names ("Daily Tile Match Puzzle",
+    // "Mine Finder Classic", "Daily Challenge" below): three merged dapp.json
+    // tests assert those names render on the lobby card, and #168's copy
+    // shortening dropped them from the mode buttons. Leading placement keeps
+    // them inside the two-line clamp at the 200px minimum column.
+    desc: 'Daily Tile Match Puzzle or free play — clear layered boards three of a kind.',
     regular: {
       gameId: 'tilematching',
       label: 'Free Play',
@@ -23744,7 +23942,7 @@ const GAME_PAIRS = [
     icon: '💣',
     tag: 'Risk',
     tagColor: GA.coral,
-    desc: 'Sweep a minefield using the numbers — one wrong tap ends the run.',
+    desc: 'Mine Finder Classic or the daily field — sweep with the numbers.',
     regular: {
       gameId: 'minesweeper',
       label: 'Free Play',
@@ -23798,7 +23996,7 @@ const GAME_PAIRS = [
     icon: '🫘',
     tag: 'Strategy',
     tagColor: GA.amber,
-    desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
+    desc: 'Daily Challenge or free play — classic stone-pit capture strategy.',
     regular: {
       gameId: 'mancala',
       label: 'Play',
@@ -24190,7 +24388,16 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, status, body } = await api(path);
+    // ?demo=signedout: render the guest lobby WITHOUT making the call at all.
+    // The server fixture answers it 401 on purpose, but the browser logs every
+    // 4xx response as a console error, and the platform's per-test console
+    // gate fails the route for it — the fixture's own mechanics failed the
+    // screen it exists to demonstrate. Skipping straight to the guest branch
+    // renders the identical state with a clean console; the server fixture
+    // stays for direct API checks.
+    const { ok, status, body } = demo === 'signedout'
+      ? { ok: false, status: 401, body: null }
+      : await api(path);
     if (ok && body) {
       GUEST_MODE = false;
       setAuthOk(true);
@@ -25178,9 +25385,14 @@ function App() {
         );
       case 'classic': {
         // In-frame classic game wrapped in the shared ClassicShell.
-        const classicSections = currentGame.leaderboard
-          ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
-          : [];
+        const classicSections = [
+          ...(currentGame.leaderboard
+            ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
+            : []),
+          // Registry-declared extra sheet sections (e.g. Minesweeper's
+          // "My Best Runs" history) — same declarative pattern as the flags.
+          ...(typeof currentGame.sheetExtras === 'function' ? currentGame.sheetExtras() : []),
+        ];
         return (
           <ClassicShell
             game={currentGame}

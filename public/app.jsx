@@ -2144,67 +2144,23 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   margin: 0 auto;
 }
+/* The board is a canvas (#142's slide/pop animation is drawn — see
+   T2048BoardCanvas); the grid box keeps the panel look and the frozen-board
+   selector the end-of-run tests assert on. */
 .t2048-grid {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1;
   background: ${C.card};
   border: 2px solid ${C.border};
   border-radius: 12px;
-  padding: 8px;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
-.t2048-cell {
-  aspect-ratio: 1;
-  border-radius: 8px;
-  background: ${C.bg};
-  border: 1px solid ${ca('border','44')};
-}
-/* PHASE 6 (#142) — tiles used to be grid children, so they teleported between
-   cells and you could not see what a swipe did. They are now absolutely
-   positioned over the (unchanged) 4x4 cell backdrop and animate their transform
-   from the previous position to the new one. Input is NEVER gated on the
-   animation: executeMove stays synchronous and the visual catches up.
-   The slide (outer, transform) and the pop (inner, scale) are on SEPARATE
-   elements on purpose — one transform property cannot carry both. */
-.t2048-layer {
-  position: absolute; inset: 8px;
-  pointer-events: none;
-}
-.t2048-tile {
-  position: absolute;
-  top: 0; left: 0;
-  width: calc((100% - 18px) / 4);
-  height: calc((100% - 18px) / 4);
-  transition: transform 100ms ease-out;
-  will-change: transform;
-}
-.t2048-tile-inner {
-  position: absolute; inset: 0;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
-}
-.t2048-tile.is-new .t2048-tile-inner {
-  animation: t2048-pop-in 120ms ease both;
-}
-.t2048-tile.is-merged .t2048-tile-inner {
-  animation: t2048-merge-pop 150ms ease both;
-}
-@keyframes t2048-pop-in {
-  from { opacity: 0; transform: scale(0.5); }
-  to   { opacity: 1; transform: scale(1); }
-}
-@keyframes t2048-merge-pop {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.18); }
-  100% { transform: scale(1); }
+.t2048-canvas-fill {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
 }
 .t2048-score-delta {
   position: absolute;
@@ -3513,7 +3469,6 @@ ${emitTapHighlightRules()}
      actually gets that everywhere, including the two animations this phase
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
-  .t2048-tile, .t2048-tile.is-new, .t2048-tile.is-merged,
   .mnc-pit.mnc-flash, .mnc-pit.mnc-capture-flash,
   .tm-bar.bar-full,
   .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
@@ -12122,13 +12077,6 @@ function t2048_tileStyle(value) {
   return { bg: palette[Math.floor(Math.log2(value)) % palette.length], color: '#FFF' };
 }
 
-function t2048_tileFontSize(v) {
-  if (v < 100)   return '1.4rem';
-  if (v < 1000)  return '1.15rem';
-  if (v < 10000) return '0.92rem';
-  return '0.72rem';
-}
-
 function t2048_newTile(value, isNew, isMerged) {
   return { value, id: ++t2048TileCounter, isNew: !!isNew, isMerged: !!isMerged };
 }
@@ -12284,6 +12232,125 @@ function t2048SaveBest(v) {
 /* ============================================================
    T2048Game component
    ============================================================ */
+/* The 2048 board as a canvas (#170 treatment), keeping #142's animation
+   contract: tiles are tracked BY ID, so a move draws each tile sliding from
+   its previous cell to its new one (100ms), new tiles pop in and merges
+   bump — and input is never gated on the animation (executeMove stays
+   synchronous; the drawing catches up). Tile faces keep the intrinsic 2048
+   palette; the backdrop reads PAL. Reduced-motion players get instant
+   placement, matching the old CSS media block. */
+function T2048BoardCanvas({ grid }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 4, rows: 4 });
+  const side = Math.max(0, Math.floor(boxW));
+  const pad = 8, gap = 6;
+  const cell = (side - pad * 2 - gap * 3) / 4;
+
+  const animRef = useRef({ prev: {}, t0: 0, reduced: false });
+  const [, setFrame] = useState(0);
+  useEffect(() => {
+    const a = animRef.current;
+    const targets = {};
+    grid.forEach((row, r) => row.forEach((t, c) => { if (t) targets[t.id] = { r, c }; }));
+    a.from = a.prev;
+    a.targets = targets;
+    a.prev = targets;
+    a.reduced = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    a.t0 = a.reduced ? -1e9 : performance.now();
+    if (a.reduced) { setFrame((f) => f + 1); return; }
+    let raf = 0;
+    const tick = () => {
+      setFrame((f) => f + 1);
+      if (performance.now() - a.t0 < 170) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [grid]);
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [grid, side],
+    draw: (ctx) => {
+      if (side < 60) return;
+      const a = animRef.current;
+      const now = performance.now();
+      const slideP = Math.min(1, (now - a.t0) / 100);
+      const ease = 1 - (1 - slideP) * (1 - slideP);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Static 4x4 backdrop.
+      for (let i = 0; i < 16; i++) {
+        const r = Math.floor(i / 4), c = i % 4;
+        const x = pad + c * (cell + gap), y = pad + r * (cell + gap);
+        klRR(ctx, x, y, cell, cell, 8);
+        ctx.fillStyle = PAL.bg;
+        ctx.fill();
+        ctx.save();
+        ctx.globalAlpha = 0.27;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        ctx.restore();
+      }
+      const at = (r, c) => [pad + c * (cell + gap), pad + r * (cell + gap)];
+      grid.forEach((row, r) => row.forEach((t, c) => {
+        if (!t) return;
+        const from = a.from && a.from[t.id];
+        const [tx, ty] = at(r, c);
+        let x = tx, y = ty;
+        if (from && (from.r !== r || from.c !== c)) {
+          const [fx, fy] = at(from.r, from.c);
+          x = fx + (tx - fx) * ease;
+          y = fy + (ty - fy) * ease;
+        }
+        let scale = 1, alpha = 1;
+        if (!a.reduced) {
+          if (t.isNew && !from) {
+            const p = Math.min(1, (now - a.t0) / 120);
+            scale = 0.5 + 0.5 * p;
+            alpha = p;
+          } else if (t.isMerged) {
+            const p = Math.min(1, (now - a.t0) / 150);
+            scale = 1 + 0.18 * Math.sin(p * Math.PI);
+          }
+        }
+        const { bg, color } = t2048_tileStyle(t.value);
+        const cx = x + cell / 2, cy = y + cell / 2;
+        const s = cell * scale;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        klRR(ctx, cx - s / 2, cy - s / 2, s, s, 8 * scale);
+        ctx.fillStyle = bg;
+        if (t.value === 2048) {
+          ctx.shadowColor = 'rgba(245,158,11,0.55)';
+          ctx.shadowBlur = 14;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        const len = String(t.value).length;
+        ctx.font = `700 ${Math.round(cell * (len <= 2 ? 0.45 : len === 3 ? 0.37 : len === 4 ? 0.3 : 0.24))}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = color;
+        ctx.fillText(String(t.value), cx, cy + 1);
+        ctx.restore();
+      }));
+    },
+  });
+
+  return (
+    <div className="t2048-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="t2048-canvas board-canvas"
+        role="img"
+        aria-label={`2048 board — highest tile ${t2048_maxTile(grid) || 0}`}
+      />
+    </div>
+  );
+}
+
 function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
   const raceMode = !!onRaceEnd;
   const _saved = raceMode ? null : t2048LoadSavedBoard();
@@ -12513,35 +12580,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
             onTouchEnd={handleTouchEnd}
           >
             <div className="t2048-grid">
-              {/* Static 4x4 backdrop. */}
-              {Array.from({ length: 16 }, (_, i) => <div key={'c' + i} className="t2048-cell" />)}
-              {/* Tiles ride above it, keyed by id so DOM identity survives a
-                  move and the browser can transition the transform (#142). */}
-              <div className="t2048-layer">
-                {grid.flatMap((row, r) => row.map((cell, c) => {
-                  if (!cell) return null;
-                  const { bg, color } = t2048_tileStyle(cell.value);
-                  return (
-                    <div
-                      key={'t' + cell.id}
-                      className={'t2048-tile' + (cell.isNew ? ' is-new' : '') + (cell.isMerged ? ' is-merged' : '')}
-                      style={{ transform: `translate(calc(${c} * (100% + 6px)), calc(${r} * (100% + 6px)))` }}
-                    >
-                      <div
-                        className="t2048-tile-inner"
-                        style={{
-                          background: bg,
-                          color,
-                          fontSize: t2048_tileFontSize(cell.value),
-                          boxShadow: cell.value === 2048 ? '0 0 14px #F59E0B88' : 'none',
-                        }}
-                      >
-                        {cell.value}
-                      </div>
-                    </div>
-                  );
-                })).filter(Boolean)}
-              </div>
+              <T2048BoardCanvas grid={grid} />
             </div>
 
             {victoryVisible && (

@@ -1477,57 +1477,19 @@ ${emitTapHighlightRules()}
   font-weight: 600;
   color: ${C.rose};
 }
+/* The guess grid is a canvas; the box stays the ONE flexible child inside the
+   fit column (PHASE 3's rule) so the keyboard, clue and tracker keep their
+   place, and the canvas sizes its tiles from whatever the box measures. The
+   invalid-guess shake is drawn (a brief rAF wiggle of the current row). */
 .cw-board {
-  display: grid;
-  gap: 0.4rem;
+  display: flex; align-items: center; justify-content: center;
   max-width: 330px;
   margin: 0 auto;
   width: 100%;
 }
-/* PHASE 3 — inside the fit column the board is the ONE flexible child: an
-   8-row grid for a 7-letter word shrinks its rows instead of pushing the
-   keyboard off the bottom of the screen (which is what #3's clipping was).
-   The tiles must give up their aspect-ratio here — it forces height from width
-   and would otherwise overflow the row tracks straight over the keyboard. */
 .fit-col .cw-board {
   flex: 1 1 auto; min-height: 0; overflow: hidden;
-  align-content: center;
 }
-.fit-col .cw-row { min-height: 0; }
-.fit-col .cw-tile {
-  aspect-ratio: auto; min-height: 0; min-width: 0;
-  font-size: clamp(0.9rem, 4.2vw, 1.5rem);
-}
-.cw-row {
-  display: grid;
-  gap: 0.4rem;
-}
-.cw-row.shake { animation: cw-shake 0.4s ease; }
-@keyframes cw-shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-6px); }
-  40%, 80% { transform: translateX(6px); }
-}
-.cw-tile {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.5rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  border: 2px solid ${C.dim};
-  border-radius: 8px;
-  background: ${C.card};
-  color: ${C.text};
-  user-select: none;
-  transition: border-color 0.1s ease, background 0.1s ease;
-}
-.cw-tile.filled { border-color: ${C.muted}; }
-.cw-tile.green  { background: ${C.emerald}; border-color: ${C.emerald}; color: #fff; }
-.cw-tile.yellow { background: ${C.gold};    border-color: ${C.gold};    color: #fff; }
-.cw-tile.gray   { background: ${C.dim};     border-color: ${C.dim};     color: ${C.text}; }
 
 .cw-kbd {
   max-width: 480px;
@@ -3606,7 +3568,6 @@ ${emitTapHighlightRules()}
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
   .t2048-tile, .t2048-tile.is-new, .t2048-tile.is-merged,
-  .cw-row.shake,
   .mnc-pit.mnc-flash, .mnc-pit.mnc-capture-flash,
   .tm-bar.bar-full,
   .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
@@ -9147,6 +9108,93 @@ function cwDailyRounds(offset) {
   return cwRoundsForDay(cwDayNum(offset));
 }
 
+/* Daily Cipher's guess grid as a canvas — pure display (the keyboard below is
+   the input). Tiles size from the measured box so a 7-letter word's 8 rows
+   shrink instead of pushing the keyboard off screen (PHASE 3's rule, kept);
+   the invalid-guess shake is a brief drawn wiggle of the current row. */
+function CwBoardCanvas({ maxGuesses, wordLen, guesses, cur, done, shake, boardWidth }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: wordLen, rows: maxGuesses });
+  const gapPx = 5;
+  const W0 = Math.min(Math.floor(boxW), boardWidth || 330);
+  const H0 = Math.floor(boxH) || 400;
+  const tile = Math.max(20, Math.min(56, Math.floor(Math.min(
+    (W0 - gapPx * (wordLen - 1)) / wordLen,
+    (H0 - gapPx * (maxGuesses - 1)) / maxGuesses
+  ))));
+  const bw = tile * wordLen + gapPx * (wordLen - 1);
+  const bh = tile * maxGuesses + gapPx * (maxGuesses - 1);
+
+  // The shake: rAF-driven wiggle for 400ms when `shake` flips true.
+  const shakeRef = useRef(null);
+  const [shakeFrame, setShakeFrame] = useState(0);
+  useEffect(() => {
+    if (!shake) { shakeRef.current = null; return; }
+    shakeRef.current = { t0: performance.now() };
+    let raf = 0;
+    const tick = () => {
+      if (!shakeRef.current) return;
+      if (performance.now() - shakeRef.current.t0 >= 400) shakeRef.current = null;
+      setShakeFrame((f) => f + 1);
+      if (shakeRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [shake]);
+
+  useCanvasBoard(canvasRef, {
+    width: bw,
+    height: bh,
+    deps: [guesses, cur, done, tile, shakeFrame],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const sh = shakeRef.current;
+      const shakeP = sh ? (performance.now() - sh.t0) / 400 : 1;
+      const wiggle = sh ? Math.sin(shakeP * Math.PI * 4) * 6 * (1 - shakeP) : 0;
+      for (let r = 0; r < maxGuesses; r++) {
+        const g = guesses[r];
+        const isCurrent = !g && r === guesses.length && !done;
+        const letters = g ? g.word : (isCurrent ? cur : '');
+        const dx = isCurrent ? wiggle : 0;
+        for (let c = 0; c < wordLen; c++) {
+          const ch = letters[c] || '';
+          const x = c * (tile + gapPx) + dx, y = r * (tile + gapPx);
+          const state = g ? g.result[c] : (ch ? 'filled' : '');
+          let bg = PAL.card, border = PAL.dim, ink = PAL.text;
+          if (state === 'filled') border = PAL.muted;
+          else if (state === 'green') { bg = PAL.emerald; border = PAL.emerald; ink = '#fff'; }
+          else if (state === 'yellow') { bg = PAL.gold; border = PAL.gold; ink = '#fff'; }
+          else if (state === 'gray') { bg = PAL.dim; border = PAL.dim; }
+          klRR(ctx, x + 1, y + 1, tile - 2, tile - 2, 8);
+          ctx.fillStyle = bg;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = border;
+          ctx.stroke();
+          if (ch) {
+            ctx.font = `600 ${Math.round(tile * 0.5)}px 'JetBrains Mono', monospace`;
+            ctx.fillStyle = ink;
+            ctx.fillText(String(ch).toUpperCase(), x + tile / 2, y + tile / 2 + 1);
+          }
+        }
+      }
+    },
+  });
+
+  return (
+    <div className="cw-board" ref={boxRef} style={{ maxWidth: `${boardWidth}px` }}>
+      <canvas
+        ref={canvasRef}
+        className="cw-canvas board-canvas"
+        role="img"
+        aria-label={`Guess grid — ${guesses.length} of ${maxGuesses} guesses used`}
+      />
+    </div>
+  );
+}
+
 function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
   // The day's stack of independent word rounds (stable for the render lifetime).
@@ -9421,34 +9469,16 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           )}
 
           {/* The guess grid is the one flexible region: it shrinks so the
-              keyboard, clue and tracker (all flex: 0 0 auto) keep their place.
-              Deliberately NOT wrapped in fit-scale-box — that box is width-free,
-              which collapses a percentage-sized grid to min-content. */}
-          <div
-            className="cw-board"
-            style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
-          >
-            {Array.from({ length: maxGuesses }).map((_, r) => {
-              const g = active.guesses[r];
-              const isCurrent = !g && r === active.guesses.length && !done;
-              const letters = g ? g.word : (isCurrent ? cur : '');
-              return (
-                <div
-                  key={r}
-                  className={`cw-row${isCurrent && shake ? ' shake' : ''}`}
-                  style={{ gridTemplateColumns: `repeat(${wordLen}, 1fr)` }}
-                >
-                  {Array.from({ length: wordLen }).map((__, c) => {
-                    const ch = letters[c] || '';
-                    const cls = ['cw-tile'];
-                    if (g) cls.push(g.result[c]);
-                    else if (ch) cls.push('filled');
-                    return <div key={c} className={cls.join(' ')}>{ch}</div>;
-                  })}
-                </div>
-              );
-            })}
-          </div>
+              keyboard, clue and tracker (all flex: 0 0 auto) keep their place. */}
+          <CwBoardCanvas
+            maxGuesses={maxGuesses}
+            wordLen={wordLen}
+            guesses={active.guesses}
+            cur={cur}
+            done={done}
+            shake={shake}
+            boardWidth={boardWidth}
+          />
 
           <div className="cw-kbd">
             {CW_KEYS.map((row, ri) => (

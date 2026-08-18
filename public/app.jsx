@@ -158,7 +158,7 @@ const TAPPABLE_CLASSES = [
   'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
   'wspr-tile', 'scell', 'numkey',
-  'wcell', 'cw-key', 'mnc-pit', 'kt-cell',
+  'wcell', 'cw-key', 'mnc-pit',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
   'm3-tile',
 ];
@@ -776,7 +776,6 @@ ${emitTapHighlightRules()}
 .wcell:not(.found):active, .wcell[data-pressed],
 .cw-key:active, .cw-key[data-pressed],
 .mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
-.kt-cell:active, .kt-cell[data-pressed],
 .ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
 .ludo-token.movable:active, .an-tile:active, .an-slot:active,
 .m3-tile:active {
@@ -3685,40 +3684,19 @@ ${emitTapHighlightRules()}
   .tappable:active, .tappable[data-pressed],
   .wspr-tile:active, .scell:active,
   .numkey:active, .wcell:active, .cw-key:active,
-  .mnc-pit:active, .kt-cell:active, .ck-cell:active, .rv-cell:active,
+  .mnc-pit:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
   .an-slot:active, .m3-tile:active { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
 .kt-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-.kt-board {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  max-width: 480px;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 2px solid ${C.border};
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 0 auto;
+.kt-boardbox {
+  max-width: 480px; width: 100%; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  touch-action: none;
 }
-.kt-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  transition: background 0.1s ease;
-  font-family: 'JetBrains Mono', monospace;
-}
-.kt-cell.kt-light { background: ${C.surface}; }
-.kt-cell.kt-dark  { background: ${C.card}; }
-.kt-cell.kt-valid { background: ${ca('accent','33')}; cursor: pointer; }
-.kt-cell.kt-valid:hover { background: ${ca('accent','55')}; }
-.kt-cell.kt-current { background: ${ca('accent','22')}; outline: 2px solid ${C.accent}; outline-offset: -2px; }
-.kt-cell.kt-visited { cursor: default; }
-.kt-knight { font-size: 1.35rem; line-height: 1; user-select: none; }
-.kt-num { font-size: 0.58rem; color: ${C.muted}; font-weight: 600; line-height: 1; }
+.kt-canvas { border-radius: 8px; }
 .kt-actions { display: flex; gap: 0.75rem; width: 100%; max-width: 480px; }
 .kt-undo-btn {
   flex: 1;
@@ -15142,6 +15120,82 @@ function ktFmtDate(iso) {
   return `${m}/${d}/${y.slice(2)}`;
 }
 
+/* The Knight's Tour board is a canvas (self-contained: it lives behind the ☰
+   tab switch, and usePointerCell binds on mount). Chessboard chrome reads
+   PAL, so it re-themes exactly as the DOM cells' C tokens did. */
+function KtBoardCanvas({ visited, currentPos, validMvs, done, onCell }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: 8, rows: 8, minCell: 28, maxCell: 60 });
+  const side = cell * 8;
+  const liveRef = useRef({});
+  liveRef.current = { visited, currentPos, validMvs, done, cell };
+
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const s = liveRef.current;
+      const c = Math.floor(p.x / s.cell), r = Math.floor(p.y / s.cell);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      const idx = r * 8 + c;
+      const isValid = !s.done && idx !== s.currentPos && s.validMvs.includes(idx);
+      const canPlace = s.currentPos === null && !(s.visited[idx] > 0);
+      if (canPlace || isValid) onCell(idx);
+    },
+  });
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [visited, currentPos, done, cell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let idx = 0; idx < 64; idx++) {
+        const r = Math.floor(idx / 8), c = idx % 8;
+        const x = c * cell, y = r * cell;
+        const isLight = (r + c) % 2 === 0;
+        const isCurrent = idx === currentPos;
+        const isVisited = visited[idx] > 0;
+        const isValid = !done && !isCurrent && validMvs.includes(idx);
+        ctx.fillStyle = isLight ? PAL.surface : PAL.card;
+        ctx.fillRect(x, y, cell, cell);
+        if (isValid) { ctx.fillStyle = 'rgba(58,110,205,0.25)'; ctx.fillRect(x, y, cell, cell); }
+        if (isCurrent) {
+          ctx.fillStyle = 'rgba(58,110,205,0.15)';
+          ctx.fillRect(x, y, cell, cell);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = PAL.accent;
+          ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+        }
+        const cx = x + cell / 2, cy = y + cell / 2;
+        if (isCurrent) {
+          ctx.font = `${Math.round(cell * 0.55)}px system-ui, sans-serif`;
+          ctx.fillStyle = PAL.text;
+          ctx.fillText('♞', cx, cy + 1);
+        } else if (isVisited) {
+          ctx.font = `600 ${Math.max(9, Math.round(cell * 0.28))}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = PAL.muted;
+          ctx.fillText(String(visited[idx]), cx, cy);
+        }
+      }
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.strokeRect(1, 1, side - 2, side - 2);
+    },
+  });
+
+  return (
+    <div className="kt-boardbox" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="kt-canvas board-canvas"
+        role="grid"
+        aria-label={`Knight's Tour board — ${visited.filter((v) => v > 0).length} of 64 squares visited`}
+      />
+    </div>
+  );
+}
+
 function KnightsTourGame({ onWin, onStepChange, resetKey }) {
   const [visited, setVisited]       = useState(() => new Array(64).fill(0));
   const [currentPos, setCurrentPos] = useState(null);
@@ -15253,34 +15307,13 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
             </div>
           </div>
 
-          <div className="kt-board">
-            {Array.from({ length: 64 }, (_, idx) => {
-              const r = Math.floor(idx / 8), c = idx % 8;
-              const isLight    = (r + c) % 2 === 0;
-              const isCurrent  = idx === currentPos;
-              const isVisited  = visited[idx] > 0;
-              const isValid    = !done && !isCurrent && validMvs.includes(idx);
-              const canPlace   = currentPos === null && !isVisited;
-
-              let cls = 'kt-cell ' + (isLight ? 'kt-light' : 'kt-dark');
-              if (isCurrent)      cls += ' kt-current';
-              else if (isVisited) cls += ' kt-visited';
-              else if (isValid)   cls += ' kt-valid';
-
-              return (
-                <div
-                  key={idx}
-                  className={cls}
-                  style={(canPlace || isValid) ? { cursor: 'pointer' } : {}}
-                  onClick={() => (canPlace || isValid) && handleCellClick(idx)}
-                >
-                  {isCurrent  ? <span className="kt-knight">♞</span>
-                   : isVisited ? <span className="kt-num">{visited[idx]}</span>
-                   : null}
-                </div>
-              );
-            })}
-          </div>
+          <KtBoardCanvas
+            visited={visited}
+            currentPos={currentPos}
+            validMvs={validMvs}
+            done={done}
+            onCell={handleCellClick}
+          />
 
           {stuck && <div className="kt-stuck-banner">No valid moves — try Undo or restart.</div>}
 

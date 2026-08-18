@@ -155,7 +155,7 @@ const GA = {
    class, and the self-test then names that one class. */
 const TAPPABLE_CLASSES = [
   'tappable',
-  'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
+  'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
   'wspr-tile', 'scell', 'numkey',
   'wcell', 'cw-key', 'mnc-pit',
@@ -4536,14 +4536,12 @@ ${emitTapHighlightRules()}
 .an-actions { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
 
 .cp-game { display: flex; flex-direction: column; align-items: center; }
-.cp-grid { display: grid; grid-auto-rows: 34px; gap: 2px; margin-bottom: 14px; }
-.cp-cell {
-  background: ${C.card}; border-radius: 4px; display: flex; align-items: center; justify-content: center;
-  font-size: 20px; user-select: none;
+.cp-boardbox {
+  flex: 1 1 auto; min-height: 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
 }
-.cp-cell.wall { background: ${C.dim}; border-radius: 2px; }
-.cp-cell.goal { background: rgb(var(--c-emerald-rgb) / 14%); box-shadow: inset 0 0 0 2px rgb(var(--c-emerald-rgb) / 45%); }
-.cp-crate.ongoal { filter: hue-rotate(60deg) brightness(1.2); }
+.cp-canvas { border-radius: 6px; }
 .cp-pad {
   display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; margin-bottom: 10px;
 }
@@ -6121,50 +6119,12 @@ function useFitBox(ref, { cols, rows, minCell = 16, maxCell = 64, gap = 0, padX 
   return { cell, boxW: box.w, boxH: box.h, ready: box.w > 0 && box.h > 0 };
 }
 
-// Scale-to-fit wrapper (slice 5). Measures its own available box AND its
-// content's natural size, then applies a single `transform: scale(k)` so the
-// content always fits without scrolling. This is the general answer for the
-// dailies whose boards are absolutely positioned at fixed pixel offsets
-// (Mahjong's layered tiles, the solitaire card columns) — those can't be
-// re-expressed as a fluid grid, but they scale perfectly as one unit, and
-// every existing click handler keeps working under a CSS transform.
-// Never scales ABOVE 1: a small board on a big screen stays its natural size.
-function FitScale({ children, className }) {
-  const boxRef = useRef(null);
-  const contentRef = useRef(null);
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const box = boxRef.current, content = contentRef.current;
-    if (!box || !content) return;
-    const measure = () => {
-      const b = box.getBoundingClientRect();
-      // offsetWidth/Height are the UNSCALED layout size — getBoundingClientRect
-      // on the content would already include our own transform and oscillate.
-      const cw = content.offsetWidth, ch = content.offsetHeight;
-      if (!cw || !ch || (b.width < 1 && b.height < 1)) return;
-      const k = Math.min(1, b.width / cw, b.height / ch);
-      setScale((prev) => (Math.abs(prev - k) < 0.005 ? prev : k));
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', measure);
-      return () => window.removeEventListener('resize', measure);
-    }
-    const ro = new ResizeObserver(measure);
-    ro.observe(box);
-    ro.observe(content);
-    return () => ro.disconnect();
-  }, []);
-
-  return (
-    <div className={'fit-scale-box' + (className ? ' ' + className : '')} ref={boxRef}>
-      <div className="fit-scale-content" ref={contentRef} style={{ transform: `scale(${scale})` }}>
-        {children}
-      </div>
-    </div>
-  );
-}
+/* The FitScale scale-to-fit wrapper (slice 5) is GONE: its last riders
+   (Mahjong, Spider, the Tile Match pair, Crate Push) all draw canvases sized
+   from the measured box now, so nothing shrinks a fixed-pixel board with a
+   transform any more. The .fit-scale-box CSS class stays — Word Search uses
+   it as a plain flex box, and describeAppStylesheet() keys on the
+   .fit-scale-content rule to recognize the app's own stylesheet. */
 
 // DPR-correct canvas sizing + redraw scheduling. `draw(ctx, geom)` is called
 // on a rAF whenever `deps` change or the element resizes; `geom` carries the
@@ -22105,21 +22065,58 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const cells = [];
-  for (let y = 0; y < level.h; y++) {
-    for (let x = 0; x < level.w; x++) {
-      const key = x + ',' + y;
-      const wall = level.walls.has(key);
-      const goal = level.goals.has(key);
-      const crate = crateAt(crates, x, y) >= 0;
-      const isP = player[0] === x && player[1] === y;
-      cells.push(
-        <div key={key} className={'cp-cell' + (wall ? ' wall' : '') + (goal ? ' goal' : '')}>
-          {crate ? <span className={'cp-crate' + (goal ? ' ongoal' : '')}>📦</span> : isP ? '🧍' : ''}
-        </div>
-      );
-    }
-  }
+  /* The room is a CANVAS (formerly a fixed-34px grid under FitScale). Cells
+     were never tappable — the D-pad and arrow keys are the input — so this is
+     pure display: walls/goals read PAL, the crate/player stay emoji, and a
+     crate on its pad gets a green ring (the DOM hue-rotate trick doesn't
+     translate to emoji glyphs on canvas). */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: level.w, rows: level.h });
+  const cpCell = Math.max(18, Math.min(46,
+    Math.floor(Math.min((Math.floor(boxW) - 4) / level.w, ((Math.floor(boxH) || 300) - 4) / level.h))));
+  const cpW = cpCell * level.w, cpH = cpCell * level.h;
+  useCanvasBoard(canvasRef, {
+    width: cpW,
+    height: cpH,
+    deps: [player, crates, done, cpCell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let y = 0; y < level.h; y++) {
+        for (let x = 0; x < level.w; x++) {
+          const key = x + ',' + y;
+          const px = x * cpCell, py = y * cpCell;
+          if (level.walls.has(key)) {
+            klRR(ctx, px + 1, py + 1, cpCell - 2, cpCell - 2, 3);
+            ctx.fillStyle = PAL.dim;
+            ctx.fill();
+          } else if (level.goals.has(key)) {
+            ctx.fillStyle = 'rgba(45,159,102,0.14)';
+            ctx.fillRect(px, py, cpCell, cpCell);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(45,159,102,0.45)';
+            ctx.strokeRect(px + 1.5, py + 1.5, cpCell - 3, cpCell - 3);
+          }
+        }
+      }
+      const glyph = (g, x, y, scale) => {
+        ctx.font = `${Math.round(cpCell * scale)}px system-ui, sans-serif`;
+        ctx.fillText(g, x * cpCell + cpCell / 2, y * cpCell + cpCell / 2 + 1);
+      };
+      for (const [cx, cy] of crates) {
+        if (level.goals.has(cx + ',' + cy)) {
+          ctx.beginPath();
+          ctx.arc(cx * cpCell + cpCell / 2, cy * cpCell + cpCell / 2, cpCell * 0.46, 0, Math.PI * 2);
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = PAL.emerald;
+          ctx.stroke();
+        }
+        glyph('📦', cx, cy, 0.72);
+      }
+      glyph('🧍', player[0], player[1], 0.72);
+    },
+  });
 
   return (
     <div className="cp-game fit-col">
@@ -22128,9 +22125,14 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
         <div className="pill"><div className="plabel">Room</div><div className="pvalue">#{levelIdx.current + 1}</div></div>
       </div>
-      <FitScale>
-        <div className="cp-grid" style={{ gridTemplateColumns: `repeat(${level.w}, 34px)` }}>{cells}</div>
-      </FitScale>
+      <div className="cp-boardbox" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="cp-canvas board-canvas"
+          role="img"
+          aria-label={`Crate Push room ${levelIdx.current + 1} — ${crates.filter(([cx, cy]) => level.goals.has(cx + ',' + cy)).length}/${crates.length} crates home, ${moves} moves`}
+        />
+      </div>
       <div className="cp-pad">
         <div />
         <button className="p6-btn" onClick={() => move(0, -1)}>▲</button>

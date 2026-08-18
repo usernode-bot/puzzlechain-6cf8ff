@@ -768,6 +768,11 @@
       "expectText": "Give up"
     },
     {
+      "name": "Klondike how-to states the suit-slot foundation rule",
+      "path": "/?howto=klondike",
+      "expectText": "each suit has its own slot"
+    },
+    {
       "name": "Spider offers a Give up escape",
       "path": "/?game=spider&practice=1",
       "expectText": "Give up"

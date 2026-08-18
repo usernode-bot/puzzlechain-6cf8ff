@@ -19673,6 +19673,21 @@ function klValidState(st) {
     Array.isArray(st.tab) && st.tab.length === 7 && Number.isFinite(st.moves);
 }
 
+/* Foundations are SUIT-SLOTTED: pile fi is the CE_SUIT_GLYPH[fi] slot the
+   empty board draws. Saves from before that rule could hold a pile on any
+   slot (an ace used to start wherever it landed first); piles are single-suit
+   by construction either way — one ace per suit — so re-home each onto its
+   suit's slot on hydrate. */
+function klSlotFoundations(st) {
+  const found = [[], [], [], []];
+  for (const f of st.found) {
+    if (!f.length) continue;
+    if (found[f[0].s].length) return st; // two piles, one suit: corrupt — keep as saved
+    found[f[0].s] = f;
+  }
+  return { ...st, found };
+}
+
 /* One geometry object drives BOTH the draw pass and the pointer hit-tests,
    so what you see is exactly what your finger hits. Card width comes from
    the measured box (7 columns); the tableau fan steps compress — and then
@@ -19765,6 +19780,7 @@ function klRR(ctx, x, y, w, h, r) {
 const KL_FACE = '#F4F6FB', KL_FACE_EDGE = '#C9D2E4',
       KL_RED = '#DC2626', KL_BLACK = '#1E293B',
       KL_BACK = '#3730A3', KL_BACK_STRIPE = '#4338CA', KL_BACK_EDGE = '#312E81';
+const KL_FLIP_MS = 260; // stock→waste draw-flip duration
 
 function klDrawCard(ctx, ly, x, y, card, opts) {
   const o = opts || {};
@@ -19846,7 +19862,7 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
   const freshDeal = useRef(null);
   if (!freshDeal.current) freshDeal.current = klDeal(dailyRng(offset, 'klondike'));
   const resumed = savedProgress && savedProgress.dayNum === dayNum && klValidState(savedProgress.st)
-    ? savedProgress.st : null;
+    ? klSlotFoundations(savedProgress.st) : null;
 
   const [st, setSt] = useState(() => resumed || freshDeal.current);
   const [sel, setSel] = useState(null); // {z:'waste'} | {z:'tab',p,i} | {z:'found',p}
@@ -19884,12 +19900,43 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     moves: st.moves,
   });
 
+  /* Stock-draw flip — presentation only. tapStock commits the draw instantly
+     (rules, saves and the move count all see the settled state); for KL_FLIP_MS
+     afterwards the canvas draws the new waste top mid-flight, travelling
+     stock→waste while flipping face-up. One repaint per rAF is driven by a
+     counter in the draw deps; progress is read off the clock at draw time.
+     Reduced-motion players get the instant appearance they had before. */
+  const flipRef = useRef(null);
+  const [flipSeq, setFlipSeq] = useState(0);        // (re)arms the rAF loop per draw
+  const [flipFrame, setFlipFrame] = useState(0);    // one bump = one repaint (a draw dep)
+  useEffect(() => {
+    if (!flipRef.current) return;
+    let raf = 0;
+    const tick = () => {
+      if (!flipRef.current) return;
+      if (performance.now() - flipRef.current.t0 >= KL_FLIP_MS) flipRef.current = null;
+      setFlipFrame((f) => f + 1); // the last bump paints the settled board
+      if (flipRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [flipSeq]);
+  const cancelFlip = () => {
+    if (!flipRef.current) return;
+    flipRef.current = null;
+    setFlipFrame((f) => f + 1); // settle immediately (a grab mid-flight)
+  };
+
   const tapStock = () => {
     if (done) return;
     const n = clone();
     if (n.stock.length) {
       const c = n.stock.pop();
       n.waste.push({ ...c, up: true });
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        flipRef.current = { t0: performance.now() };
+        setFlipSeq((q) => q + 1);
+      }
     } else if (n.waste.length) {
       n.stock = n.waste.slice().reverse().map((c) => ({ ...c, up: false }));
       n.waste = [];
@@ -19905,8 +19952,13 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
      inline note below when you actually try it. */
   const canTab = (card, destTop) =>
     destTop ? (ceIsRed(card) !== ceIsRed(destTop) && card.r === destTop.r - 1) : card.r === 12;
-  const canFound = (card, f) =>
-    f.length ? (card.s === f[f.length - 1].s && card.r === f[f.length - 1].r + 1) : card.r === 0;
+  // Suit-slotted: pile fi only ever takes suit fi (the glyph its empty slot
+  // shows), starting from the Ace — an ace can no longer start any old pile.
+  const canFound = (card, fi) => {
+    if (card.s !== fi) return false;
+    const f = st.found[fi];
+    return f.length ? card.r === f[f.length - 1].r + 1 : card.r === 0;
+  };
 
   const [note, setNote] = useState('');
   const noteTimer = useRef(null);
@@ -19945,8 +19997,8 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
   const tryFoundation = (s) => {
     const cards = selCards(s);
     if (cards.length !== 1) return false;
-    const fi = st.found.findIndex((f) => canFound(cards[0], f));
-    if (fi < 0) return false;
+    const fi = cards[0].s; // its one legal home now
+    if (!canFound(cards[0], fi)) return false;
     const n = clone();
     n.found[fi].push({ ...takeSel(n, s)[0], up: true });
     n.moves++;
@@ -19971,10 +20023,17 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     return true;
   };
   // `src` (a drag payload) overrides the tap selection, same as moveSelToTab.
+  // Refusals explain themselves here so tap and drag get the same note (#123).
   const moveSelToFound = (fi, src) => {
     const s = src || sel;
     const cards = selCards(s);
-    if (cards.length !== 1 || !canFound(cards[0], st.found[fi])) return false;
+    if (cards.length !== 1) { say('Send one card home at a time.'); return false; }
+    if (!canFound(cards[0], fi)) {
+      say(cards[0].s !== fi
+        ? `${CE_SUIT_GLYPH[cards[0].s]} builds on its own slot, Ace first.`
+        : 'Foundations build up by suit from the Ace.');
+      return false;
+    }
     const n = clone();
     n.found[fi].push({ ...takeSel(n, s)[0], up: true });
     n.moves++;
@@ -20058,11 +20117,7 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
       for (let fi = 0; fi < 4; fi++) {
         if (pt.x >= l.foundX[fi] - l.gap / 2 && pt.x < l.foundX[fi] + l.cw + l.gap / 2) {
           if (src.z === 'found' && src.p === fi) return; // dropped on itself
-          if (cards.length !== 1 || !canFound(cards[0], st.found[fi])) {
-            say('Foundations build up by suit from the Ace.');
-            return;
-          }
-          moveSelToFound(fi, src);
+          moveSelToFound(fi, src); // says why when refused
           return;
         }
       }
@@ -20077,6 +20132,7 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     onDown: (pt) => {
       pendRef.current = null;
       if (dragRef.current) setDragBoth(null); // a cancelled drag left a ghost
+      cancelFlip(); // a grab mid-flight settles the board first
       const l = lyRef.current;
       if (done || !l) return;
       const hit = klHitAt(l, st, pt.x, pt.y);
@@ -20121,7 +20177,7 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [st, sel, drag, done, W, H],
+    deps: [st, sel, drag, done, W, H, flipFrame],
     draw: (ctx) => {
       const l = lyRef.current;
       if (!l) return;
@@ -20141,8 +20197,10 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
         klDrawSlot(ctx, l, l.stockX, 0, '↻');
       }
 
-      // Waste — the top card (or the one beneath it while that's dragged).
-      const wTop = st.waste.length - 1 - hideWaste;
+      // Waste — the top card (or the one beneath it while that's dragged, or
+      // still in flight from the stock).
+      const flip = flipRef.current;
+      const wTop = st.waste.length - 1 - hideWaste - (flip ? 1 : 0);
       if (wTop >= 0) klDrawCard(ctx, l, l.wasteX, 0, st.waste[wTop], { sel: isSel('waste') });
       else klDrawSlot(ctx, l, l.wasteX, 0);
 
@@ -20163,6 +20221,23 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
           klDrawCard(ctx, l, l.colX(p), l.colYs[p][i], col[i],
             { sel: sel && sel.z === 'tab' && sel.p === p && i >= sel.i });
         }
+      }
+
+      /* The stock-draw flight: the real top waste card, travelling
+         stock→waste while a horizontal squeeze flips it from back to face
+         at the halfway point. Drawn over the board, under the drag ghost. */
+      if (flip && st.waste.length) {
+        const fp = Math.min(1, (performance.now() - flip.t0) / KL_FLIP_MS);
+        const ease = 1 - (1 - fp) * (1 - fp); // easeOutQuad travel
+        const x = l.stockX + (l.wasteX - l.stockX) * ease;
+        const sx = Math.max(0.06, Math.abs(Math.cos(Math.PI * fp))); // 1→0→1
+        const cx = x + l.cw / 2;
+        ctx.save();
+        ctx.translate(cx, 0);
+        ctx.scale(sx, 1);
+        ctx.translate(-cx, 0);
+        klDrawCard(ctx, l, x, 0, { ...st.waste[st.waste.length - 1], up: fp >= 0.5 }, { shadow: true });
+        ctx.restore();
       }
 
       // The dragged run rides the finger, drawn last so it's on top.
@@ -23760,7 +23835,7 @@ const GAMES = [
     fitShell: true,
     howToPlay: [
       { title: 'Build down, alternate colors', body: 'Drag a card (or tap it, then its destination). Tableau piles build downward in alternating colors; only a King moves to an empty column — empty columns show a faint K. An illegal move tells you why.' },
-      { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
+      { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King — each suit has its own slot, marked on the board. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
       { title: 'Score', body: 'Fill all four foundations to win. Fewer moves and faster solves score higher — same deal for everyone today.' },
       { title: 'Stuck?', body: 'Give up closes the day at zero and reveals the deal. It does NOT break your streak.' },
     ],
@@ -24577,6 +24652,17 @@ function App() {
     if (!cid) return;
     const g = GAMES.find((x) => x.id === cid);
     if (g) setChatGame(g);
+  }, [loading]);
+
+  // ?howto=<gameId> deep link opens that game's How-to-Play cards the same
+  // way — proposal tests assert on manifest copy through it (the modal is
+  // otherwise tap-only once a browser has marked the game seen).
+  useEffect(() => {
+    if (loading) return;
+    const hid = new URLSearchParams(window.location.search).get('howto');
+    if (!hid) return;
+    const g = GAMES.find((x) => x.id === hid);
+    if (g) setHowToGame(g);
   }, [loading]);
 
   // Theme test hooks (also useful as share/deep links):

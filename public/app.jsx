@@ -3463,53 +3463,19 @@ ${emitTapHighlightRules()}
 .m3-level-name { font-size: 0.72rem; margin-top: 0.2rem; color: ${C.muted}; }
 
 /* ---- Diamond Rush ---- */
+/* The gem board is a canvas; the box keeps the panel look and sizing. */
 .dr-grid {
   width: var(--cg-board);
   height: var(--cg-board);
   max-width: 94vw;
   max-height: 94vw;
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
+  display: flex; align-items: center; justify-content: center;
   background: ${C.surface};
   border: 2px solid ${C.border};
   border-radius: 12px;
   padding: 4px;
   touch-action: none;
 }
-.dr-gem {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(0.9rem, 4vw, 1.5rem);
-  border-radius: 6px;
-  cursor: pointer;
-  user-select: none;
-  aspect-ratio: 1;
-  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
-}
-.dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
-.dr-gem.clearing { opacity: 0; transform: scale(0.4); }
-.dr-gem.bomb {
-  background: rgba(255, 193, 7, 0.15);
-  box-shadow: 0 0 12px rgba(255, 193, 7, 0.4);
-  animation: dr-glow-bomb 1.5s ease-in-out infinite;
-}
-.dr-gem.lightning {
-  background: rgba(100, 200, 255, 0.15);
-  box-shadow: 0 0 12px rgba(100, 200, 255, 0.6);
-  animation: dr-glow-lightning 1.2s ease-in-out infinite;
-}
-.dr-gem.rainbow {
-  background: linear-gradient(45deg, rgba(255, 0, 127, 0.15), rgba(0, 200, 255, 0.15));
-  box-shadow: 0 0 15px rgba(200, 100, 255, 0.5);
-  animation: dr-glow-rainbow 1.8s ease-in-out infinite;
-}
-@keyframes dr-glow-bomb { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
-@keyframes dr-glow-lightning { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
-@keyframes dr-glow-rainbow { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(60deg); } }
-.dr-gem.hint-target { outline: 3px solid ${C.gold}; animation: hintPulse 0.6s ease-in-out; }
-@keyframes hintPulse { 0%, 100% { box-shadow: 0 0 8px ${C.gold}; } 50% { box-shadow: 0 0 16px ${C.gold}; } }
 .dr-powerups-bar {
   display: flex;
   gap: 0.6rem;
@@ -3560,7 +3526,7 @@ ${emitTapHighlightRules()}
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cg-sheet, .m3-tile, .dr-gem { transition: none !important; }
+  .cg-sheet, .m3-tile { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
   /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)
      was dead CSS. A player who asks their phone to calm animations down now
@@ -13548,26 +13514,88 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     if (ns >= TARGET) { setTimeout(() => finish(ns, true, nm), 150); }
     else if (nm <= 0) { setTimeout(() => finish(ns, false, nm), 150); }
   };
-  const onGemDown = (e, i) => { const p = pointerXY(e); touch.current = { i, x: p.x, y: p.y }; };
-  const onGemUp = (e, i) => {
-    const start = touch.current; touch.current = null;
-    if (!start) { return; }
-    const p = pointerXY(e);
-    const dx = p.x - start.x, dy = p.y - start.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
-      // swipe from start.i toward neighbor
-      const r = Math.floor(start.i / 8), c = start.i % 8;
-      let nr = r, nc = c;
-      if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
-      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
-      else setSel(-1);
-      return;
-    }
-    // tap
-    if (sel === -1) { setSel(start.i); cgSound('click'); }
-    else if (sel === start.i) { setSel(-1); }
-    else trySwap(sel, start.i);
+  /* The board is a CANVAS (#170 treatment) — same tap-or-swipe grammar as the
+     DOM gems: press a gem and release nearby to select/swap-with-selection,
+     or flick past the threshold to swap toward the flick. */
+  const drBoxRef = useRef(null);
+  const drCanvasRef = useRef(null);
+  const { cell: drCell } = useFitBox(drBoxRef, { cols: 8, rows: 8, minCell: 28, maxCell: 56, gap: 2 });
+  const drStep = drCell + 2;
+  const drSide = drStep * 8 - 2;
+  const drGeoRef = useRef(0);
+  drGeoRef.current = drStep;
+  const drCellAt = (p) => {
+    const stp = drGeoRef.current;
+    const c = Math.floor(p.x / stp), r = Math.floor(p.y / stp);
+    if (c < 0 || c > 7 || r < 0 || r > 7) return -1;
+    return r * 8 + c;
   };
+  usePointerCell(drCanvasRef, {
+    onDown: (p) => {
+      const i = drCellAt(p);
+      touch.current = i >= 0 ? { i, x: p.x, y: p.y } : null;
+    },
+    onUp: (p) => {
+      const start = touch.current; touch.current = null;
+      if (!start || done) return;
+      const dx = p.x - start.x, dy = p.y - start.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
+        const r = Math.floor(start.i / 8), c = start.i % 8;
+        let nr = r, nc = c;
+        if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
+        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
+        else setSel(-1);
+        return;
+      }
+      if (sel === -1) { setSel(start.i); cgSound('click'); }
+      else if (sel === start.i) { setSel(-1); }
+      else trySwap(sel, start.i);
+    },
+  }, { moveTolerance: 4 });
+  useCanvasBoard(drCanvasRef, {
+    width: drSide,
+    height: drSide,
+    deps: [grid, sel, hintIndices, done, drCell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const GLOW = { 6: 'rgba(255,193,7,0.5)', 7: 'rgba(100,200,255,0.6)', 8: 'rgba(200,100,255,0.55)' };
+      for (let i = 0; i < 64; i++) {
+        const v = grid[i];
+        if (v == null) continue;
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = c * drStep, y = r * drStep;
+        const cx = x + drCell / 2, cy = y + drCell / 2;
+        if (v >= 6) {
+          // Intrinsic special-gem glow (bomb / lightning / rainbow).
+          klRR(ctx, x, y, drCell, drCell, 6);
+          ctx.fillStyle = v === 6 ? 'rgba(255,193,7,0.15)' : v === 7 ? 'rgba(100,200,255,0.15)' : 'rgba(200,100,255,0.15)';
+          ctx.fill();
+          ctx.save();
+          ctx.shadowColor = GLOW[v];
+          ctx.shadowBlur = 12;
+          ctx.font = `${Math.round(drCell * 0.62)}px system-ui, sans-serif`;
+          ctx.fillText(DR_GEMS[v], cx, cy + 1);
+          ctx.restore();
+        } else {
+          ctx.font = `${Math.round(drCell * 0.62)}px system-ui, sans-serif`;
+          ctx.fillText(DR_GEMS[v], cx, cy + 1);
+        }
+        if (sel === i) {
+          klRR(ctx, x + 1, y + 1, drCell - 2, drCell - 2, 6);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+        }
+        if (hintIndices.includes(i)) {
+          klRR(ctx, x - 1, y - 1, drCell + 2, drCell + 2, 7);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.stroke();
+        }
+      }
+    },
+  });
   const usePowerUp = (type) => {
     if (done || powerUps[type] <= 0) return;
     if (type === 'hint') {
@@ -13627,18 +13655,13 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
             </button>
           ))}
         </div>
-        <div className="dr-grid">
-          {grid.map((v, i) => {
-            const isSpecial = v >= 6 ? ['bomb', 'lightning', 'rainbow'][v - 6] : null;
-            return (
-              <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '') + (isSpecial ? ' ' + isSpecial : '') + (hintIndices.includes(i) ? ' hint-target' : '')}
-                data-special={isSpecial}
-                onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
-                onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
-                {DR_GEMS[v]}
-              </div>
-            );
-          })}
+        <div className="dr-grid" ref={drBoxRef}>
+          <canvas
+            ref={drCanvasRef}
+            className="dr-canvas board-canvas"
+            role="grid"
+            aria-label={`Diamond Rush board — score ${score} of ${TARGET}, ${moves} moves left`}
+          />
         </div>
         {timeBoost && <div className="dr-time-boost">+30 sec</div>}
       </div>

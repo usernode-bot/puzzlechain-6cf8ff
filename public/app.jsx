@@ -158,7 +158,7 @@ const TAPPABLE_CLASSES = [
   'p6-btn',
   'mf-canvas', 'board-canvas',
   'numkey',
-  'cw-key', 'mnc-pit',
+  'cw-key',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
 ];
 
@@ -772,7 +772,6 @@ ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
 .numkey:active, .numkey[data-pressed],
 .cw-key:active, .cw-key[data-pressed],
-.mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
 .ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
 .ludo-token.movable:active {
   filter: brightness(0.9);
@@ -1722,108 +1721,15 @@ ${emitTapHighlightRules()}
 /* Light theme overrides for minesweeper board only */
 
 /* ---- Mancala ---- */
+/* The board (stores, pits, stones) is one canvas — see MncBoardCanvas. */
 .mnc-board {
-  display: grid;
-  grid-template-columns: 3.2rem repeat(6, 1fr) 3.2rem;
-  grid-template-rows: 1fr 1fr;
-  gap: 5px;
-  background: #7B4F2E;
-  border: 2px solid #5A2F14;
-  border-radius: 16px;
-  padding: 8px;
   max-width: 480px;
   margin: 0 auto;
-  align-items: stretch;
+  display: flex; justify-content: center;
+  touch-action: none;
 }
-.mnc-store {
-  border-radius: 999px;
-  background: #4A1E09;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.4rem 0;
-  min-height: 88px;
-  border: 2px solid #3A1206;
-  transition: border-color 0.2s;
-  position: relative;
-  overflow: hidden;
-}
-.mnc-store-score {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #C8A87A;
-  transition: color 0.2s;
-  position: relative;
-  z-index: 1;
-}
-.mnc-store-label {
-  font-size: 0.48rem;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: #9E7A5A;
-  position: relative;
-  z-index: 1;
-}
-.mnc-pit {
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #4A1E09;
-  border: 2px solid #3A1206;
-  position: relative;
-  overflow: hidden;
-  user-select: none;
-  cursor: default;
-  transition: background 0.1s ease, transform 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
-}
-.mnc-pit.mnc-clickable {
-  cursor: pointer;
-  border-color: #9E7A5A;
-}
-.mnc-pit.mnc-clickable:hover {
-  background: #6B3A24;
-  transform: scale(1.1);
-  border-color: #C8A87A;
-}
-.mnc-pit.mnc-dim { opacity: 0.4; }
-.mnc-pit.mnc-flash { animation: mnc-pit-flash 0.22s ease forwards; }
-.mnc-pit.mnc-capture-flash { animation: mnc-capture-flash 0.32s ease forwards; }
-@keyframes mnc-pit-flash {
-  0%   { background: #4A1E09; border-color: #3A1206; }
-  40%  { background: #5E2E12; border-color: #9E7A5A; }
-  100% { background: #4A1E09; border-color: #3A1206; }
-}
-@keyframes mnc-capture-flash {
-  0%   { background: #4A1E09; }
-  40%  { background: ${ca('rose','22')}; border-color: ${C.rose}; }
-  100% { background: #4A1E09; }
-}
-.mnc-pit-stones {
-  position: absolute;
-  inset: 0;
-}
-.mnc-stone {
-  position: absolute;
-  border-radius: 50%;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.5);
-}
-@keyframes mnc-stone-enter {
-  from { transform: scale(0); opacity: 0.3; }
-  to   { transform: scale(1); opacity: 1; }
-}
-.mnc-stone-entering {
-  animation: mnc-stone-enter 0.12s ease-out forwards;
-  transform-origin: center;
-}
-@keyframes mnc-stones-scatter {
-  0%   { transform: scale(1);   opacity: 1; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-.mnc-stones-capturing {
-  animation: mnc-stones-scatter 0.22s ease-out forwards;
-}
+.mnc-canvas { border-radius: 16px; }
+
 .mnc-banner {
   text-align: center;
   font-size: 0.92rem;
@@ -1940,10 +1846,6 @@ ${emitTapHighlightRules()}
   text-align: center;
   padding: 2rem 0;
   font-size: 0.9rem;
-}
-@media (max-width: 380px) {
-  .mnc-board { grid-template-columns: 2.5rem repeat(6, 1fr) 2.5rem; gap: 3px; padding: 5px; }
-  .mnc-store { min-height: 70px; }
 }
 
 /* ---- Mancala mode selection ---- */
@@ -3444,7 +3346,6 @@ ${emitTapHighlightRules()}
      actually gets that everywhere, including the two animations this phase
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
-  .mnc-pit.mnc-flash, .mnc-pit.mnc-capture-flash,
   .tm-bar.bar-full,
   .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
     animation: none !important;
@@ -3453,7 +3354,7 @@ ${emitTapHighlightRules()}
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
   .numkey:active, .cw-key:active,
-  .mnc-pit:active, .ck-cell:active, .rv-cell:active,
+  .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active { transform: none !important; }
 }
 
@@ -9943,49 +9844,155 @@ function mncStoneSizeFactor(count, isStore) {
   return 0.13;
 }
 
-// Renders count pebble divs absolutely-positioned inside the pit/store container.
-// pitSeed: pit array index (stable random layout per pit).
-// entering: true → newest stone (index count-1) plays pop-in animation.
-// capturing: true → whole stone layer plays scatter-out animation.
-// isStore: adjusts stone sizing for the taller pill-shaped store.
-function MncPitStones({ count, pitSeed, entering, capturing, isStore }) {
-  const stones = [];
-  const sf = mncStoneSizeFactor(count, isStore);
-  // Max center offset as fraction of element size; sqrt ensures uniform-disk distribution.
-  const maxR = (0.5 - sf / 2) * 0.82;
+/* The Mancala board as ONE canvas shared by all four modes — local 2P, Daily
+   Challenge, Versus Bot, and Online (#170 treatment). The carved-wood palette
+   stays intrinsic (hardcoded, as CLAUDE.md requires); stones keep their
+   seeded uniform-disk layouts (the exact MncPitStones math, drawn). Each
+   caller passes its own pitState(idx) → { clickable, flash, capture } so the
+   four modes' turn/animation rules stay exactly where they lived. */
+const MNC_WOOD = { board: '#7B4F2E', edge: '#5A2F14', pit: '#4A1E09', pitEdge: '#3A1206', pitHot: '#9E7A5A', text: '#C8A87A', label: '#9E7A5A', flashBg: '#5E2E12' };
+function MncBoardCanvas({ pits, pitState, storeGlowL, storeGlowR, labelL, labelR, onPit }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 8, rows: 2 });
+  const W = Math.max(0, Math.floor(boxW));
+  const storeW = Math.round(W * 0.13);
+  const pad = 8, gap = 5;
+  const cell = Math.floor((W - pad * 2 - storeW * 2 - gap * 7) / 6);
+  const H = pad * 2 + cell * 2 + gap;
+  const geoRef = useRef({});
+  geoRef.current = { W, H, storeW, pad, gap, cell };
 
-  for (let i = 0; i < count; i++) {
-    const r     = Math.sqrt(mncRandVal(pitSeed, i * 3))        * maxR;
-    const theta = mncRandVal(pitSeed, i * 3 + 1) * 2 * Math.PI;
-    const sVar  = 0.85 + mncRandVal(pitSeed, i * 3 + 2) * 0.30; // ±15% size variance
+  // Pit centers: p2 row (indices 12..7) on top, p1 row (0..5) below.
+  const pitCenter = (idx) => {
+    const g = geoRef.current;
+    const topRow = idx >= 7 && idx <= 12;
+    const col = topRow ? 12 - idx : idx;
+    const x = g.pad + g.storeW + g.gap + col * (g.cell + g.gap) + g.cell / 2;
+    const y = topRow ? g.pad + g.cell / 2 : g.pad + g.cell + g.gap + g.cell / 2;
+    return [x, y];
+  };
 
-    const cx   = 0.5 + r * Math.cos(theta);
-    const cy   = 0.5 + r * Math.sin(theta);
-    const sz   = sf * sVar * 100;
-    const left = (cx - (sf * sVar) / 2) * 100;
-    const top  = (cy - (sf * sVar) / 2) * 100;
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const g = geoRef.current;
+      for (let idx = 0; idx <= 12; idx++) {
+        if (idx === 6) continue;
+        const [cx, cy] = pitCenter(idx);
+        if (Math.hypot(p.x - cx, p.y - cy) <= g.cell / 2 + 3) {
+          if (pitState(idx).clickable) onPit(idx);
+          return;
+        }
+      }
+    },
+  });
 
-    stones.push(
-      React.createElement('div', {
-        key: i,
-        className: 'mnc-stone' + (entering && i === count - 1 ? ' mnc-stone-entering' : ''),
-        style: {
-          left:       `${left}%`,
-          top:        `${top}%`,
-          width:      `${sz}%`,
-          height:     `${sz}%`,
-          background: MNC_STONE_COLORS[i % MNC_STONE_COLORS.length],
-        },
-      })
-    );
-  }
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    // pitState is a fresh closure each parent render, so flash/capture/turn
+    // changes repaint even though the sets live in the caller.
+    deps: [pits, storeGlowL, storeGlowR, W, pitState],
+    draw: (ctx) => {
+      if (W < 120) return;
+      const g = geoRef.current;
+      ctx.textAlign = 'center';
+      // Carved-wood board.
+      klRR(ctx, 1, 1, g.W - 2, g.H - 2, 16);
+      ctx.fillStyle = MNC_WOOD.board;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = MNC_WOOD.edge;
+      ctx.stroke();
 
-  return React.createElement(
-    'div',
-    { className: 'mnc-pit-stones' + (capturing ? ' mnc-stones-capturing' : '') },
-    ...stones
+      // Seeded stone layout — the MncPitStones math, drawn.
+      const drawStones = (idx, cx, cy, radius, isStore) => {
+        const count = pits[idx];
+        const sf = mncStoneSizeFactor(count, isStore);
+        const maxR = (0.5 - sf / 2) * 0.82;
+        for (let i = 0; i < count; i++) {
+          const rr = Math.sqrt(mncRandVal(idx, i * 3)) * maxR;
+          const theta = mncRandVal(idx, i * 3 + 1) * 2 * Math.PI;
+          const sVar = 0.85 + mncRandVal(idx, i * 3 + 2) * 0.30;
+          const sx = cx + rr * Math.cos(theta) * radius * 2;
+          const sy = cy + rr * Math.sin(theta) * radius * 2;
+          ctx.beginPath();
+          ctx.arc(sx, sy, Math.max(2, sf * sVar * radius), 0, Math.PI * 2);
+          ctx.fillStyle = MNC_STONE_COLORS[i % MNC_STONE_COLORS.length];
+          ctx.fill();
+        }
+      };
+
+      // Stores: idx 13 left, idx 6 right, pill-shaped, spanning both rows.
+      const storeH = g.H - g.pad * 2;
+      const stores = [
+        { idx: 13, x: g.pad, glow: storeGlowL, label: labelL || 'P2' },
+        { idx: 6, x: g.W - g.pad - g.storeW, glow: storeGlowR, label: labelR || 'P1' },
+      ];
+      for (const s of stores) {
+        klRR(ctx, s.x, g.pad, g.storeW, storeH, g.storeW / 2);
+        ctx.fillStyle = MNC_WOOD.pit;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = s.glow || MNC_WOOD.pitEdge;
+        ctx.stroke();
+        ctx.save();
+        klRR(ctx, s.x, g.pad, g.storeW, storeH, g.storeW / 2);
+        ctx.clip();
+        drawStones(s.idx, s.x + g.storeW / 2, g.pad + storeH / 2, g.storeW / 2.4, true);
+        ctx.restore();
+        const fs = Math.max(8, Math.round(g.storeW * 0.22));
+        ctx.font = `600 ${Math.max(6, Math.round(g.storeW * 0.16))}px 'Space Grotesk', sans-serif`;
+        ctx.fillStyle = MNC_WOOD.label;
+        ctx.fillText(s.label.toUpperCase().slice(0, 6), s.x + g.storeW / 2, g.pad + storeH * 0.24);
+        ctx.font = `600 ${fs}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = s.glow || MNC_WOOD.text;
+        ctx.fillText(String(pits[s.idx]), s.x + g.storeW / 2, g.pad + storeH / 2 + fs * 0.35);
+        ctx.font = `600 ${Math.max(6, Math.round(g.storeW * 0.14))}px 'Space Grotesk', sans-serif`;
+        ctx.fillStyle = MNC_WOOD.label;
+        ctx.fillText('STORE', s.x + g.storeW / 2, g.pad + storeH * 0.8);
+      }
+
+      // Pits.
+      for (let idx = 0; idx <= 12; idx++) {
+        if (idx === 6) continue;
+        const st = pitState(idx);
+        const [cx, cy] = pitCenter(idx);
+        const radius = g.cell / 2 - 2;
+        ctx.save();
+        if (!st.clickable && !st.flash && !st.capture) ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = st.flash ? MNC_WOOD.flashBg : MNC_WOOD.pit;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = st.capture ? PAL.gold : st.flash || st.clickable ? MNC_WOOD.pitHot : MNC_WOOD.pitEdge;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+        ctx.clip();
+        drawStones(idx, cx, cy, radius, false);
+        ctx.restore();
+        // Count bubble so buried stones stay countable at a glance.
+        ctx.font = `600 ${Math.max(8, Math.round(g.cell * 0.2))}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = MNC_WOOD.text;
+        ctx.fillText(String(pits[idx]), cx, cy + radius - Math.max(3, g.cell * 0.06));
+      }
+    },
+  });
+
+  return (
+    <div className="mnc-board" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="mnc-canvas board-canvas"
+        role="img"
+        aria-label={`Mancala board — ${labelL || 'P2'} store ${pits[13]}, ${labelR || 'P1'} store ${pits[6]}`}
+      />
+    </div>
   );
 }
+
 const MNC_HISTORY_MAX = 50;
 const MNC_SOUND_KEY = 'puzzlechain_mancala_sound';
 
@@ -10374,21 +10381,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
   };
 
   // Board display order: P2 pits shown right-to-left (pit 12 at left, pit 7 at right)
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
-
-  const pitClass = (idx) => {
-    const ownMin = player === 1 ? 0 : 7;
-    const ownMax = player === 1 ? 5 : 12;
-    const isOwn = idx >= ownMin && idx <= ownMax;
-    const canClick = !done && !animatingRef.current && isOwn && pits[idx] > 0;
-    const cls = ['mnc-pit'];
-    if (canClick) cls.push('mnc-clickable');
-    else cls.push('mnc-dim');
-    if (flashPits.has(idx)) cls.push('mnc-flash');
-    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
-    return cls.join(' ');
-  };
 
   const p1Color = C.accent;
   const p2Color = C.rose;
@@ -10450,59 +10442,20 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
           </div>
 
           {/* Board */}
-          <div className="mnc-board">
-            {/* P2 Store — col 1, spans both rows */}
-            <div className="mnc-store" style={{
-              gridColumn: 1, gridRow: '1 / 3',
-              borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206',
-            }}>
-              <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
-              <div className="mnc-store-label">P2</div>
-              <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>
-                {pits[13]}
-              </div>
-              <div className="mnc-store-label">store</div>
-            </div>
-
-            {/* P2 pits — row 1, cols 2–7 */}
-            {p2Display.map((idx, i) => (
-              <div
-                key={idx}
-                className={pitClass(idx)}
-                style={{ gridRow: 1, gridColumn: i + 2 }}
-                onClick={() => handlePitClick(idx)}
-                aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}
-              >
-                <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-              </div>
-            ))}
-
-            {/* P1 Store — col 8, spans both rows */}
-            <div className="mnc-store" style={{
-              gridColumn: 8, gridRow: '1 / 3',
-              borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206',
-            }}>
-              <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
-              <div className="mnc-store-label">P1</div>
-              <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>
-                {pits[6]}
-              </div>
-              <div className="mnc-store-label">store</div>
-            </div>
-
-            {/* P1 pits — row 2, cols 2–7 */}
-            {p1Display.map((idx, i) => (
-              <div
-                key={idx}
-                className={pitClass(idx)}
-                style={{ gridRow: 2, gridColumn: i + 2 }}
-                onClick={() => handlePitClick(idx)}
-                aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}
-              >
-                <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-              </div>
-            ))}
-          </div>
+          <MncBoardCanvas
+            pits={pits}
+            pitState={(idx) => {
+              const ownMin = player === 1 ? 0 : 7, ownMax = player === 1 ? 5 : 12;
+              return {
+                clickable: !done && !animatingRef.current && idx >= ownMin && idx <= ownMax && pits[idx] > 0,
+                flash: flashPits.has(idx),
+                capture: captureFlash.has(idx),
+              };
+            }}
+            storeGlowL={!done && player === 2 ? p2Color : null}
+            storeGlowR={!done && player === 1 ? p1Color : null}
+            onPit={handlePitClick}
+          />
 
           {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
 
@@ -11118,8 +11071,6 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
   }
 
   // ----- play phase -----
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
   const p1Color = C.accent, p2Color = C.rose;
   const activeColor = player === 1 ? p1Color : p2Color;
   const leadingRecord = globalRecord != null && pits[6] > globalRecord;
@@ -11129,16 +11080,6 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
     if (idx < 0 || idx > 5 || pits[idx] === 0) return;
     applyMove(idx, 1);
   };
-  const pitClass = (idx) => {
-    const isP1Pit = idx <= 5;
-    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
-    const cls = ['mnc-pit'];
-    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
-    if (flashPits.has(idx)) cls.push('mnc-flash');
-    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
-    return cls.join(' ');
-  };
-
   return (
     <div>
       <div className="mnc-daily-header">
@@ -11176,31 +11117,19 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
           : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits'}
       </div>
 
-      <div className="mnc-board">
-        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
-          <div className="mnc-store-label">AI</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p2Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
-          <div className="mnc-store-label">You</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p1Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
-            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-      </div>
+      <MncBoardCanvas
+        pits={pits}
+        pitState={(idx) => ({
+          clickable: !done && player === 1 && idx <= 5 && pits[idx] > 0 && !animatingRef.current,
+          flash: flashPits.has(idx),
+          capture: captureFlash.has(idx),
+        })}
+        storeGlowL={!done && player === 2 ? p2Color : null}
+        storeGlowR={!done && player === 1 ? p1Color : null}
+        labelL="AI"
+        labelR="You"
+        onPit={handlePitClick}
+      />
 
       {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
       {becameRecord && <div className="mnc-banner" style={{ color: C.gold }}>🏆 New daily record!</div>}
@@ -11550,21 +11479,9 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     applyMove(idx, 1);
   };
 
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
   const p1Color = C.accent;
   const p2Color = C.rose;
   const activeColor = player === 1 ? p1Color : p2Color;
-
-  const pitClass = (idx) => {
-    const isP1Pit = idx <= 5;
-    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
-    const cls = ['mnc-pit'];
-    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
-    if (flashPits.has(idx)) cls.push('mnc-flash');
-    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
-    return cls.join(' ');
-  };
 
   const aiHistory = history.filter(h => h.mode === 'ai');
   const stats = aiHistory.reduce(
@@ -11604,31 +11521,19 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
           : player === 2 ? 'AI is thinking… 🤖' : 'Your turn'}
       </div>
 
-      <div className="mnc-board">
-        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
-          <div className="mnc-store-label">AI</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p2Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
-          <div className="mnc-store-label">You</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p1Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
-            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-      </div>
+      <MncBoardCanvas
+        pits={pits}
+        pitState={(idx) => ({
+          clickable: !done && player === 1 && idx <= 5 && pits[idx] > 0 && !animatingRef.current,
+          flash: flashPits.has(idx),
+          capture: captureFlash.has(idx),
+        })}
+        storeGlowL={!done && player === 2 ? p2Color : null}
+        storeGlowR={!done && player === 1 ? p1Color : null}
+        labelL="AI"
+        labelR="You"
+        onPit={handlePitClick}
+      />
 
       {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
 
@@ -11741,17 +11646,6 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
     submitMove(idx);
   };
 
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
-
-  const pitClass = (idx) => {
-    const isP1Pit = idx <= 5;
-    const isMyPit = myPlayerNum === 1 ? isP1Pit : !isP1Pit;
-    const canClick = isMyTurn && isMyPit && pits[idx] > 0;
-    const cls = ['mnc-pit'];
-    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
-    return cls.join(' ');
-  };
 
   const p1Name = room && room.player1Name ? room.player1Name : 'P1';
   const p2Name = room && room.player2Name ? room.player2Name : 'P2';
@@ -11779,31 +11673,19 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
         </div>
       )}
 
-      <div className="mnc-board">
-        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: currentPlayer === 2 && status === 'active' ? p2Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={false} capturing={false} />
-          <div className="mnc-store-label">{myPlayerNum === 2 ? 'You' : oppName}</div>
-          <div className="mnc-store-score" style={{ color: currentPlayer === 2 && status === 'active' ? p2Color : '#C8A87A' }}>{pits[13]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p2Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }} onClick={() => handleClick(idx)}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={false} capturing={false} />
-          </div>
-        ))}
-        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: currentPlayer === 1 && status === 'active' ? p1Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={false} capturing={false} />
-          <div className="mnc-store-label">{myPlayerNum === 1 ? 'You' : oppName}</div>
-          <div className="mnc-store-score" style={{ color: currentPlayer === 1 && status === 'active' ? p1Color : '#C8A87A' }}>{pits[6]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p1Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handleClick(idx)}
-            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={false} capturing={false} />
-          </div>
-        ))}
-      </div>
+      <MncBoardCanvas
+        pits={pits}
+        pitState={(idx) => {
+          const isP1Pit = idx <= 5;
+          const isMyPit = myPlayerNum === 1 ? isP1Pit : !isP1Pit;
+          return { clickable: isMyTurn && isMyPit && pits[idx] > 0, flash: false, capture: false };
+        }}
+        storeGlowL={currentPlayer === 2 && status === 'active' ? p2Color : null}
+        storeGlowR={currentPlayer === 1 && status === 'active' ? p1Color : null}
+        labelL={myPlayerNum === 2 ? 'You' : oppName}
+        labelR={myPlayerNum === 1 ? 'You' : oppName}
+        onPit={handleClick}
+      />
     </div>
   );
 }

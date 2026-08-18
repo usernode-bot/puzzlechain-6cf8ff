@@ -155,7 +155,7 @@ const GA = {
    class, and the self-test then names that one class. */
 const TAPPABLE_CLASSES = [
   'tappable',
-  'an-tile', 'an-slot', 'p6-btn',
+  'p6-btn',
   'mf-canvas', 'board-canvas',
   'numkey',
   'cw-key', 'mnc-pit',
@@ -163,9 +163,10 @@ const TAPPABLE_CLASSES = [
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
-   (.an-rack button) can't live in TAPPABLE_CLASSES — that array is probed with
-   a bare class name — so they're appended verbatim by the emitters below. */
-const TAP_HIGHLIGHT_EXTRA_SELECTORS = ['.an-rack button'];
+   can't live in TAPPABLE_CLASSES — that array is probed with a bare class
+   name — so they're appended verbatim by the emitters below. (Empty since the
+   anagram rack moved onto its canvas; the plumbing stays for the next one.) */
+const TAP_HIGHLIGHT_EXTRA_SELECTORS = [];
 
 /* The canary is emitted from the SAME generator as the real rules, so probing
    it answers "is this stylesheet applying at all?" independently of whether any
@@ -676,7 +677,7 @@ body {
 .fit-col .status-bar, .fit-col .p6-hint, .fit-col .numpad,
 .fit-col .word-list, .fit-col .cp-pad, .fit-col .an-actions,
 .fit-col .cw-hint-bar, .fit-col .p6-banner, .fit-col .word-theme,
-.fit-col .an-dots, .fit-col .an-slots, .fit-col .an-rack,
+.fit-col .an-dots, .fit-col .an-boardbox,
 .fit-col .tm-daylabel, .fit-col .ds-pad, .fit-col .mf-controls,
 .fit-col .ng-modes,
 /* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
@@ -773,7 +774,7 @@ ${emitTapHighlightRules()}
 .cw-key:active, .cw-key[data-pressed],
 .mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
 .ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
-.ludo-token.movable:active, .an-tile:active, .an-slot:active {
+.ludo-token.movable:active {
   filter: brightness(0.9);
   transform: scale(0.96);
 }
@@ -3523,8 +3524,7 @@ ${emitTapHighlightRules()}
   .tappable:active, .tappable[data-pressed],
   .numkey:active, .cw-key:active,
   .mnc-pit:active, .ck-cell:active, .rv-cell:active,
-  .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
-  .an-slot:active { transform: none !important; }
+  .fir-cell:active, .gmk-cell:active, .ludo-token:active { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
@@ -4353,24 +4353,11 @@ ${emitTapHighlightRules()}
 }
 .an-dot.solved { border-color: ${C.emerald}; color: ${C.emerald}; }
 .an-dot.cur { border-color: ${C.accent}; color: ${C.text}; }
-.an-slots { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
-/* PHASE 2 (#129) — up from 40×48 / 44×52; both had hover-only feedback. */
-.an-slot {
-  width: 48px; height: 54px; border-radius: 8px; border: 1.5px dashed ${C.dim};
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-  font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: ${C.text};
+/* Slots + rack draw on one canvas; the box centers it. */
+.an-boardbox {
+  width: 100%; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px; touch-action: none;
 }
-.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgb(var(--c-accent-rgb) / 10%); }
-.an-slots.bad .an-slot.has { border-color: ${C.rose}; background: rgb(var(--c-rose-rgb) / 12%); animation: an-shake .4s; }
-@keyframes an-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-.an-rack { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
-.an-tile {
-  width: 44px; height: 52px; border-radius: 8px; border: 1px solid ${C.border}; cursor: pointer;
-  background: ${C.card}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
-  font-size: 20px; font-weight: 700;
-}
-.an-tile:hover { border-color: ${C.accent}; }
-.an-tile.used { opacity: .25; cursor: default; }
 .an-actions { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
 
 .cp-game { display: flex; flex-direction: column; align-items: center; }
@@ -21946,6 +21933,100 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     }
   };
 
+  /* Slots + rack draw on ONE canvas (#170 treatment): tap a rack tile to
+     place its letter, tap anywhere on the slot row to take one back — the
+     DOM grammar exactly. A wrong guess wiggles the slot row in rose. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: Math.max(word.length, 5), rows: 2 });
+  const anGap = 6;
+  const anW = Math.max(120, Math.floor(boxW));
+  const tileW = Math.max(34, Math.min(52, Math.floor((anW - anGap * (word.length - 1)) / word.length)));
+  const tileH = Math.round(tileW * 1.12);
+  const bandGap = 16;
+  const anBW = tileW * word.length + anGap * (word.length - 1);
+  const anBH = tileH * 2 + bandGap;
+  const anX0 = Math.floor((anW - anBW) / 2);
+
+  const flashRef = useRef(null);
+  const [flashFrame, setFlashFrame] = useState(0);
+  useEffect(() => {
+    if (!flash) { flashRef.current = null; return; }
+    flashRef.current = { t0: performance.now() };
+    let raf = 0;
+    const tick = () => {
+      if (!flashRef.current) return;
+      if (performance.now() - flashRef.current.t0 >= 450) flashRef.current = null;
+      setFlashFrame((f) => f + 1);
+      if (flashRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [flash]);
+
+  const anGeoRef = useRef({});
+  anGeoRef.current = { tileW, tileH, bandGap, anX0, gap: anGap, n: word.length };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const g = anGeoRef.current;
+      if (done) return;
+      if (p.y <= g.tileH + 4) { backspace(); return; }
+      if (p.y >= g.tileH + g.bandGap - 4) {
+        const i = Math.floor((p.x - g.anX0 + g.gap / 2) / (g.tileW + g.gap));
+        if (i >= 0 && i < g.n) tapTile(i);
+      }
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: anW,
+    height: anBH,
+    deps: [picked, wordIdx, done, tileW, flashFrame],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const fl = flashRef.current;
+      const p01 = fl ? (performance.now() - fl.t0) / 450 : 1;
+      const wiggle = fl ? Math.sin(p01 * Math.PI * 4) * 4 * (1 - p01) : 0;
+      ctx.font = `700 ${Math.round(tileW * 0.42)}px 'JetBrains Mono', monospace`;
+      for (let i = 0; i < word.length; i++) {
+        const x = anX0 + i * (tileW + anGap) + (picked[i] ? wiggle : 0);
+        const has = !!picked[i];
+        klRR(ctx, x + 1, 1, tileW - 2, tileH - 2, 8);
+        if (has) {
+          ctx.fillStyle = fl ? 'rgba(205,75,58,0.12)' : 'rgba(58,110,205,0.10)';
+          ctx.fill();
+          ctx.setLineDash([]);
+          ctx.strokeStyle = fl ? PAL.rose : PAL.accent;
+        } else {
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = PAL.dim;
+        }
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (has) {
+          ctx.fillStyle = PAL.text;
+          ctx.fillText(picked[i].ch, x + tileW / 2, tileH / 2 + 1);
+        }
+      }
+      const ry = tileH + bandGap;
+      for (let i = 0; i < rack.length; i++) {
+        const x = anX0 + i * (tileW + anGap);
+        ctx.save();
+        if (usedSet.has(i)) ctx.globalAlpha = 0.25;
+        klRR(ctx, x + 1, ry + 1, tileW - 2, tileH - 2, 8);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        ctx.fillStyle = PAL.text;
+        ctx.fillText(rack[i].ch, x + tileW / 2, ry + tileH / 2 + 1);
+        ctx.restore();
+      }
+    },
+  });
+
   return (
     <div className="an-game fit-col">
       <div className="status-bar">
@@ -21960,19 +22041,13 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           </span>
         ))}
       </div>
-      <div className={'an-slots' + (flash ? ' bad' : '')}>
-        {Array.from({ length: word.length }, (_, i) => (
-          <div key={i} className={'an-slot' + (picked[i] ? ' has' : '')} onClick={backspace}>
-            {picked[i] ? picked[i].ch : ''}
-          </div>
-        ))}
-      </div>
-      <div className="an-rack">
-        {rack.map((t, i) => (
-          <button key={i} className={'an-tile' + (usedSet.has(i) ? ' used' : '')} onClick={() => tapTile(i)}>
-            {t.ch}
-          </button>
-        ))}
+      <div className="an-boardbox" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="an-canvas board-canvas"
+          role="img"
+          aria-label={`Anagram — ${picked.length} of ${word.length} letters placed, word ${Math.min(solvedCount + 1, words.length)} of ${words.length}`}
+        />
       </div>
       <div className="an-actions">
         <button className="p6-btn" onClick={backspace} disabled={!picked.length}>⌫ Undo letter</button>

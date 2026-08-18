@@ -157,7 +157,7 @@ const TAPPABLE_CLASSES = [
   'tappable',
   'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
-  'wspr-tile', 'scell', 'numkey',
+  'scell', 'numkey',
   'wcell', 'cw-key', 'mnc-pit',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
   'm3-tile',
@@ -770,7 +770,6 @@ ${emitTouchActionRules()}
    never stick. */
 ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
-.wspr-tile:not(.dim):active, .wspr-tile[data-pressed],
 .scell:not(.given):active, .scell[data-pressed],
 .numkey:active, .numkey[data-pressed],
 .wcell:not(.found):active, .wcell[data-pressed],
@@ -783,7 +782,7 @@ ${emitTapHighlightRules()}
   transform: scale(0.96);
 }
 /* A press must never look "stuck on" for a disabled/decorative cell. */
-.wspr-tile.dim:active, .scell.given:active {
+.scell.given:active {
   filter: none; transform: none;
 }
 .sr-only {
@@ -909,19 +908,13 @@ ${emitTapHighlightRules()}
 .sdk-choice-name { display: block; font-size: 1.05rem; font-weight: 700; }
 .sdk-choice-note { display: block; color: ${C.muted}; font-size: 0.78rem; margin-top: 0.15rem; }
 /* ---- Word Sprint (daily Boggle-style word grid) ---- */
+/* The grid box hosts the letter canvas now; its width/aspect constraints are
+   what the fit-col rules and self-tests measure, unchanged. */
 .wspr-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-  max-width: 320px; margin: 0 auto; aspect-ratio: 1;
-}
-.wspr-tile {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
-  cursor: pointer; user-select: none; position: relative;
+  max-width: 320px; margin: 0 auto; aspect-ratio: 1;
+  touch-action: none;
 }
-.wspr-tile.onpath { background: ${C.accent}; color: #fff; border-color: ${C.accent}; }
-.wspr-tile.pathlast { box-shadow: 0 0 0 3px ${C.gold}; }
-.wspr-tile.dim { opacity: 0.45; cursor: default; }
 .wspr-word {
   text-align: center; font-family: 'JetBrains Mono', monospace; letter-spacing: 2px;
   font-size: 1.15rem; font-weight: 700; min-height: 1.6rem; margin: 0.7rem 0 0.4rem;
@@ -3682,7 +3675,7 @@ ${emitTapHighlightRules()}
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
-  .wspr-tile:active, .scell:active,
+  .scell:active,
   .numkey:active, .wcell:active, .cw-key:active,
   .mnc-pit:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
@@ -22923,6 +22916,62 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
 
   const fmtLeft = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
 
+  /* The letter grid is a CANVAS (#170 treatment): same tap grammar — start
+     anywhere, extend to an adjacent tile, tap an earlier tile to backtrack,
+     tap the last tile again to submit. Tile chrome reads PAL. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell: wsprCell } = useFitBox(boxRef, { cols: WSPR_SIZE, rows: WSPR_SIZE, minCell: 44, maxCell: 76, gap: 6 });
+  const wsprStep = wsprCell + 6;
+  const wsprSide = wsprStep * WSPR_SIZE - 6;
+  const geomRef = useRef(0);
+  geomRef.current = wsprStep;
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const stp = geomRef.current;
+      const c = Math.floor(p.x / stp), r = Math.floor(p.y / stp);
+      if (c < 0 || c >= WSPR_SIZE || r < 0 || r >= WSPR_SIZE) return;
+      const i = r * WSPR_SIZE + c;
+      const onPath = path.includes(i);
+      const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
+      if (selectable) tap(i);
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: wsprSide,
+    height: wsprSide,
+    deps: [path, done, wsprCell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < WSPR_SIZE * WSPR_SIZE; i++) {
+        const r = Math.floor(i / WSPR_SIZE), c = i % WSPR_SIZE;
+        const x = c * wsprStep, y = r * wsprStep;
+        const onPath = path.includes(i);
+        const isLast = path.length > 0 && path[path.length - 1] === i;
+        const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
+        ctx.save();
+        if (!selectable) ctx.globalAlpha = 0.45;
+        klRR(ctx, x, y, wsprCell, wsprCell, 10);
+        ctx.fillStyle = onPath ? PAL.accent : PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = onPath ? PAL.accent : PAL.border;
+        ctx.stroke();
+        ctx.font = `700 ${Math.round(wsprCell * 0.42)}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = onPath ? '#fff' : PAL.text;
+        ctx.fillText(L[i], x + wsprCell / 2, y + wsprCell / 2 + 1);
+        ctx.restore();
+        if (isLast) {
+          klRR(ctx, x - 1.5, y - 1.5, wsprCell + 3, wsprCell + 3, 11);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.stroke();
+        }
+      }
+    },
+  });
+
   return (
     // PHASE 3 (#131) — .fit-col + fitShell: true stops the page scrolling as the
     // found-words list grows (that list now has its own scroll strip).
@@ -22936,19 +22985,13 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
         <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
       </div>
 
-      <div className="wspr-grid">
-        {L.map((ch, i) => {
-          const onPath = path.includes(i);
-          const isLast = path.length > 0 && path[path.length - 1] === i;
-          const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
-          return (
-            <div
-              key={i}
-              className={'wspr-tile' + (onPath ? ' onpath' : '') + (isLast ? ' pathlast' : '') + (!selectable ? ' dim' : '')}
-              {...tapProps(() => selectable && tap(i))}
-            >{ch}</div>
-          );
-        })}
+      <div className="wspr-grid" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="wspr-canvas board-canvas"
+          role="grid"
+          aria-label={`Word Sprint letters — tracing ${word || 'nothing'}, ${found.length} words found`}
+        />
       </div>
 
       <div className="wspr-word">{word || ' '}</div>

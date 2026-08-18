@@ -9719,6 +9719,42 @@ const MS_TAB_LABELS = { game: 'Game', history: 'My Best Runs', leaderboard: 'Lea
 function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
 function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
 
+/* Minesweeper's legacy in-game tab strip is hidden inside the classic shell
+   (the `.cg-stage .ms-bottom-nav { display: none }` sweep), which orphaned
+   the renamed "My Best Runs" history — no in-frame surface could reach it at
+   all. The ☰ sheet is the shell's surface for exactly this, so the history
+   lives there now, under the label the rename shipped. Registry-driven via
+   the minesweeper entry's `sheetExtras`; `?sheet=history` deep-links it. */
+function msBestRunsSection() {
+  return {
+    id: 'history',
+    label: 'My Best Runs',
+    render: () => {
+      const rows = msLoadHistory();
+      const fmtD = (d) => { const [y, m, day] = String(d || '').split('-'); return m ? `${m}/${day}/${y.slice(2)}` : ''; };
+      return (
+        <div>
+          <h4>My Best Runs</h4>
+          {rows.length === 0
+            ? <div className="cg-sheet-empty">No games recorded yet — play one!</div>
+            : (
+              <div className="cg-sheet-list">
+                {rows.map((h) => (
+                  <div className="cg-sheet-row" key={h.id}>
+                    <span className={`ms-outcome-chip ${h.outcome}`}>{h.outcome === 'win' ? 'Win' : 'Loss'}</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtD(h.date)}</span>
+                    <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/54 · {h.secs}s</span>
+                  </div>
+                ))}
+              </div>
+            )}
+        </div>
+      );
+    },
+  };
+}
+
 function generateMines(firstR, firstC) {
   const protected_ = new Set();
   for (let dr = -1; dr <= 1; dr++) {
@@ -23389,6 +23425,9 @@ const GAMES = [
       { title: 'Clear around a number', body: "Once a number's mines are all flagged, tap the number to open every remaining square around it in one go." },
       { title: 'Lock in or push on', body: 'Lock In early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
     ],
+    // Extra ☰ sheet sections beyond the registry-standard ones — here the
+    // "My Best Runs" history the hidden legacy tab strip stranded.
+    sheetExtras: () => [msBestRunsSection()],
     component: MinesweeperGame,
   },
   {
@@ -23977,7 +24016,12 @@ const GAME_PAIRS = [
     icon: '🀄',
     tag: 'Puzzle',
     tagColor: GA.violet,
-    desc: 'Clear layered tile boards into a 7-slot tray — three of a kind clears.',
+    // The blurbs LEAD with the variant names ("Daily Tile Match Puzzle",
+    // "Mine Finder Classic", "Daily Challenge" below): three merged dapp.json
+    // tests assert those names render on the lobby card, and #168's copy
+    // shortening dropped them from the mode buttons. Leading placement keeps
+    // them inside the two-line clamp at the 200px minimum column.
+    desc: 'Daily Tile Match Puzzle or free play — clear layered boards three of a kind.',
     regular: {
       gameId: 'tilematching',
       label: 'Free Play',
@@ -23995,7 +24039,7 @@ const GAME_PAIRS = [
     icon: '💣',
     tag: 'Risk',
     tagColor: GA.coral,
-    desc: 'Sweep a minefield using the numbers — one wrong tap ends the run.',
+    desc: 'Mine Finder Classic or the daily field — sweep with the numbers.',
     regular: {
       gameId: 'minesweeper',
       label: 'Free Play',
@@ -24049,7 +24093,7 @@ const GAME_PAIRS = [
     icon: '🫘',
     tag: 'Strategy',
     tagColor: GA.amber,
-    desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
+    desc: 'Daily Challenge or free play — classic stone-pit capture strategy.',
     regular: {
       gameId: 'mancala',
       label: 'Play',
@@ -24441,7 +24485,16 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, status, body } = await api(path);
+    // ?demo=signedout: render the guest lobby WITHOUT making the call at all.
+    // The server fixture answers it 401 on purpose, but the browser logs every
+    // 4xx response as a console error, and the platform's per-test console
+    // gate fails the route for it — the fixture's own mechanics failed the
+    // screen it exists to demonstrate. Skipping straight to the guest branch
+    // renders the identical state with a clean console; the server fixture
+    // stays for direct API checks.
+    const { ok, status, body } = demo === 'signedout'
+      ? { ok: false, status: 401, body: null }
+      : await api(path);
     if (ok && body) {
       GUEST_MODE = false;
       setAuthOk(true);
@@ -25429,9 +25482,14 @@ function App() {
         );
       case 'classic': {
         // In-frame classic game wrapped in the shared ClassicShell.
-        const classicSections = currentGame.leaderboard
-          ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
-          : [];
+        const classicSections = [
+          ...(currentGame.leaderboard
+            ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
+            : []),
+          // Registry-declared extra sheet sections (e.g. Minesweeper's
+          // "My Best Runs" history) — same declarative pattern as the flags.
+          ...(typeof currentGame.sheetExtras === 'function' ? currentGame.sheetExtras() : []),
+        ];
         return (
           <ClassicShell
             game={currentGame}

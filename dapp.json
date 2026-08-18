@@ -327,7 +327,7 @@
     },
     {
       "name": "Minesweeper history tab renamed to My Best Runs",
-      "path": "/?game=minesweeper",
+      "path": "/?game=minesweeper&sheet=history",
       "expectText": "My Best Runs"
     },
     {

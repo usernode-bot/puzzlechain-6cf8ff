@@ -158,7 +158,7 @@ const TAPPABLE_CLASSES = [
   'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
   'scell', 'numkey',
-  'wcell', 'cw-key', 'mnc-pit',
+  'cw-key', 'mnc-pit',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
   'm3-tile',
 ];
@@ -772,7 +772,6 @@ ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
 .scell:not(.given):active, .scell[data-pressed],
 .numkey:active, .numkey[data-pressed],
-.wcell:not(.found):active, .wcell[data-pressed],
 .cw-key:active, .cw-key[data-pressed],
 .mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
 .ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
@@ -1368,12 +1367,10 @@ ${emitTapHighlightRules()}
 .lrow.pinned { margin-top: 0.3rem; border-top: 1px dashed ${C.border}; padding-top: 0.5rem; }
 
 /* ---- Word Hunt ---- */
+/* The box hosts the letter canvas; its sizing is what the fit-col rules and
+   self-tests measure, unchanged. Gridlines are drawn inside the canvas. */
 .wordsearch {
-  display: grid;
-  /* Kept in lockstep with WS_SIZE (#139). */
-  grid-template-columns: repeat(10, 1fr);
-  background: ${C.border};
-  gap: 1px; /* #149 — see .sudoku: no gap meant no gridlines ever rendered. */
+  display: flex; align-items: center; justify-content: center;
   border: 2px solid ${C.border};
   border-radius: 10px;
   overflow: hidden;
@@ -1382,23 +1379,6 @@ ${emitTapHighlightRules()}
   aspect-ratio: 1;
   touch-action: none;
 }
-.wcell {
-  background: ${C.card};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.05rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  transition: background 0.08s ease, color 0.08s ease;
-  aspect-ratio: 1;
-}
-.wcell.found { background: ${ca('emerald','33')}; color: ${C.emerald}; cursor: default; }
-.wcell.sel { background: ${ca('accent','55')}; color: #fff; }
 
 .word-list {
   display: flex;
@@ -1530,12 +1510,6 @@ ${emitTapHighlightRules()}
   color: ${C.gold};
   font-weight: 700;
   background: ${ca('gold','1a')};
-}
-.wcell.hinted {
-  background: ${ca('gold','33')};
-  outline: 2px solid ${C.gold};
-  outline-offset: -2px;
-  border-radius: 4px;
 }
 .cw-board {
   display: grid;
@@ -3676,7 +3650,7 @@ ${emitTapHighlightRules()}
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
   .scell:active,
-  .numkey:active, .wcell:active, .cw-key:active,
+  .numkey:active, .cw-key:active,
   .mnc-pit:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
   .an-slot:active, .m3-tile:active { transform: none !important; }
@@ -8722,6 +8696,61 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const selSet = new Set(sel);
 
+  /* The letter grid is a CANVAS (#170 treatment). The DOM board drag-selected
+     via pointerenter on sibling cells (after manually releasing the implicit
+     touch capture); the canvas keeps its capture and maps the pointer to a
+     cell directly, so a fast diagonal swipe can't skip cells. Chrome reads
+     PAL; letters render uppercase as the DOM's text-transform did. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell: wsCell } = useFitBox(boxRef, { cols: WS_SIZE, rows: WS_SIZE, minCell: 24, maxCell: 42, gap: 1 });
+  const wsStep = wsCell + 1;
+  const wsSide = wsStep * WS_SIZE - 1;
+  const wsStepRef = useRef(wsStep);
+  wsStepRef.current = wsStep;
+  const wsCellAt = (p) => {
+    const stp = wsStepRef.current;
+    const c = Math.max(0, Math.min(WS_SIZE - 1, Math.floor(p.x / stp)));
+    const r = Math.max(0, Math.min(WS_SIZE - 1, Math.floor(p.y / stp)));
+    return [r, c];
+  };
+  usePointerCell(canvasRef, {
+    onDown: (p) => { const [r, c] = wsCellAt(p); startSel(r, c); },
+    onDrag: (p) => { const [r, c] = wsCellAt(p); moveSel(r, c); },
+    onUp: () => endSel(),
+  }, { moveTolerance: 3 });
+  useCanvasBoard(canvasRef, {
+    width: wsSide,
+    height: wsSide,
+    deps: [foundCells, hintedStarts, sel, done, wsCell],
+    draw: (ctx) => {
+      ctx.fillStyle = PAL.border; // the 1px gridline gaps
+      ctx.fillRect(0, 0, wsSide, wsSide);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let r = 0; r < WS_SIZE; r++) {
+        for (let c = 0; c < WS_SIZE; c++) {
+          const i = idx(r, c);
+          const x = c * wsStep, y = r * wsStep;
+          const isFound = foundCells.has(i);
+          const isHinted = !isFound && hintedStarts.has(i);
+          const isSel = selSet.has(i);
+          ctx.fillStyle = isFound ? 'rgba(45,159,102,0.20)' : isHinted ? 'rgba(201,162,39,0.20)' : PAL.card;
+          ctx.fillRect(x, y, wsCell, wsCell);
+          if (isSel) { ctx.fillStyle = 'rgba(58,110,205,0.55)'; ctx.fillRect(x, y, wsCell, wsCell); }
+          if (isHinted) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = PAL.gold;
+            ctx.strokeRect(x + 1, y + 1, wsCell - 2, wsCell - 2);
+          }
+          ctx.font = `600 ${Math.round(wsCell * 0.5)}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = isSel ? '#fff' : isFound ? PAL.emerald : PAL.text;
+          ctx.fillText(String(letters[r][c]).toUpperCase(), x + wsCell / 2, y + wsCell / 2 + 1);
+        }
+      }
+    },
+  });
+
   return (
     <div className="fit-col">
       <div className="status-bar">
@@ -8742,34 +8771,13 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       <div className="word-theme">Theme: <b>{theme}</b> · drag across letters to find each word</div>
 
       <div className="fit-scale-box">
-      <div className="wordsearch" onPointerUp={endSel} onPointerLeave={endSel}>
-        {letters.map((row, r) =>
-          row.map((ch, c) => {
-            const i = idx(r, c);
-            const cls = ['wcell'];
-            if (foundCells.has(i)) cls.push('found');
-            else if (hintedStarts.has(i)) cls.push('hinted');
-            if (selSet.has(i)) cls.push('sel');
-            return (
-              <div
-                key={i}
-                className={cls.join(' ')}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  // Release implicit touch pointer-capture so pointerenter
-                  // fires on sibling cells as the finger drags across them.
-                  if (e.target.releasePointerCapture && e.target.hasPointerCapture && e.target.hasPointerCapture(e.pointerId)) {
-                    e.target.releasePointerCapture(e.pointerId);
-                  }
-                  startSel(r, c);
-                }}
-                onPointerEnter={() => moveSel(r, c)}
-              >
-                {ch}
-              </div>
-            );
-          })
-        )}
+      <div className="wordsearch" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="ws-canvas board-canvas"
+          role="grid"
+          aria-label={`Word search grid — ${found.size} of ${total} words found`}
+        />
       </div>
       </div>
 

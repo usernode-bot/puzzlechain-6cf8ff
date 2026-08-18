@@ -155,9 +155,9 @@ const GA = {
    class, and the self-test then names that one class. */
 const TAPPABLE_CLASSES = [
   'tappable',
-  'mf-cell', 'ng-cell', 'ds-cell', 'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
+  'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
-  'mj-tile', 'wspr-tile', 'ce-card', 'sp-col', 'scell', 'numkey',
+  'wspr-tile', 'scell', 'numkey',
   'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
   'tm-tile', 'm3-tile',
@@ -726,9 +726,10 @@ html.un-scroll-locked, body.un-scroll-locked {
 .fit-col .wspr-grid, .fit-col .dsnk-board { width: 100%; }
 /* Sudoku's difficulty chooser is a fixed-size card, not a board. */
 .fit-col .sdk-choose { flex: 0 0 auto; width: 100%; }
-/* #170 — Klondike's canvas board box is the flexible region (the .dbnc-wrap
-   idiom): useFitBox measures it and the canvas sizes its cards to fill it. */
-.kl-board-box {
+/* #170 — the canvas board box is the flexible region (the .dbnc-wrap idiom):
+   useFitBox measures it and the canvas sizes its cards/tiles to fill it.
+   Klondike first; Spider and Mahjong joined in the wave-1 migration. */
+.kl-board-box, .sp-board-box, .mj-board-box {
   position: relative; flex: 1 1 auto; min-height: 0; min-width: 0;
   display: flex; align-items: flex-start; justify-content: center;
   overscroll-behavior: contain;
@@ -769,9 +770,7 @@ ${emitTouchActionRules()}
    never stick. */
 ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
-.mj-tile:active, .mj-tile[data-pressed],
 .wspr-tile:not(.dim):active, .wspr-tile[data-pressed],
-.ce-card:active, .ce-card[data-pressed],
 .scell:not(.given):active, .scell[data-pressed],
 .numkey:active, .numkey[data-pressed],
 .wcell:not(.found):active, .wcell[data-pressed],
@@ -787,23 +786,9 @@ ${emitTapHighlightRules()}
 }
 /* A press must never look "stuck on" for a disabled/decorative cell. */
 .wspr-tile.dim:active, .scell.given:active, .ms-cell.ms-revealed:active,
-.tm-tile.locked:active, .ce-card.face-down:active {
+.tm-tile.locked:active {
   filter: none; transform: none;
 }
-/* Selected-card affordance — tapping a card gave no sign it landed (#123). */
-.ce-card.selected {
-  outline: 3px solid ${C.accent};
-  outline-offset: -1px;
-  box-shadow: 0 0 0 2px ${ca('accent', '55')}, 0 4px 10px var(--c-shadow-md);
-  transform: translateY(-3px);
-}
-/* A blocked Mahjong tile now says so instead of silently ignoring the tap. */
-@keyframes un-nudge {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
-}
-.mj-tile.nudge { animation: un-nudge 0.22s ease; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -3788,19 +3773,18 @@ ${emitTapHighlightRules()}
   .t2048-tile, .t2048-tile.is-new, .t2048-tile.is-merged,
   .tm-tile, .tm-tile.flash, .cw-row.shake,
   .mnc-pit.mnc-flash, .mnc-pit.mnc-capture-flash,
-  .tm-bar.bar-full, .mj-tile, .mj-tile.nudge, .ce-card,
+  .tm-bar.bar-full,
   .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
     animation: none !important;
     transition: none !important;
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
-  .mj-tile:active, .wspr-tile:active, .ce-card:active, .scell:active,
+  .wspr-tile:active, .scell:active,
   .numkey:active, .wcell:active, .cw-key:active, .ms-cell:active,
   .mnc-pit:active, .kt-cell:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
   .an-slot:active, .tm-tile:active, .m3-tile:active { transform: none !important; }
-  .ce-card.selected { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
@@ -4345,12 +4329,6 @@ ${emitTapHighlightRules()}
   border-radius: 999px; background: ${ca('gold', '22')}; color: ${C.gold};
   text-transform: capitalize;
 }
-/* PHASE 5 — card drag ghost, modelled on Block Fit's existing .bb-drag-ghost. */
-.ce-drag-ghost {
-  position: fixed; z-index: 70; pointer-events: none; opacity: 0.92;
-  transform: translate(-50%, -50%); display: flex; flex-direction: column;
-}
-.ce-drag-ghost .ce-card { box-shadow: 0 6px 18px var(--c-shadow-lg); }
 .kl-note {
   text-align: center; font-size: 0.8rem; font-weight: 600; color: ${C.rose};
   min-height: 1.1rem;
@@ -4584,60 +4562,19 @@ ${emitTapHighlightRules()}
   border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
 }
 
-.ce-card {
-  width: 44px; height: 62px; border-radius: 6px; box-sizing: border-box;
-  background: #F4F6FB; border: 1px solid #C9D2E4; cursor: pointer; user-select: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-family: 'JetBrains Mono', monospace; line-height: 1; flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,.4);
-}
-.ce-card .ce-rank { font-size: 15px; font-weight: 700; }
-.ce-card .ce-suit { font-size: 15px; margin-top: 2px; }
-.ce-card.red { color: #DC2626; }
-.ce-card.black { color: #1E293B; }
-.ce-card.down {
-  background: repeating-linear-gradient(135deg, #3730A3, #3730A3 4px, #4338CA 4px, #4338CA 8px);
-  border-color: #312E81;
-}
-.ce-card.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; }
-.ce-card.dim { opacity: .5; }
-.ce-card.ce-slot {
-  background: var(--c-well); border: 1.5px dashed ${C.dim}; box-shadow: none;
-  color: ${C.dim}; font-size: 18px;
-}
-
 /* #170 — the Klondike board is a canvas now (cards are drawn, not DOM), so
-   the column can afford to be wide: cards grow with it, capped in klLayout. */
+   the column can afford to be wide: cards grow with it, capped in klLayout.
+   Wave 1 gave Spider and Mahjong the same treatment: their fixed-pixel DOM
+   boards (and the FitScale shrink that made phone tiles sub-fingertip) are
+   gone; everything below the status bar is one sized-from-the-column canvas. */
 .kl-game { max-width: 620px; margin: 0 auto; }
-.kl-canvas { border-radius: 8px; }
+.kl-canvas, .sp-canvas, .mj-canvas { border-radius: 8px; }
 
-.sp-game { max-width: 420px; margin: 0 auto; }
+.sp-game { max-width: 620px; margin: 0 auto; }
 .sp-game .status-bar { flex-wrap: wrap; align-items: center; gap: 8px; }
-.sp-tab { display: flex; gap: 3px; justify-content: center; }
-.sp-col { position: relative; width: 44px; }
-.sp-col .ce-card { width: 44px; height: 54px; border-radius: 5px; }
-.sp-col .ce-card .ce-rank { font-size: 13px; }
-.sp-col .ce-card .ce-suit { font-size: 11px; margin-top: 1px; }
-.sp-col .ce-card.ce-slot.sm { font-size: 13px; }
 
-.mj-game { display: flex; flex-direction: column; align-items: center; }
+.mj-game { display: flex; flex-direction: column; }
 .mj-game .status-bar { align-items: center; gap: 8px; }
-.mj-board { position: relative; margin: 4px auto 0; }
-/* PHASE 2 (#120) — 36×46 was well under a fingertip, and FitScale shrank it
-   further. 44×56 with the shared press state; the layout offsets below scale
-   from MJ_TW/MJ_TH so the whole board stays inside FitScale. */
-.mj-tile {
-  position: absolute; width: 44px; height: 56px; border-radius: 6px; cursor: pointer;
-  background: linear-gradient(180deg, #F8FAFF, #DDE4F2); border: 1px solid #B7C2D8;
-  border-bottom-width: 3px; display: flex; align-items: center; justify-content: center;
-  font-size: 23px; user-select: none; box-shadow: 2px 3px 4px rgba(0,0,0,.45);
-  transition: transform 0.1s ease, filter 0.1s ease;
-}
-.mj-tile.hinted { box-shadow: 0 0 0 3px ${C.gold}, 2px 3px 4px rgba(0,0,0,.45); }
-.mj-tile.blocked { filter: brightness(.62); cursor: default; }
-.mj-tile.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; filter: brightness(1.08); }
-.mj-tile.up1 { border-color: #A3B0CB; }
-.mj-tile.up2, .mj-tile.up3 { border-color: #8E9DBD; }
 
 /* Nonogram — canvas board (slice 5). The clue gutters are drawn inside the
    canvas so grid + clues scale together off one useFitBox measurement. */
@@ -19654,7 +19591,8 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
    A small client-side engine every card/tile daily rides:
    seeded deck building + Fisher-Yates shuffling (mulberry32 via
    dailyRng, same PRNG family as lib/dapp.js's tile-match board
-   generator), a shared <CeCard> renderer, and a layered-tile
+   generator), the intrinsic-art card/tile draw helpers the canvas
+   boards share (klDrawCard and friends), and a layered-tile
    layout helper (free-tile rule + reverse-deal solvable dealing,
    the same layer/overlap model as lib/dapp.js's tileBoard).
    All phase-6 games are tier B server-side (snapshot + timing
@@ -19690,119 +19628,10 @@ function ceDeck(nDecks, suits, rng) {
   return rng ? ceShuffle(cards, rng) : cards;
 }
 
-// Shared card renderer. Face-down cards show a patterned back; face-up cards
-// show rank + suit in red/black. `sel` draws the selection ring.
-function CeCard({ card, sel, dim, onClick, style, onDragStart, dropTarget }) {
-  const cls = ['ce-card'];
-  if (!card.up) cls.push('down');
-  else cls.push(ceIsRed(card) ? 'red' : 'black');
-  if (sel) cls.push('selected'); // Phase 2 — a visible "this one is selected".
-  if (sel) cls.push('sel');
-  if (dim) cls.push('dim');
-  if (!card.up) cls.push('face-down');
-  return (
-    <div
-      className={cls.join(' ')}
-      style={style}
-      data-drop={dropTarget}
-      {...(onDragStart ? { onPointerDown: onDragStart } : {})}
-      {...tapProps(onClick)}
-    >
-      {card.up && (
-        <React.Fragment>
-          <div className="ce-rank">{CE_RANK_LABEL[card.r]}</div>
-          <div className="ce-suit">{CE_SUIT_GLYPH[card.s]}</div>
-        </React.Fragment>
-      )}
-    </div>
-  );
-}
-
-// An empty pile slot (foundation / empty column / stock base).
-function CeSlot({ label, onClick, className, dropTarget }) {
-  return (
-    <div
-      className={'ce-card ce-slot' + (className ? ' ' + className : '')}
-      data-drop={dropTarget}
-      {...tapProps(onClick)}
-    >
-      {label || ''}
-    </div>
-  );
-}
-
-/* PHASE 5 (#123) — finger drag for the DOM card games (Spider; Klondike's
-   canvas board hit-tests its own drags in board coordinates now, #170).
-   Tap-select/tap-destination was the only way to move a card, which is not how
-   anyone expects to play patience. Modelled on Block Fit's existing
-   .bb-drag-ghost rather than inventing a second drag idiom: a fixed-position
-   ghost tracks the pointer 1:1, and the drop target is resolved from
-   `data-drop` under the finger at release. If the pointer never travels past
-   the tolerance it is NOT a drag — the existing tap path runs instead, so both
-   input styles work and nothing regresses for mouse users. */
-const CE_DRAG_TOLERANCE = 8;
-
-function useCardDrag(onDrop) {
-  const [ghost, setGhost] = useState(null); // { cards, x, y }
-  const live = useRef(null);
-  const onDropRef = useRef(onDrop);
-  onDropRef.current = onDrop;
-
-  // Begin a potential drag. `payload` identifies the source; `cards` is what
-  // the ghost renders (a run, for a tableau grab).
-  const begin = (e, payload, cards) => {
-    if (!cards || !cards.length) return;
-    live.current = {
-      payload, cards, startX: e.clientX, startY: e.clientY, moved: false,
-      pointerId: e.pointerId,
-    };
-    // Deliberately NOT setPointerCapture on the card: capture would retarget
-    // every later event to the card and break elementFromPoint's usefulness.
-  };
-
-  useEffect(() => {
-    const onMove = (e) => {
-      const d = live.current;
-      if (!d) return;
-      if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < CE_DRAG_TOLERANCE) return;
-      d.moved = true;
-      d.lastX = e.clientX; d.lastY = e.clientY;
-      setGhost({ cards: d.cards, x: e.clientX, y: e.clientY });
-      if (e.cancelable) e.preventDefault();
-    };
-    const onUp = (e) => {
-      const d = live.current;
-      live.current = null;
-      setGhost(null);
-      if (!d || !d.moved) return; // a tap, not a drag — let tapProps handle it
-      // Hide the ghost before hit-testing or it eats the point (it is
-      // pointer-events: none, but elementFromPoint is cheaper to trust this way).
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const target = el && el.closest ? el.closest('[data-drop]') : null;
-      onDropRef.current && onDropRef.current(d.payload, target ? target.getAttribute('data-drop') : null);
-    };
-    window.addEventListener('pointermove', onMove, { passive: false });
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
-    };
-  }, []);
-
-  // True while a real drag is in flight — callers suppress their tap handling.
-  const dragging = !!ghost;
-  const ghostEl = ghost ? (
-    <div className="ce-drag-ghost" style={{ left: ghost.x, top: ghost.y }}>
-      {ghost.cards.map((c, i) => (
-        <CeCard key={c.id || i} card={c} style={{ marginTop: i ? -34 : 0 }} />
-      ))}
-    </div>
-  ) : null;
-
-  return { begin, dragging, ghostEl };
-}
+/* The DOM card renderer (CeCard/CeSlot) and the elementFromPoint drag hook
+   (useCardDrag) that carried the pre-canvas solitaires were REMOVED in the
+   wave-1 migration: Spider was their last consumer, and both solitaires now
+   hit-test drags in board coordinates on their canvases (#170's pattern). */
 
 /* ---- Klondike Solitaire (daily) -------------------------------------------
    Classic single-deck patience: 7 tableau columns, draw-1 stock with
@@ -20413,6 +20242,71 @@ function spSweep(n) {
   return swept;
 }
 
+/* The Spider board is a CANVAS now — the #170 Klondike treatment: the DOM
+   board fixed every column at 44px and FitScale-shrank the whole tableau,
+   so ten columns on a phone meant ~30px cards and elementFromPoint drag
+   hit-testing against scaled elements. The canvas sizes cards from the
+   measured box (they grow to fill a phone screen), the fan compresses
+   before the cards shrink, and drag/tap hit-testing is coordinate math in
+   the exact layout each frame was drawn from. Rules, state shape, progress
+   save/resume and scoring are unchanged; the cards reuse Klondike's
+   intrinsic deck art (klDrawCard/klDrawSlot read sizes off this layout). */
+function spLayout(w, h, st) {
+  const gap = Math.max(3, Math.min(8, Math.round(w * 0.01)));
+  const build = (cw) => {
+    const ch = Math.round(cw * 1.36);
+    const fontPx = Math.max(9, Math.min(15, Math.round(cw * 0.32)));
+    const totalW = cw * 10 + gap * 9;
+    const x0 = Math.floor((w - totalW) / 2);
+    let upStep = Math.max(fontPx + 6, Math.round(ch * 0.34));
+    let downStep = Math.max(4, Math.round(ch * 0.13));
+    const needed = (us, ds) => {
+      let need = ch;
+      for (const col of st.cols) {
+        let y = 0;
+        for (let i = 1; i < col.length; i++) y += col[i - 1].up ? us : ds;
+        need = Math.max(need, y + ch);
+      }
+      return need;
+    };
+    const avail = Math.max(0, h);
+    // Compress the fan before shrinking the cards (the Klondike rule): a
+    // readable top card beats a taller sliver of a buried one.
+    let guard = 0;
+    while (avail > 0 && needed(upStep, downStep) > avail && guard++ < 80) {
+      if (downStep > 4) downStep -= 1;
+      else if (upStep > 11) upStep -= 1;
+      else break;
+    }
+    const fits = avail === 0 || needed(upStep, downStep) <= avail;
+    return { w, h, gap, cw, ch, fontPx, x0, upStep, downStep, fits };
+  };
+  let cw = Math.min(60, Math.floor((w - gap * 9) / 10));
+  let ly = build(cw);
+  let guard = 0;
+  while (!ly.fits && cw > 24 && guard++ < 30) { cw -= 2; ly = build(cw); }
+  ly.colX = (p) => ly.x0 + p * (ly.cw + ly.gap);
+  // Absolute y of every card, shared by the draw pass and the hit-test.
+  ly.colYs = st.cols.map((col) => {
+    let y = 0;
+    return col.map((c) => { const yy = y; y += c.up ? ly.upStep : ly.downStep; return yy; });
+  });
+  return ly;
+}
+
+// Topmost card under a canvas point (i null = the empty column itself); a
+// point below a stack still targets the column, like the DOM board's
+// tap-the-column-background behaviour.
+function spHitAt(ly, st, x, y) {
+  const p = Math.floor((x - ly.x0 + ly.gap / 2) / (ly.cw + ly.gap));
+  if (p < 0 || p > 9) return null;
+  const col = st.cols[p];
+  for (let i = col.length - 1; i >= 0; i--) {
+    if (y >= ly.colYs[p][i] && y < ly.colYs[p][i] + ly.ch) return { p, i };
+  }
+  return { p, i: col.length ? col.length - 1 : null };
+}
+
 function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const freshDeal = useRef(null);
@@ -20520,17 +20414,89 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
     });
   };
 
-  // #123 — drag (useCardDrag; Klondike moved to canvas-native dragging, #170).
-  const drag = useCardDrag((payload, dropId) => {
-    if (done || !dropId) return;
-    const [z, idx] = dropId.split(':');
-    if (z !== 'col') return;
-    moveRun(payload.p, payload.i, Number(idx));
+  /* #123/#170 — canvas plumbing + drag, the Klondike pattern: the box is the
+     fit column's flexible region, the layout is recomputed from the CURRENT
+     state each render, the authoritative drag lives in a ref (pointer events
+     outrun React renders) and the state copy only schedules repaints. */
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 10, rows: 1 });
+  const W = Math.floor(boxW), H = Math.floor(boxH);
+  const ly = W > 80 && H > 80 ? spLayout(W, H, st) : null;
+  const lyRef = useRef(ly);
+  lyRef.current = ly;
+
+  const [drag, setDrag] = useState(null); // { src:{p,i}, cards, x, y, gx, gy }
+  const dragRef = useRef(null);
+  const pendRef = useRef(null);
+  const setDragBoth = (d) => { dragRef.current = d; setDrag(d); };
+
+  usePointerCell(canvasRef, {
+    onDown: (pt) => {
+      pendRef.current = null;
+      if (dragRef.current) setDragBoth(null); // a cancelled drag left a ghost
+      const l = lyRef.current;
+      if (done || !l) return;
+      const hit = spHitAt(l, st, pt.x, pt.y);
+      if (!hit || hit.i == null) return;
+      if (!runOk(st.cols[hit.p], hit.i)) return;
+      pendRef.current = {
+        src: { p: hit.p, i: hit.i }, cards: st.cols[hit.p].slice(hit.i),
+        x0: l.colX(hit.p), y0: l.colYs[hit.p][hit.i], px: pt.x, py: pt.y,
+      };
+    },
+    onDrag: (pt, info) => {
+      const pend = pendRef.current;
+      if (done || !pend || !info.moved) return;
+      const d = dragRef.current ||
+        { src: pend.src, cards: pend.cards, gx: pend.px - pend.x0, gy: pend.py - pend.y0 };
+      setDragBoth({ ...d, x: pt.x, y: pt.y });
+    },
+    onUp: (pt) => {
+      pendRef.current = null;
+      const d = dragRef.current;
+      if (!d) return;
+      setDragBoth(null);
+      if (done) return;
+      const l = lyRef.current;
+      if (!l) return;
+      const p = Math.max(0, Math.min(9, Math.floor((pt.x - l.x0 + l.gap / 2) / (l.cw + l.gap))));
+      moveRun(d.src.p, d.src.i, p); // refusals explain themselves in moveRun
+    },
+    onTap: (pt) => {
+      const l = lyRef.current;
+      if (done || !l) return;
+      const hit = spHitAt(l, st, pt.x, pt.y);
+      if (!hit) { setSel(null); return; }
+      tapCol(hit.p, hit.i);
+    },
+  }, { moveTolerance: 8 });
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [st, sel, drag, done, W, H],
+    draw: (ctx) => {
+      const l = lyRef.current;
+      if (!l) return;
+      const dragSrc = drag && drag.src;
+      for (let p = 0; p < 10; p++) {
+        const col = st.cols[p];
+        const hideFrom = dragSrc && dragSrc.p === p ? dragSrc.i : Infinity;
+        if (!col.length || hideFrom === 0) klDrawSlot(ctx, l, l.colX(p), 0);
+        for (let i = 0; i < col.length && i < hideFrom; i++) {
+          klDrawCard(ctx, l, l.colX(p), l.colYs[p][i], col[i],
+            { sel: sel && sel.p === p && i >= sel.i });
+        }
+      }
+      // The dragged run rides the finger, drawn last so it's on top.
+      if (drag) {
+        const dx = drag.x - drag.gx, dy = drag.y - drag.gy;
+        drag.cards.forEach((c, i) => klDrawCard(ctx, l, dx, dy + i * l.upStep, c, { shadow: i === 0 }));
+      }
+    },
   });
 
-  const maxCol = Math.max(...st.cols.map((c) => c.length), 1);
-  // Raised from a fixed 13px so the exposed strip of a buried card is aimable.
-  const step = maxCol > 16 ? 14 : maxCol > 12 ? 18 : 22;
   return (
     <div className="sp-game fit-col">
       <div className="status-bar">
@@ -20541,38 +20507,19 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
           Deal +10 ({Math.floor(st.stock.length / 10)})
         </button>
       </div>
-      <FitScale>
-      <div className="sp-tab">
-        {st.cols.map((col, p) => (
-          <div
-            key={p}
-            className="sp-col"
-            data-drop={'col:' + p}
-            style={{ height: 54 + (maxCol - 1) * step }}
-            onClick={(e) => { if (e.target === e.currentTarget) tapCol(p, col.length ? col.length - 1 : null); }}
-          >
-            {col.length === 0 && <CeSlot className="sm" onClick={() => tapCol(p, null)} dropTarget={'col:' + p} />}
-            {col.map((c, i) => (
-              <CeCard
-                key={c.id}
-                card={c}
-                sel={sel && sel.p === p && i >= sel.i}
-                onClick={() => tapCol(p, i)}
-                onDragStart={runOk(col, i) ? (e) => drag.begin(e, { p, i }, col.slice(i)) : undefined}
-                dropTarget={'col:' + p}
-                style={{ position: 'absolute', top: i * step, left: 0, zIndex: i }}
-              />
-            ))}
-          </div>
-        ))}
+      <div className="sp-board-box" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="sp-canvas board-canvas"
+          role="img"
+          aria-label={`Spider board — ${st.done8}/8 runs cleared, ${Math.floor(st.stock.length / 10)} deals left, ${st.moves} moves`}
+        />
       </div>
-      </FitScale>
       <div className="kl-note">{note}</div>
       <div className="p6-hint">One suit: drag (or tap) any descending run. Build K→A to clear a run — 8 clears win.</div>
       <div className="mj-controls">
         <button onClick={giveUp} disabled={done}>🏳️ Give up</button>
       </div>
-      {drag.ghostEl}
     </div>
   );
 }
@@ -20755,6 +20702,90 @@ function mjHasMove(faces, removed, layout, freeSet) {
   return !!mjFindPair(faces, removed, layout, freeSet);
 }
 
+/* The Mahjong board is a CANVAS now (#170 treatment): the DOM board
+   positioned 60 absolutely-placed 44px tiles at fixed pixel offsets and
+   FitScale-shrank the whole stack, so phones got sub-fingertip tiles.
+   Tiles now size from the measured box, and the tap hit-test walks the
+   same painter's order the frame was drawn in, so overlapping layers
+   resolve exactly as they look. Layout coords are half-tile units
+   (p.x, p.y); a layer lifts p.z * lift px, like the DOM's -5px steps. */
+function mjGeom(w, h, L) {
+  let maxX = 0, maxY = 0, maxZ = 0;
+  for (const p of L) { maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); maxZ = Math.max(maxZ, p.z); }
+  const padX = 6;
+  const build = (tw) => {
+    const th = Math.round(tw * 1.27);
+    const lift = Math.max(3, Math.round(th * 0.09));
+    return { tw, th, lift, bw: maxX * (tw / 2) + tw + padX * 2, bh: maxY * (th / 2) + th + maxZ * lift + 10 };
+  };
+  let tw = Math.min(56, Math.floor((w - padX * 2) / (maxX / 2 + 1)));
+  let g = build(tw);
+  let guard = 0;
+  while (g.bh > h && tw > 20 && guard++ < 60) { tw -= 1; g = build(tw); }
+  const ox = Math.floor((w - g.bw) / 2) + padX;
+  const oy = maxZ * g.lift + 4;
+  const at = (p) => [ox + p.x * (g.tw / 2), oy + p.y * (g.th / 2) - p.z * g.lift];
+  return { ...g, w, h, ox, oy, at, glyphPx: Math.round(g.tw * 0.52) };
+}
+
+// Painter's order — z asc, then y, then x — matching the DOM zIndex rule
+// (z*100 + y). Hit-testing walks it in reverse so the topmost tile wins.
+function mjPaintOrder(L) {
+  return L.map((_, i) => i).sort((a, b) =>
+    (L[a].z - L[b].z) || (L[a].y - L[b].y) || (L[a].x - L[b].x));
+}
+
+function mjHitAt(geo, L, removed, order, x, y) {
+  for (let k = order.length - 1; k >= 0; k--) {
+    const i = order[k];
+    if (removed[i]) continue;
+    const [tx, ty] = geo.at(L[i]);
+    if (x >= tx && x < tx + geo.tw && y >= ty && y < ty + geo.th) return i;
+  }
+  return null;
+}
+
+// Intrinsic tile art (the DOM .mj-tile look, hardcoded like every deck in
+// the app): edge-colour rounded rect with a 3px bottom lip, ivory vertical
+// gradient face, centred emoji glyph. Chrome states (selection ring, hint
+// glow, blocked scrim, refusal flash) draw over it; only they read PAL.
+const MJ_EDGE_BY_Z = ['#B7C2D8', '#A3B0CB', '#8E9DBD', '#8E9DBD', '#8E9DBD'];
+function mjDrawTile(ctx, geo, p, x, y, glyph, o) {
+  const { tw, th } = geo;
+  const r = Math.max(3, Math.round(tw * 0.13));
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 3;
+  klRR(ctx, x, y, tw, th, r);
+  ctx.fillStyle = MJ_EDGE_BY_Z[Math.min(p.z, MJ_EDGE_BY_Z.length - 1)];
+  ctx.fill();
+  ctx.restore();
+  const grad = ctx.createLinearGradient(0, y, 0, y + th);
+  grad.addColorStop(0, '#F8FAFF');
+  grad.addColorStop(1, '#DDE4F2');
+  klRR(ctx, x + 1, y + 1, tw - 2, th - 4, Math.max(2, r - 1));
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.font = geo.glyphPx + 'px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#1E293B';
+  ctx.fillText(glyph, x + tw / 2, y + th / 2 - 1);
+  if (o && o.blocked) {
+    klRR(ctx, x, y, tw, th, r);
+    ctx.fillStyle = 'rgba(9,14,24,0.38)'; // ≈ the DOM brightness(.62) dim
+    ctx.fill();
+  }
+  if (o && (o.sel || o.hinted || o.flash)) {
+    klRR(ctx, x - 1.5, y - 1.5, tw + 3, th + 3, r + 1);
+    ctx.lineWidth = o.hinted ? 3 : 2.5;
+    ctx.strokeStyle = o.flash ? PAL.rose : PAL.gold;
+    ctx.stroke();
+  }
+}
+
 function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const seedBase = useRef(null);
@@ -20815,6 +20846,34 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
   const freeSet = React.useMemo(() => mjFreeSet(removed, L), [removed, L]);
   const stuck = !done && remaining > 0 && !mjHasMove(faces, removed, L, freeSet);
 
+  // Canvas plumbing (#170 pattern). Paint order is fixed per layout.
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 9, rows: 5 });
+  const W = Math.floor(boxW), H = Math.floor(boxH);
+  const geo = W > 80 && H > 80 ? mjGeom(W, H, L) : null;
+  const geoRef = useRef(geo);
+  geoRef.current = geo;
+  const order = React.useMemo(() => mjPaintOrder(L), [L]);
+
+  // #120's blocked-tap feedback, canvas edition: a brief rose ring on the
+  // tile next to the warn line. One repaint per rAF while the flash lives.
+  const flashRef = useRef(null); // { i, t0 }
+  const [flashSeq, setFlashSeq] = useState(0);
+  const [flashFrame, setFlashFrame] = useState(0);
+  useEffect(() => {
+    if (!flashRef.current) return;
+    let raf = 0;
+    const tick = () => {
+      if (!flashRef.current) return;
+      if (performance.now() - flashRef.current.t0 >= 450) flashRef.current = null;
+      setFlashFrame((f) => f + 1);
+      if (flashRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [flashSeq]);
+
   const stateRef = useRef({});
   stateRef.current = { faces, removed, shuffles, pairs, secs, undos, layerPts, chainPts };
   const buildProgress = () => ({
@@ -20843,10 +20902,12 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
   const tap = (i) => {
     if (done || removed[i] || !freeSet.has(i)) {
       // #120 — a blocked tile used to absorb the tap silently, which is
-      // indistinguishable from an unresponsive board. Now it says so.
+      // indistinguishable from an unresponsive board. Now it says so: the
+      // warn line plus a brief flash ring on the tile (canvas edition of
+      // the old DOM nudge shake).
       if (!done && !removed[i]) {
-        const el = document.querySelector(`[data-mj="${i}"]`);
-        if (el) { el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); }
+        flashRef.current = { i, t0: performance.now() };
+        setFlashSeq((q) => q + 1);
         setWarn('That tile is covered or blocked on both sides.');
         setTimeout(() => setWarn(''), 1600);
       }
@@ -20940,11 +21001,37 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     }
   }, [stuck, shuffles, done]);
 
-  const TW = 44, TH = 56; // Phase 2 — up from 36x46.
-  const maxX = L.reduce((m, p) => Math.max(m, p.x), 0);
-  const maxY = L.reduce((m, p) => Math.max(m, p.y), 0);
-  const boardW = maxX * (TW / 2) + TW + 8;
-  const boardH = maxY * (TH / 2) + TH + 16;
+  usePointerCell(canvasRef, {
+    onTap: (pt) => {
+      const g = geoRef.current;
+      if (done || !g) return;
+      const i = mjHitAt(g, L, removed, order, pt.x, pt.y);
+      if (i == null) { setSel(null); return; }
+      tap(i);
+    },
+  }, { moveTolerance: 10 });
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [faces, removed, sel, hintPair, done, W, H, flashFrame],
+    draw: (ctx) => {
+      const g = geoRef.current;
+      if (!g) return;
+      const flash = flashRef.current;
+      for (const i of order) {
+        if (removed[i]) continue;
+        const [tx, ty] = g.at(L[i]);
+        mjDrawTile(ctx, g, L[i], tx, ty, MJ_FACES[faces[i]], {
+          blocked: !freeSet.has(i),
+          sel: sel === i,
+          hinted: hintPair && (hintPair[0] === i || hintPair[1] === i),
+          flash: flash && flash.i === i,
+        });
+      }
+    },
+  });
+
   return (
     <div className="mj-game fit-col">
       <div className="status-bar">
@@ -20957,28 +21044,14 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
         <div className="p6-banner">No free pair left — use your shuffle to keep going.</div>
       )}
       {warn && <div className="mj-warn">{warn}</div>}
-      <FitScale>
-      <div className="mj-board" style={{ width: boardW, height: boardH }}>
-        {L.map((p, i) => {
-          if (removed[i]) return null;
-          const free = freeSet.has(i);
-          const hinted = hintPair && (hintPair[0] === i || hintPair[1] === i);
-          return (
-            <div
-              key={i}
-              data-mj={i}
-              className={'mj-tile' + (free ? '' : ' blocked') + (sel === i ? ' sel' : '') + (hinted ? ' hinted' : '') + (p.z > 0 ? ' up' + p.z : '')}
-              style={{
-                left: p.x * (TW / 2),
-                top: p.y * (TH / 2) - p.z * 5,
-                zIndex: p.z * 100 + p.y,
-              }}
-              {...tapProps(() => tap(i))}
-            >{MJ_FACES[faces[i]]}</div>
-          );
-        })}
+      <div className="mj-board-box" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="mj-canvas board-canvas"
+          role="img"
+          aria-label={`Mahjong board — ${remaining}/${L.length} tiles left, ${layout.current.name} layout`}
+        />
       </div>
-      </FitScale>
       <div className="mj-controls">
         <button onClick={doUndo} disabled={undos <= 0 || !history.current.length || done}>↶ Undo ({undos})</button>
         <button onClick={buyHint} disabled={done || hints.exhausted || hints.buying}>💡 Hint ({hints.hintsLeft})</button>

@@ -773,6 +773,16 @@
       "expectText": "Give up"
     },
     {
+      "name": "Spider renders its canvas board",
+      "path": "/?game=spider&practice=1",
+      "expectSelector": "canvas.sp-canvas"
+    },
+    {
+      "name": "Mahjong renders its canvas board",
+      "path": "/?game=mahjongsol&practice=1",
+      "expectSelector": "canvas.mj-canvas"
+    },
+    {
       "name": "Gomoku pass-and-play confirms before placing",
       "path": "/?game=gomoku&mode=2p",
       "expectText": "Tap a point"

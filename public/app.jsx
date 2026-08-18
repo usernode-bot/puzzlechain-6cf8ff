@@ -157,7 +157,7 @@ const TAPPABLE_CLASSES = [
   'tappable',
   'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
-  'scell', 'numkey',
+  'numkey',
   'cw-key', 'mnc-pit',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
   'm3-tile',
@@ -770,7 +770,6 @@ ${emitTouchActionRules()}
    never stick. */
 ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
-.scell:not(.given):active, .scell[data-pressed],
 .numkey:active, .numkey[data-pressed],
 .cw-key:active, .cw-key[data-pressed],
 .mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
@@ -779,10 +778,6 @@ ${emitTapHighlightRules()}
 .m3-tile:active {
   filter: brightness(0.9);
   transform: scale(0.96);
-}
-/* A press must never look "stuck on" for a disabled/decorative cell. */
-.scell.given:active {
-  filter: none; transform: none;
 }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -878,22 +873,18 @@ ${emitTapHighlightRules()}
 .pill .pvalue.time { color: ${C.gold}; }
 
 /* ---- Sudoku ---- */
+/* The box hosts the board canvas; sizing is what fit-col rules and the
+   self-tests measure, unchanged. Gridlines + box separators draw inside. */
 .sudoku {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  background: ${C.border};
-  /* #149 — the "background: border" idiom only shows as gridlines if the grid
-     actually has a gap. Without it the cells sat flush and no separators ever
-     rendered, which is what made the 9×9 board hard to read. */
-  gap: 1px;
+  display: flex; align-items: center; justify-content: center;
   border: 2px solid ${C.border};
   border-radius: 10px;
   overflow: hidden;
   max-width: 360px;
   margin: 0 auto;
   aspect-ratio: 1;
+  touch-action: none;
 }
-.sudoku.s9 .scell { font-size: 1.02rem; }
 .sdk-choose { max-width: 380px; margin: 1.5rem auto; text-align: center; }
 .sdk-choose-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.35rem; }
 .sdk-choose-sub { color: ${C.muted}; font-size: 0.82rem; margin-bottom: 1.1rem; }
@@ -970,25 +961,6 @@ ${emitTapHighlightRules()}
 .ludo-token.p3 { background: ${C.gold}; }
 .ludo-token.p4 { background: ${GA.teal}; }
 .ludo-token.forfeited { opacity: 0.35; }
-.scell {
-  background: ${C.card};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.4rem;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.1s ease;
-  aspect-ratio: 1;
-}
-.scell.given { color: ${C.text}; cursor: default; }
-.scell.user { color: ${C.accent}; }
-.scell.sel { background: ${ca('accent','33')}; }
-.scell.hl { background: ${ca('accent','0a')}; }
-.scell.err { color: ${C.rose}; background: ${ca('rose','1a')}; }
-
 .numpad {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -1504,12 +1476,6 @@ ${emitTapHighlightRules()}
   font-size: 0.74rem;
   font-weight: 600;
   color: ${C.rose};
-}
-/* Hinted reveals in the daily puzzles */
-.scell.hinted {
-  color: ${C.gold};
-  font-weight: 700;
-  background: ${ca('gold','1a')};
 }
 .cw-board {
   display: grid;
@@ -3649,7 +3615,6 @@ ${emitTapHighlightRules()}
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
-  .scell:active,
   .numkey:active, .cw-key:active,
   .mnc-pit:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
@@ -7658,6 +7623,77 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   const boldRight = (c) => size === 9 ? (c === 2 || c === 5) : c === 2;
   const boldBottom = (r) => size === 9 ? (r === 2 || r === 5) : (r === 1 || r === 3);
 
+  /* The grid is a CANVAS (#170 treatment); the numpad and hint bar stay DOM
+     buttons — they are controls, not the board. Cell chrome reads PAL; the
+     box separators keep #149's rule (they out-read the 1px gridlines by
+     using the muted tone, one contrast step above border). */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell: sdkCell } = useFitBox(boxRef, { cols: size, rows: size, minCell: 26, maxCell: size === 9 ? 44 : 56, gap: 1 });
+  const sdkStep = sdkCell + 1;
+  const sdkSide = sdkStep * size - 1;
+  const sdkGeoRef = useRef({});
+  sdkGeoRef.current = { sdkStep, size, done };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const g = sdkGeoRef.current;
+      if (g.done) return;
+      const c = Math.floor(p.x / g.sdkStep), r = Math.floor(p.y / g.sdkStep);
+      if (c < 0 || c >= g.size || r < 0 || r >= g.size) return;
+      const locked = isGiven(r, c) || hintedCells.has(cellKey(r, c));
+      if (!locked) setSelected([r, c]);
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: sdkSide,
+    height: sdkSide,
+    deps: [grid, selected, errors, hintedCells, done, sdkCell],
+    draw: (ctx) => {
+      ctx.fillStyle = PAL.border; // 1px gridlines (#149's gap idiom, drawn)
+      ctx.fillRect(0, 0, sdkSide, sdkSide);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const key = `${r},${c}`;
+          const x = c * sdkStep, y = r * sdkStep;
+          const given = isGiven(r, c);
+          const hinted = hintedCells.has(cellKey(r, c));
+          const isSel = selKey === key;
+          const isHl = !isSel && selected &&
+            (selected[0] === r || selected[1] === c || boxAt(r, c, size) === selBox);
+          const isErr = errors.has(key);
+          let bg = PAL.card;
+          if (isErr) bg = 'rgba(205,75,58,0.12)';
+          else if (isSel) bg = 'rgba(58,110,205,0.28)';
+          else if (isHl) bg = 'rgba(58,110,205,0.06)';
+          else if (hinted) bg = 'rgba(201,162,39,0.12)';
+          ctx.fillStyle = bg;
+          ctx.fillRect(x, y, sdkCell, sdkCell);
+          const v = grid[r][c];
+          if (v !== 0) {
+            ctx.font = `600 ${Math.round(sdkCell * (size === 9 ? 0.5 : 0.55))}px 'JetBrains Mono', monospace`;
+            ctx.fillStyle = isErr ? PAL.rose : given ? PAL.text : hinted ? PAL.gold : PAL.accent;
+            ctx.fillText(String(v), x + sdkCell / 2, y + sdkCell / 2 + 1);
+          }
+        }
+      }
+      // Box separators over the gridlines (the #149 contrast rule).
+      ctx.strokeStyle = PAL.muted;
+      ctx.lineWidth = 2;
+      for (let c = 0; c < size; c++) {
+        if (!boldRight(c)) continue;
+        const x = (c + 1) * sdkStep - 0.5;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sdkSide); ctx.stroke();
+      }
+      for (let r = 0; r < size; r++) {
+        if (!boldBottom(r)) continue;
+        const y = (r + 1) * sdkStep - 0.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sdkSide, y); ctx.stroke();
+      }
+    },
+  });
+
   return (
     <div className="fit-col">
       <div className="status-bar">
@@ -7683,41 +7719,15 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
 
       <div
         className={'sudoku' + (size === 9 ? ' s9' : '')}
-        style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, maxWidth: size === 9 ? 420 : 360 }}
+        ref={boxRef}
+        style={{ maxWidth: size === 9 ? 420 : 360 }}
       >
-        {grid.map((row, r) =>
-          row.map((v, c) => {
-            const key = `${r},${c}`;
-            const given = isGiven(r, c);
-            const hinted = hintedCells.has(cellKey(r, c));
-            const locked = given || hinted;
-            const isSel = selKey === key;
-            const isHl = !isSel && selected &&
-              (selected[0] === r || selected[1] === c || boxAt(r, c, size) === selBox);
-            const isErr = errors.has(key);
-            const cls = ['scell'];
-            if (given) cls.push('given'); else if (hinted) cls.push('hinted'); else if (v !== 0) cls.push('user');
-            if (isSel) cls.push('sel'); else if (isHl) cls.push('hl');
-            if (isErr) cls.push('err');
-            return (
-              <div
-                key={key}
-                className={cls.join(' ')}
-                /* Box separators must out-read the 1px cell gridlines the grid's
-                   own gap now draws (#149) — in C.border, the same colour, the
-                   3×3 structure was invisible on the 9×9 board. C.muted is the
-                   next step up the palette's contrast ladder and re-themes. */
-                style={{
-                  borderRight: boldRight(c) ? `2px solid ${C.muted}` : undefined,
-                  borderBottom: boldBottom(r) ? `2px solid ${C.muted}` : undefined,
-                }}
-                {...tapProps(() => !locked && !done && setSelected([r, c]))}
-              >
-                {v !== 0 ? v : ''}
-              </div>
-            );
-          })
-        )}
+        <canvas
+          ref={canvasRef}
+          className="sdk-canvas board-canvas"
+          role="grid"
+          aria-label={`Sudoku ${size} by ${size} board — ${grid.flat().filter((v) => v !== 0).length} of ${size * size} filled`}
+        />
       </div>
 
       {!done && (

@@ -158,7 +158,7 @@ const TAPPABLE_CLASSES = [
   'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
   'wspr-tile', 'scell', 'numkey',
-  'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
+  'wcell', 'cw-key', 'mnc-pit', 'kt-cell',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
   'm3-tile',
 ];
@@ -775,7 +775,6 @@ ${emitTapHighlightRules()}
 .numkey:active, .numkey[data-pressed],
 .wcell:not(.found):active, .wcell[data-pressed],
 .cw-key:active, .cw-key[data-pressed],
-.ms-cell.ms-hidden:active, .ms-cell[data-pressed],
 .mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
 .kt-cell:active, .kt-cell[data-pressed],
 .ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
@@ -785,7 +784,7 @@ ${emitTapHighlightRules()}
   transform: scale(0.96);
 }
 /* A press must never look "stuck on" for a disabled/decorative cell. */
-.wspr-tile.dim:active, .scell.given:active, .ms-cell.ms-revealed:active {
+.wspr-tile.dim:active, .scell.given:active {
   filter: none; transform: none;
 }
 .sr-only {
@@ -1652,48 +1651,17 @@ ${emitTapHighlightRules()}
 }
 
 /* ---- Minesweeper ---- */
-.ms-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
+/* The board is a canvas (Mine Finder's exact pattern); the box keeps the old
+   .ms-grid footprint. Its light/dark look still keys off the RESOLVED theme
+   (the old data-ms-theme override pair) rather than raw PAL tokens. */
+.ms-boardbox {
   max-width: 360px;
   margin: 0 auto;
-  background: ${C.border};
-  border: 2px solid ${C.border};
-  border-radius: 10px;
-  overflow: hidden;
-  aspect-ratio: 1/1;
-  touch-action: none;
-}
-.ms-cell {
-  font-family: 'JetBrains Mono', monospace;
-  aspect-ratio: 1/1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  transition: background 0.08s ease;
-  border: none;
-  background: ${C.card};
+  touch-action: none;
 }
-.ms-cell.ms-hidden { background: ${C.card}; }
-.ms-cell.ms-hidden:hover { background: ${ca('accent','26')}; }
-.ms-cell.ms-revealed { background: ${C.surface}; cursor: default; }
-.ms-cell.ms-flagged { background: ${C.card}; cursor: default; }
-.ms-cell.ms-mine-dead { background: ${ca('rose','40')}; cursor: default; }
-.ms-cell.ms-exploded { background: ${ca('rose','99')}; cursor: default; }
-.ms-n1 { color: ${C.accent}; }
-.ms-n2 { color: ${C.emerald}; }
-.ms-n3 { color: ${C.rose}; }
-.ms-n4 { color: ${C.violet}; }
-.ms-n5 { color: ${C.gold}; }
-.ms-n6 { color: #06b6d4; }
-.ms-n7 { color: #be123c; }
-.ms-n8 { color: ${C.muted}; }
 @keyframes ms-pulse {
   0%, 100% { box-shadow: 0 0 0 0 ${ca('emerald','40')}; }
   50% { box-shadow: 0 0 0 6px ${ca('emerald','00')}; }
@@ -1859,13 +1827,6 @@ ${emitTapHighlightRules()}
   font-size: 0.9rem;
 }
 /* Light theme overrides for minesweeper board only */
-[data-ms-theme="light"] .ms-cell.ms-hidden { background: #e5e7eb; }
-[data-ms-theme="light"] .ms-cell.ms-hidden:hover { background: #d1d5db; }
-[data-ms-theme="light"] .ms-cell.ms-revealed { background: #f9fafb; color: #111827; }
-[data-ms-theme="light"] .ms-cell.ms-flagged { background: #e5e7eb; }
-[data-ms-theme="light"] .ms-grid { background: #9ca3af; border-color: #9ca3af; }
-[data-ms-theme="light"] .ms-cell.ms-mine-dead { background: #fca5a5; }
-[data-ms-theme="light"] .ms-cell.ms-exploded { background: #f87171; }
 
 /* ---- Mancala ---- */
 .mnc-board {
@@ -3723,7 +3684,7 @@ ${emitTapHighlightRules()}
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
   .wspr-tile:active, .scell:active,
-  .numkey:active, .wcell:active, .cw-key:active, .ms-cell:active,
+  .numkey:active, .wcell:active, .cw-key:active,
   .mnc-pit:active, .kt-cell:active, .ck-cell:active, .rv-cell:active,
   .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
   .an-slot:active, .m3-tile:active { transform: none !important; }
@@ -9675,6 +9636,102 @@ function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
   return next;
 }
 
+/* The Minesweeper board is a canvas — Mine Finder's exact pattern (they are
+   the same family on purpose). Self-contained because the board lives behind
+   the ☰ tab switch: usePointerCell binds on mount, so the canvas must exist
+   when its hooks run. The board's light/dark look still keys off the RESOLVED
+   theme (the old data-ms-theme pair), not the raw palette: base art is dark,
+   light pins its own greys — intrinsic to this board, like the daily's. */
+const MS_LIGHT = { grid: '#9ca3af', hidden: '#e5e7eb', revealed: '#f9fafb', mineDead: '#fca5a5', exploded: '#f87171' };
+function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverMine, done, onCellTap, onCellFlag, onCellAlt }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: MS_COLS, rows: MS_ROWS, minCell: 26, maxCell: 46, gap: 2 });
+  const cellStep = cell + 2;
+  const boardPx = cellStep * MS_COLS - 2;
+
+  const liveRef = useRef({});
+  liveRef.current = { revealed, flagged, done, cellStep };
+  const idxAt = (p) => {
+    const cs = liveRef.current.cellStep;
+    const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
+    if (c < 0 || c >= MS_COLS || r < 0 || r >= MS_ROWS) return -1;
+    return r * MS_COLS + c;
+  };
+  usePointerCell(canvasRef, {
+    onTap: (p) => { const i = idxAt(p); if (i >= 0 && !liveRef.current.done) onCellTap(i); },
+    onLongPress: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      onCellAlt(i);
+    },
+    onContext: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      onCellFlag(i);
+    },
+  });
+
+  useCanvasBoard(canvasRef, {
+    width: boardPx,
+    height: boardPx,
+    deps: [cell, revealed, flagged, mineSet, gameOverMine, done, theme],
+    draw: (ctx) => {
+      const light = theme === 'light';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const radius = Math.max(3, Math.round(cell * 0.16));
+      for (let i = 0; i < MS_ROWS * MS_COLS; i++) {
+        const r = Math.floor(i / MS_COLS), c = i % MS_COLS;
+        const x = c * cellStep, y = r * cellStep;
+        const isRev = revealed.has(i);
+        const isFlag = flagged.has(i);
+        const isMineVisible = done && mineSet && mineSet.has(i) && !isRev;
+        const isExploded = gameOverMine === i;
+        const adjVal = adjacency ? adjacency[i] : 0;
+
+        let fill = light ? MS_LIGHT.hidden : PAL.card;
+        if (isRev) fill = light ? MS_LIGHT.revealed : PAL.surface;
+        if (isMineVisible) fill = light ? MS_LIGHT.mineDead : 'rgba(205,75,58,.25)';
+        if (isExploded) fill = light ? MS_LIGHT.exploded : 'rgba(205,75,58,.60)';
+        klRR(ctx, x, y, cell, cell, radius);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = light ? MS_LIGHT.grid : PAL.border;
+        ctx.stroke();
+
+        const cx = x + cell / 2, cy = y + cell / 2;
+        if (isExploded) {
+          ctx.font = `${Math.round(cell * 0.6)}px system-ui, sans-serif`;
+          ctx.fillText('💥', cx, cy + 1);
+        } else if (isMineVisible) {
+          ctx.font = `${Math.round(cell * 0.58)}px system-ui, sans-serif`;
+          ctx.fillText('💣', cx, cy + 1);
+        } else if (isRev && adjVal > 0) {
+          ctx.font = `700 ${Math.round(cell * 0.5)}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = palOf(MF_NUM_COLORS[adjVal], PAL.text);
+          ctx.fillText(String(adjVal), cx, cy + 1);
+        } else if (isFlag) {
+          ctx.font = `${Math.round(cell * 0.55)}px system-ui, sans-serif`;
+          ctx.fillText('🚩', cx, cy + 1);
+        }
+      }
+    },
+  });
+
+  return (
+    <div className="ms-boardbox" ref={boxRef} onContextMenu={(e) => e.preventDefault()}>
+      <canvas
+        ref={canvasRef}
+        className="ms-canvas board-canvas"
+        role="grid"
+        aria-label={`Minesweeper, 8 by 8 board, ${revealed.size} cells revealed`}
+      />
+    </div>
+  );
+}
+
 function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   // The board follows the APP theme now (its own light/dark button is gone —
   // one control, in Settings). Base .ms-* rules are dark and
@@ -9694,7 +9751,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   // leaves SFX untouched.
   const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
   const [musicPaused, setMusicPaused] = useState(false);
-  const flagTimerRef = useRef(null);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
 
   // Reset when parent increments resetKey
@@ -9905,17 +9961,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     handleReveal(idx);
   };
 
-  // Long-press stays as the INVERSE of the current mode, so both gestures work.
-  const onPointerDown = (idx) => {
-    flagTimerRef.current = setTimeout(() => {
-      flagTimerRef.current = null;
-      if (revealed.has(idx)) return;
-      if (flagMode) handleReveal(idx); else handleFlag(idx);
-      cgHaptic(12);
-    }, 500);
-  };
-  const onPointerUp = () => { if (flagTimerRef.current) { clearTimeout(flagTimerRef.current); flagTimerRef.current = null; } };
-
   const minesLeft = MS_MINES - flagged.size;
 
   const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
@@ -9965,48 +10010,18 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
             Tap a number whose flags all match to clear around it.
           </div>
 
-          <div
-            className="ms-grid"
-            data-ms-theme={theme}
-            onContextMenu={e => e.preventDefault()}
-          >
-            {Array.from({ length: MS_ROWS * MS_COLS }, (_, idx) => {
-              const isRevealed = revealed.has(idx);
-              const isFlagged = flagged.has(idx);
-              const isMine = mineSet && mineSet.has(idx);
-              const isExploded = gameOverMine === idx;
-              const isMineVisible = done && mineSet && mineSet.has(idx) && !isRevealed;
-              const adjVal = adjacency && adjacency[idx];
-
-              let cls = 'ms-cell';
-              if (isExploded) cls += ' ms-exploded';
-              else if (isMineVisible) cls += ' ms-mine-dead';
-              else if (isRevealed) { cls += ' ms-revealed'; if (adjVal > 0) cls += ` ms-n${adjVal}`; }
-              else if (isFlagged) cls += ' ms-flagged';
-              else cls += ' ms-hidden';
-
-              let content = '';
-              if (isExploded) content = '💥';
-              else if (isMineVisible) content = '💣';
-              else if (isRevealed && adjVal > 0) content = adjVal;
-              else if (isRevealed && adjVal === 0) content = '';
-              else if (isFlagged) content = '🚩';
-
-              return (
-                <div
-                  key={idx}
-                  className={cls}
-                  onClick={() => handleCellTap(idx)}
-                  onContextMenu={e => { e.preventDefault(); handleFlag(idx); }}
-                  onPointerDown={() => onPointerDown(idx)}
-                  onPointerUp={onPointerUp}
-                  onPointerLeave={onPointerUp}
-                >
-                  {content}
-                </div>
-              );
-            })}
-          </div>
+          <MsBoardCanvas
+            theme={theme}
+            revealed={revealed}
+            flagged={flagged}
+            mineSet={mineSet}
+            adjacency={adjacency}
+            gameOverMine={gameOverMine}
+            done={done}
+            onCellTap={handleCellTap}
+            onCellFlag={handleFlag}
+            onCellAlt={(idx) => { if (flagMode) handleReveal(idx); else handleFlag(idx); cgHaptic(12); }}
+          />
 
           <div className="ms-action-row">
             <div className="ms-cashout-wrap">

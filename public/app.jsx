@@ -4591,6 +4591,11 @@ function palOf(nameOrLiteral, fallback) {
   if (!nameOrLiteral) return fallback || PAL.text;
   if (typeof nameOrLiteral !== 'string') return fallback || PAL.text;
   if (PAL[nameOrLiteral] != null) return PAL[nameOrLiteral];
+  // A C.* token ('var(--c-x)') handed to canvas code resolves through PAL —
+  // components that share one colour between DOM chrome and a canvas board
+  // (the Snakes & Ladders pawns) pass the token form of both.
+  const m = /^var\(--c-([a-z0-9-]+)\)$/.exec(nameOrLiteral);
+  if (m && PAL[m[1]] != null) return PAL[m[1]];
   return nameOrLiteral;
 }
 
@@ -9934,7 +9939,7 @@ function MncBoardCanvas({ pits, pitState, storeGlowL, storeGlowR, labelL, labelR
         ctx.fillStyle = MNC_WOOD.pit;
         ctx.fill();
         ctx.lineWidth = 2;
-        ctx.strokeStyle = s.glow || MNC_WOOD.pitEdge;
+        ctx.strokeStyle = s.glow ? palOf(s.glow, MNC_WOOD.pitHot) : MNC_WOOD.pitEdge;
         ctx.stroke();
         ctx.save();
         klRR(ctx, s.x, g.pad, g.storeW, storeH, g.storeW / 2);
@@ -9946,7 +9951,7 @@ function MncBoardCanvas({ pits, pitState, storeGlowL, storeGlowR, labelL, labelR
         ctx.fillStyle = MNC_WOOD.label;
         ctx.fillText(s.label.toUpperCase().slice(0, 6), s.x + g.storeW / 2, g.pad + storeH * 0.24);
         ctx.font = `600 ${fs}px 'JetBrains Mono', monospace`;
-        ctx.fillStyle = s.glow || MNC_WOOD.text;
+        ctx.fillStyle = s.glow ? palOf(s.glow, MNC_WOOD.text) : MNC_WOOD.text;
         ctx.fillText(String(pits[s.idx]), s.x + g.storeW / 2, g.pad + storeH / 2 + fs * 0.35);
         ctx.font = `600 ${Math.max(6, Math.round(g.storeW * 0.14))}px 'Space Grotesk', sans-serif`;
         ctx.fillStyle = MNC_WOOD.label;
@@ -17784,7 +17789,7 @@ function CnlBoardCanvas({ V, isMoksha, p1Pos, p2Pos, p1Color, p2Color }) {
       for (const [x, y, color] of [[x1, y1, p1Color], [x2, y2, p2Color]]) {
         ctx.beginPath();
         ctx.arc(x, y, rp, 0, Math.PI * 2);
-        ctx.fillStyle = color;
+        ctx.fillStyle = palOf(color, PAL.accent);
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#fff';

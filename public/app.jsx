@@ -159,7 +159,6 @@ const TAPPABLE_CLASSES = [
   'mf-canvas', 'board-canvas',
   'numkey',
   'cw-key',
-  'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
@@ -771,9 +770,7 @@ ${emitTouchActionRules()}
 ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
 .numkey:active, .numkey[data-pressed],
-.cw-key:active, .cw-key[data-pressed],
-.ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
-.ludo-token.movable:active {
+.cw-key:active, .cw-key[data-pressed] {
   filter: brightness(0.9);
   transform: scale(0.96);
 }
@@ -949,16 +946,6 @@ ${emitTapHighlightRules()}
   border: 2px solid ${C.border}; border-radius: 10px; background: #10131c;
   touch-action: none; max-width: 100%;
 }
-/* ---- Ludo seats 3/4 (2–4 player boards) ---- */
-.ludo-cell.home3 { background: ${ca('gold','22')}; }
-.ludo-cell.home4 { background: ${GA.teal}22; }
-.ludo-cell.base3 { background: ${ca('gold','33')}; border-color: ${C.gold}; }
-.ludo-cell.base4 { background: ${GA.teal}33; border-color: ${GA.teal}; }
-.ludo-cell.start3 { background: ${ca('gold','2e')}; }
-.ludo-cell.start4 { background: ${GA.teal}2e; }
-.ludo-token.p3 { background: ${C.gold}; }
-.ludo-token.p4 { background: ${GA.teal}; }
-.ludo-token.forfeited { opacity: 0.35; }
 .numpad {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -1547,11 +1534,14 @@ ${emitTapHighlightRules()}
    .ms-grid footprint. Its light/dark look still keys off the RESOLVED theme
    (the old data-ms-theme override pair) rather than raw PAL tokens. */
 .ms-boardbox {
-  max-width: 360px;
+  width: min(92vw, 360px, var(--cg-board, 360px));
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
+  aspect-ratio: 1; /* real height for useFitBox — see .kt-boardbox */
+  flex: 0 0 auto;
   touch-action: none;
 }
 @keyframes ms-pulse {
@@ -3157,13 +3147,10 @@ ${emitTapHighlightRules()}
 .cg-stage .ms-boardbox, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
 .cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
 .cg-stage .ms-bottom-nav, .cg-stage .mnc-bottom-nav, .cg-stage .t2048-bottom-nav { display: none; }
-/* PHASE 3 — the five phase-5 board games hardcoded width: min(92vw, 340–380px)
-   and ignored --cg-board, so board + status + legend + leaderboard was always
-   taller than a phone and you had to scroll to see whose turn it was. Same
-   pattern the three older classics above already used. */
-.cg-stage .ck-board, .cg-stage .rv-board, .cg-stage .gmk-board,
-.cg-stage .ludo-board { max-width: min(380px, var(--cg-board)) !important; }
-.cg-stage .fir-board { max-width: min(340px, var(--cg-board)) !important; }
+/* The five board-game canvases size from .brg-canvas-box, whose max-width
+   composes the per-board cap (--brg-cap, set inline by BrgBoardBox) with the
+   --cg-board viewport cap — the PHASE 3 "no scrolling to see whose turn it
+   is" rule, now one declaration instead of per-board !important overrides. */
 /* The board-game rooms stack status + board + legend + leaderboard, so cap the
    text chrome too — the board fitting is only half of "no scrolling to see
    whose turn it is". */
@@ -3353,16 +3340,20 @@ ${emitTapHighlightRules()}
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
-  .numkey:active, .cw-key:active,
-  .ck-cell:active, .rv-cell:active,
-  .fir-cell:active, .gmk-cell:active, .ludo-token:active { transform: none !important; }
+  .numkey:active, .cw-key:active { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
 .kt-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
 .kt-boardbox {
-  max-width: 480px; width: 100%; margin: 0 auto;
+  width: min(92vw, 480px, var(--cg-board, 480px)); max-width: 100%; margin: 0 auto;
   display: flex; align-items: center; justify-content: center;
+  /* aspect-ratio hands useFitBox a real height; without it the measure loop's
+     only height is the canvas's own, which pins the cell at minCell (~224px
+     boards on a 390px phone). flex 0 0 auto stops the stage's flex column
+     from shrinking the ratio box (and its width with it). */
+  aspect-ratio: 1;
+  flex: 0 0 auto;
   touch-action: none;
 }
 .kt-canvas { border-radius: 8px; }
@@ -3708,99 +3699,36 @@ ${emitTapHighlightRules()}
 }
 .brg-legend > span { display: inline-flex; align-items: center; gap: 0.3rem; }
 
-.ck-board {
-  display: grid; grid-template-columns: repeat(8, 1fr);
-  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
-  border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
-}
-.ck-cell { background: #d8c49a; display: flex; align-items: center; justify-content: center; }
-.ck-cell.dark { background: #7a5a3a; cursor: pointer; }
-.ck-cell.sel { box-shadow: inset 0 0 0 3px ${C.gold}; }
-.ck-piece {
-  width: 74%; height: 74%; border-radius: 50%;
+/* All five boards draw on canvases inside .brg-canvas-box; only the legend
+   swatches (.ck-piece-mini / .rv-disc-mini / .fir-disc-mini), the note/legend
+   text and the DOM affordances (Gomoku's confirm bar, Ludo's move list)
+   remain as elements. The box's max-width composes the per-board cap with
+   the --cg-board viewport cap; aspect-ratio hands useFitBox a real height
+   (see .kt-boardbox). */
+.brg-canvas-box {
+  /* A DEFINITE width, like the DOM boards' min(92vw, Npx) — width:100% would
+     resolve against the shrink-wrapped view wrapper (i.e. the legend's text
+     width). --cg-board folds in the viewport cap. */
+  width: min(92vw, var(--brg-cap, 380px), var(--cg-board, 380px));
+  max-width: 100%;
+  margin: 0 auto;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.85rem; color: #ffffffcc;
-  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.35);
+  /* An aspect-ratio flex item SHRINKS on the stage's main axis, and the ratio
+     drags the width down with it — refuse, and let .cg-scroll scroll instead
+     (what the DOM boards did). */
+  flex: 0 0 auto;
+  touch-action: none;
 }
-.ck-piece.p1 { background: ${C.accent}; }
-.ck-piece.p2 { background: #2b2f3d; border: 1px solid #555; }
 .ck-piece-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
 .ck-piece-mini.p1 { background: ${C.accent}; }
 .ck-piece-mini.p2 { background: #2b2f3d; border: 1px solid #555; }
-
-.rv-board {
-  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
-  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
-  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
-}
-.rv-cell { background: #1d5c3a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.rv-disc { width: 76%; height: 76%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
-.rv-disc.d1, .rv-disc-mini.d1 { background: #171a24; border: 1px solid #444; }
-.rv-disc.d2, .rv-disc-mini.d2 { background: #f2f0e8; }
 .rv-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
+.rv-disc-mini.d1 { background: #171a24; border: 1px solid #444; }
+.rv-disc-mini.d2 { background: #f2f0e8; }
 .rv-count { display: inline-flex; align-items: center; gap: 0.3rem; color: ${C.text}; font-weight: 600; }
-
-.fir-board {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
-  width: min(92vw, 340px); margin: 0 auto; padding: 8px;
-  background: #22335e; border-radius: 12px;
-}
-.fir-cell {
-  aspect-ratio: 1; background: ${C.bg}; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-}
-.fir-cell.last { box-shadow: 0 0 0 2px ${C.gold}; }
-.fir-disc { width: 86%; height: 86%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
-.fir-disc.d1, .fir-disc-mini.d1 { background: ${C.rose}; }
-.fir-disc.d2, .fir-disc-mini.d2 { background: ${C.gold}; }
 .fir-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
-
-.gmk-scroll { overflow-x: auto; }
-.gmk-board {
-  display: grid; grid-template-columns: repeat(15, 1fr); gap: 1px;
-  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
-  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 6px; overflow: hidden;
-}
-.gmk-cell { background: #b08b4f; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.gmk-cell.last { box-shadow: inset 0 0 0 2px ${C.gold}; }
-.gmk-stone { width: 78%; height: 78%; border-radius: 50%; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3); }
-.gmk-stone.s1 { background: #171a24; }
-.gmk-stone.s2 { background: #f2f0e8; }
-
-.ludo-board {
-  display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
-  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
-  background: ${C.surface}; border: 2px solid ${C.border}; border-radius: 10px;
-  position: relative; padding: 2px; gap: 1px;
-}
-.ludo-cell {
-  border-radius: 3px; display: flex; align-items: center; justify-content: center;
-  font-size: 0.55rem; color: ${C.muted};
-}
-.ludo-cell.ring { background: ${C.card}; border: 1px solid ${C.border}; }
-.ludo-cell.ring.safe { color: ${C.gold}; }
-.ludo-cell.ring.start1 { background: ${ca('accent','33')}; border-color: ${C.accent}; }
-.ludo-cell.ring.start2 { background: ${ca('rose','33')}; border-color: ${C.rose}; }
-.ludo-cell.home1 { background: ${ca('accent','22')}; border: 1px dashed ${ca('accent','66')}; }
-.ludo-cell.home2 { background: ${ca('rose','22')}; border: 1px dashed ${ca('rose','66')}; }
-.ludo-cell.base1 { background: ${ca('accent','18')}; border: 1px solid ${ca('accent','55')}; border-radius: 50%; }
-.ludo-cell.base2 { background: ${ca('rose','18')}; border: 1px solid ${ca('rose','55')}; border-radius: 50%; }
-.ludo-cell.center { background: ${ca('gold','22')}; border: 1px solid ${C.gold}; font-size: 0.8rem; }
-.ludo-token {
-  z-index: 2; width: 85%; height: 85%; border-radius: 50%; align-self: center; justify-self: center;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.55rem; font-weight: 700; color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-.ludo-token.p1 { background: ${C.accent}; }
-.ludo-token.p2 { background: ${C.rose}; }
-.ludo-token.movable { cursor: pointer; box-shadow: 0 0 0 2px ${C.gold}, 0 1px 3px rgba(0,0,0,0.5); animation: ludoPulse 0.9s ease-in-out infinite; }
-/* PHASE 2 — a 15x15 board puts each Ludo token inside a ~25px cell, and tokens
-   sharing a square overlap almost completely (5px offset). The board tap stays
-   as a shortcut; this pad is the unambiguous, full-size way to move. */
-.ludo-token::after {
-  content: ''; position: absolute; inset: -8px; /* hit slop, no layout change */
-}
+.fir-disc-mini.d1 { background: ${C.rose}; }
+.fir-disc-mini.d2 { background: ${C.gold}; }
 .brd-movelist {
   display: flex; flex-direction: column; gap: 0.4rem;
   width: min(92vw, 380px); margin: 0.7rem auto 0;
@@ -3819,11 +3747,8 @@ ${emitTapHighlightRules()}
 .brd-move-btn .brd-move-sub { font-size: 0.74rem; color: ${C.muted}; font-weight: 500; }
 .brd-move-btn.primary { border-color: ${C.accent}; background: ${ca('accent', '14')}; }
 /* PHASE 2 — Gomoku ghost-confirm. 15x15 in 380px is ~24px per intersection and
-   a mis-tap used to place a stone permanently. */
-.gmk-cell .gmk-ghost {
-  width: 62%; height: 62%; border-radius: 50%;
-  border: 2px dashed ${C.gold}; box-sizing: border-box;
-}
+   a mis-tap used to place a stone permanently. The ghost stone itself is drawn
+   on the canvas now; the confirm bar stays DOM. */
 .brd-confirm-bar {
   display: flex; gap: 0.5rem; width: min(92vw, 380px); margin: 0.6rem auto 0;
 }
@@ -3895,7 +3820,6 @@ ${emitTapHighlightRules()}
   text-align: center; font-size: 0.8rem; color: ${C.muted}; margin-top: 0.5rem;
 }
 .practice-note { font-weight: 500; opacity: 0.75; font-size: 0.82em; }
-@keyframes ludoPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 
 /* ---- Chutes & Ladders ---- */
 .cnl-banner {
@@ -18422,6 +18346,27 @@ function OnlineRoomSetup({ gameId, onReady }) {
 
 function ckOwnerOf(v) { return v === 1 || v === 3 ? 1 : v === 2 || v === 4 ? 2 : 0; }
 
+/* All five board-game views draw their boards on canvases now (#170
+   treatment) — the SAME components in the SAME BOARD_VIEWS registry, so
+   online rooms, pass-and-play and Versus Bot all inherit the change with
+   the move payloads untouched. Intrinsic art (checkers browns, Reversi
+   felt, the goban, Ludo seat colours) stays hardcoded per the palette
+   rules; only chrome reads PAL. Gomoku keeps its ghost-then-confirm bar
+   and Ludo its full-size move list — those are the deliberate dense-board
+   affordances, and they stay DOM. */
+/* The box gives useFitBox BOTH axes: width from the column (capped per board
+   via --brg-cap composed with the --cg-board viewport cap in one max-width),
+   height from aspect-ratio. Without the ratio the box's height would be the
+   canvas's own height, and the measure loop would pin the cell at minCell —
+   the exact trap that shrank Knight's Tour/Minesweeper to ~224px. */
+function BrgBoardBox({ boxRef, canvasRef, className, cap, ratio, ariaLabel }) {
+  return (
+    <div className="brg-canvas-box" style={{ '--brg-cap': cap, aspectRatio: ratio || '1 / 1' }} ref={boxRef}>
+      <canvas ref={canvasRef} className={className + ' board-canvas'} role="img" aria-label={ariaLabel} />
+    </div>
+  );
+}
+
 function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const [sel, setSel] = useState(null);
   const board = st.board || [];
@@ -18431,25 +18376,66 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     if (owner === myPlayerNum) { setSel(i === sel ? null : i); return; }
     if (sel != null && board[i] === 0) { submit({ from: sel, to: i }); setSel(null); }
   };
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: 8, rows: 8, minCell: 28, maxCell: 48 });
+  const side = cell * 8;
+  const liveRef = useRef({});
+  liveRef.current = { cell, board, isMyTurn };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const c = Math.floor(p.x / lv.cell), r = Math.floor(p.y / lv.cell);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      if ((r + c) % 2 === 1) click(r * 8 + c);
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [board, sel, cell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const dark = (r + c) % 2 === 1;
+        const x = c * cell, y = r * cell;
+        ctx.fillStyle = dark ? '#7a5a3a' : '#d8c49a'; // intrinsic checkers browns
+        ctx.fillRect(x, y, cell, cell);
+        if (sel === i) {
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+        }
+        const owner = ckOwnerOf(board[i]);
+        if (owner !== 0) {
+          ctx.beginPath();
+          ctx.arc(x + cell / 2, y + cell / 2, cell * 0.37, 0, Math.PI * 2);
+          ctx.fillStyle = owner === 1 ? palOf(C.accent, '#3A6ECD') : '#2b2f3d';
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = owner === 1 ? 'rgba(0,0,0,0.35)' : '#555';
+          ctx.stroke();
+          if (board[i] > 2) {
+            ctx.font = `${Math.round(cell * 0.4)}px system-ui, sans-serif`;
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillText('♛', x + cell / 2, y + cell / 2 + 1);
+          }
+        }
+      }
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.strokeRect(1, 1, side - 2, side - 2);
+    },
+  });
   return (
     <div>
       {st.mustJumpFrom != null && isMyTurn && (
         <div className="brg-note">Chain jump! Continue with the same piece.</div>
       )}
-      <div className="ck-board">
-        {board.map((v, i) => {
-          const r = Math.floor(i / 8), c = i % 8;
-          const dark = (r + c) % 2 === 1;
-          const owner = ckOwnerOf(v);
-          return (
-            <div key={i} className={'ck-cell' + (dark ? ' dark' : '') + (sel === i ? ' sel' : '')} {...tapProps(() => dark && click(i))}>
-              {owner !== 0 && (
-                <div className={'ck-piece p' + owner + (v > 2 ? ' king' : '')}>{v > 2 ? '♛' : ''}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ck-canvas" cap="360px"
+        ariaLabel="Checkers board" />
       <div className="brg-legend">
         <span><span className="ck-piece-mini p1" /> Player 1 (moves down)</span>
         <span><span className="ck-piece-mini p2" /> Player 2 (moves up)</span>
@@ -18458,10 +18444,59 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   );
 }
 
+// Reversi disc — the DOM disc's flat face + bottom inset shade, drawn.
+function rvDrawDisc(ctx, cx, cy, r, side) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = side === 1 ? '#171a24' : '#f2f0e8';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = side === 1 ? '#444' : 'rgba(0,0,0,0.25)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 1.5, Math.PI * 0.2, Math.PI * 0.8);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+  ctx.stroke();
+}
+
 function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
   const p1 = board.filter(x => x === 1).length;
   const p2 = board.filter(x => x === 2).length;
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: 8, rows: 8, minCell: 26, maxCell: 44, gap: 2, padX: 4, padY: 4 });
+  const step = cell + 2;
+  const side = step * 8 - 2 + 4; // 2px gutters between felt cells + 2px frame
+  const liveRef = useRef({});
+  liveRef.current = { step, board, isMyTurn };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - 2) / lv.step);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      const i = r * 8 + c;
+      if (lv.isMyTurn && lv.board[i] === 0) submit({ cell: i });
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [board, cell],
+    draw: (ctx) => {
+      klRR(ctx, 0, 0, side, side, 8);
+      ctx.fillStyle = PAL.border; // the gutter grid shows through between cells
+      ctx.fill();
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = 2 + c * step, y = 2 + r * step;
+        ctx.fillStyle = '#1d5c3a'; // intrinsic Reversi felt
+        ctx.fillRect(x, y, cell, cell);
+        if (board[i] !== 0) rvDrawDisc(ctx, x + cell / 2, y + cell / 2, cell * 0.38, board[i]);
+      }
+    },
+  });
   return (
     <div>
       <div className="brg-note">
@@ -18469,32 +18504,72 @@ function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
         <span className="rv-count"><span className="rv-disc-mini d2" /> {p2}</span>
         {st.passed && <span style={{ marginLeft: '0.6rem' }}>Opponent had no move — you go again.</span>}
       </div>
-      <div className="rv-board">
-        {board.map((v, i) => (
-          <div key={i} className="rv-cell" {...tapProps(() => isMyTurn && v === 0 && submit({ cell: i }))}>
-            {v !== 0 && <div className={'rv-disc d' + v} />}
-          </div>
-        ))}
-      </div>
+      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="rv-canvas" cap="360px"
+        ariaLabel={`Reversi board — ${p1} dark, ${p2} light`} />
     </div>
   );
 }
 
 function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: 7, rows: 6, minCell: 30, maxCell: 46, gap: 4, padX: 16, padY: 16 });
+  const step = cell + 4;
+  const W = step * 7 - 4 + 16, H = step * 6 - 4 + 16;
+  const liveRef = useRef({});
+  liveRef.current = { step, isMyTurn };
+  usePointerCell(canvasRef, {
+    // The whole column is the target (the DOM cells all submitted their
+    // column anyway) — a drop game wants the fattest possible hit area.
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const col = Math.floor((p.x - 8) / lv.step);
+      if (col < 0 || col > 6 || !lv.isMyTurn) return;
+      submit({ col });
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [board, st.lastMove, cell],
+    draw: (ctx) => {
+      klRR(ctx, 0, 0, W, H, 12);
+      ctx.fillStyle = '#22335e'; // intrinsic Four-in-a-Row panel blue
+      ctx.fill();
+      for (let i = 0; i < 42; i++) {
+        const r = Math.floor(i / 7), c = i % 7;
+        const cx = 8 + c * step + cell / 2, cy = 8 + r * step + cell / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cell / 2, 0, Math.PI * 2);
+        ctx.fillStyle = PAL.bg; // the punched-hole look
+        ctx.fill();
+        const v = board[i];
+        if (v !== 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.43, 0, Math.PI * 2);
+          ctx.fillStyle = v === 1 ? palOf(C.rose, '#CD4B3A') : palOf(C.gold, '#D9A54A');
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.43 - 1.5, Math.PI * 0.2, Math.PI * 0.8);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+          ctx.stroke();
+        }
+        if (st.lastMove === i) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell / 2 - 1, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.stroke();
+        }
+      }
+    },
+  });
   return (
     <div>
-      <div className="fir-board">
-        {board.map((v, i) => (
-          <div
-            key={i}
-            className={'fir-cell' + (st.lastMove === i ? ' last' : '')}
-            {...tapProps(() => isMyTurn && submit({ col: i % 7 }))}
-          >
-            {v !== 0 && <div className={'fir-disc d' + v} />}
-          </div>
-        ))}
-      </div>
+      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="fir-canvas" cap="340px" ratio="7 / 6"
+        ariaLabel="Four in a Row board" />
       <div className="brg-legend">
         <span><span className="fir-disc-mini d1" /> Player 1</span>
         <span><span className="fir-disc-mini d2" /> Player 2</span>
@@ -18532,21 +18607,69 @@ function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     setPending(i);
   };
 
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: 15, rows: 15, minCell: 18, maxCell: 26, gap: 1, padX: 4, padY: 4 });
+  const step = cell + 1;
+  const side = step * 15 - 1 + 4;
+  const liveRef = useRef({});
+  liveRef.current = { step, pick };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - 2) / lv.step);
+      if (c < 0 || c > 14 || r < 0 || r > 14) return;
+      lv.pick(r * 15 + c);
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [board, pending, st.lastMove, cell],
+    draw: (ctx) => {
+      klRR(ctx, 0, 0, side, side, 6);
+      ctx.fillStyle = '#b08b4f'; // intrinsic goban wood
+      ctx.fill();
+      ctx.strokeStyle = PAL.border;
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 15; i++) {
+        const at = 2 + i * step - 0.5;
+        ctx.beginPath(); ctx.moveTo(at, 2); ctx.lineTo(at, side - 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(2, at); ctx.lineTo(side - 2, at); ctx.stroke();
+      }
+      for (let i = 0; i < 225; i++) {
+        const r = Math.floor(i / 15), c = i % 15;
+        const x = 2 + c * step, y = 2 + r * step;
+        const cx = x + cell / 2, cy = y + cell / 2;
+        const v = board[i];
+        if (v !== 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.39, 0, Math.PI * 2);
+          ctx.fillStyle = v === 1 ? '#171a24' : '#f2f0e8';
+          ctx.fill();
+          if (v === 2) { ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.stroke(); }
+        } else if (pending === i) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.31, 0, Math.PI * 2);
+          ctx.setLineDash([4, 3]);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        if (st.lastMove === i) {
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+        }
+      }
+    },
+  });
   const rc = pending == null ? null : [Math.floor(pending / 15) + 1, (pending % 15) + 1];
   return (
-    <div className="gmk-scroll">
-      <div className="gmk-board">
-        {board.map((v, i) => (
-          <div
-            key={i}
-            className={'gmk-cell' + (st.lastMove === i ? ' last' : '')}
-            {...tapProps(() => pick(i))}
-          >
-            {v !== 0 && <div className={'gmk-stone s' + v} />}
-            {v === 0 && pending === i && <div className="gmk-ghost" />}
-          </div>
-        ))}
-      </div>
+    <div>
+      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="gmk-canvas" cap="380px"
+        ariaLabel="Gomoku board, 15 by 15" />
       {isMyTurn && (
         <div className="brd-confirm-bar">
           <button onClick={() => setPending(null)} disabled={pending == null}>Cancel</button>
@@ -18607,48 +18730,160 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     if (pos === -1) return st.die === 6;
     return pos + st.die <= 57;
   };
-  const cells = [];
-  // Ring — a start cell is safe (and tinted) only for seats actually playing.
-  LUDO_RING_XY.forEach(([x, y], i) => {
-    const startOwner = seatList.find(p => LUDO_START_ABS[p] === i) || 0;
-    const safe = i === 0 || i === 13 || i === 26 || i === 39;
-    cells.push(
-      <div key={'r' + i} className={'ludo-cell ring' + (safe ? ' safe' : '') + (startOwner ? ' start' + startOwner : '')}
-           style={{ gridColumn: x + 1, gridRow: y + 1 }}>{safe ? '★' : ''}</div>
-    );
-  });
-  // Home columns + center + bases (only for seats in this match)
+  // Tokens flattened in DRAW order (seat asc, token asc) — the tap hit-test
+  // walks this list in reverse so the topmost of a 5px-offset stack wins,
+  // exactly like the DOM's z-order did.
+  const toks = [];
   for (const p of seatList) {
-    LUDO_HOME_XY[p].forEach(([x, y], i) => {
-      cells.push(<div key={'h' + p + i} className={'ludo-cell home' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
-    });
-    LUDO_BASE_XY[p].forEach(([x, y], i) => {
-      cells.push(<div key={'b' + p + i} className={'ludo-cell base' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
-    });
-  }
-  cells.push(<div key="center" className="ludo-cell center" style={{ gridColumn: 8, gridRow: 8 }}>🏁</div>);
-  // Tokens (offset stacked tokens slightly so pile-ups stay visible)
-  const tokens = [];
-  for (const p of seatList) {
-    const toks = seats[p] || [];
     const out = forfeited.includes(p);
-    toks.forEach((pos, i) => {
-      const [x, y] = ludoTokenXY(p, pos, i);
-      const mine = p === myPlayerNum;
-      const movable = mine && !out && canMoveToken(pos);
-      tokens.push(
-        <div
-          key={'t' + p + i}
-          className={'ludo-token p' + p + (movable ? ' movable' : '') + (out ? ' forfeited' : '')}
-          style={{
-            gridColumn: x + 1, gridRow: y + 1,
-            transform: `translate(${(i % 2) * 5 - 2}px, ${Math.floor(i / 2) * 5 - 2}px)`,
-          }}
-          {...tapProps(() => movable && submit({ type: 'move', token: i }))}
-        >{i + 1}</div>
-      );
+    (seats[p] || []).forEach((pos, i) => {
+      const [gx, gy] = ludoTokenXY(p, pos, i);
+      toks.push({ p, i, pos, gx, gy, out, movable: p === myPlayerNum && !out && canMoveToken(pos) });
     });
   }
+
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: 15, rows: 15, minCell: 18, maxCell: 26, gap: 1, padX: 6, padY: 6 });
+  const step = cell + 1;
+  const PADI = 3;
+  const side = step * 15 - 1 + PADI * 2;
+  const tokenC = (t) => [
+    PADI + t.gx * step + cell / 2 + (t.i % 2) * 5 - 2,
+    PADI + t.gy * step + cell / 2 + Math.floor(t.i / 2) * 5 - 2,
+  ];
+  const liveRef = useRef({});
+  liveRef.current = { toks, cell, tokenC };
+  usePointerCell(canvasRef, {
+    onTap: (pt) => {
+      const lv = liveRef.current;
+      const rr = lv.cell * 0.425 + 8; // +8 = the DOM token's hit-slop ::after
+      for (let k = lv.toks.length - 1; k >= 0; k--) {
+        const t = lv.toks[k];
+        if (!t.movable) continue;
+        const [cx, cy] = lv.tokenC(t);
+        if ((pt.x - cx) * (pt.x - cx) + (pt.y - cy) * (pt.y - cy) <= rr * rr) {
+          submit({ type: 'move', token: t.i });
+          return;
+        }
+      }
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [st, cell, myPlayerNum, nPlayers],
+    draw: (ctx) => {
+      klRR(ctx, 0, 0, side, side, 10);
+      ctx.fillStyle = PAL.surface;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const seatColor = (p) => palOf(LUDO_SEAT_COLORS[p], '#888');
+      const cellRect = (gx, gy) => [PADI + gx * step, PADI + gy * step];
+      // Ring — a start cell is safe (and tinted) only for seats actually playing.
+      LUDO_RING_XY.forEach(([gx, gy], i) => {
+        const [x, y] = cellRect(gx, gy);
+        const startOwner = seatList.find(p => LUDO_START_ABS[p] === i) || 0;
+        const safe = i === 0 || i === 13 || i === 26 || i === 39;
+        klRR(ctx, x, y, cell, cell, 3);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        if (startOwner) {
+          ctx.save();
+          ctx.globalAlpha = 0.2;
+          ctx.fillStyle = seatColor(startOwner);
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = startOwner ? seatColor(startOwner) : PAL.border;
+        ctx.stroke();
+        if (safe) {
+          ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
+          ctx.fillStyle = palOf(C.gold, '#D9A54A');
+          ctx.fillText('★', x + cell / 2, y + cell / 2 + 0.5);
+        }
+      });
+      // Home columns + bases (only for seats in this match)
+      for (const p of seatList) {
+        const col = seatColor(p);
+        for (const [gx, gy] of LUDO_HOME_XY[p]) {
+          const [x, y] = cellRect(gx, gy);
+          klRR(ctx, x, y, cell, cell, 3);
+          ctx.save();
+          ctx.globalAlpha = 0.13;
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.globalAlpha = 0.4;
+          ctx.setLineDash([3, 2]);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+          ctx.restore();
+        }
+        for (const [gx, gy] of LUDO_BASE_XY[p]) {
+          const [x, y] = cellRect(gx, gy);
+          ctx.beginPath();
+          ctx.arc(x + cell / 2, y + cell / 2, cell / 2 - 0.5, 0, Math.PI * 2);
+          ctx.save();
+          ctx.globalAlpha = 0.1;
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.globalAlpha = 0.35;
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      { // center 🏁
+        const [x, y] = cellRect(7, 7);
+        klRR(ctx, x, y, cell, cell, 3);
+        ctx.save();
+        ctx.globalAlpha = 0.13;
+        ctx.fillStyle = palOf(C.gold, '#D9A54A');
+        ctx.fill();
+        ctx.restore();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+        ctx.stroke();
+        ctx.font = `${Math.round(cell * 0.7)}px system-ui, sans-serif`;
+        ctx.fillText('🏁', x + cell / 2, y + cell / 2 + 0.5);
+      }
+      // Tokens
+      for (const t of toks) {
+        const [cx, cy] = tokenC(t);
+        const r = cell * 0.425;
+        ctx.save();
+        if (t.out) ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = seatColor(t.p);
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.stroke();
+        if (t.movable) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 1.5, 0, Math.PI * 2);
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.shadowColor = palOf(C.gold, '#D9A54A');
+          ctx.shadowBlur = 6;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        ctx.font = `700 ${Math.max(8, Math.round(cell * 0.42))}px system-ui, sans-serif`;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(String(t.i + 1), cx, cy + 0.5);
+        ctx.restore();
+      }
+    },
+  });
 
   /* PHASE 2 — the movable-token pad.
      The board tap targets a token INSIDE a ~25px cell, and tokens sharing a
@@ -18669,7 +18904,8 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
 
   return (
     <div>
-      <div className="ludo-board">{cells}{tokens}</div>
+      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ludo-canvas" cap="380px"
+        ariaLabel={`Ludo board, ${nPlayers} players`} />
       {movableList.length > 0 && (
         <div className="brd-movelist">
           <div className="brd-movelist-label">Your moves · rolled {st.die}</div>
@@ -25806,9 +26042,9 @@ function App() {
                 it overflow:hidden would CLIP a tall setup screen rather than fit
                 it, which is the exact failure Daily Cipher had. What stops the
                 scrolling is upstream — useScrollLock owns the document while a
-                run is live, and the five phase-5 board games now honour the
-                --cg-board viewport cap (see the .ck-board/.rv-board/... rules),
-                so board + status + legend fit at 390x844 without moving. */}
+                run is live, and the five phase-5 board games honour the
+                --cg-board viewport cap (folded into .brg-canvas-box's
+                max-width), so board + status + legend fit at 390x844. */}
             <div className="cg-stage cg-scroll">
               <GameComponent
                 onWin={handleWin}

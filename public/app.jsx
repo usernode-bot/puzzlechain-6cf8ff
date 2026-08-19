@@ -5754,7 +5754,9 @@ function CuiBar({ height, build }) {
   ctlRef.current = controls;
   const [pressedId, setPressedId] = useState(null);
   usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
-  const key = controls.map((c) => [c.id, c.label, c.value, !!c.disabled, !!c.on].join(',')).join('|');
+  // Redraw key = the controls' FULL visual state (functions dropped): a change
+  // to only sub/color/bg/solid or a rect must repaint even with labels constant.
+  const key = JSON.stringify(controls, (k, v) => (typeof v === 'function' ? undefined : v));
   useCanvasBoard(canvasRef, {
     width: W,
     height,

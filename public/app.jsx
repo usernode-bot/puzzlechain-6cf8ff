@@ -673,7 +673,7 @@ body {
    Miss one of these and it gets crushed to zero height by the board. */
 .fit-col .status-bar, .fit-col .p6-hint,
 .fit-col .word-list,
-.fit-col .p6-banner, .fit-col .ds-pad,
+.fit-col .p6-banner,
 /* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
    plus 3-row keyboard was CLIPPED by the fit shell's overflow:hidden rather
    than fitted; players lost sight of Enter on long words. Everything except the
@@ -731,6 +731,9 @@ html.un-scroll-locked, body.un-scroll-locked {
   flex: 1 1 auto; min-height: 0;
   height: auto; max-height: 100%; aspect-ratio: auto;
 }
+/* The control strip for real-time boards (CuiBar). */
+.cui-bar { width: 100%; flex: 0 0 auto; touch-action: none; }
+.cui-bar-canvas { display: block; }
 /* #170 — the canvas board box is the flexible region (the .dbnc-wrap idiom):
    useFitBox measures it and the canvas sizes its cards/tiles to fill it.
    Klondike first; Spider and Mahjong joined in the wave-1 migration. */
@@ -3784,7 +3787,6 @@ ${emitTapHighlightRules()}
 
 /* Drop Stack — real-time well + side panel (slice 6). The well is a canvas
    sized by useFitBox; Next/Hold sit beside it so everything fits one screen. */
-.ds-main { flex: 1 1 auto; min-height: 0; display: flex; gap: 10px; align-items: stretch; }
 .ds-boardbox {
   position: relative; flex: 1 1 auto; min-height: 0; min-width: 0;
   display: flex; align-items: center; justify-content: center;
@@ -3793,22 +3795,6 @@ ${emitTapHighlightRules()}
   border-radius: 8px; background: rgba(0,0,0,.03);
   -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
-.ds-side { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
-.ds-panel {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
-  padding: 6px 8px; min-width: 62px; text-align: center;
-  font-family: inherit; color: ${C.text};
-}
-.ds-panel-label {
-  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
-  text-transform: uppercase; color: ${C.muted}; margin-bottom: 4px;
-}
-.ds-queue { display: flex; flex-direction: column; gap: 6px; align-items: center; }
-.ds-mini-piece { position: relative; display: block; }
-.ds-mini-cell { position: absolute; width: 8px; height: 8px; border-radius: 2px; }
-.ds-mini-empty { color: ${C.dim}; font-size: 12px; }
-.ds-hold { cursor: pointer; touch-action: manipulation; }
-.ds-hold:disabled, .ds-hold.used { opacity: .45; cursor: default; }
 .ds-level-flash {
   position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%);
   font-size: 1.5rem; font-weight: 800; color: ${C.gold};
@@ -3820,8 +3806,6 @@ ${emitTapHighlightRules()}
   25% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
   100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
 }
-.ds-pad { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.ds-pad .p6-btn { min-height: 44px; min-width: 58px; }
 
 
 /* ---- Phase 7: GotD hero, home reorg, chat ---- */
@@ -6106,6 +6090,36 @@ function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
       h.onContext(p, e);
     } : undefined,
   };
+}
+
+/* A self-contained control STRIP on its own canvas — for games whose board
+   canvas is a hand-rolled real-time loop (Daily Snake/Bounce, the classic
+   arcade games) where splicing bands into the loop would be surgery. The
+   strip draws pills/labels/buttons, wires presses, and carries its twin;
+   stacked over the board canvas it reads as one surface. */
+function CuiBar({ height, build }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const controls = W > 40 ? build(W) : [];
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
+  const key = controls.map((c) => [c.id, c.label, c.value, !!c.disabled, !!c.on].join(',')).join('|');
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height,
+    deps: [key, W, height, pressedId],
+    draw: (ctx) => cuiDrawControls(ctx, ctlRef.current, pressedId),
+  });
+  return (
+    <div className="cui-bar" ref={boxRef}>
+      <canvas ref={canvasRef} className="cui-bar-canvas" aria-hidden="true" />
+      <CuiTwin controls={controls} />
+    </div>
+  );
 }
 
 // Shift a board's pointer handlers below the frame's top bands: the handlers
@@ -22821,24 +22835,72 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
     return () => window.removeEventListener('keydown', onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- Responsive canvas well ---------------------------------------------
+  // ---- Responsive canvas FRAME (controls wave) ----------------------------
+  // Pills, the well, the Next queue, the Hold button and the D-pad draw on
+  // one canvas; only the hint paragraph (and the level-flash overlay) stay
+  // DOM. The well keeps its drag/tap/flick grammar, guarded to its region.
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, {
-    cols: DS_W, rows: DS_H, minCell: 12, maxCell: 34, gap: DS_GAP, padX: 4, padY: 4,
-  });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const DS_GAPY = 8, DS_PILL_H = 46, DS_PAD_H = 44, DS_SIDE_W = 96, DS_NEXT_H = 116, DS_HOLD_H = 64;
+  const dsChrome = DS_PILL_H + DS_GAPY + DS_GAPY + DS_PAD_H + 4;
+  const availWell = Math.max(60, Math.floor(boxH) - dsChrome);
+  const wellAvailW = Math.max(60, W - DS_SIDE_W - 8);
+  const cell = Math.max(12, Math.min(34, Math.floor(Math.min(
+    (wellAvailW - 8 - DS_GAP * (DS_W - 1)) / DS_W,
+    (availWell - 8 - DS_GAP * (DS_H - 1)) / DS_H
+  ))));
   const cellStep = cell + DS_GAP;
   const wellW = cellStep * DS_W - DS_GAP;
   const wellH = cellStep * DS_H - DS_GAP;
+  const groupW = wellW + 8 + DS_SIDE_W;
+  const gx0 = Math.max(0, Math.floor((W - groupW) / 2));
+  const boardY = DS_PILL_H + DS_GAPY;
+  const sideX = gx0 + wellW + 8;
+  const padY = boardY + wellH + DS_GAPY;
+  const H = padY + DS_PAD_H + 4;
+  const dsGeoRef = useRef({});
+  dsGeoRef.current = { gx0, boardY, wellW, wellH };
+
+  const dsControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, DS_PILL_H, 5);
+    dsControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    dsControls.push({ id: 'p-level', kind: 'pill', r: pr[1], label: 'Level', value: level });
+    dsControls.push({ id: 'p-lines', kind: 'pill', r: pr[2], label: 'Lines', value: lines });
+    dsControls.push({ id: 'p-points', kind: 'pill', r: pr[3], label: 'Points', value: points });
+    dsControls.push({ id: 'p-piece', kind: 'pill', r: pr[4], label: 'Piece', value: `${Math.min(pieceIdx + 1, DS_PIECES)}/${DS_PIECES}` });
+    dsControls.push({
+      id: 'hold', kind: 'button', r: [sideX, boardY + DS_NEXT_H + 8, DS_SIDE_W, DS_HOLD_H],
+      label: 'Hold', font: 11, on: hold != null && !holdUsed,
+      disabled: holdUsed || done, action: doHold,
+    });
+    const kr = cuiRow(Math.floor(W * 0.04), padY, Math.floor(W * 0.92), DS_PAD_H, 4);
+    dsControls.push({ id: 'left', kind: 'button', r: kr[0], label: '◀', font: 16, action: () => nudge(-1) });
+    dsControls.push({ id: 'rot', kind: 'button', r: kr[1], label: '⟳', font: 16, action: rotate });
+    dsControls.push({ id: 'right', kind: 'button', r: kr[2], label: '▶', font: 16, action: () => nudge(1) });
+    dsControls.push({ id: 'drop', kind: 'button', r: kr[3], label: '⬇ Drop', font: 14, primary: true, action: hardDrop });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = dsControls;
+  const [pressedId, setPressedId] = useState(null);
 
   // Drag maps finger travel to columns; a fast downward flick hard-drops; a
-  // tap that never became a drag rotates.
+  // tap that never became a drag rotates. Guarded to the well region so a
+  // stray tap on the Next panel doesn't rotate.
   const dragRef = useRef({ startCol: 0, moved: false });
-  usePointerCell(canvasRef, {
-    onDown: () => { dragRef.current = { startCol: liveRef.current.clampedCol, moved: false }; },
+  const dsInWell = (pt) => {
+    const g = dsGeoRef.current;
+    return pt.x >= g.gx0 && pt.x <= g.gx0 + g.wellW && pt.y >= g.boardY && pt.y <= g.boardY + g.wellH;
+  };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onDown: (pt) => {
+      dragRef.current = { startCol: liveRef.current.clampedCol, moved: false, armed: dsInWell(pt) };
+    },
     onDrag: (_p, info) => {
       const cur = liveRef.current;
-      if (cur.done) return;
+      if (cur.done || !dragRef.current.armed) return;
       const steps = Math.round(info.dx / Math.max(cellStep, 1));
       const target = Math.min(Math.max(dragRef.current.startCol + steps, 0), DS_W - cur.shapeW);
       if (target !== cur.clampedCol && canPlace(cur.grid, target, Math.floor(fallYRef.current), cur.cells)) {
@@ -22858,16 +22920,57 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
     },
     // A press that never moved is a rotate. No long-press action on the well,
     // so the timer is effectively disabled.
-    onTap: () => { if (!dragRef.current.moved) rotate(); },
-  }, { moveTolerance: 6 });
+    onTap: () => { if (dragRef.current.armed && !dragRef.current.moved) rotate(); },
+  }), { moveTolerance: 6 });
 
   const ghostY = landingY(grid, clampedCol);
+  const nextThree = [1, 2, 3]
+    .map((n) => (pieceIdx + n < DS_PIECES ? seq.current[pieceIdx + n] : null));
+
+  // Side-panel mini pieces, drawn (the DOM 9px-cell idiom on canvas).
+  const dsDrawMini = (ctx, idx, cx, cy, boxW2, boxH2) => {
+    if (idx == null) {
+      ctx.font = '600 12px ' + CUI_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = PAL.muted;
+      ctx.fillText('—', cx + boxW2 / 2, cy + boxH2 / 2);
+      return;
+    }
+    const cs = dsCells(idx, 0);
+    const w = Math.max(...cs.map(([x]) => x)) + 1;
+    const h = Math.max(...cs.map(([, y]) => y)) + 1;
+    const u = 9;
+    const x0 = cx + (boxW2 - w * u) / 2, y0 = cy + (boxH2 - h * u) / 2;
+    for (const [x, y] of cs) {
+      ctx.fillStyle = DS_SHAPES[idx].color;
+      ctx.fillRect(x0 + x * u, y0 + y * u, u - 1, u - 1);
+    }
+  };
 
   useCanvasBoard(canvasRef, {
-    width: wellW,
-    height: wellH,
-    deps: [cell, grid, clampedCol, rot, fallY, pieceIdx, done],
+    width: W,
+    height: H,
+    deps: [cell, grid, clampedCol, rot, fallY, pieceIdx, done, W, fmt, level, lines, points, hold, holdUsed, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Next panel (display) + the queued minis; the Hold button's mini
+      // draws over its control face.
+      klRR(ctx, sideX, boardY, DS_SIDE_W, DS_NEXT_H, 10);
+      ctx.fillStyle = PAL.card;
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+      ctx.font = '600 9px ' + CUI_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = PAL.muted;
+      ctx.fillText('NEXT', sideX + DS_SIDE_W / 2, boardY + 14);
+      nextThree.forEach((n, k) => dsDrawMini(ctx, n, sideX + 4, boardY + 18 + k * 32, DS_SIDE_W - 8, 30));
+      dsDrawMini(ctx, hold, sideX + 4, boardY + DS_NEXT_H + 8 + 24, DS_SIDE_W - 8, DS_HOLD_H - 30);
+      ctx.save();
+      ctx.translate(gx0, boardY);
       const radius = Math.max(2, Math.round(cell * 0.18));
       const box = (x, y, fill, stroke, alpha) => {
         ctx.globalAlpha = alpha == null ? 1 : alpha;
@@ -22898,69 +23001,22 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
           box((clampedCol + dx) * cellStep, (y0 + dy) * cellStep, color, null);
         }
       }
+      ctx.restore();
     },
   });
 
-  const miniPiece = (idx, key) => {
-    if (idx == null) return <span key={key} className="ds-mini-empty">—</span>;
-    const cs = dsCells(idx, 0);
-    const w = Math.max(...cs.map(([x]) => x)) + 1;
-    const h = Math.max(...cs.map(([, y]) => y)) + 1;
-    return (
-      <span key={key} className="ds-mini-piece" style={{ width: w * 9, height: h * 9 }}>
-        {cs.map(([x, y], k) => (
-          <span key={k} className="ds-mini-cell"
-            style={{ background: DS_SHAPES[idx].color, left: x * 9, top: y * 9 }} />
-        ))}
-      </span>
-    );
-  };
-  const nextThree = [1, 2, 3]
-    .map((n) => (pieceIdx + n < DS_PIECES ? seq.current[pieceIdx + n] : null));
-
   return (
     <div className="ds-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Level</div><div className="pvalue">{level}</div></div>
-        <div className="pill"><div className="plabel">Lines</div><div className="pvalue">{lines}</div></div>
-        <div className="pill"><div className="plabel">Points</div><div className="pvalue">{points}</div></div>
-        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">{Math.min(pieceIdx + 1, DS_PIECES)}/{DS_PIECES}</div></div>
+      <div className="ds-boardbox cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="ds-canvas board-canvas"
+          role="grid"
+          aria-label={`Drop Stack well, level ${level}, ${lines} lines cleared, piece ${Math.min(pieceIdx + 1, DS_PIECES)} of ${DS_PIECES}`}
+        />
+        {levelFlash > 0 && <div className="ds-level-flash">Level {levelFlash}</div>}
       </div>
-
-      <div className="ds-main">
-        <div className="ds-boardbox" ref={boxRef}>
-          <canvas
-            ref={canvasRef}
-            className="ds-canvas board-canvas"
-            role="grid"
-            aria-label={`Drop Stack well, level ${level}, ${lines} lines cleared, piece ${Math.min(pieceIdx + 1, DS_PIECES)} of ${DS_PIECES}`}
-          />
-          {levelFlash > 0 && <div className="ds-level-flash">Level {levelFlash}</div>}
-        </div>
-        <div className="ds-side">
-          <div className="ds-panel">
-            <div className="ds-panel-label">Next</div>
-            <div className="ds-queue">{nextThree.map((n, k) => miniPiece(n, k))}</div>
-          </div>
-          <button
-            className={'ds-panel ds-hold' + (holdUsed ? ' used' : '')}
-            onClick={doHold}
-            disabled={holdUsed || done}
-            title="Bank this piece (once per piece)"
-          >
-            <div className="ds-panel-label">Hold</div>
-            <div className="ds-queue">{miniPiece(hold, 'h')}</div>
-          </button>
-        </div>
-      </div>
-
-      <div className="ds-pad">
-        <button className="p6-btn" onClick={() => nudge(-1)}>◀</button>
-        <button className="p6-btn" onClick={rotate}>⟳</button>
-        <button className="p6-btn" onClick={() => nudge(1)}>▶</button>
-        <button className="p6-btn primary" onClick={hardDrop}>⬇ Drop</button>
-      </div>
+      <CuiTwin controls={dsControls} />
       <div className="p6-hint">
         Drag to slide, tap to rotate, swipe down to drop. Speed rises every {DS_LINES_PER_LEVEL} lines.
       </div>
@@ -23551,11 +23607,14 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
   return (
     // PHASE 3 — fit column so a swipe on the board never pulls the page.
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Apples</div><div className="pvalue">{eaten}/{DSNK_TARGET}</div></div>
-        <div className="pill"><div className="plabel">Length</div><div className="pvalue">{s.snake.length}</div></div>
-      </div>
+      <CuiBar height={46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 3);
+        return [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-apples', kind: 'pill', r: pr[1], label: 'Apples', value: `${eaten}/${DSNK_TARGET}` },
+          { id: 'p-length', kind: 'pill', r: pr[2], label: 'Length', value: s.snake.length },
+        ];
+      }} />
       <div className="dsnk-board" ref={boardRef}>
         <SnakeCanvas n={DSNK_N} stRef={st} tick={tick} skin="daily" ariaLabel={`Daily Snake board — ${eaten}/${DSNK_TARGET} apples`} />
       </div>
@@ -23937,19 +23996,22 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
 
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
-        <div className="pill"><div className="plabel">Balls</div><div className="pvalue">{'●'.repeat(Math.max(0, balls))}{'○'.repeat(DBNC_BALLS - Math.max(0, balls))}</div></div>
-        <div className="pill"><div className="plabel">Bricks</div><div className="pvalue">{s.total - s.bricks.length}/{s.total}</div></div>
-      </div>
-      {effectLabels.length > 0 && (
-        <div className="dbnc-effects">
-          {effectLabels.map(t => (
-            <span key={t} className="dbnc-effect">{POWERUP_ICONS[t] || '✨'} {t.replace(/-/g, ' ')}</span>
-          ))}
-        </div>
-      )}
+      <CuiBar height={effectLabels.length ? 68 : 46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-score', kind: 'pill', r: pr[1], label: 'Score', value: score },
+          { id: 'p-balls', kind: 'pill', r: pr[2], label: 'Balls', value: `${'●'.repeat(Math.max(0, balls))}${'○'.repeat(DBNC_BALLS - Math.max(0, balls))}` },
+          { id: 'p-bricks', kind: 'pill', r: pr[3], label: 'Bricks', value: `${s.total - s.bricks.length}/${s.total}` },
+        ];
+        if (effectLabels.length) {
+          out.push({
+            id: 'effects', kind: 'label', r: [0, 48, W, 20], gold: true, font: 12,
+            label: effectLabels.map(t => `${POWERUP_ICONS[t] || '✨'} ${t.replace(/-/g, ' ')}`).join(' · '),
+          });
+        }
+        return out;
+      }} />
       <div className="dbnc-wrap">
         <canvas ref={canvasRef} className="dbnc-canvas" />
       </div>

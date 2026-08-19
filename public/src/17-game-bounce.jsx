@@ -49,12 +49,41 @@ function bounceSpeedForLevel(level) {
 }
 
 // Build the brick wall for a level — denser (more rows) as levels climb.
-function bounceBuildBricks(level) {
+/* ============================================================
+   Wall patterns (#176)
+   ============================================================
+   "Arcade generates random layouts, that are still coherent" was the ask, and
+   COHERENT is the whole job: bricks placed at random read as noise, not as a
+   designed wall. So layouts come from a small GRAMMAR of shapes instead — each
+   one is a predicate over (row, col) that either keeps a brick or leaves a
+   gap. Symmetry and structure fall out of the predicate rather than having to
+   be checked for afterwards.
+
+   The same grammar serves both new modes: story walks the patterns in a fixed
+   order (each rung is a specific wall you can learn), arcade rolls one plus a
+   row count. One generator, two modes, no authored levels. */
+const BOUNCE_PATTERNS = [
+  { id: 'solid',    label: 'Solid',      keep: () => true },
+  { id: 'arch',     label: 'Arch',       keep: (r, c, rows, cols) => r >= Math.abs(c - (cols - 1) / 2) * (rows / cols) },
+  { id: 'columns',  label: 'Columns',    keep: (r, c) => c % 2 === 0 },
+  { id: 'checker',  label: 'Checker',    keep: (r, c) => (r + c) % 2 === 0 },
+  { id: 'pyramid',  label: 'Pyramid',    keep: (r, c, rows, cols) => Math.abs(c - (cols - 1) / 2) <= r },
+  { id: 'diamond',  label: 'Diamond',    keep: (r, c, rows, cols) =>
+      Math.abs(c - (cols - 1) / 2) + Math.abs(r - (rows - 1) / 2) <= Math.max(rows, cols) / 2 },
+  { id: 'hourglass',label: 'Hourglass',  keep: (r, c, rows, cols) =>
+      Math.abs(c - (cols - 1) / 2) >= Math.abs(r - (rows - 1) / 2) - 1 },
+  { id: 'brickwork',label: 'Brickwork',  keep: (r, c) => !((r % 2 === 0 && c % 4 === 0) || (r % 2 === 1 && c % 4 === 2)) },
+];
+const bouncePattern = (i) => BOUNCE_PATTERNS[((i % BOUNCE_PATTERNS.length) + BOUNCE_PATTERNS.length) % BOUNCE_PATTERNS.length];
+
+function bounceBuildBricks(level, pattern) {
   const rows = Math.min(4 + (level - 1), 8);
   const brickW = (BOUNCE_W - 2 * BOUNCE_MARGIN - (BOUNCE_COLS - 1) * BOUNCE_GAP_X) / BOUNCE_COLS;
   const bricks = [];
+  const keep = (pattern && pattern.keep) || (() => true);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < BOUNCE_COLS; c++) {
+      if (!keep(r, c, rows, BOUNCE_COLS)) continue;
       bricks.push({
         x: BOUNCE_MARGIN + c * (brickW + BOUNCE_GAP_X),
         y: BOUNCE_TOP + r * (BOUNCE_BRICK_H + BOUNCE_GAP_Y),
@@ -116,7 +145,29 @@ function updatePowerup(pu, scale) {
   pu.vy += 0.1 * scale;
 }
 
-function BounceGame({ onWin, onStepChange, resetKey }) {
+function BounceGame({ onWin, onStepChange, resetKey, playMode, band, offset }) {
+  /* #176 — story walks the pattern grammar in order (each rung is a specific
+     wall you can learn and re-attempt), arcade rolls a pattern per level so
+     the wall is different every run but never noise. Free play keeps the
+     original solid wall, so the classic game is unchanged. */
+  const bncMode = useRef(null);
+  if (!bncMode.current) {
+    if (playMode === 'story') {
+      bncMode.current = { fixed: bouncePattern(Math.max(0, band || 0)), rng: null };
+    } else if (playMode === 'arcade') {
+      const i = Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band));
+      bncMode.current = { fixed: null, rng: modeSeed('arcade', 'bounce', i, offset).rng, base: i * 2 };
+    } else {
+      bncMode.current = { fixed: null, rng: null };
+    }
+  }
+  // Which wall to build for a given level number, per mode.
+  const bncPatternFor = (lvl) => {
+    const m = bncMode.current;
+    if (m.fixed) return m.fixed;
+    if (m.rng) return bouncePattern((m.base || 0) + Math.floor(m.rng() * BOUNCE_PATTERNS.length) + lvl);
+    return null;
+  };
   const [score, setScore]   = useState(0);
   const [lives, setLives]   = useState(BOUNCE_LIVES);
   const [level, setLevel]   = useState(1);
@@ -147,7 +198,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
   const paddleRef   = useRef(BOUNCE_W / 2);
   const ballRef     = useRef({ x: BOUNCE_W / 2, y: BOUNCE_PADDLE_Y - BOUNCE_BALL_R - 1, vx: 0, vy: 0 });
-  const bricksRef   = useRef(bounceBuildBricks(1));
+  const bricksRef   = useRef(bounceBuildBricks(1, bncPatternFor(1)));
   const speedRef    = useRef(bounceSpeedForLevel(1));
   const scoreRef    = useRef(0);
   const livesRef    = useRef(BOUNCE_LIVES);
@@ -220,7 +271,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
   const handleNewGame = () => {
     paddleRef.current = BOUNCE_W / 2;
     basePaddleWRef.current = BOUNCE_PADDLE_W;
-    bricksRef.current = bounceBuildBricks(1);
+    bricksRef.current = bounceBuildBricks(1, bncPatternFor(1));
     speedRef.current = bounceSpeedForLevel(1);
     baseSpeedRef.current = bounceSpeedForLevel(1);
     scoreRef.current = 0;
@@ -299,7 +350,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
     levelRef.current = lvl;
     setLevel(lvl);
     speedRef.current = bounceSpeedForLevel(lvl);
-    bricksRef.current = bounceBuildBricks(lvl);
+    bricksRef.current = bounceBuildBricks(lvl, bncPatternFor(lvl));
     launchedRef.current = false;
     resetBallToPaddle();
   };

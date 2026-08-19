@@ -557,6 +557,19 @@ function comboMultiplier(combo) {
   if (combo <= 5) return 1.5;
   return 2.0;
 }
+/* The story ladder: target up, moves down. Eight rungs, mirroring
+   STORY_BANDS.diamondrush in server.js. */
+const DR_BANDS = [
+  { target: 500,  moves: 20 },
+  { target: 800,  moves: 18 },
+  { target: 1200, moves: 18 },
+  { target: 1600, moves: 17 },
+  { target: 2100, moves: 16 },
+  { target: 2700, moves: 15 },
+  { target: 3400, moves: 14 },
+  { target: 4200, moves: 13 },
+];
+
 function drMake(powerUpSeed = false) {
   const g = new Array(64);
   for (let i = 0; i < 64; i++) {
@@ -705,8 +718,24 @@ function findHighestScoringSwap(grid) {
   }
   return best;
 }
-function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, savedProgress, onSaveProgress }) {
-  const TARGET = 800, START_MOVES = 18;
+function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig, savedProgress, onSaveProgress, playMode, band }) {
+  /* #176 — Diamond Rush's ladder is its own two dials: how many points you
+     must reach and how many moves you get to do it in. Nothing else about the
+     game changes across a band, which is right — the tension here is entirely
+     "can I find enough cascades before the moves run out".
+
+     (An earlier reading of this game had it as a five-level tile-maze
+     adventure with server-saved progress. That was DEAD CODE — an authored
+     maze, its two API routes and its table, none of them reachable from any
+     component. All of it is deleted in this commit. The game players actually
+     open is this gem-swap board, and this is its ladder.) */
+  const drBandIdx = playMode === 'story' ? Math.max(0, band || 0)
+    : playMode === 'arcade'
+      ? [1, 4, 7][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      : null;
+  const drSpec = drBandIdx != null ? DR_BANDS[Math.min(DR_BANDS.length - 1, drBandIdx)] : null;
+  const TARGET = drSpec ? drSpec.target : 800;
+  const START_MOVES = drSpec ? drSpec.moves : 18;
   const [grid, setGrid] = useState(() => drMake());
   const [sel, setSel] = useState(-1);
   const [moves, setMoves] = useState(START_MOVES);

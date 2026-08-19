@@ -303,40 +303,6 @@ const CLASSIC_LB_LIMIT = 20;
    mulberry32 + ngGenerate in public/src/ exactly; used ONLY by that
    IS_STAGING fixture, never by gameplay or validation. Keep in sync with
    ngGenerate if the generator changes. */
-function srvMulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function srvNonogramSolution(seed) {
-  const rng = srvMulberry32(seed >>> 0);
-  let g = null;
-  for (let attempt = 0; attempt < 50; attempt++) {
-    g = [];
-    let filled = 0;
-    for (let r = 0; r < 8; r++) {
-      const row = [];
-      for (let c = 0; c < 8; c++) {
-        const v = rng() < 0.55 ? 1 : 0;
-        row.push(v);
-        filled += v;
-      }
-      g.push(row);
-    }
-    if (filled < 22 || filled > 44) continue;
-    const rowsOk = g.every((row) => row.some((v) => v === 1));
-    const colsOk = g[0].every((_, c) => g.some((row) => row[c] === 1));
-    if (rowsOk && colsOk) return g;
-  }
-  return g;
-}
-
 // FNV-1a string hash — byte-for-byte mirror of hashStr in public/src/.
 function srvHashStr(s) {
   let h = 2166136261 >>> 0;
@@ -2408,12 +2374,20 @@ app.get('/api/daily', async (req, res) => {
        locked-day review screen renders. Uses nonogram, not sudoku, on purpose:
        demo=locked and demo=streak both finish the viewer's sudoku row for today
        and proposal checks share one staging DB, so a second sudoku fixture would
-       collide. The grid is derived the same way the client derives it — from the
-       day's seed — so "View board" shows a real solved puzzle rather than a
-       plausible-looking fake. Idempotent; strict no-op in production. */
+       collide.
+
+       #176 — this used to mirror the client's nonogram generator so the stored
+       grid was byte-identical to the one the client would derive. That mirror
+       is retired along with the noise generator it copied: the review screen
+       renders whatever SNAPSHOT the finished row carries, so a fixed
+       silhouette is exactly as good for a staging fixture and costs no
+       cross-file invariant to keep in step. Idempotent; no-op in production. */
     if (IS_STAGING && req.query.demo === 'solvedboard') {
-      const ngSeed = await ensureDailySeed('nonogram');
-      const ngSolved = srvNonogramSolution(ngSeed);
+      const ngSolved = [
+        [0,0,1,1,1,1,0,0], [0,1,1,0,0,1,1,0], [1,1,0,1,1,0,1,1],
+        [1,1,1,1,1,1,1,1], [1,1,0,1,1,0,1,1], [1,1,1,0,0,1,1,1],
+        [0,1,1,1,1,1,1,0], [0,0,1,1,1,1,0,0],
+      ];
       await pool.query(
         `INSERT INTO daily_attempts
            (user_id, username, game_id, attempt_date, score, steps, time_secs,

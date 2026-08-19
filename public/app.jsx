@@ -2739,6 +2739,7 @@ ${emitTapHighlightRules()}
    composes the per-board cap (--brg-cap, set inline by BrgBoardBox) with the
    --cg-board viewport cap — the PHASE 3 "no scrolling to see whose turn it
    is" rule, now one declaration instead of per-board !important overrides. */
+.cg-stage .cnl-board-wrap { max-width: min(480px, var(--cg-board)) !important; }
 /* The board-game rooms stack status + board + legend + leaderboard, so cap the
    text chrome too — the board fitting is only half of "no scrolling to see
    whose turn it is". */
@@ -3279,7 +3280,6 @@ ${emitTapHighlightRules()}
 .mok-name em { color: ${C.muted}; font-weight: 400; }
 .mok-dest { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-left: 0.4rem; }
 .mok-blurb { color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; }
-/* Tumbling spin: ~3 full turns that decelerate and settle on the result. */
 
 /* ---- Pre-launch Game Mode Modal ---- */
 .gm-modal-backdrop {
@@ -3950,7 +3950,10 @@ function cgSound(name, pitch) {
 }
 function cgHaptic(ms) {
   if (!cgPrefs.haptics) return;
-  try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
+  try {
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    if (navigator.vibrate) navigator.vibrate(ms || 12);
+  } catch {}
 }
 
 /* ============================================================
@@ -4315,21 +4318,31 @@ const CLASSIC_MODE_META = {
 
 // Inline mode picker shown by the Game Menu's "New Game" for games that route
 // their modes through the menu (e.g. Chutes & Ladders). Calls onPlay(mode, opts).
-function ClassicModePicker({ game, onPlay }) {
+// game.variantPicker (optional): { label, options: [{ id, name, note? }], default }
+// — an opt-in, purely mechanical board-style choice (today: Chutes & Ladders'
+// Classic/Moksha Patam tables). When present, this generic picker renders the
+// same Board-style sub-section ChutesLaddersModeSelect uses for first launch,
+// so "New Game" from the ☰ menu can reach it too, not just the initial pick.
+function ClassicModePicker({ game, onPlay, onGlossary }) {
   const [mode, setMode] = useState(null);
   const [onlineAction, setOnlineAction] = useState(null);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const vp = game.variantPicker;
+  const [variant, setVariant] = useState(vp ? vp.default : null);
 
   const handlePlay = async () => {
     if (!mode) return;
-    if (mode !== 'online') { onPlay(mode, {}); return; }
+    const variantOpts = vp ? { variant } : {};
+    if (mode !== 'online') { onPlay(mode, variantOpts); return; }
     if (onlineAction === 'create') {
       setBusy(true);
-      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, {
+        method: 'POST', body: JSON.stringify(variantOpts),
+      });
       setBusy(false);
-      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id });
+      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id, ...variantOpts });
       else setError('Could not create room. Try again.');
     } else if (onlineAction === 'join') {
       const code = joinCode.trim().toUpperCase();
@@ -4369,6 +4382,22 @@ function ClassicModePicker({ game, onPlay }) {
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
             </div>
           )}
+        </div>
+      )}
+      {vp && (
+        <div className="cnl-variant-block">
+          <div className="cnl-variant-label">{vp.label}</div>
+          <div className="mnc-mode-sub">
+            {vp.options.map(o => (
+              <button key={o.id} className={'mnc-difficulty-pill' + (variant === o.id ? ' active' : '')}
+                onClick={() => setVariant(o.id)}>{o.name}</button>
+            ))}
+          </div>
+          {(() => { const active = vp.options.find(o => o.id === variant); return active && active.note ? (
+            <div className="cnl-variant-note">
+              {active.note}{onGlossary && <> <button className="cnl-variant-link" onClick={onGlossary}>📖 What do these mean?</button></>}
+            </div>
+          ) : null; })()}
         </div>
       )}
       {error && <div className="mnc-join-error">{error}</div>}
@@ -4469,7 +4498,7 @@ function GameModeModal({ game, onStart, onClose }) {
 
 // The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
 // only), and Post to Feed (after a result).
-function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose }) {
+function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose, onGlossary }) {
   const [picking, setPicking] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain'
   const modes = game.modes || [];
@@ -4498,7 +4527,7 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
       <div className="cg-menu-label">New game</div>
       {usePicker ? (
         picking
-          ? <ClassicModePicker game={game} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
+          ? <ClassicModePicker game={game} onGlossary={onGlossary} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
           : <button className="cg-sheet-action" onClick={() => setPicking(true)}>↺ New Game</button>
       ) : (
         <button className="cg-sheet-action" onClick={() => { onNewGameMode(defaultMode, {}); onClose && onClose(); }}>↺ New Game</button>
@@ -5056,9 +5085,41 @@ function useScrollLock(active) {
    `data-pressed` is cleared on up/cancel/lostpointercapture so it can never
    stick. Mouse and keyboard paths are preserved (onClick still fires for
    non-touch, guarded against double-firing). */
+/* The touch/click de-dupe guard lives at MODULE scope, not in tapProps'
+   closure. That distinction is the whole bug behind "one tap types two
+   letters" (Daily Cipher's LENDING -> LLEENND):
+
+     pointerup -> onTap() -> setState -> React 18 flushes the re-render
+     SYNCHRONOUSLY (pointerup is a discrete event) -> the element's props are
+     replaced by a FRESH tapProps(...) object -> the browser's compatibility
+     `click` then dispatches against that new object, whose per-render
+     `handledPointer` is back to false -> onTap() fires a SECOND time.
+
+   Any tappable that changes state on tap hit this on every touch device, so
+   the guard has to outlive the render. We record which element consumed a
+   touch and when; the compat click that follows (always within a few ms) is
+   swallowed. Asserted by the `tap-dedupe-survives-rerender` self-test. */
+let _tapHandledEl = null;
+let _tapHandledAt = 0;
+const TAP_CLICK_SUPPRESS_MS = 700;
+
+function tapMarkHandled(el) {
+  _tapHandledEl = el || null;
+  _tapHandledAt = Date.now();
+}
+function tapWasHandled(el) {
+  if (!_tapHandledEl || _tapHandledEl !== el) return false;
+  if (Date.now() - _tapHandledAt > TAP_CLICK_SUPPRESS_MS) {
+    _tapHandledEl = null;
+    return false;
+  }
+  // One-shot: consume it so a later genuine click on the same element works.
+  _tapHandledEl = null;
+  return true;
+}
+
 function tapProps(onTap, { disabled = false } = {}) {
   if (disabled) return {};
-  let handledPointer = false;
   return {
     onPointerDown: (e) => {
       if (e.currentTarget.setAttribute) e.currentTarget.setAttribute('data-pressed', '1');
@@ -5068,7 +5129,9 @@ function tapProps(onTap, { disabled = false } = {}) {
       // Touch/pen act on release-in-place; mouse falls through to onClick so
       // text selection and drag handlers elsewhere keep working.
       if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-        handledPointer = true;
+        // Mark BEFORE running the action: onTap re-renders, and the compat
+        // click is dispatched against whatever props exist by then.
+        tapMarkHandled(e.currentTarget);
         onTap && onTap(e);
       }
     },
@@ -5079,7 +5142,7 @@ function tapProps(onTap, { disabled = false } = {}) {
       if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
     },
     onClick: (e) => {
-      if (handledPointer) { handledPointer = false; return; }
+      if (tapWasHandled(e.currentTarget)) return;
       onTap && onTap(e);
     },
   };
@@ -5191,6 +5254,30 @@ function runClientSelfTests(styleReady) {
 
   // Phase 1 — canvas colours.
   check('canvas-colors', canvasColorSelfTest);
+
+  /* The double-input regression guard. One TOUCH tap = exactly one action,
+     even though the action's setState re-renders the element and replaces its
+     handler props before the compatibility `click` arrives. The old per-render
+     `handledPointer` closure failed exactly here, which is why typing LENDING
+     in Daily Cipher produced LLEENND. Simulated with plain objects: the second
+     tapProps(...) stands in for the post-render props object. */
+  check('tap-dedupe-survives-rerender', () => {
+    const el = { _attrs: {}, setAttribute(k, v) { this._attrs[k] = v; }, removeAttribute(k) { delete this._attrs[k]; } };
+    let fired = 0;
+    const onTap = () => { fired++; };
+    const first = tapProps(onTap);
+    first.onPointerDown({ currentTarget: el, pointerType: 'touch' });
+    first.onPointerUp({ currentTarget: el, pointerType: 'touch' });
+    if (fired !== 1) throw new Error('touch pointerup fired ' + fired + ' times, expected 1');
+    // The re-render the action just caused: brand-new props object, same node.
+    const afterRerender = tapProps(onTap);
+    afterRerender.onClick({ currentTarget: el });
+    if (fired !== 1) throw new Error('compat click after re-render fired again (' + fired + ' total)');
+    // A genuine MOUSE click on the same element afterwards must still work.
+    tapProps(onTap).onClick({ currentTarget: el });
+    if (fired !== 2) throw new Error('mouse click was swallowed (' + fired + ' total, expected 2)');
+    return true;
+  });
 
   // Phase 5 (#143) — 2048 vertical swipes were inverted. A lone tile at the
   // bottom row swiped 'up' must reach row 0, and vice versa.
@@ -5632,7 +5719,20 @@ function cuiDrawButton(ctx, c, pressed) {
   const fs = c.font || Math.min(15, Math.max(12, Math.round(h * 0.3)));
   ctx.font = '600 ' + fs + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
   ctx.fillStyle = c.ink || (c.solid ? '#fff' : PAL.text);
-  ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, c.sub ? y + h / 2 - fs * 0.42 : y + h / 2 + 0.5, w - 10);
+  if (c.pips) {
+    // Die face: 3x3 pip grid (row-major booleans) instead of the label text.
+    const pr = Math.max(2, Math.min(w, h) * 0.075);
+    for (let i = 0; i < 9; i++) {
+      if (!c.pips[i]) continue;
+      const px = x + w * (0.28 + 0.22 * (i % 3));
+      const py = y + h * (0.28 + 0.22 * Math.floor(i / 3));
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, c.sub ? y + h / 2 - fs * 0.42 : y + h / 2 + 0.5, w - 10);
+  }
   if (c.sub) {
     ctx.font = '500 ' + Math.max(9, Math.round(fs * 0.72)) + 'px ' + CUI_FONT;
     ctx.fillStyle = c.solid ? 'rgba(255,255,255,0.85)' : PAL.muted;
@@ -5788,7 +5888,7 @@ function cuiShiftHandlers(h, topRef) {
 // per game frame, fed the same controls array the canvas drew.
 function CuiTwin({ controls, extra }) {
   return (
-    <div className="sr-only">
+    <div className="cui-twin sr-only">
       {controls.map((c) => (
         // One block per control so innerText keeps line breaks between them.
         <div key={c.id}>
@@ -5798,9 +5898,9 @@ function CuiTwin({ controls, extra }) {
               disabled={!!c.disabled}
               aria-pressed={c.on != null ? !!c.on : undefined}
               onClick={() => { if (!c.disabled) c.action(); }}
-            >{String(c.label != null ? c.label : c.id) + (c.sub ? ' — ' + c.sub : '') + (c.value != null ? ' ' + c.value : '')}</button>
+            >{String(c.twinLabel != null ? c.twinLabel : (c.label != null ? c.label : c.id)) + (c.sub ? ' — ' + c.sub : '') + (c.value != null ? ' ' + c.value : '')}</button>
           ) : (
-            <span>{(c.label != null ? String(c.label) + ' ' : '') + (c.value != null ? c.value : '')}</span>
+            <span>{((c.twinLabel != null ? String(c.twinLabel) : (c.label != null ? String(c.label) : '')) + ' ' + (c.value != null ? c.value : '')).trim()}</span>
           )}
         </div>
       ))}
@@ -8332,13 +8432,46 @@ function cwDailyRounds(offset) {
   return cwRoundsForDay(cwDayNum(offset));
 }
 
-/* Daily Cipher's guess grid as a canvas — pure display (the keyboard below is
-   the input). Tiles size from the measured box so a 7-letter word's 8 rows
-   shrink instead of pushing the keyboard off screen (PHASE 3's rule, kept);
-   the invalid-guess shake is a brief drawn wiggle of the current row. */
 /* CwBoardCanvas was absorbed into CryptoWordleGame's single frame canvas
    (controls wave) — pills, theme, tracker, clues, hint bar, guess grid and
    the keyboard all draw together; see the frame block in the component. */
+
+/* Screenshot-state + regression deep link: `?cwtype=LEND-`.
+   dapp.json checks can only NAVIGATE — they never tap — so the double-input
+   bug ("one tap types two letters") was invisible to every check we had. This
+   replays a REAL touch pointer sequence (pointerdown -> pointerup -> compat
+   click, exactly what a phone dispatches) against the frame canvas at each
+   drawn key's position, so the guess row ends up holding the typed string and
+   a check can assert on it via `.cw-board[data-cw-typed="LEND"]`. A `-` means
+   backspace. Writes nothing — typing never claims, saves or submits — so it
+   is safe in every environment (the "before" screenshot comes from
+   production). */
+function cwTypeScript() {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('cwtype') || '';
+    return raw.toUpperCase().replace(/[^A-Z-]/g, '').slice(0, 20);
+  } catch (e) { return ''; }
+}
+
+function cwSimulateTouchTapAt(el, clientX, clientY) {
+  const opts = {
+    bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1,
+    isPrimary: true, clientX, clientY,
+  };
+  const PE = window.PointerEvent;
+  const fire = (type) => {
+    let ev;
+    try { ev = PE ? new PE(type, opts) : new MouseEvent(type, opts); }
+    catch (e) { ev = new MouseEvent(type, opts); }
+    if (!('pointerType' in ev)) { try { Object.defineProperty(ev, 'pointerType', { value: 'touch' }); } catch (e2) {} }
+    el.dispatchEvent(ev);
+  };
+  fire('pointerdown');
+  fire('pointerup');
+  // The browser's compatibility click, which is the half that used to double
+  // on the DOM keyboard. The canvas has no click handler, so it must no-op.
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX, clientY }));
+}
 
 function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
@@ -8518,21 +8651,76 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     finishIfDone(resolveRounds(newRoundGuesses));
   };
 
-  const typeLetter = (ch) => { if (!done && active && cur.length < active.def.word.length) setCur(cur + ch); };
-  const backspace = () => { if (!done) setCur(cur.slice(0, -1)); };
+  // Functional updates: the length cap is evaluated against the LIVE value, so
+  // even if two calls ever land in one batch the word can never overflow its
+  // boxes (the visible symptom of the double-input bug).
+  const maxLen = active ? active.def.word.length : 0;
+  const typeLetter = (ch) => {
+    if (done || !active) return;
+    setCur((prev) => (prev.length < maxLen ? prev + ch : prev));
+  };
+  const backspace = () => {
+    if (done) return;
+    setCur((prev) => prev.slice(0, -1));
+  };
 
   // Physical keyboard, dispatched through a ref so each keypress runs the latest closure.
   const apiRef = useRef({});
   apiRef.current = { submit, typeLetter, backspace };
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); return; }
-      if (e.key === 'Backspace') { apiRef.current.backspace(); return; }
+      // Held keys auto-repeat: one PRESS must be one letter, so ignore repeats
+      // (and any modifier combo, which is a browser shortcut, not a guess).
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      // Enter/Space on a FOCUSED on-screen key already fires that button's own
+      // click. Running the window handler too would submit AND type from one
+      // press, so let the button own those two keys while it has focus.
+      const inKbd = e.target && e.target.closest && e.target.closest('.cui-twin');
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        if (inKbd) return;
+        if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); }
+        return;
+      }
+      if (e.key === 'Backspace') { e.preventDefault(); apiRef.current.backspace(); return; }
       const ch = (e.key || '').toUpperCase();
       if (ch.length === 1 && ch >= 'A' && ch <= 'Z') apiRef.current.typeLetter(ch);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // `?cwtype=` — replay real touch taps once the drawn keyboard is on screen.
+  // Keys are canvas controls now, so each tap is a coordinate-carrying pointer
+  // sequence at the key's drawn rect, through the same usePointerCell ->
+  // cuiWrapHandlers path a finger takes (twin buttons are the CLICK path and
+  // would sidestep the hit-test this exists to regress).
+  useEffect(() => {
+    const script = cwTypeScript();
+    if (!script) return;
+    let tries = 0, timer = null, cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      const canvas = canvasRef.current;
+      const hasKeys = ctlRef.current.some((c) => c.id === 'bksp');
+      if (!canvas || !hasKeys) {
+        if (tries++ < 40) timer = setTimeout(run, 50);
+        return;
+      }
+      for (const ch of script) {
+        const id = ch === '-' ? 'bksp' : 'k' + ch;
+        const c = ctlRef.current.find((k) => k.id === id);
+        if (!c) continue;
+        const rect = canvas.getBoundingClientRect();
+        const scale = rect.width / (parseFloat(canvas.style.width) || rect.width);
+        cwSimulateTouchTapAt(
+          canvas,
+          rect.left + (c.r[0] + c.r[2] / 2) * scale,
+          rect.top + (c.r[1] + c.r[3] / 2) * scale
+        );
+      }
+    };
+    timer = setTimeout(run, 60);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, []);
 
   const wordLen = active ? active.def.word.length : 5;
@@ -8725,7 +8913,14 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   return (
     // PHASE 3 — .fit-col keeps the frame the one flexible child (fitShell).
     <div className="fit-col">
-      <div className="cw-board cui-frame" ref={boxRef}>
+      <div
+        className="cw-board cui-frame"
+        ref={boxRef}
+        /* The live entry, verbatim. A check asserts
+           `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
+           the double-input bug it would read "LLEENN" and the check fails. */
+        data-cw-typed={cur}
+      >
         <canvas
           ref={canvasRef}
           className="cw-canvas board-canvas"
@@ -17041,6 +17236,48 @@ const CNL_VARIANTS = {
 };
 function cnlVariant(v) { return CNL_VARIANTS[v] ? v : 'classic'; }
 
+// Standard 1-6 pip layouts on a 3x3 grid (row-major, 1 = pip present).
+const CNL_DIE_PIPS = {
+  1: [0, 0, 0, 0, 1, 0, 0, 0, 0],
+  2: [1, 0, 0, 0, 0, 0, 0, 0, 1],
+  3: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  4: [1, 0, 1, 0, 0, 0, 1, 0, 1],
+  5: [1, 0, 1, 0, 1, 0, 1, 0, 1],
+  6: [1, 0, 1, 1, 0, 1, 1, 0, 1],
+};
+
+// Cosmetic (client-only, per-device) Classic-board skins. These substitute
+// only the ladder/chute glyphs and the label shown in the picker — the
+// mechanical variant (ladders/chutes tables) is untouched, so a skin never
+// needs to reach the server. Disabled when the mechanical variant is
+// 'moksha' (which has its own snake/virtue art baked into the board).
+const CNL_SKINS = {
+  plain:   { label: 'Classic', icon: '🪜', ladderMark: '🪜', chuteMark: '🛝' },
+  jungle:  { label: 'Jungle Vine', icon: '🌿', ladderMark: '🌿', chuteMark: '🐊' },
+  space:   { label: 'Star Voyage', icon: '🚀', ladderMark: '🚀', chuteMark: '☄️' },
+  pirate:  { label: 'Treasure Trail', icon: '🏴‍☠️', ladderMark: '⚓', chuteMark: '🦑' },
+};
+const CNL_SKIN_KEY = 'puzzlechain_cnl_skin';
+function cnlSkinId(v) { return CNL_SKINS[v] ? v : 'plain'; }
+function useCnlSkin() {
+  const [skin, setSkinState] = useState(() => {
+    // ?cnlskin=<id> is a screenshot-state deep link — it lets proposal tests
+    // and before/after captures reach a skin that's otherwise only chosen by
+    // clicking a pill, and it wins over the stored device preference.
+    try {
+      const q = new URLSearchParams(window.location.search).get('cnlskin');
+      if (q && CNL_SKINS[q]) return q;
+    } catch (e) {}
+    try { return cnlSkinId(localStorage.getItem(CNL_SKIN_KEY)); } catch (e) { return 'plain'; }
+  });
+  const setSkin = (v) => {
+    const id = cnlSkinId(v);
+    setSkinState(id);
+    try { localStorage.setItem(CNL_SKIN_KEY, id); } catch (e) {}
+  };
+  return [skin, setSkin];
+}
+
 // The glossary — reachable from the mode picker and the in-game header, so a
 // player can read what a square means before or during a game.
 function MokshaGlossaryModal({ onClose }) {
@@ -17099,7 +17336,7 @@ function cnlRowCol(n) {
    between squares with the same 130ms ease the DOM transition gave them.
    Display-only: the Roll buttons are the input. Chrome reads PAL; the two
    pawn colors come from the callers, as before. */
-function CnlBoardCanvas({ V, isMoksha, p1Pos, p2Pos, p1Color, p2Color }) {
+function CnlBoardCanvas({ V, isMoksha, SK, p1Pos, p2Pos, p1Color, p2Color, p2Glyph }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const { boxW } = useFitBox(boxRef, { cols: 10, rows: 10 });
@@ -17128,7 +17365,7 @@ function CnlBoardCanvas({ V, isMoksha, p1Pos, p2Pos, p1Color, p2Color }) {
   useCanvasBoard(canvasRef, {
     width: side,
     height: side,
-    deps: [p1Pos, p2Pos, V, isMoksha, side],
+    deps: [p1Pos, p2Pos, V, isMoksha, side, SK && SK.label, p2Glyph],
     draw: (ctx) => {
       if (side < 80) return;
       const pad = 4;
@@ -17149,7 +17386,7 @@ function CnlBoardCanvas({ V, isMoksha, p1Pos, p2Pos, p1Color, p2Color }) {
           ctx.fillStyle = n === 100 ? PAL.gold : PAL.muted;
           ctx.fillText(String(n), x + 3, y + 2);
           const isL = V.ladders[n] !== undefined;
-          const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
+          const mark = isL ? (SK ? SK.ladderMark : '🪜') : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : (SK ? SK.chuteMark : '🛝')) : null;
           if (mark) {
             ctx.font = `${Math.round(cs * 0.34)}px system-ui, sans-serif`;
             ctx.textAlign = 'right';
@@ -17207,15 +17444,29 @@ function CnlBoardCanvas({ V, isMoksha, p1Pos, p2Pos, p1Color, p2Color }) {
       let [x2, y2] = posOf(g.p2);
       if (g.p1.to === g.p2.to) { x1 -= side * 0.024; x2 += side * 0.024; }
       const rp = side * 0.035;
-      for (const [x, y, color] of [[x1, y1, p1Color], [x2, y2, p2Color]]) {
+      const glyphs = { p1: '1', p2: p2Glyph || '2' };
+      for (const [key, x, y, color] of [['p1', x1, y1, p1Color], ['p2', x2, y2, p2Color]]) {
         ctx.beginPath();
-        ctx.arc(x, y, rp, 0, Math.PI * 2);
+        if (key === 'p2') {
+          // Diamond token: same shape identity as #175's DOM pawn, so the two
+          // players are tellable apart by form, not colour alone.
+          const rd = rp * 1.25;
+          ctx.moveTo(x, y - rd); ctx.lineTo(x + rd, y); ctx.lineTo(x, y + rd); ctx.lineTo(x - rd, y); ctx.closePath();
+        } else {
+          ctx.arc(x, y, rp, 0, Math.PI * 2);
+        }
         ctx.fillStyle = palOf(color, PAL.accent);
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#fff';
         ctx.stroke();
+        ctx.font = `800 ${Math.max(7, Math.round(rp * 1.05))}px 'Space Grotesk', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(glyphs[key], x, y + 0.5);
       }
+      ctx.textBaseline = 'top';
       // Outer border.
       klRR(ctx, 1, 1, side - 2, side - 2, 12);
       ctx.lineWidth = 2;
@@ -17230,7 +17481,8 @@ function CnlBoardCanvas({ V, isMoksha, p1Pos, p2Pos, p1Color, p2Color }) {
         ref={canvasRef}
         className="cnl-canvas board-canvas"
         role="img"
-        aria-label={`Board — player 1 on square ${p1Pos || 0}, player 2 on square ${p2Pos || 0}`}
+        data-cnl-p2="diamond"
+        aria-label={`Board — player 1 (round token) on square ${p1Pos || 0}, player 2 (diamond token${p2Glyph === '🤖' ? ', bot' : ''}) on square ${p2Pos || 0}`}
       />
     </div>
   );
@@ -17250,6 +17502,14 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   const vkey = cnlVariant(variant);
   const V = CNL_VARIANTS[vkey];
   const isMoksha = vkey === 'moksha';
+  // Cosmetic board skin — a local per-device preference, independent of the
+  // server-synced mechanical variant. Only applies on the Classic board.
+  const [skin, setSkin] = useCnlSkin();
+  const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
+  const cycleSkin = () => {
+    const ids = Object.keys(CNL_SKINS);
+    setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
+  };
   const [p1Pos, setP1Pos]   = useState(0);
   const [p2Pos, setP2Pos]   = useState(0);
   const [player, setPlayer] = useState(1);
@@ -17308,16 +17568,23 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   useEffect(() => () => clearTimers(), []);
 
   const p1Color = C.accent;
-  const p2Color = C.rose;
+  const p2Color = C.violet;
+  const p1Token = 'accent';
+  const p2Token = 'violet';
   const activeColor = done ? C.muted : (player === 1 ? p1Color : p2Color);
+  const activeToken = done ? 'muted' : (player === 1 ? p1Token : p2Token);
 
   const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
 
   const finishTurn = (who, landed) => {
     const jump = V.jumps[landed];
+    // The win check must look at where the turn actually ENDS. A jump (e.g.
+    // the 80->100 ladder) moves the pawn past `landed`, so checking `landed`
+    // itself misses every jump-into-100 case and soft-locks the game.
+    const finalSquare = jump !== undefined ? jump : landed;
     const settle = () => {
       // Win check: must land exactly on 100 (no chute sits on 100).
-      if (landed === 100) {
+      if (finalSquare === 100) {
         setDone(true);
         setWinner(who);
         if (onClearSave) onClearSave();
@@ -17418,13 +17685,14 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
 
   const bannerActive = !!banner;
   const bannerColor = done ? C.muted : activeColor;
+  const bannerToken = done ? 'muted' : activeToken;
 
   return (
     <div>
       {resumeOffer && (
         <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
       )}
-      <CuiBar height={isMoksha ? 96 : 46} build={(W) => {
+      <CuiBar height={96} build={(W) => {
         const pr = cuiRow(0, 0, W, 46, 5);
         const out = [
           { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
@@ -17435,6 +17703,10 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
         ];
         if (isMoksha) {
           out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary });
+        } else {
+          // Cosmetic board skin (per-device, never sent to the server) — the
+          // same slot the Moksha board uses for its glossary button.
+          out.push({ id: 'skin', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: `${SK.icon} ${SK.label}`, font: 12, action: cycleSkin });
         }
         return out;
       }} />
@@ -17448,13 +17720,13 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
       }])} />
 
       <div className="cnl-board-wrap">
-        <CnlBoardCanvas V={V} isMoksha={isMoksha} p1Pos={p1Pos} p2Pos={p2Pos} p1Color={p1Color} p2Color={p2Color} />
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} SK={SK} p1Pos={p1Pos} p2Pos={p2Pos} p1Color={p1Color} p2Color={p2Color} p2Glyph={vsBot ? '🤖' : '2'} />
       </div>
 
       <CuiBar height={54} build={(W) => {
         const bw = Math.floor((W - 78) / 2) - 8;
         return [
-          { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: die == null ? '·' : String(die), font: 20, mono: true, disabled: true },
+          { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: die == null ? '·' : String(die), twinLabel: die == null ? 'Die not yet rolled' : `Die showing ${die}`, pips: die == null ? null : CNL_DIE_PIPS[die], font: 20, mono: true, disabled: true },
           {
             id: 'roll1', kind: 'button', r: [4, 7, bw, 40],
             label: `${vsBot ? 'Your' : 'Player 1 -'} Roll`, solid: true, bg: palOf(p1Color, undefined), ink: '#fff',
@@ -17480,6 +17752,10 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
   // Board style is independent of the play mode; Classic stays the default
   // because the Moksha board is deliberately a longer game.
   const [variant, setVariant] = useState('classic');
+  // Cosmetic skin is a separate, per-device preference (never sent to the
+  // server) — hidden once Moksha is picked since that board has its own
+  // baked-in virtue/vice art and isn't skinnable.
+  const [skin, setSkin] = useCnlSkin();
 
   const modes = [
     { id: '2p',     icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
@@ -17556,6 +17832,17 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
           </div>
         )}
       </div>
+      {variant !== 'moksha' && (
+        <div className="cnl-variant-block">
+          <div className="cnl-variant-label">Board skin</div>
+          <div className="mnc-mode-sub">
+            {Object.keys(CNL_SKINS).map(id => (
+              <button key={id} className={'mnc-difficulty-pill' + (skin === id ? ' active' : '')}
+                onClick={() => setSkin(id)}>{CNL_SKINS[id].icon} {CNL_SKINS[id].label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       {error && <div className="mnc-join-error">{error}</div>}
       {mode && <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
     </div>
@@ -17570,6 +17857,11 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
   const secsRef = useRef(0); secsRef.current = secs;
   const movesRef = useRef(0);
+  const [skin, setSkin] = useCnlSkin();
+  const cycleSkin = () => {
+    const ids = Object.keys(CNL_SKINS);
+    setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
+  };
 
   useEffect(() => {
     if (!room || room.status !== 'finished' || winCalledRef.current) return;
@@ -17606,10 +17898,12 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
   const vkey = cnlVariant(st.variant);
   const V = CNL_VARIANTS[vkey];
   const isMoksha = vkey === 'moksha';
+  const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
   const cur = st.currentPlayer || 1;
   const isMyTurn = status === 'active' && cur === myPlayerNum;
-  const p1Color = C.accent, p2Color = C.rose;
+  const p1Color = C.accent, p2Color = C.violet;
   const myColor = myPlayerNum === 1 ? p1Color : p2Color;
+  const myToken = myPlayerNum === 1 ? 'accent' : 'violet';
 
   const doRoll = () => {
     if (!isMyTurn) return;
@@ -17623,7 +17917,7 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
 
   return (
     <div>
-      <CuiBar height={(opponentDisconnected ? 20 : 0) + (isMoksha ? 96 : 46)} build={(W) => {
+      <CuiBar height={(opponentDisconnected ? 20 : 0) + 96} build={(W) => {
         const pr = cuiRow(0, 0, W, 46, 4);
         const out = [
           { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
@@ -17633,14 +17927,15 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
         ];
         let y = 50;
         if (isMoksha) { out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), y, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary }); y += 46; }
+        else { out.push({ id: 'skin', kind: 'button', r: [Math.floor(W * 0.2), y, Math.floor(W * 0.6), 40], label: `${SK.icon} ${SK.label}`, font: 12, action: cycleSkin }); y += 46; }
         if (opponentDisconnected) out.push({ id: 'disc', kind: 'label', r: [0, y, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
         return out;
       }} />
       <div className="cnl-board-wrap">
-        <CnlBoardCanvas V={V} isMoksha={isMoksha} p1Pos={st.p1Pos || 0} p2Pos={st.p2Pos || 0} p1Color={p1Color} p2Color={p2Color} />
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} SK={SK} p1Pos={st.p1Pos || 0} p2Pos={st.p2Pos || 0} p1Color={p1Color} p2Color={p2Color} p2Glyph={'2'} />
       </div>
       <CuiBar height={54} build={(W) => ([
-        { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: st.die == null ? '·' : String(st.die), font: 20, mono: true, disabled: true },
+        { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: st.die == null ? '·' : String(st.die), twinLabel: st.die == null ? 'Die not yet rolled' : `Die showing ${st.die}`, pips: st.die == null ? null : CNL_DIE_PIPS[st.die], font: 20, mono: true, disabled: true },
         { id: 'roll', kind: 'button', r: [W - Math.floor(W * 0.34) - 4, 7, Math.floor(W * 0.34), 40],
           label: status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…',
           solid: isMyTurn, bg: isMyTurn ? palOf(myColor, undefined) : undefined, ink: isMyTurn ? '#fff' : undefined,
@@ -19017,6 +19312,7 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   // Sync mode from the Game Menu's New Game selection.
   useEffect(() => {
     setMode(gameMode || null);
+    if (gameModeOpts && gameModeOpts.variant) setVariant(gameModeOpts.variant);
     if (gameModeOpts && gameModeOpts.roomId) {
       setRoomId(gameModeOpts.roomId);
       setMyPlayerNum(gameModeOpts.roomAction === 'join' ? 2 : 1);
@@ -23736,6 +24032,17 @@ const GAMES = [
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
     menuModePicker: true,
+    variantPicker: {
+      label: 'Board style',
+      default: 'classic',
+      options: [
+        { id: 'classic', name: 'Classic' },
+        {
+          id: 'moksha', name: 'Moksha Patam (original)',
+          note: 'The Indian original: ladders on virtues, snakes on vices — 11 vices to 5 virtues, so the climb is a slower one.',
+        },
+      ],
+    },
     leaderboard: true,
     leaderboardOpts: { valueLabel: 'Best Streak' },
   },
@@ -25041,6 +25348,13 @@ function App() {
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
     if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
+    // Non-modal classic games (Mancala, Snakes & Ladders) skip the pre-launch
+    // modal entirely and pick their mode from their own mode-select screen —
+    // so ?mode=bot/2p needs to pin it here too, or a deep link can only ever
+    // land on that screen instead of the running match it names.
+    if (!g.preLaunchModal && mmode && mmode !== 'online' && (g.modes || []).includes(mmode)) {
+      setClassicGameMode(mmode);
+    }
     // ?play=1 skips the pre-game screen (and the first-open how-to) and
     // claims/mounts immediately — used by proposal tests that assert on
     // in-game UI, and by "jump straight in" share links.

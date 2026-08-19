@@ -700,6 +700,36 @@
       "expectSelector": ".cnl-variant-block"
     },
     {
+      "name": "Chutes & Ladders bot mode deep-links straight into a running board",
+      "path": "/?game=chutes-ladders&mode=bot",
+      "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
+    },
+    {
+      "name": "Chutes & Ladders 2p mode deep-links straight into a running board",
+      "path": "/?game=chutes-ladders&mode=2p",
+      "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
+    },
+    {
+      "name": "Chutes & Ladders P2 pawn renders as a diamond token",
+      "path": "/?game=chutes-ladders&mode=bot",
+      "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"
+    },
+    {
+      "name": "Chutes & Ladders Jungle Vine skin deep-link renders",
+      "path": "/?game=chutes-ladders&mode=bot&cnlskin=jungle",
+      "expectText": "Jungle Vine"
+    },
+    {
+      "name": "Chutes & Ladders Star Voyage skin deep-link renders",
+      "path": "/?game=chutes-ladders&mode=bot&cnlskin=space",
+      "expectText": "Star Voyage"
+    },
+    {
+      "name": "Chutes & Ladders Treasure Trail skin deep-link renders",
+      "path": "/?game=chutes-ladders&mode=bot&cnlskin=pirate",
+      "expectText": "Treasure Trail"
+    },
+    {
       "name": "Moksha demo room seeds cleanly",
       "path": "/?demo=moksha",
       "expectText": "Game Corner"
@@ -879,6 +909,16 @@
       "name": "Daily Cipher names the day's theme",
       "path": "/?game=cryptowordle&practice=1",
       "expectText": "Today's theme"
+    },
+    {
+      "name": "Daily Cipher: one tap = one letter",
+      "path": "/?game=cryptowordle&practice=1&cwtype=LEN",
+      "expectSelector": ".cw-board[data-cw-typed=\"LEN\"]"
+    },
+    {
+      "name": "Daily Cipher: backspace removes exactly one letter",
+      "path": "/?game=cryptowordle&practice=1&cwtype=LEN-",
+      "expectSelector": ".cw-board[data-cw-typed=\"LE\"]"
     },
     {
       "name": "Word Search grid is the larger 10x10 board",

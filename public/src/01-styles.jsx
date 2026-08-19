@@ -3684,7 +3684,9 @@ ${emitTapHighlightRules()}
 .kt-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
 .kt-board {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  /* #176 — the board is 5x5 to 8x8 now, so the column count comes from the
+     component via --kt-size rather than being baked in at 8. */
+  grid-template-columns: repeat(var(--kt-size, 8), 1fr);
   max-width: 480px;
   width: 100%;
   aspect-ratio: 1;
@@ -3692,6 +3694,14 @@ ${emitTapHighlightRules()}
   border-radius: 8px;
   overflow: hidden;
   margin: 0 auto;
+}
+/* A square the knight may not enter. Reads as part of the board rather than as
+   a missing cell, so a blocked-square board still looks like a chessboard. */
+.kt-cell.kt-blocked {
+  background: ${C.well};
+  background-image: repeating-linear-gradient(45deg,
+    transparent 0 4px, ${ca('muted', '33')} 4px 8px);
+  cursor: not-allowed;
 }
 .kt-cell {
   display: flex;

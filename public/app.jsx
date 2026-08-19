@@ -676,8 +676,7 @@ body {
 .fit-col .word-list, .fit-col .cp-pad, .fit-col .an-actions,
 .fit-col .cw-hint-bar, .fit-col .p6-banner, .fit-col .word-theme,
 .fit-col .an-dots, .fit-col .an-boardbox,
-.fit-col .tm-daylabel, .fit-col .ds-pad, .fit-col .mf-controls,
-.fit-col .ng-modes,
+.fit-col .tm-daylabel, .fit-col .ds-pad,
 /* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
    plus 3-row keyboard was CLIPPED by the fit shell's overflow:hidden rather
    than fitted; players lost sight of Enter on long words. Everything except the
@@ -3322,7 +3321,7 @@ ${emitTapHighlightRules()}
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
   .tm-bar.bar-full,
-  .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
+  .cnl-roll-btn, .gm-mode-btn {
     animation: none !important;
     transition: none !important;
   }
@@ -4003,16 +4002,6 @@ ${emitTapHighlightRules()}
   border-radius: 8px; cursor: pointer;
   -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
-.ng-modes { flex: 0 0 auto; display: flex; gap: 8px; justify-content: center; }
-.ng-mode-btn {
-  flex: 1 1 auto; max-width: 170px; min-height: 48px;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
-  color: ${C.text}; font-family: inherit; font-size: 15px; font-weight: 600;
-  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.ng-mode-btn.on { border-color: ${C.accent}; background: rgba(45,95,174,.12); }
-.ng-mode-btn:active { transform: scale(0.98); }
 
 .mf-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
 .mf-game .status-bar { align-items: center; gap: 8px; }
@@ -4028,20 +4017,6 @@ ${emitTapHighlightRules()}
   -webkit-tap-highlight-color: transparent;
   user-select: none; -webkit-user-select: none;
 }
-.mf-controls {
-  flex: 0 0 auto; display: flex; gap: 8px; align-items: center; justify-content: center;
-}
-.mf-mode-btn {
-  flex: 1 1 auto; max-width: 260px; min-height: 48px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
-  color: ${C.text}; font-family: inherit; font-size: 15px; font-weight: 600;
-  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.mf-mode-btn .mf-mode-label { font-size: 12px; color: ${C.muted}; font-weight: 500; }
-.mf-mode-btn.flag { border-color: ${C.rose}; background: rgba(205,75,58,.10); }
-.mf-mode-btn.dig  { border-color: ${C.accent}; background: rgba(45,95,174,.10); }
-.mf-mode-btn:active { transform: scale(0.98); }
 
 .an-game { max-width: 420px; margin: 0 auto; text-align: center; }
 .an-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
@@ -6348,12 +6323,20 @@ function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
       if (h.onDrag) h.onDrag(p, d, e);
     },
     onUp: (p, e) => {
-      if (ctlRef.pressed) { ctlRef.pressed = null; setPressed(null); return; }
+      // A control fires on press + release-in-rect (the DOM button contract),
+      // NOT via onTap — a board's tight moveTolerance would otherwise eat
+      // slightly-jittery finger taps on buttons.
+      if (ctlRef.pressed) {
+        const c = (ctlRef.current || []).find(x => x.id === ctlRef.pressed);
+        ctlRef.pressed = null;
+        setPressed(null);
+        if (c && !c.disabled && c.action && cuiInRect(c.r, p.x, p.y)) c.action();
+        return;
+      }
       if (h.onUp) h.onUp(p, e);
     },
     onTap: (p, e) => {
-      const c = cuiHitAt(ctlRef.current || [], p.x, p.y);
-      if (c) { c.action(); return; }
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return; // fired in onUp
       if (h.onTap) h.onTap(p, e);
     },
     onLongPress: h.onLongPress ? (p, e) => {
@@ -8469,34 +8452,77 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const selSet = new Set(sel);
 
-  /* The letter grid is a CANVAS (#170 treatment). The DOM board drag-selected
-     via pointerenter on sibling cells (after manually releasing the implicit
-     touch capture); the canvas keeps its capture and maps the pointer to a
-     cell directly, so a fast diagonal swipe can't skip cells. Chrome reads
-     PAL; letters render uppercase as the DOM's text-transform did. */
+  /* The whole frame is ONE canvas (controls wave): pills, theme line, letter
+     grid and hint bar draw together; only the found-words chip list stays
+     DOM (read-only content, scrolls). The canvas keeps pointer capture, so a
+     fast diagonal swipe can't skip cells; letters render uppercase as the
+     DOM's text-transform did. */
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell: wsCell } = useFitBox(boxRef, { cols: WS_SIZE, rows: WS_SIZE, minCell: 24, maxCell: 42, gap: 1 });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, THEME_H = 22, HINT_H = 36;
+  const chrome = PILL_H + THEME_H + HINT_H + GAP * 3;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const wsCell = Math.max(24, Math.min(42, Math.floor((availB - (WS_SIZE - 1)) / WS_SIZE)));
   const wsStep = wsCell + 1;
   const wsSide = wsStep * WS_SIZE - 1;
-  const wsStepRef = useRef(wsStep);
-  wsStepRef.current = wsStep;
+  const H = chrome + wsSide;
+  const boardX = Math.floor((W - wsSide) / 2);
+  const boardY = PILL_H + GAP + THEME_H + GAP;
+  const hintY = boardY + wsSide + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-found', kind: 'pill', r: pr[1], label: 'Found', value: `${found.size}/${total}` });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[2], label: 'Steps', value: steps });
+    controls.push({ id: 'theme', kind: 'label', r: [0, PILL_H + GAP, W, THEME_H], label: `Theme: ${theme} · drag across letters to find each word`, font: 12 });
+    if (!done) {
+      const exhausted = hints.exhausted || hintsExhausted;
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hints.msg ? 0 : Math.floor(W * 0.2), hintY, hints.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: exhausted ? '💡 No more hints'
+          : `💡 Hint${Number.isFinite(hints.hintsLeft) ? ` · ${hints.hintsLeft} left` : ''}`,
+        disabled: hints.buying || exhausted,
+        action: buyHint,
+      });
+      if (hints.msg) {
+        controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hints.msg, font: 11 });
+      }
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const wsGeoRef = useRef({});
+  wsGeoRef.current = { wsStep, boardX, boardY };
   const wsCellAt = (p) => {
-    const stp = wsStepRef.current;
-    const c = Math.max(0, Math.min(WS_SIZE - 1, Math.floor(p.x / stp)));
-    const r = Math.max(0, Math.min(WS_SIZE - 1, Math.floor(p.y / stp)));
+    const g = wsGeoRef.current;
+    const c = Math.max(0, Math.min(WS_SIZE - 1, Math.floor((p.x - g.boardX) / g.wsStep)));
+    const r = Math.max(0, Math.min(WS_SIZE - 1, Math.floor((p.y - g.boardY) / g.wsStep)));
     return [r, c];
   };
-  usePointerCell(canvasRef, {
-    onDown: (p) => { const [r, c] = wsCellAt(p); startSel(r, c); },
+  const wsInBoard = (p) => {
+    const g = wsGeoRef.current;
+    return p.y >= g.boardY && p.y < g.boardY + wsSide + 8;
+  };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onDown: (p) => { if (!wsInBoard(p)) return; const [r, c] = wsCellAt(p); startSel(r, c); },
     onDrag: (p) => { const [r, c] = wsCellAt(p); moveSel(r, c); },
     onUp: () => endSel(),
-  }, { moveTolerance: 3 });
+  }), { moveTolerance: 3 });
   useCanvasBoard(canvasRef, {
-    width: wsSide,
-    height: wsSide,
-    deps: [foundCells, hintedStarts, sel, done, wsCell],
+    width: W,
+    height: H,
+    deps: [foundCells, hintedStarts, sel, done, wsCell, W, fmt, steps, found, pressedId, hints.hintsLeft, hints.msg, hints.buying],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       ctx.fillStyle = PAL.border; // the 1px gridline gaps
       ctx.fillRect(0, 0, wsSide, wsSide);
       ctx.textAlign = 'center';
@@ -8521,30 +8547,13 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           ctx.fillText(String(letters[r][c]).toUpperCase(), x + wsCell / 2, y + wsCell / 2 + 1);
         }
       }
+      ctx.restore();
     },
   });
 
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Found</div>
-          <div className="pvalue">{found.size}/{total}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Steps</div>
-          <div className="pvalue">{steps}</div>
-        </div>
-      </div>
-
-      <div className="word-theme">Theme: <b>{theme}</b> · drag across letters to find each word</div>
-
-      <div className="fit-scale-box">
-      <div className="wordsearch" ref={boxRef}>
+      <div className="wordsearch cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="ws-canvas board-canvas"
@@ -8552,18 +8561,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           aria-label={`Word search grid — ${found.size} of ${total} words found`}
         />
       </div>
-      </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={hints.hintsLeft}
-          exhausted={hints.exhausted || hintsExhausted}
-          buying={hints.buying}
-          onBuy={buyHint}
-          msg={hints.msg}
-          label="No more hints"
-        />
-      )}
+      <CuiTwin controls={controls} />
 
       <div className="word-list">
         {words.map(w => (
@@ -21679,26 +21677,33 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     return true;
   };
 
-  // ---- Responsive canvas board (slice 5) ----------------------------------
-  // Clue gutters live inside the canvas, so the whole thing scales as one unit
-  // instead of the old auto-auto CSS grid with three fixed-34px tracks.
+  // ---- Responsive canvas frame (controls wave) ----------------------------
+  // Clue gutters live inside the canvas, and now so do the pills and the
+  // Fill/Mark toggle — the whole frame scales as one unit. The gutters are
+  // sized in cells (2 wide for row clues, 2 tall for column clues), so the
+  // fit is over a 10×10 board and the clue text scales with it.
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  // The gutters are sized in cells (2 wide for row clues, 2 tall for column
-  // clues), so the fit is over a 10×10 board and the clue text scales with it.
-  const { cell } = useFitBox(boxRef, {
-    cols: 10, rows: 10, minCell: 20, maxCell: 42, gap: NG_GAP, padX: 4, padY: 4,
-  });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, MODE_H = 48;
+  const chrome = PILL_H + MODE_H + GAP * 2;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome)) - 8;
+  const cell = Math.max(20, Math.min(42, Math.floor((availB - NG_GAP * 9) / 10)));
   const cellStep = cell + NG_GAP;
   const gutter = cellStep * 2;
   const boardPx = gutter + cellStep * 8 - NG_GAP;
+  const H = chrome + boardPx;
+  const boardX = Math.floor((W - boardPx) / 2);
+  const boardY = PILL_H + GAP;
+  const modesY = boardY + boardPx + GAP;
 
   const liveRef = useRef({});
-  liveRef.current = { grid, mode, done, steps, secs, cellStep, gutter };
+  liveRef.current = { grid, mode, done, steps, secs, cellStep, gutter, boardX, boardY };
 
   const cellAt = (p) => {
-    const { cellStep: cs, gutter: gu } = liveRef.current;
-    const c = Math.floor((p.x - gu) / cs), r = Math.floor((p.y - gu) / cs);
+    const { cellStep: cs, gutter: gu, boardX: bx, boardY: by } = liveRef.current;
+    const c = Math.floor((p.x - bx - gu) / cs), r = Math.floor((p.y - by - gu) / cs);
     if (c < 0 || c > 7 || r < 0 || r > 7) return null;
     return { r, c };
   };
@@ -21729,7 +21734,23 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     }
   };
 
-  usePointerCell(canvasRef, {
+  const filled = grid.reduce((n, row) => n + row.filter((v) => v === 1).length, 0);
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
+    controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: filled });
+    const bw = Math.min(170, Math.floor((W - GAP) / 2));
+    const bx = Math.floor((W - bw * 2 - GAP) / 2);
+    controls.push({ id: 'mode-fill', kind: 'button', r: [bx, modesY, bw, MODE_H], label: '⬛ Fill', on: mode === 'fill', action: () => setMode('fill') });
+    controls.push({ id: 'mode-mark', kind: 'button', r: [bx + bw + GAP, modesY, bw, MODE_H], label: '✗ Mark', on: mode === 'mark', action: () => setMode('mark') });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
     // Long-press = the opposite tool, same idiom as Mine Finder.
     onLongPress: (p) => {
@@ -21737,13 +21758,16 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       if (t) apply(t.r, t.c, liveRef.current.mode === 'fill' ? 'mark' : 'fill');
     },
     onContext: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, 'mark'); },
-  });
+  }));
 
   useCanvasBoard(canvasRef, {
-    width: boardPx,
-    height: boardPx,
-    deps: [cell, grid, done],
+    width: W,
+    height: H,
+    deps: [cell, grid, done, W, fmt, steps, mode, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       const radius = Math.max(2, Math.round(cell * 0.14));
       const clueFont = Math.max(9, Math.round(cell * 0.42));
       ctx.textAlign = 'center';
@@ -21793,19 +21817,13 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
         ctx.beginPath(); ctx.moveTo(off, gutter - NG_GAP); ctx.lineTo(off, boardPx); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(gutter - NG_GAP, off); ctx.lineTo(boardPx, off); ctx.stroke();
       }
+      ctx.restore();
     },
   });
 
-  const filled = grid.reduce((n, row) => n + row.filter((v) => v === 1).length, 0);
-
   return (
     <div className="ng-game">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
-        <div className="pill"><div className="plabel">Filled</div><div className="pvalue">{filled}</div></div>
-      </div>
-      <div className="ng-boardbox" ref={boxRef}>
+      <div className="ng-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="ng-canvas board-canvas"
@@ -21813,10 +21831,7 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           aria-label={`Nonogram, 8 by 8 picture grid, ${filled} cells filled`}
         />
       </div>
-      <div className="ng-modes">
-        <button className={'ng-mode-btn' + (mode === 'fill' ? ' on' : '')} onClick={() => setMode('fill')}>⬛ Fill</button>
-        <button className={'ng-mode-btn' + (mode === 'mark' ? ' on' : '')} onClick={() => setMode('mark')}>✗ Mark</button>
-      </div>
+      <CuiTwin controls={controls} />
       <div className="p6-hint">
         Numbers are runs of filled cells, in order. Long-press uses the other tool.
       </div>
@@ -21928,23 +21943,30 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const saveNow = (rv, fl, ns) =>
     onSaveProgress && onSaveProgress({ dayNum, revealed: [...rv], flags: [...fl] }, ns, secs);
 
-  // ---- Responsive canvas geometry -----------------------------------------
+  // ---- Responsive canvas frame (controls wave) ----------------------------
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, {
-    cols: 9, rows: 9, minCell: 24, maxCell: 46, gap: MF_GAP, padX: 4, padY: 4,
-  });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, MODE_H = 48;
+  const chrome = PILL_H + MODE_H + GAP * 2;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome)) - 8;
+  const cell = Math.max(24, Math.min(46, Math.floor((availB - MF_GAP * 8) / 9)));
   const cellStep = cell + MF_GAP;
   const boardPx = cellStep * 9 - MF_GAP;
+  const H = chrome + boardPx;
+  const boardX = Math.floor((W - boardPx) / 2);
+  const boardY = PILL_H + GAP;
+  const modeY = boardY + boardPx + GAP;
 
   // Mutable snapshot the pointer handlers read — usePointerCell binds its
   // listeners once, so it must not close over stale render state.
   const liveRef = useRef({});
-  liveRef.current = { revealed, flags, flagMode, done, steps, secs, cellStep };
+  liveRef.current = { revealed, flags, flagMode, done, steps, secs, cellStep, boardX, boardY };
 
   const idxAt = (p) => {
-    const { cellStep: cs } = liveRef.current;
-    const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
+    const { cellStep: cs, boardX: bx, boardY: by } = liveRef.current;
+    const c = Math.floor((p.x - bx) / cs), r = Math.floor((p.y - by) / cs);
     if (c < 0 || c > 8 || r < 0 || r > 8) return -1;
     return r * 9 + c;
   };
@@ -22041,7 +22063,26 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
     return true;
   };
 
-  usePointerCell(canvasRef, {
+  const minesLeftLive = Math.max(10 - flags.size, 0);
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-mines', kind: 'pill', r: pr[1], label: 'Mines', value: minesLeftLive });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[2], label: 'Steps', value: steps });
+    const bw = Math.min(260, W - 20);
+    controls.push({
+      id: 'mode', kind: 'button', r: [Math.floor((W - bw) / 2), modeY, bw, MODE_H],
+      label: `${flagMode ? '🚩' : '⛏'} Mode: ${flagMode ? 'Flag' : 'Dig'}`,
+      sub: 'tap to switch', on: flagMode,
+      action: () => setFlagMode(m => !m),
+    });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => {
       const i = idxAt(p);
       if (i < 0 || liveRef.current.done) return;
@@ -22060,14 +22101,17 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
       doFlag(i);
     },
-  });
+  }));
 
   // ---- Draw ----------------------------------------------------------------
   useCanvasBoard(canvasRef, {
-    width: boardPx,
-    height: boardPx,
-    deps: [cell, revealed, flags, boom, pulse, done],
+    width: W,
+    height: H,
+    deps: [cell, revealed, flags, boom, pulse, done, W, fmt, steps, flagMode, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const radius = Math.max(3, Math.round(cell * 0.16));
@@ -22106,19 +22150,15 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
           ctx.fillText('🚩', cx, cy + 1);
         }
       }
+      ctx.restore();
     },
   });
 
-  const minesLeft = Math.max(10 - flags.size, 0);
+  const minesLeft = minesLeftLive;
 
   return (
     <div className="mf-game">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Mines</div><div className="pvalue">{minesLeft}</div></div>
-        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
-      </div>
-      <div className="mf-boardbox" ref={boxRef}>
+      <div className="mf-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="mf-canvas board-canvas"
@@ -22126,18 +22166,8 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
           aria-label={`Mine Finder, 9 by 9 field, ${minesLeft} mines unflagged, ${revealed.size} of 71 safe cells uncovered`}
         />
       </div>
+      <CuiTwin controls={controls} />
       <div className="sr-only" aria-live="polite">{announce}</div>
-      <div className="mf-controls">
-        <button
-          className={'mf-mode-btn ' + (flagMode ? 'flag' : 'dig')}
-          aria-pressed={flagMode}
-          onClick={() => setFlagMode(m => !m)}
-        >
-          <span>{flagMode ? '🚩' : '⛏'}</span>
-          <span>Mode: {flagMode ? 'Flag' : 'Dig'}</span>
-          <span className="mf-mode-label">tap to switch</span>
-        </button>
-      </div>
       <div className="p6-hint">
         Numbers count adjacent mines. Long-press does the opposite of the current mode
         (right-click flags). Tap a number whose flags all match to clear around it.

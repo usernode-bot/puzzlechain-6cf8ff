@@ -181,10 +181,25 @@ function klValidState(st) {
     Array.isArray(st.tab) && st.tab.length === 7 && Number.isFinite(st.moves);
 }
 
-function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* #176 — story and arcade deal from a RATED seed: one that an offline solver
+     confirmed is winnable, in the difficulty band that was asked for. The
+     daily is untouched (it deals from today's server seed like every other
+     daily), and if the corpus has not loaded the mode falls back to an
+     ordinary seeded deal — you lose the guarantee, not the game. */
+  const kdBand = playMode === 'story' ? Math.max(0, band || 0)
+    : playMode === 'arcade'
+      ? [0, 2, 4][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      : null;
+  const kdSeeded = useRef(null);
+  if (kdSeeded.current === null && kdBand !== null) {
+    const { rng } = modeSeed(playMode, 'klondike', kdBand, offset);
+    const rated = corpusSeed('klondike', kdBand, rng);
+    kdSeeded.current = rated != null ? mulberry32(rated >>> 0) : rng;
+  }
   const freshDeal = useRef(null);
-  if (!freshDeal.current) freshDeal.current = klDeal(dailyRng(offset, 'klondike'));
+  if (!freshDeal.current) freshDeal.current = klDeal(kdSeeded.current || dailyRng(offset, 'klondike'));
   const resumed = savedProgress && savedProgress.dayNum === dayNum && klValidState(savedProgress.st)
     ? savedProgress.st : null;
 
@@ -508,10 +523,23 @@ function spSweep(n) {
   return swept;
 }
 
-function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* Spider's traditional ladder is SUIT COUNT (1 → 2 → 4), and its three story
+     bands are exactly that — a real progression before any rating enters.
+     Within a band, a rated seed picks a deal of known effort. */
+  const spBand = playMode === 'story' ? Math.max(0, band || 0)
+    : playMode === 'arcade'
+      ? Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))
+      : null;
+  const spSeeded = useRef(null);
+  if (spSeeded.current === null && spBand !== null) {
+    const { rng } = modeSeed(playMode, 'spider', spBand, offset);
+    const rated = corpusSeed('spider', spBand, rng);
+    spSeeded.current = rated != null ? mulberry32(rated >>> 0) : rng;
+  }
   const freshDeal = useRef(null);
-  if (!freshDeal.current) freshDeal.current = spDeal(dailyRng(offset, 'spider'));
+  if (!freshDeal.current) freshDeal.current = spDeal(spSeeded.current || dailyRng(offset, 'spider'));
   const resumed = savedProgress && savedProgress.dayNum === dayNum && spValidState(savedProgress.st)
     ? savedProgress.st : null;
 

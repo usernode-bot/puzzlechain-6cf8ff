@@ -1256,8 +1256,10 @@ ${emitTapHighlightRules()}
 /* ---- Word Hunt ---- */
 .wordsearch {
   display: grid;
-  /* Kept in lockstep with WS_SIZE (#139). */
-  grid-template-columns: repeat(10, 1fr);
+  /* #176 — the grid is 8x8 to 15x15 now (the ladder's first real knob), so
+     the column count comes from the component via --ws-size rather than being
+     kept in lockstep with a constant by hand. */
+  grid-template-columns: repeat(var(--ws-size, 10), 1fr);
   background: ${C.border};
   gap: 1px; /* #149 — see .sudoku: no gap meant no gridlines ever rendered. */
   border: 2px solid ${C.border};

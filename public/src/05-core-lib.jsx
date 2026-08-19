@@ -108,6 +108,61 @@ function dailyRng(offset, gameId) {
    Returns { rng, seed } — `seed` is null for the daily, whose seed already
    lives server-side on the daily_seeds row.
    ============================================================ */
+/* ============================================================
+   Rated seed corpora (#176)
+   ============================================================
+   Most games rate a board in milliseconds and generate-and-check at mount.
+   Solitaire cannot: deciding whether a Klondike deal is winnable is a search,
+   not a deduction. So that work happens OFFLINE (scripts/rate-seeds.js) and
+   what ships is not a board but a rated SEED — the deal is re-derived from it
+   on demand, which is why a corpus of hundreds of deals is tens of kilobytes.
+
+   Fetched lazily and cached per game, and every caller degrades gracefully: if
+   the corpus has not arrived, the game deals from an ordinary seed instead. A
+   slow network costs you the difficulty guarantee, never the game.
+   ============================================================ */
+const CORPUS_GAMES = new Set(['klondike', 'spider']);
+const _corpusCache = {};
+const _corpusPending = {};
+
+function loadCorpus(gameId) {
+  if (!CORPUS_GAMES.has(gameId)) return Promise.resolve(null);
+  if (_corpusCache[gameId]) return Promise.resolve(_corpusCache[gameId]);
+  if (_corpusPending[gameId]) return _corpusPending[gameId];
+  _corpusPending[gameId] = fetch(`/corpus/${gameId}.json`)
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => {
+      if (j && Array.isArray(j.seeds)) {
+        // Group once, so a pick is O(1) rather than a scan per mount.
+        const byBand = {};
+        for (const [seed, band] of j.seeds) (byBand[band] = byBand[band] || []).push(seed);
+        _corpusCache[gameId] = { ...j, byBand };
+      }
+      return _corpusCache[gameId] || null;
+    })
+    .catch(() => null);
+  return _corpusPending[gameId];
+}
+
+/* Pick a rated seed for a band. `rng` chooses WITHIN the band, so a story rung
+   is stable (its rng is derived from the band) while an arcade run is not.
+   Returns null when the corpus is unavailable — callers fall back. */
+function corpusSeed(gameId, band, rng) {
+  const c = _corpusCache[gameId];
+  if (!c || !c.byBand) return null;
+  const nBands = c.bands || 1;
+  const idx = Math.max(0, Math.min(nBands - 1, band));
+  // Walk outward if the requested band is empty, so a sparse corpus still
+  // returns something of roughly the right difficulty.
+  for (let d = 0; d < nBands; d++) {
+    for (const b of [idx - d, idx + d]) {
+      const list = c.byBand[b];
+      if (list && list.length) return list[Math.floor(rng() * list.length)];
+    }
+  }
+  return null;
+}
+
 function modeSeed(playMode, gameId, band, offset) {
   if (playMode === 'story') {
     const s = (hashStr(gameId + ':story:' + band) >>> 0);

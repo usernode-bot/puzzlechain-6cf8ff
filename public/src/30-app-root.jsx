@@ -460,6 +460,16 @@ function App() {
   /* Story opens on the first band you have not cleared, not on band 0 — the
      ladder is a progression, so re-entering it should carry on rather than
      restart. Falls back to 0 before progress has loaded. */
+  /* Corpus-backed games (the two solitaires) need their rated-seed table
+     before the board is dealt, and the pre-game screen is the natural place to
+     fetch it: story and arcade both pass through it, and the Play button is a
+     beat later. A miss is harmless — the game deals from a plain seed. */
+  useEffect(() => {
+    if (screen === 'pregame' && currentGame && CORPUS_GAMES.has(currentGame.id)) {
+      loadCorpus(currentGame.id);
+    }
+  }, [screen, currentGame]);
+
   /* Pull the viewer's standing on the selected arcade band whenever the
      pre-game screen is showing one. Kept out of loadDaily on purpose: it is
      per-band and changes as the picker moves, so it belongs to the screen

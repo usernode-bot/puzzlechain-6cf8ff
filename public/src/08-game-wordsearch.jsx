@@ -16,14 +16,69 @@ const WS_DIRS = [
 
 // Themed word sets. Words are <= 6 letters so they always place on an 8×8 grid.
 // 10 words per theme, max length 10 so every word fits any axis of the grid.
+/* #176 — the content library WAS seven themed sets of ten words. Seventy
+   words, picked uniformly at random per day with no anti-repeat rule, so the
+   same grid contents recurred inside a week: this is the game the request
+   named, and "do it once and you're done" was a fair description.
+
+   Forty themes now, and the pick is a SLIDING PARTITION rather than a uniform
+   draw — the same technique Daily Cipher already uses. Themes are shuffled
+   once with a fixed seed and consumed in order, so no theme can recur until
+   every other has been seen. That is a hard 40-day guarantee, where the old
+   uniform draw gave a ~14% chance of repeating the very next day. */
 const WORD_SETS = [
-  { theme: 'Space',   words: ['COMET', 'ORBIT', 'PLANET', 'GALAXY', 'NEBULA', 'ROCKET', 'STAR', 'MARS', 'ECLIPSE', 'METEOR'] },
-  { theme: 'Ocean',   words: ['CORAL', 'WHALE', 'SHARK', 'TIDE', 'PEARL', 'SQUID', 'WAVE', 'REEF', 'LAGOON', 'DOLPHIN'] },
-  { theme: 'Kitchen', words: ['SPOON', 'WHISK', 'KNIFE', 'PLATE', 'KETTLE', 'GRATER', 'OVEN', 'BOWL', 'SKILLET', 'LADLE'] },
-  { theme: 'Forest',  words: ['CEDAR', 'MAPLE', 'BIRCH', 'WILLOW', 'ACORN', 'FERN', 'MOSS', 'PINE', 'THICKET', 'CANOPY'] },
-  { theme: 'Music',   words: ['TEMPO', 'CHORD', 'PIANO', 'VIOLIN', 'MELODY', 'FLUTE', 'DRUM', 'BANJO', 'HARMONY', 'OCTAVE'] },
-  { theme: 'Weather', words: ['CLOUD', 'THUNDER', 'BREEZE', 'FROST', 'DRIZZLE', 'HAIL', 'GUST', 'MIST', 'RAINBOW', 'SLEET'] },
-  { theme: 'Garden',  words: ['TULIP', 'HEDGE', 'TROWEL', 'COMPOST', 'SEEDLING', 'PETAL', 'VINE', 'BLOOM', 'ORCHID', 'SPADE'] },
+  { theme: 'Space',      words: ['COMET', 'ORBIT', 'PLANET', 'GALAXY', 'NEBULA', 'ROCKET', 'STAR', 'MARS', 'ECLIPSE', 'METEOR'] },
+  { theme: 'Ocean',      words: ['CORAL', 'WHALE', 'SHARK', 'TIDE', 'PEARL', 'SQUID', 'WAVE', 'REEF', 'LAGOON', 'DOLPHIN'] },
+  { theme: 'Kitchen',    words: ['SPOON', 'WHISK', 'KNIFE', 'PLATE', 'KETTLE', 'GRATER', 'OVEN', 'BOWL', 'SKILLET', 'LADLE'] },
+  { theme: 'Forest',     words: ['CEDAR', 'MAPLE', 'BIRCH', 'WILLOW', 'ACORN', 'FERN', 'MOSS', 'PINE', 'THICKET', 'CANOPY'] },
+  { theme: 'Music',      words: ['TEMPO', 'CHORD', 'PIANO', 'VIOLIN', 'MELODY', 'FLUTE', 'DRUM', 'BANJO', 'HARMONY', 'OCTAVE'] },
+  { theme: 'Weather',    words: ['CLOUD', 'THUNDER', 'BREEZE', 'FROST', 'DRIZZLE', 'HAIL', 'GUST', 'MIST', 'RAINBOW', 'SLEET'] },
+  { theme: 'Garden',     words: ['TULIP', 'HEDGE', 'TROWEL', 'COMPOST', 'SEEDLING', 'PETAL', 'VINE', 'BLOOM', 'ORCHID', 'SPADE'] },
+  { theme: 'Mountains',  words: ['SUMMIT', 'RIDGE', 'GLACIER', 'BOULDER', 'VALLEY', 'SLOPE', 'CRAG', 'ASCENT', 'PLATEAU', 'GORGE'] },
+  { theme: 'Desert',     words: ['CACTUS', 'DUNE', 'OASIS', 'MIRAGE', 'CAMEL', 'SCORPION', 'ARID', 'CANYON', 'SANDS', 'NOMAD'] },
+  { theme: 'Birds',      words: ['FALCON', 'SPARROW', 'HERON', 'RAVEN', 'PELICAN', 'ROBIN', 'SWIFT', 'OSPREY', 'MAGPIE', 'FINCH'] },
+  { theme: 'Insects',    words: ['BEETLE', 'MANTIS', 'CRICKET', 'HORNET', 'APHID', 'WEEVIL', 'LOCUST', 'MOTH', 'CICADA', 'EARWIG'] },
+  { theme: 'Fruit',      words: ['BANANA', 'CHERRY', 'PAPAYA', 'GUAVA', 'LYCHEE', 'APRICOT', 'PLUM', 'MELON', 'DAMSON', 'QUINCE'] },
+  { theme: 'Vegetables', words: ['CARROT', 'TURNIP', 'PARSNIP', 'SPINACH', 'LEEK', 'RADISH', 'MARROW', 'CELERY', 'SHALLOT', 'ENDIVE'] },
+  { theme: 'Baking',     words: ['PASTRY', 'BATTER', 'KNEAD', 'YEAST', 'SCONE', 'GLAZE', 'CRUMB', 'PROOF', 'STRUDEL', 'MERINGUE'] },
+  { theme: 'Tools',      words: ['HAMMER', 'CHISEL', 'PLIERS', 'WRENCH', 'MALLET', 'AUGER', 'CLAMP', 'RASP', 'SCRIBER', 'JIGSAW'] },
+  { theme: 'Fabric',     words: ['COTTON', 'VELVET', 'DENIM', 'LINEN', 'SATIN', 'TWEED', 'CANVAS', 'CHIFFON', 'BROCADE', 'MUSLIN'] },
+  { theme: 'Colours',    words: ['CRIMSON', 'INDIGO', 'AMBER', 'OLIVE', 'MAROON', 'TEAL', 'AZURE', 'SEPIA', 'MAGENTA', 'SAFFRON'] },
+  { theme: 'Metals',     words: ['COPPER', 'NICKEL', 'BRONZE', 'PEWTER', 'COBALT', 'SILVER', 'TITANIUM', 'ZINC', 'BRASS', 'IRIDIUM'] },
+  { theme: 'Gemstones',  words: ['GARNET', 'OPAL', 'TOPAZ', 'JASPER', 'ZIRCON', 'BERYL', 'AMETHYST', 'ONYX', 'PERIDOT', 'JADE'] },
+  { theme: 'Castles',    words: ['TURRET', 'MOAT', 'RAMPART', 'BAILEY', 'KEEP', 'DRAWBRIDGE', 'PARAPET', 'BATTLEMENT', 'PORTCULLIS', 'DUNGEON'] },
+  { theme: 'Sailing',    words: ['ANCHOR', 'RUDDER', 'MAST', 'GALLEY', 'STARBOARD', 'KEEL', 'HALYARD', 'SCHOONER', 'BOWSPRIT', 'TILLER'] },
+  { theme: 'Cycling',    words: ['PEDAL', 'SADDLE', 'SPOKE', 'CHAIN', 'HANDLEBAR', 'GEAR', 'BRAKE', 'PELOTON', 'CADENCE', 'TANDEM'] },
+  { theme: 'Athletics',  words: ['SPRINT', 'HURDLE', 'JAVELIN', 'DISCUS', 'RELAY', 'VAULT', 'MARATHON', 'SHOTPUT', 'STRIDE', 'PODIUM'] },
+  { theme: 'Camping',    words: ['TENT', 'LANTERN', 'CANTEEN', 'EMBERS', 'BEDROLL', 'COMPASS', 'TRAIL', 'KINDLING', 'SATCHEL', 'HAMMOCK'] },
+  { theme: 'Winter',     words: ['MITTEN', 'ICICLE', 'BLIZZARD', 'SLEDGE', 'FLURRY', 'THAW', 'GLAZE', 'PARKA', 'SNOWDRIFT', 'FROSTBITE'] },
+  { theme: 'Library',    words: ['VOLUME', 'INDEX', 'ARCHIVE', 'BINDING', 'FOLIO', 'ATLAS', 'CATALOGUE', 'MARGIN', 'PREFACE', 'MANUSCRIPT'] },
+  { theme: 'Theatre',    words: ['CURTAIN', 'REHEARSE', 'BALCONY', 'SCRIPT', 'ENCORE', 'BACKDROP', 'MONOLOGUE', 'USHER', 'MATINEE', 'SPOTLIGHT'] },
+  { theme: 'Painting',   words: ['CANVAS', 'PALETTE', 'EASEL', 'PIGMENT', 'VARNISH', 'PRIMER', 'BRUSH', 'FRESCO', 'STIPPLE', 'GOUACHE'] },
+  { theme: 'Photography',words: ['SHUTTER', 'LENS', 'APERTURE', 'TRIPOD', 'EXPOSURE', 'FILTER', 'NEGATIVE', 'FOCUS', 'DARKROOM', 'PORTRAIT'] },
+  { theme: 'Cinema',     words: ['REEL', 'SCENE', 'EDITOR', 'SCREEN', 'TRAILER', 'CAMEO', 'MONTAGE', 'CREDITS', 'DIRECTOR', 'SOUNDTRACK'] },
+  { theme: 'Rivers',     words: ['DELTA', 'RAPIDS', 'ESTUARY', 'BANK', 'MEANDER', 'SOURCE', 'TRIBUTARY', 'FORD', 'CURRENT', 'CATARACT'] },
+  { theme: 'Volcanoes',  words: ['MAGMA', 'CRATER', 'LAVA', 'ASHFALL', 'CALDERA', 'VENT', 'PUMICE', 'ERUPTION', 'BASALT', 'FISSURE'] },
+  { theme: 'Astronomy',  words: ['QUASAR', 'PULSAR', 'CORONA', 'ZENITH', 'PARALLAX', 'ECLIPTIC', 'AURORA', 'SOLSTICE', 'PENUMBRA', 'PERIHELION'] },
+  { theme: 'Chemistry',  words: ['BEAKER', 'CATALYST', 'ISOTOPE', 'SOLVENT', 'ALKALI', 'TITRATE', 'MOLAR', 'REAGENT', 'DISTIL', 'POLYMER'] },
+  { theme: 'Anatomy',    words: ['TENDON', 'CORTEX', 'SPLEEN', 'MARROW', 'SINEW', 'RETINA', 'FEMUR', 'ARTERY', 'LIGAMENT', 'CARTILAGE'] },
+  { theme: 'Architecture', words: ['ATRIUM', 'COLUMN', 'GABLE', 'ARCH', 'ROTUNDA', 'FACADE', 'CORNICE', 'BUTTRESS', 'PORTICO', 'MEZZANINE'] },
+  { theme: 'Transport',  words: ['FERRY', 'TRAM', 'CARRIAGE', 'GONDOLA', 'FREIGHT', 'SHUTTLE', 'CONVOY', 'MONORAIL', 'CARAVAN', 'AIRSHIP'] },
+  { theme: 'Markets',    words: ['STALL', 'BARTER', 'VENDOR', 'HAGGLE', 'PRODUCE', 'AWNING', 'CRATE', 'BAZAAR', 'MERCHANT', 'TROLLEY'] },
+  { theme: 'Puzzles',    words: ['RIDDLE', 'CIPHER', 'MAZE', 'ANAGRAM', 'CLUE', 'LOGIC', 'PATTERN', 'REBUS', 'CROSSWORD', 'CONUNDRUM'] },
+  { theme: 'Mythology',  words: ['ORACLE', 'TITAN', 'CHIMERA', 'PHOENIX', 'SIREN', 'MINOTAUR', 'PEGASUS', 'HYDRA', 'CENTAUR', 'VALKYRIE'] },
+];
+
+/* Difficulty for this game is GENERATOR PARAMETERS, not a corpus: a bigger
+   grid, more words, diagonals and reversals allowed, and denser decoy letters
+   each make a search genuinely harder. Bands name all four. */
+const WS_BANDS = [
+  { size: 8,  words: 6,  dirs: 4, reverse: false },
+  { size: 10, words: 8,  dirs: 4, reverse: false },
+  { size: 10, words: 10, dirs: 8, reverse: false },
+  { size: 12, words: 10, dirs: 8, reverse: true },
+  { size: 14, words: 12, dirs: 8, reverse: true },
+  { size: 15, words: 14, dirs: 8, reverse: true },
 ];
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -31,27 +86,32 @@ const wsRandLetter = (rng = Math.random) => ALPHABET[Math.floor(rng() * 26)];
 
 // Try to place every word into a fresh grid. Returns the filled letter grid,
 // or null if any word couldn't be placed (caller retries with a new grid).
-function placeWords(words, rng = Math.random) {
-  const grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
+function placeWords(words, rng = Math.random, size = WS_SIZE, dirs = WS_DIRS, allowReverse = true) {
+  const grid = Array.from({ length: size }, () => Array(size).fill(null));
   // Longest first: a 10-letter word on a 10x10 grid has very few legal
   // placements, and trying it after the grid is half-full wastes retries.
   for (const word of words.slice().sort((a, b) => b.length - a.length)) {
     let placed = false;
+    // A band that forbids reversals writes the word forwards only; one that
+    // allows them flips a coin per word, which is what makes a grid feel
+    // adversarial rather than merely large.
+    const spelled = (allowReverse && rng() < 0.4)
+      ? word.split('').reverse().join('') : word;
     for (let attempt = 0; attempt < 400 && !placed; attempt++) {
-      const [dr, dc] = WS_DIRS[Math.floor(rng() * WS_DIRS.length)];
-      const r0 = Math.floor(rng() * WS_SIZE);
-      const c0 = Math.floor(rng() * WS_SIZE);
+      const [dr, dc] = dirs[Math.floor(rng() * dirs.length)];
+      const r0 = Math.floor(rng() * size);
+      const c0 = Math.floor(rng() * size);
       const rEnd = r0 + dr * (word.length - 1);
       const cEnd = c0 + dc * (word.length - 1);
-      if (rEnd < 0 || rEnd >= WS_SIZE || cEnd < 0 || cEnd >= WS_SIZE) continue;
+      if (rEnd < 0 || rEnd >= size || cEnd < 0 || cEnd >= size) continue;
       // Overlap is allowed only where the existing letter already matches.
       let ok = true;
-      for (let i = 0; i < word.length; i++) {
+      for (let i = 0; i < spelled.length; i++) {
         const ch = grid[r0 + dr * i][c0 + dc * i];
-        if (ch !== null && ch !== word[i]) { ok = false; break; }
+        if (ch !== null && ch !== spelled[i]) { ok = false; break; }
       }
       if (!ok) continue;
-      for (let i = 0; i < word.length; i++) grid[r0 + dr * i][c0 + dc * i] = word[i];
+      for (let i = 0; i < spelled.length; i++) grid[r0 + dr * i][c0 + dc * i] = spelled[i];
       placed = true;
     }
     if (!placed) return null;
@@ -59,32 +119,57 @@ function placeWords(words, rng = Math.random) {
   return grid;
 }
 
-function generateWordSearch(rng = Math.random) {
-  const set = WORD_SETS[Math.floor(rng() * WORD_SETS.length)];
-  const words = set.words.slice();
+/* Theme rotation as a PARTITION, not a sample. Shuffle the themes once with a
+   fixed seed and walk them in order, so a theme cannot recur until all forty
+   have been seen. The old uniform draw over seven sets gave a ~14% chance of
+   repeating the very next day; this gives a hard 40-day guarantee. (Daily
+   Cipher already worked this way — this is that idea applied to the game the
+   request actually complained about.) */
+const WS_THEME_ORDER = shuffle(WORD_SETS.map((_, i) => i), mulberry32(0x5EED17));
+const wsThemeForDay = (dayNum) => WORD_SETS[WS_THEME_ORDER[
+  ((dayNum % WS_THEME_ORDER.length) + WS_THEME_ORDER.length) % WS_THEME_ORDER.length
+]];
+
+/* Generate against a band spec: grid size, word count, how many directions are
+   allowed and whether words may run backwards. All four are what actually make
+   a word search hard, which is why this game never needed a board corpus —
+   only more vocabulary and these knobs. */
+function generateWordSearch(rng = Math.random, spec, themeIdx) {
+  const band = spec || WS_BANDS[2];
+  const set = themeIdx != null
+    ? WORD_SETS[themeIdx % WORD_SETS.length]
+    : WORD_SETS[Math.floor(rng() * WORD_SETS.length)];
+  // Longest words first: they are the hardest to place, and a band that asks
+  // for fewer words should drop the easy short ones rather than the long ones.
+  const words = set.words.slice()
+    .sort((a, b) => b.length - a.length)
+    .slice(0, band.words);
+  const size = band.size;
+  const dirs = WS_DIRS.slice(0, band.dirs);
   let grid = null;
-  // Raised from 60: a 10-word set on a 10x10 grid needs more retries than an
-  // 8-word set on 8x8, and a fallback blank grid would be an unsolvable board.
-  for (let attempt = 0; attempt < 400 && !grid; attempt++) grid = placeWords(words, rng);
-  if (!grid) grid = Array.from({ length: WS_SIZE }, () => Array(WS_SIZE).fill(null));
+  for (let attempt = 0; attempt < 400 && !grid; attempt++) {
+    grid = placeWords(words, rng, size, dirs, band.reverse);
+  }
+  if (!grid) grid = Array.from({ length: size }, () => Array(size).fill(null));
   // Fill the empty cells with seeded filler letters.
   const letters = grid.map(row => row.map(ch => ch || wsRandLetter(rng)));
-  return { theme: set.theme, words, letters };
+  return { theme: set.theme, words, letters, size };
 }
 
 // Locate `word` on the letter grid (any of the 8 directions, forwards or
 // reversed) and return its cell indices, or null. Used to restore highlighted
 // cells for words a resumed player had already found.
 function locateWord(letters, word) {
-  const idx = (r, c) => r * WS_SIZE + c;
-  for (let r = 0; r < WS_SIZE; r++) {
-    for (let c = 0; c < WS_SIZE; c++) {
+  const n = letters.length;
+  const idx = (r, c) => r * n + c;
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
       for (const [dr, dc] of WS_DIRS) {
         const cells = [];
         let ok = true;
         for (let i = 0; i < word.length; i++) {
           const rr = r + dr * i, cc = c + dc * i;
-          if (rr < 0 || rr >= WS_SIZE || cc < 0 || cc >= WS_SIZE || letters[rr][cc] !== word[i]) { ok = false; break; }
+          if (rr < 0 || rr >= n || cc < 0 || cc >= n || letters[rr][cc] !== word[i]) { ok = false; break; }
           cells.push(idx(rr, cc));
         }
         if (ok) return cells;
@@ -94,9 +179,30 @@ function locateWord(letters, word) {
   return null;
 }
 
-function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
-  const board = useRef(generateWordSearch(dailyRng(offset, 'wordhunt'))).current;
-  const { theme, words, letters } = board;
+function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
+  /* #176 — the daily now walks the theme partition (no repeat for 40 days,
+     where the old uniform draw over seven sets could repeat tomorrow) at the
+     middle band. Story climbs the band ladder; arcade rolls a fresh grid at
+     one of three points on it. */
+  const wsBandIdx = playMode === 'story' ? Math.max(0, band || 0)
+    : playMode === 'arcade'
+      ? [1, 3, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      : 2;
+  const wsSpec = WS_BANDS[Math.min(WS_BANDS.length - 1, wsBandIdx)];
+  const board = useRef(null);
+  if (!board.current) {
+    if (playMode === 'story' || playMode === 'arcade') {
+      const { rng } = modeSeed(playMode, 'wordhunt', wsBandIdx, offset);
+      board.current = generateWordSearch(rng, wsSpec);
+    } else {
+      board.current = generateWordSearch(
+        dailyRng(offset, 'wordhunt'), wsSpec, WS_THEME_ORDER[
+          ((utcDayNum(offset) % WS_THEME_ORDER.length) + WS_THEME_ORDER.length) % WS_THEME_ORDER.length
+        ]);
+    }
+  }
+  const { theme, words, letters } = board.current;
+  const WS_N = board.current.size;
   const total = words.length;
   const dayNum = useRef(utcDayNum(offset)).current;
 
@@ -137,7 +243,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const secsRef = useRef(initialSecs);
   secsRef.current = secs;
 
-  const idx = (r, c) => r * WS_SIZE + c;
+  const idx = (r, c) => r * WS_N + c;
 
   // Idle/leave autosave; per-find saves happen in endSel().
   const stateRef = useRef({});
@@ -205,7 +311,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const endSel = () => {
     if (done || !anchor || sel.length === 0) { setAnchor(null); setSel([]); return; }
 
-    const word = sel.map(i => letters[Math.floor(i / WS_SIZE)][i % WS_SIZE]).join('');
+    const word = sel.map(i => letters[Math.floor(i / WS_N)][i % WS_N]).join('');
     const rev = word.split('').reverse().join('');
     const match = words.find(w => (w === word || w === rev) && !found.has(w));
 
@@ -258,7 +364,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       <div className="word-theme">Theme: <b>{theme}</b> · drag across letters to find each word</div>
 
       <div className="fit-scale-box">
-      <div className="wordsearch" onPointerUp={endSel} onPointerLeave={endSel}>
+      <div className="wordsearch" style={{ '--ws-size': WS_N }} onPointerUp={endSel} onPointerLeave={endSel}>
         {letters.map((row, r) =>
           row.map((ch, c) => {
             const i = idx(r, c);

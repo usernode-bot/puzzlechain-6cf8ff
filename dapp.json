@@ -710,7 +710,7 @@
     {
       "name": "Daily Tile Match resumes a seeded run",
       "path": "/?demo=tilematch&game=tilematchingdaily&play=1",
-      "expectSelector": ".tm-board-container"
+      "expectSelector": "canvas.tm-canvas"
     },
     {
       "name": "Review demo seeds the nonogram board",
@@ -795,7 +795,7 @@
     {
       "name": "Ludo pass-and-play board renders",
       "path": "/?game=ludo&mode=2p",
-      "expectSelector": ".ludo-board"
+      "expectSelector": "canvas.ludo-canvas"
     },
     {
       "name": "Word Sprint found-list has its own scroll strip",
@@ -820,7 +820,7 @@
     {
       "name": "Checkers board is capped to the viewport",
       "path": "/?game=checkers&mode=2p",
-      "expectSelector": ".cg-stage .ck-board"
+      "expectSelector": ".cg-stage .brg-canvas-box canvas.ck-canvas"
     },
     {
       "name": "Locked day shows today's result, not just a countdown",
@@ -910,7 +910,7 @@
     {
       "name": "Versus Bot match starts locally",
       "path": "/?game=fourinarow&mode=bot",
-      "expectSelector": ".fir-board"
+      "expectSelector": "canvas.fir-canvas"
     },
     {
       "name": "Rules registry is reachable from the browser",
@@ -1020,7 +1020,7 @@
     {
       "name": "Sudoku 9x9 board is deep-linkable and fills its column",
       "path": "/?game=sudoku&practice=1&sdk=9",
-      "expectSelector": ".sudoku.s9 .scell"
+      "expectSelector": ".sudoku.s9 canvas.sdk-canvas"
     },
     {
       "name": "Sudoku 9x9 keypad renders full-width digit keys",
@@ -1030,7 +1030,7 @@
     {
       "name": "Sudoku 6x6 Mini board is deep-linkable",
       "path": "/?game=sudoku&practice=1&sdk=6",
-      "expectSelector": ".sudoku .scell"
+      "expectSelector": ".sudoku canvas.sdk-canvas"
     },
     {
       "name": "Sudoku difficulty chooser still renders without ?sdk",
@@ -1040,7 +1040,7 @@
     {
       "name": "Word Search board renders",
       "path": "/?game=wordhunt&practice=1",
-      "expectSelector": ".wordsearch .wcell"
+      "expectSelector": ".wordsearch canvas.ws-canvas"
     },
     {
       "name": "Daily Snake board renders",
@@ -1050,7 +1050,7 @@
     {
       "name": "Word Sprint grid renders",
       "path": "/?game=wordsprint&practice=1",
-      "expectSelector": ".wspr-grid .wspr-tile"
+      "expectSelector": ".wspr-grid canvas.wspr-canvas"
     },
     {
       "name": "Daily Bounce canvas fits its column",
@@ -1126,6 +1126,66 @@
       "name": "Paired card mode buttons render side by side",
       "path": "/",
       "expectSelector": ".grid > .card .card-modes .card-mode-btn"
+    },
+    {
+      "name": "Minesweeper board is a canvas",
+      "path": "/?game=minesweeper",
+      "expectSelector": "canvas.ms-canvas"
+    },
+    {
+      "name": "Knight's Tour board is a canvas",
+      "path": "/?game=knights-tour",
+      "expectSelector": "canvas.kt-canvas"
+    },
+    {
+      "name": "Crate Push room is a canvas",
+      "path": "/?game=cratepush&practice=1",
+      "expectSelector": "canvas.cp-canvas"
+    },
+    {
+      "name": "Daily Cipher guess grid is a canvas",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectSelector": ".cw-board canvas.cw-canvas"
+    },
+    {
+      "name": "Diamond Rush gem board is a canvas",
+      "path": "/?game=diamondrush",
+      "expectSelector": ".dr-grid canvas.dr-canvas"
+    },
+    {
+      "name": "Anagram Sprint slots + rack are a canvas",
+      "path": "/?game=anagrams&practice=1",
+      "expectSelector": ".an-boardbox canvas.an-canvas"
+    },
+    {
+      "name": "Snake board is a canvas",
+      "path": "/?game=snake&snake=normal",
+      "expectSelector": ".snake-board canvas.snake-canvas"
+    },
+    {
+      "name": "Daily Snake board is a canvas",
+      "path": "/?game=snakedaily&practice=1",
+      "expectSelector": ".dsnk-board canvas.snake-canvas"
+    },
+    {
+      "name": "2048 board is a canvas",
+      "path": "/?game=2048&result=1",
+      "expectSelector": ".game-body.frozen .t2048-grid canvas.t2048-canvas"
+    },
+    {
+      "name": "Block Fit well is a canvas",
+      "path": "/?game=blockblast&result=1",
+      "expectSelector": "canvas.bb-canvas"
+    },
+    {
+      "name": "Reversi pass-and-play board is a canvas",
+      "path": "/?game=reversi&mode=2p",
+      "expectSelector": "canvas.rv-canvas"
+    },
+    {
+      "name": "Gomoku board is a canvas (confirm bar stays)",
+      "path": "/?game=gomoku&mode=2p",
+      "expectSelector": "canvas.gmk-canvas"
     }
   ],
   "visibility": {

@@ -3,7 +3,7 @@
  * Mancala Daily Challenge — self-test.
  *
  * Verifies the invariants the feature depends on WITHOUT a database:
- *   1. Board determinism + parity: the client (mncDailyBoard, public/app.jsx)
+ *   1. Board determinism + parity: the client (mncDailyBoard, public/src/)
  *      and server (srvMncDailyBoard, server.js) derive a byte-identical board
  *      for the same UTC day number, and that board is fair (both sides equal
  *      sum = 24, stores empty).
@@ -17,7 +17,7 @@
 
 function assert(cond, msg) { if (!cond) { console.error('FAIL: ' + msg); process.exitCode = 1; throw new Error(msg); } }
 
-/* ---- shared deterministic primitives (identical in app.jsx & server.js) ---- */
+/* ---- shared deterministic primitives (identical in the frontend source & server.js) ---- */
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -33,7 +33,7 @@ function hashStr(s) {
   return h >>> 0;
 }
 
-/* ---- CLIENT copy: mncDailyBoard (public/app.jsx) ---- */
+/* ---- CLIENT copy: mncDailyBoard (public/src/) ---- */
 function clientBoard(dayNum) {
   const rng = mulberry32((dayNum + hashStr('mancaladaily')) >>> 0);
   const side = [0, 0, 0, 0, 0, 0];

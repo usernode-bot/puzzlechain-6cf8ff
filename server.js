@@ -44,7 +44,7 @@ function signIntegrationPayload(payload) {
 // Server-authoritative daily hint cap. Hints are FREE (the MATCH currency is
 // retired) but still capped and counted server-side so the count survives
 // reloads and a client can't reveal more clues than the day's puzzle carries.
-// Mirrors app.jsx's cwDailyRounds: the day's round count R is the FIRST draw
+// Mirrors the frontend source's cwDailyRounds: the day's round count R is the FIRST draw
 // off dailyRng(offset, 'cryptowordle'), before any word is picked, so we can
 // reproduce R without porting the whole CW_WORDS list — only the round-count
 // draw needs to match byte-for-byte. Every CW_WORDS entry ships exactly
@@ -105,7 +105,7 @@ let migrationsReady = false;
 
 // ---- Authoritative game registry -----------------------------------------
 // Single source of truth for every game in the hub, keyed by id, mirroring the
-// GAMES array in public/app.jsx. `category` is the lobby tab; `tier` is the
+// GAMES array in public/src/. `category` is the lobby tab; `tier` is the
 // DApp-Mode validation tier (A=full replay, B=snapshot/heuristic,
 // C=server-authoritative). This reconciles the historical GAMES/GAME_IDS drift:
 // GAME_IDS is now DERIVED from this registry's daily-category games (the set the
@@ -248,7 +248,7 @@ const CLASSIC_LB_LIMIT = 20;
 /* PHASE 4 (#122) — the staging `demo=solvedboard` fixture needs a REAL solved
    nonogram grid, not a plausible-looking fake, so the review screen a tester
    sees is the puzzle the client would actually have generated. Mirrors
-   mulberry32 + ngGenerate in public/app.jsx exactly; used ONLY by that
+   mulberry32 + ngGenerate in public/src/ exactly; used ONLY by that
    IS_STAGING fixture, never by gameplay or validation. Keep in sync with
    ngGenerate if the generator changes. */
 function srvMulberry32(seed) {
@@ -285,7 +285,7 @@ function srvNonogramSolution(seed) {
   return g;
 }
 
-// FNV-1a string hash — byte-for-byte mirror of hashStr in public/app.jsx.
+// FNV-1a string hash — byte-for-byte mirror of hashStr in public/src/.
 function srvHashStr(s) {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) {
@@ -514,7 +514,7 @@ function rateMatch(gameId, p1, p2, winner) {
 }
 
 // Consecutive-day streak milestones that unlock a named badge. Kept in sync
-// with STREAK_BADGES in public/app.jsx (the client owns the icon/name copy;
+// with STREAK_BADGES in public/src/ (the client owns the icon/name copy;
 // the server only persists the day thresholds as streak_milestone achievements
 // so a player's earned badges survive a later streak reset).
 const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
@@ -522,7 +522,7 @@ const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
 // ---- Achievement badges (non-streak) -------------------------------------
 // Persisted in user_achievements as one row per earned badge `type`, mirroring
 // the streak_milestone pattern. Kept in sync with ACHIEVEMENT_BADGES in
-// public/app.jsx (the client owns the icon/name copy; the server owns the
+// public/src/ (the client owns the icon/name copy; the server owns the
 // award criteria and persists the earned `type`). All criteria derive from
 // columns already recorded per solve (time_secs, steps, score, game_id,
 // attempt_date), so no new data is needed.
@@ -1702,7 +1702,7 @@ function generateRoomId() {
 
 /* ============================================================
    Mancala Daily Challenge — deterministic board + AI engine
-   These MUST stay byte-identical to the client helpers in app.jsx
+   These MUST stay byte-identical to the client helpers in the frontend source
    (mulberry32 / hashStr / mncDailyBoard / mncMinimax / mncAIMove) or
    verification fails. Pure integer math, no randomness.
    ============================================================ */

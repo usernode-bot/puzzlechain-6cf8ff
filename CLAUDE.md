@@ -40,29 +40,39 @@ more games slot into the same registry.
 
 ## App-specific conventions
 
-This is a **single-page React 18 app with NO build step**. Read this
-before editing the frontend — the loading mechanism is unusual on
-purpose.
+This is a **single-page React 18 app** built by concatenation rather
+than by a module bundler. Read this before editing the frontend — the
+loading mechanism is unusual on purpose.
 
-- **`public/app.jsx` is the entire frontend** — one file. React,
-  hooks, the design system, every game component, the registry, and
-  the root `App` all live here.
-- **In-browser compile.** `public/index.html` loads React 18 UMD +
-  ReactDOM + Babel Standalone from unpkg, then fetches `/app.jsx` and
-  compiles it with `Babel.transform(src, { presets: ['react'],
-  sourceType: 'script' })` — classic `React.createElement` runtime,
-  **not** ES modules. Consequences:
-  - **Never add `import` or `export`** to `app.jsx`. It runs as a
-    classic script in global scope.
+- **The frontend is `public/src/*.jsx` — 32 files, concatenated.**
+  `scripts/build.js` joins them in the order declared by
+  `public/src/ORDER` and runs esbuild's JSX transform over the result,
+  emitting `public/app.js`. `index.html` loads that as a plain script.
+  Run `npm run build`; the Dockerfile does it at image build time.
+  (Before Aug 2026 this was a single 26k-line `public/app.jsx`. The
+  split is provably behaviour-preserving: at that commit the
+  concatenation was byte-identical to the old file and the compiled
+  `app.js` did not change by one byte.)
+  - **Still never add `import` or `export`.** The files are
+    concatenated, not linked — one classic script, one global scope,
+    exactly as before. Cross-file references just work.
+  - **`ORDER` is load-bearing.** Anything read at evaluation time —
+    the `css` template reads the palette, `GAMES` names every game
+    component — must be declared in an earlier file. A new file that
+    isn't listed in `ORDER` fails the build rather than silently not
+    shipping.
   - Use the globals: `const { useState, useEffect, useRef } = React;`
     and mount with `ReactDOM.createRoot`. `React`/`ReactDOM` are on
     `window`.
-- **Don't touch these parts of `index.html`:** the deterministic
-  fetch→compile→inject bootstrap, the `// usernode-dev-console@1`
+  - `npm run check` compiles the same concatenation with Babel — a
+    second, independent parser as a syntax backstop.
+- **Don't touch these parts of `index.html`:** the `<script src="/app.js">`
+  load and its watchdog/error shell, the `// usernode-dev-console@1`
   block (platform log forwarder), and the inline data-URI favicon
   (its absence triggers a `/favicon.ico` 401 that logs a console
   error and trips the no-console-errors check).
-- **Design system lives in `app.jsx`:** a `const C` color-palette
+- **Design system lives in `public/src/00-palette.jsx` and
+  `01-styles.jsx`:** a `const C` color-palette
   object and a single global `css` template literal injected via
   `<style>{css}</style>`. Add component styles to `css` and reuse `C`
   tokens (e.g. `${C.accent}`); don't introduce a second stylesheet.
@@ -99,7 +109,8 @@ purpose.
   - `public/index.html` carries an **inline pre-paint script** that sets
     `data-theme` before the first style block (no ivory flash for
     dark-mode players) plus a self-contained dark boot-shell block. It
-    duplicates the storage key and resolution rule from `app.jsx` on
+    duplicates the storage key and resolution rule from
+    `public/src/02-prefs-theme.jsx` on
     purpose — **keep the two in sync**. `?theme=` and `?settings=1` are
     the deep links proposal tests use.
   - The control is `ThemeChoice` (a System/Light/Dark segmented control),
@@ -300,7 +311,7 @@ prior days via `seedFeaturedStreakDays` (featured-game attempts + their
 `daily_featured` rows) so they hold under the new rule.
 
 The streak multiplies points via **tiers**, defined once in
-`STREAK_TIERS` (`public/app.jsx`) and applied client-side in
+`STREAK_TIERS` (`public/src/05-core-lib.jsx`) and applied client-side in
 `streakMultiplier(streak)`:
 
 | Streak (consecutive days) | Multiplier |
@@ -334,7 +345,7 @@ Phase 2 of the Game Corner evolution added four things; keep them in
 mind when touching the daily flow:
 
 - **Registry manifest metadata.** Both `GAME_REGISTRY` (`server.js`)
-  and `GAMES` (`public/app.jsx`) now carry a per-game `manifest`:
+  and `GAMES` (`public/src/28-registry.jsx`) now carry a per-game `manifest`:
   `{ scoreDirection, tieBreak, sessionLength, input, undo }` — the
   machine-relevant fields **must match by id across the two files**.
   The client entries additionally carry `howToPlay` card copy
@@ -378,7 +389,7 @@ mind when touching the daily flow:
 ## Game Corner phase 3 — shell-owned chrome
 
 Phase 3 gave the daily flow standard, shell-owned furniture. Key
-pieces (all in `public/app.jsx`):
+pieces (all under `public/src/`):
 
 - **Pre-game screen (`PreGameScreen`).** Opening a daily game now lands
   on `screen === 'pregame'` — game identity, manifest chips
@@ -495,7 +506,7 @@ pieces (all in `public/app.jsx`):
 ## Game Corner phase 6 — shared card/tile engine + Lane A dailies
 
 Phase 6 added a small client-side **card/tile engine** and eight new
-daily games riding it (all in `public/app.jsx`, section "Phase 6 —
+daily games riding it (`public/src/24-engine-cards.jsx`, "Phase 6 —
 Shared card/tile engine + Lane A daily games"):
 
 - **Engine primitives:** `ceDeck(nDecks, suits, rng)` /
@@ -543,9 +554,8 @@ Shared card/tile engine + Lane A daily games"):
   moves }`, dropstack `{ dayNum, grid, pieceIdx, lines, points, level,
   hold }` (the last two added by the phase-9 rebuild; hydration still
   accepts the old shape and derives `level` from `lines`).
-- The single-file `app.jsx` (~19k lines) is still esbuild-compiled in
-  one pass; the spec's deferred file-split remains available if it
-  grows past comfortable, but was not needed for this phase.
+- The frontend was a single `app.jsx` through this phase; it was split
+  into `public/src/*.jsx` in Aug 2026 (see "App-specific conventions").
 
 ### What makes a good Daily Tile Match board (issue #116)
 
@@ -977,7 +987,8 @@ by self-tests; the fourth is the kind of bug only a mounted browser shows.
 
 ### 1. `TAPPABLE_CLASSES` is the single source of truth for fast taps
 
-`TAPPABLE_CLASSES` (top of `app.jsx`, above `css`) is the ONE list. Both
+`TAPPABLE_CLASSES` (`public/src/00-palette.jsx`, before `css`) is the ONE
+list. Both
 `touch-action: manipulation` and `-webkit-tap-highlight-color` are **generated**
 from it (`emitTouchActionRules()` / `emitTapHighlightRules()`), and the
 `registry-touch-action` self-test probes that same array. **Adding a game means

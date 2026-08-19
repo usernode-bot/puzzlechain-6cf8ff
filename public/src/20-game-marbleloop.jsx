@@ -597,9 +597,31 @@ function ZumaGame({ onWin, onStepChange, resetKey, playMode, band }) {
 }
 
 // ---- Match-3 Campaign Game ----
-function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, resetKey }) {
-  const [phase, setPhase] = useState('campaign'); // 'campaign' | 'playing' | 'won' | 'lost'
-  const [selectedPuzzle, setSelectedPuzzle] = useState(1);
+function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, resetKey, playMode, band }) {
+  /* #176 — the campaign CONVERGES onto the shared progression at the layer
+     that matters: rewards. Its fifty authored puzzles group into five story
+     bands of ten, and clearing a band's last puzzle ticks the rung and pays,
+     once, through game_progress. The campaign keeps its own fine-grained
+     match3_* rows for which individual puzzle you are on and your per-puzzle
+     bests, because that is session detail rather than progression — moving it
+     would have been a risky migration for no behavioural gain.
+
+     Daily and arcade come nearly free on top: the board generator was already
+     seeded, so a daily is "today's goal plus today's board" and arcade is the
+     same with a fresh seed and a goal that keeps rising. */
+  const M3_BAND_SIZE = 10;
+  const bandPuzzle = playMode === 'story'
+    ? Math.min(50, (Math.max(0, band || 0) + 1) * M3_BAND_SIZE)
+    : null;
+  const dailyPuzzle = playMode === 'daily'
+    ? 1 + (utcDayNum(offset) % 50)
+    : null;
+  const arcadePuzzle = playMode === 'arcade'
+    ? [12, 28, 46][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))] || 28
+    : null;
+  const forcedPuzzle = bandPuzzle || dailyPuzzle || arcadePuzzle;
+  const [phase, setPhase] = useState(forcedPuzzle ? 'playing' : 'campaign');
+  const [selectedPuzzle, setSelectedPuzzle] = useState(forcedPuzzle || 1);
   const [puzzleConfig, setPuzzleConfig] = useState(null);
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
@@ -677,6 +699,12 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
       }
     })();
   }, []);
+
+  // A mode that named a puzzle skips the campaign screen entirely.
+  const m3Booted = useRef(false);
+  useEffect(() => {
+    if (forcedPuzzle && !m3Booted.current) { m3Booted.current = true; startPuzzle(forcedPuzzle); }
+  }, [forcedPuzzle]);
 
   // Start a puzzle
   const startPuzzle = async (puzzleId) => {
@@ -756,6 +784,9 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
             onWin(newScore, newMoves, secsRef.current, { share: `Match-3 • Puzzle ${selectedPuzzle}: ${newScore}pts` });
             setDone(true);
             setPhase('won');
+            /* The campaign row still records which puzzle you reached and your
+               best on it. The shell's mode dispatch handles the band clear and
+               the payout, so this stays a pure campaign-detail write. */
             api(`/api/match3/finish/${selectedPuzzle}`, {
               method: 'POST',
               body: JSON.stringify({ score: newScore, timeSecs: secsRef.current, moves: newMoves })

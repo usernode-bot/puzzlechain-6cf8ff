@@ -868,6 +868,16 @@
       "expectText": "Today's theme"
     },
     {
+      "name": "Daily Cipher: one tap = one letter",
+      "path": "/?game=cryptowordle&practice=1&cwtype=LEN",
+      "expectSelector": ".cw-board[data-cw-typed=\"LEN\"]"
+    },
+    {
+      "name": "Daily Cipher: backspace removes exactly one letter",
+      "path": "/?game=cryptowordle&practice=1&cwtype=LEN-",
+      "expectSelector": ".cw-board[data-cw-typed=\"LE\"]"
+    },
+    {
       "name": "Word Search grid is the larger 10x10 board",
       "path": "/?game=wordhunt&practice=1",
       "expectSelector": ".wordsearch"

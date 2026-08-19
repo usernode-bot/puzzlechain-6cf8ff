@@ -6424,9 +6424,41 @@ function useScrollLock(active) {
    `data-pressed` is cleared on up/cancel/lostpointercapture so it can never
    stick. Mouse and keyboard paths are preserved (onClick still fires for
    non-touch, guarded against double-firing). */
+/* The touch/click de-dupe guard lives at MODULE scope, not in tapProps'
+   closure. That distinction is the whole bug behind "one tap types two
+   letters" (Daily Cipher's LENDING -> LLEENND):
+
+     pointerup -> onTap() -> setState -> React 18 flushes the re-render
+     SYNCHRONOUSLY (pointerup is a discrete event) -> the element's props are
+     replaced by a FRESH tapProps(...) object -> the browser's compatibility
+     `click` then dispatches against that new object, whose per-render
+     `handledPointer` is back to false -> onTap() fires a SECOND time.
+
+   Any tappable that changes state on tap hit this on every touch device, so
+   the guard has to outlive the render. We record which element consumed a
+   touch and when; the compat click that follows (always within a few ms) is
+   swallowed. Asserted by the `tap-dedupe-survives-rerender` self-test. */
+let _tapHandledEl = null;
+let _tapHandledAt = 0;
+const TAP_CLICK_SUPPRESS_MS = 700;
+
+function tapMarkHandled(el) {
+  _tapHandledEl = el || null;
+  _tapHandledAt = Date.now();
+}
+function tapWasHandled(el) {
+  if (!_tapHandledEl || _tapHandledEl !== el) return false;
+  if (Date.now() - _tapHandledAt > TAP_CLICK_SUPPRESS_MS) {
+    _tapHandledEl = null;
+    return false;
+  }
+  // One-shot: consume it so a later genuine click on the same element works.
+  _tapHandledEl = null;
+  return true;
+}
+
 function tapProps(onTap, { disabled = false } = {}) {
   if (disabled) return {};
-  let handledPointer = false;
   return {
     onPointerDown: (e) => {
       if (e.currentTarget.setAttribute) e.currentTarget.setAttribute('data-pressed', '1');
@@ -6436,7 +6468,9 @@ function tapProps(onTap, { disabled = false } = {}) {
       // Touch/pen act on release-in-place; mouse falls through to onClick so
       // text selection and drag handlers elsewhere keep working.
       if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-        handledPointer = true;
+        // Mark BEFORE running the action: onTap re-renders, and the compat
+        // click is dispatched against whatever props exist by then.
+        tapMarkHandled(e.currentTarget);
         onTap && onTap(e);
       }
     },
@@ -6447,7 +6481,7 @@ function tapProps(onTap, { disabled = false } = {}) {
       if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
     },
     onClick: (e) => {
-      if (handledPointer) { handledPointer = false; return; }
+      if (tapWasHandled(e.currentTarget)) return;
       onTap && onTap(e);
     },
   };
@@ -6559,6 +6593,30 @@ function runClientSelfTests(styleReady) {
 
   // Phase 1 — canvas colours.
   check('canvas-colors', canvasColorSelfTest);
+
+  /* The double-input regression guard. One TOUCH tap = exactly one action,
+     even though the action's setState re-renders the element and replaces its
+     handler props before the compatibility `click` arrives. The old per-render
+     `handledPointer` closure failed exactly here, which is why typing LENDING
+     in Daily Cipher produced LLEENND. Simulated with plain objects: the second
+     tapProps(...) stands in for the post-render props object. */
+  check('tap-dedupe-survives-rerender', () => {
+    const el = { _attrs: {}, setAttribute(k, v) { this._attrs[k] = v; }, removeAttribute(k) { delete this._attrs[k]; } };
+    let fired = 0;
+    const onTap = () => { fired++; };
+    const first = tapProps(onTap);
+    first.onPointerDown({ currentTarget: el, pointerType: 'touch' });
+    first.onPointerUp({ currentTarget: el, pointerType: 'touch' });
+    if (fired !== 1) throw new Error('touch pointerup fired ' + fired + ' times, expected 1');
+    // The re-render the action just caused: brand-new props object, same node.
+    const afterRerender = tapProps(onTap);
+    afterRerender.onClick({ currentTarget: el });
+    if (fired !== 1) throw new Error('compat click after re-render fired again (' + fired + ' total)');
+    // A genuine MOUSE click on the same element afterwards must still work.
+    tapProps(onTap).onClick({ currentTarget: el });
+    if (fired !== 2) throw new Error('mouse click was swallowed (' + fired + ' total, expected 2)');
+    return true;
+  });
 
   // Phase 5 (#143) — 2048 vertical swipes were inverted. A lone tile at the
   // bottom row swiped 'up' must reach row 0, and vice versa.
@@ -9358,6 +9416,38 @@ function cwDailyRounds(offset) {
   return cwRoundsForDay(cwDayNum(offset));
 }
 
+/* Screenshot-state + regression deep link: `?cwtype=LEND-`.
+   dapp.json checks can only NAVIGATE — they never tap — so the double-input
+   bug ("one tap types two letters") was invisible to every check we had. This
+   replays a REAL touch tap sequence (pointerdown -> pointerup -> compat click,
+   exactly what a phone dispatches) against the on-screen keys, so the guess
+   row ends up holding the typed string and a check can assert on it via
+   `.cw-board[data-cw-typed="LEND"]`. A `-` means backspace. Writes nothing —
+   typing never claims, saves or submits — so it is safe in every environment
+   (the "before" screenshot comes from production). */
+function cwTypeScript() {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('cwtype') || '';
+    return raw.toUpperCase().replace(/[^A-Z-]/g, '').slice(0, 20);
+  } catch (e) { return ''; }
+}
+
+function cwSimulateTouchTap(el) {
+  const opts = { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1, isPrimary: true };
+  const PE = window.PointerEvent;
+  const fire = (type) => {
+    let ev;
+    try { ev = PE ? new PE(type, opts) : new MouseEvent(type, opts); }
+    catch (e) { ev = new MouseEvent(type, opts); }
+    if (!('pointerType' in ev)) { try { Object.defineProperty(ev, 'pointerType', { value: 'touch' }); } catch (e2) {} }
+    el.dispatchEvent(ev);
+  };
+  fire('pointerdown');
+  fire('pointerup');
+  // The browser's compatibility click, which is the half that used to double.
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+}
+
 function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
   // The day's stack of independent word rounds (stable for the render lifetime).
@@ -9536,21 +9626,65 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     finishIfDone(resolveRounds(newRoundGuesses));
   };
 
-  const typeLetter = (ch) => { if (!done && active && cur.length < active.def.word.length) setCur(cur + ch); };
-  const backspace = () => { if (!done) setCur(cur.slice(0, -1)); };
+  // Functional updates: the length cap is evaluated against the LIVE value, so
+  // even if two calls ever land in one batch the word can never overflow its
+  // boxes (the visible symptom of the double-input bug).
+  const maxLen = active ? active.def.word.length : 0;
+  const typeLetter = (ch) => {
+    if (done || !active) return;
+    setCur((prev) => (prev.length < maxLen ? prev + ch : prev));
+  };
+  const backspace = () => {
+    if (done) return;
+    setCur((prev) => prev.slice(0, -1));
+  };
 
   // Physical keyboard, dispatched through a ref so each keypress runs the latest closure.
   const apiRef = useRef({});
   apiRef.current = { submit, typeLetter, backspace };
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); return; }
-      if (e.key === 'Backspace') { apiRef.current.backspace(); return; }
+      // Held keys auto-repeat: one PRESS must be one letter, so ignore repeats
+      // (and any modifier combo, which is a browser shortcut, not a guess).
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      // Enter/Space on a FOCUSED on-screen key already fires that button's own
+      // click. Running the window handler too would submit AND type from one
+      // press, so let the button own those two keys while it has focus.
+      const inKbd = e.target && e.target.closest && e.target.closest('.cw-kbd');
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        if (inKbd) return;
+        if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); }
+        return;
+      }
+      if (e.key === 'Backspace') { e.preventDefault(); apiRef.current.backspace(); return; }
       const ch = (e.key || '').toUpperCase();
       if (ch.length === 1 && ch >= 'A' && ch <= 'Z') apiRef.current.typeLetter(ch);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // `?cwtype=` — replay real touch taps once the keyboard is on screen.
+  useEffect(() => {
+    const script = cwTypeScript();
+    if (!script) return;
+    let tries = 0, timer = null, cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      const keys = Array.from(document.querySelectorAll('.cw-kbd .cw-key'));
+      if (!keys.length) {
+        if (tries++ < 40) timer = setTimeout(run, 50);
+        return;
+      }
+      for (const ch of script) {
+        const label = ch === '-' ? '\u232b' : ch;
+        const btn = Array.from(document.querySelectorAll('.cw-kbd .cw-key'))
+          .find(b => (b.textContent || '').trim() === label);
+        if (btn) cwSimulateTouchTap(btn);
+      }
+    };
+    timer = setTimeout(run, 60);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, []);
 
   const wordLen = active ? active.def.word.length : 5;
@@ -9637,6 +9771,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
               which collapses a percentage-sized grid to min-content. */}
           <div
             className="cw-board"
+            /* The live entry, verbatim. A check asserts
+               `.cw-board[data-cw-typed="LEND"]` after the ?cwtype= replay — with
+               the double-input bug it reads "LLEENNDD" and the check fails. */
+            data-cw-typed={cur}
             style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
           >
             {Array.from({ length: maxGuesses }).map((_, r) => {

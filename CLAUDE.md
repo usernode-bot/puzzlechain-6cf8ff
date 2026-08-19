@@ -1002,6 +1002,44 @@ drift (the old hand-copied probe list was missing 8 classes the CSS covered).
 - `touch-action-rules-emitted` is the static half: it fails even when the sheet
   is dead, proving the array and the emitted CSS are the same list.
 
+### 1b. `tapProps`' de-dupe guard must OUTLIVE the render (#one-tap-two-letters)
+
+`tapProps` fires the action on touch `pointerup` and then swallows the browser's
+compatibility `click`. The guard that does the swallowing lived in the function's
+own closure — and that is a **use-after-rerender** bug, because the action's
+`setState` re-renders before the click arrives:
+
+```
+pointerup -> onTap() -> setState -> React 18 flushes SYNCHRONOUSLY (pointerup is
+a discrete event) -> the element's props are replaced by a FRESH tapProps(...)
+object -> the compat `click` dispatches against THAT object, whose per-render
+`handledPointer` is back to false -> onTap() fires a SECOND time.
+```
+
+So **every tappable that changes state fired twice on every touch device** —
+reported as Daily Cipher typing `LLEENND` instead of `LENDING`, but the Cipher
+keyboard was only the most legible symptom, not the scope. The guard is now
+module scope (`_tapHandledEl` / `_tapHandledAt`, one-shot, 700 ms window), so it
+survives the re-render. Standing rules:
+
+- **A tap guard may never be a per-render closure.** Anything that must span
+  pointerup → click spans a re-render by construction.
+- `tap-dedupe-survives-rerender` asserts it by simulating exactly that swap (two
+  separate `tapProps(...)` objects against one element).
+- Desktop had a second double path: with an on-screen key focused, Enter/Space
+  fires that button's own click AND the window `keydown`. Daily Cipher's handler
+  now ignores `e.repeat`/modifiers and defers Enter/Space to the focused button
+  when `e.target.closest('.cw-kbd')` matches.
+- `typeLetter`/`backspace` use **functional** `setCur`, so the length cap is
+  evaluated against the live value and a batched double can never overflow the
+  boxes.
+- **`?cwtype=LEN-`** replays a real touch tap sequence (pointerdown → pointerup →
+  compat click) against the on-screen keys at boot, and `.cw-board` carries
+  `data-cw-typed`. That pair is what makes this testable at all: `dapp.json`
+  checks can only navigate, so before it no check could see a tap-driven bug. A
+  `-` means backspace. Keep the asserted strings **≤ 3 letters** — the day's word
+  length varies (min 3) and `typeLetter` caps at it.
+
 ### 2. The `.game-body` wrapper is UNCONDITIONAL — never toggle it in/out
 
 `{screen==='game' && <div className={'game-body' + (boardReviewable ? ' frozen'

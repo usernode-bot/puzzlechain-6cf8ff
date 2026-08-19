@@ -652,7 +652,6 @@ body {
   align-items: center;
   justify-content: center;
 }
-.game-wrap.fit .status-bar { flex: 0 0 auto; margin-bottom: 0; }
 /* In fit mode the hint is a fixed footer line, not a scroll-away paragraph —
    the board flexes around it so it can never be pushed off the viewport. */
 .game-wrap.fit .p6-hint { flex: 0 0 auto; margin-top: 0; font-size: 11.5px; line-height: 1.35; }
@@ -667,11 +666,9 @@ body {
 }
 /* Stat pills wrap rather than forcing the column wider than the phone —
    a five-pill row is ~400px and would push the board off a 360px screen. */
-.fit-col .status-bar { flex-wrap: wrap; }
-.fit-col .status-bar .pill { flex: 1 1 auto; min-width: 0; }
 /* Everything that is NOT the board is fixed-size, so only the board flexes.
    Miss one of these and it gets crushed to zero height by the board. */
-.fit-col .status-bar, .fit-col .p6-hint,
+.fit-col .p6-hint,
 .fit-col .word-list,
 .fit-col .p6-banner,
 /* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
@@ -844,32 +841,6 @@ ${emitTapHighlightRules()}
 .back-btn:hover { border-color: ${C.accent}; }
 .game-title { font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
 
-.status-bar {
-  display: flex;
-  gap: 0.6rem;
-  margin-bottom: 1.25rem;
-}
-.pill {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  padding: 0.55rem 0.7rem;
-  text-align: center;
-}
-.pill .plabel {
-  font-size: 0.58rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: ${C.muted};
-}
-.pill .pvalue {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
-  font-size: 1.1rem;
-  margin-top: 0.1rem;
-}
-.pill .pvalue.time { color: ${C.gold}; }
 
 /* ---- Sudoku ---- */
 /* The box hosts the board canvas; sizing is what fit-col rules and the
@@ -1853,9 +1824,6 @@ ${emitTapHighlightRules()}
   margin-left: auto;
   margin-right: auto;
 }
-.mnc-conn-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
-.mnc-conn-dot.green { background: ${C.emerald}; }
-.mnc-conn-dot.amber { background: ${C.gold}; }
 
 /* ---- Mancala AI thinking banner ---- */
 .mnc-ai-thinking {
@@ -1901,45 +1869,10 @@ ${emitTapHighlightRules()}
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
 }
-.t2048-score-delta {
-  position: absolute;
-  top: -1.4rem;
-  right: 0.1rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: ${C.gold};
-  pointer-events: none;
-  animation: t2048-float-up 600ms ease-out forwards;
-  white-space: nowrap;
-}
 @keyframes t2048-float-up {
   from { opacity: 1; transform: translateY(0); }
   to   { opacity: 0; transform: translateY(-22px); }
 }
-.t2048-controls {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.8rem auto 0;
-}
-.t2048-controls button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.t2048-controls button:hover { border-color: ${C.accent}; }
-.t2048-controls button:disabled { opacity: 0.38; cursor: not-allowed; }
-.t2048-controls button:disabled:hover { border-color: ${C.border}; }
 .t2048-banner {
   font-size: 0.72rem;
   color: ${C.muted};
@@ -2077,27 +2010,6 @@ ${emitTapHighlightRules()}
   margin: 0 auto;
   width: 100%;
 }
-.snake-controls {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.8rem auto 0;
-}
-.snake-controls button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.snake-controls button:hover { border-color: ${C.accent}; }
 .snake-dpad {
   display: grid;
   grid-template-columns: repeat(3, 56px);
@@ -2212,68 +2124,6 @@ ${emitTapHighlightRules()}
   text-align: center;
   padding: 1rem;
 }
-.bounce-controls {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.8rem auto 0;
-}
-.bounce-controls button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.bounce-controls button:hover { border-color: ${C.accent}; }
-.bounce-audio-row {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.7rem auto 0;
-}
-.bounce-audio-row button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.4rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.bounce-audio-row button:hover:not(:disabled) { border-color: ${C.accent}; }
-.bounce-audio-row button:disabled { opacity: 0.4; cursor: default; }
-.bounce-dpad {
-  display: grid;
-  grid-template-columns: repeat(2, 72px);
-  gap: 0.6rem;
-  justify-content: center;
-  margin: 0.9rem auto 0;
-}
-.bounce-dpad button {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  font-size: 1.3rem;
-  height: 56px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.12s, background 0.12s;
-}
-.bounce-dpad button:active { background: ${C.accent}; border-color: ${C.accent}; }
 
 /* ---- Zuma ---- */
 .zuma-wrap {
@@ -2655,23 +2505,6 @@ ${emitTapHighlightRules()}
   overflow: hidden;
 }
 .cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
-.cg-statusbar {
-  display: flex;
-  gap: 0.5rem;
-  width: var(--cg-board);
-  max-width: 94vw;
-}
-.cg-stat {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  padding: 0.4rem 0.5rem;
-  text-align: center;
-  min-width: 0;
-}
-.cg-stat .l { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
-.cg-stat .v { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: clamp(0.9rem, 3.5vw, 1.15rem); margin-top: 0.05rem; }
 
 /* Bottom sheet */
 .cg-sheet-backdrop {
@@ -2910,7 +2743,6 @@ ${emitTapHighlightRules()}
 /* The board-game rooms stack status + board + legend + leaderboard, so cap the
    text chrome too — the board fitting is only half of "no scrolling to see
    whose turn it is". */
-.brg-legend { font-size: 0.74rem; }
 
 /* ---- Snake ---- */
 .snake-board {
@@ -2969,31 +2801,6 @@ ${emitTapHighlightRules()}
   display: flex; align-items: center; justify-content: center;
   touch-action: none;
 }
-.m3-bar {
-  width: var(--cg-board);
-  max-width: 94vw;
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  padding: 0.6rem 0.7rem;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 12px;
-}
-.m3-bar.full { border-color: ${C.rose}; }
-.m3-bar-label {
-  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: ${C.muted}; font-weight: 700; margin-right: 0.2rem;
-}
-.m3-bar-label.full { color: ${C.rose}; }
-.m3-bar-tile {
-  width: 34px; height: 34px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.05rem;
-}
-.m3-bar-empty { color: ${C.muted}; font-size: 0.82rem; }
 .m3-level {
   padding: 0.85rem 0.6rem; min-height: 62px;
   background: ${C.card}; color: ${C.text};
@@ -3022,49 +2829,6 @@ ${emitTapHighlightRules()}
   border-radius: 12px;
   padding: 4px;
   touch-action: none;
-}
-.dr-powerups-bar {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: center;
-  width: var(--cg-board);
-  max-width: 94vw;
-  margin-top: 0.8rem;
-}
-.dr-powerup-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.6rem;
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-  flex: 1;
-  max-width: 90px;
-}
-.dr-powerup-btn.owned:not(:disabled) { border-color: ${C.accent}; background: ${ca('accent','14')}; }
-.dr-powerup-btn.owned:not(:disabled):hover { border-color: ${C.gold}; background: ${ca('gold','22')}; }
-.dr-powerup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.dr-powerup-btn .icon { font-size: 1.4rem; line-height: 1; }
-.dr-powerup-btn .count { font-size: 0.65rem; color: ${C.muted}; }
-.dr-time-boost {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: ${C.gold};
-  animation: timeBounce 1s ease-out;
-  pointer-events: none;
-  z-index: 50;
 }
 @keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
@@ -3102,46 +2866,8 @@ ${emitTapHighlightRules()}
   touch-action: none;
 }
 .kt-canvas { border-radius: 8px; }
-.kt-actions { display: flex; gap: 0.75rem; width: 100%; max-width: 480px; }
-.kt-undo-btn {
-  flex: 1;
-  padding: 0.7rem;
-  background: ${C.surface};
-  color: ${C.text};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-}
 .kt-undo-btn:hover:not(:disabled) { border-color: ${C.accent}; }
-.kt-undo-btn:disabled { opacity: 0.35; cursor: default; }
-.kt-new-btn {
-  flex: 1;
-  padding: 0.7rem;
-  background: ${C.surface};
-  color: ${C.rose};
-  border: 1px solid ${ca('rose','44')};
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-}
 .kt-new-btn:hover { border-color: ${C.rose}; }
-.kt-stuck-banner { color: ${C.rose}; font-size: 0.85rem; font-weight: 600; text-align: center; }
-.kt-hint { color: ${C.muted}; font-size: 0.82rem; text-align: center; margin-top: 0.25rem; }
-.kt-history-list { overflow-y: auto; max-height: 60vh; padding: 0.5rem 0; }
-.kt-history-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0.5rem;
-  border-bottom: 1px solid ${ca('border','22')};
-}
 .kt-history-row.kt-row-new { background: ${ca('accent','11')}; border-radius: 6px; }
 .kt-rank { font-size: 0.75rem; color: ${C.muted}; font-family: 'JetBrains Mono', monospace; min-width: 2rem; }
 .kt-best { font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.75rem; text-align: center; font-weight: 600; }
@@ -3434,15 +3160,10 @@ ${emitTapHighlightRules()}
   border: 1px solid ${ca('accent','44')}; border-radius: 10px;
   padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; text-align: center;
 }
-.brg-note {
-  text-align: center; font-size: 0.8rem; color: ${C.gold}; margin: 0.4rem 0;
-  display: flex; gap: 0.8rem; justify-content: center; align-items: center; flex-wrap: wrap;
-}
 .brg-legend {
   display: flex; gap: 0.9rem; justify-content: center; align-items: center;
   font-size: 0.72rem; color: ${C.muted}; margin-top: 0.6rem; flex-wrap: wrap;
 }
-.brg-legend > span { display: inline-flex; align-items: center; gap: 0.3rem; }
 
 /* All five boards draw on canvases inside .brg-canvas-box; only the legend
    swatches (.ck-piece-mini / .rv-disc-mini / .fir-disc-mini), the note/legend
@@ -3464,46 +3185,11 @@ ${emitTapHighlightRules()}
   flex: 0 0 auto;
   touch-action: none;
 }
-.ck-piece-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
 .ck-piece-mini.p1 { background: ${C.accent}; }
-.ck-piece-mini.p2 { background: #2b2f3d; border: 1px solid #555; }
-.rv-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
-.rv-disc-mini.d1 { background: #171a24; border: 1px solid #444; }
-.rv-disc-mini.d2 { background: #f2f0e8; }
-.rv-count { display: inline-flex; align-items: center; gap: 0.3rem; color: ${C.text}; font-weight: 600; }
-.fir-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
-.fir-disc-mini.d1 { background: ${C.rose}; }
-.fir-disc-mini.d2 { background: ${C.gold}; }
-.brd-movelist {
-  display: flex; flex-direction: column; gap: 0.4rem;
-  width: min(92vw, 380px); margin: 0.7rem auto 0;
-}
-.brd-movelist-label {
-  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: ${C.muted}; font-weight: 700;
-}
-.brd-move-btn {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-  min-height: 48px; padding: 0.5rem 0.85rem;
-  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
-  color: ${C.text}; font-family: inherit; font-size: 0.9rem; font-weight: 600;
-  cursor: pointer; text-align: left; width: 100%;
-}
-.brd-move-btn .brd-move-sub { font-size: 0.74rem; color: ${C.muted}; font-weight: 500; }
-.brd-move-btn.primary { border-color: ${C.accent}; background: ${ca('accent', '14')}; }
 /* PHASE 2 — Gomoku ghost-confirm. 15x15 in 380px is ~24px per intersection and
    a mis-tap used to place a stone permanently. The ghost stone itself is drawn
    on the canvas now; the confirm bar stays DOM. */
-.brd-confirm-bar {
-  display: flex; gap: 0.5rem; width: min(92vw, 380px); margin: 0.6rem auto 0;
-}
-.brd-confirm-bar button {
-  flex: 1 1 auto; min-height: 48px; border-radius: 12px;
-  font-family: inherit; font-size: 0.92rem; font-weight: 700; cursor: pointer;
-  border: 1.5px solid ${C.border}; background: ${C.card}; color: ${C.text};
-}
 .brd-confirm-bar button.go { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
-.brd-confirm-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* PHASE 7 — "Your rooms": a room you hosted was invisible once you left it. */
 .brd-myrooms { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.9rem; }
 .brd-myrooms-label {
@@ -3552,12 +3238,6 @@ ${emitTapHighlightRules()}
 .practice-note { font-weight: 500; opacity: 0.75; font-size: 0.82em; }
 
 /* ---- Chutes & Ladders ---- */
-.cnl-banner {
-  text-align: center; font-size: 0.82rem; font-weight: 600;
-  border-radius: 999px; padding: 0.32rem 0.8rem;
-  max-width: 480px; margin: 0 auto 0.65rem; display: block;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
-}
 .cnl-board-wrap {
   position: relative; max-width: 480px; margin: 0 auto;
   aspect-ratio: 1; width: 100%;
@@ -3568,7 +3248,6 @@ ${emitTapHighlightRules()}
   display: flex; align-items: center; justify-content: center;
 }
 .cnl-canvas { border-radius: 12px; }
-.cnl-glossary-btn { margin-left: auto; font-size: 0.75rem; }
 .cnl-variant-block { margin-top: 0.5rem; }
 .cnl-variant-label {
   font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.08em;
@@ -3601,40 +3280,7 @@ ${emitTapHighlightRules()}
 .mok-name em { color: ${C.muted}; font-weight: 400; }
 .mok-dest { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-left: 0.4rem; }
 .mok-blurb { color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; }
-.cnl-die {
-  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
-  margin: 0.9rem auto 0.2rem; max-width: 480px;
-}
-.cnl-die-face {
-  width: 3.4rem; height: 3.4rem; border-radius: 14px;
-  background: ${C.card}; border: 2px solid ${C.border};
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'JetBrains Mono', monospace; font-weight: 700;
-  font-size: 1.7rem; color: ${C.text};
-  transition: transform 0.1s ease, border-color 0.2s;
-}
 /* Tumbling spin: ~3 full turns that decelerate and settle on the result. */
-.cnl-die-face.rolling { animation: cnl-spin 0.72s cubic-bezier(0.22, 0.61, 0.36, 1); }
-@keyframes cnl-spin {
-  0%   { transform: rotate(0deg) scale(1); }
-  20%  { transform: rotate(230deg) scale(1.14); }
-  45%  { transform: rotate(560deg) scale(1.1); }
-  72%  { transform: rotate(880deg) scale(1.12); }
-  100% { transform: rotate(1080deg) scale(1); }
-}
-.cnl-roll-buttons {
-  display: flex; gap: 0.5rem;
-  max-width: 480px; margin: 0 auto;
-}
-.cnl-roll-btn {
-  flex: 1; min-width: 0;
-  border: none; cursor: pointer;
-  border-radius: 12px; padding: 0.8rem 0.6rem;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.95rem;
-  color: #fff; transition: opacity 0.15s, transform 0.1s;
-}
-.cnl-roll-btn:active:not(:disabled) { transform: scale(0.98); }
-.cnl-roll-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* ---- Pre-launch Game Mode Modal ---- */
 .gm-modal-backdrop {
@@ -3730,10 +3376,8 @@ ${emitTapHighlightRules()}
 .kl-canvas, .sp-canvas, .mj-canvas { border-radius: 8px; }
 
 .sp-game { max-width: 620px; margin: 0 auto; }
-.sp-game .status-bar { flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .mj-game { display: flex; flex-direction: column; }
-.mj-game .status-bar { align-items: center; gap: 8px; }
 
 /* Nonogram — canvas board (slice 5). The clue gutters are drawn inside the
    canvas so grid + clues scale together off one useFitBox measurement. */
@@ -10250,41 +9894,16 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     <div>
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmt}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue">{moves}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Turn</div>
-              <div className="pvalue" style={{ color: done ? C.muted : activeColor, fontSize: '0.9rem' }}>
-                {done ? (winner === 'draw' ? 'Draw' : `P${winner}`) : `P${player}`}
-              </div>
-            </div>
-          </div>
-
-          {/* Active-player indicator */}
-          <div style={{
-            textAlign: 'center',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            color: done ? C.muted : activeColor,
-            background: (done ? C.dim : activeColor) + '22',
-            border: `1px solid ${(done ? C.dim : activeColor)}44`,
-            borderRadius: '999px',
-            padding: '0.32rem 0.8rem',
-            maxWidth: 480,
-            margin: '0 auto 0.65rem',
-            display: 'block',
-          }}>
-            {done
-              ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : `Game over — Player ${winner} wins! 🎉`)
-              : `Player ${player}'s turn`}
-          </div>
+          <CuiBar height={72} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+              { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
+              { id: 'p-turn', kind: 'pill', r: pr[2], label: 'Turn', value: done ? (winner === 'draw' ? 'Draw' : `P${winner}`) : `P${player}`, color: done ? undefined : palOf(activeColor, undefined) },
+              { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
+                label: done ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : `Game over — Player ${winner} wins! 🎉`) : `Player ${player}'s turn` },
+            ];
+          }} />
 
           {/* Board */}
           <MncBoardCanvas
@@ -10937,30 +10556,20 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
         </div>
       </div>
 
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: p1Color }}>{pits[6]}</div></div>
-        <div className="pill">
-          <div className="plabel">ZK</div>
-          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
-            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
-          </div>
-        </div>
-      </div>
-
-      <div style={{
-        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
-        color: done ? C.muted : activeColor,
-        background: (done ? C.dim : activeColor) + '22',
-        border: `1px solid ${(done ? C.dim : activeColor)}44`,
-        borderRadius: '999px', padding: '0.32rem 0.8rem',
-        maxWidth: 480, margin: '0 auto 0.65rem',
-      }}>
-        {done
-          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
-          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits'}
-      </div>
+      <CuiBar height={72} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        return [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: pits[6], color: palOf(p1Color, undefined) },
+          { id: 'p-zk', kind: 'pill', r: pr[3], label: 'ZK', value: verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—',
+            color: verifying ? PAL.gold : verified === true ? '#4ade80' : verified === false ? PAL.rose : sessionIdRef.current ? PAL.accent : PAL.muted },
+          { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
+            label: done
+              ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+              : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits' },
+        ];
+      }} />
 
       <MncBoardCanvas
         pits={pits}
@@ -11338,33 +10947,20 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   return (
     <div>
       {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
-        <div className="pill">
-          <div className="plabel">Diff</div>
-          <div className="pvalue" style={{ fontSize: '0.8rem', textTransform: 'capitalize' }}>{difficulty}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">ZK</div>
-          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? C.emerald : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
-            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
-          </div>
-        </div>
-      </div>
-
-      <div style={{
-        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
-        color: done ? C.muted : activeColor,
-        background: (done ? C.dim : activeColor) + '22',
-        border: `1px solid ${(done ? C.dim : activeColor)}44`,
-        borderRadius: '999px', padding: '0.32rem 0.8rem',
-        maxWidth: 480, margin: '0 auto 0.65rem',
-      }}>
-        {done
-          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
-          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn'}
-      </div>
+      <CuiBar height={72} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        return [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
+          { id: 'p-diff', kind: 'pill', r: pr[2], label: 'Diff', value: String(difficulty).toUpperCase() },
+          { id: 'p-zk', kind: 'pill', r: pr[3], label: 'ZK', value: verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—',
+            color: verifying ? PAL.gold : verified === true ? PAL.emerald : verified === false ? PAL.rose : sessionIdRef.current ? PAL.accent : PAL.muted },
+          { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
+            label: done
+              ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+              : player === 2 ? 'AI is thinking… 🤖' : 'Your turn' },
+        ];
+      }} />
 
       <MncBoardCanvas
         pits={pits}
@@ -11503,20 +11099,18 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} />
-          <div className="plabel">Online</div>
-        </div>
-      </div>
-
-      {opponentDisconnected && (
-        <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-          Opponent connection lost — waiting for reconnect…
-        </div>
-      )}
+      <CuiBar height={opponentDisconnected ? 68 : 46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 3);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-conn', kind: 'pill', r: pr[2], label: 'Online', value: opponentDisconnected ? '●' : '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        if (opponentDisconnected) {
+          out.push({ id: 'disc', kind: 'label', r: [0, 50, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        }
+        return out;
+      }} />
 
       <MncBoardCanvas
         pits={pits}
@@ -17823,83 +17417,47 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
       {resumeOffer && (
         <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
       )}
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Turn</div>
-          <div className="pvalue" style={{ color: activeColor, fontSize: '0.95rem' }}>
-            {done ? pLabel(winner) : pLabel(player)}
-          </div>
-        </div>
-        <div className="pill">
-          <div className="plabel">{pLabel(1)}</div>
-          <div className="pvalue" style={{ color: p1Color, fontSize: '0.95rem' }}>{p1Pos}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">{pLabel(2)}</div>
-          <div className="pvalue" style={{ color: p2Color, fontSize: '0.95rem' }}>{p2Pos}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Rolls</div>
-          <div className="pvalue">{rolls}</div>
-        </div>
-        {isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>
-            📖 What do these mean?
-          </button>
-        )}
-      </div>
+      <CuiBar height={isMoksha ? 96 : 46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 5);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: done ? pLabel(winner) : pLabel(player), color: palOf(activeColor, undefined) },
+          { id: 'p-1', kind: 'pill', r: pr[2], label: pLabel(1), value: p1Pos, color: palOf(p1Color, undefined) },
+          { id: 'p-2', kind: 'pill', r: pr[3], label: pLabel(2), value: p2Pos, color: palOf(p2Color, undefined) },
+          { id: 'p-rolls', kind: 'pill', r: pr[4], label: 'Rolls', value: rolls },
+        ];
+        if (isMoksha) {
+          out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary });
+        }
+        return out;
+      }} />
 
-      <div
-        className="cnl-banner"
-        style={{
-          color: bannerColor,
-          background: (bannerActive ? bannerColor : activeColor) + '22',
-          border: `1px solid ${(bannerActive ? bannerColor : activeColor)}44`,
-        }}
-      >
-        {done
+      <CuiBar height={30} build={(W) => ([{
+        id: 'banner', kind: 'label', r: [0, 0, W, 28], font: 13, bold: true,
+        color: palOf(bannerActive ? bannerColor : activeColor, undefined),
+        label: done
           ? `Game over — ${pLabel(winner)} win${vsBot && winner === 1 ? '' : 's'}! 🎉`
-          : (banner || `${pLabel(player)}'s turn`)}
-      </div>
+          : (banner || `${pLabel(player)}'s turn`),
+      }])} />
 
       <div className="cnl-board-wrap">
         <CnlBoardCanvas V={V} isMoksha={isMoksha} p1Pos={p1Pos} p2Pos={p2Pos} p1Color={p1Color} p2Color={p2Color} />
       </div>
 
-      <div className="cnl-die">
-        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: activeColor + '88' }}>
-          {die == null ? '·' : die}
-        </div>
-      </div>
-
-      <div className="cnl-roll-buttons">
-        <button
-          className="cnl-roll-btn"
-          style={{ background: p1Color }}
-          onClick={() => roll(1)}
-          disabled={done || animating || rolling || player !== 1 || !!resumeOffer}
-        >
-          {vsBot ? 'Your' : 'Player 1 -'} Roll
-        </button>
-        {vsBot ? (
-          <button className="cnl-roll-btn" style={{ background: p2Color, opacity: 0.85 }} disabled>
-            {player === 2 && !done ? 'Bot rolling…' : 'Bot'}
-          </button>
-        ) : (
-          <button
-            className="cnl-roll-btn"
-            style={{ background: p2Color }}
-            onClick={() => roll(2)}
-            disabled={done || animating || rolling || player !== 2}
-          >
-            Player 2 - Roll
-          </button>
-        )}
-      </div>
+      <CuiBar height={54} build={(W) => {
+        const bw = Math.floor((W - 78) / 2) - 8;
+        return [
+          { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: die == null ? '·' : String(die), font: 20, mono: true, disabled: true },
+          {
+            id: 'roll1', kind: 'button', r: [4, 7, bw, 40],
+            label: `${vsBot ? 'Your' : 'Player 1 -'} Roll`, solid: true, bg: palOf(p1Color, undefined), ink: '#fff',
+            disabled: done || animating || rolling || player !== 1 || !!resumeOffer, action: () => roll(1),
+          },
+          vsBot
+            ? { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: player === 2 && !done ? 'Bot rolling…' : 'Bot', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: true }
+            : { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: 'Player 2 - Roll', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: done || animating || rolling || player !== 2, action: () => roll(2) },
+        ];
+      }} />
     </div>
   );
 }
@@ -18058,27 +17616,29 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.95rem' }}>{myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0)}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
-        {isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>📖 What do these mean?</button>
-        )}
-      </div>
-      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <CuiBar height={(opponentDisconnected ? 20 : 0) + (isMoksha ? 96 : 46)} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0), color: palOf(myColor, undefined) },
+          { id: 'p-conn', kind: 'pill', r: pr[3], label: 'Online', value: '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        let y = 50;
+        if (isMoksha) { out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), y, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary }); y += 46; }
+        if (opponentDisconnected) out.push({ id: 'disc', kind: 'label', r: [0, y, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        return out;
+      }} />
       <div className="cnl-board-wrap">
         <CnlBoardCanvas V={V} isMoksha={isMoksha} p1Pos={st.p1Pos || 0} p2Pos={st.p2Pos || 0} p1Color={p1Color} p2Color={p2Color} />
       </div>
-      <div className="cnl-die">
-        <div className="cnl-die-face" style={{ borderColor: myColor + '88' }}>{st.die == null ? '·' : st.die}</div>
-      </div>
-      <div className="cnl-roll-buttons">
-        <button className="cnl-roll-btn" style={{ background: myColor }} onClick={doRoll} disabled={!isMyTurn}>
-          {status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…'}
-        </button>
-      </div>
+      <CuiBar height={54} build={(W) => ([
+        { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: st.die == null ? '·' : String(st.die), font: 20, mono: true, disabled: true },
+        { id: 'roll', kind: 'button', r: [W - Math.floor(W * 0.34) - 4, 7, Math.floor(W * 0.34), 40],
+          label: status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…',
+          solid: isMyTurn, bg: isMyTurn ? palOf(myColor, undefined) : undefined, ink: isMyTurn ? '#fff' : undefined,
+          disabled: !isMyTurn, action: doRoll },
+      ])} />
     </div>
   );
 }
@@ -18247,18 +17807,19 @@ function ckOwnerOf(v) { return v === 1 || v === 3 ? 1 : v === 2 || v === 4 ? 2 :
    online rooms, pass-and-play and Versus Bot all inherit the change with
    the move payloads untouched. Intrinsic art (checkers browns, Reversi
    felt, the goban, Ludo seat colours) stays hardcoded per the palette
-   rules; only chrome reads PAL. Gomoku keeps its ghost-then-confirm bar
-   and Ludo its full-size move list — those are the deliberate dense-board
-   affordances, and they stay DOM. */
-/* The box gives useFitBox BOTH axes: width from the column (capped per board
-   via --brg-cap composed with the --cg-board viewport cap in one max-width),
-   height from aspect-ratio. Without the ratio the box's height would be the
-   canvas's own height, and the measure loop would pin the cell at minCell —
-   the exact trap that shrank Knight's Tour/Minesweeper to ~224px. */
-function BrgBoardBox({ boxRef, canvasRef, className, cap, ratio, ariaLabel }) {
+   rules; only chrome reads PAL. The controls wave folded the notes, legends,
+   Gomoku's confirm bar and Ludo's move list into the same canvases, each
+   control twinned in the sr-only layer. */
+/* The box owns the WIDTH (per-board --brg-cap composed with the --cg-board
+   viewport cap in one max-width); the views derive their cell size from that
+   width alone, and since the controls wave their canvases carry the whole
+   frame (board + notes + legends + buttons), the box height simply follows
+   the canvas. `children` hosts the frame's CuiTwin. */
+function BrgBoardBox({ boxRef, canvasRef, className, cap, ariaLabel, children }) {
   return (
-    <div className="brg-canvas-box" style={{ '--brg-cap': cap, aspectRatio: ratio || '1 / 1' }} ref={boxRef}>
+    <div className="brg-canvas-box" style={{ '--brg-cap': cap }} ref={boxRef}>
       <canvas ref={canvasRef} className={className + ' board-canvas'} role="img" aria-label={ariaLabel} />
+      {children}
     </div>
   );
 }
@@ -18274,8 +17835,15 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   };
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, { cols: 8, rows: 8, minCell: 28, maxCell: 48 });
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(28, Math.min(48, Math.floor(Math.floor(boxW) / 8)));
   const side = cell * 8;
+  const showNote = st.mustJumpFrom != null && isMyTurn;
+  const NOTE_H = showNote ? 22 : 0, LEG_H = 24;
+  const H = side + 4 + NOTE_H + LEG_H;
+  const controls = [];
+  if (showNote) controls.push({ id: 'note', kind: 'label', r: [0, side + 4, side, 20], label: 'Chain jump! Continue with the same piece.', gold: true, font: 12 });
+  controls.push({ id: 'legend', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: 'Player 1 (moves down) · Player 2 (moves up)' });
   const liveRef = useRef({});
   liveRef.current = { cell, board, isMyTurn };
   usePointerCell(canvasRef, {
@@ -18288,8 +17856,8 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   });
   useCanvasBoard(canvasRef, {
     width: side,
-    height: side,
-    deps: [board, sel, cell],
+    height: H,
+    deps: [board, sel, cell, showNote],
     draw: (ctx) => {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -18316,27 +17884,37 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
           if (board[i] > 2) {
             ctx.font = `${Math.round(cell * 0.4)}px system-ui, sans-serif`;
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.fillText('♛', x + cell / 2, y + cell / 2 + 1);
+            ctx.fillText('\u265b', x + cell / 2, y + cell / 2 + 1);
           }
         }
       }
       ctx.lineWidth = 2;
       ctx.strokeStyle = PAL.border;
       ctx.strokeRect(1, 1, side - 2, side - 2);
+      cuiDrawControls(ctx, controls, null);
+      // Legend with drawn swatch dots.
+      const ly = side + 4 + NOTE_H + 11;
+      ctx.font = '500 11px ' + CUI_FONT;
+      ctx.textBaseline = 'middle';
+      const t1 = ' Player 1 (moves down)', t2 = ' Player 2 (moves up)';
+      const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width;
+      let lx = Math.max(4, (side - (w1 + w2 + 40)) / 2);
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.accent, '#3A6ECD'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.textAlign = 'left';
+      ctx.fillText(t1, lx + 14, ly);
+      lx += w1 + 34;
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = '#2b2f3d'; ctx.fill();
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = PAL.muted;
+      ctx.fillText(t2, lx + 14, ly);
+      ctx.textAlign = 'center';
     },
   });
   return (
-    <div>
-      {st.mustJumpFrom != null && isMyTurn && (
-        <div className="brg-note">Chain jump! Continue with the same piece.</div>
-      )}
-      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ck-canvas" cap="360px"
-        ariaLabel="Checkers board" />
-      <div className="brg-legend">
-        <span><span className="ck-piece-mini p1" /> Player 1 (moves down)</span>
-        <span><span className="ck-piece-mini p2" /> Player 2 (moves up)</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ck-canvas" cap="360px"
+      ariaLabel="Checkers board">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -18362,15 +17940,23 @@ function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const p2 = board.filter(x => x === 2).length;
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, { cols: 8, rows: 8, minCell: 26, maxCell: 44, gap: 2, padX: 4, padY: 4 });
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(26, Math.min(44, Math.floor((Math.floor(boxW) - 4 - 14) / 8)));
   const step = cell + 2;
   const side = step * 8 - 2 + 4; // 2px gutters between felt cells + 2px frame
+  const NOTE_H = 24;
+  const H = NOTE_H + 4 + side;
+  const boardY = NOTE_H + 4;
+  const controls = [
+    { id: 'counts', kind: 'label', noDraw: true, r: [0, 0, 0, 0],
+      label: `Dark ${p1} · Light ${p2}${st.passed ? ' · Opponent had no move — you go again.' : ''}` },
+  ];
   const liveRef = useRef({});
-  liveRef.current = { step, board, isMyTurn };
+  liveRef.current = { step, board, isMyTurn, boardY };
   usePointerCell(canvasRef, {
     onTap: (p) => {
       const lv = liveRef.current;
-      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - 2) / lv.step);
+      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - lv.boardY - 2) / lv.step);
       if (c < 0 || c > 7 || r < 0 || r > 7) return;
       const i = r * 8 + c;
       if (lv.isMyTurn && lv.board[i] === 0) submit({ cell: i });
@@ -18378,9 +17964,32 @@ function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   });
   useCanvasBoard(canvasRef, {
     width: side,
-    height: side,
-    deps: [board, cell],
+    height: H,
+    deps: [board, cell, st.passed],
     draw: (ctx) => {
+      // Counts band: two drawn discs + live totals (+ the pass note).
+      ctx.textBaseline = 'middle';
+      ctx.font = '600 12px ' + CUI_FONT;
+      const passTxt = st.passed ? '   Opponent had no move — you go again.' : '';
+      const t1 = ` ${p1}`, t2 = ` ${p2}`;
+      const total = 16 + ctx.measureText(t1).width + 26 + 16 + ctx.measureText(t2).width + ctx.measureText(passTxt).width;
+      let lx = Math.max(4, (side - total) / 2);
+      const ly = NOTE_H / 2 + 2;
+      rvDrawDisc(ctx, lx + 7, ly, 7, 1);
+      ctx.fillStyle = PAL.text;
+      ctx.textAlign = 'left';
+      ctx.fillText(t1, lx + 16, ly);
+      lx += 16 + ctx.measureText(t1).width + 26;
+      rvDrawDisc(ctx, lx + 7, ly, 7, 2);
+      ctx.fillStyle = PAL.text;
+      ctx.fillText(t2, lx + 16, ly);
+      if (passTxt) {
+        ctx.fillStyle = PAL.gold;
+        ctx.fillText(passTxt, lx + 16 + ctx.measureText(t2).width, ly);
+      }
+      ctx.textAlign = 'center';
+      ctx.save();
+      ctx.translate(0, boardY);
       klRR(ctx, 0, 0, side, side, 8);
       ctx.fillStyle = PAL.border; // the gutter grid shows through between cells
       ctx.fill();
@@ -18391,18 +18000,14 @@ function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
         ctx.fillRect(x, y, cell, cell);
         if (board[i] !== 0) rvDrawDisc(ctx, x + cell / 2, y + cell / 2, cell * 0.38, board[i]);
       }
+      ctx.restore();
     },
   });
   return (
-    <div>
-      <div className="brg-note">
-        <span className="rv-count"><span className="rv-disc-mini d1" /> {p1}</span>
-        <span className="rv-count"><span className="rv-disc-mini d2" /> {p2}</span>
-        {st.passed && <span style={{ marginLeft: '0.6rem' }}>Opponent had no move — you go again.</span>}
-      </div>
-      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="rv-canvas" cap="360px"
-        ariaLabel={`Reversi board — ${p1} dark, ${p2} light`} />
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="rv-canvas" cap="360px"
+      ariaLabel={`Reversi board — ${p1} dark, ${p2} light`}>
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -18410,16 +18015,22 @@ function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, { cols: 7, rows: 6, minCell: 30, maxCell: 46, gap: 4, padX: 16, padY: 16 });
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(30, Math.min(46, Math.floor((Math.floor(boxW) - 16 - 24) / 7)));
   const step = cell + 4;
-  const W = step * 7 - 4 + 16, H = step * 6 - 4 + 16;
+  const W = step * 7 - 4 + 16, BH = step * 6 - 4 + 16;
+  const LEG_H = 24;
+  const H = BH + 4 + LEG_H;
+  const controls = [
+    { id: 'legend', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: 'Player 1 · Player 2 · Tap a column to drop' },
+  ];
   const liveRef = useRef({});
   liveRef.current = { step, isMyTurn };
   usePointerCell(canvasRef, {
-    // The whole column is the target (the DOM cells all submitted their
-    // column anyway) — a drop game wants the fattest possible hit area.
+    // The whole column is the target — a drop game wants the fattest hit area.
     onTap: (p) => {
       const lv = liveRef.current;
+      if (p.y > BH) return;
       const col = Math.floor((p.x - 8) / lv.step);
       if (col < 0 || col > 6 || !lv.isMyTurn) return;
       submit({ col });
@@ -18430,7 +18041,7 @@ function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
     height: H,
     deps: [board, st.lastMove, cell],
     draw: (ctx) => {
-      klRR(ctx, 0, 0, W, H, 12);
+      klRR(ctx, 0, 0, W, BH, 12);
       ctx.fillStyle = '#22335e'; // intrinsic Four-in-a-Row panel blue
       ctx.fill();
       for (let i = 0; i < 42; i++) {
@@ -18460,28 +18071,37 @@ function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
           ctx.stroke();
         }
       }
+      // Legend band with drawn swatch discs.
+      const ly = BH + 4 + LEG_H / 2;
+      ctx.font = '500 11px ' + CUI_FONT;
+      ctx.textBaseline = 'middle';
+      const t1 = ' Player 1', t2 = ' Player 2', t3 = 'Tap a column to drop';
+      const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width, w3 = ctx.measureText(t3).width;
+      let lx = Math.max(4, (W - (w1 + w2 + w3 + 72)) / 2);
+      ctx.textAlign = 'left';
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.rose, '#CD4B3A'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.fillText(t1, lx + 14, ly);
+      lx += w1 + 32;
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.gold, '#D9A54A'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.fillText(t2, lx + 14, ly);
+      lx += w2 + 32;
+      ctx.fillText(t3, lx, ly);
+      ctx.textAlign = 'center';
     },
   });
   return (
-    <div>
-      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="fir-canvas" cap="340px" ratio="7 / 6"
-        ariaLabel="Four in a Row board" />
-      <div className="brg-legend">
-        <span><span className="fir-disc-mini d1" /> Player 1</span>
-        <span><span className="fir-disc-mini d2" /> Player 2</span>
-        <span style={{ color: C.muted }}>Tap a column to drop</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="fir-canvas" cap="340px"
+      ariaLabel="Four in a Row board">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
 /* PHASE 2 — Gomoku ghost-confirm.
-   15x15 inside min(92vw, 380px) is ~24px per intersection — about a quarter of a
-   fingertip — and the old single onClick committed a PERMANENT stone on the first
-   tap. Now the first tap only places a ghost; you can slide it around and then
-   confirm. The move payload and the server's applyMove contract are unchanged
-   (only WHEN submit fires), so online, pass-and-play and bot modes all behave
-   identically and lib/board-rules.js needed no change. */
+   15x15 is ~24px per intersection — about a quarter of a fingertip — and the
+   old single tap committed a PERMANENT stone. The first tap places a ghost;
+   slide it, then confirm. The confirm bar draws in the same canvas now
+   (controls wave); the move payload is unchanged. */
 function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
   const [pending, setPending] = useState(null);
@@ -18505,24 +18125,39 @@ function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
 
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, { cols: 15, rows: 15, minCell: 18, maxCell: 26, gap: 1, padX: 4, padY: 4 });
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(18, Math.min(26, Math.floor((Math.floor(boxW) - 4 - 14) / 15)));
   const step = cell + 1;
   const side = step * 15 - 1 + 4;
+  const BAR_H = isMyTurn ? 52 : 0;
+  const H = side + (BAR_H ? 6 + BAR_H : 0);
+  const rc = pending == null ? null : [Math.floor(pending / 15) + 1, (pending % 15) + 1];
+  const controls = [];
+  if (isMyTurn) {
+    const br = cuiRow(2, side + 8, side - 4, 46, 2);
+    controls.push({ id: 'cancel', kind: 'button', r: br[0], label: 'Cancel', disabled: pending == null, action: () => setPending(null) });
+    controls.push({ id: 'place', kind: 'button', r: br[1], label: pending == null ? 'Tap a point' : `Place stone (row ${rc[0]}, col ${rc[1]})`, font: 13, solid: pending != null, disabled: pending == null, action: place });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
   const liveRef = useRef({});
   liveRef.current = { step, pick };
-  usePointerCell(canvasRef, {
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => {
       const lv = liveRef.current;
+      if (p.y > side) return;
       const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - 2) / lv.step);
       if (c < 0 || c > 14 || r < 0 || r > 14) return;
       lv.pick(r * 15 + c);
     },
-  });
+  }));
   useCanvasBoard(canvasRef, {
     width: side,
-    height: side,
-    deps: [board, pending, st.lastMove, cell],
+    height: H,
+    deps: [board, pending, st.lastMove, cell, isMyTurn, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
       klRR(ctx, 0, 0, side, side, 6);
       ctx.fillStyle = '#b08b4f'; // intrinsic goban wood
       ctx.fill();
@@ -18561,20 +18196,11 @@ function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
       }
     },
   });
-  const rc = pending == null ? null : [Math.floor(pending / 15) + 1, (pending % 15) + 1];
   return (
-    <div>
-      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="gmk-canvas" cap="380px"
-        ariaLabel="Gomoku board, 15 by 15" />
-      {isMyTurn && (
-        <div className="brd-confirm-bar">
-          <button onClick={() => setPending(null)} disabled={pending == null}>Cancel</button>
-          <button className="go" onClick={place} disabled={pending == null}>
-            {pending == null ? 'Tap a point' : `Place stone (row ${rc[0]}, col ${rc[1]})`}
-          </button>
-        </div>
-      )}
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="gmk-canvas" cap="380px"
+      ariaLabel="Gomoku board, 15 by 15">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -18627,8 +18253,7 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     return pos + st.die <= 57;
   };
   // Tokens flattened in DRAW order (seat asc, token asc) — the tap hit-test
-  // walks this list in reverse so the topmost of a 5px-offset stack wins,
-  // exactly like the DOM's z-order did.
+  // walks this list in reverse so the topmost of a 5px-offset stack wins.
   const toks = [];
   for (const p of seatList) {
     const out = forfeited.includes(p);
@@ -18640,7 +18265,8 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
 
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, { cols: 15, rows: 15, minCell: 18, maxCell: 26, gap: 1, padX: 6, padY: 6 });
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(18, Math.min(26, Math.floor((Math.floor(boxW) - 6 - 14) / 15)));
   const step = cell + 1;
   const PADI = 3;
   const side = step * 15 - 1 + PADI * 2;
@@ -18648,12 +18274,72 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     PADI + t.gx * step + cell / 2 + (t.i % 2) * 5 - 2,
     PADI + t.gy * step + cell / 2 + Math.floor(t.i / 2) * 5 - 2,
   ];
+
+  // The move pad (the unambiguous full-size path for stacked tokens), the
+  // die, the roll button, the event notes and the legend all draw in-frame.
+  const myTokens = (seats[myPlayerNum] || []);
+  const movableList = phase === 'move' && isMyTurn && st.die != null
+    ? myTokens.map((pos, i) => ({ i, pos })).filter(t => canMoveToken(t.pos))
+    : [];
+  const describe = (pos) => {
+    if (pos === -1) return 'in base — a 6 brings it out';
+    if (pos >= 51) return `home column, ${57 - pos} to finish`;
+    const dest = pos + st.die;
+    return `step ${pos} → ${dest >= 51 ? 'home column' : dest}`;
+  };
+  const notes = [];
+  if (st.lastEvent === 'no-move') notes.push('No legal move for that roll — turn passed.');
+  if (st.lastEvent === 'capture') notes.push('💥 Capture! Token sent back to base.');
+  if (forfeited.length > 0) notes.push(`${forfeited.map(p => 'P' + p).join(', ')} forfeited — the match continues.`);
+  if (nPlayers > 2 && !isMyTurn) notes.push(`Waiting on P${st.currentPlayer || 1}…`);
+
+  const MOVE_H = movableList.length ? 18 + movableList.length * 50 : 0;
+  const ROLL_H = 54;
+  const NOTES_H = notes.length * 18;
+  const LEG_H = 18;
+  const H = side + (MOVE_H ? 6 + MOVE_H : 0) + 6 + ROLL_H + (NOTES_H ? 4 + NOTES_H : 0) + 4 + LEG_H;
+  let by = side + 6;
+  const moveY = by; if (MOVE_H) by += MOVE_H + 6;
+  const rollY = by; by += ROLL_H + 4;
+  const notesY = by; if (NOTES_H) by += NOTES_H + 4;
+  const legY = by;
+
+  const controls = [];
+  if (movableList.length) {
+    controls.push({ id: 'ml-label', kind: 'label', r: [0, moveY, side, 16], label: `YOUR MOVES · ROLLED ${st.die}`, font: 10 });
+    movableList.forEach((t, k) => {
+      controls.push({
+        id: 'mv' + t.i, kind: 'button',
+        r: [Math.floor(side * 0.05), moveY + 18 + k * 50, Math.floor(side * 0.9), 46],
+        label: `Token ${t.i + 1}`, sub: describe(t.pos),
+        action: () => submit({ type: 'move', token: t.i }),
+      });
+    });
+  }
+  controls.push({ id: 'die', kind: 'button', r: [Math.floor(side / 2) - 24, rollY, 48, 48], label: st.die == null ? '·' : String(st.die), font: 20, mono: true, disabled: true });
+  const rollW = Math.floor(side * 0.34);
+  controls.push({
+    id: 'roll', kind: 'button', r: [side - rollW - 4, rollY + 4, rollW, 44],
+    label: !isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a token',
+    font: 13, solid: isMyTurn && phase === 'roll',
+    bg: isMyTurn && phase === 'roll' ? palOf(LUDO_SEAT_COLORS[myPlayerNum] || C.accent, '#3A6ECD') : undefined,
+    ink: isMyTurn && phase === 'roll' ? '#fff' : undefined,
+    disabled: !isMyTurn || phase !== 'roll',
+    action: () => submit({ type: 'roll' }),
+  });
+  notes.forEach((n, k) => controls.push({ id: 'note' + k, kind: 'label', r: [0, notesY + k * 18, side, 18], label: n, gold: true, font: 11.5 }));
+  controls.push({ id: 'legend', kind: 'label', r: [0, legY, side, 16], label: '🎲 6 leaves base & rolls again · ★ safe cells · Exact roll to finish', font: 10.5 });
+
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
   const liveRef = useRef({});
   liveRef.current = { toks, cell, tokenC };
-  usePointerCell(canvasRef, {
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (pt) => {
       const lv = liveRef.current;
-      const rr = lv.cell * 0.425 + 8; // +8 = the DOM token's hit-slop ::after
+      if (pt.y > side) return;
+      const rr = lv.cell * 0.425 + 8; // +8 = the old DOM token's hit-slop
       for (let k = lv.toks.length - 1; k >= 0; k--) {
         const t = lv.toks[k];
         if (!t.movable) continue;
@@ -18664,12 +18350,13 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
         }
       }
     },
-  });
+  }));
   useCanvasBoard(canvasRef, {
     width: side,
-    height: side,
-    deps: [st, cell, myPlayerNum, nPlayers],
+    height: H,
+    deps: [st, cell, myPlayerNum, nPlayers, pressedId, isMyTurn],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
       klRR(ctx, 0, 0, side, side, 10);
       ctx.fillStyle = PAL.surface;
       ctx.fill();
@@ -18781,67 +18468,11 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     },
   });
 
-  /* PHASE 2 — the movable-token pad.
-     The board tap targets a token INSIDE a ~25px cell, and tokens sharing a
-     square are offset by only 5px, so two of them overlap almost entirely —
-     there was no reliable way to pick the one you meant (and no accessible way
-     at all). This list is the unambiguous, full-size path; the board tap stays
-     as a shortcut. Same { type: 'move', token } payload either way. */
-  const myTokens = (seats[myPlayerNum] || []);
-  const movableList = phase === 'move' && isMyTurn && st.die != null
-    ? myTokens.map((pos, i) => ({ i, pos })).filter(t => canMoveToken(t.pos))
-    : [];
-  const describe = (pos) => {
-    if (pos === -1) return 'in base — a 6 brings it out';
-    if (pos >= 51) return `home column, ${57 - pos} to finish`;
-    const dest = pos + st.die;
-    return `step ${pos} → ${dest >= 51 ? 'home column' : dest}`;
-  };
-
   return (
-    <div>
-      <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ludo-canvas" cap="380px"
-        ariaLabel={`Ludo board, ${nPlayers} players`} />
-      {movableList.length > 0 && (
-        <div className="brd-movelist">
-          <div className="brd-movelist-label">Your moves · rolled {st.die}</div>
-          {movableList.map(t => (
-            <button
-              key={t.i}
-              className="brd-move-btn"
-              {...tapProps(() => submit({ type: 'move', token: t.i }))}
-            >
-              <span>Token {t.i + 1}</span>
-              <span className="brd-move-sub">{describe(t.pos)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="cnl-die"><div className="cnl-die-face">{st.die == null ? '·' : st.die}</div></div>
-      {st.lastEvent === 'no-move' && <div className="brg-note">No legal move for that roll — turn passed.</div>}
-      {st.lastEvent === 'capture' && <div className="brg-note">💥 Capture! Token sent back to base.</div>}
-      {forfeited.length > 0 && (
-        <div className="brg-note">{forfeited.map(p => `P${p}`).join(', ')} forfeited — the match continues.</div>
-      )}
-      {nPlayers > 2 && !isMyTurn && (
-        <div className="brg-note">Waiting on P{st.currentPlayer || 1}…</div>
-      )}
-      <div className="cnl-roll-buttons">
-        <button
-          className="cnl-roll-btn"
-          style={{ background: LUDO_SEAT_COLORS[myPlayerNum] || C.accent }}
-          onClick={() => submit({ type: 'roll' })}
-          disabled={!isMyTurn || phase !== 'roll'}
-        >
-          {!isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a highlighted token'}
-        </button>
-      </div>
-      <div className="brg-legend">
-        <span>🎲 6 leaves base & rolls again</span>
-        <span>★ safe cells</span>
-        <span>Exact roll to finish</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ludo-canvas" cap="380px"
+      ariaLabel={`Ludo board, ${nPlayers} players`}>
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -18944,13 +18575,17 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.82rem' }}>P{myPlayerNum}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
-      </div>
-      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <CuiBar height={opponentDisconnected ? 68 : 46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: 'P' + myPlayerNum, color: palOf(myColor, undefined) },
+          { id: 'p-conn', kind: 'pill', r: pr[3], label: 'Online', value: '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        if (opponentDisconnected) out.push({ id: 'disc', kind: 'label', r: [0, 50, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        return out;
+      }} />
       {room.status === 'active' && (() => {
         // Correspondence turn timer: the server auto-forfeits the side to move
         // after turnTimeoutHours without a move — surface the remaining window.
@@ -19286,12 +18921,13 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
 
   return (
     <div>
-      <div className="brg-intro">
-        {over
+      <CuiBar height={36} build={(W) => ([{
+        id: 'intro', kind: 'label', r: [0, 4, W, 28], font: 13, bold: true, color: PAL.text,
+        label: over
           ? (over.winner === 'draw' ? "It's a draw." : `${label(Number(over.winner))} ${vsBot && over.winner === '1' ? 'win' : 'wins'}! 🎉`)
           : thinking ? 'Bot is thinking…'
-          : `${label(cur)} to move`}
-      </div>
+          : `${label(cur)} to move`,
+      }])} />
       {err && <div className="mnc-join-error">{err}</div>}
       <View
         st={state}

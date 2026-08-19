@@ -673,9 +673,8 @@ body {
 /* Everything that is NOT the board is fixed-size, so only the board flexes.
    Miss one of these and it gets crushed to zero height by the board. */
 .fit-col .status-bar, .fit-col .p6-hint,
-.fit-col .word-list, .fit-col .cp-pad, .fit-col .an-actions,
+.fit-col .word-list,
 .fit-col .cw-hint-bar, .fit-col .p6-banner, .fit-col .word-theme,
-.fit-col .an-dots, .fit-col .an-boardbox,
 .fit-col .tm-daylabel, .fit-col .ds-pad,
 /* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
    plus 3-row keyboard was CLIPPED by the fit shell's overflow:hidden rather
@@ -4019,19 +4018,11 @@ ${emitTapHighlightRules()}
 }
 
 .an-game { max-width: 420px; margin: 0 auto; text-align: center; }
-.an-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
-.an-dot {
-  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 999px;
-  padding: 3px 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
-}
-.an-dot.solved { border-color: ${C.emerald}; color: ${C.emerald}; }
-.an-dot.cur { border-color: ${C.accent}; color: ${C.text}; }
 /* Slots + rack draw on one canvas; the box centers it. */
 .an-boardbox {
   width: 100%; display: flex; align-items: center; justify-content: center;
   margin-bottom: 12px; touch-action: none;
 }
-.an-actions { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
 
 .cp-game { display: flex; flex-direction: column; align-items: center; }
 .cp-boardbox {
@@ -4040,10 +4031,6 @@ ${emitTapHighlightRules()}
   margin-bottom: 10px;
 }
 .cp-canvas { border-radius: 6px; }
-.cp-pad {
-  display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; margin-bottom: 10px;
-}
-.cp-pad .p6-btn { padding: 10px 0; }
 
 /* Drop Stack — real-time well + side panel (slice 6). The well is a canvas
    sized by useFitBox; Next/Hold sit beside it so everything fits one screen. */
@@ -22275,9 +22262,11 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     }
   };
 
-  /* Slots + rack draw on ONE canvas (#170 treatment): tap a rack tile to
-     place its letter, tap anywhere on the slot row to take one back — the
-     DOM grammar exactly. A wrong guess wiggles the slot row in rose. */
+  /* The whole frame is ONE canvas (controls wave): pills, word-progress
+     chips, slots + rack, and the Undo/Submit buttons draw together; only
+     the hint paragraph stays DOM. Tap a rack tile to place its letter, tap
+     anywhere on the slot row to take one back — the DOM grammar exactly.
+     A wrong guess wiggles the slot row in rose. */
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const { boxW } = useFitBox(boxRef, { cols: Math.max(word.length, 5), rows: 2 });
@@ -22289,6 +22278,25 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const anBW = tileW * word.length + anGap * (word.length - 1);
   const anBH = tileH * 2 + bandGap;
   const anX0 = Math.floor((anW - anBW) / 2);
+  const GAP = 8, PILL_H = 46, DOTS_H = 26, ACT_H = 44;
+  const dotsY = PILL_H + GAP;
+  const boardY = dotsY + DOTS_H + GAP;
+  const actY = boardY + anBH + GAP;
+  const H = actY + ACT_H;
+
+  const controls = [];
+  if (anW > 80) {
+    const pr = cuiRow(0, 0, anW, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-word', kind: 'pill', r: pr[1], label: 'Word', value: `${Math.min(solvedCount + 1, words.length)}/${words.length}` });
+    controls.push({ id: 'p-tries', kind: 'pill', r: pr[2], label: 'Tries', value: steps });
+    const ar = cuiRow(0, actY, anW, ACT_H, 2);
+    controls.push({ id: 'undo', kind: 'button', r: ar[0], label: '⌫ Undo letter', disabled: !picked.length, action: backspace });
+    controls.push({ id: 'submit', kind: 'button', r: ar[1], label: 'Submit', primary: true, disabled: picked.length !== word.length, action: submit });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
 
   const flashRef = useRef(null);
   const [flashFrame, setFlashFrame] = useState(0);
@@ -22307,23 +22315,51 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   }, [flash]);
 
   const anGeoRef = useRef({});
-  anGeoRef.current = { tileW, tileH, bandGap, anX0, gap: anGap, n: word.length };
-  usePointerCell(canvasRef, {
+  anGeoRef.current = { tileW, tileH, bandGap, anX0, gap: anGap, n: word.length, boardY };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => {
       const g = anGeoRef.current;
       if (done) return;
-      if (p.y <= g.tileH + 4) { backspace(); return; }
-      if (p.y >= g.tileH + g.bandGap - 4) {
+      const y = p.y - g.boardY;
+      if (y < -4) return;
+      if (y <= g.tileH + 4) { backspace(); return; }
+      if (y >= g.tileH + g.bandGap - 4 && y <= g.tileH * 2 + g.bandGap + 4) {
         const i = Math.floor((p.x - g.anX0 + g.gap / 2) / (g.tileW + g.gap));
         if (i >= 0 && i < g.n) tapTile(i);
       }
     },
-  });
+  }));
   useCanvasBoard(canvasRef, {
     width: anW,
-    height: anBH,
-    deps: [picked, wordIdx, done, tileW, flashFrame],
+    height: H,
+    deps: [picked, wordIdx, done, tileW, flashFrame, fmt, steps, solvedCount, pressedId, anW],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Word-progress chips (display only): solved words spelled out, the
+      // rest as letter counts, the live word ringed in accent.
+      {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `600 11px 'JetBrains Mono', monospace`;
+        const labels = words.map((w, i) => (i < solvedCount ? w : String(w.length)));
+        const pad = 10, gapC = 6;
+        const widths = labels.map((t) => Math.ceil(ctx.measureText(t).width) + pad * 2);
+        let x = Math.max(2, Math.floor((anW - (widths.reduce((a, b) => a + b, 0) + gapC * (labels.length - 1))) / 2));
+        labels.forEach((t, i) => {
+          const cw = widths[i];
+          klRR(ctx, x, dotsY, cw, DOTS_H, 12);
+          ctx.fillStyle = i < solvedCount ? 'rgba(45,159,102,0.12)' : PAL.card;
+          ctx.fill();
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = i < solvedCount ? PAL.emerald : (i === wordIdx && !done) ? PAL.accent : PAL.border;
+          ctx.stroke();
+          ctx.fillStyle = i < solvedCount ? PAL.emerald : (i === wordIdx && !done) ? PAL.text : PAL.muted;
+          ctx.fillText(t, x + cw / 2, dotsY + DOTS_H / 2 + 0.5);
+          x += cw + gapC;
+        });
+      }
+      ctx.save();
+      ctx.translate(0, boardY);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const fl = flashRef.current;
@@ -22366,24 +22402,13 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
         ctx.fillText(rack[i].ch, x + tileW / 2, ry + tileH / 2 + 1);
         ctx.restore();
       }
+      ctx.restore();
     },
   });
 
   return (
     <div className="an-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Word</div><div className="pvalue">{Math.min(solvedCount + 1, words.length)}/{words.length}</div></div>
-        <div className="pill"><div className="plabel">Tries</div><div className="pvalue">{steps}</div></div>
-      </div>
-      <div className="an-dots">
-        {words.map((w, i) => (
-          <span key={i} className={'an-dot' + (i < solvedCount ? ' solved' : i === wordIdx && !done ? ' cur' : '')}>
-            {i < solvedCount ? w : w.length}
-          </span>
-        ))}
-      </div>
-      <div className="an-boardbox" ref={boxRef}>
+      <div className="an-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="an-canvas board-canvas"
@@ -22391,10 +22416,7 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           aria-label={`Anagram — ${picked.length} of ${word.length} letters placed, word ${Math.min(solvedCount + 1, words.length)} of ${words.length}`}
         />
       </div>
-      <div className="an-actions">
-        <button className="p6-btn" onClick={backspace} disabled={!picked.length}>⌫ Undo letter</button>
-        <button className="p6-btn primary" onClick={submit} disabled={picked.length !== word.length}>Submit</button>
-      </div>
+      <CuiTwin controls={controls} />
       <div className="p6-hint">Tap letters to build the word, tap a slot to take one back. Wrong guesses cost tries, never the day.</div>
     </div>
   );
@@ -22574,22 +22596,57 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  /* The room is a CANVAS (formerly a fixed-34px grid under FitScale). Cells
-     were never tappable — the D-pad and arrow keys are the input — so this is
-     pure display: walls/goals read PAL, the crate/player stay emoji, and a
-     crate on its pad gets a green ring (the DOM hue-rotate trick doesn't
-     translate to emoji glyphs on canvas). */
+  /* The whole frame is ONE canvas (controls wave): pills, the room, the
+     D-pad and Undo/Restart draw together (arrow keys still work); only the
+     hint paragraph stays DOM. Room cells were never tappable — the D-pad and
+     arrow keys are the input — so the board region is pure display:
+     walls/goals read PAL, the crate/player stay emoji, and a crate on its
+     pad gets a green ring. */
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: level.w, rows: level.h });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, KEY_H = 44, ACT_H = 40;
+  const padH = KEY_H * 2 + 6;
+  const chrome = PILL_H + padH + ACT_H + GAP * 3;
   const cpCell = Math.max(18, Math.min(46,
-    Math.floor(Math.min((Math.floor(boxW) - 4) / level.w, ((Math.floor(boxH) || 300) - 4) / level.h))));
+    Math.floor(Math.min((W - 4) / level.w, (((Math.floor(boxH) || 300) - chrome) - 4) / level.h))));
   const cpW = cpCell * level.w, cpH = cpCell * level.h;
+  const H = chrome + cpH;
+  const boardX = Math.floor((W - cpW) / 2);
+  const boardY = PILL_H + GAP;
+  const padY = boardY + cpH + GAP;
+  const actY = padY + padH + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves });
+    controls.push({ id: 'p-room', kind: 'pill', r: pr[2], label: 'Room', value: '#' + (levelIdx.current + 1) });
+    const kw = 52, kg = 6;
+    const px0 = Math.floor((W - kw * 3 - kg * 2) / 2);
+    controls.push({ id: 'up', kind: 'button', r: [px0 + kw + kg, padY, kw, KEY_H], label: '▲', font: 16, action: () => move(0, -1) });
+    controls.push({ id: 'left', kind: 'button', r: [px0, padY + KEY_H + 6, kw, KEY_H], label: '◀', font: 16, action: () => move(-1, 0) });
+    controls.push({ id: 'down', kind: 'button', r: [px0 + kw + kg, padY + KEY_H + 6, kw, KEY_H], label: '▼', font: 16, action: () => move(0, 1) });
+    controls.push({ id: 'right', kind: 'button', r: [px0 + (kw + kg) * 2, padY + KEY_H + 6, kw, KEY_H], label: '▶', font: 16, action: () => move(1, 0) });
+    const ar = cuiRow(Math.floor(W * 0.1), actY, Math.floor(W * 0.8), ACT_H, 2);
+    controls.push({ id: 'undo', kind: 'button', r: ar[0], label: '↶ Undo', disabled: !hist.length, action: undo });
+    controls.push({ id: 'restart', kind: 'button', r: ar[1], label: '⟲ Restart', action: restart });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
+
   useCanvasBoard(canvasRef, {
-    width: cpW,
-    height: cpH,
-    deps: [player, crates, done, cpCell],
+    width: W,
+    height: H,
+    deps: [player, crates, done, cpCell, W, fmt, moves, hist.length, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (let y = 0; y < level.h; y++) {
@@ -22624,17 +22681,13 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
         glyph('📦', cx, cy, 0.72);
       }
       glyph('🧍', player[0], player[1], 0.72);
+      ctx.restore();
     },
   });
 
   return (
     <div className="cp-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
-        <div className="pill"><div className="plabel">Room</div><div className="pvalue">#{levelIdx.current + 1}</div></div>
-      </div>
-      <div className="cp-boardbox" ref={boxRef}>
+      <div className="cp-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="cp-canvas board-canvas"
@@ -22642,18 +22695,7 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
           aria-label={`Crate Push room ${levelIdx.current + 1} — ${crates.filter(([cx, cy]) => level.goals.has(cx + ',' + cy)).length}/${crates.length} crates home, ${moves} moves`}
         />
       </div>
-      <div className="cp-pad">
-        <div />
-        <button className="p6-btn" onClick={() => move(0, -1)}>▲</button>
-        <div />
-        <button className="p6-btn" onClick={() => move(-1, 0)}>◀</button>
-        <button className="p6-btn" onClick={() => move(0, 1)}>▼</button>
-        <button className="p6-btn" onClick={() => move(1, 0)}>▶</button>
-      </div>
-      <div className="an-actions">
-        <button className="p6-btn" onClick={undo} disabled={!hist.length}>↶ Undo</button>
-        <button className="p6-btn" onClick={restart}>⟲ Restart</button>
-      </div>
+      <CuiTwin controls={controls} />
       <div className="p6-hint">Push every crate onto a green pad. You can push one crate at a time — never pull.</div>
     </div>
   );

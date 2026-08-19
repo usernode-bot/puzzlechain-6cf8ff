@@ -155,7 +155,6 @@ const GA = {
    class, and the self-test then names that one class. */
 const TAPPABLE_CLASSES = [
   'tappable',
-  'p6-btn',
   'mf-canvas', 'board-canvas',
 ];
 
@@ -3353,14 +3352,6 @@ ${emitTapHighlightRules()}
 .hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
 
 /* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
-.p6-btn {
-  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
-  border-radius: 10px; padding: 8px 12px; font-family: inherit; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: border-color .15s;
-}
-.p6-btn:hover { border-color: ${C.accent}; }
-.p6-btn:disabled { opacity: .4; cursor: default; }
-.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgb(var(--c-accent-rgb) / 14%); }
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
 .p6-banner {
   background: rgb(var(--c-gold-rgb) / 12%); border: 1px solid rgb(var(--c-gold-rgb) / 40%); color: ${C.gold};

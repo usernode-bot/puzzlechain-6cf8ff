@@ -453,7 +453,8 @@
     {
       "name": "Mine Finder resumes into the canvas board from a claimed attempt",
       "path": "/?demo=minefinder&game=minefinder&play=1",
-      "expectSelector": ".mf-mode-btn"
+      "expectSelector": ".mf-boardbox canvas.mf-canvas",
+      "expectText": "Mode: Dig"
     },
     {
       "name": "Anagram Sprint pre-game screen",

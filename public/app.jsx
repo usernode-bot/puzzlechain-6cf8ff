@@ -13217,7 +13217,11 @@ function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onT
       id: 'p' + i, kind: 'pill', r: pr[i], label: p.label, value: p.value,
       gold: p.gold, color: p.warn ? PAL.rose : undefined,
     }));
-    if (dayLabel) controls.push({ id: 'day', kind: 'label', r: [0, PILL_H + GAP, W, DAY_H], label: dayLabel, font: 11 });
+    if (dayLabel) {
+      controls.push({ id: 'day', kind: 'label', r: [0, PILL_H + GAP, W, DAY_H], label: dayLabel, font: 11 });
+      // Twin-only descriptive line (screen readers + text checks).
+      controls.push({ id: 'day-sr', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: "Today's board: " + dayLabel });
+    }
     controls.push({
       id: 'barl', kind: 'label', r: [0, barlY, W, BARL_H],
       label: barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`,

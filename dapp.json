@@ -680,12 +680,13 @@
     {
       "name": "Drop Stack shows the Hold slot",
       "path": "/?game=dropstack&practice=1",
-      "expectSelector": ".ds-hold"
+      "expectSelector": ".ds-boardbox canvas.ds-canvas",
+      "expectText": "Hold"
     },
     {
       "name": "Drop Stack resumes a seeded run",
       "path": "/?demo=dropstack&game=dropstack&play=1",
-      "expectSelector": ".ds-queue"
+      "expectSelector": ".ds-boardbox canvas.ds-canvas"
     },
     {
       "name": "Chutes & Ladders board-style pills render",
@@ -705,7 +706,7 @@
     {
       "name": "Daily Tile Match shows the day difficulty label",
       "path": "/?game=tilematchingdaily&practice=1",
-      "expectSelector": ".tm-daylabel"
+      "expectText": "Today's board:"
     },
     {
       "name": "Daily Tile Match resumes a seeded run",
@@ -743,9 +744,10 @@
       "expectText": "Start mining"
     },
     {
-      "name": "Daily Cipher keyboard renders full-size keys",
+      "name": "Daily Cipher keyboard is drawn with key twins",
       "path": "/?game=cryptowordle&practice=1",
-      "expectSelector": ".cw-key"
+      "expectSelector": ".cw-board canvas.cw-canvas",
+      "expectText": "Enter"
     },
     {
       "name": "Daily Cipher Enter key is on screen",
@@ -815,7 +817,7 @@
     {
       "name": "Daily Cipher runs in the fit column",
       "path": "/?game=cryptowordle&practice=1",
-      "expectSelector": ".fit-col .cw-kbd"
+      "expectSelector": ".fit-col .cw-board canvas.cw-canvas"
     },
     {
       "name": "Checkers board is capped to the viewport",
@@ -1023,9 +1025,10 @@
       "expectSelector": ".sudoku.s9 canvas.sdk-canvas"
     },
     {
-      "name": "Sudoku 9x9 keypad renders full-width digit keys",
+      "name": "Sudoku 9x9 keypad is drawn with key twins",
       "path": "/?game=sudoku&practice=1&sdk=9",
-      "expectSelector": ".numpad .numkey"
+      "expectSelector": ".sudoku.s9 canvas.sdk-canvas",
+      "expectText": "Erase"
     },
     {
       "name": "Sudoku 6x6 Mini board is deep-linkable",

@@ -766,33 +766,8 @@ async function migrate() {
     )
   `);
 
-  // poker_chips is PUBLIC — chip counts contain no sensitive data.
-  // One row per user; upserted after every hand.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS poker_chips (
-      user_id    TEXT        PRIMARY KEY,
-      chips      INTEGER     NOT NULL DEFAULT 1000,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
 
-  // idle_game_state is PUBLIC: game state, no sensitive data.
-  // One row per user; tracks currency, prestige, units owned, upgrades.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS idle_game_state (
-      id              SERIAL PRIMARY KEY,
-      user_id         TEXT NOT NULL UNIQUE,
-      currency        BIGINT NOT NULL DEFAULT 0,
-      peak_currency   BIGINT NOT NULL DEFAULT 0,
-      prestige_points INTEGER NOT NULL DEFAULT 0,
-      tap_power       DECIMAL NOT NULL DEFAULT 1,
-      units_owned     JSONB NOT NULL DEFAULT '{}',
-      upgrades        JSONB NOT NULL DEFAULT '{}',
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
   // diamond_rush_progress is PUBLIC: per-user game progress, no sensitive
   // data (and a future leaderboard would want it visible). One row per user.
@@ -848,35 +823,6 @@ async function migrate() {
     )
   `);
 
-  // pvp_matches is PUBLIC — match results contain no sensitive data.
-  // One row per PvP wager match; status: waiting|active|finished|cancelled.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pvp_matches (
-      id              TEXT PRIMARY KEY,
-      player1_id      TEXT NOT NULL,
-      player2_id      TEXT,
-      player1_name    TEXT,
-      player2_name    TEXT,
-      player1_addr    TEXT,
-      player2_addr    TEXT,
-      wager_utgo      TEXT NOT NULL DEFAULT '0',
-      board_seed      BIGINT,
-      status          TEXT NOT NULL DEFAULT 'waiting',
-      winner_id       TEXT,
-      p1_deposited    BOOLEAN NOT NULL DEFAULT false,
-      p2_deposited    BOOLEAN NOT NULL DEFAULT false,
-      p1_score        INTEGER,
-      p2_score        INTEGER,
-      p1_steps        INTEGER,
-      p2_steps        INTEGER,
-      p1_time_secs    INTEGER,
-      p2_time_secs    INTEGER,
-      p1_finished_at  TIMESTAMPTZ,
-      p2_finished_at  TIMESTAMPTZ,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
   // zuma_scores is PUBLIC — high scores for the Zuma classic game, shown on
   // a global leaderboard (no sensitive data; gameplay results only). One row
@@ -965,34 +911,7 @@ async function migrate() {
   // finish just after midnight still verifies against the start day's board.
   await pool.query(`ALTER TABLE mancala_sessions ADD COLUMN IF NOT EXISTS puzzle_date DATE`);
 
-  // pvp_moves: per-move log for anti-cheat timing analysis. PUBLIC.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pvp_moves (
-      id          BIGSERIAL PRIMARY KEY,
-      match_id    TEXT NOT NULL,
-      player_id   TEXT NOT NULL,
-      move_seq    INTEGER NOT NULL,
-      ts          TIMESTAMPTZ NOT NULL DEFAULT now(),
-      UNIQUE (match_id, player_id, move_seq)
-    )
-  `);
 
-  // Schema migrations — add new columns idempotently (safe to run on every boot).
-  await pool.query(`
-    ALTER TABLE pvp_matches
-      ADD COLUMN IF NOT EXISTS bet_tier          INTEGER DEFAULT 10,
-      ADD COLUMN IF NOT EXISTS p1_remaining      INTEGER,
-      ADD COLUMN IF NOT EXISTS p2_remaining      INTEGER,
-      ADD COLUMN IF NOT EXISTS started_at        TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS p1_last_seen_at   TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS p2_last_seen_at   TIMESTAMPTZ,
-      DROP COLUMN IF EXISTS contract_tx
-  `);
-  await pool.query(`
-    ALTER TABLE pvp_moves
-      ADD COLUMN IF NOT EXISTS tile_type  INTEGER,
-      ADD COLUMN IF NOT EXISTS ts_client  TIMESTAMPTZ
-  `);
 
   // users is PUBLIC: centralized user metadata. Lazy init on first API call.
   // No sensitive data — just identity.
@@ -1006,100 +925,11 @@ async function migrate() {
     )
   `);
 
-  // user_wallets is PRIVATE: maps user_id to EVM wallet address.
-  // Marked private because it links a Usernode identity to a financial address.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_wallets (
-      user_id     TEXT PRIMARY KEY,
-      wallet_addr TEXT NOT NULL,
-      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await pool.query(`COMMENT ON TABLE user_wallets IS 'staging:private'`);
 
-  // token_rewards_ledger is PUBLIC: per-user accrual of earned-but-unclaimed $UTGO.
-  // No sensitive data (amounts are gameplay results like daily_attempts).
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS token_rewards_ledger (
-      user_id              TEXT PRIMARY KEY,
-      pending_wei          NUMERIC(78,0) NOT NULL DEFAULT 0,
-      lifetime_earned_wei  NUMERIC(78,0) NOT NULL DEFAULT 0,
-      lifetime_claimed_wei NUMERIC(78,0) NOT NULL DEFAULT 0,
-      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
-  // token_reward_events is PUBLIC: idempotency log for puzzle reward credits.
-  // UNIQUE (user_id, game_id, attempt_date) prevents double-crediting on retries.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS token_reward_events (
-      id           BIGSERIAL PRIMARY KEY,
-      user_id      TEXT NOT NULL,
-      game_id      TEXT NOT NULL,
-      attempt_date DATE NOT NULL,
-      amount_wei   NUMERIC(78,0) NOT NULL,
-      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-      UNIQUE (user_id, game_id, attempt_date)
-    )
-  `);
 
-  // token_tips is PUBLIC: one row per tip between users.
-  // Mirrors public on-chain transfers; powers profile "tips received" panel.
-  // LEGACY: retained for history; tips now move MATCH via match_ledger_events.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS token_tips (
-      id           BIGSERIAL PRIMARY KEY,
-      from_user_id TEXT NOT NULL,
-      to_user_id   TEXT NOT NULL,
-      from_addr    TEXT,
-      to_addr      TEXT,
-      amount_wei   NUMERIC(78,0) NOT NULL,
-      tx_hash      TEXT,
-      status       TEXT NOT NULL DEFAULT 'confirmed',
-      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
-  // match_ledger_events is PUBLIC: the unified, append-only log of every MATCH
-  // movement (the single in-app currency) plus its on-chain anchor receipt.
-  // No sensitive data — only user ids, kind, amount (integer MATCH),
-  // counterpart user id (for tips), and public chain/tx hashes. No FK to any
-  // private table. `amount` is the signed delta (earn/tip_received positive,
-  // spend_*/tip_sent negative). `balance_after` is the post-movement balance.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS match_ledger_events (
-      id            BIGSERIAL PRIMARY KEY,
-      user_id       TEXT NOT NULL,
-      kind          TEXT NOT NULL,
-      game_id       TEXT,
-      attempt_date  DATE,
-      amount        INTEGER NOT NULL,
-      balance_after INTEGER,
-      counterpart   TEXT,
-      chain_hash    TEXT,
-      anchor_status TEXT NOT NULL DEFAULT 'pending',
-      anchor_tx_hash TEXT,
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  // Idempotent earns: at most one 'earn' row per (user, game, day) — the direct
-  // successor to token_reward_events' constraint, so a double-finish can't
-  // double-credit MATCH.
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS match_ledger_earn_unique
-      ON match_ledger_events (user_id, game_id, attempt_date)
-      WHERE kind = 'earn'
-  `);
-  // Idempotent hint spends: one row per (user, day, hint index).
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS match_ledger_hint_unique
-      ON match_ledger_events (user_id, attempt_date, amount, kind)
-      WHERE kind = 'spend_hint'
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS match_ledger_user_idx ON match_ledger_events (user_id, created_at DESC)`);
 
-  // Migration marker for the one-time legacy $UTGO → MATCH fold.
-  await pool.query(`ALTER TABLE token_rewards_ledger ADD COLUMN IF NOT EXISTS migrated_to_match_at TIMESTAMPTZ`);
 
   // user_follows is PUBLIC: directional follow relationships.
   // One row per (follower_id, followee_id) pair.
@@ -1149,55 +979,8 @@ async function migrate() {
     )
   `);
 
-  // posts is PUBLIC: shared game results and scores. No sensitive data.
-  // One row per post. user_id is the author.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS posts (
-      id              SERIAL PRIMARY KEY,
-      user_id         TEXT NOT NULL,
-      game_id         TEXT NOT NULL,
-      score           INTEGER NOT NULL,
-      steps           INTEGER,
-      time_secs       INTEGER,
-      caption         TEXT,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
-  // post_comments is PUBLIC: comments on shared posts. No sensitive data.
-  // One row per comment. Cascades delete when post is deleted.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS post_comments (
-      id              SERIAL PRIMARY KEY,
-      post_id         INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-      user_id         TEXT NOT NULL,
-      text            TEXT NOT NULL,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
-  // collab_sessions is PUBLIC: collaborative puzzle-solving sessions.
-  // One row per co-op game session. status: waiting|active|finished.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS collab_sessions (
-      id              TEXT PRIMARY KEY,
-      game_id         TEXT NOT NULL,
-      initiator_id    TEXT NOT NULL,
-      invitee_id      TEXT,
-      initiator_name  TEXT,
-      invitee_name    TEXT,
-      status          TEXT NOT NULL DEFAULT 'waiting',
-      state           JSONB,
-      seed            BIGINT,
-      initiator_score INTEGER,
-      invitee_score   INTEGER,
-      started_at      TIMESTAMPTZ,
-      finished_at     TIMESTAMPTZ,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-      last_activity   TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
   // Create indices for social queries
   await pool.query(`
@@ -1216,26 +999,6 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_user_achievements_created
     ON user_achievements(created_at DESC)
   `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_posts_user_created
-    ON posts(user_id, created_at DESC)
-  `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_posts_created
-    ON posts(created_at DESC)
-  `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_post_comments_post_created
-    ON post_comments(post_id, created_at DESC)
-  `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_collab_sessions_initiator
-    ON collab_sessions(initiator_id, created_at DESC)
-  `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_collab_sessions_invitee
-    ON collab_sessions(invitee_id)
-  `);
 
   // tilematch_scores is PUBLIC: personal-best scores for the Tile Match Puzzle
   // (1000-level mode). One row per user, upserted with GREATEST.
@@ -1251,52 +1014,13 @@ async function migrate() {
     )
   `);
 
-  // tilematch_tokens is PUBLIC: off-chain MATCH token balance per user.
-  // Server enforces balance >= 0 on every write.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS tilematch_tokens (
-      user_id    TEXT PRIMARY KEY,
-      username   TEXT,
-      balance    INTEGER NOT NULL DEFAULT 0,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
-  // tilematch_daily_tasks is PUBLIC: per-user per-day task progress.
-  // Uses the same UTC date reset semantics as daily_attempts.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS tilematch_daily_tasks (
-      user_id    TEXT NOT NULL,
-      task_date  DATE NOT NULL,
-      task_id    TEXT NOT NULL,
-      progress   INTEGER NOT NULL DEFAULT 0,
-      claimed_at TIMESTAMPTZ,
-      PRIMARY KEY (user_id, task_date, task_id)
-    )
-  `);
 
-  // cryptowordle_hints is PUBLIC: per-user, per-UTC-day count of paid hints
-  // bought in Crypto Wordle. Drives the doubling cost ramp (1,2,4,8…) which
-  // resets implicitly at midnight UTC (a new hint_date yields no row → count 0).
-  // No sensitive data — just a gameplay counter, same class as daily_attempts.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS cryptowordle_hints (
-      user_id         TEXT NOT NULL,
-      username        TEXT,
-      hint_date       DATE NOT NULL,
-      hints_purchased INTEGER NOT NULL DEFAULT 0,
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-      PRIMARY KEY (user_id, hint_date)
-    )
-  `);
 
-  // daily_hints is PUBLIC: the game-keyed generalization of cryptowordle_hints.
-  // One row per (user, daily game, UTC day) tracking how many paid hints were
-  // bought that day — drives the doubling cost ramp (1,2,4,8…) per game, resets
-  // implicitly at midnight UTC. No sensitive data (a gameplay counter, same
-  // class as daily_attempts). Crypto Wordle now uses this table too (game_id
-  // 'cryptowordle'); the legacy cryptowordle_hints table is left in place but
-  // unused so older deploys migrate cleanly.
+  // daily_hints is PUBLIC: one row per (user, daily game, UTC day) tracking how
+  // many hints were used that day — drives the per-day cap, resets implicitly at
+  // midnight UTC. No sensitive data (a gameplay counter, same class as
+  // daily_attempts). Daily Cipher uses this table under game_id 'cryptowordle'.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS daily_hints (
       user_id         TEXT NOT NULL,
@@ -1309,63 +1033,13 @@ async function migrate() {
     )
   `);
 
-  // match_ledger is PUBLIC: one row per MATCH token movement (spend/earn),
-  // mirrored on-chain via the bridge memo standard (see buildMatchMemo). Holds
-  // the structured memo + the on-chain tx_hash once the client anchors it.
-  // No sensitive data — same class as token_tips (which also stores tx_hash).
-  // The authoritative balance still lives in tilematch_tokens; this is an
-  // append-only, publicly-verifiable audit trail of balance changes.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS match_ledger (
-      id            BIGSERIAL PRIMARY KEY,
-      user_id       TEXT NOT NULL,
-      username      TEXT,
-      game_id       TEXT,
-      action        TEXT NOT NULL,
-      amount        INTEGER NOT NULL,
-      balance_after INTEGER NOT NULL,
-      memo          TEXT,
-      tx_hash       TEXT,
-      status        TEXT NOT NULL DEFAULT 'pending',
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
-  // tilematch_duels is PUBLIC: in-app MATCH token 1v1 duels.
-  // Mirrors pvp_matches but uses MATCH tokens (off-chain), no on-chain fields.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS tilematch_duels (
-      id               TEXT PRIMARY KEY,
-      player1_id       TEXT NOT NULL,
-      player2_id       TEXT,
-      player1_name     TEXT,
-      player2_name     TEXT,
-      stake_tokens     INTEGER NOT NULL DEFAULT 10,
-      board_seed       BIGINT,
-      status           TEXT NOT NULL DEFAULT 'waiting',
-      winner_id        TEXT,
-      p1_score         INTEGER,
-      p2_score         INTEGER,
-      p1_steps         INTEGER,
-      p2_steps         INTEGER,
-      p1_time_secs     INTEGER,
-      p2_time_secs     INTEGER,
-      p1_finished_at   TIMESTAMPTZ,
-      p2_finished_at   TIMESTAMPTZ,
-      p1_last_seen_at  TIMESTAMPTZ,
-      p2_last_seen_at  TIMESTAMPTZ,
-      created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
 
   // ---- DApp Mode (Phase 0) tables -----------------------------------------
-  // game_sessions is PUBLIC: one wallet-bound verification session per play.
+  // game_sessions is PUBLIC: one verification session per play.
   // Holds gameplay results + the session's final chain hash + on-chain anchor
-  // state. Deliberately stores NO wallet address (it carries usernode_pubkey,
-  // which is already public in `users`); the EVM address is looked up from the
-  // private user_wallets table at anchor time, so this public table never links
-  // identity → financial address (public-table-no-FK-to-private rule).
+  // state. Carries usernode_pubkey only (already public in `users`) and no
+  // financial identifiers of any kind.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS game_sessions (
       id               TEXT PRIMARY KEY,
@@ -1404,20 +1078,6 @@ async function migrate() {
     )
   `);
 
-  // wallet_ownership_proofs is PRIVATE: binds a Usernode identity to a signed
-  // ownership challenge over an EVM address. Auth material → staging:private,
-  // mirroring user_wallets.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS wallet_ownership_proofs (
-      user_id         TEXT PRIMARY KEY,
-      usernode_pubkey TEXT,
-      wallet_addr     TEXT NOT NULL,
-      nonce           TEXT NOT NULL,
-      signature       TEXT NOT NULL,
-      verified_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await pool.query(`COMMENT ON TABLE wallet_ownership_proofs IS 'staging:private'`);
 
   // match3_progress is PUBLIC — per-user campaign progress.
   await pool.query(`
@@ -1470,7 +1130,7 @@ async function migrate() {
   // an arbitrary game-specific JSON blob. This is the reusable persistence
   // layer for NEW non-daily games — they read/write it via GET/PUT
   // /api/state/:gameId instead of needing a bespoke table. Existing bespoke
-  // tables (idle_game_state, diamond_rush_progress, …) stay as-is.
+  // tables (diamond_rush_progress, match3_progress, …) stay as-is.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_game_state (
       user_id    TEXT NOT NULL,
@@ -1489,7 +1149,7 @@ async function migrate() {
   // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
   // `state` JSONB is game-specific and `game_id` is validated against
   // ALL_GAME_IDS. No sensitive data (gameplay results only). Any user can join
-  // a waiting room by code, so no inviteeId is required (unlike collab_sessions).
+  // a waiting room by code, so no inviteeId is required.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS classic_rooms (
       id             TEXT PRIMARY KEY,
@@ -1671,89 +1331,8 @@ async function migrate() {
         ON CONFLICT (user_id) DO NOTHING
       `, [p.id, p.name, p.highest, p.best]);
     }
-
-    // Seed posts from demo users with varied games
-    const posts = [
-      ['staging-demo-user', 'sudoku', 980, 17, 132, 'Finally beat my PB! 🎉'],
-      ['staging-alice', 'wordhunt', 1050, 28, 95, 'Had so much fun with this one'],
-      ['staging-bob', 'mancala', 750, null, 180, 'Mancala champion right here'],
-      ['staging-demo-user', 'wordhunt', 920, 31, 108, ''],
-      ['staging-charlie', 'sudoku', 620, 22, 156, 'Still learning but enjoying it'],
-      ['staging-alice', 'cryptowordle', 890, 4, 85, 'Got the daily crypto word!'],
-      ['staging-bob', 'sudoku', 1100, 19, 145, 'Personal record on sudoku today'],
-      // Classic-game posts so the feed exercises the classic-result share shape
-      // (game name/icon resolution, "pts" rendering) introduced by Share to Feed.
-      ['staging-demo-user', 'snake', 320, 0, 95, 'New Snake high score! 🐍'],
-      ['staging-alice', '2048', 2048, 412, 600, 'Finally hit 2048'],
-      ['staging-bob', 'minesweeper', 540, 41, 70, 'Cashed out before the last mine 💣'],
-      ['staging-charlie', 'blockblast', 880, 0, 210, 'Block Blast streak going strong'],
-    ];
-
-    for (const [userId, gameId, score, steps, timeSecs, caption] of posts) {
-      await pool.query(
-        `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, now() - interval '${Math.floor(Math.random() * 48)} hours')
-         ON CONFLICT DO NOTHING`,
-        [userId, gameId, score, steps, timeSecs, caption || null]
-      );
-    }
-
-    // Seed comments on a few posts (fetch post IDs for linking)
-    const postsForComments = await pool.query(
-      `SELECT id FROM posts WHERE user_id IN ('staging-demo-user', 'staging-alice', 'staging-bob')
-       LIMIT 3`
-    );
-
-    if (postsForComments.rows.length > 0) {
-      const comments = [
-        [postsForComments.rows[0].id, 'staging-alice', 'Nice score! 👍'],
-        [postsForComments.rows[0].id, 'staging-bob', 'How did you solve that so fast?'],
-        [postsForComments.rows[0].id, 'staging-charlie', 'Amazing!'],
-      ];
-      if (postsForComments.rows.length > 1) {
-        comments.push([postsForComments.rows[1].id, 'staging-demo-user', 'Congrats Alice!']);
-        comments.push([postsForComments.rows[1].id, 'staging-charlie', 'Great work']);
-      }
-      if (postsForComments.rows.length > 2) {
-        comments.push([postsForComments.rows[2].id, 'staging-alice', 'Awesome!']);
-      }
-
-      for (const [postId, userId, text] of comments) {
-        await pool.query(
-          `INSERT INTO post_comments (post_id, user_id, text, created_at)
-           VALUES ($1, $2, $3, now() - interval '${Math.floor(Math.random() * 24)} hours')
-           ON CONFLICT DO NOTHING`,
-          [postId, userId, text]
-        );
-      }
-    }
-
-    // Seed collab sessions: one finished, one active
-    const finishedPits = JSON.stringify([0,0,0,0,0,0,32,0,0,0,0,0,0,16]);
-    const activePits = JSON.stringify([0,0,0,0,0,1,28,2,2,2,2,2,2,5]);
-
-    await pool.query(
-      `INSERT INTO collab_sessions
-         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
-          status, state, seed, initiator_score, invitee_score, started_at, finished_at, created_at, last_activity)
-       VALUES ($1, 'mancala', 'staging-demo-user', 'staging-alice', 'staging-demo-user', 'staging-alice',
-               'finished', $2, 42317893, 750, 620,
-               now() - interval '2 hours', now() - interval '1 hour 50 minutes',
-               now() - interval '2 hours', now() - interval '1 hour 50 minutes')
-       ON CONFLICT (id) DO NOTHING`,
-      ['COLL1', finishedPits]
-    );
-
-    await pool.query(
-      `INSERT INTO collab_sessions
-         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
-          status, state, seed, created_at, last_activity)
-       VALUES ($1, 'mancala', 'staging-bob', 'staging-charlie', 'staging-bob', 'staging-charlie',
-               'waiting', $2, 12345678, now() - interval '15 minutes', now() - interval '5 minutes')
-       ON CONFLICT (id) DO NOTHING`,
-      ['COLL2', activePits]
-    );
   }
+
 
   // Staging seeds for mancala_rooms so testers can exercise all states
   // without needing a second device. Strictly a no-op in production.
@@ -2728,386 +2307,19 @@ app.delete('/api/social/unfollow/:userId', async (req, res) => {
 
 // ---- Posts API (sharing) -----------------------------------------------
 
-// POST /api/posts — create a post from a win
-app.post('/api/posts', async (req, res) => {
-  const { gameId, score, steps, timeSecs, caption } = req.body;
-  if (!gameId || !Number.isFinite(score)) {
-    return res.status(400).json({ error: 'gameId and score are required' });
-  }
-  try {
-    const { rows } = await pool.query(
-      `INSERT INTO posts (user_id, game_id, score, steps, time_secs, caption)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, user_id, game_id, score, steps, time_secs, caption, created_at`,
-      [req.user.id, gameId, score, steps || null, timeSecs || null, caption || null]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('[posts] create failed:', err.message);
-    res.status(500).json({ error: 'Failed to create post' });
-  }
-});
 
-// GET /api/posts/feed — fetch feed for signed-in user
-app.get('/api/posts/feed', async (req, res) => {
-  try {
-    const limit = Math.min(50, parseInt(req.query.limit) || 20);
-    const offset = Math.max(0, parseInt(req.query.offset) || 0);
 
-    // Get user's posts + posts from followed users, ordered by created_at DESC
-    const { rows: posts } = await pool.query(
-      `SELECT p.id, p.user_id, u.username, p.game_id, p.score, p.steps, p.time_secs, p.caption, p.created_at,
-              (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count
-       FROM posts p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.user_id = $1
-          OR p.user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1)
-       ORDER BY p.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [req.user.id, limit, offset]
-    );
-
-    const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*) as total FROM posts p
-       WHERE p.user_id = $1
-          OR p.user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $1)`,
-      [req.user.id]
-    );
-
-    res.json({
-      posts: posts.map(p => ({
-        id: p.id,
-        userId: p.user_id,
-        username: p.username,
-        gameId: p.game_id,
-        score: p.score,
-        steps: p.steps,
-        timeSecs: p.time_secs,
-        caption: p.caption,
-        createdAt: p.created_at,
-        commentCount: parseInt(p.comment_count),
-      })),
-      total: parseInt(countRows[0].total),
-    });
-  } catch (err) {
-    console.error('[posts] feed failed:', err.message);
-    res.status(500).json({ error: 'Failed to load feed' });
-  }
-});
-
-// GET /api/posts/:postId — fetch single post
-app.get('/api/posts/:postId', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT p.id, p.user_id, u.username, p.game_id, p.score, p.steps, p.time_secs, p.caption, p.created_at,
-              (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count
-       FROM posts p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
-      [req.params.postId]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
-    const p = rows[0];
-    res.json({
-      id: p.id,
-      userId: p.user_id,
-      username: p.username,
-      gameId: p.game_id,
-      score: p.score,
-      steps: p.steps,
-      timeSecs: p.time_secs,
-      caption: p.caption,
-      createdAt: p.created_at,
-      commentCount: parseInt(p.comment_count),
-    });
-  } catch (err) {
-    console.error('[posts] get failed:', err.message);
-    res.status(500).json({ error: 'Failed to load post' });
-  }
-});
 
 // ---- Post comments API ---------------------------------------------------
 
-// GET /api/posts/:postId/comments — fetch comments on a post
-app.get('/api/posts/:postId/comments', async (req, res) => {
-  try {
-    const limit = Math.min(100, parseInt(req.query.limit) || 50);
-    const offset = Math.max(0, parseInt(req.query.offset) || 0);
 
-    // Verify post exists
-    const { rows: postRows } = await pool.query(
-      `SELECT id FROM posts WHERE id = $1`,
-      [req.params.postId]
-    );
-    if (postRows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
 
-    const { rows: comments } = await pool.query(
-      `SELECT c.id, c.post_id, c.user_id, u.username, c.text, c.created_at
-       FROM post_comments c
-       JOIN users u ON c.user_id = u.id
-       WHERE c.post_id = $1
-       ORDER BY c.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [req.params.postId, limit, offset]
-    );
-
-    const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*) as total FROM post_comments WHERE post_id = $1`,
-      [req.params.postId]
-    );
-
-    res.json({
-      comments: comments.map(c => ({
-        id: c.id,
-        postId: c.post_id,
-        userId: c.user_id,
-        username: c.username,
-        text: c.text,
-        createdAt: c.created_at,
-      })),
-      total: parseInt(countRows[0].total),
-    });
-  } catch (err) {
-    console.error('[comments] get failed:', err.message);
-    res.status(500).json({ error: 'Failed to load comments' });
-  }
-});
-
-// POST /api/posts/:postId/comments — add a comment
-app.post('/api/posts/:postId/comments', async (req, res) => {
-  const { text } = req.body;
-  if (!text || text.length > 280) {
-    return res.status(400).json({ error: 'text is required and must be <= 280 chars' });
-  }
-  try {
-    // Verify post exists
-    const { rows: postRows } = await pool.query(
-      `SELECT id FROM posts WHERE id = $1`,
-      [req.params.postId]
-    );
-    if (postRows.length === 0) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
-
-    const { rows } = await pool.query(
-      `INSERT INTO post_comments (post_id, user_id, text)
-       VALUES ($1, $2, $3)
-       RETURNING id, post_id, user_id, text, created_at`,
-      [req.params.postId, req.user.id, text]
-    );
-    const c = rows[0];
-    res.json({
-      id: c.id,
-      postId: c.post_id,
-      userId: c.user_id,
-      text: c.text,
-      createdAt: c.created_at,
-    });
-  } catch (err) {
-    console.error('[comments] create failed:', err.message);
-    res.status(500).json({ error: 'Failed to add comment' });
-  }
-});
-
-// DELETE /api/posts/:postId/comments/:commentId — delete own comment
-app.delete('/api/posts/:postId/comments/:commentId', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `DELETE FROM post_comments
-       WHERE id = $1 AND post_id = $2 AND user_id = $3
-       RETURNING id`,
-      [req.params.commentId, req.params.postId, req.user.id]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Comment not found or not owned by you' });
-    }
-    res.status(204).send();
-  } catch (err) {
-    console.error('[comments] delete failed:', err.message);
-    res.status(500).json({ error: 'Failed to delete comment' });
-  }
-});
 
 // ---- Collaborative sessions API ----------------------------------------
 
-// POST /api/collab/sessions — initiate a collaborative session
-app.post('/api/collab/sessions', async (req, res) => {
-  const { gameId, inviteeId } = req.body;
-  if (!gameId || !inviteeId) {
-    return res.status(400).json({ error: 'gameId and inviteeId are required' });
-  }
-  if (inviteeId === req.user.id) {
-    return res.status(409).json({ error: 'Cannot invite yourself' });
-  }
-  try {
-    // Generate room ID (6-char code)
-    let roomId = '';
-    const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    for (let i = 0; i < 6; i++) {
-      roomId += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
-    }
 
-    // Get invitee name
-    const { rows: inviteeRows } = await pool.query(
-      `SELECT username FROM users WHERE id = $1`,
-      [inviteeId]
-    );
-    if (inviteeRows.length === 0) {
-      return res.status(404).json({ error: 'Invitee not found' });
-    }
 
-    const { rows } = await pool.query(
-      `INSERT INTO collab_sessions
-         (id, game_id, initiator_id, invitee_id, initiator_name, invitee_name, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'waiting')
-       RETURNING id, game_id, initiator_id, invitee_id, initiator_name, invitee_name, status, created_at`,
-      [roomId, gameId, req.user.id, inviteeId, req.user.username, inviteeRows[0].username]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('[collab] create failed:', err.message);
-    res.status(500).json({ error: 'Failed to create session' });
-  }
-});
 
-// GET /api/collab/sessions/:roomId — poll session state
-app.get('/api/collab/sessions/:roomId', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, game_id, initiator_id, invitee_id, initiator_name, invitee_name,
-              status, state, seed, initiator_score, invitee_score, started_at, finished_at, created_at
-       FROM collab_sessions WHERE id = $1`,
-      [req.params.roomId]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-    const s = rows[0];
-    res.json({
-      id: s.id,
-      gameId: s.game_id,
-      initiatorId: s.initiator_id,
-      inviteeId: s.invitee_id,
-      initiatorName: s.initiator_name,
-      inviteeName: s.invitee_name,
-      status: s.status,
-      state: s.state,
-      seed: s.seed,
-      initiatorScore: s.initiator_score,
-      inviteeScore: s.invitee_score,
-      startedAt: s.started_at,
-      finishedAt: s.finished_at,
-      createdAt: s.created_at,
-    });
-  } catch (err) {
-    console.error('[collab] get failed:', err.message);
-    res.status(500).json({ error: 'Failed to load session' });
-  }
-});
-
-// POST /api/collab/sessions/:roomId/move — apply a move (game-dependent)
-app.post('/api/collab/sessions/:roomId/move', async (req, res) => {
-  const { move, moveSeq } = req.body;
-  if (typeof move !== 'object' || typeof moveSeq !== 'number') {
-    return res.status(400).json({ error: 'move (object) and moveSeq (number) are required' });
-  }
-  try {
-    const { rows: sessionRows } = await pool.query(
-      `SELECT game_id, state, initiator_id, invitee_id FROM collab_sessions WHERE id = $1`,
-      [req.params.roomId]
-    );
-    if (sessionRows.length === 0) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-    const session = sessionRows[0];
-    if (req.user.id !== session.initiator_id && req.user.id !== session.invitee_id) {
-      return res.status(403).json({ error: 'Not a participant in this session' });
-    }
-
-    // For now, stub with success. In future: game-specific move validation.
-    // Update state (placeholder: just track moves)
-    const newState = session.state || { moves: [] };
-    newState.moves = (newState.moves || []).concat([move]);
-
-    await pool.query(
-      `UPDATE collab_sessions SET state = $2, last_activity = now()
-       WHERE id = $1`,
-      [req.params.roomId, JSON.stringify(newState)]
-    );
-
-    const { rows } = await pool.query(
-      `SELECT id, game_id, status, state FROM collab_sessions WHERE id = $1`,
-      [req.params.roomId]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('[collab] move failed:', err.message);
-    res.status(500).json({ error: 'Failed to apply move' });
-  }
-});
-
-// POST /api/collab/sessions/:roomId/finish — finish the session and record score
-app.post('/api/collab/sessions/:roomId/finish', async (req, res) => {
-  const { initiatorScore, inviteeScore } = req.body;
-  try {
-    const { rows: sessionRows } = await pool.query(
-      `SELECT game_id, initiator_id, status FROM collab_sessions WHERE id = $1`,
-      [req.params.roomId]
-    );
-    if (sessionRows.length === 0) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-
-    const session = sessionRows[0];
-    // Only initiator records a daily attempt
-    if (GAME_IDS.has(session.game_id)) {
-      await pool.query(
-        `INSERT INTO daily_attempts
-           (user_id, username, game_id, attempt_date, score, finished_at)
-         VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, now())
-         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
-        [session.initiator_id, req.user.username || null, session.game_id, initiatorScore]
-      );
-
-      // Update stats if this is a win
-      if (initiatorScore && initiatorScore > 0) {
-        await pool.query(
-          `INSERT INTO user_stats_snapshot (user_id, username, total_score, last_win_at, updated_at)
-           VALUES ($1, $2, $3, now(), now())
-           ON CONFLICT (user_id) DO UPDATE SET
-             total_score = user_stats_snapshot.total_score + $3,
-             last_win_at = now(),
-             updated_at = now()`,
-          [session.initiator_id, req.user.username || null, initiatorScore]
-        );
-      }
-    }
-
-    // Mark session as finished
-    const { rows } = await pool.query(
-      `UPDATE collab_sessions
-         SET status = 'finished', initiator_score = $2, invitee_score = $3, finished_at = now()
-       WHERE id = $1
-       RETURNING id, game_id, status, initiator_score, invitee_score`,
-      [req.params.roomId, initiatorScore, inviteeScore]
-    );
-
-    // Recompute streak
-    const streak = await computeStreak(session.initiator_id);
-
-    res.json({
-      ...rows[0],
-      streak,
-    });
-  } catch (err) {
-    console.error('[collab] finish failed:', err.message);
-    res.status(500).json({ error: 'Failed to finish session' });
-  }
-});
 
 // ---- Daily attempts API --------------------------------------------------
 

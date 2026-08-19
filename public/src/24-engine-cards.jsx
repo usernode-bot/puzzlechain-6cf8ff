@@ -1333,34 +1333,7 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
    9×9 with 10 mines, same board for everyone. A safe opening area is
    revealed for you; one wrong tap ends the day. */
 
-function mfBuild(rng) {
-  const idxs = ceShuffle(Array.from({ length: 81 }, (_, i) => i), rng);
-  const mines = new Set(idxs.slice(0, 10));
-  const counts = new Array(81).fill(0);
-  for (let i = 0; i < 81; i++) {
-    if (mines.has(i)) { counts[i] = -1; continue; }
-    const r = Math.floor(i / 9), c = i % 9;
-    let n = 0;
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      const rr = r + dr, cc = c + dc;
-      if (rr >= 0 && rr < 9 && cc >= 0 && cc < 9 && mines.has(rr * 9 + cc)) n++;
-    }
-    counts[i] = n;
-  }
-  // Deterministic safe opening: the zero-cell whose flood region is largest.
-  let best = -1, bestSize = -1;
-  const seen = new Set();
-  for (let i = 0; i < 81; i++) {
-    if (counts[i] !== 0 || seen.has(i)) continue;
-    const region = mfFlood(i, counts);
-    for (const j of region) seen.add(j);
-    if (region.size > bestSize) { bestSize = region.size; best = i; }
-  }
-  if (best < 0) best = counts.findIndex((v) => v >= 0); // no zeros: any safe cell
-  return { mines, counts, start: best };
-}
-
-function mfFlood(startIdx, counts) {
+function mfFlood(startIdx, counts, cols = 9, rows = 9) {
   const out = new Set([startIdx]);
   const queue = [startIdx];
   while (queue.length) {
@@ -1385,28 +1358,195 @@ function mfFlood(startIdx, counts) {
 const MF_NUM_COLORS = [null, 'accent', 'emerald', 'rose', 'violet', 'gold', '#06b6d4', '#be123c', 'muted'];
 const MF_GAP = 3;
 
-// Neighbour indices of a cell on the 9×9 field.
-function mfNeighbors(i) {
-  const r = Math.floor(i / 9), c = i % 9;
+/* ============================================================
+   Mine Finder — no-guess generation (#176)
+   ============================================================
+   The difficulty ladder needed a solver, but the solver turned out to matter
+   more than the ladder: WITHOUT it, a generated minefield can require a coin
+   flip. A board you lose to a 50/50 is not "hard", it is unfair, and rating
+   such a board is meaningless because the rating describes logic the player
+   never got to use.
+
+   So generation is now: place mines → try to solve by pure deduction → keep
+   only boards that fall. The rules, in the order a person would reach for
+   them, are also the difficulty ladder:
+
+     0 count-complete   a number's mines are all flagged ⇒ the rest are safe
+     1 count-forced     a number's unknowns equal its remaining mines ⇒ all mines
+     2 subset           one number's unknowns are a subset of another's; the
+                        difference resolves (this is the 1-2-1 pattern and
+                        friends, and it is where the game gets interesting)
+
+   Anything needing more than these is rejected rather than shipped as "very
+   hard", the same rule Sudoku's grader uses.
+   ============================================================ */
+const MF_RULES = ['count-complete', 'count-forced', 'subset'];
+
+// Board geometry is a parameter now (the ladder grows the grid), so neighbours
+// are computed against a width rather than the old hardcoded 9.
+function mfNeighborsN(i, cols, rows) {
+  const r = Math.floor(i / cols), c = i % cols;
   const out = [];
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
     if (!dr && !dc) continue;
     const rr = r + dr, cc = c + dc;
-    if (rr >= 0 && rr < 9 && cc >= 0 && cc < 9) out.push(rr * 9 + cc);
+    if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) out.push(rr * cols + cc);
   }
   return out;
 }
 
-function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+/* Deduction-only solve from a given opening. Returns { solved, hardest }.
+   `known` mirrors what a player would know: 0 unknown, 1 revealed safe,
+   2 deduced mine. */
+function mfSolveGraded(mines, counts, cols, rows, start) {
+  const n = cols * rows;
+  const known = new Array(n).fill(0);
+  let hardest = -1;
+
+  const reveal = (i) => {
+    if (known[i]) return;
+    known[i] = 1;
+    if (counts[i] === 0) for (const j of mfNeighborsN(i, cols, rows)) reveal(j);
+  };
+  reveal(start);
+
+  for (;;) {
+    let acted = false;
+
+    // 0 / 1 — the two counting rules, applied to every revealed number.
+    for (let i = 0; i < n && !acted; i++) {
+      if (known[i] !== 1 || counts[i] <= 0) continue;
+      const nb = mfNeighborsN(i, cols, rows);
+      const unknown = nb.filter(j => known[j] === 0);
+      const flagged = nb.filter(j => known[j] === 2).length;
+      if (!unknown.length) continue;
+      if (flagged === counts[i]) {
+        for (const j of unknown) reveal(j);
+        hardest = Math.max(hardest, 0); acted = true;
+      } else if (unknown.length === counts[i] - flagged) {
+        for (const j of unknown) known[j] = 2;
+        hardest = Math.max(hardest, 1); acted = true;
+      }
+    }
+    if (acted) continue;
+
+    /* 2 — subset. For two revealed numbers A and B whose unknown neighbours
+       satisfy U(A) ⊂ U(B), the cells in U(B)\U(A) account for exactly
+       remaining(B) − remaining(A) mines. When that difference is 0 they are all
+       safe; when it equals the set size they are all mines. */
+    const cells = [];
+    for (let i = 0; i < n; i++) {
+      if (known[i] !== 1 || counts[i] <= 0) continue;
+      const nb = mfNeighborsN(i, cols, rows);
+      const unknown = nb.filter(j => known[j] === 0);
+      if (!unknown.length) continue;
+      const flagged = nb.filter(j => known[j] === 2).length;
+      cells.push({ set: unknown, need: counts[i] - flagged });
+    }
+    for (let a = 0; a < cells.length && !acted; a++) {
+      for (let b = 0; b < cells.length; b++) {
+        if (a === b) continue;
+        const A = cells[a], B = cells[b];
+        if (A.set.length >= B.set.length) continue;
+        if (!A.set.every(x => B.set.indexOf(x) !== -1)) continue;
+        const diff = B.set.filter(x => A.set.indexOf(x) === -1);
+        const need = B.need - A.need;
+        if (need === 0) {
+          for (const j of diff) reveal(j);
+          hardest = Math.max(hardest, 2); acted = true; break;
+        }
+        if (need === diff.length) {
+          for (const j of diff) known[j] = 2;
+          hardest = Math.max(hardest, 2); acted = true; break;
+        }
+      }
+    }
+    if (acted) continue;
+
+    // Nothing fired. Solved iff every non-mine cell is revealed.
+    for (let i = 0; i < n; i++) {
+      if (!mines.has(i) && known[i] !== 1) return { solved: false, hardest: MF_RULES.length };
+    }
+    return { solved: true, hardest: Math.max(hardest, 0) };
+  }
+}
+
+/* The ladder: grid size crossed with mine density. Both matter and they are
+   not interchangeable — a dense small board is a different kind of hard from a
+   sparse large one — so each band names both. */
+const MF_BANDS = [
+  { cols: 7,  rows: 7,  mines: 6 },
+  { cols: 9,  rows: 9,  mines: 10 },
+  { cols: 9,  rows: 9,  mines: 14 },
+  { cols: 11, rows: 11, mines: 20 },
+  { cols: 11, rows: 11, mines: 26 },
+  { cols: 13, rows: 13, mines: 38 },
+];
+
+/* Build a no-guess board for a band. Retries until the deduction solver clears
+   it; falls back to the last board tried rather than hanging, because a
+   slightly-unfair board is better than a frozen mount — and with these
+   densities the fallback effectively never fires. */
+function mfBuildForBand(rng, bandIdx) {
+  const spec = MF_BANDS[Math.min(MF_BANDS.length - 1, Math.max(0, bandIdx))];
+  const { cols, rows } = spec;
+  const n = cols * rows;
+  let last = null;
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const idxs = ceShuffle(Array.from({ length: n }, (_, i) => i), rng);
+    const mines = new Set(idxs.slice(0, spec.mines));
+    const counts = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      if (mines.has(i)) { counts[i] = -1; continue; }
+      counts[i] = mfNeighborsN(i, cols, rows).filter(j => mines.has(j)).length;
+    }
+    // Open on the largest zero-region, which is both the friendliest start and
+    // the one that gives deduction the most to work with.
+    let start = -1, bestSize = -1;
+    const seen = new Set();
+    for (let i = 0; i < n; i++) {
+      if (counts[i] !== 0 || seen.has(i)) continue;
+      const region = new Set(); const stack = [i];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (region.has(cur)) continue;
+        region.add(cur); seen.add(cur);
+        if (counts[cur] === 0) for (const j of mfNeighborsN(cur, cols, rows)) if (!region.has(j)) stack.push(j);
+      }
+      if (region.size > bestSize) { bestSize = region.size; start = i; }
+    }
+    if (start < 0) continue;               // no zero cell: nowhere safe to open
+    last = { mines, counts, start, cols, rows, total: n - spec.mines };
+    const { solved, hardest } = mfSolveGraded(mines, counts, cols, rows, start);
+    if (solved) return { ...last, hardest };
+  }
+  return last ? { ...last, hardest: MF_RULES.length } : null;
+}
+
+function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* #176 — every board now comes from the no-guess generator, INCLUDING the
+     daily. Band 1 is the same 9×9 / 10-mine shape the daily has always had, so
+     nothing about it changes size — but it can no longer hand a player a 50/50
+     they have to lose to, which it previously could. That is a fairness fix
+     that happens to fall out of building the ladder. */
+  const bandIdx = playMode === 'story' ? Math.max(0, band || 0)
+    : playMode === 'arcade'
+      ? [0, 2, 4][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      : 1;
   const board = useRef(null);
-  if (!board.current) board.current = mfBuild(dailyRng(offset, 'minefinder'));
-  const { mines, counts, start } = board.current;
+  if (!board.current) {
+    const { rng } = playMode === 'story' || playMode === 'arcade'
+      ? modeSeed(playMode, 'minefinder', bandIdx, offset)
+      : { rng: dailyRng(offset, 'minefinder') };
+    board.current = mfBuildForBand(rng, bandIdx);
+  }
+  const { mines, counts, start, cols: MF_COLS, rows: MF_ROWS } = board.current;
 
   const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.revealed)
     ? savedProgress : null;
   const [revealed, setRevealed] = useState(() =>
-    new Set(resumed ? resumed.revealed : [...mfFlood(start, counts)])
+    new Set(resumed ? resumed.revealed : [...mfFlood(start, counts, MF_COLS, MF_ROWS)])
   );
   const [flags, setFlags] = useState(() => new Set(resumed && Array.isArray(resumed.flags) ? resumed.flags : []));
   const [flagMode, setFlagMode] = useState(false);
@@ -1437,10 +1577,10 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const { cell } = useFitBox(boxRef, {
-    cols: 9, rows: 9, minCell: 24, maxCell: 46, gap: MF_GAP, padX: 4, padY: 4,
+    cols: MF_COLS, rows: MF_ROWS, minCell: 16, maxCell: 46, gap: MF_GAP, padX: 4, padY: 4,
   });
   const cellStep = cell + MF_GAP;
-  const boardPx = cellStep * 9 - MF_GAP;
+  const boardPx = cellStep * MF_COLS - MF_GAP;
 
   // Mutable snapshot the pointer handlers read — usePointerCell binds its
   // listeners once, so it must not close over stale render state.
@@ -1450,8 +1590,8 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const idxAt = (p) => {
     const { cellStep: cs } = liveRef.current;
     const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
-    if (c < 0 || c > 8 || r < 0 || r > 8) return -1;
-    return r * 9 + c;
+    if (c < 0 || c >= MF_COLS || r < 0 || r >= MF_ROWS) return -1;
+    return r * MF_COLS + c;
   };
 
   // ---- Actions -------------------------------------------------------------
@@ -1465,7 +1605,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
     for (const i of openIdxs) {
       if (cur.flags.has(i) || rv.has(i)) continue;
       if (mines.has(i)) { hitMine = i; break; }
-      if (counts[i] === 0) for (const j of mfFlood(i, counts)) rv.add(j);
+      if (counts[i] === 0) for (const j of mfFlood(i, counts, MF_COLS, MF_ROWS)) rv.add(j);
       else rv.add(i);
     }
     if (hitMine >= 0) {
@@ -1481,7 +1621,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       return;
     }
     setRevealed(rv);
-    const won = rv.size >= 71;
+    const won = rv.size >= board.current.total;
     // Deliberately skip the progress save on the winning move: the finish call
     // closes the attempt and a racing write would 409 against the closed row.
     if (!won) saveNow(rv, cur.flags, ns);
@@ -1493,7 +1633,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
         share: `Game Corner Mine Finder — swept today's field in ${fmt} 🚩`,
       });
     } else {
-      setAnnounce(`${rv.size} of 71 safe cells uncovered.`);
+      setAnnounce(`${rv.size} of ${board.current.total} safe cells uncovered.`);
     }
   };
 
@@ -1531,7 +1671,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const doChord = (i) => {
     const cur = liveRef.current;
     if (cur.done || !cur.revealed.has(i) || counts[i] <= 0) return false;
-    const nb = mfNeighbors(i);
+    const nb = mfNeighborsN(i, MF_COLS, MF_ROWS);
     const flagged = nb.filter((j) => cur.flags.has(j)).length;
     const closed = nb.filter((j) => !cur.revealed.has(j) && !cur.flags.has(j));
     if (!closed.length) return false;
@@ -1576,8 +1716,8 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const radius = Math.max(3, Math.round(cell * 0.16));
-      for (let i = 0; i < 81; i++) {
-        const r = Math.floor(i / 9), c = i % 9;
+      for (let i = 0; i < MF_COLS * MF_ROWS; i++) {
+        const r = Math.floor(i / MF_COLS), c = i % MF_COLS;
         const x = c * cellStep, y = r * cellStep;
         const isRev = revealed.has(i);
         const isMine = mines.has(i);
@@ -1628,7 +1768,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
           ref={canvasRef}
           className="mf-canvas board-canvas"
           role="grid"
-          aria-label={`Mine Finder, 9 by 9 field, ${minesLeft} mines unflagged, ${revealed.size} of 71 safe cells uncovered`}
+          aria-label={`Mine Finder, ${MF_COLS} by ${MF_ROWS} field, ${minesLeft} mines unflagged, ${revealed.size} of ${board.current.total} safe cells uncovered`}
         />
       </div>
       <div className="sr-only" aria-live="polite">{announce}</div>

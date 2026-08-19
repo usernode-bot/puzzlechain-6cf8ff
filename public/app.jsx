@@ -157,7 +157,6 @@ const TAPPABLE_CLASSES = [
   'tappable',
   'p6-btn',
   'mf-canvas', 'board-canvas',
-  'numkey',
   'cw-key',
 ];
 
@@ -673,7 +672,7 @@ body {
 .fit-col .status-bar .pill { flex: 1 1 auto; min-width: 0; }
 /* Everything that is NOT the board is fixed-size, so only the board flexes.
    Miss one of these and it gets crushed to zero height by the board. */
-.fit-col .status-bar, .fit-col .p6-hint, .fit-col .numpad,
+.fit-col .status-bar, .fit-col .p6-hint,
 .fit-col .word-list, .fit-col .cp-pad, .fit-col .an-actions,
 .fit-col .cw-hint-bar, .fit-col .p6-banner, .fit-col .word-theme,
 .fit-col .an-dots, .fit-col .an-boardbox,
@@ -713,7 +712,6 @@ html.un-scroll-locked, body.un-scroll-locked {
    "width: 100%" makes the cross size DEFINITE again, so the autos resolve to 0
    (or centre the board within its own max-width) instead of driving the size.
    The fitcol-auto-margin self-test guards the whole class of bug. */
-.fit-col .numpad { margin-top: 0; width: 100%; }
 /* Fluid square grids (Sudoku, Word Hunt) fit BOTH axes natively — no
    transform needed, so their pointer-drag selection math is untouched. */
 .fit-col .sudoku, .fit-col .wordsearch {
@@ -725,6 +723,19 @@ html.un-scroll-locked, body.un-scroll-locked {
 .fit-col .wspr-grid, .fit-col .dsnk-board { width: 100%; }
 /* Sudoku's difficulty chooser is a fixed-size card, not a board. */
 .fit-col .sdk-choose { flex: 0 0 auto; width: 100%; }
+/* Controls wave — the shared frame host. A migrated game's whole frame
+   (pills, board, buttons) is ONE canvas inside this box; the legacy board
+   class stays on the box so width rules and probes keep holding. In a fit
+   column the frame IS the flexible child; these overrides out-rank the
+   square-board rules above by source order. */
+.cui-frame {
+  display: flex; align-items: flex-start; justify-content: center;
+  width: 100%; margin: 0 auto; touch-action: none;
+}
+.fit-col .cui-frame {
+  flex: 1 1 auto; min-height: 0;
+  height: auto; max-height: 100%; aspect-ratio: auto;
+}
 /* #170 — the canvas board box is the flexible region (the .dbnc-wrap idiom):
    useFitBox measures it and the canvas sizes its cards/tiles to fill it.
    Klondike first; Spider and Mahjong joined in the wave-1 migration. */
@@ -769,7 +780,6 @@ ${emitTouchActionRules()}
    never stick. */
 ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
-.numkey:active, .numkey[data-pressed],
 .cw-key:active, .cw-key[data-pressed] {
   filter: brightness(0.9);
   transform: scale(0.96);
@@ -946,28 +956,6 @@ ${emitTapHighlightRules()}
   border: 2px solid ${C.border}; border-radius: 10px; background: #10131c;
   touch-action: none; max-width: 100%;
 }
-.numpad {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 1.1rem auto 0;
-}
-.numkey {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  color: ${C.text};
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.2rem;
-  font-weight: 600;
-  padding: 0.65rem 0;
-  cursor: pointer;
-  transition: border-color 0.1s ease, background 0.1s ease;
-}
-.numkey:hover { border-color: ${C.accent}; background: ${ca('accent','1a')}; }
-.numkey.erase { color: ${C.rose}; font-size: 1rem; }
-
 /* ---- Win overlay ---- */
 .win-overlay {
   position: fixed;
@@ -3340,7 +3328,7 @@ ${emitTapHighlightRules()}
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed],
-  .numkey:active, .cw-key:active { transform: none !important; }
+  .cw-key:active { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
@@ -6009,7 +5997,7 @@ function runClientSelfTests(styleReady) {
      that sets an auto SIDE margin without a definite width is the bug class;
      inside .fit-col that always collapses the board. */
   check('fitcol-auto-margin', () => {
-    const BOARDS = ['sudoku', 'wordsearch', 'wspr-grid', 'dsnk-board', 'numpad'];
+    const BOARDS = ['sudoku', 'wordsearch', 'wspr-grid', 'dsnk-board'];
     const bad = [];
     for (const cls of BOARDS) {
       // Grab the .fit-col-scoped rule bodies for this class.
@@ -6235,6 +6223,169 @@ function usePointerCell(ref, handlers, { longPressMs = 450, moveTolerance = 10 }
       el.removeEventListener('contextmenu', onCtx);
     };
   }, [ref, longPressMs, moveTolerance]);
+}
+
+/* ================= cui — the canvas control kit (controls wave) =============
+   Draws the in-frame chrome — status pills, buttons, key grids — INTO a
+   game's canvas, so a running game is one uninterrupted surface. Every drawn
+   control is backed by a REAL, visually-hidden DOM twin (<CuiTwin/>): screen
+   readers, hardware focus and innerText-based checks keep working, because
+   .sr-only clips the box without unrendering the text. Menus, sheets,
+   overlays, hint paragraphs and scroll-away content lists stay DOM on
+   purpose — they are prose or navigation, not play-surface controls.
+
+   A game builds `controls` fresh each render (geometry from its fit box):
+     { id, kind: 'pill' | 'button' | 'label',
+       r: [x, y, w, h], label, value, sub, gold, mono, font,
+       primary, on, solid, disabled, action }
+   and threads the SAME array through three places:
+     draw:    cuiDrawControls(ctx, controls, pressedId)
+     pointer: usePointerCell(ref, cuiWrapHandlers(ctlRef, setPressed, boardHandlers))
+     JSX:     <CuiTwin controls={controls} />                                 */
+const CUI_FONT = "'Space Grotesk', system-ui, sans-serif";
+const CUI_MONO = "'JetBrains Mono', monospace";
+
+function cuiInRect(r, x, y) { return x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3]; }
+
+function cuiHitAt(controls, x, y) {
+  for (let i = controls.length - 1; i >= 0; i--) {
+    const c = controls[i];
+    if (c.action && !c.disabled && cuiInRect(c.r, x, y)) return c;
+  }
+  return null;
+}
+
+// Split a horizontal band into n equal rects with a gap — the .status-bar /
+// button-row layout, minus the DOM.
+function cuiRow(x, y, w, h, n, gap = 8) {
+  const cw = (w - gap * (n - 1)) / n;
+  return Array.from({ length: n }, (_, i) => [x + i * (cw + gap), y, cw, h]);
+}
+
+// The .pill look: card capsule, uppercase muted label over a mono value.
+function cuiDrawPill(ctx, c) {
+  const [x, y, w, h] = c.r;
+  klRR(ctx, x, y, w, h, 10);
+  ctx.fillStyle = PAL.card;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = PAL.border;
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = '600 9px ' + CUI_FONT;
+  ctx.fillStyle = PAL.muted;
+  ctx.fillText(String(c.label || '').toUpperCase(), x + w / 2, y + h * 0.4, w - 8);
+  ctx.font = '600 ' + Math.max(13, Math.round(h * 0.34)) + 'px ' + CUI_MONO;
+  ctx.fillStyle = c.gold ? PAL.gold : PAL.text;
+  ctx.fillText(String(c.value != null ? c.value : ''), x + w / 2, y + h * 0.85, w - 8);
+}
+
+// The .p6-btn look (card + border, accent tint when primary/on, solid accent
+// for the one big CTA), with the pressed state drawn since :active can't be.
+function cuiDrawButton(ctx, c, pressed) {
+  const [x, y, w, h] = c.r;
+  ctx.save();
+  if (c.disabled) ctx.globalAlpha = 0.4;
+  klRR(ctx, x, y, w, h, Math.min(12, h * 0.3));
+  ctx.fillStyle = c.solid ? palOf(C.accent, '#3A6ECD') : PAL.card;
+  ctx.fill();
+  if ((c.primary || c.on) && !c.solid) {
+    ctx.save(); ctx.globalAlpha *= 0.14; ctx.fillStyle = palOf(C.accent, '#3A6ECD'); ctx.fill(); ctx.restore();
+  }
+  if (pressed && !c.disabled) {
+    ctx.save(); ctx.globalAlpha *= 0.14; ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+  }
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = (c.primary || c.on || c.solid) ? palOf(C.accent, '#3A6ECD') : PAL.border;
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fs = c.font || Math.min(15, Math.max(12, Math.round(h * 0.3)));
+  ctx.font = '600 ' + fs + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
+  ctx.fillStyle = c.solid ? '#fff' : PAL.text;
+  ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, c.sub ? y + h / 2 - fs * 0.42 : y + h / 2 + 0.5, w - 10);
+  if (c.sub) {
+    ctx.font = '500 ' + Math.max(9, Math.round(fs * 0.72)) + 'px ' + CUI_FONT;
+    ctx.fillStyle = c.solid ? 'rgba(255,255,255,0.85)' : PAL.muted;
+    ctx.fillText(String(c.sub), x + w / 2, y + h / 2 + fs * 0.58, w - 10);
+  }
+  ctx.restore();
+}
+
+// Plain centred text (the brg-note / warn-line role).
+function cuiDrawLabel(ctx, c) {
+  const [x, y, w, h] = c.r;
+  ctx.font = (c.font || 12) + 'px ' + CUI_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = c.gold ? PAL.gold : PAL.muted;
+  ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, y + h / 2, w - 4);
+}
+
+function cuiDrawControls(ctx, controls, pressedId) {
+  for (const c of controls) {
+    if (c.kind === 'pill') cuiDrawPill(ctx, c);
+    else if (c.kind === 'label') cuiDrawLabel(ctx, c);
+    else cuiDrawButton(ctx, c, pressedId === c.id);
+  }
+}
+
+/* Route the pointer stream: controls first (press feedback on finger-DOWN,
+   action on the release, exactly tapProps' contract), board handlers only
+   when no control claims the point. `ctlRef.current` must always hold the
+   render's live controls array. */
+function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
+  return {
+    ...h,
+    onDown: (p, e) => {
+      const c = cuiHitAt(ctlRef.current || [], p.x, p.y);
+      if (c) { ctlRef.pressed = c.id; setPressed(c.id); cgHaptic(8); return; }
+      if (h.onDown) h.onDown(p, e);
+    },
+    onDrag: (p, d, e) => {
+      if (ctlRef.pressed) return;
+      if (h.onDrag) h.onDrag(p, d, e);
+    },
+    onUp: (p, e) => {
+      if (ctlRef.pressed) { ctlRef.pressed = null; setPressed(null); return; }
+      if (h.onUp) h.onUp(p, e);
+    },
+    onTap: (p, e) => {
+      const c = cuiHitAt(ctlRef.current || [], p.x, p.y);
+      if (c) { c.action(); return; }
+      if (h.onTap) h.onTap(p, e);
+    },
+    onLongPress: h.onLongPress ? (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return;
+      h.onLongPress(p, e);
+    } : undefined,
+    onContext: h.onContext ? (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return;
+      h.onContext(p, e);
+    } : undefined,
+  };
+}
+
+// The accessibility twin: real buttons and live text, visually clipped. One
+// per game frame, fed the same controls array the canvas drew.
+function CuiTwin({ controls, extra }) {
+  return (
+    <div className="sr-only">
+      {controls.map((c) => c.action ? (
+        <button
+          key={c.id}
+          type="button"
+          disabled={!!c.disabled}
+          aria-pressed={c.on != null ? !!c.on : undefined}
+          onClick={() => { if (!c.disabled) c.action(); }}
+        >{String(c.label != null ? c.label : c.id) + (c.sub ? ' — ' + c.sub : '') + (c.value != null ? ' ' + c.value : '')}</button>
+      ) : (
+        <span key={c.id}>{(c.label != null ? String(c.label) + ' ' : '') + (c.value != null ? c.value : '')}</span>
+      ))}
+      {extra || null}
+    </div>
+  );
 }
 
 /* ============================================================
@@ -7231,32 +7382,79 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   const boldRight = (c) => size === 9 ? (c === 2 || c === 5) : c === 2;
   const boldBottom = (r) => size === 9 ? (r === 2 || r === 5) : (r === 1 || r === 3);
 
-  /* The grid is a CANVAS (#170 treatment); the numpad and hint bar stay DOM
-     buttons — they are controls, not the board. Cell chrome reads PAL; the
-     box separators keep #149's rule (they out-read the 1px gridlines by
-     using the muted tone, one contrast step above border). */
+  /* The whole game frame is ONE canvas now (controls wave): pills, grid,
+     hint bar and numpad draw together, with <CuiTwin> carrying the real
+     hidden buttons. Cell chrome reads PAL; the box separators keep #149's
+     rule (they out-read the 1px gridlines by using the muted tone). */
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell: sdkCell } = useFitBox(boxRef, { cols: size, rows: size, minCell: 26, maxCell: size === 9 ? 44 : 56, gap: 1 });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, HINT_H = 36, KEY_H = 44, ERASE_H = 38;
+  const chrome = PILL_H + HINT_H + KEY_H + ERASE_H + GAP * 4;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const sdkCell = Math.max(24, Math.min(size === 9 ? 44 : 56, Math.floor((availB - (size - 1)) / size)));
   const sdkStep = sdkCell + 1;
   const sdkSide = sdkStep * size - 1;
+  const H = chrome + sdkSide;
+  const boardX = Math.floor((W - sdkSide) / 2);
+  const boardY = PILL_H + GAP;
+  const hintY = boardY + sdkSide + GAP;
+  const keysY = hintY + HINT_H + GAP;
+  const eraseY = keysY + KEY_H + GAP;
+
+  const filled = grid.flat().filter(v => v !== 0).length;
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 4);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
+    controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: `${filled}/${size * size}` });
+    controls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: size === 9 ? '9×9 ×2' : '6×6' });
+    if (!done) {
+      const exhausted = hints.exhausted || noEmpty;
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hints.msg ? 0 : Math.floor(W * 0.2), hintY, hints.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: exhausted ? `💡 ${noEmpty ? 'Board full' : 'No more hints'}`
+          : `💡 Hint${Number.isFinite(hints.hintsLeft) ? ` · ${hints.hintsLeft} left` : ''}`,
+        disabled: hints.buying || exhausted,
+        action: buyHint,
+      });
+      if (hints.msg) {
+        controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hints.msg, font: 11 });
+      }
+      const kr = cuiRow(0, keysY, W, KEY_H, size, 6);
+      for (let n = 1; n <= size; n++) {
+        controls.push({ id: 'k' + n, kind: 'button', r: kr[n - 1], label: String(n), mono: true, font: 18, action: () => place(n) });
+      }
+      controls.push({ id: 'erase', kind: 'button', r: [0, eraseY, W, ERASE_H], label: 'Erase', action: () => place(0) });
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
   const sdkGeoRef = useRef({});
-  sdkGeoRef.current = { sdkStep, size, done };
-  usePointerCell(canvasRef, {
+  sdkGeoRef.current = { sdkStep, size, done, boardX, boardY, sdkSide };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => {
       const g = sdkGeoRef.current;
       if (g.done) return;
-      const c = Math.floor(p.x / g.sdkStep), r = Math.floor(p.y / g.sdkStep);
+      const c = Math.floor((p.x - g.boardX) / g.sdkStep), r = Math.floor((p.y - g.boardY) / g.sdkStep);
       if (c < 0 || c >= g.size || r < 0 || r >= g.size) return;
       const locked = isGiven(r, c) || hintedCells.has(cellKey(r, c));
       if (!locked) setSelected([r, c]);
     },
-  });
+  }));
   useCanvasBoard(canvasRef, {
-    width: sdkSide,
-    height: sdkSide,
-    deps: [grid, selected, errors, hintedCells, done, sdkCell],
+    width: W,
+    height: H,
+    deps: [grid, selected, errors, hintedCells, done, sdkCell, W, fmt, steps, pressedId, hints.hintsLeft, hints.msg, hints.buying],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       ctx.fillStyle = PAL.border; // 1px gridlines (#149's gap idiom, drawn)
       ctx.fillRect(0, 0, sdkSide, sdkSide);
       ctx.textAlign = 'center';
@@ -7299,64 +7497,21 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
         const y = (r + 1) * sdkStep - 0.5;
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sdkSide, y); ctx.stroke();
       }
+      ctx.restore();
     },
   });
 
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Steps</div>
-          <div className="pvalue">{steps}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Filled</div>
-          <div className="pvalue">
-            {grid.flat().filter(v => v !== 0).length}/{size * size}
-          </div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Board</div>
-          <div className="pvalue" style={{ fontSize: '0.82rem' }}>{size === 9 ? '9×9 ×2' : '6×6'}</div>
-        </div>
-      </div>
-
-      <div
-        className={'sudoku' + (size === 9 ? ' s9' : '')}
-        ref={boxRef}
-        style={{ maxWidth: size === 9 ? 420 : 360 }}
-      >
+      <div className={'sudoku cui-frame' + (size === 9 ? ' s9' : '')} ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="sdk-canvas board-canvas"
           role="grid"
-          aria-label={`Sudoku ${size} by ${size} board — ${grid.flat().filter((v) => v !== 0).length} of ${size * size} filled`}
+          aria-label={`Sudoku ${size} by ${size} board — ${filled} of ${size * size} filled`}
         />
       </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={hints.hintsLeft}
-          exhausted={hints.exhausted || noEmpty}
-          buying={hints.buying}
-          onBuy={buyHint}
-          msg={hints.msg}
-          label={noEmpty ? 'Board full' : 'No more hints'}
-        />
-      )}
-
-      <div className="numpad" style={size === 9 ? { gridTemplateColumns: 'repeat(9, 1fr)' } : undefined}>
-        {Array.from({ length: size }, (_, i) => i + 1).map(n => (
-          <button key={n} className="numkey" {...tapProps(() => place(n))}>{n}</button>
-        ))}
-      </div>
-      <div className="numpad" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-        <button className="numkey erase" {...tapProps(() => place(0))}>Erase</button>
-      </div>
+      <CuiTwin controls={controls} />
     </div>
   );
 }

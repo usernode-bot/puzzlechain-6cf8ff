@@ -160,7 +160,7 @@ const TAPPABLE_CLASSES = [
   'mj-tile', 'wspr-tile', 'ce-card', 'sp-col', 'scell', 'numkey',
   'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
   'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
-  'tm-tile', 'm3-tile',
+  'tm-tile', 'm3-tile', 'cnl-roll-btn',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
@@ -3541,6 +3541,7 @@ ${emitTapHighlightRules()}
 .cg-stage .ck-board, .cg-stage .rv-board, .cg-stage .gmk-board,
 .cg-stage .ludo-board { max-width: min(380px, var(--cg-board)) !important; }
 .cg-stage .fir-board { max-width: min(340px, var(--cg-board)) !important; }
+.cg-stage .cnl-board-wrap { max-width: min(480px, var(--cg-board)) !important; }
 /* The board-game rooms stack status + board + legend + leaderboard, so cap the
    text chrome too — the board fitting is only half of "no scrolling to see
    whose turn it is". */
@@ -4463,6 +4464,16 @@ ${emitTapHighlightRules()}
   box-shadow: 0 1px 4px rgba(0,0,0,0.5);
   transform: translate(-50%, -50%);
   transition: left 0.13s ease, top 0.13s ease;
+  display: flex; align-items: center; justify-content: center;
+}
+.cnl-pawn.p2 {
+  border-radius: 3px;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.cnl-pawn-glyph {
+  font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 0.62rem;
+  color: #fff; line-height: 1; pointer-events: none; user-select: none;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 .cnl-die {
   display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
@@ -4476,6 +4487,13 @@ ${emitTapHighlightRules()}
   font-size: 1.7rem; color: ${C.text};
   transition: transform 0.1s ease, border-color 0.2s;
 }
+.cnl-die-pips {
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+  width: 68%; height: 68%; gap: 2px;
+}
+.cnl-pip { border-radius: 50%; background: transparent; }
+.cnl-pip.on { background: ${C.text}; }
+.cnl-die-dash { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.7rem; color: ${C.muted}; }
 /* Tumbling spin: ~3 full turns that decelerate and settle on the result. */
 .cnl-die-face.rolling { animation: cnl-spin 0.72s cubic-bezier(0.22, 0.61, 0.36, 1); }
 @keyframes cnl-spin {
@@ -5649,21 +5667,31 @@ const CLASSIC_MODE_META = {
 
 // Inline mode picker shown by the Game Menu's "New Game" for games that route
 // their modes through the menu (e.g. Chutes & Ladders). Calls onPlay(mode, opts).
-function ClassicModePicker({ game, onPlay }) {
+// game.variantPicker (optional): { label, options: [{ id, name, note? }], default }
+// — an opt-in, purely mechanical board-style choice (today: Chutes & Ladders'
+// Classic/Moksha Patam tables). When present, this generic picker renders the
+// same Board-style sub-section ChutesLaddersModeSelect uses for first launch,
+// so "New Game" from the ☰ menu can reach it too, not just the initial pick.
+function ClassicModePicker({ game, onPlay, onGlossary }) {
   const [mode, setMode] = useState(null);
   const [onlineAction, setOnlineAction] = useState(null);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const vp = game.variantPicker;
+  const [variant, setVariant] = useState(vp ? vp.default : null);
 
   const handlePlay = async () => {
     if (!mode) return;
-    if (mode !== 'online') { onPlay(mode, {}); return; }
+    const variantOpts = vp ? { variant } : {};
+    if (mode !== 'online') { onPlay(mode, variantOpts); return; }
     if (onlineAction === 'create') {
       setBusy(true);
-      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, {
+        method: 'POST', body: JSON.stringify(variantOpts),
+      });
       setBusy(false);
-      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id });
+      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id, ...variantOpts });
       else setError('Could not create room. Try again.');
     } else if (onlineAction === 'join') {
       const code = joinCode.trim().toUpperCase();
@@ -5703,6 +5731,22 @@ function ClassicModePicker({ game, onPlay }) {
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
             </div>
           )}
+        </div>
+      )}
+      {vp && (
+        <div className="cnl-variant-block">
+          <div className="cnl-variant-label">{vp.label}</div>
+          <div className="mnc-mode-sub">
+            {vp.options.map(o => (
+              <button key={o.id} className={'mnc-difficulty-pill' + (variant === o.id ? ' active' : '')}
+                onClick={() => setVariant(o.id)}>{o.name}</button>
+            ))}
+          </div>
+          {(() => { const active = vp.options.find(o => o.id === variant); return active && active.note ? (
+            <div className="cnl-variant-note">
+              {active.note}{onGlossary && <> <button className="cnl-variant-link" onClick={onGlossary}>📖 What do these mean?</button></>}
+            </div>
+          ) : null; })()}
         </div>
       )}
       {error && <div className="mnc-join-error">{error}</div>}
@@ -5803,7 +5847,7 @@ function GameModeModal({ game, onStart, onClose }) {
 
 // The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
 // only), and Post to Feed (after a result).
-function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose }) {
+function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose, onGlossary }) {
   const [picking, setPicking] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain'
   const modes = game.modes || [];
@@ -5832,7 +5876,7 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
       <div className="cg-menu-label">New game</div>
       {usePicker ? (
         picking
-          ? <ClassicModePicker game={game} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
+          ? <ClassicModePicker game={game} onGlossary={onGlossary} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
           : <button className="cg-sheet-action" onClick={() => setPicking(true)}>↺ New Game</button>
       ) : (
         <button className="cg-sheet-action" onClick={() => { onNewGameMode(defaultMode, {}); onClose && onClose(); }}>↺ New Game</button>
@@ -17638,6 +17682,48 @@ const CNL_VARIANTS = {
 };
 function cnlVariant(v) { return CNL_VARIANTS[v] ? v : 'classic'; }
 
+// Standard 1-6 pip layouts on a 3x3 grid (row-major, 1 = pip present).
+const CNL_DIE_PIPS = {
+  1: [0, 0, 0, 0, 1, 0, 0, 0, 0],
+  2: [1, 0, 0, 0, 0, 0, 0, 0, 1],
+  3: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  4: [1, 0, 1, 0, 0, 0, 1, 0, 1],
+  5: [1, 0, 1, 0, 1, 0, 1, 0, 1],
+  6: [1, 0, 1, 1, 0, 1, 1, 0, 1],
+};
+
+// Cosmetic (client-only, per-device) Classic-board skins. These substitute
+// only the ladder/chute glyphs and the label shown in the picker — the
+// mechanical variant (ladders/chutes tables) is untouched, so a skin never
+// needs to reach the server. Disabled when the mechanical variant is
+// 'moksha' (which has its own snake/virtue art baked into the board).
+const CNL_SKINS = {
+  plain:   { label: 'Classic', icon: '🪜', ladderMark: '🪜', chuteMark: '🛝' },
+  jungle:  { label: 'Jungle Vine', icon: '🌿', ladderMark: '🌿', chuteMark: '🐊' },
+  space:   { label: 'Star Voyage', icon: '🚀', ladderMark: '🚀', chuteMark: '☄️' },
+  pirate:  { label: 'Treasure Trail', icon: '🏴‍☠️', ladderMark: '⚓', chuteMark: '🦑' },
+};
+const CNL_SKIN_KEY = 'puzzlechain_cnl_skin';
+function cnlSkinId(v) { return CNL_SKINS[v] ? v : 'plain'; }
+function useCnlSkin() {
+  const [skin, setSkinState] = useState(() => {
+    // ?cnlskin=<id> is a screenshot-state deep link — it lets proposal tests
+    // and before/after captures reach a skin that's otherwise only chosen by
+    // clicking a pill, and it wins over the stored device preference.
+    try {
+      const q = new URLSearchParams(window.location.search).get('cnlskin');
+      if (q && CNL_SKINS[q]) return q;
+    } catch (e) {}
+    try { return cnlSkinId(localStorage.getItem(CNL_SKIN_KEY)); } catch (e) { return 'plain'; }
+  });
+  const setSkin = (v) => {
+    const id = cnlSkinId(v);
+    setSkinState(id);
+    try { localStorage.setItem(CNL_SKIN_KEY, id); } catch (e) {}
+  };
+  return [skin, setSkin];
+}
+
 // The glossary — reachable from the mode picker and the in-game header, so a
 // player can read what a square means before or during a game.
 function MokshaGlossaryModal({ onClose }) {
@@ -17704,6 +17790,14 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   const vkey = cnlVariant(variant);
   const V = CNL_VARIANTS[vkey];
   const isMoksha = vkey === 'moksha';
+  // Cosmetic board skin — a local per-device preference, independent of the
+  // server-synced mechanical variant. Only applies on the Classic board.
+  const [skin, setSkin] = useCnlSkin();
+  const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
+  const cycleSkin = () => {
+    const ids = Object.keys(CNL_SKINS);
+    setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
+  };
   const [p1Pos, setP1Pos]   = useState(0);
   const [p2Pos, setP2Pos]   = useState(0);
   const [player, setPlayer] = useState(1);
@@ -17762,16 +17856,23 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   useEffect(() => () => clearTimers(), []);
 
   const p1Color = C.accent;
-  const p2Color = C.rose;
+  const p2Color = C.violet;
+  const p1Token = 'accent';
+  const p2Token = 'violet';
   const activeColor = done ? C.muted : (player === 1 ? p1Color : p2Color);
+  const activeToken = done ? 'muted' : (player === 1 ? p1Token : p2Token);
 
   const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
 
   const finishTurn = (who, landed) => {
     const jump = V.jumps[landed];
+    // The win check must look at where the turn actually ENDS. A jump (e.g.
+    // the 80->100 ladder) moves the pawn past `landed`, so checking `landed`
+    // itself misses every jump-into-100 case and soft-locks the game.
+    const finalSquare = jump !== undefined ? jump : landed;
     const settle = () => {
       // Win check: must land exactly on 100 (no chute sits on 100).
-      if (landed === 100) {
+      if (finalSquare === 100) {
         setDone(true);
         setWinner(who);
         if (onClearSave) onClearSave();
@@ -17878,7 +17979,8 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
       const within = (row % 2 === 0) ? col : (9 - col);
       const n = row * 10 + within + 1;
       const isL = V.ladders[n] !== undefined;
-      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
+      const mark = isL ? (isMoksha ? '🪜' : SK.ladderMark)
+        : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : SK.chuteMark) : null;
       const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
       cells.push(
         <div
@@ -17942,6 +18044,7 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
 
   const bannerActive = !!banner;
   const bannerColor = done ? C.muted : activeColor;
+  const bannerToken = done ? 'muted' : activeToken;
 
   return (
     <div>
@@ -17976,14 +18079,19 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
             📖 What do these mean?
           </button>
         )}
+        {!isMoksha && (
+          <button className="p6-btn cnl-glossary-btn" onClick={cycleSkin} aria-label="Change board skin" title="Change board skin">
+            {SK.icon} {SK.label}
+          </button>
+        )}
       </div>
 
       <div
         className="cnl-banner"
         style={{
           color: bannerColor,
-          background: (bannerActive ? bannerColor : activeColor) + '22',
-          border: `1px solid ${(bannerActive ? bannerColor : activeColor)}44`,
+          background: ca(bannerActive ? bannerToken : activeToken, '22'),
+          border: `1px solid ${ca(bannerActive ? bannerToken : activeToken, '44')}`,
         }}
       >
         {done
@@ -17996,13 +18104,21 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
         <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
           {lines}
         </svg>
-        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn" />
-        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn" />
+        <div className={'cnl-pawn p1'} style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn">
+          <span className="cnl-pawn-glyph">1</span>
+        </div>
+        <div className={'cnl-pawn p2'} style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn">
+          <span className="cnl-pawn-glyph">{vsBot ? '🤖' : '2'}</span>
+        </div>
       </div>
 
       <div className="cnl-die">
-        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: activeColor + '88' }}>
-          {die == null ? '·' : die}
+        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: ca(activeToken, '88') }} aria-label={die == null ? 'Die not yet rolled' : `Die showing ${die}`}>
+          {die == null ? <span className="cnl-die-dash">·</span> : (
+            <span className={'cnl-die-pips n' + die}>
+              {CNL_DIE_PIPS[die].map((on, i) => <span key={i} className={'cnl-pip' + (on ? ' on' : '')} />)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -18045,6 +18161,10 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
   // Board style is independent of the play mode; Classic stays the default
   // because the Moksha board is deliberately a longer game.
   const [variant, setVariant] = useState('classic');
+  // Cosmetic skin is a separate, per-device preference (never sent to the
+  // server) — hidden once Moksha is picked since that board has its own
+  // baked-in virtue/vice art and isn't skinnable.
+  const [skin, setSkin] = useCnlSkin();
 
   const modes = [
     { id: '2p',     icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
@@ -18121,6 +18241,17 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
           </div>
         )}
       </div>
+      {variant !== 'moksha' && (
+        <div className="cnl-variant-block">
+          <div className="cnl-variant-label">Board skin</div>
+          <div className="mnc-mode-sub">
+            {Object.keys(CNL_SKINS).map(id => (
+              <button key={id} className={'mnc-difficulty-pill' + (skin === id ? ' active' : '')}
+                onClick={() => setSkin(id)}>{CNL_SKINS[id].icon} {CNL_SKINS[id].label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       {error && <div className="mnc-join-error">{error}</div>}
       {mode && <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
     </div>
@@ -18135,6 +18266,11 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
   const secsRef = useRef(0); secsRef.current = secs;
   const movesRef = useRef(0);
+  const [skin, setSkin] = useCnlSkin();
+  const cycleSkin = () => {
+    const ids = Object.keys(CNL_SKINS);
+    setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
+  };
 
   useEffect(() => {
     if (!room || room.status !== 'finished' || winCalledRef.current) return;
@@ -18171,10 +18307,12 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
   const vkey = cnlVariant(st.variant);
   const V = CNL_VARIANTS[vkey];
   const isMoksha = vkey === 'moksha';
+  const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
   const cur = st.currentPlayer || 1;
   const isMyTurn = status === 'active' && cur === myPlayerNum;
-  const p1Color = C.accent, p2Color = C.rose;
+  const p1Color = C.accent, p2Color = C.violet;
   const myColor = myPlayerNum === 1 ? p1Color : p2Color;
+  const myToken = myPlayerNum === 1 ? 'accent' : 'violet';
 
   const doRoll = () => {
     if (!isMyTurn) return;
@@ -18190,7 +18328,7 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
       const within = (row % 2 === 0) ? col : (9 - col);
       const n = row * 10 + within + 1;
       const isL = V.ladders[n] !== undefined;
-      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
+      const mark = isL ? SK.ladderMark : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : SK.chuteMark) : null;
       const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
       cells.push(
         <div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
@@ -18236,16 +18374,31 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
         {isMoksha && (
           <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>📖 What do these mean?</button>
         )}
+        {!isMoksha && (
+          <button className="p6-btn cnl-glossary-btn" onClick={cycleSkin} aria-label="Change board skin" title="Change board skin">
+            {SK.icon} {SK.label}
+          </button>
+        )}
       </div>
       {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
       <div className="cnl-board-wrap">
         <div className="cnl-board">{cells}</div>
         <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">{lines}</svg>
-        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} />
-        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} />
+        <div className={'cnl-pawn p1'} style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn">
+          <span className="cnl-pawn-glyph">1</span>
+        </div>
+        <div className={'cnl-pawn p2'} style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn">
+          <span className="cnl-pawn-glyph">2</span>
+        </div>
       </div>
       <div className="cnl-die">
-        <div className="cnl-die-face" style={{ borderColor: myColor + '88' }}>{st.die == null ? '·' : st.die}</div>
+        <div className="cnl-die-face" style={{ borderColor: ca(myToken, '88') }} aria-label={st.die == null ? 'Die not yet rolled' : `Die showing ${st.die}`}>
+          {st.die == null ? <span className="cnl-die-dash">·</span> : (
+            <span className={'cnl-die-pips n' + st.die}>
+              {CNL_DIE_PIPS[st.die].map((on, i) => <span key={i} className={'cnl-pip' + (on ? ' on' : '')} />)}
+            </span>
+          )}
+        </div>
       </div>
       <div className="cnl-roll-buttons">
         <button className="cnl-roll-btn" style={{ background: myColor }} onClick={doRoll} disabled={!isMyTurn}>
@@ -19235,6 +19388,7 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   // Sync mode from the Game Menu's New Game selection.
   useEffect(() => {
     setMode(gameMode || null);
+    if (gameModeOpts && gameModeOpts.variant) setVariant(gameModeOpts.variant);
     if (gameModeOpts && gameModeOpts.roomId) {
       setRoomId(gameModeOpts.roomId);
       setMyPlayerNum(gameModeOpts.roomAction === 'join' ? 2 : 1);
@@ -23444,6 +23598,17 @@ const GAMES = [
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
     menuModePicker: true,
+    variantPicker: {
+      label: 'Board style',
+      default: 'classic',
+      options: [
+        { id: 'classic', name: 'Classic' },
+        {
+          id: 'moksha', name: 'Moksha Patam (original)',
+          note: 'The Indian original: ladders on virtues, snakes on vices — 11 vices to 5 virtues, so the climb is a slower one.',
+        },
+      ],
+    },
     leaderboard: true,
     leaderboardOpts: { valueLabel: 'Best Streak' },
   },
@@ -24749,6 +24914,13 @@ function App() {
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
     if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
+    // Non-modal classic games (Mancala, Snakes & Ladders) skip the pre-launch
+    // modal entirely and pick their mode from their own mode-select screen —
+    // so ?mode=bot/2p needs to pin it here too, or a deep link can only ever
+    // land on that screen instead of the running match it names.
+    if (!g.preLaunchModal && mmode && mmode !== 'online' && (g.modes || []).includes(mmode)) {
+      setClassicGameMode(mmode);
+    }
     // ?play=1 skips the pre-game screen (and the first-open how-to) and
     // claims/mounts immediately — used by proposal tests that assert on
     // in-game UI, and by "jump straight in" share links.

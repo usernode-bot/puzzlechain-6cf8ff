@@ -683,7 +683,7 @@ body {
    growing lists get their own scroll strip below. */
 .fit-col .cw-tracker, .fit-col .cw-clue, .fit-col .cw-kbd,
 .fit-col .cw-alldone, .fit-col .wspr-found, .fit-col .an-solved,
-.fit-col .dsnk-hint, .fit-col .dbnc-effects, .fit-col .wspr-actions,
+.fit-col .dsnk-hint, .fit-col .dbnc-effects,
 .fit-col .mj-controls, .fit-col .kl-note { flex: 0 0 auto; }
 /* Growing lists must never push the board off screen (#131, #130). */
 .fit-col .wspr-found, .fit-col .an-solved, .fit-col .word-list {
@@ -908,20 +908,6 @@ ${emitTapHighlightRules()}
   max-width: 320px; margin: 0 auto; aspect-ratio: 1;
   touch-action: none;
 }
-.wspr-word {
-  text-align: center; font-family: 'JetBrains Mono', monospace; letter-spacing: 2px;
-  font-size: 1.15rem; font-weight: 700; min-height: 1.6rem; margin: 0.7rem 0 0.4rem;
-}
-.wspr-msg { text-align: center; font-size: 0.8rem; min-height: 1.1rem; color: ${C.muted}; }
-.wspr-msg.good { color: ${GA.lime}; }
-.wspr-msg.bad { color: ${C.rose}; }
-.wspr-actions { display: flex; gap: 0.5rem; justify-content: center; margin: 0.5rem 0 0.8rem; }
-.wspr-btn {
-  padding: 0.55rem 1.4rem; border-radius: 10px; border: 1px solid ${C.border};
-  background: ${C.card}; color: inherit; font-family: inherit; font-weight: 700; cursor: pointer;
-}
-.wspr-btn.primary { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
-.wspr-btn:disabled { opacity: 0.45; cursor: default; }
 /* PHASE 3 (#131) — this list was unbounded and grew the document as you played,
    pushing the grid off screen. Own scroll strip, fixed height. */
 .wspr-found {
@@ -3772,7 +3758,7 @@ ${emitTapHighlightRules()}
   color: ${C.rose}; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
 }
 /* PHASE 8 — Mahjong controls (undo / hint / shuffle) + Daily Bounce effects. */
-.mj-controls, .wspr-actions {
+.mj-controls {
   display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
 }
 .mj-controls button {
@@ -6239,7 +6225,7 @@ function cuiDrawPill(ctx, c) {
   ctx.fillStyle = PAL.muted;
   ctx.fillText(String(c.label || '').toUpperCase(), x + w / 2, y + h * 0.4, w - 8);
   ctx.font = '600 ' + Math.max(13, Math.round(h * 0.34)) + 'px ' + CUI_MONO;
-  ctx.fillStyle = c.gold ? PAL.gold : PAL.text;
+  ctx.fillStyle = c.color || (c.gold ? PAL.gold : PAL.text);
   ctx.fillText(String(c.value != null ? c.value : ''), x + w / 2, y + h * 0.85, w - 8);
 }
 
@@ -6278,10 +6264,10 @@ function cuiDrawButton(ctx, c, pressed) {
 // Plain centred text (the brg-note / warn-line role).
 function cuiDrawLabel(ctx, c) {
   const [x, y, w, h] = c.r;
-  ctx.font = (c.font || 12) + 'px ' + CUI_FONT;
+  ctx.font = (c.bold ? '700 ' : '') + (c.font || 12) + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = c.gold ? PAL.gold : PAL.muted;
+  ctx.fillStyle = c.color || (c.gold ? PAL.gold : PAL.muted);
   ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, y + h / 2, w - 4);
 }
 
@@ -23474,32 +23460,65 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
 
   const fmtLeft = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
 
-  /* The letter grid is a CANVAS (#170 treatment): same tap grammar — start
+  /* The whole frame is ONE canvas (controls wave): pills, letter grid, the
+     live trace word, the feedback line and Clear/Submit draw together; only
+     the found-words scroll strip stays DOM. Same tap grammar — start
      anywhere, extend to an adjacent tile, tap an earlier tile to backtrack,
      tap the last tile again to submit. Tile chrome reads PAL. */
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell: wsprCell } = useFitBox(boxRef, { cols: WSPR_SIZE, rows: WSPR_SIZE, minCell: 44, maxCell: 76, gap: 6 });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, WORD_H = 26, MSG_H = 18, ACT_H = 44;
+  const chrome = PILL_H + WORD_H + MSG_H + ACT_H + GAP * 4;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const wsprCell = Math.max(44, Math.min(76, Math.floor((availB - 6 * (WSPR_SIZE - 1)) / WSPR_SIZE)));
   const wsprStep = wsprCell + 6;
   const wsprSide = wsprStep * WSPR_SIZE - 6;
-  const geomRef = useRef(0);
-  geomRef.current = wsprStep;
-  usePointerCell(canvasRef, {
+  const H = chrome + wsprSide;
+  const boardX = Math.floor((W - wsprSide) / 2);
+  const boardY = PILL_H + GAP;
+  const wordY = boardY + wsprSide + GAP;
+  const msgY = wordY + WORD_H;
+  const actY = msgY + MSG_H + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-left', kind: 'pill', r: pr[0], label: 'Left', value: fmtLeft, color: remaining <= 10 ? PAL.rose : PAL.gold });
+    controls.push({ id: 'p-words', kind: 'pill', r: pr[1], label: 'Words', value: found.length });
+    controls.push({ id: 'p-score', kind: 'pill', r: pr[2], label: 'Score', value: score });
+    controls.push({ id: 'word', kind: 'label', r: [0, wordY, W, WORD_H], label: word || ' ', font: 17, mono: true, bold: true, color: PAL.text });
+    if (msg) controls.push({ id: 'msg', kind: 'label', r: [0, msgY, W, MSG_H], label: msg.text, font: 12, color: msg.kind === 'good' ? PAL.emerald : PAL.rose });
+    const ar = cuiRow(Math.floor(W * 0.08), actY, Math.floor(W * 0.84), ACT_H, 2);
+    controls.push({ id: 'clear', kind: 'button', r: ar[0], label: 'Clear', disabled: done || path.length === 0, action: () => { setPath([]); setMsg(null); } });
+    controls.push({ id: 'submit', kind: 'button', r: ar[1], label: 'Submit', primary: true, disabled: done || word.length < 3, action: submit });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const geomRef = useRef({});
+  geomRef.current = { wsprStep, boardX, boardY };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => {
-      const stp = geomRef.current;
-      const c = Math.floor(p.x / stp), r = Math.floor(p.y / stp);
+      const g = geomRef.current;
+      const c = Math.floor((p.x - g.boardX) / g.wsprStep), r = Math.floor((p.y - g.boardY) / g.wsprStep);
       if (c < 0 || c >= WSPR_SIZE || r < 0 || r >= WSPR_SIZE) return;
       const i = r * WSPR_SIZE + c;
       const onPath = path.includes(i);
       const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
       if (selectable) tap(i);
     },
-  });
+  }));
   useCanvasBoard(canvasRef, {
-    width: wsprSide,
-    height: wsprSide,
-    deps: [path, done, wsprCell],
+    width: W,
+    height: H,
+    deps: [path, done, wsprCell, W, fmtLeft, found, msg, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (let i = 0; i < WSPR_SIZE * WSPR_SIZE; i++) {
@@ -23527,6 +23546,7 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
           ctx.stroke();
         }
       }
+      ctx.restore();
     },
   });
 
@@ -23534,16 +23554,7 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
     // PHASE 3 (#131) — .fit-col + fitShell: true stops the page scrolling as the
     // found-words list grows (that list now has its own scroll strip).
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Left</div>
-          <div className="pvalue time" style={remaining <= 10 ? { color: C.rose } : undefined}>{fmtLeft}</div>
-        </div>
-        <div className="pill"><div className="plabel">Words</div><div className="pvalue">{found.length}</div></div>
-        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
-      </div>
-
-      <div className="wspr-grid" ref={boxRef}>
+      <div className="wspr-grid cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="wspr-canvas board-canvas"
@@ -23551,14 +23562,7 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
           aria-label={`Word Sprint letters — tracing ${word || 'nothing'}, ${found.length} words found`}
         />
       </div>
-
-      <div className="wspr-word">{word || ' '}</div>
-      <div className={'wspr-msg' + (msg ? ' ' + msg.kind : '')}>{msg ? msg.text : ' '}</div>
-
-      <div className="wspr-actions">
-        <button className="wspr-btn" onClick={() => { setPath([]); setMsg(null); }} disabled={done || path.length === 0}>Clear</button>
-        <button className="wspr-btn primary" onClick={submit} disabled={done || word.length < 3}>Submit</button>
-      </div>
+      <CuiTwin controls={controls} />
 
       {found.length > 0 && (
         <div className="wspr-found">

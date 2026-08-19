@@ -155,18 +155,14 @@ const GA = {
    class, and the self-test then names that one class. */
 const TAPPABLE_CLASSES = [
   'tappable',
-  'mf-cell', 'ng-cell', 'ds-cell', 'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
-  'mj-tile', 'wspr-tile', 'ce-card', 'sp-col', 'scell', 'numkey',
-  'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
-  'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
-  'tm-tile', 'm3-tile', 'cnl-roll-btn',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
-   (.an-rack button) can't live in TAPPABLE_CLASSES — that array is probed with
-   a bare class name — so they're appended verbatim by the emitters below. */
-const TAP_HIGHLIGHT_EXTRA_SELECTORS = ['.an-rack button'];
+   can't live in TAPPABLE_CLASSES — that array is probed with a bare class
+   name — so they're appended verbatim by the emitters below. (Empty since the
+   anagram rack moved onto its canvas; the plumbing stays for the next one.) */
+const TAP_HIGHLIGHT_EXTRA_SELECTORS = [];
 
 /* The canary is emitted from the SAME generator as the real rules, so probing
    it answers "is this stylesheet applying at all?" independently of whether any
@@ -655,7 +651,6 @@ body {
   align-items: center;
   justify-content: center;
 }
-.game-wrap.fit .status-bar { flex: 0 0 auto; margin-bottom: 0; }
 /* In fit mode the hint is a fixed footer line, not a scroll-away paragraph —
    the board flexes around it so it can never be pushed off the viewport. */
 .game-wrap.fit .p6-hint { flex: 0 0 auto; margin-top: 0; font-size: 11.5px; line-height: 1.35; }
@@ -670,25 +665,19 @@ body {
 }
 /* Stat pills wrap rather than forcing the column wider than the phone —
    a five-pill row is ~400px and would push the board off a 360px screen. */
-.fit-col .status-bar { flex-wrap: wrap; }
-.fit-col .status-bar .pill { flex: 1 1 auto; min-width: 0; }
 /* Everything that is NOT the board is fixed-size, so only the board flexes.
    Miss one of these and it gets crushed to zero height by the board. */
-.fit-col .status-bar, .fit-col .p6-hint, .fit-col .numpad,
-.fit-col .word-list, .fit-col .cp-pad, .fit-col .an-actions,
-.fit-col .cw-hint-bar, .fit-col .p6-banner, .fit-col .word-theme,
-.fit-col .an-dots, .fit-col .an-slots, .fit-col .an-rack,
-.fit-col .tm-daylabel, .fit-col .ds-pad, .fit-col .mf-controls,
-.fit-col .ng-modes,
+.fit-col .p6-hint,
+.fit-col .word-list,
+.fit-col .p6-banner,
 /* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
    plus 3-row keyboard was CLIPPED by the fit shell's overflow:hidden rather
    than fitted; players lost sight of Enter on long words. Everything except the
    board is fixed-size so only the board flexes. Word Sprint / Anagram Sprint
    growing lists get their own scroll strip below. */
-.fit-col .cw-tracker, .fit-col .cw-clue, .fit-col .cw-kbd,
-.fit-col .cw-alldone, .fit-col .wspr-found, .fit-col .an-solved,
-.fit-col .dsnk-hint, .fit-col .dbnc-effects, .fit-col .wspr-actions,
-.fit-col .mj-controls, .fit-col .kl-note { flex: 0 0 auto; }
+.fit-col .wspr-found, .fit-col .an-solved,
+.fit-col .dsnk-hint, .fit-col .dbnc-effects,
+
 /* Growing lists must never push the board off screen (#131, #130). */
 .fit-col .wspr-found, .fit-col .an-solved, .fit-col .word-list {
   max-height: 5.2rem; overflow-y: auto; overscroll-behavior: contain;
@@ -714,7 +703,6 @@ html.un-scroll-locked, body.un-scroll-locked {
    "width: 100%" makes the cross size DEFINITE again, so the autos resolve to 0
    (or centre the board within its own max-width) instead of driving the size.
    The fitcol-auto-margin self-test guards the whole class of bug. */
-.fit-col .numpad { margin-top: 0; width: 100%; }
 /* Fluid square grids (Sudoku, Word Hunt) fit BOTH axes natively — no
    transform needed, so their pointer-drag selection math is untouched. */
 .fit-col .sudoku, .fit-col .wordsearch {
@@ -726,9 +714,26 @@ html.un-scroll-locked, body.un-scroll-locked {
 .fit-col .wspr-grid, .fit-col .dsnk-board { width: 100%; }
 /* Sudoku's difficulty chooser is a fixed-size card, not a board. */
 .fit-col .sdk-choose { flex: 0 0 auto; width: 100%; }
-/* #170 — Klondike's canvas board box is the flexible region (the .dbnc-wrap
-   idiom): useFitBox measures it and the canvas sizes its cards to fill it. */
-.kl-board-box {
+/* Controls wave — the shared frame host. A migrated game's whole frame
+   (pills, board, buttons) is ONE canvas inside this box; the legacy board
+   class stays on the box so width rules and probes keep holding. In a fit
+   column the frame IS the flexible child; these overrides out-rank the
+   square-board rules above by source order. */
+.cui-frame {
+  display: flex; align-items: flex-start; justify-content: center;
+  width: 100%; margin: 0 auto; touch-action: none;
+}
+.fit-col .cui-frame {
+  flex: 1 1 auto; min-height: 0;
+  height: auto; max-height: 100%; aspect-ratio: auto;
+}
+/* The control strip for real-time boards (CuiBar). */
+.cui-bar { width: 100%; flex: 0 0 auto; touch-action: none; }
+.cui-bar-canvas { display: block; }
+/* #170 — the canvas board box is the flexible region (the .dbnc-wrap idiom):
+   useFitBox measures it and the canvas sizes its cards/tiles to fill it.
+   Klondike first; Spider and Mahjong joined in the wave-1 migration. */
+.kl-board-box, .sp-board-box, .mj-board-box {
   position: relative; flex: 1 1 auto; min-height: 0; min-width: 0;
   display: flex; align-items: flex-start; justify-content: center;
   overscroll-behavior: contain;
@@ -769,41 +774,6 @@ ${emitTouchActionRules()}
    never stick. */
 ${emitTapHighlightRules()}
 .tappable:active, .tappable[data-pressed],
-.mj-tile:active, .mj-tile[data-pressed],
-.wspr-tile:not(.dim):active, .wspr-tile[data-pressed],
-.ce-card:active, .ce-card[data-pressed],
-.scell:not(.given):active, .scell[data-pressed],
-.numkey:active, .numkey[data-pressed],
-.wcell:not(.found):active, .wcell[data-pressed],
-.cw-key:active, .cw-key[data-pressed],
-.ms-cell.ms-hidden:active, .ms-cell[data-pressed],
-.mnc-pit.mnc-clickable:active, .mnc-pit[data-pressed],
-.kt-cell:active, .kt-cell[data-pressed],
-.ck-cell:active, .rv-cell:active, .fir-cell:active, .gmk-cell:active,
-.ludo-token.movable:active, .an-tile:active, .an-slot:active,
-.tm-tile.available:active, .m3-tile:active {
-  filter: brightness(0.9);
-  transform: scale(0.96);
-}
-/* A press must never look "stuck on" for a disabled/decorative cell. */
-.wspr-tile.dim:active, .scell.given:active, .ms-cell.ms-revealed:active,
-.tm-tile.locked:active, .ce-card.face-down:active {
-  filter: none; transform: none;
-}
-/* Selected-card affordance — tapping a card gave no sign it landed (#123). */
-.ce-card.selected {
-  outline: 3px solid ${C.accent};
-  outline-offset: -1px;
-  box-shadow: 0 0 0 2px ${ca('accent', '55')}, 0 4px 10px var(--c-shadow-md);
-  transform: translateY(-3px);
-}
-/* A blocked Mahjong tile now says so instead of silently ignoring the tap. */
-@keyframes un-nudge {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
-}
-.mj-tile.nudge { animation: un-nudge 0.22s ease; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -870,50 +840,20 @@ ${emitTapHighlightRules()}
 .back-btn:hover { border-color: ${C.accent}; }
 .game-title { font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
 
-.status-bar {
-  display: flex;
-  gap: 0.6rem;
-  margin-bottom: 1.25rem;
-}
-.pill {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  padding: 0.55rem 0.7rem;
-  text-align: center;
-}
-.pill .plabel {
-  font-size: 0.58rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: ${C.muted};
-}
-.pill .pvalue {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
-  font-size: 1.1rem;
-  margin-top: 0.1rem;
-}
-.pill .pvalue.time { color: ${C.gold}; }
 
 /* ---- Sudoku ---- */
+/* The box hosts the board canvas; sizing is what fit-col rules and the
+   self-tests measure, unchanged. Gridlines + box separators draw inside. */
 .sudoku {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  background: ${C.border};
-  /* #149 — the "background: border" idiom only shows as gridlines if the grid
-     actually has a gap. Without it the cells sat flush and no separators ever
-     rendered, which is what made the 9×9 board hard to read. */
-  gap: 1px;
+  display: flex; align-items: center; justify-content: center;
   border: 2px solid ${C.border};
   border-radius: 10px;
   overflow: hidden;
   max-width: 360px;
   margin: 0 auto;
   aspect-ratio: 1;
+  touch-action: none;
 }
-.sudoku.s9 .scell { font-size: 1.02rem; }
 .sdk-choose { max-width: 380px; margin: 1.5rem auto; text-align: center; }
 .sdk-choose-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.35rem; }
 .sdk-choose-sub { color: ${C.muted}; font-size: 0.82rem; margin-bottom: 1.1rem; }
@@ -927,33 +867,13 @@ ${emitTapHighlightRules()}
 .sdk-choice-name { display: block; font-size: 1.05rem; font-weight: 700; }
 .sdk-choice-note { display: block; color: ${C.muted}; font-size: 0.78rem; margin-top: 0.15rem; }
 /* ---- Word Sprint (daily Boggle-style word grid) ---- */
+/* The grid box hosts the letter canvas now; its width/aspect constraints are
+   what the fit-col rules and self-tests measure, unchanged. */
 .wspr-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-  max-width: 320px; margin: 0 auto; aspect-ratio: 1;
-}
-.wspr-tile {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700;
-  cursor: pointer; user-select: none; position: relative;
+  max-width: 320px; margin: 0 auto; aspect-ratio: 1;
+  touch-action: none;
 }
-.wspr-tile.onpath { background: ${C.accent}; color: #fff; border-color: ${C.accent}; }
-.wspr-tile.pathlast { box-shadow: 0 0 0 3px ${C.gold}; }
-.wspr-tile.dim { opacity: 0.45; cursor: default; }
-.wspr-word {
-  text-align: center; font-family: 'JetBrains Mono', monospace; letter-spacing: 2px;
-  font-size: 1.15rem; font-weight: 700; min-height: 1.6rem; margin: 0.7rem 0 0.4rem;
-}
-.wspr-msg { text-align: center; font-size: 0.8rem; min-height: 1.1rem; color: ${C.muted}; }
-.wspr-msg.good { color: ${GA.lime}; }
-.wspr-msg.bad { color: ${C.rose}; }
-.wspr-actions { display: flex; gap: 0.5rem; justify-content: center; margin: 0.5rem 0 0.8rem; }
-.wspr-btn {
-  padding: 0.55rem 1.4rem; border-radius: 10px; border: 1px solid ${C.border};
-  background: ${C.card}; color: inherit; font-family: inherit; font-weight: 700; cursor: pointer;
-}
-.wspr-btn.primary { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
-.wspr-btn:disabled { opacity: 0.45; cursor: default; }
 /* PHASE 3 (#131) — this list was unbounded and grew the document as you played,
    pushing the grid off screen. Own scroll strip, fixed height. */
 .wspr-found {
@@ -967,14 +887,15 @@ ${emitTapHighlightRules()}
 }
 /* ---- Daily Snake / Daily Bounce (seeded daily arcade variants) ---- */
 .dsnk-board {
-  display: grid; gap: 1px; background: ${C.border}; border: 2px solid ${C.border};
+  background: ${C.card}; border: 2px solid ${C.border};
   border-radius: 10px; overflow: hidden; max-width: 340px; margin: 0 auto; aspect-ratio: 1;
   touch-action: none;
 }
-.dsnk-cell { background: ${C.card}; }
-.dsnk-cell.body { background: ${GA.lime}; }
-.dsnk-cell.head { background: ${C.accent}; }
-.dsnk-cell.food { background: ${C.rose}; border-radius: 50%; }
+/* The snake canvas fills whichever board box hosts it (classic or daily). */
+.snake-canvas-fill {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
 .dsnk-hint { text-align: center; color: ${C.muted}; font-size: 0.8rem; margin-top: 0.6rem; }
 /* #149 — this is the flexible region of Daily Bounce's fit column, and its
    measured box is what sizeCanvas() reads to scale the canvas. Before, the
@@ -985,57 +906,6 @@ ${emitTapHighlightRules()}
   border: 2px solid ${C.border}; border-radius: 10px; background: #10131c;
   touch-action: none; max-width: 100%;
 }
-/* ---- Ludo seats 3/4 (2–4 player boards) ---- */
-.ludo-cell.home3 { background: ${ca('gold','22')}; }
-.ludo-cell.home4 { background: ${GA.teal}22; }
-.ludo-cell.base3 { background: ${ca('gold','33')}; border-color: ${C.gold}; }
-.ludo-cell.base4 { background: ${GA.teal}33; border-color: ${GA.teal}; }
-.ludo-cell.start3 { background: ${ca('gold','2e')}; }
-.ludo-cell.start4 { background: ${GA.teal}2e; }
-.ludo-token.p3 { background: ${C.gold}; }
-.ludo-token.p4 { background: ${GA.teal}; }
-.ludo-token.forfeited { opacity: 0.35; }
-.scell {
-  background: ${C.card};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.4rem;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.1s ease;
-  aspect-ratio: 1;
-}
-.scell.given { color: ${C.text}; cursor: default; }
-.scell.user { color: ${C.accent}; }
-.scell.sel { background: ${ca('accent','33')}; }
-.scell.hl { background: ${ca('accent','0a')}; }
-.scell.err { color: ${C.rose}; background: ${ca('rose','1a')}; }
-
-.numpad {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 1.1rem auto 0;
-}
-.numkey {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  color: ${C.text};
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.2rem;
-  font-weight: 600;
-  padding: 0.65rem 0;
-  cursor: pointer;
-  transition: border-color 0.1s ease, background 0.1s ease;
-}
-.numkey:hover { border-color: ${C.accent}; background: ${ca('accent','1a')}; }
-.numkey.erase { color: ${C.rose}; font-size: 1rem; }
-
 /* ---- Win overlay ---- */
 .win-overlay {
   position: fixed;
@@ -1392,12 +1262,10 @@ ${emitTapHighlightRules()}
 .lrow.pinned { margin-top: 0.3rem; border-top: 1px dashed ${C.border}; padding-top: 0.5rem; }
 
 /* ---- Word Hunt ---- */
+/* The box hosts the letter canvas; its sizing is what the fit-col rules and
+   self-tests measure, unchanged. Gridlines are drawn inside the canvas. */
 .wordsearch {
-  display: grid;
-  /* Kept in lockstep with WS_SIZE (#139). */
-  grid-template-columns: repeat(10, 1fr);
-  background: ${C.border};
-  gap: 1px; /* #149 — see .sudoku: no gap meant no gridlines ever rendered. */
+  display: flex; align-items: center; justify-content: center;
   border: 2px solid ${C.border};
   border-radius: 10px;
   overflow: hidden;
@@ -1406,23 +1274,6 @@ ${emitTapHighlightRules()}
   aspect-ratio: 1;
   touch-action: none;
 }
-.wcell {
-  background: ${C.card};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.05rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  transition: background 0.08s ease, color 0.08s ease;
-  aspect-ratio: 1;
-}
-.wcell.found { background: ${ca('emerald','33')}; color: ${C.emerald}; cursor: default; }
-.wcell.sel { background: ${ca('accent','55')}; color: #fff; }
 
 .word-list {
   display: flex;
@@ -1451,209 +1302,28 @@ ${emitTapHighlightRules()}
   color: ${C.emerald};
   text-decoration: line-through;
 }
-.word-theme {
-  text-align: center;
-  color: ${C.muted};
-  font-size: 0.82rem;
-  margin: 0 auto 1rem;
-}
-.word-theme b { color: ${C.text}; }
 
 /* ---- Crypto Wordle ---- */
-.cw-tracker {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  max-width: 460px;
-  margin: 0 auto 0.8rem;
+
 }
-.cw-tracker .cw-dot {
-  font-size: 0.95rem;
-  line-height: 1;
-  color: ${C.muted};
-  font-family: 'JetBrains Mono', monospace;
-}
-.cw-tracker .cw-dot.solved { color: ${C.emerald}; }
-.cw-tracker .cw-dot.missed { color: ${C.rose}; }
-.cw-tracker .cw-dot.active { color: ${C.accent}; }
-.cw-alldone {
-  text-align: center;
-  max-width: 460px;
-  margin: 1rem auto 0;
-  font-weight: 600;
-  color: ${C.emerald};
-}
-.cw-clue {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  max-width: 460px;
-  margin: 0 auto 0.9rem;
-  padding: 0.6rem 0.8rem;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-left: 3px solid ${C.emerald};
-  border-radius: 10px;
-}
-.cw-clue-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: ${C.emerald};
-  font-weight: 700;
-}
-.cw-clue-text { flex: 1 1 auto; font-size: 0.9rem; color: ${C.text}; }
-.cw-clue-len {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.68rem;
-  color: ${C.muted};
-  white-space: nowrap;
-}
-.cw-clue-extra {
-  margin-top: -0.4rem;
-  border-left-color: ${C.gold};
-}
-.cw-clue-extra .cw-clue-label { color: ${C.gold}; }
-.cw-hint-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  max-width: 460px;
-  margin: 0 auto 0.9rem;
-}
-.cw-hint-btn {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #fff;
-  background: ${C.gold};
-  border: none;
-  border-radius: 8px;
-  padding: 0.45rem 0.8rem;
-  cursor: pointer;
-  transition: filter 0.1s ease, opacity 0.1s ease;
-}
-.cw-hint-btn:hover:not(:disabled) { filter: brightness(1.08); }
-.cw-hint-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.cw-hint-balance {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.74rem;
-  color: ${C.muted};
-}
-.cw-hint-msg {
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: ${C.rose};
-}
-/* Hinted reveals in the daily puzzles */
-.scell.hinted {
-  color: ${C.gold};
-  font-weight: 700;
-  background: ${ca('gold','1a')};
-}
-.wcell.hinted {
-  background: ${ca('gold','33')};
-  outline: 2px solid ${C.gold};
-  outline-offset: -2px;
-  border-radius: 4px;
-}
-.tm-tile.hint-target {
-  outline: 3px solid ${C.gold};
-  outline-offset: -1px;
-  animation: tmHintPulse 0.7s ease-in-out infinite;
-  z-index: 999 !important;
-}
-@keyframes tmHintPulse {
-  0%, 100% { box-shadow: 0 0 6px ${C.gold}; }
-  50% { box-shadow: 0 0 16px ${C.gold}; }
-}
+/* The guess grid is a canvas; the box stays the ONE flexible child inside the
+   fit column (PHASE 3's rule) so the keyboard, clue and tracker keep their
+   place, and the canvas sizes its tiles from whatever the box measures. The
+   invalid-guess shake is drawn (a brief rAF wiggle of the current row). */
 .cw-board {
-  display: grid;
-  gap: 0.4rem;
-  max-width: 330px;
+  display: flex; align-items: center; justify-content: center;
+  /* The box hosts the whole FRAME now (pills + clue + grid + keyboard), so
+     the old 330px board cap would squeeze the keyboard; the guess grid caps
+     itself via boardWidth inside the canvas. */
+  max-width: 480px;
   margin: 0 auto;
   width: 100%;
 }
-/* PHASE 3 — inside the fit column the board is the ONE flexible child: an
-   8-row grid for a 7-letter word shrinks its rows instead of pushing the
-   keyboard off the bottom of the screen (which is what #3's clipping was).
-   The tiles must give up their aspect-ratio here — it forces height from width
-   and would otherwise overflow the row tracks straight over the keyboard. */
 .fit-col .cw-board {
   flex: 1 1 auto; min-height: 0; overflow: hidden;
-  align-content: center;
 }
-.fit-col .cw-row { min-height: 0; }
-.fit-col .cw-tile {
-  aspect-ratio: auto; min-height: 0; min-width: 0;
-  font-size: clamp(0.9rem, 4.2vw, 1.5rem);
-}
-.cw-row {
-  display: grid;
-  gap: 0.4rem;
-}
-.cw-row.shake { animation: cw-shake 0.4s ease; }
-@keyframes cw-shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-6px); }
-  40%, 80% { transform: translateX(6px); }
-}
-.cw-tile {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.5rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  border: 2px solid ${C.dim};
-  border-radius: 8px;
-  background: ${C.card};
-  color: ${C.text};
-  user-select: none;
-  transition: border-color 0.1s ease, background 0.1s ease;
-}
-.cw-tile.filled { border-color: ${C.muted}; }
-.cw-tile.green  { background: ${C.emerald}; border-color: ${C.emerald}; color: #fff; }
-.cw-tile.yellow { background: ${C.gold};    border-color: ${C.gold};    color: #fff; }
-.cw-tile.gray   { background: ${C.dim};     border-color: ${C.dim};     color: ${C.text}; }
 
-.cw-kbd {
-  max-width: 480px;
-  margin: 1.3rem auto 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.cw-kbd-row { display: flex; gap: 0.22rem; justify-content: center; }
-/* PHASE 2 — the worst tap surface in the app: ~34×41px keys with hover-only
-   feedback on a game where typing IS the interaction. */
-.cw-key {
-  flex: 1 1 auto;
-  min-width: 2rem;
-  min-height: 46px;
-  padding: 0.85rem 0.2rem;
-  background: ${C.border};
-  border: none;
-  border-radius: 6px;
-  color: ${C.text};
-  font-family: inherit;
-  font-weight: 600;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.1s ease, color 0.1s ease;
-}
-.cw-key:hover { background: ${C.accent}; color: #fff; }
-.cw-key.wide { flex: 1.6 1 auto; font-size: 0.72rem; }
-.cw-key.green  { background: ${C.emerald}; color: #fff; }
-.cw-key.yellow { background: ${C.gold};    color: #fff; }
-.cw-key.gray   { background: ${C.dim};     color: ${C.muted}; }
+     color: ${C.muted}; }
 
 /* ---- Lobby tab switcher ---- */
 .lobby-tabs { display: flex; gap: 0.35rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
@@ -1677,48 +1347,20 @@ ${emitTapHighlightRules()}
 }
 
 /* ---- Minesweeper ---- */
-.ms-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
-  max-width: 360px;
+/* The board is a canvas (Mine Finder's exact pattern); the box keeps the old
+   .ms-grid footprint. Its light/dark look still keys off the RESOLVED theme
+   (the old data-ms-theme override pair) rather than raw PAL tokens. */
+.ms-boardbox {
+  width: min(92vw, 360px, var(--cg-board, 360px));
+  max-width: 100%;
   margin: 0 auto;
-  background: ${C.border};
-  border: 2px solid ${C.border};
-  border-radius: 10px;
-  overflow: hidden;
-  aspect-ratio: 1/1;
-  touch-action: none;
-}
-.ms-cell {
-  font-family: 'JetBrains Mono', monospace;
-  aspect-ratio: 1/1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  transition: background 0.08s ease;
-  border: none;
-  background: ${C.card};
+  aspect-ratio: 1; /* real height for useFitBox — see .kt-boardbox */
+  flex: 0 0 auto;
+  touch-action: none;
 }
-.ms-cell.ms-hidden { background: ${C.card}; }
-.ms-cell.ms-hidden:hover { background: ${ca('accent','26')}; }
-.ms-cell.ms-revealed { background: ${C.surface}; cursor: default; }
-.ms-cell.ms-flagged { background: ${C.card}; cursor: default; }
-.ms-cell.ms-mine-dead { background: ${ca('rose','40')}; cursor: default; }
-.ms-cell.ms-exploded { background: ${ca('rose','99')}; cursor: default; }
-.ms-n1 { color: ${C.accent}; }
-.ms-n2 { color: ${C.emerald}; }
-.ms-n3 { color: ${C.rose}; }
-.ms-n4 { color: ${C.violet}; }
-.ms-n5 { color: ${C.gold}; }
-.ms-n6 { color: #06b6d4; }
-.ms-n7 { color: #be123c; }
-.ms-n8 { color: ${C.muted}; }
 @keyframes ms-pulse {
   0%, 100% { box-shadow: 0 0 0 0 ${ca('emerald','40')}; }
   50% { box-shadow: 0 0 0 6px ${ca('emerald','00')}; }
@@ -1884,117 +1526,17 @@ ${emitTapHighlightRules()}
   font-size: 0.9rem;
 }
 /* Light theme overrides for minesweeper board only */
-[data-ms-theme="light"] .ms-cell.ms-hidden { background: #e5e7eb; }
-[data-ms-theme="light"] .ms-cell.ms-hidden:hover { background: #d1d5db; }
-[data-ms-theme="light"] .ms-cell.ms-revealed { background: #f9fafb; color: #111827; }
-[data-ms-theme="light"] .ms-cell.ms-flagged { background: #e5e7eb; }
-[data-ms-theme="light"] .ms-grid { background: #9ca3af; border-color: #9ca3af; }
-[data-ms-theme="light"] .ms-cell.ms-mine-dead { background: #fca5a5; }
-[data-ms-theme="light"] .ms-cell.ms-exploded { background: #f87171; }
 
 /* ---- Mancala ---- */
+/* The board (stores, pits, stones) is one canvas — see MncBoardCanvas. */
 .mnc-board {
-  display: grid;
-  grid-template-columns: 3.2rem repeat(6, 1fr) 3.2rem;
-  grid-template-rows: 1fr 1fr;
-  gap: 5px;
-  background: #7B4F2E;
-  border: 2px solid #5A2F14;
-  border-radius: 16px;
-  padding: 8px;
   max-width: 480px;
   margin: 0 auto;
-  align-items: stretch;
+  display: flex; justify-content: center;
+  touch-action: none;
 }
-.mnc-store {
-  border-radius: 999px;
-  background: #4A1E09;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.4rem 0;
-  min-height: 88px;
-  border: 2px solid #3A1206;
-  transition: border-color 0.2s;
-  position: relative;
-  overflow: hidden;
-}
-.mnc-store-score {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #C8A87A;
-  transition: color 0.2s;
-  position: relative;
-  z-index: 1;
-}
-.mnc-store-label {
-  font-size: 0.48rem;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: #9E7A5A;
-  position: relative;
-  z-index: 1;
-}
-.mnc-pit {
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #4A1E09;
-  border: 2px solid #3A1206;
-  position: relative;
-  overflow: hidden;
-  user-select: none;
-  cursor: default;
-  transition: background 0.1s ease, transform 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
-}
-.mnc-pit.mnc-clickable {
-  cursor: pointer;
-  border-color: #9E7A5A;
-}
-.mnc-pit.mnc-clickable:hover {
-  background: #6B3A24;
-  transform: scale(1.1);
-  border-color: #C8A87A;
-}
-.mnc-pit.mnc-dim { opacity: 0.4; }
-.mnc-pit.mnc-flash { animation: mnc-pit-flash 0.22s ease forwards; }
-.mnc-pit.mnc-capture-flash { animation: mnc-capture-flash 0.32s ease forwards; }
-@keyframes mnc-pit-flash {
-  0%   { background: #4A1E09; border-color: #3A1206; }
-  40%  { background: #5E2E12; border-color: #9E7A5A; }
-  100% { background: #4A1E09; border-color: #3A1206; }
-}
-@keyframes mnc-capture-flash {
-  0%   { background: #4A1E09; }
-  40%  { background: ${ca('rose','22')}; border-color: ${C.rose}; }
-  100% { background: #4A1E09; }
-}
-.mnc-pit-stones {
-  position: absolute;
-  inset: 0;
-}
-.mnc-stone {
-  position: absolute;
-  border-radius: 50%;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.5);
-}
-@keyframes mnc-stone-enter {
-  from { transform: scale(0); opacity: 0.3; }
-  to   { transform: scale(1); opacity: 1; }
-}
-.mnc-stone-entering {
-  animation: mnc-stone-enter 0.12s ease-out forwards;
-  transform-origin: center;
-}
-@keyframes mnc-stones-scatter {
-  0%   { transform: scale(1);   opacity: 1; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-.mnc-stones-capturing {
-  animation: mnc-stones-scatter 0.22s ease-out forwards;
-}
+.mnc-canvas { border-radius: 16px; }
+
 .mnc-banner {
   text-align: center;
   font-size: 0.92rem;
@@ -2111,10 +1653,6 @@ ${emitTapHighlightRules()}
   text-align: center;
   padding: 2rem 0;
   font-size: 0.9rem;
-}
-@media (max-width: 380px) {
-  .mnc-board { grid-template-columns: 2.5rem repeat(6, 1fr) 2.5rem; gap: 3px; padding: 5px; }
-  .mnc-store { min-height: 70px; }
 }
 
 /* ---- Mancala mode selection ---- */
@@ -2285,9 +1823,6 @@ ${emitTapHighlightRules()}
   margin-left: auto;
   margin-right: auto;
 }
-.mnc-conn-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
-.mnc-conn-dot.green { background: ${C.emerald}; }
-.mnc-conn-dot.amber { background: ${C.gold}; }
 
 /* ---- Mancala AI thinking banner ---- */
 .mnc-ai-thinking {
@@ -2315,107 +1850,28 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   margin: 0 auto;
 }
+/* The board is a canvas (#142's slide/pop animation is drawn — see
+   T2048BoardCanvas); the grid box keeps the panel look and the frozen-board
+   selector the end-of-run tests assert on. */
 .t2048-grid {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1;
   background: ${C.card};
   border: 2px solid ${C.border};
   border-radius: 12px;
-  padding: 8px;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
-.t2048-cell {
-  aspect-ratio: 1;
-  border-radius: 8px;
-  background: ${C.bg};
-  border: 1px solid ${ca('border','44')};
-}
-/* PHASE 6 (#142) — tiles used to be grid children, so they teleported between
-   cells and you could not see what a swipe did. They are now absolutely
-   positioned over the (unchanged) 4x4 cell backdrop and animate their transform
-   from the previous position to the new one. Input is NEVER gated on the
-   animation: executeMove stays synchronous and the visual catches up.
-   The slide (outer, transform) and the pop (inner, scale) are on SEPARATE
-   elements on purpose — one transform property cannot carry both. */
-.t2048-layer {
-  position: absolute; inset: 8px;
-  pointer-events: none;
-}
-.t2048-tile {
-  position: absolute;
-  top: 0; left: 0;
-  width: calc((100% - 18px) / 4);
-  height: calc((100% - 18px) / 4);
-  transition: transform 100ms ease-out;
-  will-change: transform;
-}
-.t2048-tile-inner {
-  position: absolute; inset: 0;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
-}
-.t2048-tile.is-new .t2048-tile-inner {
-  animation: t2048-pop-in 120ms ease both;
-}
-.t2048-tile.is-merged .t2048-tile-inner {
-  animation: t2048-merge-pop 150ms ease both;
-}
-@keyframes t2048-pop-in {
-  from { opacity: 0; transform: scale(0.5); }
-  to   { opacity: 1; transform: scale(1); }
-}
-@keyframes t2048-merge-pop {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.18); }
-  100% { transform: scale(1); }
-}
-.t2048-score-delta {
-  position: absolute;
-  top: -1.4rem;
-  right: 0.1rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: ${C.gold};
-  pointer-events: none;
-  animation: t2048-float-up 600ms ease-out forwards;
-  white-space: nowrap;
+.t2048-canvas-fill {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
 }
 @keyframes t2048-float-up {
   from { opacity: 1; transform: translateY(0); }
   to   { opacity: 0; transform: translateY(-22px); }
 }
-.t2048-controls {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.8rem auto 0;
-}
-.t2048-controls button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.t2048-controls button:hover { border-color: ${C.accent}; }
-.t2048-controls button:disabled { opacity: 0.38; cursor: not-allowed; }
-.t2048-controls button:disabled:hover { border-color: ${C.border}; }
 .t2048-banner {
   font-size: 0.72rem;
   color: ${C.muted};
@@ -2553,47 +2009,6 @@ ${emitTapHighlightRules()}
   margin: 0 auto;
   width: 100%;
 }
-.snake-grid {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  background: ${C.card};
-  border: 2px solid ${C.border};
-  border-radius: 12px;
-  padding: 6px;
-  gap: 1px;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.snake-cell {
-  border-radius: 2px;
-  background: ${C.bg};
-}
-.snake-cell.snake-body { background: ${C.emerald}; border-radius: 3px; }
-.snake-cell.snake-head { background: ${C.emerald}; border-radius: 4px; box-shadow: 0 0 8px ${ca('emerald','aa')}; }
-.snake-cell.snake-food { background: ${C.gold}; border-radius: 50%; box-shadow: 0 0 8px ${ca('gold','aa')}; }
-.snake-controls {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.8rem auto 0;
-}
-.snake-controls button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.snake-controls button:hover { border-color: ${C.accent}; }
 .snake-dpad {
   display: grid;
   grid-template-columns: repeat(3, 56px);
@@ -2708,68 +2123,6 @@ ${emitTapHighlightRules()}
   text-align: center;
   padding: 1rem;
 }
-.bounce-controls {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.8rem auto 0;
-}
-.bounce-controls button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.bounce-controls button:hover { border-color: ${C.accent}; }
-.bounce-audio-row {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.7rem auto 0;
-}
-.bounce-audio-row button {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.4rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 500;
-  transition: border-color 0.12s;
-  white-space: nowrap;
-}
-.bounce-audio-row button:hover:not(:disabled) { border-color: ${C.accent}; }
-.bounce-audio-row button:disabled { opacity: 0.4; cursor: default; }
-.bounce-dpad {
-  display: grid;
-  grid-template-columns: repeat(2, 72px);
-  gap: 0.6rem;
-  justify-content: center;
-  margin: 0.9rem auto 0;
-}
-.bounce-dpad button {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  font-size: 1.3rem;
-  height: 56px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.12s, background 0.12s;
-}
-.bounce-dpad button:active { background: ${C.accent}; border-color: ${C.accent}; }
 
 /* ---- Zuma ---- */
 .zuma-wrap {
@@ -2797,27 +2150,6 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   margin: 0 auto;
 }
-.bb-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
-  background: ${C.border};
-  border: 2px solid ${C.border};
-  border-radius: 10px;
-  overflow: hidden;
-  aspect-ratio: 1;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.bb-cell {
-  aspect-ratio: 1;
-  background: ${C.card};
-  transition: background 0.08s ease;
-}
-.bb-cell.occupied { background: var(--bb-color); }
-.bb-cell.ghost-valid { background: ${ca('accent','66')}; }
-.bb-cell.ghost-invalid { background: ${ca('rose','44')}; }
 .bb-score-delta {
   position: absolute;
   top: -1.4rem;
@@ -2911,128 +2243,18 @@ ${emitTapHighlightRules()}
 /* ---- Tile Match ---- */
 .tm-wrap { max-width: 400px; margin: 0 auto; }
 .tm-wrap.fit-col { max-width: 520px; }
-.tm-board-container {
-  position: relative;
-  margin: 0 auto;
-  overflow: visible;
+/* The canvas board box (both variants): the daily's carries tm-board-fit so
+   it is the fit column's flexible region; classic takes natural height and
+   the shell scrolls, as it always did. */
+.tm-board-box {
+  position: relative; width: 100%;
+  display: flex; align-items: center; justify-content: center;
 }
+.tm-board-fit { flex: 1 1 auto; min-height: 0; overscroll-behavior: contain; }
+.tm-canvas { border-radius: 8px; }
 /* Today's layout + difficulty band (slice 8), so the shape and the weekly
    curve are legible before the first tap. */
-.tm-daylabel {
-  flex: 0 0 auto; text-align: center; color: ${C.muted};
-  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
-  letter-spacing: 0.08em; text-transform: uppercase;
-}
-.tm-wrap.fit-col .tm-bar, .tm-wrap.fit-col .tm-bar-label,
-.tm-wrap.fit-col .tm-boosters, .tm-wrap.fit-col .hint-bar { flex: 0 0 auto; }
-.tm-tile {
-  position: absolute;
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.55rem;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-  transition: transform 0.1s ease, opacity 0.12s ease, box-shadow 0.12s ease;
-  border: 2px solid rgba(255,255,255,0.18);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-}
-.tm-tile.available:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-.tm-tile.locked { opacity: 0.35; cursor: default; pointer-events: none; filter: brightness(0.7); }
-.tm-tile.flash {
-  animation: tm-match-flash 0.35s ease forwards;
-}
-@keyframes tm-match-flash {
-  0%   { transform: scale(1);   opacity: 1; }
-  50%  { transform: scale(1.25); opacity: 0.9; }
-  100% { transform: scale(0);   opacity: 0; }
-}
-.tm-bar {
-  display: flex;
-  gap: 5px;
-  justify-content: center;
-  margin: 1rem auto 0;
-  max-width: 360px;
-  padding: 0.5rem;
-  background: ${C.surface};
-  border: 1px solid ${C.border};
-  border-radius: 12px;
-  transition: border-color 0.2s;
-}
-.tm-bar.bar-full { animation: tm-bar-flash 0.4s ease; border-color: ${C.rose}; }
-@keyframes tm-bar-flash {
-  0%, 100% { border-color: ${C.rose}; }
-  50%  { border-color: ${C.rose}; box-shadow: 0 0 12px ${ca('rose','66')}; }
-}
-.tm-slot {
-  width: 44px;
-  height: 44px;
-  border: 2px dashed ${C.dim};
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  transition: border-color 0.15s, background 0.15s;
-  flex-shrink: 0;
-}
-.tm-slot.filled { border-style: solid; border-color: ${ca('accent','33')}; background: ${C.card}; }
-.tm-slot.clear-target {
-  cursor: pointer;
-  border-color: ${C.rose};
-  background: ${ca('rose','1a')};
-  animation: tm-slot-pulse 0.7s ease infinite alternate;
-}
-.tm-slot.clear-target:hover { background: ${ca('rose','33')}; }
-@keyframes tm-slot-pulse {
-  from { box-shadow: 0 0 0 0 ${ca('rose','44')}; }
-  to   { box-shadow: 0 0 0 4px ${ca('rose','00')}; }
-}
-.tm-bar-label {
-  text-align: center;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: ${C.muted};
-  margin-top: 0.3rem;
-}
-.tm-bar-label.full { color: ${C.rose}; font-weight: 600; }
-.tm-boosters {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.7rem auto 0;
-}
-.tm-booster-btn {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.45rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 500;
-  transition: border-color 0.12s, background 0.12s;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-}
-.tm-booster-btn:hover:not(:disabled) { border-color: ${C.accent}; background: ${ca('accent','10')}; }
-.tm-booster-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.tm-booster-btn.active { border-color: ${C.rose}; background: ${ca('rose','15')}; }
-.tm-booster-icon { font-size: 1rem; }
-.tm-booster-count {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.6rem;
-  color: ${C.muted};
+
 }
 .tm-level-select { max-width: 400px; margin: 0 auto; }
 .tm-level-select h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.2rem; }
@@ -3147,10 +2369,6 @@ ${emitTapHighlightRules()}
 }
 .tm-end-btn:hover { border-color: ${C.accent}; }
 /* Timer pill */
-.tm-timer-pill {
-  transition: background 0.3s, color 0.3s;
-}
-.tm-timer-pill.warning {
   background: ${ca('rose','22')} !important;
   color: ${C.rose} !important;
   animation: tm-timer-pulse 0.9s ease infinite alternate;
@@ -3286,23 +2504,6 @@ ${emitTapHighlightRules()}
   overflow: hidden;
 }
 .cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
-.cg-statusbar {
-  display: flex;
-  gap: 0.5rem;
-  width: var(--cg-board);
-  max-width: 94vw;
-}
-.cg-stat {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  padding: 0.4rem 0.5rem;
-  text-align: center;
-  min-width: 0;
-}
-.cg-stat .l { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: ${C.muted}; }
-.cg-stat .v { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: clamp(0.9rem, 3.5vw, 1.15rem); margin-top: 0.05rem; }
 
 /* Bottom sheet */
 .cg-sheet-backdrop {
@@ -3531,21 +2732,17 @@ ${emitTapHighlightRules()}
 .cg-onchain-badge:hover { opacity: 1; text-decoration: underline; }
 
 /* Keep existing classic boards fitting inside the shell stage */
-.cg-stage .ms-grid, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
+.cg-stage .ms-boardbox, .cg-stage .t2048-board-wrap { max-width: min(360px, var(--cg-board)) !important; }
 .cg-stage .mnc-board { max-width: min(480px, var(--cg-board)) !important; }
 .cg-stage .ms-bottom-nav, .cg-stage .mnc-bottom-nav, .cg-stage .t2048-bottom-nav { display: none; }
-/* PHASE 3 — the five phase-5 board games hardcoded width: min(92vw, 340–380px)
-   and ignored --cg-board, so board + status + legend + leaderboard was always
-   taller than a phone and you had to scroll to see whose turn it was. Same
-   pattern the three older classics above already used. */
-.cg-stage .ck-board, .cg-stage .rv-board, .cg-stage .gmk-board,
-.cg-stage .ludo-board { max-width: min(380px, var(--cg-board)) !important; }
-.cg-stage .fir-board { max-width: min(340px, var(--cg-board)) !important; }
+/* The five board-game canvases size from .brg-canvas-box, whose max-width
+   composes the per-board cap (--brg-cap, set inline by BrgBoardBox) with the
+   --cg-board viewport cap — the PHASE 3 "no scrolling to see whose turn it
+   is" rule, now one declaration instead of per-board !important overrides. */
 .cg-stage .cnl-board-wrap { max-width: min(480px, var(--cg-board)) !important; }
 /* The board-game rooms stack status + board + legend + leaderboard, so cap the
    text chrome too — the board fitting is only half of "no scrolling to see
    whose turn it is". */
-.brg-legend { font-size: 0.74rem; }
 
 /* ---- Snake ---- */
 .snake-board {
@@ -3553,7 +2750,6 @@ ${emitTapHighlightRules()}
   height: var(--cg-board);
   max-width: 94vw;
   max-height: 94vw;
-  display: grid;
   background: ${C.surface};
   border: 2px solid ${C.border};
   border-radius: 12px;
@@ -3561,31 +2757,23 @@ ${emitTapHighlightRules()}
   touch-action: none;
   position: relative;
 }
-.snake-cell { width: 100%; height: 100%; }
-.snake-cell.body { background: ${C.emerald}; border-radius: 3px; }
-.snake-cell.head { background: ${C.accent}; border-radius: 4px; }
-.snake-cell.food { background: ${C.rose}; border-radius: 50%; transform: scale(0.8); }
 .snake-hint { color: ${C.muted}; font-size: 0.8rem; text-align: center; }
 
 /* ---- Block Blast ---- */
+/* The grid is a canvas; the box keeps the panel look and the rect the drag
+   origin math measures. */
 .bb-grid {
   width: var(--cg-board);
   height: var(--cg-board);
   max-width: 94vw;
   max-height: 94vw;
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 3px;
+  display: flex; align-items: center; justify-content: center;
   background: ${C.surface};
   border: 2px solid ${C.border};
   border-radius: 12px;
   padding: 4px;
   touch-action: none;
 }
-.bb-cell { background: ${C.bg}; border-radius: 4px; aspect-ratio: 1; transition: background 0.1s ease; }
-.bb-cell.filled { background: ${C.accent}; }
-.bb-cell.preview { background: ${ca('accent','66')}; }
-.bb-cell.invalid { background: ${ca('rose','55')}; }
 .bb-tray {
   display: flex;
   gap: 0.8rem;
@@ -3595,15 +2783,6 @@ ${emitTapHighlightRules()}
   max-width: 94vw;
   min-height: 5rem;
 }
-.bb-piece {
-  display: grid;
-  gap: 2px;
-  cursor: grab;
-  touch-action: none;
-  padding: 0.3rem;
-}
-.bb-piece.dragging { opacity: 0.3; }
-.bb-piece.used { opacity: 0; pointer-events: none; }
 .bb-pcell { width: clamp(0.7rem, 3.5vw, 1.1rem); height: clamp(0.7rem, 3.5vw, 1.1rem); border-radius: 3px; }
 .bb-pcell.on { background: ${C.accent}; }
 .bb-drag-ghost { position: fixed; z-index: 60; pointer-events: none; display: grid; gap: 2px; opacity: 0.9; }
@@ -3615,57 +2794,13 @@ ${emitTapHighlightRules()}
    no design system at all: hand-written inline styles, plain coloured blocks,
    a bare Bar: label. Renamed to .m3-* and actually wired up, which also earns
    it the Phase 2 touch-action/press rules and the Phase 3 fit sizing. */
+/* The tile board is a canvas; the box keeps the width caps. */
 .m3-grid {
   width: var(--cg-board);
   max-width: 94vw;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: clamp(3px, 1vw, 6px);
-  touch-action: manipulation;
-}
-.m3-tile {
-  aspect-ratio: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(1.1rem, 5vw, 1.8rem);
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  padding: 0;
-  font-family: inherit;
-  transition: transform 0.1s ease, background 0.1s ease, opacity 0.18s ease;
-}
-.m3-tile.sel { background: ${ca('accent','44')}; border-color: ${C.accent}; transform: scale(0.92); }
-.m3-tile.gone { opacity: 0.22; pointer-events: none; cursor: default; }
-.m3-bar {
-  width: var(--cg-board);
-  max-width: 94vw;
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  padding: 0.6rem 0.7rem;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 12px;
-}
-.m3-bar.full { border-color: ${C.rose}; }
-.m3-bar-label {
-  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: ${C.muted}; font-weight: 700; margin-right: 0.2rem;
-}
-.m3-bar-label.full { color: ${C.rose}; }
-.m3-bar-tile {
-  width: 34px; height: 34px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.05rem;
+  touch-action: none;
 }
-.m3-bar-empty { color: ${C.muted}; font-size: 0.82rem; }
 .m3-level {
   padding: 0.85rem 0.6rem; min-height: 62px;
   background: ${C.card}; color: ${C.text};
@@ -3682,95 +2817,18 @@ ${emitTapHighlightRules()}
 .m3-level-name { font-size: 0.72rem; margin-top: 0.2rem; color: ${C.muted}; }
 
 /* ---- Diamond Rush ---- */
+/* The gem board is a canvas; the box keeps the panel look and sizing. */
 .dr-grid {
   width: var(--cg-board);
   height: var(--cg-board);
   max-width: 94vw;
   max-height: 94vw;
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
+  display: flex; align-items: center; justify-content: center;
   background: ${C.surface};
   border: 2px solid ${C.border};
   border-radius: 12px;
   padding: 4px;
   touch-action: none;
-}
-.dr-gem {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(0.9rem, 4vw, 1.5rem);
-  border-radius: 6px;
-  cursor: pointer;
-  user-select: none;
-  aspect-ratio: 1;
-  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
-}
-.dr-gem.sel { outline: 2px solid #fff; transform: scale(0.86); }
-.dr-gem.clearing { opacity: 0; transform: scale(0.4); }
-.dr-gem.bomb {
-  background: rgba(255, 193, 7, 0.15);
-  box-shadow: 0 0 12px rgba(255, 193, 7, 0.4);
-  animation: dr-glow-bomb 1.5s ease-in-out infinite;
-}
-.dr-gem.lightning {
-  background: rgba(100, 200, 255, 0.15);
-  box-shadow: 0 0 12px rgba(100, 200, 255, 0.6);
-  animation: dr-glow-lightning 1.2s ease-in-out infinite;
-}
-.dr-gem.rainbow {
-  background: linear-gradient(45deg, rgba(255, 0, 127, 0.15), rgba(0, 200, 255, 0.15));
-  box-shadow: 0 0 15px rgba(200, 100, 255, 0.5);
-  animation: dr-glow-rainbow 1.8s ease-in-out infinite;
-}
-@keyframes dr-glow-bomb { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
-@keyframes dr-glow-lightning { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
-@keyframes dr-glow-rainbow { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(60deg); } }
-.dr-gem.hint-target { outline: 3px solid ${C.gold}; animation: hintPulse 0.6s ease-in-out; }
-@keyframes hintPulse { 0%, 100% { box-shadow: 0 0 8px ${C.gold}; } 50% { box-shadow: 0 0 16px ${C.gold}; } }
-.dr-powerups-bar {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: center;
-  width: var(--cg-board);
-  max-width: 94vw;
-  margin-top: 0.8rem;
-}
-.dr-powerup-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.5rem 0.6rem;
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-  flex: 1;
-  max-width: 90px;
-}
-.dr-powerup-btn.owned:not(:disabled) { border-color: ${C.accent}; background: ${ca('accent','14')}; }
-.dr-powerup-btn.owned:not(:disabled):hover { border-color: ${C.gold}; background: ${ca('gold','22')}; }
-.dr-powerup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.dr-powerup-btn .icon { font-size: 1.4rem; line-height: 1; }
-.dr-powerup-btn .count { font-size: 0.65rem; color: ${C.muted}; }
-.dr-time-boost {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: ${C.gold};
-  animation: timeBounce 1s ease-out;
-  pointer-events: none;
-  z-index: 50;
 }
 @keyframes timeBounce { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
 
@@ -3779,100 +2837,37 @@ ${emitTapHighlightRules()}
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cg-sheet, .m3-tile, .dr-gem, .snake-cell { transition: none !important; }
+  .cg-sheet { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
   /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)
      was dead CSS. A player who asks their phone to calm animations down now
      actually gets that everywhere, including the two animations this phase
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
-  .t2048-tile, .t2048-tile.is-new, .t2048-tile.is-merged,
-  .tm-tile, .tm-tile.flash, .cw-row.shake,
-  .mnc-pit.mnc-flash, .mnc-pit.mnc-capture-flash,
-  .tm-bar.bar-full, .mj-tile, .mj-tile.nudge, .ce-card,
-  .cnl-roll-btn, .gm-mode-btn, .ng-mode-btn, .mf-mode-btn {
+  .cnl-roll-btn, .gm-mode-btn {
     animation: none !important;
     transition: none !important;
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
-  .tappable:active, .tappable[data-pressed],
-  .mj-tile:active, .wspr-tile:active, .ce-card:active, .scell:active,
-  .numkey:active, .wcell:active, .cw-key:active, .ms-cell:active,
-  .mnc-pit:active, .kt-cell:active, .ck-cell:active, .rv-cell:active,
-  .fir-cell:active, .gmk-cell:active, .ludo-token:active, .an-tile:active,
-  .an-slot:active, .tm-tile:active, .m3-tile:active { transform: none !important; }
-  .ce-card.selected { transform: none !important; }
+  .tappable:active, .tappable[data-pressed] { transform: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
 .kt-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-.kt-board {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  max-width: 480px;
-  width: 100%;
+.kt-boardbox {
+  width: min(92vw, 480px, var(--cg-board, 480px)); max-width: 100%; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  /* aspect-ratio hands useFitBox a real height; without it the measure loop's
+     only height is the canvas's own, which pins the cell at minCell (~224px
+     boards on a 390px phone). flex 0 0 auto stops the stage's flex column
+     from shrinking the ratio box (and its width with it). */
   aspect-ratio: 1;
-  border: 2px solid ${C.border};
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 0 auto;
+  flex: 0 0 auto;
+  touch-action: none;
 }
-.kt-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  transition: background 0.1s ease;
-  font-family: 'JetBrains Mono', monospace;
-}
-.kt-cell.kt-light { background: ${C.surface}; }
-.kt-cell.kt-dark  { background: ${C.card}; }
-.kt-cell.kt-valid { background: ${ca('accent','33')}; cursor: pointer; }
-.kt-cell.kt-valid:hover { background: ${ca('accent','55')}; }
-.kt-cell.kt-current { background: ${ca('accent','22')}; outline: 2px solid ${C.accent}; outline-offset: -2px; }
-.kt-cell.kt-visited { cursor: default; }
-.kt-knight { font-size: 1.35rem; line-height: 1; user-select: none; }
-.kt-num { font-size: 0.58rem; color: ${C.muted}; font-weight: 600; line-height: 1; }
-.kt-actions { display: flex; gap: 0.75rem; width: 100%; max-width: 480px; }
-.kt-undo-btn {
-  flex: 1;
-  padding: 0.7rem;
-  background: ${C.surface};
-  color: ${C.text};
-  border: 1px solid ${C.border};
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-}
+.kt-canvas { border-radius: 8px; }
 .kt-undo-btn:hover:not(:disabled) { border-color: ${C.accent}; }
-.kt-undo-btn:disabled { opacity: 0.35; cursor: default; }
-.kt-new-btn {
-  flex: 1;
-  padding: 0.7rem;
-  background: ${C.surface};
-  color: ${C.rose};
-  border: 1px solid ${ca('rose','44')};
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-}
 .kt-new-btn:hover { border-color: ${C.rose}; }
-.kt-stuck-banner { color: ${C.rose}; font-size: 0.85rem; font-weight: 600; text-align: center; }
-.kt-hint { color: ${C.muted}; font-size: 0.82rem; text-align: center; margin-top: 0.25rem; }
-.kt-history-list { overflow-y: auto; max-height: 60vh; padding: 0.5rem 0; }
-.kt-history-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0.5rem;
-  border-bottom: 1px solid ${ca('border','22')};
-}
 .kt-history-row.kt-row-new { background: ${ca('accent','11')}; border-radius: 6px; }
 .kt-rank { font-size: 0.75rem; color: ${C.muted}; font-family: 'JetBrains Mono', monospace; min-width: 2rem; }
 .kt-best { font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.75rem; text-align: center; font-weight: 600; }
@@ -4165,142 +3160,36 @@ ${emitTapHighlightRules()}
   border: 1px solid ${ca('accent','44')}; border-radius: 10px;
   padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; text-align: center;
 }
-.brg-note {
-  text-align: center; font-size: 0.8rem; color: ${C.gold}; margin: 0.4rem 0;
-  display: flex; gap: 0.8rem; justify-content: center; align-items: center; flex-wrap: wrap;
-}
 .brg-legend {
   display: flex; gap: 0.9rem; justify-content: center; align-items: center;
   font-size: 0.72rem; color: ${C.muted}; margin-top: 0.6rem; flex-wrap: wrap;
 }
-.brg-legend > span { display: inline-flex; align-items: center; gap: 0.3rem; }
 
-.ck-board {
-  display: grid; grid-template-columns: repeat(8, 1fr);
-  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
-  border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
-}
-.ck-cell { background: #d8c49a; display: flex; align-items: center; justify-content: center; }
-.ck-cell.dark { background: #7a5a3a; cursor: pointer; }
-.ck-cell.sel { box-shadow: inset 0 0 0 3px ${C.gold}; }
-.ck-piece {
-  width: 74%; height: 74%; border-radius: 50%;
+/* All five boards draw on canvases inside .brg-canvas-box; only the legend
+   swatches (.ck-piece-mini / .rv-disc-mini / .fir-disc-mini), the note/legend
+   text and the DOM affordances (Gomoku's confirm bar, Ludo's move list)
+   remain as elements. The box's max-width composes the per-board cap with
+   the --cg-board viewport cap; aspect-ratio hands useFitBox a real height
+   (see .kt-boardbox). */
+.brg-canvas-box {
+  /* A DEFINITE width, like the DOM boards' min(92vw, Npx) — width:100% would
+     resolve against the shrink-wrapped view wrapper (i.e. the legend's text
+     width). --cg-board folds in the viewport cap. */
+  width: min(92vw, var(--brg-cap, 380px), var(--cg-board, 380px));
+  max-width: 100%;
+  margin: 0 auto;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.85rem; color: #ffffffcc;
-  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.35);
+  /* An aspect-ratio flex item SHRINKS on the stage's main axis, and the ratio
+     drags the width down with it — refuse, and let .cg-scroll scroll instead
+     (what the DOM boards did). */
+  flex: 0 0 auto;
+  touch-action: none;
 }
-.ck-piece.p1 { background: ${C.accent}; }
-.ck-piece.p2 { background: #2b2f3d; border: 1px solid #555; }
-.ck-piece-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
 .ck-piece-mini.p1 { background: ${C.accent}; }
-.ck-piece-mini.p2 { background: #2b2f3d; border: 1px solid #555; }
-
-.rv-board {
-  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
-  width: min(92vw, 360px); aspect-ratio: 1; margin: 0 auto;
-  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 8px; overflow: hidden;
-}
-.rv-cell { background: #1d5c3a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.rv-disc { width: 76%; height: 76%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
-.rv-disc.d1, .rv-disc-mini.d1 { background: #171a24; border: 1px solid #444; }
-.rv-disc.d2, .rv-disc-mini.d2 { background: #f2f0e8; }
-.rv-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
-.rv-count { display: inline-flex; align-items: center; gap: 0.3rem; color: ${C.text}; font-weight: 600; }
-
-.fir-board {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
-  width: min(92vw, 340px); margin: 0 auto; padding: 8px;
-  background: #22335e; border-radius: 12px;
-}
-.fir-cell {
-  aspect-ratio: 1; background: ${C.bg}; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-}
-.fir-cell.last { box-shadow: 0 0 0 2px ${C.gold}; }
-.fir-disc { width: 86%; height: 86%; border-radius: 50%; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3); }
-.fir-disc.d1, .fir-disc-mini.d1 { background: ${C.rose}; }
-.fir-disc.d2, .fir-disc-mini.d2 { background: ${C.gold}; }
-.fir-disc-mini { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; }
-
-.gmk-scroll { overflow-x: auto; }
-.gmk-board {
-  display: grid; grid-template-columns: repeat(15, 1fr); gap: 1px;
-  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
-  background: ${C.border}; border: 2px solid ${C.border}; border-radius: 6px; overflow: hidden;
-}
-.gmk-cell { background: #b08b4f; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.gmk-cell.last { box-shadow: inset 0 0 0 2px ${C.gold}; }
-.gmk-stone { width: 78%; height: 78%; border-radius: 50%; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3); }
-.gmk-stone.s1 { background: #171a24; }
-.gmk-stone.s2 { background: #f2f0e8; }
-
-.ludo-board {
-  display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
-  width: min(92vw, 380px); aspect-ratio: 1; margin: 0 auto;
-  background: ${C.surface}; border: 2px solid ${C.border}; border-radius: 10px;
-  position: relative; padding: 2px; gap: 1px;
-}
-.ludo-cell {
-  border-radius: 3px; display: flex; align-items: center; justify-content: center;
-  font-size: 0.55rem; color: ${C.muted};
-}
-.ludo-cell.ring { background: ${C.card}; border: 1px solid ${C.border}; }
-.ludo-cell.ring.safe { color: ${C.gold}; }
-.ludo-cell.ring.start1 { background: ${ca('accent','33')}; border-color: ${C.accent}; }
-.ludo-cell.ring.start2 { background: ${ca('rose','33')}; border-color: ${C.rose}; }
-.ludo-cell.home1 { background: ${ca('accent','22')}; border: 1px dashed ${ca('accent','66')}; }
-.ludo-cell.home2 { background: ${ca('rose','22')}; border: 1px dashed ${ca('rose','66')}; }
-.ludo-cell.base1 { background: ${ca('accent','18')}; border: 1px solid ${ca('accent','55')}; border-radius: 50%; }
-.ludo-cell.base2 { background: ${ca('rose','18')}; border: 1px solid ${ca('rose','55')}; border-radius: 50%; }
-.ludo-cell.center { background: ${ca('gold','22')}; border: 1px solid ${C.gold}; font-size: 0.8rem; }
-.ludo-token {
-  z-index: 2; width: 85%; height: 85%; border-radius: 50%; align-self: center; justify-self: center;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.55rem; font-weight: 700; color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-.ludo-token.p1 { background: ${C.accent}; }
-.ludo-token.p2 { background: ${C.rose}; }
-.ludo-token.movable { cursor: pointer; box-shadow: 0 0 0 2px ${C.gold}, 0 1px 3px rgba(0,0,0,0.5); animation: ludoPulse 0.9s ease-in-out infinite; }
-/* PHASE 2 — a 15x15 board puts each Ludo token inside a ~25px cell, and tokens
-   sharing a square overlap almost completely (5px offset). The board tap stays
-   as a shortcut; this pad is the unambiguous, full-size way to move. */
-.ludo-token::after {
-  content: ''; position: absolute; inset: -8px; /* hit slop, no layout change */
-}
-.brd-movelist {
-  display: flex; flex-direction: column; gap: 0.4rem;
-  width: min(92vw, 380px); margin: 0.7rem auto 0;
-}
-.brd-movelist-label {
-  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: ${C.muted}; font-weight: 700;
-}
-.brd-move-btn {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-  min-height: 48px; padding: 0.5rem 0.85rem;
-  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
-  color: ${C.text}; font-family: inherit; font-size: 0.9rem; font-weight: 600;
-  cursor: pointer; text-align: left; width: 100%;
-}
-.brd-move-btn .brd-move-sub { font-size: 0.74rem; color: ${C.muted}; font-weight: 500; }
-.brd-move-btn.primary { border-color: ${C.accent}; background: ${ca('accent', '14')}; }
 /* PHASE 2 — Gomoku ghost-confirm. 15x15 in 380px is ~24px per intersection and
-   a mis-tap used to place a stone permanently. */
-.gmk-cell .gmk-ghost {
-  width: 62%; height: 62%; border-radius: 50%;
-  border: 2px dashed ${C.gold}; box-sizing: border-box;
-}
-.brd-confirm-bar {
-  display: flex; gap: 0.5rem; width: min(92vw, 380px); margin: 0.6rem auto 0;
-}
-.brd-confirm-bar button {
-  flex: 1 1 auto; min-height: 48px; border-radius: 12px;
-  font-family: inherit; font-size: 0.92rem; font-weight: 700; cursor: pointer;
-  border: 1.5px solid ${C.border}; background: ${C.card}; color: ${C.text};
-}
+   a mis-tap used to place a stone permanently. The ghost stone itself is drawn
+   on the canvas now; the confirm bar stays DOM. */
 .brd-confirm-bar button.go { background: ${C.accent}; border-color: ${C.accent}; color: #fff; }
-.brd-confirm-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* PHASE 7 — "Your rooms": a room you hosted was invisible once you left it. */
 .brd-myrooms { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.9rem; }
 .brd-myrooms-label {
@@ -4327,33 +3216,12 @@ ${emitTapHighlightRules()}
   background: transparent; border: 1px solid ${C.rose}; border-radius: 12px;
   color: ${C.rose}; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
 }
-/* PHASE 8 — Mahjong controls (undo / hint / shuffle) + Daily Bounce effects. */
-.mj-controls, .wspr-actions {
-  display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
-}
-.mj-controls button {
-  min-height: 44px; min-width: 84px; padding: 0 0.8rem; border-radius: 12px;
-  background: ${C.card}; border: 1.5px solid ${C.border}; color: ${C.text};
-  font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.mj-controls button:active { transform: scale(0.98); }
-.mj-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
-.mj-warn { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; text-align: center; }
 .dbnc-effects { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
 .dbnc-effect {
   font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.5rem;
   border-radius: 999px; background: ${ca('gold', '22')}; color: ${C.gold};
   text-transform: capitalize;
 }
-/* PHASE 5 — card drag ghost, modelled on Block Fit's existing .bb-drag-ghost. */
-.ce-drag-ghost {
-  position: fixed; z-index: 70; pointer-events: none; opacity: 0.92;
-  transform: translate(-50%, -50%); display: flex; flex-direction: column;
-}
-.ce-drag-ghost .ce-card { box-shadow: 0 6px 18px var(--c-shadow-lg); }
-.kl-note {
-  text-align: center; font-size: 0.8rem; font-weight: 600; color: ${C.rose};
   min-height: 1.1rem;
 }
 /* PHASE 4 — practice replay ribbon (#133). */
@@ -4368,58 +3236,18 @@ ${emitTapHighlightRules()}
   text-align: center; font-size: 0.8rem; color: ${C.muted}; margin-top: 0.5rem;
 }
 .practice-note { font-weight: 500; opacity: 0.75; font-size: 0.82em; }
-@keyframes ludoPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 
 /* ---- Chutes & Ladders ---- */
-.cnl-banner {
-  text-align: center; font-size: 0.82rem; font-weight: 600;
-  border-radius: 999px; padding: 0.32rem 0.8rem;
-  max-width: 480px; margin: 0 auto 0.65rem; display: block;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
-}
 .cnl-board-wrap {
   position: relative; max-width: 480px; margin: 0 auto;
   aspect-ratio: 1; width: 100%;
 }
-.cnl-board {
+/* The board (cells, connectors, pawns) is one canvas — see CnlBoardCanvas. */
+.cnl-board-canvas-fill {
   position: absolute; inset: 0;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
-  gap: 2px;
-  background: ${C.border};
-  border: 2px solid ${C.border};
-  border-radius: 12px;
-  padding: 2px;
-  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
 }
-.cnl-cell {
-  position: relative;
-  display: flex; align-items: flex-start; justify-content: flex-start;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.5rem;
-  font-weight: 600;
-  color: ${C.muted};
-  background: ${C.card};
-  padding: 1px 2px;
-  user-select: none;
-}
-.cnl-cell.alt { background: ${C.surface}; }
-.cnl-cell.cnl-goal { background: ${ca('gold','22')}; color: ${C.gold}; }
-.cnl-cell-mark {
-  position: absolute; bottom: 0; right: 1px;
-  font-size: 0.72rem; line-height: 1;
-}
-/* ---- Moksha Patam variant (slice 7) ---- */
-.cnl-cell-name {
-  position: absolute; left: 1px; right: 1px; bottom: 0;
-  font-size: 0.36rem; line-height: 1.05; font-weight: 700; letter-spacing: 0.01em;
-  text-align: center; text-transform: uppercase; overflow: hidden; white-space: nowrap;
-  text-overflow: ellipsis; pointer-events: none;
-}
-.cnl-cell-name.up { color: ${C.emerald}; }
-.cnl-cell-name.down { color: ${C.rose}; }
-.cnl-glossary-btn { margin-left: auto; font-size: 0.75rem; }
+.cnl-canvas { border-radius: 12px; }
 .cnl-variant-block { margin-top: 0.5rem; }
 .cnl-variant-label {
   font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.08em;
@@ -4452,70 +3280,6 @@ ${emitTapHighlightRules()}
 .mok-name em { color: ${C.muted}; font-weight: 400; }
 .mok-dest { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-left: 0.4rem; }
 .mok-blurb { color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; }
-.cnl-svg {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 2;
-}
-.cnl-pawn {
-  position: absolute; z-index: 3;
-  width: 7%; height: 7%;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
-  transform: translate(-50%, -50%);
-  transition: left 0.13s ease, top 0.13s ease;
-  display: flex; align-items: center; justify-content: center;
-}
-.cnl-pawn.p2 {
-  border-radius: 3px;
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-}
-.cnl-pawn-glyph {
-  font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 0.62rem;
-  color: #fff; line-height: 1; pointer-events: none; user-select: none;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-}
-.cnl-die {
-  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
-  margin: 0.9rem auto 0.2rem; max-width: 480px;
-}
-.cnl-die-face {
-  width: 3.4rem; height: 3.4rem; border-radius: 14px;
-  background: ${C.card}; border: 2px solid ${C.border};
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'JetBrains Mono', monospace; font-weight: 700;
-  font-size: 1.7rem; color: ${C.text};
-  transition: transform 0.1s ease, border-color 0.2s;
-}
-.cnl-die-pips {
-  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
-  width: 68%; height: 68%; gap: 2px;
-}
-.cnl-pip { border-radius: 50%; background: transparent; }
-.cnl-pip.on { background: ${C.text}; }
-.cnl-die-dash { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.7rem; color: ${C.muted}; }
-/* Tumbling spin: ~3 full turns that decelerate and settle on the result. */
-.cnl-die-face.rolling { animation: cnl-spin 0.72s cubic-bezier(0.22, 0.61, 0.36, 1); }
-@keyframes cnl-spin {
-  0%   { transform: rotate(0deg) scale(1); }
-  20%  { transform: rotate(230deg) scale(1.14); }
-  45%  { transform: rotate(560deg) scale(1.1); }
-  72%  { transform: rotate(880deg) scale(1.12); }
-  100% { transform: rotate(1080deg) scale(1); }
-}
-.cnl-roll-buttons {
-  display: flex; gap: 0.5rem;
-  max-width: 480px; margin: 0 auto;
-}
-.cnl-roll-btn {
-  flex: 1; min-width: 0;
-  border: none; cursor: pointer;
-  border-radius: 12px; padding: 0.8rem 0.6rem;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.95rem;
-  color: #fff; transition: opacity 0.15s, transform 0.1s;
-}
-.cnl-roll-btn:active:not(:disabled) { transform: scale(0.98); }
-.cnl-roll-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* ---- Pre-launch Game Mode Modal ---- */
 .gm-modal-backdrop {
@@ -4588,74 +3352,23 @@ ${emitTapHighlightRules()}
 .hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
 
 /* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
-.p6-btn {
-  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
-  border-radius: 10px; padding: 8px 12px; font-family: inherit; font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: border-color .15s;
-}
-.p6-btn:hover { border-color: ${C.accent}; }
-.p6-btn:disabled { opacity: .4; cursor: default; }
-.p6-btn.on, .p6-btn.primary { border-color: ${C.accent}; background: rgb(var(--c-accent-rgb) / 14%); }
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
 .p6-banner {
   background: rgb(var(--c-gold-rgb) / 12%); border: 1px solid rgb(var(--c-gold-rgb) / 40%); color: ${C.gold};
   border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
 }
 
-.ce-card {
-  width: 44px; height: 62px; border-radius: 6px; box-sizing: border-box;
-  background: #F4F6FB; border: 1px solid #C9D2E4; cursor: pointer; user-select: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-family: 'JetBrains Mono', monospace; line-height: 1; flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,.4);
-}
-.ce-card .ce-rank { font-size: 15px; font-weight: 700; }
-.ce-card .ce-suit { font-size: 15px; margin-top: 2px; }
-.ce-card.red { color: #DC2626; }
-.ce-card.black { color: #1E293B; }
-.ce-card.down {
-  background: repeating-linear-gradient(135deg, #3730A3, #3730A3 4px, #4338CA 4px, #4338CA 8px);
-  border-color: #312E81;
-}
-.ce-card.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; }
-.ce-card.dim { opacity: .5; }
-.ce-card.ce-slot {
-  background: var(--c-well); border: 1.5px dashed ${C.dim}; box-shadow: none;
-  color: ${C.dim}; font-size: 18px;
-}
-
 /* #170 — the Klondike board is a canvas now (cards are drawn, not DOM), so
-   the column can afford to be wide: cards grow with it, capped in klLayout. */
+   the column can afford to be wide: cards grow with it, capped in klLayout.
+   Wave 1 gave Spider and Mahjong the same treatment: their fixed-pixel DOM
+   boards (and the FitScale shrink that made phone tiles sub-fingertip) are
+   gone; everything below the status bar is one sized-from-the-column canvas. */
 .kl-game { max-width: 620px; margin: 0 auto; }
-.kl-canvas { border-radius: 8px; }
+.kl-canvas, .sp-canvas, .mj-canvas { border-radius: 8px; }
 
-.sp-game { max-width: 420px; margin: 0 auto; }
-.sp-game .status-bar { flex-wrap: wrap; align-items: center; gap: 8px; }
-.sp-tab { display: flex; gap: 3px; justify-content: center; }
-.sp-col { position: relative; width: 44px; }
-.sp-col .ce-card { width: 44px; height: 54px; border-radius: 5px; }
-.sp-col .ce-card .ce-rank { font-size: 13px; }
-.sp-col .ce-card .ce-suit { font-size: 11px; margin-top: 1px; }
-.sp-col .ce-card.ce-slot.sm { font-size: 13px; }
+.sp-game { max-width: 620px; margin: 0 auto; }
 
-.mj-game { display: flex; flex-direction: column; align-items: center; }
-.mj-game .status-bar { align-items: center; gap: 8px; }
-.mj-board { position: relative; margin: 4px auto 0; }
-/* PHASE 2 (#120) — 36×46 was well under a fingertip, and FitScale shrank it
-   further. 44×56 with the shared press state; the layout offsets below scale
-   from MJ_TW/MJ_TH so the whole board stays inside FitScale. */
-.mj-tile {
-  position: absolute; width: 44px; height: 56px; border-radius: 6px; cursor: pointer;
-  background: linear-gradient(180deg, #F8FAFF, #DDE4F2); border: 1px solid #B7C2D8;
-  border-bottom-width: 3px; display: flex; align-items: center; justify-content: center;
-  font-size: 23px; user-select: none; box-shadow: 2px 3px 4px rgba(0,0,0,.45);
-  transition: transform 0.1s ease, filter 0.1s ease;
-}
-.mj-tile.hinted { box-shadow: 0 0 0 3px ${C.gold}, 2px 3px 4px rgba(0,0,0,.45); }
-.mj-tile.blocked { filter: brightness(.62); cursor: default; }
-.mj-tile.sel { outline: 2px solid ${C.gold}; outline-offset: 1px; filter: brightness(1.08); }
-.mj-tile.up1 { border-color: #A3B0CB; }
-.mj-tile.up2, .mj-tile.up3 { border-color: #8E9DBD; }
+.mj-game { display: flex; flex-direction: column; }
 
 /* Nonogram — canvas board (slice 5). The clue gutters are drawn inside the
    canvas so grid + clues scale together off one useFitBox measurement. */
@@ -4667,16 +3380,6 @@ ${emitTapHighlightRules()}
   border-radius: 8px; cursor: pointer;
   -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
-.ng-modes { flex: 0 0 auto; display: flex; gap: 8px; justify-content: center; }
-.ng-mode-btn {
-  flex: 1 1 auto; max-width: 170px; min-height: 48px;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
-  color: ${C.text}; font-family: inherit; font-size: 15px; font-weight: 600;
-  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.ng-mode-btn.on { border-color: ${C.accent}; background: rgba(45,95,174,.12); }
-.ng-mode-btn:active { transform: scale(0.98); }
 
 .mf-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
 .mf-game .status-bar { align-items: center; gap: 8px; }
@@ -4692,66 +3395,24 @@ ${emitTapHighlightRules()}
   -webkit-tap-highlight-color: transparent;
   user-select: none; -webkit-user-select: none;
 }
-.mf-controls {
-  flex: 0 0 auto; display: flex; gap: 8px; align-items: center; justify-content: center;
-}
-.mf-mode-btn {
-  flex: 1 1 auto; max-width: 260px; min-height: 48px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  background: ${C.card}; border: 1.5px solid ${C.border}; border-radius: 12px;
-  color: ${C.text}; font-family: inherit; font-size: 15px; font-weight: 600;
-  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.mf-mode-btn .mf-mode-label { font-size: 12px; color: ${C.muted}; font-weight: 500; }
-.mf-mode-btn.flag { border-color: ${C.rose}; background: rgba(205,75,58,.10); }
-.mf-mode-btn.dig  { border-color: ${C.accent}; background: rgba(45,95,174,.10); }
-.mf-mode-btn:active { transform: scale(0.98); }
 
 .an-game { max-width: 420px; margin: 0 auto; text-align: center; }
-.an-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
-.an-dot {
-  background: ${C.card}; border: 1px solid ${C.border}; color: ${C.muted}; border-radius: 999px;
-  padding: 3px 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+/* Slots + rack draw on one canvas; the box centers it. */
+.an-boardbox {
+  width: 100%; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px; touch-action: none;
 }
-.an-dot.solved { border-color: ${C.emerald}; color: ${C.emerald}; }
-.an-dot.cur { border-color: ${C.accent}; color: ${C.text}; }
-.an-slots { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
-/* PHASE 2 (#129) — up from 40×48 / 44×52; both had hover-only feedback. */
-.an-slot {
-  width: 48px; height: 54px; border-radius: 8px; border: 1.5px dashed ${C.dim};
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-  font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: ${C.text};
-}
-.an-slot.has { border-style: solid; border-color: ${C.accent}; background: rgb(var(--c-accent-rgb) / 10%); }
-.an-slots.bad .an-slot.has { border-color: ${C.rose}; background: rgb(var(--c-rose-rgb) / 12%); animation: an-shake .4s; }
-@keyframes an-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-.an-rack { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
-.an-tile {
-  width: 44px; height: 52px; border-radius: 8px; border: 1px solid ${C.border}; cursor: pointer;
-  background: ${C.card}; color: ${C.text}; font-family: 'JetBrains Mono', monospace;
-  font-size: 20px; font-weight: 700;
-}
-.an-tile:hover { border-color: ${C.accent}; }
-.an-tile.used { opacity: .25; cursor: default; }
-.an-actions { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
 
 .cp-game { display: flex; flex-direction: column; align-items: center; }
-.cp-grid { display: grid; grid-auto-rows: 34px; gap: 2px; margin-bottom: 14px; }
-.cp-cell {
-  background: ${C.card}; border-radius: 4px; display: flex; align-items: center; justify-content: center;
-  font-size: 20px; user-select: none;
+.cp-boardbox {
+  flex: 1 1 auto; min-height: 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
 }
-.cp-cell.wall { background: ${C.dim}; border-radius: 2px; }
-.cp-cell.goal { background: rgb(var(--c-emerald-rgb) / 14%); box-shadow: inset 0 0 0 2px rgb(var(--c-emerald-rgb) / 45%); }
-.cp-crate.ongoal { filter: hue-rotate(60deg) brightness(1.2); }
-.cp-pad {
-  display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; margin-bottom: 10px;
-}
-.cp-pad .p6-btn { padding: 10px 0; }
+.cp-canvas { border-radius: 6px; }
 
 /* Drop Stack — real-time well + side panel (slice 6). The well is a canvas
    sized by useFitBox; Next/Hold sit beside it so everything fits one screen. */
-.ds-main { flex: 1 1 auto; min-height: 0; display: flex; gap: 10px; align-items: stretch; }
 .ds-boardbox {
   position: relative; flex: 1 1 auto; min-height: 0; min-width: 0;
   display: flex; align-items: center; justify-content: center;
@@ -4760,22 +3421,6 @@ ${emitTapHighlightRules()}
   border-radius: 8px; background: rgba(0,0,0,.03);
   -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
-.ds-side { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
-.ds-panel {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
-  padding: 6px 8px; min-width: 62px; text-align: center;
-  font-family: inherit; color: ${C.text};
-}
-.ds-panel-label {
-  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
-  text-transform: uppercase; color: ${C.muted}; margin-bottom: 4px;
-}
-.ds-queue { display: flex; flex-direction: column; gap: 6px; align-items: center; }
-.ds-mini-piece { position: relative; display: block; }
-.ds-mini-cell { position: absolute; width: 8px; height: 8px; border-radius: 2px; }
-.ds-mini-empty { color: ${C.dim}; font-size: 12px; }
-.ds-hold { cursor: pointer; touch-action: manipulation; }
-.ds-hold:disabled, .ds-hold.used { opacity: .45; cursor: default; }
 .ds-level-flash {
   position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%);
   font-size: 1.5rem; font-weight: 800; color: ${C.gold};
@@ -4787,8 +3432,6 @@ ${emitTapHighlightRules()}
   25% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
   100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
 }
-.ds-pad { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.ds-pad .p6-btn { min-height: 44px; min-width: 58px; }
 
 
 /* ---- Phase 7: GotD hero, home reorg, chat ---- */
@@ -5182,6 +3825,11 @@ function palOf(nameOrLiteral, fallback) {
   if (!nameOrLiteral) return fallback || PAL.text;
   if (typeof nameOrLiteral !== 'string') return fallback || PAL.text;
   if (PAL[nameOrLiteral] != null) return PAL[nameOrLiteral];
+  // A C.* token ('var(--c-x)') handed to canvas code resolves through PAL —
+  // components that share one colour between DOM chrome and a canvas board
+  // (the Snakes & Ladders pawns) pass the token form of both.
+  const m = /^var\(--c-([a-z0-9-]+)\)$/.exec(nameOrLiteral);
+  if (m && PAL[m[1]] != null) return PAL[m[1]];
   return nameOrLiteral;
 }
 
@@ -5302,7 +3950,10 @@ function cgSound(name, pitch) {
 }
 function cgHaptic(ms) {
   if (!cgPrefs.haptics) return;
-  try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
+  try {
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    if (navigator.vibrate) navigator.vibrate(ms || 12);
+  } catch {}
 }
 
 /* ============================================================
@@ -5980,13 +4631,17 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
 }
 
 // Shared status-bar helper for new games.
+/* The classic-shell status row draws on a CuiBar canvas now (controls wave):
+   every CgStatus caller — Snake, Block Fit, Diamond Rush, Zuma, and co —
+   inherits the drawn pills + the sr-only twin in one move. */
 function CgStatus({ items }) {
   return (
-    <div className="cg-statusbar">
-      {items.map((it, i) => (
-        <div className="cg-stat" key={i}><div className="l">{it.l}</div><div className="v">{it.v}</div></div>
-      ))}
-    </div>
+    <CuiBar height={46} build={(W) => {
+      const pr = cuiRow(0, 0, W, 46, items.length);
+      return items.map((it, i) => ({
+        id: 'cg' + i, kind: 'pill', r: pr[i], label: it.l, value: it.v, gold: /time/i.test(String(it.l)),
+      }));
+    }} />
   );
 }
 
@@ -6347,50 +5002,12 @@ function useFitBox(ref, { cols, rows, minCell = 16, maxCell = 64, gap = 0, padX 
   return { cell, boxW: box.w, boxH: box.h, ready: box.w > 0 && box.h > 0 };
 }
 
-// Scale-to-fit wrapper (slice 5). Measures its own available box AND its
-// content's natural size, then applies a single `transform: scale(k)` so the
-// content always fits without scrolling. This is the general answer for the
-// dailies whose boards are absolutely positioned at fixed pixel offsets
-// (Mahjong's layered tiles, the solitaire card columns) — those can't be
-// re-expressed as a fluid grid, but they scale perfectly as one unit, and
-// every existing click handler keeps working under a CSS transform.
-// Never scales ABOVE 1: a small board on a big screen stays its natural size.
-function FitScale({ children, className }) {
-  const boxRef = useRef(null);
-  const contentRef = useRef(null);
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const box = boxRef.current, content = contentRef.current;
-    if (!box || !content) return;
-    const measure = () => {
-      const b = box.getBoundingClientRect();
-      // offsetWidth/Height are the UNSCALED layout size — getBoundingClientRect
-      // on the content would already include our own transform and oscillate.
-      const cw = content.offsetWidth, ch = content.offsetHeight;
-      if (!cw || !ch || (b.width < 1 && b.height < 1)) return;
-      const k = Math.min(1, b.width / cw, b.height / ch);
-      setScale((prev) => (Math.abs(prev - k) < 0.005 ? prev : k));
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', measure);
-      return () => window.removeEventListener('resize', measure);
-    }
-    const ro = new ResizeObserver(measure);
-    ro.observe(box);
-    ro.observe(content);
-    return () => ro.disconnect();
-  }, []);
-
-  return (
-    <div className={'fit-scale-box' + (className ? ' ' + className : '')} ref={boxRef}>
-      <div className="fit-scale-content" ref={contentRef} style={{ transform: `scale(${scale})` }}>
-        {children}
-      </div>
-    </div>
-  );
-}
+/* The FitScale scale-to-fit wrapper (slice 5) is GONE: its last riders
+   (Mahjong, Spider, the Tile Match pair, Crate Push) all draw canvases sized
+   from the measured box now, so nothing shrinks a fixed-pixel board with a
+   transform any more. The .fit-scale-box CSS class stays — Word Search uses
+   it as a plain flex box, and describeAppStylesheet() keys on the
+   .fit-scale-content rule to recognize the app's own stylesheet. */
 
 // DPR-correct canvas sizing + redraw scheduling. `draw(ctx, geom)` is called
 // on a rAF whenever `deps` change or the element resizes; `geom` carries the
@@ -6793,7 +5410,7 @@ function runClientSelfTests(styleReady) {
      that sets an auto SIDE margin without a definite width is the bug class;
      inside .fit-col that always collapses the board. */
   check('fitcol-auto-margin', () => {
-    const BOARDS = ['sudoku', 'wordsearch', 'wspr-grid', 'dsnk-board', 'numpad'];
+    const BOARDS = ['sudoku', 'wordsearch', 'wspr-grid', 'dsnk-board'];
     const bad = [];
     for (const cls of BOARDS) {
       // Grab the .fit-col-scoped rule bodies for this class.
@@ -7019,6 +5636,277 @@ function usePointerCell(ref, handlers, { longPressMs = 450, moveTolerance = 10 }
       el.removeEventListener('contextmenu', onCtx);
     };
   }, [ref, longPressMs, moveTolerance]);
+}
+
+/* ================= cui — the canvas control kit (controls wave) =============
+   Draws the in-frame chrome — status pills, buttons, key grids — INTO a
+   game's canvas, so a running game is one uninterrupted surface. Every drawn
+   control is backed by a REAL, visually-hidden DOM twin (<CuiTwin/>): screen
+   readers, hardware focus and innerText-based checks keep working, because
+   .sr-only clips the box without unrendering the text. Menus, sheets,
+   overlays, hint paragraphs and scroll-away content lists stay DOM on
+   purpose — they are prose or navigation, not play-surface controls.
+
+   A game builds `controls` fresh each render (geometry from its fit box):
+     { id, kind: 'pill' | 'button' | 'label',
+       r: [x, y, w, h], label, value, sub, gold, mono, font,
+       primary, on, solid, disabled, action }
+   and threads the SAME array through three places:
+     draw:    cuiDrawControls(ctx, controls, pressedId)
+     pointer: usePointerCell(ref, cuiWrapHandlers(ctlRef, setPressed, boardHandlers))
+     JSX:     <CuiTwin controls={controls} />                                 */
+const CUI_FONT = "'Space Grotesk', system-ui, sans-serif";
+const CUI_MONO = "'JetBrains Mono', monospace";
+
+function cuiInRect(r, x, y) { return x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3]; }
+
+function cuiHitAt(controls, x, y) {
+  for (let i = controls.length - 1; i >= 0; i--) {
+    const c = controls[i];
+    if (c.action && !c.disabled && cuiInRect(c.r, x, y)) return c;
+  }
+  return null;
+}
+
+// Split a horizontal band into n equal rects with a gap — the .status-bar /
+// button-row layout, minus the DOM.
+function cuiRow(x, y, w, h, n, gap = 8) {
+  const cw = (w - gap * (n - 1)) / n;
+  return Array.from({ length: n }, (_, i) => [x + i * (cw + gap), y, cw, h]);
+}
+
+// The .pill look: card capsule, uppercase muted label over a mono value.
+function cuiDrawPill(ctx, c) {
+  const [x, y, w, h] = c.r;
+  klRR(ctx, x, y, w, h, 10);
+  ctx.fillStyle = PAL.card;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = PAL.border;
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = '600 9px ' + CUI_FONT;
+  ctx.fillStyle = PAL.muted;
+  ctx.fillText(String(c.label || '').toUpperCase(), x + w / 2, y + h * 0.4, w - 8);
+  ctx.font = '600 ' + Math.max(13, Math.round(h * 0.34)) + 'px ' + CUI_MONO;
+  ctx.fillStyle = c.color || (c.gold ? PAL.gold : PAL.text);
+  ctx.fillText(String(c.value != null ? c.value : ''), x + w / 2, y + h * 0.85, w - 8);
+}
+
+// The .p6-btn look (card + border, accent tint when primary/on, solid accent
+// for the one big CTA), with the pressed state drawn since :active can't be.
+function cuiDrawButton(ctx, c, pressed) {
+  const [x, y, w, h] = c.r;
+  ctx.save();
+  if (c.disabled) ctx.globalAlpha = 0.4;
+  klRR(ctx, x, y, w, h, c.radius != null ? c.radius : Math.min(12, h * 0.3));
+  ctx.fillStyle = c.bg ? c.bg : (c.solid ? palOf(C.accent, '#3A6ECD') : PAL.card);
+  ctx.fill();
+  if ((c.primary || c.on) && !c.solid && !c.bg) {
+    ctx.save(); ctx.globalAlpha *= 0.14; ctx.fillStyle = palOf(C.accent, '#3A6ECD'); ctx.fill(); ctx.restore();
+  }
+  if (pressed && !c.disabled) {
+    ctx.save(); ctx.globalAlpha *= 0.18; ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+  }
+  if (!c.noBorder) {
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = (c.primary || c.on || c.solid) ? palOf(C.accent, '#3A6ECD') : PAL.border;
+    ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fs = c.font || Math.min(15, Math.max(12, Math.round(h * 0.3)));
+  ctx.font = '600 ' + fs + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
+  ctx.fillStyle = c.ink || (c.solid ? '#fff' : PAL.text);
+  if (c.pips) {
+    // Die face: 3x3 pip grid (row-major booleans) instead of the label text.
+    const pr = Math.max(2, Math.min(w, h) * 0.075);
+    for (let i = 0; i < 9; i++) {
+      if (!c.pips[i]) continue;
+      const px = x + w * (0.28 + 0.22 * (i % 3));
+      const py = y + h * (0.28 + 0.22 * Math.floor(i / 3));
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, c.sub ? y + h / 2 - fs * 0.42 : y + h / 2 + 0.5, w - 10);
+  }
+  if (c.sub) {
+    ctx.font = '500 ' + Math.max(9, Math.round(fs * 0.72)) + 'px ' + CUI_FONT;
+    ctx.fillStyle = c.solid ? 'rgba(255,255,255,0.85)' : PAL.muted;
+    ctx.fillText(String(c.sub), x + w / 2, y + h / 2 + fs * 0.58, w - 10);
+  }
+  ctx.restore();
+}
+
+// Plain centred text (the brg-note / warn-line role).
+function cuiDrawLabel(ctx, c) {
+  const [x, y, w, h] = c.r;
+  ctx.font = (c.bold ? '700 ' : '') + (c.font || 12) + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = c.color || (c.gold ? PAL.gold : PAL.muted);
+  ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, y + h / 2, w - 4);
+}
+
+function cuiDrawControls(ctx, controls, pressedId) {
+  for (const c of controls) {
+    if (c.noDraw) continue; // twin-only entry (prose the draw pass renders itself)
+    if (c.kind === 'pill') cuiDrawPill(ctx, c);
+    else if (c.kind === 'label') cuiDrawLabel(ctx, c);
+    else cuiDrawButton(ctx, c, pressedId === c.id);
+  }
+}
+
+// Wrapped prose on canvas (clue lines): naive word wrap via measureText.
+function cuiWrapText(ctx, text, x, y, maxW, lineH, maxLines) {
+  const words = String(text).split(/\s+/);
+  let line = '', lines = [];
+  for (const w of words) {
+    const probe = line ? line + ' ' + w : w;
+    if (ctx.measureText(probe).width > maxW && line) { lines.push(line); line = w; }
+    else line = probe;
+  }
+  if (line) lines.push(line);
+  if (maxLines && lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    lines[maxLines - 1] += '…';
+  }
+  lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineH));
+  return lines.length;
+}
+
+/* Route the pointer stream: controls first (press feedback on finger-DOWN,
+   action on the release, exactly tapProps' contract), board handlers only
+   when no control claims the point. `ctlRef.current` must always hold the
+   render's live controls array. */
+function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
+  return {
+    ...h,
+    onDown: (p, e) => {
+      const c = cuiHitAt(ctlRef.current || [], p.x, p.y);
+      if (c) {
+        ctlRef.pressed = c.id;
+        setPressed(c.id);
+        cgHaptic(8);
+        if (c.holdDown) c.holdDown(); // hold-to-act controls (D-pads) engage on DOWN
+        return;
+      }
+      if (h.onDown) h.onDown(p, e);
+    },
+    onDrag: (p, d, e) => {
+      if (ctlRef.pressed) {
+        // A hold control releases if the finger slides off it (the DOM
+        // pointerleave contract) — capture means leave never fires.
+        const c = (ctlRef.current || []).find(x => x.id === ctlRef.pressed);
+        if (c && c.holdDown && !cuiInRect(c.r, p.x, p.y)) {
+          if (c.holdUp) c.holdUp();
+          ctlRef.pressed = null;
+          setPressed(null);
+        }
+        return;
+      }
+      if (h.onDrag) h.onDrag(p, d, e);
+    },
+    onUp: (p, e) => {
+      // A control fires on press + release-in-rect (the DOM button contract),
+      // NOT via onTap — a board's tight moveTolerance would otherwise eat
+      // slightly-jittery finger taps on buttons.
+      if (ctlRef.pressed) {
+        const c = (ctlRef.current || []).find(x => x.id === ctlRef.pressed);
+        ctlRef.pressed = null;
+        setPressed(null);
+        if (c && c.holdDown) { if (c.holdUp) c.holdUp(); return; }
+        if (c && !c.disabled && c.action && cuiInRect(c.r, p.x, p.y)) c.action();
+        return;
+      }
+      if (h.onUp) h.onUp(p, e);
+    },
+    onTap: (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return; // fired in onUp
+      if (h.onTap) h.onTap(p, e);
+    },
+    onLongPress: h.onLongPress ? (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return;
+      h.onLongPress(p, e);
+    } : undefined,
+    onContext: h.onContext ? (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return;
+      h.onContext(p, e);
+    } : undefined,
+  };
+}
+
+/* A self-contained control STRIP on its own canvas — for games whose board
+   canvas is a hand-rolled real-time loop (Daily Snake/Bounce, the classic
+   arcade games) where splicing bands into the loop would be surgery. The
+   strip draws pills/labels/buttons, wires presses, and carries its twin;
+   stacked over the board canvas it reads as one surface. */
+function CuiBar({ height, build }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const controls = W > 40 ? build(W) : [];
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
+  // Redraw key = the controls' FULL visual state (functions dropped): a change
+  // to only sub/color/bg/solid or a rect must repaint even with labels constant.
+  const key = JSON.stringify(controls, (k, v) => (typeof v === 'function' ? undefined : v));
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height,
+    deps: [key, W, height, pressedId],
+    draw: (ctx) => cuiDrawControls(ctx, ctlRef.current, pressedId),
+  });
+  return (
+    <div className="cui-bar" ref={boxRef}>
+      <canvas ref={canvasRef} className="cui-bar-canvas" aria-hidden="true" />
+      <CuiTwin controls={controls} />
+    </div>
+  );
+}
+
+// Shift a board's pointer handlers below the frame's top bands: the handlers
+// keep their own coordinate space (verbatim code), the frame subtracts its
+// band height once here. topRef.current = the board region's y offset.
+function cuiShiftHandlers(h, topRef) {
+  const out = {};
+  for (const k of Object.keys(h)) {
+    const fn = h[k];
+    if (typeof fn !== 'function') continue;
+    out[k] = (pt, a, b) => fn({ x: pt.x, y: pt.y - (topRef.current || 0) }, a, b);
+  }
+  return out;
+}
+
+// The accessibility twin: real buttons and live text, visually clipped. One
+// per game frame, fed the same controls array the canvas drew.
+function CuiTwin({ controls, extra }) {
+  return (
+    <div className="cui-twin sr-only">
+      {controls.map((c) => (
+        // One block per control so innerText keeps line breaks between them.
+        <div key={c.id}>
+          {c.action ? (
+            <button
+              type="button"
+              disabled={!!c.disabled}
+              aria-pressed={c.on != null ? !!c.on : undefined}
+              onClick={() => { if (!c.disabled) c.action(); }}
+            >{String(c.twinLabel != null ? c.twinLabel : (c.label != null ? c.label : c.id)) + (c.sub ? ' — ' + c.sub : '') + (c.value != null ? ' ' + c.value : '')}</button>
+          ) : (
+            <span>{((c.twinLabel != null ? String(c.twinLabel) : (c.label != null ? String(c.label) : '')) + ' ' + (c.value != null ? c.value : '')).trim()}</span>
+          )}
+        </div>
+      ))}
+      {extra || null}
+    </div>
+  );
 }
 
 /* ============================================================
@@ -7260,22 +6148,8 @@ async function dappAnchor(session) {
 // is retired) but capped per day and counted server-side. Behaviour-free: the
 // parent owns the hint state and passes a `buy` handler (kept identical across
 // all four daily games so the control looks and feels the same everywhere).
-function HintBar({ hintsLeft, exhausted, buying, onBuy, msg, label }) {
-  return (
-    <div className="cw-hint-bar">
-      <button
-        className="cw-hint-btn"
-        onClick={onBuy}
-        disabled={buying || exhausted}
-      >
-        {exhausted
-          ? `💡 ${label || 'No more hints'}`
-          : <>💡 Hint{Number.isFinite(hintsLeft) ? ` · ${hintsLeft} left` : ''}</>}
-      </button>
-      {msg && <span className="cw-hint-msg">{msg}</span>}
-    </div>
-  );
-}
+/* HintBar retired (controls wave) — hint buttons draw on each game
+   frame via the cui kit; useDailyHints below is unchanged. */
 
 // Shared hint state hook for the daily games that use a generic "reveal"
 // (Sudoku cell, Word Hunt start, Tile Match nudge). Reads today's
@@ -8015,87 +6889,136 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   const boldRight = (c) => size === 9 ? (c === 2 || c === 5) : c === 2;
   const boldBottom = (r) => size === 9 ? (r === 2 || r === 5) : (r === 1 || r === 3);
 
+  /* The whole game frame is ONE canvas now (controls wave): pills, grid,
+     hint bar and numpad draw together, with <CuiTwin> carrying the real
+     hidden buttons. Cell chrome reads PAL; the box separators keep #149's
+     rule (they out-read the 1px gridlines by using the muted tone). */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, HINT_H = 36, KEY_H = 44, ERASE_H = 38;
+  const chrome = PILL_H + HINT_H + KEY_H + ERASE_H + GAP * 4;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const sdkCell = Math.max(24, Math.min(size === 9 ? 44 : 56, Math.floor((availB - (size - 1)) / size)));
+  const sdkStep = sdkCell + 1;
+  const sdkSide = sdkStep * size - 1;
+  const H = chrome + sdkSide;
+  const boardX = Math.floor((W - sdkSide) / 2);
+  const boardY = PILL_H + GAP;
+  const hintY = boardY + sdkSide + GAP;
+  const keysY = hintY + HINT_H + GAP;
+  const eraseY = keysY + KEY_H + GAP;
+
+  const filled = grid.flat().filter(v => v !== 0).length;
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 4);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
+    controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: `${filled}/${size * size}` });
+    controls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: size === 9 ? '9×9 ×2' : '6×6' });
+    if (!done) {
+      const exhausted = hints.exhausted || noEmpty;
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hints.msg ? 0 : Math.floor(W * 0.2), hintY, hints.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: exhausted ? `💡 ${noEmpty ? 'Board full' : 'No more hints'}`
+          : `💡 Hint${Number.isFinite(hints.hintsLeft) ? ` · ${hints.hintsLeft} left` : ''}`,
+        disabled: hints.buying || exhausted,
+        action: buyHint,
+      });
+      if (hints.msg) {
+        controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hints.msg, font: 11 });
+      }
+      const kr = cuiRow(0, keysY, W, KEY_H, size, 6);
+      for (let n = 1; n <= size; n++) {
+        controls.push({ id: 'k' + n, kind: 'button', r: kr[n - 1], label: String(n), mono: true, font: 18, action: () => place(n) });
+      }
+      controls.push({ id: 'erase', kind: 'button', r: [0, eraseY, W, ERASE_H], label: 'Erase', action: () => place(0) });
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const sdkGeoRef = useRef({});
+  sdkGeoRef.current = { sdkStep, size, done, boardX, boardY, sdkSide };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (p) => {
+      const g = sdkGeoRef.current;
+      if (g.done) return;
+      const c = Math.floor((p.x - g.boardX) / g.sdkStep), r = Math.floor((p.y - g.boardY) / g.sdkStep);
+      if (c < 0 || c >= g.size || r < 0 || r >= g.size) return;
+      const locked = isGiven(r, c) || hintedCells.has(cellKey(r, c));
+      if (!locked) setSelected([r, c]);
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [grid, selected, errors, hintedCells, done, sdkCell, W, fmt, steps, pressedId, hints.hintsLeft, hints.msg, hints.buying],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
+      ctx.fillStyle = PAL.border; // 1px gridlines (#149's gap idiom, drawn)
+      ctx.fillRect(0, 0, sdkSide, sdkSide);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const key = `${r},${c}`;
+          const x = c * sdkStep, y = r * sdkStep;
+          const given = isGiven(r, c);
+          const hinted = hintedCells.has(cellKey(r, c));
+          const isSel = selKey === key;
+          const isHl = !isSel && selected &&
+            (selected[0] === r || selected[1] === c || boxAt(r, c, size) === selBox);
+          const isErr = errors.has(key);
+          let bg = PAL.card;
+          if (isErr) bg = 'rgba(205,75,58,0.12)';
+          else if (isSel) bg = 'rgba(58,110,205,0.28)';
+          else if (isHl) bg = 'rgba(58,110,205,0.06)';
+          else if (hinted) bg = 'rgba(201,162,39,0.12)';
+          ctx.fillStyle = bg;
+          ctx.fillRect(x, y, sdkCell, sdkCell);
+          const v = grid[r][c];
+          if (v !== 0) {
+            ctx.font = `600 ${Math.round(sdkCell * (size === 9 ? 0.5 : 0.55))}px 'JetBrains Mono', monospace`;
+            ctx.fillStyle = isErr ? PAL.rose : given ? PAL.text : hinted ? PAL.gold : PAL.accent;
+            ctx.fillText(String(v), x + sdkCell / 2, y + sdkCell / 2 + 1);
+          }
+        }
+      }
+      // Box separators over the gridlines (the #149 contrast rule).
+      ctx.strokeStyle = PAL.muted;
+      ctx.lineWidth = 2;
+      for (let c = 0; c < size; c++) {
+        if (!boldRight(c)) continue;
+        const x = (c + 1) * sdkStep - 0.5;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sdkSide); ctx.stroke();
+      }
+      for (let r = 0; r < size; r++) {
+        if (!boldBottom(r)) continue;
+        const y = (r + 1) * sdkStep - 0.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sdkSide, y); ctx.stroke();
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Steps</div>
-          <div className="pvalue">{steps}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Filled</div>
-          <div className="pvalue">
-            {grid.flat().filter(v => v !== 0).length}/{size * size}
-          </div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Board</div>
-          <div className="pvalue" style={{ fontSize: '0.82rem' }}>{size === 9 ? '9×9 ×2' : '6×6'}</div>
-        </div>
-      </div>
-
-      <div
-        className={'sudoku' + (size === 9 ? ' s9' : '')}
-        style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, maxWidth: size === 9 ? 420 : 360 }}
-      >
-        {grid.map((row, r) =>
-          row.map((v, c) => {
-            const key = `${r},${c}`;
-            const given = isGiven(r, c);
-            const hinted = hintedCells.has(cellKey(r, c));
-            const locked = given || hinted;
-            const isSel = selKey === key;
-            const isHl = !isSel && selected &&
-              (selected[0] === r || selected[1] === c || boxAt(r, c, size) === selBox);
-            const isErr = errors.has(key);
-            const cls = ['scell'];
-            if (given) cls.push('given'); else if (hinted) cls.push('hinted'); else if (v !== 0) cls.push('user');
-            if (isSel) cls.push('sel'); else if (isHl) cls.push('hl');
-            if (isErr) cls.push('err');
-            return (
-              <div
-                key={key}
-                className={cls.join(' ')}
-                /* Box separators must out-read the 1px cell gridlines the grid's
-                   own gap now draws (#149) — in C.border, the same colour, the
-                   3×3 structure was invisible on the 9×9 board. C.muted is the
-                   next step up the palette's contrast ladder and re-themes. */
-                style={{
-                  borderRight: boldRight(c) ? `2px solid ${C.muted}` : undefined,
-                  borderBottom: boldBottom(r) ? `2px solid ${C.muted}` : undefined,
-                }}
-                {...tapProps(() => !locked && !done && setSelected([r, c]))}
-              >
-                {v !== 0 ? v : ''}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={hints.hintsLeft}
-          exhausted={hints.exhausted || noEmpty}
-          buying={hints.buying}
-          onBuy={buyHint}
-          msg={hints.msg}
-          label={noEmpty ? 'Board full' : 'No more hints'}
+      <div className={'sudoku cui-frame' + (size === 9 ? ' s9' : '')} ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="sdk-canvas board-canvas"
+          role="grid"
+          aria-label={`Sudoku ${size} by ${size} board — ${filled} of ${size * size} filled`}
         />
-      )}
-
-      <div className="numpad" style={size === 9 ? { gridTemplateColumns: 'repeat(9, 1fr)' } : undefined}>
-        {Array.from({ length: size }, (_, i) => i + 1).map(n => (
-          <button key={n} className="numkey" {...tapProps(() => place(n))}>{n}</button>
-        ))}
       </div>
-      <div className="numpad" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-        <button className="numkey erase" {...tapProps(() => place(0))}>Erase</button>
-      </div>
+      <CuiTwin controls={controls} />
     </div>
   );
 }
@@ -9053,67 +7976,116 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const selSet = new Set(sel);
 
+  /* The whole frame is ONE canvas (controls wave): pills, theme line, letter
+     grid and hint bar draw together; only the found-words chip list stays
+     DOM (read-only content, scrolls). The canvas keeps pointer capture, so a
+     fast diagonal swipe can't skip cells; letters render uppercase as the
+     DOM's text-transform did. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, THEME_H = 22, HINT_H = 36;
+  const chrome = PILL_H + THEME_H + HINT_H + GAP * 3;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const wsCell = Math.max(24, Math.min(42, Math.floor((availB - (WS_SIZE - 1)) / WS_SIZE)));
+  const wsStep = wsCell + 1;
+  const wsSide = wsStep * WS_SIZE - 1;
+  const H = chrome + wsSide;
+  const boardX = Math.floor((W - wsSide) / 2);
+  const boardY = PILL_H + GAP + THEME_H + GAP;
+  const hintY = boardY + wsSide + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-found', kind: 'pill', r: pr[1], label: 'Found', value: `${found.size}/${total}` });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[2], label: 'Steps', value: steps });
+    controls.push({ id: 'theme', kind: 'label', r: [0, PILL_H + GAP, W, THEME_H], label: `Theme: ${theme} · drag across letters to find each word`, font: 12 });
+    if (!done) {
+      const exhausted = hints.exhausted || hintsExhausted;
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hints.msg ? 0 : Math.floor(W * 0.2), hintY, hints.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: exhausted ? '💡 No more hints'
+          : `💡 Hint${Number.isFinite(hints.hintsLeft) ? ` · ${hints.hintsLeft} left` : ''}`,
+        disabled: hints.buying || exhausted,
+        action: buyHint,
+      });
+      if (hints.msg) {
+        controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hints.msg, font: 11 });
+      }
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const wsGeoRef = useRef({});
+  wsGeoRef.current = { wsStep, boardX, boardY };
+  const wsCellAt = (p) => {
+    const g = wsGeoRef.current;
+    const c = Math.max(0, Math.min(WS_SIZE - 1, Math.floor((p.x - g.boardX) / g.wsStep)));
+    const r = Math.max(0, Math.min(WS_SIZE - 1, Math.floor((p.y - g.boardY) / g.wsStep)));
+    return [r, c];
+  };
+  const wsInBoard = (p) => {
+    const g = wsGeoRef.current;
+    return p.y >= g.boardY && p.y < g.boardY + wsSide + 8;
+  };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onDown: (p) => { if (!wsInBoard(p)) return; const [r, c] = wsCellAt(p); startSel(r, c); },
+    onDrag: (p) => { const [r, c] = wsCellAt(p); moveSel(r, c); },
+    onUp: () => endSel(),
+  }), { moveTolerance: 3 });
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [foundCells, hintedStarts, sel, done, wsCell, W, fmt, steps, found, pressedId, hints.hintsLeft, hints.msg, hints.buying],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
+      ctx.fillStyle = PAL.border; // the 1px gridline gaps
+      ctx.fillRect(0, 0, wsSide, wsSide);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let r = 0; r < WS_SIZE; r++) {
+        for (let c = 0; c < WS_SIZE; c++) {
+          const i = idx(r, c);
+          const x = c * wsStep, y = r * wsStep;
+          const isFound = foundCells.has(i);
+          const isHinted = !isFound && hintedStarts.has(i);
+          const isSel = selSet.has(i);
+          ctx.fillStyle = isFound ? 'rgba(45,159,102,0.20)' : isHinted ? 'rgba(201,162,39,0.20)' : PAL.card;
+          ctx.fillRect(x, y, wsCell, wsCell);
+          if (isSel) { ctx.fillStyle = 'rgba(58,110,205,0.55)'; ctx.fillRect(x, y, wsCell, wsCell); }
+          if (isHinted) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = PAL.gold;
+            ctx.strokeRect(x + 1, y + 1, wsCell - 2, wsCell - 2);
+          }
+          ctx.font = `600 ${Math.round(wsCell * 0.5)}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = isSel ? '#fff' : isFound ? PAL.emerald : PAL.text;
+          ctx.fillText(String(letters[r][c]).toUpperCase(), x + wsCell / 2, y + wsCell / 2 + 1);
+        }
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Found</div>
-          <div className="pvalue">{found.size}/{total}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Steps</div>
-          <div className="pvalue">{steps}</div>
-        </div>
-      </div>
-
-      <div className="word-theme">Theme: <b>{theme}</b> · drag across letters to find each word</div>
-
-      <div className="fit-scale-box">
-      <div className="wordsearch" onPointerUp={endSel} onPointerLeave={endSel}>
-        {letters.map((row, r) =>
-          row.map((ch, c) => {
-            const i = idx(r, c);
-            const cls = ['wcell'];
-            if (foundCells.has(i)) cls.push('found');
-            else if (hintedStarts.has(i)) cls.push('hinted');
-            if (selSet.has(i)) cls.push('sel');
-            return (
-              <div
-                key={i}
-                className={cls.join(' ')}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  // Release implicit touch pointer-capture so pointerenter
-                  // fires on sibling cells as the finger drags across them.
-                  if (e.target.releasePointerCapture && e.target.hasPointerCapture && e.target.hasPointerCapture(e.pointerId)) {
-                    e.target.releasePointerCapture(e.pointerId);
-                  }
-                  startSel(r, c);
-                }}
-                onPointerEnter={() => moveSel(r, c)}
-              >
-                {ch}
-              </div>
-            );
-          })
-        )}
-      </div>
-      </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={hints.hintsLeft}
-          exhausted={hints.exhausted || hintsExhausted}
-          buying={hints.buying}
-          onBuy={buyHint}
-          msg={hints.msg}
-          label="No more hints"
+      <div className="wordsearch cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="ws-canvas board-canvas"
+          role="grid"
+          aria-label={`Word search grid — ${found.size} of ${total} words found`}
         />
-      )}
+      </div>
+      <CuiTwin controls={controls} />
 
       <div className="word-list">
         {words.map(w => (
@@ -9460,15 +8432,20 @@ function cwDailyRounds(offset) {
   return cwRoundsForDay(cwDayNum(offset));
 }
 
+/* CwBoardCanvas was absorbed into CryptoWordleGame's single frame canvas
+   (controls wave) — pills, theme, tracker, clues, hint bar, guess grid and
+   the keyboard all draw together; see the frame block in the component. */
+
 /* Screenshot-state + regression deep link: `?cwtype=LEND-`.
    dapp.json checks can only NAVIGATE — they never tap — so the double-input
    bug ("one tap types two letters") was invisible to every check we had. This
-   replays a REAL touch tap sequence (pointerdown -> pointerup -> compat click,
-   exactly what a phone dispatches) against the on-screen keys, so the guess
-   row ends up holding the typed string and a check can assert on it via
-   `.cw-board[data-cw-typed="LEND"]`. A `-` means backspace. Writes nothing —
-   typing never claims, saves or submits — so it is safe in every environment
-   (the "before" screenshot comes from production). */
+   replays a REAL touch pointer sequence (pointerdown -> pointerup -> compat
+   click, exactly what a phone dispatches) against the frame canvas at each
+   drawn key's position, so the guess row ends up holding the typed string and
+   a check can assert on it via `.cw-board[data-cw-typed="LEND"]`. A `-` means
+   backspace. Writes nothing — typing never claims, saves or submits — so it
+   is safe in every environment (the "before" screenshot comes from
+   production). */
 function cwTypeScript() {
   try {
     const raw = new URLSearchParams(window.location.search).get('cwtype') || '';
@@ -9476,8 +8453,11 @@ function cwTypeScript() {
   } catch (e) { return ''; }
 }
 
-function cwSimulateTouchTap(el) {
-  const opts = { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1, isPrimary: true };
+function cwSimulateTouchTapAt(el, clientX, clientY) {
+  const opts = {
+    bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1,
+    isPrimary: true, clientX, clientY,
+  };
   const PE = window.PointerEvent;
   const fire = (type) => {
     let ev;
@@ -9488,8 +8468,9 @@ function cwSimulateTouchTap(el) {
   };
   fire('pointerdown');
   fire('pointerup');
-  // The browser's compatibility click, which is the half that used to double.
-  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  // The browser's compatibility click, which is the half that used to double
+  // on the DOM keyboard. The canvas has no click handler, so it must no-op.
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX, clientY }));
 }
 
 function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
@@ -9694,7 +8675,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
       // Enter/Space on a FOCUSED on-screen key already fires that button's own
       // click. Running the window handler too would submit AND type from one
       // press, so let the button own those two keys while it has focus.
-      const inKbd = e.target && e.target.closest && e.target.closest('.cw-kbd');
+      const inKbd = e.target && e.target.closest && e.target.closest('.cui-twin');
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
         if (inKbd) return;
         if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); }
@@ -9708,23 +8689,34 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // `?cwtype=` — replay real touch taps once the keyboard is on screen.
+  // `?cwtype=` — replay real touch taps once the drawn keyboard is on screen.
+  // Keys are canvas controls now, so each tap is a coordinate-carrying pointer
+  // sequence at the key's drawn rect, through the same usePointerCell ->
+  // cuiWrapHandlers path a finger takes (twin buttons are the CLICK path and
+  // would sidestep the hit-test this exists to regress).
   useEffect(() => {
     const script = cwTypeScript();
     if (!script) return;
     let tries = 0, timer = null, cancelled = false;
     const run = () => {
       if (cancelled) return;
-      const keys = Array.from(document.querySelectorAll('.cw-kbd .cw-key'));
-      if (!keys.length) {
+      const canvas = canvasRef.current;
+      const hasKeys = ctlRef.current.some((c) => c.id === 'bksp');
+      if (!canvas || !hasKeys) {
         if (tries++ < 40) timer = setTimeout(run, 50);
         return;
       }
       for (const ch of script) {
-        const label = ch === '-' ? '\u232b' : ch;
-        const btn = Array.from(document.querySelectorAll('.cw-kbd .cw-key'))
-          .find(b => (b.textContent || '').trim() === label);
-        if (btn) cwSimulateTouchTap(btn);
+        const id = ch === '-' ? 'bksp' : 'k' + ch;
+        const c = ctlRef.current.find((k) => k.id === id);
+        if (!c) continue;
+        const rect = canvas.getBoundingClientRect();
+        const scale = rect.width / (parseFloat(canvas.style.width) || rect.width);
+        cwSimulateTouchTapAt(
+          canvas,
+          rect.left + (c.r[0] + c.r[2] / 2) * scale,
+          rect.top + (c.r[1] + c.r[3] / 2) * scale
+        );
       }
     };
     timer = setTimeout(run, 60);
@@ -9733,139 +8725,212 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
 
   const wordLen = active ? active.def.word.length : 5;
   const maxGuesses = active ? active.maxG : 6;
-  const rowsLeft = active ? Math.max(maxGuesses - active.guesses.length, 0) : 0;
   const boardWidth = Math.min(wordLen * 52, 440);
 
+  /* ---- The whole frame is ONE canvas (controls wave) --------------------
+     Pills, theme line, round tracker, clue prose (wrapped on canvas), hint
+     bar, the guess grid AND the keyboard draw together; the hardware
+     keyboard listener above still types. CuiTwin carries every key. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, THEME_H = 20, TRACK_H = 24, CLUE_H = 34, XCLUE_H = 28, HINTB_H = 36, KEY_H = 46, KGAP = 4;
+  const kbdH = KEY_H * 3 + KGAP * 2;
+  const activeXtra = active ? revealedExtra : 0;
+  const hasHintBar = !!(active && activeHints.length > 0 && !done);
+  const chrome = PILL_H + GAP + THEME_H + GAP + TRACK_H + GAP
+    + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + kbdH + GAP : 0)
+    + (allResolved ? 34 : 0);
+  const gapPx = 5;
+  const availB = Math.max(90, Math.floor(boxH) - chrome);
+  const tile = active ? Math.max(20, Math.min(56, Math.floor(Math.min(
+    (Math.min(W, boardWidth) - gapPx * (wordLen - 1)) / wordLen,
+    (availB - gapPx * (maxGuesses - 1)) / maxGuesses
+  )))) : 0;
+  const bw = active ? tile * wordLen + gapPx * (wordLen - 1) : 0;
+  const bh = active ? tile * maxGuesses + gapPx * (maxGuesses - 1) : 0;
+  const H = chrome + bh;
+  let cwY = PILL_H + GAP;
+  const themeY = cwY; cwY += THEME_H + GAP;
+  const trackY = cwY; cwY += TRACK_H + GAP;
+  const clueY = cwY; if (active) cwY += CLUE_H + activeXtra * XCLUE_H + GAP;
+  const hintbY = cwY; if (hasHintBar) cwY += HINTB_H + GAP;
+  const boardY = cwY; if (active) cwY += bh + GAP;
+  const kbdY = cwY;
+  const boardX = Math.floor((W - bw) / 2);
+
+  // The shake: rAF-driven wiggle for 400ms when `shake` flips true.
+  const shakeRef = useRef(null);
+  const [shakeFrame, setShakeFrame] = useState(0);
+  useEffect(() => {
+    if (!shake) { shakeRef.current = null; return; }
+    shakeRef.current = { t0: performance.now() };
+    let raf = 0;
+    const tick = () => {
+      if (!shakeRef.current) return;
+      if (performance.now() - shakeRef.current.t0 >= 400) shakeRef.current = null;
+      setShakeFrame((f) => f + 1);
+      if (shakeRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [shake]);
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 4);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-word', kind: 'pill', r: pr[1], label: 'Word', value: `${Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/${roundsDef.length}` });
+    controls.push({ id: 'p-solved', kind: 'pill', r: pr[2], label: 'Solved', value: `${solvedCount}/${roundsDef.length}` });
+    controls.push({ id: 'p-points', kind: 'pill', r: pr[3], label: 'Points', value: totalScore });
+    controls.push({ id: 'theme', kind: 'label', r: [0, themeY, W, THEME_H], label: `Today's theme: ${cwThemeForDay(dayNum)}`, font: 12 });
+    if (active) {
+      // Clue prose is custom-drawn (wrapped); twin-only entries carry the text.
+      controls.push({ id: 'clue', kind: 'label', noDraw: true, r: [0, clueY, W, CLUE_H], label: `Clue: ${active.def.clue} · ${wordLen} letters` });
+      activeHints.slice(0, revealedExtra).forEach((h, i) => {
+        controls.push({ id: 'xclue' + i, kind: 'label', noDraw: true, r: [0, clueY + CLUE_H + i * XCLUE_H, W, XCLUE_H], label: `Hint ${i + 1}: ${h}` });
+      });
+      if (hasHintBar) {
+        const exhausted = cluesLeft <= 0;
+        controls.push({
+          id: 'hint', kind: 'button',
+          r: [hintMsg ? 0 : Math.floor(W * 0.2), hintbY, hintMsg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINTB_H],
+          label: exhausted ? '💡 No more clues' : `💡 Hint${Number.isFinite(cluesLeft) ? ` · ${cluesLeft} left` : ''}`,
+          disabled: buying || exhausted,
+          action: buyHint,
+        });
+        if (hintMsg) controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintbY, Math.floor(W * 0.5), HINTB_H], label: hintMsg, font: 11 });
+      }
+      // Keyboard: 3 rows, wide Enter/⌫ flanking the bottom row.
+      const kbW = Math.min(W, 480);
+      const kbX0 = Math.floor((W - kbW) / 2);
+      const keyBg = (ch) => keyState[ch] === 'green' ? PAL.emerald
+        : keyState[ch] === 'yellow' ? PAL.gold
+        : keyState[ch] === 'gray' ? PAL.dim : PAL.border;
+      const keyInk = (ch) => keyState[ch] === 'gray' ? PAL.muted
+        : keyState[ch] ? '#fff' : PAL.text;
+      CW_KEYS.forEach((row, ri) => {
+        const y = kbdY + ri * (KEY_H + KGAP);
+        const units = row.length + (ri === 2 ? 3.2 : 0); // two 1.6-wide keys
+        const uw = (kbW - KGAP * (row.length - 1 + (ri === 2 ? 2 : 0))) / units;
+        let x = kbX0 + (ri === 1 ? uw / 2 : 0);
+        if (ri === 2) {
+          controls.push({ id: 'enter', kind: 'button', r: [x, y, uw * 1.6, KEY_H], label: 'Enter', font: 11, noBorder: true, bg: PAL.border, radius: 6, action: submit });
+          x += uw * 1.6 + KGAP;
+        }
+        for (const ch of row.split('')) {
+          controls.push({ id: 'k' + ch, kind: 'button', r: [x, y, uw, KEY_H], label: ch, font: 13, noBorder: true, radius: 6, bg: keyBg(ch), ink: keyInk(ch), action: () => typeLetter(ch) });
+          x += uw + KGAP;
+        }
+        if (ri === 2) {
+          controls.push({ id: 'bksp', kind: 'button', r: [x, y, uw * 1.6, KEY_H], label: '⌫', font: 14, noBorder: true, bg: PAL.border, radius: 6, action: backspace });
+        }
+      });
+    }
+    if (allResolved) {
+      controls.push({ id: 'alldone', kind: 'label', r: [0, trackY + TRACK_H + GAP, W, 30], label: `Puzzle complete — ${solvedCount}/${roundsDef.length} words · ${totalScore} pts`, font: 14, color: PAL.text, bold: true });
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [roundGuesses, cur, done, tile, shakeFrame, W, fmt, solvedCount, totalScore, revealedExtra, cluesLeft, buying, hintMsg, pressedId, activeIdx],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Round tracker dots.
+      {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '600 13px ' + CUI_MONO;
+        const n = roundState.length;
+        const stepX = 26;
+        let x = Math.floor(W / 2 - ((n - 1) * stepX) / 2);
+        roundState.forEach((r, i) => {
+          ctx.fillStyle = r.solved ? PAL.emerald : r.missed ? PAL.rose : i === activeIdx ? PAL.accent : PAL.dim;
+          ctx.fillText(r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○', x, trackY + TRACK_H / 2);
+          x += stepX;
+        });
+      }
+      if (active) {
+        // Clue prose, wrapped.
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = '600 12px ' + CUI_FONT;
+        ctx.fillStyle = PAL.text;
+        cuiWrapText(ctx, `Clue: ${active.def.clue} · ${wordLen} letters`, W / 2, clueY + 14, W - 16, 15, 2);
+        ctx.fillStyle = PAL.gold;
+        ctx.font = '500 11.5px ' + CUI_FONT;
+        activeHints.slice(0, revealedExtra).forEach((h, i) => {
+          cuiWrapText(ctx, `Hint ${i + 1}: ${h}`, W / 2, clueY + CLUE_H + i * XCLUE_H + 12, W - 16, 13, 2);
+        });
+        // Guess grid.
+        ctx.save();
+        ctx.translate(boardX, boardY);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const sh = shakeRef.current;
+        const shakeP = sh ? (performance.now() - sh.t0) / 400 : 1;
+        const wiggle = sh ? Math.sin(shakeP * Math.PI * 4) * 6 * (1 - shakeP) : 0;
+        const guesses = active.guesses;
+        for (let r = 0; r < maxGuesses; r++) {
+          const g = guesses[r];
+          const isCurrent = !g && r === guesses.length && !done;
+          const letters = g ? g.word : (isCurrent ? cur : '');
+          const dx = isCurrent ? wiggle : 0;
+          for (let c = 0; c < wordLen; c++) {
+            const ch = letters[c] || '';
+            const x = c * (tile + gapPx) + dx, y = r * (tile + gapPx);
+            const state = g ? g.result[c] : (ch ? 'filled' : '');
+            let bg = PAL.card, border = PAL.dim, ink = PAL.text;
+            if (state === 'filled') border = PAL.muted;
+            else if (state === 'green') { bg = PAL.emerald; border = PAL.emerald; ink = '#fff'; }
+            else if (state === 'yellow') { bg = PAL.gold; border = PAL.gold; ink = '#fff'; }
+            else if (state === 'gray') { bg = PAL.dim; border = PAL.dim; }
+            klRR(ctx, x + 1, y + 1, tile - 2, tile - 2, 8);
+            ctx.fillStyle = bg;
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = border;
+            ctx.stroke();
+            if (ch) {
+              ctx.font = `600 ${Math.round(tile * 0.5)}px 'JetBrains Mono', monospace`;
+              ctx.fillStyle = ink;
+              ctx.fillText(String(ch).toUpperCase(), x + tile / 2, y + tile / 2 + 1);
+            }
+          }
+        }
+        ctx.restore();
+      }
+    },
+  });
+
   return (
-    // PHASE 3 — this root was a bare <div> despite the game carrying
-    // fitShell: true, so .game-wrap.fit's overflow:hidden CLIPPED the board +
-    // keyboard on long words instead of fitting them. .fit-col makes the board
-    // the one flexible child; the keyboard/clue/tracker are pinned in the
-    // flex: 0 0 auto list.
+    // PHASE 3 — .fit-col keeps the frame the one flexible child (fitShell).
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Word</div>
-          <div className="pvalue">{Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/{roundsDef.length}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Solved</div>
-          <div className="pvalue">{solvedCount}/{roundsDef.length}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Points</div>
-          <div className="pvalue">{totalScore}</div>
-        </div>
+      <div
+        className="cw-board cui-frame"
+        ref={boxRef}
+        /* The live entry, verbatim. A check asserts
+           `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
+           the double-input bug it would read "LLEENN" and the check fails. */
+        data-cw-typed={cur}
+      >
+        <canvas
+          ref={canvasRef}
+          className="cw-canvas board-canvas"
+          role="img"
+          aria-label={active
+            ? `Daily Cipher — word ${activeIdx + 1} of ${roundsDef.length}, ${active.guesses.length} of ${maxGuesses} guesses used`
+            : `Daily Cipher — puzzle complete, ${solvedCount} of ${roundsDef.length} words`}
+        />
       </div>
-
-      {/* #138 — naming the theme is half the "it feels different today" fix. */}
-      <div className="word-theme">Today's theme: <b>{cwThemeForDay(dayNum)}</b></div>
-
-      <div className="cw-tracker">
-        {roundState.map((r, i) => {
-          let cls = 'cw-dot';
-          if (r.solved) cls += ' solved';
-          else if (r.missed) cls += ' missed';
-          else if (i === activeIdx) cls += ' active';
-          return (
-            <span
-              key={i}
-              className={cls}
-              title={r.resolved ? `Word ${i + 1}: ${r.def.word}` : `Word ${i + 1}`}
-            >
-              {r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○'}
-            </span>
-          );
-        })}
-      </div>
-
-      {active && (
-        <>
-          <div className="cw-clue">
-            <span className="cw-clue-label">Clue</span>
-            <span className="cw-clue-text">{active.def.clue}</span>
-            <span className="cw-clue-len">{wordLen} letters</span>
-          </div>
-
-          {activeHints.slice(0, revealedExtra).map((h, i) => (
-            <div key={i} className="cw-clue cw-clue-extra">
-              <span className="cw-clue-label">Hint {i + 1}</span>
-              <span className="cw-clue-text">{h}</span>
-            </div>
-          ))}
-
-          {activeHints.length > 0 && (
-            <HintBar
-              hintsLeft={cluesLeft}
-              exhausted={cluesLeft <= 0}
-              buying={buying}
-              onBuy={buyHint}
-              msg={hintMsg}
-              label="No more clues"
-            />
-          )}
-
-          {/* The guess grid is the one flexible region: it shrinks so the
-              keyboard, clue and tracker (all flex: 0 0 auto) keep their place.
-              Deliberately NOT wrapped in fit-scale-box — that box is width-free,
-              which collapses a percentage-sized grid to min-content. */}
-          <div
-            className="cw-board"
-            /* The live entry, verbatim. A check asserts
-               `.cw-board[data-cw-typed="LEND"]` after the ?cwtype= replay — with
-               the double-input bug it reads "LLEENNDD" and the check fails. */
-            data-cw-typed={cur}
-            style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
-          >
-            {Array.from({ length: maxGuesses }).map((_, r) => {
-              const g = active.guesses[r];
-              const isCurrent = !g && r === active.guesses.length && !done;
-              const letters = g ? g.word : (isCurrent ? cur : '');
-              return (
-                <div
-                  key={r}
-                  className={`cw-row${isCurrent && shake ? ' shake' : ''}`}
-                  style={{ gridTemplateColumns: `repeat(${wordLen}, 1fr)` }}
-                >
-                  {Array.from({ length: wordLen }).map((__, c) => {
-                    const ch = letters[c] || '';
-                    const cls = ['cw-tile'];
-                    if (g) cls.push(g.result[c]);
-                    else if (ch) cls.push('filled');
-                    return <div key={c} className={cls.join(' ')}>{ch}</div>;
-                  })}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="cw-kbd">
-            {CW_KEYS.map((row, ri) => (
-              <div key={ri} className="cw-kbd-row">
-                {ri === 2 && <button className="cw-key wide" {...tapProps(submit)}>Enter</button>}
-                {row.split('').map(ch => (
-                  <button
-                    key={ch}
-                    className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
-                    {...tapProps(() => typeLetter(ch))}
-                  >
-                    {ch}
-                  </button>
-                ))}
-                {ri === 2 && <button className="cw-key wide" {...tapProps(backspace)}>⌫</button>}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {allResolved && (
-        <div className="cw-alldone">Puzzle complete — {solvedCount}/{roundsDef.length} words · {totalScore} pts</div>
-      )}
+      <CuiTwin controls={controls} />
     </div>
   );
 }
@@ -9978,6 +9043,102 @@ function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
   return next;
 }
 
+/* The Minesweeper board is a canvas — Mine Finder's exact pattern (they are
+   the same family on purpose). Self-contained because the board lives behind
+   the ☰ tab switch: usePointerCell binds on mount, so the canvas must exist
+   when its hooks run. The board's light/dark look still keys off the RESOLVED
+   theme (the old data-ms-theme pair), not the raw palette: base art is dark,
+   light pins its own greys — intrinsic to this board, like the daily's. */
+const MS_LIGHT = { grid: '#9ca3af', hidden: '#e5e7eb', revealed: '#f9fafb', mineDead: '#fca5a5', exploded: '#f87171' };
+function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverMine, done, onCellTap, onCellFlag, onCellAlt }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: MS_COLS, rows: MS_ROWS, minCell: 26, maxCell: 46, gap: 2 });
+  const cellStep = cell + 2;
+  const boardPx = cellStep * MS_COLS - 2;
+
+  const liveRef = useRef({});
+  liveRef.current = { revealed, flagged, done, cellStep };
+  const idxAt = (p) => {
+    const cs = liveRef.current.cellStep;
+    const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
+    if (c < 0 || c >= MS_COLS || r < 0 || r >= MS_ROWS) return -1;
+    return r * MS_COLS + c;
+  };
+  usePointerCell(canvasRef, {
+    onTap: (p) => { const i = idxAt(p); if (i >= 0 && !liveRef.current.done) onCellTap(i); },
+    onLongPress: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      onCellAlt(i);
+    },
+    onContext: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      onCellFlag(i);
+    },
+  });
+
+  useCanvasBoard(canvasRef, {
+    width: boardPx,
+    height: boardPx,
+    deps: [cell, revealed, flagged, mineSet, gameOverMine, done, theme],
+    draw: (ctx) => {
+      const light = theme === 'light';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const radius = Math.max(3, Math.round(cell * 0.16));
+      for (let i = 0; i < MS_ROWS * MS_COLS; i++) {
+        const r = Math.floor(i / MS_COLS), c = i % MS_COLS;
+        const x = c * cellStep, y = r * cellStep;
+        const isRev = revealed.has(i);
+        const isFlag = flagged.has(i);
+        const isMineVisible = done && mineSet && mineSet.has(i) && !isRev;
+        const isExploded = gameOverMine === i;
+        const adjVal = adjacency ? adjacency[i] : 0;
+
+        let fill = light ? MS_LIGHT.hidden : PAL.card;
+        if (isRev) fill = light ? MS_LIGHT.revealed : PAL.surface;
+        if (isMineVisible) fill = light ? MS_LIGHT.mineDead : 'rgba(205,75,58,.25)';
+        if (isExploded) fill = light ? MS_LIGHT.exploded : 'rgba(205,75,58,.60)';
+        klRR(ctx, x, y, cell, cell, radius);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = light ? MS_LIGHT.grid : PAL.border;
+        ctx.stroke();
+
+        const cx = x + cell / 2, cy = y + cell / 2;
+        if (isExploded) {
+          ctx.font = `${Math.round(cell * 0.6)}px system-ui, sans-serif`;
+          ctx.fillText('💥', cx, cy + 1);
+        } else if (isMineVisible) {
+          ctx.font = `${Math.round(cell * 0.58)}px system-ui, sans-serif`;
+          ctx.fillText('💣', cx, cy + 1);
+        } else if (isRev && adjVal > 0) {
+          ctx.font = `700 ${Math.round(cell * 0.5)}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = palOf(MF_NUM_COLORS[adjVal], PAL.text);
+          ctx.fillText(String(adjVal), cx, cy + 1);
+        } else if (isFlag) {
+          ctx.font = `${Math.round(cell * 0.55)}px system-ui, sans-serif`;
+          ctx.fillText('🚩', cx, cy + 1);
+        }
+      }
+    },
+  });
+
+  return (
+    <div className="ms-boardbox" ref={boxRef} onContextMenu={(e) => e.preventDefault()}>
+      <canvas
+        ref={canvasRef}
+        className="ms-canvas board-canvas"
+        role="grid"
+        aria-label={`Minesweeper, 8 by 8 board, ${revealed.size} cells revealed`}
+      />
+    </div>
+  );
+}
+
 function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   // The board follows the APP theme now (its own light/dark button is gone —
   // one control, in Settings). Base .ms-* rules are dark and
@@ -9997,7 +9158,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   // leaves SFX untouched.
   const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
   const [musicPaused, setMusicPaused] = useState(false);
-  const flagTimerRef = useRef(null);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
 
   // Reset when parent increments resetKey
@@ -10208,17 +9368,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     handleReveal(idx);
   };
 
-  // Long-press stays as the INVERSE of the current mode, so both gestures work.
-  const onPointerDown = (idx) => {
-    flagTimerRef.current = setTimeout(() => {
-      flagTimerRef.current = null;
-      if (revealed.has(idx)) return;
-      if (flagMode) handleReveal(idx); else handleFlag(idx);
-      cgHaptic(12);
-    }, 500);
-  };
-  const onPointerUp = () => { if (flagTimerRef.current) { clearTimeout(flagTimerRef.current); flagTimerRef.current = null; } };
-
   const minesLeft = MS_MINES - flagged.size;
 
   const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
@@ -10228,39 +9377,23 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{timeFmt}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Mines Left</div>
-              <div className="pvalue">{minesLeft}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Safe Revealed</div>
-              <div className="pvalue">{safeRevealed}/{MS_SAFE}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: timeFmt, gold: true },
+              { id: 'p-mines', kind: 'pill', r: pr[1], label: 'Mines Left', value: minesLeft },
+              { id: 'p-safe', kind: 'pill', r: pr[2], label: 'Safe Revealed', value: `${safeRevealed}/${MS_SAFE}` },
+            ];
+          }} />
 
-          {/* #136 — flag/dig toggle. Mirrors the daily Mine Finder's
-              .mf-mode-btn pair so the two mine games read the same. */}
-          <div className="mf-controls" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-            <button
-              className={'mf-mode-btn' + (flagMode ? '' : ' on')}
-              onClick={() => setFlagMode(false)}
-              aria-pressed={!flagMode}
-            >
-              ⛏️ Dig<span className="mf-mode-label">tap to reveal</span>
-            </button>
-            <button
-              className={'mf-mode-btn flag' + (flagMode ? ' on' : '')}
-              onClick={() => setFlagMode(true)}
-              aria-pressed={flagMode}
-            >
-              🚩 Flag<span className="mf-mode-label">tap to mark</span>
-            </button>
-          </div>
+          {/* #136 — flag/dig toggle, drawn; the two mine games read the same. */}
+          <CuiBar height={52} build={(W) => {
+            const br = cuiRow(Math.floor(W * 0.06), 2, Math.floor(W * 0.88), 48, 2);
+            return [
+              { id: 'dig', kind: 'button', r: br[0], label: '⛏️ Dig', sub: 'tap to reveal', on: !flagMode, action: () => setFlagMode(false) },
+              { id: 'flag', kind: 'button', r: br[1], label: '🚩 Flag', sub: 'tap to mark', on: flagMode, action: () => setFlagMode(true) },
+            ];
+          }} />
           {/* #136 — chording was completely undiscoverable: tapping a revealed
               number simply did nothing, with no hint that it ever would. */}
           <div className="p6-hint" style={{ textAlign: 'center' }}>
@@ -10268,74 +9401,31 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
             Tap a number whose flags all match to clear around it.
           </div>
 
-          <div
-            className="ms-grid"
-            data-ms-theme={theme}
-            onContextMenu={e => e.preventDefault()}
-          >
-            {Array.from({ length: MS_ROWS * MS_COLS }, (_, idx) => {
-              const isRevealed = revealed.has(idx);
-              const isFlagged = flagged.has(idx);
-              const isMine = mineSet && mineSet.has(idx);
-              const isExploded = gameOverMine === idx;
-              const isMineVisible = done && mineSet && mineSet.has(idx) && !isRevealed;
-              const adjVal = adjacency && adjacency[idx];
+          <MsBoardCanvas
+            theme={theme}
+            revealed={revealed}
+            flagged={flagged}
+            mineSet={mineSet}
+            adjacency={adjacency}
+            gameOverMine={gameOverMine}
+            done={done}
+            onCellTap={handleCellTap}
+            onCellFlag={handleFlag}
+            onCellAlt={(idx) => { if (flagMode) handleReveal(idx); else handleFlag(idx); cgHaptic(12); }}
+          />
 
-              let cls = 'ms-cell';
-              if (isExploded) cls += ' ms-exploded';
-              else if (isMineVisible) cls += ' ms-mine-dead';
-              else if (isRevealed) { cls += ' ms-revealed'; if (adjVal > 0) cls += ` ms-n${adjVal}`; }
-              else if (isFlagged) cls += ' ms-flagged';
-              else cls += ' ms-hidden';
-
-              let content = '';
-              if (isExploded) content = '💥';
-              else if (isMineVisible) content = '💣';
-              else if (isRevealed && adjVal > 0) content = adjVal;
-              else if (isRevealed && adjVal === 0) content = '';
-              else if (isFlagged) content = '🚩';
-
-              return (
-                <div
-                  key={idx}
-                  className={cls}
-                  onClick={() => handleCellTap(idx)}
-                  onContextMenu={e => { e.preventDefault(); handleFlag(idx); }}
-                  onPointerDown={() => onPointerDown(idx)}
-                  onPointerUp={onPointerUp}
-                  onPointerLeave={onPointerUp}
-                >
-                  {content}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="ms-action-row">
-            <div className="ms-cashout-wrap">
-              <button
-                className={'ms-cashout-btn' + (cashOutActive ? '' : ' disabled')}
-                onClick={handleCashOut}
-                disabled={!cashOutActive}
-              >
-                Lock In 🔒 ×{cashoutMultiplier}
-              </button>
-            </div>
-            <button
-              className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
-              onClick={() => setMusicPaused(p => !p)}
-              disabled={!soundOn}
-              title={!soundOn ? 'Sound is off (Settings)' : musicPaused ? 'Resume music' : 'Pause music'}
-              aria-label={!soundOn ? 'Sound off' : musicPaused ? 'Resume music' : 'Pause music'}
-            >
-              {!soundOn ? '🔇' : musicPaused ? '▶' : '⏸'}
-            </button>
-            <button className="ms-newgame-btn" onClick={() => {
-              setMineSet(null); setAdjacency(null); setRevealed(new Set());
-              setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
-              setMusicPaused(false);
-            }}>↺ New</button>
-          </div>
+          <CuiBar height={50} build={(W) => {
+            const br = cuiRow(Math.floor(W * 0.04), 4, Math.floor(W * 0.92), 42, 3);
+            return [
+              { id: 'lockin', kind: 'button', r: [br[0][0], 4, br[0][2] + br[1][2] * 0.35, 42], label: `Lock In 🔒 ×${cashoutMultiplier}`, solid: cashOutActive, disabled: !cashOutActive, action: handleCashOut },
+              { id: 'music', kind: 'button', r: [br[1][0] + br[1][2] * 0.45, 4, br[1][2] * 0.55, 42], label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', disabled: !soundOn, action: () => setMusicPaused(p => !p) },
+              { id: 'new', kind: 'button', r: br[2], label: '↺ New', action: () => {
+                setMineSet(null); setAdjacency(null); setRevealed(new Set());
+                setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+                setMusicPaused(false);
+              } },
+            ];
+          }} />
         </div>
       )}
 
@@ -10435,49 +9525,155 @@ function mncStoneSizeFactor(count, isStore) {
   return 0.13;
 }
 
-// Renders count pebble divs absolutely-positioned inside the pit/store container.
-// pitSeed: pit array index (stable random layout per pit).
-// entering: true → newest stone (index count-1) plays pop-in animation.
-// capturing: true → whole stone layer plays scatter-out animation.
-// isStore: adjusts stone sizing for the taller pill-shaped store.
-function MncPitStones({ count, pitSeed, entering, capturing, isStore }) {
-  const stones = [];
-  const sf = mncStoneSizeFactor(count, isStore);
-  // Max center offset as fraction of element size; sqrt ensures uniform-disk distribution.
-  const maxR = (0.5 - sf / 2) * 0.82;
+/* The Mancala board as ONE canvas shared by all four modes — local 2P, Daily
+   Challenge, Versus Bot, and Online (#170 treatment). The carved-wood palette
+   stays intrinsic (hardcoded, as CLAUDE.md requires); stones keep their
+   seeded uniform-disk layouts (the exact MncPitStones math, drawn). Each
+   caller passes its own pitState(idx) → { clickable, flash, capture } so the
+   four modes' turn/animation rules stay exactly where they lived. */
+const MNC_WOOD = { board: '#7B4F2E', edge: '#5A2F14', pit: '#4A1E09', pitEdge: '#3A1206', pitHot: '#9E7A5A', text: '#C8A87A', label: '#9E7A5A', flashBg: '#5E2E12' };
+function MncBoardCanvas({ pits, pitState, storeGlowL, storeGlowR, labelL, labelR, onPit }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 8, rows: 2 });
+  const W = Math.max(0, Math.floor(boxW));
+  const storeW = Math.round(W * 0.13);
+  const pad = 8, gap = 5;
+  const cell = Math.floor((W - pad * 2 - storeW * 2 - gap * 7) / 6);
+  const H = pad * 2 + cell * 2 + gap;
+  const geoRef = useRef({});
+  geoRef.current = { W, H, storeW, pad, gap, cell };
 
-  for (let i = 0; i < count; i++) {
-    const r     = Math.sqrt(mncRandVal(pitSeed, i * 3))        * maxR;
-    const theta = mncRandVal(pitSeed, i * 3 + 1) * 2 * Math.PI;
-    const sVar  = 0.85 + mncRandVal(pitSeed, i * 3 + 2) * 0.30; // ±15% size variance
+  // Pit centers: p2 row (indices 12..7) on top, p1 row (0..5) below.
+  const pitCenter = (idx) => {
+    const g = geoRef.current;
+    const topRow = idx >= 7 && idx <= 12;
+    const col = topRow ? 12 - idx : idx;
+    const x = g.pad + g.storeW + g.gap + col * (g.cell + g.gap) + g.cell / 2;
+    const y = topRow ? g.pad + g.cell / 2 : g.pad + g.cell + g.gap + g.cell / 2;
+    return [x, y];
+  };
 
-    const cx   = 0.5 + r * Math.cos(theta);
-    const cy   = 0.5 + r * Math.sin(theta);
-    const sz   = sf * sVar * 100;
-    const left = (cx - (sf * sVar) / 2) * 100;
-    const top  = (cy - (sf * sVar) / 2) * 100;
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const g = geoRef.current;
+      for (let idx = 0; idx <= 12; idx++) {
+        if (idx === 6) continue;
+        const [cx, cy] = pitCenter(idx);
+        if (Math.hypot(p.x - cx, p.y - cy) <= g.cell / 2 + 3) {
+          if (pitState(idx).clickable) onPit(idx);
+          return;
+        }
+      }
+    },
+  });
 
-    stones.push(
-      React.createElement('div', {
-        key: i,
-        className: 'mnc-stone' + (entering && i === count - 1 ? ' mnc-stone-entering' : ''),
-        style: {
-          left:       `${left}%`,
-          top:        `${top}%`,
-          width:      `${sz}%`,
-          height:     `${sz}%`,
-          background: MNC_STONE_COLORS[i % MNC_STONE_COLORS.length],
-        },
-      })
-    );
-  }
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    // pitState is a fresh closure each parent render, so flash/capture/turn
+    // changes repaint even though the sets live in the caller.
+    deps: [pits, storeGlowL, storeGlowR, W, pitState],
+    draw: (ctx) => {
+      if (W < 120) return;
+      const g = geoRef.current;
+      ctx.textAlign = 'center';
+      // Carved-wood board.
+      klRR(ctx, 1, 1, g.W - 2, g.H - 2, 16);
+      ctx.fillStyle = MNC_WOOD.board;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = MNC_WOOD.edge;
+      ctx.stroke();
 
-  return React.createElement(
-    'div',
-    { className: 'mnc-pit-stones' + (capturing ? ' mnc-stones-capturing' : '') },
-    ...stones
+      // Seeded stone layout — the MncPitStones math, drawn.
+      const drawStones = (idx, cx, cy, radius, isStore) => {
+        const count = pits[idx];
+        const sf = mncStoneSizeFactor(count, isStore);
+        const maxR = (0.5 - sf / 2) * 0.82;
+        for (let i = 0; i < count; i++) {
+          const rr = Math.sqrt(mncRandVal(idx, i * 3)) * maxR;
+          const theta = mncRandVal(idx, i * 3 + 1) * 2 * Math.PI;
+          const sVar = 0.85 + mncRandVal(idx, i * 3 + 2) * 0.30;
+          const sx = cx + rr * Math.cos(theta) * radius * 2;
+          const sy = cy + rr * Math.sin(theta) * radius * 2;
+          ctx.beginPath();
+          ctx.arc(sx, sy, Math.max(2, sf * sVar * radius), 0, Math.PI * 2);
+          ctx.fillStyle = MNC_STONE_COLORS[i % MNC_STONE_COLORS.length];
+          ctx.fill();
+        }
+      };
+
+      // Stores: idx 13 left, idx 6 right, pill-shaped, spanning both rows.
+      const storeH = g.H - g.pad * 2;
+      const stores = [
+        { idx: 13, x: g.pad, glow: storeGlowL, label: labelL || 'P2' },
+        { idx: 6, x: g.W - g.pad - g.storeW, glow: storeGlowR, label: labelR || 'P1' },
+      ];
+      for (const s of stores) {
+        klRR(ctx, s.x, g.pad, g.storeW, storeH, g.storeW / 2);
+        ctx.fillStyle = MNC_WOOD.pit;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = s.glow ? palOf(s.glow, MNC_WOOD.pitHot) : MNC_WOOD.pitEdge;
+        ctx.stroke();
+        ctx.save();
+        klRR(ctx, s.x, g.pad, g.storeW, storeH, g.storeW / 2);
+        ctx.clip();
+        drawStones(s.idx, s.x + g.storeW / 2, g.pad + storeH / 2, g.storeW / 2.4, true);
+        ctx.restore();
+        const fs = Math.max(8, Math.round(g.storeW * 0.22));
+        ctx.font = `600 ${Math.max(6, Math.round(g.storeW * 0.16))}px 'Space Grotesk', sans-serif`;
+        ctx.fillStyle = MNC_WOOD.label;
+        ctx.fillText(s.label.toUpperCase().slice(0, 6), s.x + g.storeW / 2, g.pad + storeH * 0.24);
+        ctx.font = `600 ${fs}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = s.glow ? palOf(s.glow, MNC_WOOD.text) : MNC_WOOD.text;
+        ctx.fillText(String(pits[s.idx]), s.x + g.storeW / 2, g.pad + storeH / 2 + fs * 0.35);
+        ctx.font = `600 ${Math.max(6, Math.round(g.storeW * 0.14))}px 'Space Grotesk', sans-serif`;
+        ctx.fillStyle = MNC_WOOD.label;
+        ctx.fillText('STORE', s.x + g.storeW / 2, g.pad + storeH * 0.8);
+      }
+
+      // Pits.
+      for (let idx = 0; idx <= 12; idx++) {
+        if (idx === 6) continue;
+        const st = pitState(idx);
+        const [cx, cy] = pitCenter(idx);
+        const radius = g.cell / 2 - 2;
+        ctx.save();
+        if (!st.clickable && !st.flash && !st.capture) ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = st.flash ? MNC_WOOD.flashBg : MNC_WOOD.pit;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = st.capture ? PAL.gold : st.flash || st.clickable ? MNC_WOOD.pitHot : MNC_WOOD.pitEdge;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+        ctx.clip();
+        drawStones(idx, cx, cy, radius, false);
+        ctx.restore();
+        // Count bubble so buried stones stay countable at a glance.
+        ctx.font = `600 ${Math.max(8, Math.round(g.cell * 0.2))}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = MNC_WOOD.text;
+        ctx.fillText(String(pits[idx]), cx, cy + radius - Math.max(3, g.cell * 0.06));
+      }
+    },
+  });
+
+  return (
+    <div className="mnc-board" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="mnc-canvas board-canvas"
+        role="img"
+        aria-label={`Mancala board — ${labelL || 'P2'} store ${pits[13]}, ${labelR || 'P1'} store ${pits[6]}`}
+      />
+    </div>
   );
 }
+
 const MNC_HISTORY_MAX = 50;
 const MNC_SOUND_KEY = 'puzzlechain_mancala_sound';
 
@@ -10866,21 +10062,6 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
   };
 
   // Board display order: P2 pits shown right-to-left (pit 12 at left, pit 7 at right)
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
-
-  const pitClass = (idx) => {
-    const ownMin = player === 1 ? 0 : 7;
-    const ownMax = player === 1 ? 5 : 12;
-    const isOwn = idx >= ownMin && idx <= ownMax;
-    const canClick = !done && !animatingRef.current && isOwn && pits[idx] > 0;
-    const cls = ['mnc-pit'];
-    if (canClick) cls.push('mnc-clickable');
-    else cls.push('mnc-dim');
-    if (flashPits.has(idx)) cls.push('mnc-flash');
-    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
-    return cls.join(' ');
-  };
 
   const p1Color = C.accent;
   const p2Color = C.rose;
@@ -10905,96 +10086,32 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
     <div>
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmt}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue">{moves}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Turn</div>
-              <div className="pvalue" style={{ color: done ? C.muted : activeColor, fontSize: '0.9rem' }}>
-                {done ? (winner === 'draw' ? 'Draw' : `P${winner}`) : `P${player}`}
-              </div>
-            </div>
-          </div>
-
-          {/* Active-player indicator */}
-          <div style={{
-            textAlign: 'center',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            color: done ? C.muted : activeColor,
-            background: (done ? C.dim : activeColor) + '22',
-            border: `1px solid ${(done ? C.dim : activeColor)}44`,
-            borderRadius: '999px',
-            padding: '0.32rem 0.8rem',
-            maxWidth: 480,
-            margin: '0 auto 0.65rem',
-            display: 'block',
-          }}>
-            {done
-              ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : `Game over — Player ${winner} wins! 🎉`)
-              : `Player ${player}'s turn`}
-          </div>
+          <CuiBar height={72} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+              { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
+              { id: 'p-turn', kind: 'pill', r: pr[2], label: 'Turn', value: done ? (winner === 'draw' ? 'Draw' : `P${winner}`) : `P${player}`, color: done ? undefined : palOf(activeColor, undefined) },
+              { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
+                label: done ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : `Game over — Player ${winner} wins! 🎉`) : `Player ${player}'s turn` },
+            ];
+          }} />
 
           {/* Board */}
-          <div className="mnc-board">
-            {/* P2 Store — col 1, spans both rows */}
-            <div className="mnc-store" style={{
-              gridColumn: 1, gridRow: '1 / 3',
-              borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206',
-            }}>
-              <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
-              <div className="mnc-store-label">P2</div>
-              <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>
-                {pits[13]}
-              </div>
-              <div className="mnc-store-label">store</div>
-            </div>
-
-            {/* P2 pits — row 1, cols 2–7 */}
-            {p2Display.map((idx, i) => (
-              <div
-                key={idx}
-                className={pitClass(idx)}
-                style={{ gridRow: 1, gridColumn: i + 2 }}
-                onClick={() => handlePitClick(idx)}
-                aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}
-              >
-                <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-              </div>
-            ))}
-
-            {/* P1 Store — col 8, spans both rows */}
-            <div className="mnc-store" style={{
-              gridColumn: 8, gridRow: '1 / 3',
-              borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206',
-            }}>
-              <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
-              <div className="mnc-store-label">P1</div>
-              <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>
-                {pits[6]}
-              </div>
-              <div className="mnc-store-label">store</div>
-            </div>
-
-            {/* P1 pits — row 2, cols 2–7 */}
-            {p1Display.map((idx, i) => (
-              <div
-                key={idx}
-                className={pitClass(idx)}
-                style={{ gridRow: 2, gridColumn: i + 2 }}
-                onClick={() => handlePitClick(idx)}
-                aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}
-              >
-                <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-              </div>
-            ))}
-          </div>
+          <MncBoardCanvas
+            pits={pits}
+            pitState={(idx) => {
+              const ownMin = player === 1 ? 0 : 7, ownMax = player === 1 ? 5 : 12;
+              return {
+                clickable: !done && !animatingRef.current && idx >= ownMin && idx <= ownMax && pits[idx] > 0,
+                flash: flashPits.has(idx),
+                capture: captureFlash.has(idx),
+              };
+            }}
+            storeGlowL={!done && player === 2 ? p2Color : null}
+            storeGlowR={!done && player === 1 ? p1Color : null}
+            onPit={handlePitClick}
+          />
 
           {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
 
@@ -11610,8 +10727,6 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
   }
 
   // ----- play phase -----
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
   const p1Color = C.accent, p2Color = C.rose;
   const activeColor = player === 1 ? p1Color : p2Color;
   const leadingRecord = globalRecord != null && pits[6] > globalRecord;
@@ -11621,16 +10736,6 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
     if (idx < 0 || idx > 5 || pits[idx] === 0) return;
     applyMove(idx, 1);
   };
-  const pitClass = (idx) => {
-    const isP1Pit = idx <= 5;
-    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
-    const cls = ['mnc-pit'];
-    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
-    if (flashPits.has(idx)) cls.push('mnc-flash');
-    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
-    return cls.join(' ');
-  };
-
   return (
     <div>
       <div className="mnc-daily-header">
@@ -11643,56 +10748,34 @@ function MancalaDailyGame({ onWin, onStepChange, offset }) {
         </div>
       </div>
 
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: p1Color }}>{pits[6]}</div></div>
-        <div className="pill">
-          <div className="plabel">ZK</div>
-          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? '#4ade80' : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
-            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
-          </div>
-        </div>
-      </div>
+      <CuiBar height={72} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        return [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: pits[6], color: palOf(p1Color, undefined) },
+          { id: 'p-zk', kind: 'pill', r: pr[3], label: 'ZK', value: verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—',
+            color: verifying ? PAL.gold : verified === true ? '#4ade80' : verified === false ? PAL.rose : sessionIdRef.current ? PAL.accent : PAL.muted },
+          { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
+            label: done
+              ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+              : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits' },
+        ];
+      }} />
 
-      <div style={{
-        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
-        color: done ? C.muted : activeColor,
-        background: (done ? C.dim : activeColor) + '22',
-        border: `1px solid ${(done ? C.dim : activeColor)}44`,
-        borderRadius: '999px', padding: '0.32rem 0.8rem',
-        maxWidth: 480, margin: '0 auto 0.65rem',
-      }}>
-        {done
-          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
-          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn — sow from your pits'}
-      </div>
-
-      <div className="mnc-board">
-        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
-          <div className="mnc-store-label">AI</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p2Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
-          <div className="mnc-store-label">You</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p1Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
-            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-      </div>
+      <MncBoardCanvas
+        pits={pits}
+        pitState={(idx) => ({
+          clickable: !done && player === 1 && idx <= 5 && pits[idx] > 0 && !animatingRef.current,
+          flash: flashPits.has(idx),
+          capture: captureFlash.has(idx),
+        })}
+        storeGlowL={!done && player === 2 ? p2Color : null}
+        storeGlowR={!done && player === 1 ? p1Color : null}
+        labelL="AI"
+        labelR="You"
+        onPit={handlePitClick}
+      />
 
       {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
       {becameRecord && <div className="mnc-banner" style={{ color: C.gold }}>🏆 New daily record!</div>}
@@ -12042,21 +11125,9 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     applyMove(idx, 1);
   };
 
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
   const p1Color = C.accent;
   const p2Color = C.rose;
   const activeColor = player === 1 ? p1Color : p2Color;
-
-  const pitClass = (idx) => {
-    const isP1Pit = idx <= 5;
-    const canClick = !done && player === 1 && isP1Pit && pits[idx] > 0 && !animatingRef.current;
-    const cls = ['mnc-pit'];
-    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
-    if (flashPits.has(idx)) cls.push('mnc-flash');
-    if (captureFlash.has(idx)) cls.push('mnc-capture-flash');
-    return cls.join(' ');
-  };
 
   const aiHistory = history.filter(h => h.mode === 'ai');
   const stats = aiHistory.reduce(
@@ -12068,59 +11139,34 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
   return (
     <div>
       {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
-        <div className="pill">
-          <div className="plabel">Diff</div>
-          <div className="pvalue" style={{ fontSize: '0.8rem', textTransform: 'capitalize' }}>{difficulty}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">ZK</div>
-          <div className="pvalue" style={{ fontSize: '0.75rem', color: verifying ? C.gold : verified === true ? C.emerald : verified === false ? C.rose : sessionIdRef.current ? C.accent : C.muted }}>
-            {verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—'}
-          </div>
-        </div>
-      </div>
+      <CuiBar height={72} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        return [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
+          { id: 'p-diff', kind: 'pill', r: pr[2], label: 'Diff', value: String(difficulty).toUpperCase() },
+          { id: 'p-zk', kind: 'pill', r: pr[3], label: 'ZK', value: verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—',
+            color: verifying ? PAL.gold : verified === true ? PAL.emerald : verified === false ? PAL.rose : sessionIdRef.current ? PAL.accent : PAL.muted },
+          { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
+            label: done
+              ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
+              : player === 2 ? 'AI is thinking… 🤖' : 'Your turn' },
+        ];
+      }} />
 
-      <div style={{
-        textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
-        color: done ? C.muted : activeColor,
-        background: (done ? C.dim : activeColor) + '22',
-        border: `1px solid ${(done ? C.dim : activeColor)}44`,
-        borderRadius: '999px', padding: '0.32rem 0.8rem',
-        maxWidth: 480, margin: '0 auto 0.65rem',
-      }}>
-        {done
-          ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
-          : player === 2 ? 'AI is thinking… 🤖' : 'Your turn'}
-      </div>
-
-      <div className="mnc-board">
-        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: !done && player === 2 ? p2Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={flashPits.has(13)} capturing={false} />
-          <div className="mnc-store-label">AI</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 2 ? p2Color : '#C8A87A' }}>{pits[13]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p2Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: !done && player === 1 ? p1Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={flashPits.has(6)} capturing={false} />
-          <div className="mnc-store-label">You</div>
-          <div className="mnc-store-score" style={{ color: !done && player === 1 ? p1Color : '#C8A87A' }}>{pits[6]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p1Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handlePitClick(idx)}
-            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={flashPits.has(idx)} capturing={captureFlash.has(idx)} />
-          </div>
-        ))}
-      </div>
+      <MncBoardCanvas
+        pits={pits}
+        pitState={(idx) => ({
+          clickable: !done && player === 1 && idx <= 5 && pits[idx] > 0 && !animatingRef.current,
+          flash: flashPits.has(idx),
+          capture: captureFlash.has(idx),
+        })}
+        storeGlowL={!done && player === 2 ? p2Color : null}
+        storeGlowR={!done && player === 1 ? p1Color : null}
+        labelL="AI"
+        labelR="You"
+        onPit={handlePitClick}
+      />
 
       {bannerMsg && <div className="mnc-banner">{bannerMsg}</div>}
 
@@ -12233,17 +11279,6 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
     submitMove(idx);
   };
 
-  const p2Display = [12, 11, 10, 9, 8, 7];
-  const p1Display = [0, 1, 2, 3, 4, 5];
-
-  const pitClass = (idx) => {
-    const isP1Pit = idx <= 5;
-    const isMyPit = myPlayerNum === 1 ? isP1Pit : !isP1Pit;
-    const canClick = isMyTurn && isMyPit && pits[idx] > 0;
-    const cls = ['mnc-pit'];
-    cls.push(canClick ? 'mnc-clickable' : 'mnc-dim');
-    return cls.join(' ');
-  };
 
   const p1Name = room && room.player1Name ? room.player1Name : 'P1';
   const p2Name = room && room.player2Name ? room.player2Name : 'P2';
@@ -12256,46 +11291,32 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} />
-          <div className="plabel">Online</div>
-        </div>
-      </div>
+      <CuiBar height={opponentDisconnected ? 68 : 46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 3);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-conn', kind: 'pill', r: pr[2], label: 'Online', value: opponentDisconnected ? '●' : '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        if (opponentDisconnected) {
+          out.push({ id: 'disc', kind: 'label', r: [0, 50, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        }
+        return out;
+      }} />
 
-      {opponentDisconnected && (
-        <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-          Opponent connection lost — waiting for reconnect…
-        </div>
-      )}
-
-      <div className="mnc-board">
-        <div className="mnc-store" style={{ gridColumn: 1, gridRow: '1 / 3', borderColor: currentPlayer === 2 && status === 'active' ? p2Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[13]} pitSeed={13} isStore={true} entering={false} capturing={false} />
-          <div className="mnc-store-label">{myPlayerNum === 2 ? 'You' : oppName}</div>
-          <div className="mnc-store-score" style={{ color: currentPlayer === 2 && status === 'active' ? p2Color : '#C8A87A' }}>{pits[13]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p2Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 1, gridColumn: i + 2 }} onClick={() => handleClick(idx)}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={false} capturing={false} />
-          </div>
-        ))}
-        <div className="mnc-store" style={{ gridColumn: 8, gridRow: '1 / 3', borderColor: currentPlayer === 1 && status === 'active' ? p1Color + '99' : '#3A1206' }}>
-          <MncPitStones count={pits[6]} pitSeed={6} isStore={true} entering={false} capturing={false} />
-          <div className="mnc-store-label">{myPlayerNum === 1 ? 'You' : oppName}</div>
-          <div className="mnc-store-score" style={{ color: currentPlayer === 1 && status === 'active' ? p1Color : '#C8A87A' }}>{pits[6]}</div>
-          <div className="mnc-store-label">store</div>
-        </div>
-        {p1Display.map((idx, i) => (
-          <div key={idx} className={pitClass(idx)} style={{ gridRow: 2, gridColumn: i + 2 }} onClick={() => handleClick(idx)}
-            aria-label={`${pits[idx]} stone${pits[idx] !== 1 ? 's' : ''}`}>
-            <MncPitStones count={pits[idx]} pitSeed={idx} entering={false} capturing={false} />
-          </div>
-        ))}
-      </div>
+      <MncBoardCanvas
+        pits={pits}
+        pitState={(idx) => {
+          const isP1Pit = idx <= 5;
+          const isMyPit = myPlayerNum === 1 ? isP1Pit : !isP1Pit;
+          return { clickable: isMyTurn && isMyPit && pits[idx] > 0, flash: false, capture: false };
+        }}
+        storeGlowL={currentPlayer === 2 && status === 'active' ? p2Color : null}
+        storeGlowR={currentPlayer === 1 && status === 'active' ? p1Color : null}
+        labelL={myPlayerNum === 2 ? 'You' : oppName}
+        labelR={myPlayerNum === 1 ? 'You' : oppName}
+        onPit={handleClick}
+      />
     </div>
   );
 }
@@ -12499,13 +11520,6 @@ function t2048_tileStyle(value) {
   return { bg: palette[Math.floor(Math.log2(value)) % palette.length], color: '#FFF' };
 }
 
-function t2048_tileFontSize(v) {
-  if (v < 100)   return '1.4rem';
-  if (v < 1000)  return '1.15rem';
-  if (v < 10000) return '0.92rem';
-  return '0.72rem';
-}
-
 function t2048_newTile(value, isNew, isMerged) {
   return { value, id: ++t2048TileCounter, isNew: !!isNew, isMerged: !!isMerged };
 }
@@ -12661,6 +11675,125 @@ function t2048SaveBest(v) {
 /* ============================================================
    T2048Game component
    ============================================================ */
+/* The 2048 board as a canvas (#170 treatment), keeping #142's animation
+   contract: tiles are tracked BY ID, so a move draws each tile sliding from
+   its previous cell to its new one (100ms), new tiles pop in and merges
+   bump — and input is never gated on the animation (executeMove stays
+   synchronous; the drawing catches up). Tile faces keep the intrinsic 2048
+   palette; the backdrop reads PAL. Reduced-motion players get instant
+   placement, matching the old CSS media block. */
+function T2048BoardCanvas({ grid }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 4, rows: 4 });
+  const side = Math.max(0, Math.floor(boxW));
+  const pad = 8, gap = 6;
+  const cell = (side - pad * 2 - gap * 3) / 4;
+
+  const animRef = useRef({ prev: {}, t0: 0, reduced: false });
+  const [, setFrame] = useState(0);
+  useEffect(() => {
+    const a = animRef.current;
+    const targets = {};
+    grid.forEach((row, r) => row.forEach((t, c) => { if (t) targets[t.id] = { r, c }; }));
+    a.from = a.prev;
+    a.targets = targets;
+    a.prev = targets;
+    a.reduced = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    a.t0 = a.reduced ? -1e9 : performance.now();
+    if (a.reduced) { setFrame((f) => f + 1); return; }
+    let raf = 0;
+    const tick = () => {
+      setFrame((f) => f + 1);
+      if (performance.now() - a.t0 < 170) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [grid]);
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [grid, side],
+    draw: (ctx) => {
+      if (side < 60) return;
+      const a = animRef.current;
+      const now = performance.now();
+      const slideP = Math.min(1, (now - a.t0) / 100);
+      const ease = 1 - (1 - slideP) * (1 - slideP);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Static 4x4 backdrop.
+      for (let i = 0; i < 16; i++) {
+        const r = Math.floor(i / 4), c = i % 4;
+        const x = pad + c * (cell + gap), y = pad + r * (cell + gap);
+        klRR(ctx, x, y, cell, cell, 8);
+        ctx.fillStyle = PAL.bg;
+        ctx.fill();
+        ctx.save();
+        ctx.globalAlpha = 0.27;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        ctx.restore();
+      }
+      const at = (r, c) => [pad + c * (cell + gap), pad + r * (cell + gap)];
+      grid.forEach((row, r) => row.forEach((t, c) => {
+        if (!t) return;
+        const from = a.from && a.from[t.id];
+        const [tx, ty] = at(r, c);
+        let x = tx, y = ty;
+        if (from && (from.r !== r || from.c !== c)) {
+          const [fx, fy] = at(from.r, from.c);
+          x = fx + (tx - fx) * ease;
+          y = fy + (ty - fy) * ease;
+        }
+        let scale = 1, alpha = 1;
+        if (!a.reduced) {
+          if (t.isNew && !from) {
+            const p = Math.min(1, (now - a.t0) / 120);
+            scale = 0.5 + 0.5 * p;
+            alpha = p;
+          } else if (t.isMerged) {
+            const p = Math.min(1, (now - a.t0) / 150);
+            scale = 1 + 0.18 * Math.sin(p * Math.PI);
+          }
+        }
+        const { bg, color } = t2048_tileStyle(t.value);
+        const cx = x + cell / 2, cy = y + cell / 2;
+        const s = cell * scale;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        klRR(ctx, cx - s / 2, cy - s / 2, s, s, 8 * scale);
+        ctx.fillStyle = bg;
+        if (t.value === 2048) {
+          ctx.shadowColor = 'rgba(245,158,11,0.55)';
+          ctx.shadowBlur = 14;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        const len = String(t.value).length;
+        ctx.font = `700 ${Math.round(cell * (len <= 2 ? 0.45 : len === 3 ? 0.37 : len === 4 ? 0.3 : 0.24))}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = color;
+        ctx.fillText(String(t.value), cx, cy + 1);
+        ctx.restore();
+      }));
+    },
+  });
+
+  return (
+    <div className="t2048-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="t2048-canvas board-canvas"
+        role="img"
+        aria-label={`2048 board — highest tile ${t2048_maxTile(grid) || 0}`}
+      />
+    </div>
+  );
+}
+
 function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
   const raceMode = !!onRaceEnd;
   const _saved = raceMode ? null : t2048LoadSavedBoard();
@@ -12858,31 +11991,16 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill" style={{ position: 'relative' }}>
-              <div className="plabel">Score</div>
-              <div className="pvalue mono">
-                {score.toLocaleString()}
-                {scoreDelta !== null && <span className="t2048-score-delta">+{scoreDelta}</span>}
-              </div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Best</div>
-              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Tile</div>
-              <div className="pvalue mono">{maxTile || '—'}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue">{moves}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 5);
+            return [
+              { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() + (scoreDelta !== null ? ` +${scoreDelta}` : '') },
+              { id: 'p-best', kind: 'pill', r: pr[1], label: 'Best', value: bestScore.toLocaleString() },
+              { id: 'p-tile', kind: 'pill', r: pr[2], label: 'Tile', value: maxTile || '—' },
+              { id: 'p-moves', kind: 'pill', r: pr[3], label: 'Moves', value: moves },
+              { id: 'p-time', kind: 'pill', r: pr[4], label: 'Time', value: fmtSecs(elapsedSecs), gold: true },
+            ];
+          }} />
 
           <div
             className="t2048-board-wrap"
@@ -12890,35 +12008,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
             onTouchEnd={handleTouchEnd}
           >
             <div className="t2048-grid">
-              {/* Static 4x4 backdrop. */}
-              {Array.from({ length: 16 }, (_, i) => <div key={'c' + i} className="t2048-cell" />)}
-              {/* Tiles ride above it, keyed by id so DOM identity survives a
-                  move and the browser can transition the transform (#142). */}
-              <div className="t2048-layer">
-                {grid.flatMap((row, r) => row.map((cell, c) => {
-                  if (!cell) return null;
-                  const { bg, color } = t2048_tileStyle(cell.value);
-                  return (
-                    <div
-                      key={'t' + cell.id}
-                      className={'t2048-tile' + (cell.isNew ? ' is-new' : '') + (cell.isMerged ? ' is-merged' : '')}
-                      style={{ transform: `translate(calc(${c} * (100% + 6px)), calc(${r} * (100% + 6px)))` }}
-                    >
-                      <div
-                        className="t2048-tile-inner"
-                        style={{
-                          background: bg,
-                          color,
-                          fontSize: t2048_tileFontSize(cell.value),
-                          boxShadow: cell.value === 2048 ? '0 0 14px #F59E0B88' : 'none',
-                        }}
-                      >
-                        {cell.value}
-                      </div>
-                    </div>
-                  );
-                })).filter(Boolean)}
-              </div>
+              <T2048BoardCanvas grid={grid} />
             </div>
 
             {victoryVisible && (
@@ -12935,9 +12025,9 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
             )}
           </div>
 
-          <div className="t2048-controls">
-            <button onClick={handleNewGame}>↺ New Game</button>
-          </div>
+          <CuiBar height={44} build={(W) => ([
+            { id: 'new', kind: 'button', r: [Math.floor(W * 0.3), 0, Math.floor(W * 0.4), 40], label: '↺ New Game', action: handleNewGame },
+          ])} />
         </div>
       )}
 
@@ -13110,9 +12200,66 @@ function SnakeGameModeSelect({ onSelectDifficulty }) {
 }
 
 /* ---- Snake — Gameplay ---- */
+/* Snake boards (classic 15×15, daily 13×13) draw to ONE canvas now: the DOM
+   grids re-reconciled 225/169 cell divs on every movement tick, which was the
+   whole cost of the game loop. The outer .snake-board/.dsnk-board boxes stay
+   (their sizing, background, border and the fit-col rules are unchanged, and
+   gestures still bind to them); this fills them with a canvas that redraws
+   once per tick. Colors read PAL — board chrome follows the theme exactly as
+   the DOM cells' C tokens did. */
+function SnakeCanvas({ n, stRef, tick, skin, ariaLabel }) {
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: n, rows: n });
+  const side = Math.min(Math.floor(boxW) || 0, Math.floor(boxH) || Math.floor(boxW) || 0);
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [tick, side, n],
+    draw: (ctx) => {
+      if (side < 40) return;
+      const pad = 6;
+      const cs = (side - pad * 2) / n;
+      const cellRect = (gx, gy, color, r) => {
+        klRR(ctx, pad + gx * cs + 0.5, pad + gy * cs + 0.5, cs - 1, cs - 1, r);
+        ctx.fillStyle = color;
+        ctx.fill();
+      };
+      if (skin === 'classic') {
+        // The classic board's darker empty-cell wash.
+        for (let gy = 0; gy < n; gy++) for (let gx = 0; gx < n; gx++) cellRect(gx, gy, PAL.bg, 2);
+      } else {
+        // The daily board's faint hairline grid.
+        ctx.strokeStyle = PAL.border;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.55;
+        for (let i = 1; i < n; i++) {
+          ctx.beginPath(); ctx.moveTo(pad + i * cs, pad); ctx.lineTo(pad + i * cs, side - pad); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(pad, pad + i * cs); ctx.lineTo(side - pad, pad + i * cs); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      const s = stRef.current;
+      if (!s) return;
+      const bodyColor = skin === 'classic' ? PAL.emerald : GA.lime;
+      for (let i = s.snake.length - 1; i >= 1; i--) cellRect(s.snake[i].x, s.snake[i].y, bodyColor, 3);
+      cellRect(s.snake[0].x, s.snake[0].y, PAL.accent, 4);
+      ctx.beginPath();
+      ctx.arc(pad + s.food.x * cs + cs / 2, pad + s.food.y * cs + cs / 2, cs * 0.38, 0, Math.PI * 2);
+      ctx.fillStyle = PAL.rose;
+      ctx.fill();
+    },
+  });
+  return (
+    <div className="snake-canvas-fill" ref={boxRef}>
+      <canvas ref={canvasRef} className="snake-canvas board-canvas" role="img" aria-label={ariaLabel} />
+    </div>
+  );
+}
+
 function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty, menuConfig }) {
   const N = 15;
-  const [, render] = useState(0);
+  const [tick, render] = useState(0);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState(0);
   const [started, setStarted] = useState(false);
@@ -13209,16 +12356,6 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   }, [started]);
 
   const s = st.current;
-  const cells = [];
-  if (s) {
-    const occ = {};
-    s.snake.forEach((seg, i) => { occ[seg.y * N + seg.x] = i === 0 ? 'head' : 'body'; });
-    const fi = s.food.y * N + s.food.x;
-    for (let i = 0; i < N * N; i++) {
-      const o = occ[i];
-      cells.push(<div key={i} className={'snake-cell' + (o ? ' ' + o : '') + (i === fi ? ' food' : '')} />);
-    }
-  }
   const hist = cgLoadHistory(SNAKE_KEY);
   const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
   const longest = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
@@ -13236,8 +12373,8 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="snake-board-wrap">
-          <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
-            {cells}
+          <div className="snake-board" ref={boardRef}>
+            <SnakeCanvas n={N} stRef={st} tick={tick} skin="classic" ariaLabel={`Snake board — score ${score}, length ${s ? s.snake.length : 0}`} />
           </div>
           {paused && !done && (
             <div className="snake-pause-overlay">
@@ -13246,21 +12383,14 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
           )}
         </div>
         <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
-        <div className="snake-controls">
-          {!started && <button onClick={() => init()}>Restart</button>}
-          {started && !paused && !done && (
-            <>
-              <button onClick={() => { setPaused(true); setPausedSecs(secs); }}>Pause</button>
-              <button onClick={() => init()}>Restart</button>
-            </>
-          )}
-          {paused && !done && (
-            <>
-              <button onClick={() => { setPaused(false); }}>Resume</button>
-              <button onClick={() => init()}>Restart</button>
-            </>
-          )}
-        </div>
+        <CuiBar height={44} build={(W) => {
+          const btns = [];
+          if (started && !paused && !done) btns.push({ id: 'pause', label: 'Pause', action: () => { setPaused(true); setPausedSecs(secs); } });
+          if (paused && !done) btns.push({ id: 'resume', label: 'Resume', primary: true, action: () => setPaused(false) });
+          btns.push({ id: 'restart', label: 'Restart', action: () => init() });
+          const br = cuiRow(Math.floor(W * 0.14), 0, Math.floor(W * 0.72), 40, btns.length);
+          return btns.map((b, i) => ({ ...b, kind: 'button', r: br[i] }));
+        }} />
       </div>
     </ClassicShell>
   );
@@ -13353,6 +12483,50 @@ function bbCanPlaceAny(grid, tray) {
 // game-over it calls onEnd(score, placed, secs); the parent decides what to do
 // (solo submits the global score + shows the overlay; the race host posts to
 // the room). The board itself never touches scoring endpoints.
+/* Block Fit's 8×8 well as a canvas (#170 treatment). Pure display: the tray
+   pieces stay DOM drag sources, the floating ghost stays DOM, and the drop
+   origin keeps its getBoundingClientRect math against the same grid box —
+   only the 64 cell divs became one draw pass. Piece colors are intrinsic. */
+function BbGridCanvas({ grid, preview }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 8, rows: 8 });
+  const side = Math.max(0, Math.min(Math.floor(boxW), Math.floor(boxH) || Math.floor(boxW)));
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [grid, preview, side],
+    draw: (ctx) => {
+      if (side < 60) return;
+      const gapPx = 3;
+      const cs = (side - gapPx * 7) / 8;
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = c * (cs + gapPx), y = r * (cs + gapPx);
+        const pv = preview && preview[i];
+        klRR(ctx, x, y, cs, cs, 4);
+        ctx.fillStyle = grid[i] || PAL.bg;
+        ctx.fill();
+        if (pv) {
+          klRR(ctx, x, y, cs, cs, 4);
+          ctx.fillStyle = pv === 'preview' ? 'rgba(58,110,205,0.40)' : 'rgba(205,75,58,0.33)';
+          ctx.fill();
+        }
+      }
+    },
+  });
+  return (
+    <div className="snake-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="bb-canvas board-canvas"
+        role="img"
+        aria-label={`Block Fit board — ${grid.filter(Boolean).length} of 64 cells filled`}
+      />
+    </div>
+  );
+}
+
 function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
   const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
@@ -13454,6 +12628,52 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
     cgSound('click');
     setDrag({ idx, cells: tray[idx].cells, color: tray[idx].color, x, y });
   };
+
+  // The tray draws on canvas too (controls wave): three piece slots, hit by
+  // thirds; the piece lifts into the existing DOM ghost on pointerdown, so
+  // the drag/drop pipeline (window-level move/up + originFromPointer against
+  // the well) is untouched.
+  const trayBoxRef = useRef(null);
+  const trayCanvasRef = useRef(null);
+  const { boxW: trayW0 } = useFitBox(trayBoxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const trayW = Math.floor(trayW0);
+  const BB_TRAY_H = 92;
+  useCanvasBoard(trayCanvasRef, {
+    width: trayW,
+    height: BB_TRAY_H,
+    deps: [tray, drag, trayW],
+    draw: (ctx) => {
+      const slotW = trayW / 3;
+      for (let i = 0; i < 3; i++) {
+        const p = tray[i];
+        const x0 = i * slotW;
+        klRR(ctx, x0 + 4, 4, slotW - 8, BB_TRAY_H - 8, 10);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        if (!p) continue;
+        ctx.save();
+        if (drag && drag.idx === i) ctx.globalAlpha = 0.3;
+        const maxR = Math.max(...p.cells.map((c) => c[0]));
+        const maxC = Math.max(...p.cells.map((c) => c[1]));
+        const u = Math.min(16, Math.floor((slotW - 24) / (maxC + 1)), Math.floor((BB_TRAY_H - 24) / (maxR + 1)));
+        const px0 = x0 + (slotW - (maxC + 1) * u) / 2;
+        const py0 = (BB_TRAY_H - (maxR + 1) * u) / 2;
+        for (const [r, c] of p.cells) {
+          // BB_COLORS are C.* var() tokens (the DOM tray + the well's DOM-era
+          // cells read them via CSS); the canvas resolves them through palOf.
+          ctx.fillStyle = palOf(p.color, '#3A6ECD');
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5, 2);
+          else ctx.rect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    },
+  });
   // preview cells
   let preview = null;
   if (drag) {
@@ -13468,30 +12688,20 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
     <>
       <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
       <div className="bb-grid" ref={gridRef}>
-        {grid.map((cell, i) => {
-          const pv = preview && preview[i];
-          return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
-            style={cell ? { background: cell } : undefined} />;
-        })}
+        <BbGridCanvas grid={grid} preview={preview} />
       </div>
-      <div className="bb-tray">
-        {tray.map((p, idx) => (
-          <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
-            style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
-            onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
-            {p && (() => {
-              const maxR = Math.max(...p.cells.map(c => c[0]));
-              const maxC = Math.max(...p.cells.map(c => c[1]));
-              const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
-              const out = [];
-              for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
-                const on = set.has(r * 10 + c);
-                out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
-              }
-              return out;
-            })()}
-          </div>
-        ))}
+      <div className="bb-tray" ref={trayBoxRef}>
+        <canvas
+          ref={trayCanvasRef}
+          className="bb-tray-canvas board-canvas"
+          role="img"
+          aria-label={`Piece tray — ${tray.filter(Boolean).length} of 3 pieces left`}
+          onPointerDown={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const idx = Math.max(0, Math.min(2, Math.floor((e.clientX - rect.left) / (rect.width / 3))));
+            startDrag(e, idx);
+          }}
+        />
       </div>
       {drag && (
         <div className="bb-drag-ghost" style={{
@@ -13810,26 +13020,88 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     if (ns >= TARGET) { setTimeout(() => finish(ns, true, nm), 150); }
     else if (nm <= 0) { setTimeout(() => finish(ns, false, nm), 150); }
   };
-  const onGemDown = (e, i) => { const p = pointerXY(e); touch.current = { i, x: p.x, y: p.y }; };
-  const onGemUp = (e, i) => {
-    const start = touch.current; touch.current = null;
-    if (!start) { return; }
-    const p = pointerXY(e);
-    const dx = p.x - start.x, dy = p.y - start.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
-      // swipe from start.i toward neighbor
-      const r = Math.floor(start.i / 8), c = start.i % 8;
-      let nr = r, nc = c;
-      if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
-      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
-      else setSel(-1);
-      return;
-    }
-    // tap
-    if (sel === -1) { setSel(start.i); cgSound('click'); }
-    else if (sel === start.i) { setSel(-1); }
-    else trySwap(sel, start.i);
+  /* The board is a CANVAS (#170 treatment) — same tap-or-swipe grammar as the
+     DOM gems: press a gem and release nearby to select/swap-with-selection,
+     or flick past the threshold to swap toward the flick. */
+  const drBoxRef = useRef(null);
+  const drCanvasRef = useRef(null);
+  const { cell: drCell } = useFitBox(drBoxRef, { cols: 8, rows: 8, minCell: 28, maxCell: 56, gap: 2 });
+  const drStep = drCell + 2;
+  const drSide = drStep * 8 - 2;
+  const drGeoRef = useRef(0);
+  drGeoRef.current = drStep;
+  const drCellAt = (p) => {
+    const stp = drGeoRef.current;
+    const c = Math.floor(p.x / stp), r = Math.floor(p.y / stp);
+    if (c < 0 || c > 7 || r < 0 || r > 7) return -1;
+    return r * 8 + c;
   };
+  usePointerCell(drCanvasRef, {
+    onDown: (p) => {
+      const i = drCellAt(p);
+      touch.current = i >= 0 ? { i, x: p.x, y: p.y } : null;
+    },
+    onUp: (p) => {
+      const start = touch.current; touch.current = null;
+      if (!start || done) return;
+      const dx = p.x - start.x, dy = p.y - start.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
+        const r = Math.floor(start.i / 8), c = start.i % 8;
+        let nr = r, nc = c;
+        if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
+        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
+        else setSel(-1);
+        return;
+      }
+      if (sel === -1) { setSel(start.i); cgSound('click'); }
+      else if (sel === start.i) { setSel(-1); }
+      else trySwap(sel, start.i);
+    },
+  }, { moveTolerance: 4 });
+  useCanvasBoard(drCanvasRef, {
+    width: drSide,
+    height: drSide,
+    deps: [grid, sel, hintIndices, done, drCell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const GLOW = { 6: 'rgba(255,193,7,0.5)', 7: 'rgba(100,200,255,0.6)', 8: 'rgba(200,100,255,0.55)' };
+      for (let i = 0; i < 64; i++) {
+        const v = grid[i];
+        if (v == null) continue;
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = c * drStep, y = r * drStep;
+        const cx = x + drCell / 2, cy = y + drCell / 2;
+        if (v >= 6) {
+          // Intrinsic special-gem glow (bomb / lightning / rainbow).
+          klRR(ctx, x, y, drCell, drCell, 6);
+          ctx.fillStyle = v === 6 ? 'rgba(255,193,7,0.15)' : v === 7 ? 'rgba(100,200,255,0.15)' : 'rgba(200,100,255,0.15)';
+          ctx.fill();
+          ctx.save();
+          ctx.shadowColor = GLOW[v];
+          ctx.shadowBlur = 12;
+          ctx.font = `${Math.round(drCell * 0.62)}px system-ui, sans-serif`;
+          ctx.fillText(DR_GEMS[v], cx, cy + 1);
+          ctx.restore();
+        } else {
+          ctx.font = `${Math.round(drCell * 0.62)}px system-ui, sans-serif`;
+          ctx.fillText(DR_GEMS[v], cx, cy + 1);
+        }
+        if (sel === i) {
+          klRR(ctx, x + 1, y + 1, drCell - 2, drCell - 2, 6);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+        }
+        if (hintIndices.includes(i)) {
+          klRR(ctx, x - 1, y - 1, drCell + 2, drCell + 2, 7);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.stroke();
+        }
+      }
+    },
+  });
   const usePowerUp = (type) => {
     if (done || powerUps[type] <= 0) return;
     if (type === 'hint') {
@@ -13875,32 +13147,23 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="dr-powerups-bar">
-          {['hint', 'shuffle', 'extraTime'].map(type => (
-            <button
-              key={type}
-              className={`dr-powerup-btn ${powerUps[type] > 0 ? 'owned' : 'empty'}`}
-              onClick={() => usePowerUp(type)}
-              disabled={powerUps[type] === 0 || done}
-              title={`${type.charAt(0).toUpperCase() + type.slice(1)} (${powerUps[type]} owned)`}
-            >
-              <span className="icon">{DR_POWER_UP_ICONS[type]}</span>
-              <span className="count">{powerUps[type]}</span>
-            </button>
-          ))}
-        </div>
-        <div className="dr-grid">
-          {grid.map((v, i) => {
-            const isSpecial = v >= 6 ? ['bomb', 'lightning', 'rainbow'][v - 6] : null;
-            return (
-              <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '') + (isSpecial ? ' ' + isSpecial : '') + (hintIndices.includes(i) ? ' hint-target' : '')}
-                data-special={isSpecial}
-                onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
-                onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
-                {DR_GEMS[v]}
-              </div>
-            );
-          })}
+        <CuiBar height={44} build={(W) => {
+          const br = cuiRow(Math.floor(W * 0.08), 0, Math.floor(W * 0.84), 40, 3);
+          return ['hint', 'shuffle', 'extraTime'].map((type, i) => ({
+            id: 'pw-' + type, kind: 'button', r: br[i],
+            label: `${DR_POWER_UP_ICONS[type]} ${powerUps[type]}`,
+            disabled: powerUps[type] === 0 || done,
+            on: powerUps[type] > 0,
+            action: () => usePowerUp(type),
+          }));
+        }} />
+        <div className="dr-grid" ref={drBoxRef}>
+          <canvas
+            ref={drCanvasRef}
+            className="dr-canvas board-canvas"
+            role="grid"
+            aria-label={`Diamond Rush board — score ${score} of ${TARGET}, ${moves} moves left`}
+          />
         </div>
         {timeBoost && <div className="dr-time-boost">+30 sec</div>}
       </div>
@@ -13975,7 +13238,6 @@ const TM_TIER_LABELS = [
   { label: 'Legend',   start: 900, end: 999 },
 ];
 
-const TM_TILE_STEP = 50; // px per grid unit (48px tile + 2px gap)
 
 function tmGenerateLevel(cfg, seed) {
   const rng = mulberry32(seed);
@@ -14031,6 +13293,231 @@ function tmIsLocked(tile, allTiles) {
 
 function tmSortBar(bar, tilesMap) {
   return bar.slice().sort((a, b) => tilesMap[a].type - tilesMap[b].type);
+}
+
+/* The Tile Match boards are CANVASES now (#170 treatment) — one renderer
+   shared by the classic levels and the daily. The DOM boards positioned
+   every tile absolutely at fixed 50px steps; the daily then FitScale-shrank
+   the whole stack and free-play just overflowed its 400px wrap at the big
+   late-level footprints. Tiles now size from the measured box, and the tap
+   hit-test walks the same painter's order the frame was drawn in, so
+   overlapping layers resolve exactly as they look. Tile art (the per-type
+   colors and icons) is intrinsic and stays hardcoded. */
+function tmGeom(w, h, boardTiles, fitH) {
+  let maxC = 0, maxR = 0;
+  for (const t of boardTiles) { maxC = Math.max(maxC, t.col); maxR = Math.max(maxR, t.row); }
+  const unitsW = maxC + 1, unitsH = maxR + 1;
+  let step = Math.floor((w - 8) / unitsW);
+  if (fitH) step = Math.min(step, Math.floor((h - 8) / unitsH));
+  step = Math.max(20, Math.min(56, step));
+  const bw = unitsW * step, bh = unitsH * step;
+  const ox = Math.floor((w - bw) / 2);
+  const oy = fitH ? Math.max(2, Math.floor((h - bh) / 2)) : 2;
+  return { step, tile: step - 2, ox, oy, bw, bh,
+    at: (t) => [ox + t.col * step, oy + t.row * step] };
+}
+// Paint order: layer ascending (same-layer tiles never overlap); the
+// hit-test walks it in reverse so the topmost tile wins, like the DOM
+// zIndex (layer*10 + 1) did.
+function tmPaintOrder(boardTiles) {
+  return boardTiles.slice().sort((a, b) => a.layer - b.layer);
+}
+function tmHitAt(geo, ordered, x, y) {
+  for (let k = ordered.length - 1; k >= 0; k--) {
+    const t = ordered[k];
+    const [tx, ty] = geo.at(t);
+    if (x >= tx && x < tx + geo.tile && y >= ty && y < ty + geo.tile) return t;
+  }
+  return null;
+}
+function tmDrawTile(ctx, geo, x, y, tt, o) {
+  const s = geo.tile;
+  const r = Math.max(4, Math.round(s * 0.2));
+  ctx.save();
+  if (o && o.locked) ctx.globalAlpha = 0.35; // the DOM .locked opacity
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  klRR(ctx, x, y, s, s, r);
+  ctx.fillStyle = tt.color;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.stroke();
+  ctx.font = Math.round(s * 0.52) + 'px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(tt.icon, x + s / 2, y + s / 2 + 1);
+  ctx.restore();
+  if (o && o.hint) {
+    klRR(ctx, x - 1.5, y - 1.5, s + 3, s + 3, r + 1);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = PAL.gold;
+    ctx.stroke();
+  }
+}
+
+/* The board as a self-contained component so screen-switching parents
+   (classic's level-select ↔ playing) mount it fresh — usePointerCell binds
+   its listeners on mount, so the canvas must exist when the hook runs.
+   `fitH` fits both axes inside a flexible box (the daily's fit column);
+   without it the canvas takes its natural height and the shell scrolls
+   (classic). Tap dispatch goes through the parent's own selectTile, which
+   keeps every rule/guard where it always lived. */
+/* The one Tile Match FRAME (controls wave): pills, day label, the tile
+   board, the 7-slot tray, its label, the booster row and the optional hint
+   bar all draw on ONE canvas, shared verbatim by the classic and daily
+   games. `fitH` fits the board region to the leftover box height (daily);
+   classic mode takes the board's natural height. */
+function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onTile,
+                         bar, tilesMap, barFull, clearSlotMode, onClearSlotTile,
+                         boosterBtns, hintBtn }) {
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 8, rows: 6 });
+  const W = Math.floor(boxW);
+  const H0 = Math.floor(boxH);
+  const boardTiles = tiles.filter((t) => !t.removed && !t.inBar);
+  const ordered = tmPaintOrder(boardTiles);
+
+  const GAP = 8, PILL_H = 46, DAY_H = dayLabel ? 18 : 0, TRAY_H = 50, BARL_H = 16, BOOST_H = 54;
+  const HINT_H = hintBtn ? 36 : 0;
+  const chrome = PILL_H + GAP + (DAY_H ? DAY_H + GAP : 0) + GAP + TRAY_H + 4 + BARL_H + GAP + BOOST_H + (HINT_H ? GAP + HINT_H : 0);
+  const boardAvail = fitH ? Math.max(80, H0 - chrome) : 1e9;
+  const geo = W > 60 && boardTiles.length
+    ? tmGeom(W, boardAvail, boardTiles, fitH) : null;
+  const boardH = fitH ? Math.max(80, H0 - chrome) : (geo ? geo.bh + 4 : 120);
+  const H = chrome + boardH;
+  const boardY = PILL_H + GAP + (DAY_H ? DAY_H + GAP : 0);
+  const trayY = boardY + boardH + GAP;
+  const barlY = trayY + TRAY_H + 4;
+  const boostY = barlY + BARL_H + GAP;
+  const hintY = boostY + BOOST_H + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, pills.length);
+    pills.forEach((p, i) => controls.push({
+      id: 'p' + i, kind: 'pill', r: pr[i], label: p.label, value: p.value,
+      gold: p.gold, color: p.warn ? PAL.rose : undefined,
+    }));
+    if (dayLabel) {
+      controls.push({ id: 'day', kind: 'label', r: [0, PILL_H + GAP, W, DAY_H], label: dayLabel, font: 11 });
+      // Twin-only descriptive line (screen readers + text checks).
+      controls.push({ id: 'day-sr', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: "Today's board: " + dayLabel });
+    }
+    controls.push({
+      id: 'barl', kind: 'label', r: [0, barlY, W, BARL_H],
+      label: barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`,
+      font: 11, color: barFull ? PAL.rose : undefined,
+    });
+    // Tray slots become controls only in clear mode (tap removes that tile).
+    const slotW = 44, slotGap = 6;
+    const tx0 = Math.floor((W - slotW * 7 - slotGap * 6) / 2);
+    if (clearSlotMode) {
+      for (let i = 0; i < 7; i++) {
+        const tid = bar[i];
+        if (tid == null) continue;
+        controls.push({
+          id: 'slot' + i, kind: 'button', noDraw: true,
+          r: [tx0 + i * (slotW + slotGap), trayY, slotW, TRAY_H],
+          label: 'Remove tray tile ' + (i + 1),
+          action: () => onClearSlotTile(tid),
+        });
+      }
+    }
+    const br = cuiRow(Math.floor(W * 0.02), boostY, Math.floor(W * 0.96), BOOST_H, boosterBtns.length);
+    boosterBtns.forEach((b, i) => controls.push({
+      id: b.id, kind: 'button', r: br[i],
+      label: `${b.icon} ${b.label}`, sub: b.count != null ? `${b.count} left` : b.sub,
+      disabled: b.disabled, on: b.active, action: b.action, font: 13,
+    }));
+    if (hintBtn) {
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hintBtn.msg ? 0 : Math.floor(W * 0.2), hintY, hintBtn.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: hintBtn.label, disabled: hintBtn.disabled, action: hintBtn.action,
+      });
+      if (hintBtn.msg) controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hintBtn.msg, font: 11 });
+    }
+  }
+  const ctlRef = useRef([]); ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const geoRef = useRef(null); geoRef.current = geo;
+  const ordRef = useRef(null); ordRef.current = ordered;
+  const stRef = useRef(null); stRef.current = { tiles, hintTileId, disabled, boardY };
+
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (pt) => {
+      const g = geoRef.current, s = stRef.current;
+      if (!g || s.disabled) return;
+      const t = tmHitAt(g, ordRef.current, pt.x, pt.y - s.boardY);
+      if (t) onTile(t.id);
+    },
+  }), { moveTolerance: 10 });
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [tiles, hintTileId, W, H, pills, barFull, clearSlotMode, pressedId, bar],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Tray slots.
+      {
+        const slotW = 44, slotGap = 6;
+        const tx0 = Math.floor((W - slotW * 7 - slotGap * 6) / 2);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let i = 0; i < 7; i++) {
+          const x = tx0 + i * (slotW + slotGap);
+          const tid = bar[i];
+          const t = tid != null ? tilesMap[tid] : null;
+          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
+          const isClear = clearSlotMode && t != null;
+          klRR(ctx, x, trayY, slotW, TRAY_H, 8);
+          ctx.fillStyle = t ? PAL.card : PAL.surface;
+          ctx.fill();
+          ctx.lineWidth = isClear ? 2 : 1;
+          ctx.strokeStyle = isClear ? PAL.rose : (barFull ? PAL.rose : PAL.border);
+          ctx.stroke();
+          if (tt) {
+            ctx.font = `${Math.round(slotW * 0.6)}px system-ui, sans-serif`;
+            ctx.fillText(tt.icon, x + slotW / 2, trayY + TRAY_H / 2 + 1);
+          }
+        }
+      }
+      // Board.
+      const g = geoRef.current;
+      if (!g) return;
+      ctx.save();
+      ctx.translate(0, stRef.current.boardY);
+      for (const t of ordRef.current) {
+        const [x, y] = g.at(t);
+        tmDrawTile(ctx, g, x, y, TM_TILE_TYPES[t.type % TM_TILE_TYPES.length], {
+          locked: tmIsLocked(t, stRef.current.tiles),
+          hint: stRef.current.hintTileId === t.id,
+        });
+      }
+      ctx.restore();
+    },
+  });
+
+  return (
+    <div className={'tm-board-box cui-frame' + (fitH ? ' tm-board-fit' : '')} ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="tm-canvas board-canvas"
+        role="img"
+        aria-label={`Tile board — ${boardTiles.length} tiles left, ${bar.length} of 7 tray slots used`}
+      />
+      <CuiTwin controls={controls} />
+    </div>
+  );
 }
 
 /* ============================================================
@@ -14457,109 +13944,34 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
   const tilesMap = {};
   tiles.forEach(t => { tilesMap[t.id] = t; });
 
-  const boardW = (cfg.boardCols) * TM_TILE_STEP;
-  const boardH = (cfg.boardRows + cfg.maxLayer * 0.5) * TM_TILE_STEP + 48;
-
   const activeTiles = tiles.filter(t => !t.removed);
   const boardTiles = activeTiles.filter(t => !t.inBar);
   const tilesLeft = boardTiles.length;
 
   return (
     <div className="tm-wrap">
-      <div className="status-bar">
-        <div className={`pill tm-timer-pill${timeLow ? ' warning' : ''}`}>
-          <div className="plabel">Time</div>
-          <div className="pvalue">{tmFmtSecs(timeRemaining === Infinity ? 0 : timeRemaining)}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Moves</div>
-          <div className="pvalue">{moves}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Tiles Left</div>
-          <div className="pvalue">{tilesLeft}</div>
-        </div>
-      </div>
-
-      <div
-        className="tm-board-container"
-        style={{ width: boardW, height: boardH, maxWidth: '100%' }}
-      >
-        {boardTiles.map(tile => {
-          const locked = tmIsLocked(tile, tiles);
-          const isFlash = flashIds.has(tile.id);
-          const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
-          return (
-            <div
-              key={tile.id}
-              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}`}
-              style={{
-                left: tile.col * TM_TILE_STEP,
-                top: tile.row * TM_TILE_STEP,
-                zIndex: tile.layer * 10 + 1,
-                background: tt.color,
-              }}
-              onClick={() => selectTile(tile.id)}
-            >
-              {tt.icon}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
-        {Array.from({ length: 7 }, (_, i) => {
-          const tid = bar[i];
-          const t = tid != null ? tilesMap[tid] : null;
-          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
-          const isClear = clearSlotMode && t != null;
-          return (
-            <div
-              key={i}
-              className={`tm-slot${t ? ' filled' : ''}${isClear ? ' clear-target' : ''}`}
-              onClick={isClear ? () => clearSlotTile(tid) : undefined}
-            >
-              {tt ? tt.icon : ''}
-            </div>
-          );
-        })}
-      </div>
-      <div className={`tm-bar-label${barFull ? ' full' : ''}`}>
-        {barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`}
-      </div>
-
-      <div className="tm-boosters">
-        <button
-          className="tm-booster-btn"
-          disabled={boosters.undo <= 0 || !lastBarEntry}
-          onClick={doUndo}
-          title="Return last tile to board"
-        >
-          <span className="tm-booster-icon">↩</span>
-          <span>Undo</span>
-          <span className="tm-booster-count">{boosters.undo} left</span>
-        </button>
-        <button
-          className="tm-booster-btn"
-          disabled={boosters.shuffle <= 0}
-          onClick={doShuffle}
-          title="Shuffle board tiles"
-        >
-          <span className="tm-booster-icon">🔀</span>
-          <span>Shuffle</span>
-          <span className="tm-booster-count">{boosters.shuffle} left</span>
-        </button>
-        <button
-          className={`tm-booster-btn${clearSlotMode ? ' active' : ''}`}
-          disabled={boosters.clear <= 0 || bar.length === 0}
-          onClick={clearSlotMode ? () => setClearSlotMode(false) : doClearMode}
-          title="Remove a tile from bar"
-        >
-          <span className="tm-booster-icon">✕</span>
-          <span>{clearSlotMode ? 'Cancel' : 'Clear'}</span>
-          <span className="tm-booster-count">{boosters.clear} left</span>
-        </button>
-      </div>
+      <TmFrameCanvas
+        pills={[
+          { label: 'Time', value: tmFmtSecs(timeRemaining === Infinity ? 0 : timeRemaining), warn: timeLow },
+          { label: 'Moves', value: moves },
+          { label: 'Tiles Left', value: tilesLeft },
+        ]}
+        tiles={tiles}
+        fitH={false}
+        disabled={done}
+        onTile={selectTile}
+        bar={bar}
+        tilesMap={tilesMap}
+        barFull={barFull}
+        clearSlotMode={clearSlotMode}
+        onClearSlotTile={clearSlotTile}
+        boosterBtns={[
+          { id: 'undo', icon: '\u21a9', label: 'Undo', count: boosters.undo, disabled: boosters.undo <= 0 || !lastBarEntry, action: doUndo },
+          { id: 'shuffle', icon: '\ud83d\udd00', label: 'Shuffle', count: boosters.shuffle, disabled: boosters.shuffle <= 0, action: doShuffle },
+          { id: 'clear', icon: '\u2715', label: clearSlotMode ? 'Cancel' : 'Clear', count: boosters.clear, disabled: boosters.clear <= 0 || bar.length === 0, active: clearSlotMode, action: clearSlotMode ? () => setClearSlotMode(false) : doClearMode },
+        ]}
+        hintBtn={null}
+      />
     </div>
   );
 }
@@ -15171,110 +14583,43 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     if (onMoveTile) onMoveTile({ replayBreak: 'clear-slot', tsClient: Date.now() });
   };
 
-  // The board box is sized from the LAYOUT's actual extent, not a fixed
-  // 8x5 assumption — layouts differ in footprint, and FitScale then shrinks
-  // the whole thing to whatever the viewport allows.
-  const slots = dayCfg.layout.slots;
-  const boardW = (Math.max(...slots.map(s => s.col)) + 1) * TM_TILE_STEP;
-  const boardH = (Math.max(...slots.map(s => s.row)) + 1) * TM_TILE_STEP + 24;
   const activeTiles = tiles.filter(t => !t.removed);
   const boardTiles = activeTiles.filter(t => !t.inBar);
   const freeCount = boardTiles.filter(t => !tmIsLocked(t, tiles)).length;
 
   return (
     <div className="tm-wrap fit-col">
-      <div className="status-bar">
-        <div className={`pill tm-timer-pill${timeLow ? ' warning' : ''}`}>
-          <div className="plabel">Time</div>
-          <div className="pvalue">{tmFmtSecs(remaining)}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Moves</div>
-          <div className="pvalue">{moves}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Tiles Left</div>
-          <div className="pvalue">{boardTiles.length}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Free</div>
-          <div className="pvalue">{freeCount}</div>
-        </div>
-      </div>
-      <div className="tm-daylabel">
-        {dayCfg.layout.name} · {dayCfg.difficulty}
-      </div>
-
-      <FitScale>
-      <div className="tm-board-container" style={{ width: boardW, height: boardH }}>
-        {boardTiles.map(tile => {
-          const locked = tmIsLocked(tile, tiles);
-          const isFlash = flashIds.has(tile.id);
-          const isHint = hintTileId === tile.id;
-          const tt = TM_TILE_TYPES[tile.type % TM_TILE_TYPES.length];
-          return (
-            <div
-              key={tile.id}
-              className={`tm-tile${locked ? ' locked' : ' available'}${isFlash ? ' flash' : ''}${isHint ? ' hint-target' : ''}`}
-              style={{ left: tile.col * TM_TILE_STEP, top: tile.row * TM_TILE_STEP, zIndex: tile.layer * 10 + 1, background: tt.color }}
-              onClick={() => selectTile(tile.id)}
-            >
-              {tt.icon}
-            </div>
-          );
-        })}
-      </div>
-      </FitScale>
-
-      <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
-        {Array.from({ length: 7 }, (_, i) => {
-          const tid = bar[i];
-          const t = tid != null ? tilesMap[tid] : null;
-          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
-          const isClear = clearSlotMode && t != null;
-          return (
-            <div
-              key={i}
-              className={`tm-slot${t ? ' filled' : ''}${isClear ? ' clear-target' : ''}`}
-              onClick={isClear ? () => clearSlotTile(tid) : undefined}
-            >
-              {tt ? tt.icon : ''}
-            </div>
-          );
-        })}
-      </div>
-      <div className={`tm-bar-label${barFull ? ' full' : ''}`}>
-        {barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`}
-      </div>
-
-      <div className="tm-boosters">
-        <button className="tm-booster-btn" disabled={boosters.undo <= 0 || !lastBarEntry} onClick={doUndo} title="Return last tile to board">
-          <span className="tm-booster-icon">↩</span>
-          <span>Undo</span>
-          <span className="tm-booster-count">{boosters.undo} left</span>
-        </button>
-        <button className="tm-booster-btn" disabled={boosters.shuffle <= 0} onClick={doShuffle} title="Shuffle board tiles">
-          <span className="tm-booster-icon">🔀</span>
-          <span>Shuffle</span>
-          <span className="tm-booster-count">{boosters.shuffle} left</span>
-        </button>
-        <button className={`tm-booster-btn${clearSlotMode ? ' active' : ''}`} disabled={boosters.clear <= 0 || bar.length === 0} onClick={clearSlotMode ? () => setClearSlotMode(false) : doClearMode} title="Remove a tile from bar">
-          <span className="tm-booster-icon">✕</span>
-          <span>{clearSlotMode ? 'Cancel' : 'Clear'}</span>
-          <span className="tm-booster-count">{boosters.clear} left</span>
-        </button>
-      </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={tmHints.hintsLeft}
-          exhausted={tmHints.exhausted || boardTiles.length === 0}
-          buying={tmHints.buying}
-          onBuy={buyTmHint}
-          msg={tmHints.msg}
-          label="No more hints"
-        />
-      )}
+      <TmFrameCanvas
+        pills={[
+          { label: 'Time', value: tmFmtSecs(remaining), warn: timeLow },
+          { label: 'Moves', value: moves },
+          { label: 'Tiles Left', value: boardTiles.length },
+          { label: 'Free', value: freeCount },
+        ]}
+        dayLabel={`${dayCfg.layout.name} · ${dayCfg.difficulty}`}
+        tiles={tiles}
+        hintTileId={hintTileId}
+        fitH
+        disabled={done}
+        onTile={selectTile}
+        bar={bar}
+        tilesMap={tilesMap}
+        barFull={barFull}
+        clearSlotMode={clearSlotMode}
+        onClearSlotTile={clearSlotTile}
+        boosterBtns={[
+          { id: 'undo', icon: '↩', label: 'Undo', count: boosters.undo, disabled: boosters.undo <= 0 || !lastBarEntry, action: doUndo },
+          { id: 'shuffle', icon: '🔀', label: 'Shuffle', count: boosters.shuffle, disabled: boosters.shuffle <= 0, action: doShuffle },
+          { id: 'clear', icon: '✕', label: clearSlotMode ? 'Cancel' : 'Clear', count: boosters.clear, disabled: boosters.clear <= 0 || bar.length === 0, active: clearSlotMode, action: clearSlotMode ? () => setClearSlotMode(false) : doClearMode },
+        ]}
+        hintBtn={done ? null : {
+          label: (tmHints.exhausted || boardTiles.length === 0) ? '💡 No more hints'
+            : `💡 Hint${Number.isFinite(tmHints.hintsLeft) ? ` · ${tmHints.hintsLeft} left` : ''}`,
+          disabled: tmHints.buying || tmHints.exhausted || boardTiles.length === 0,
+          action: buyTmHint,
+          msg: tmHints.msg,
+        }}
+      />
     </div>
   );
 }
@@ -15308,6 +14653,82 @@ function ktFmtTime(s) {
 function ktFmtDate(iso) {
   const [y, m, d] = iso.split('-');
   return `${m}/${d}/${y.slice(2)}`;
+}
+
+/* The Knight's Tour board is a canvas (self-contained: it lives behind the ☰
+   tab switch, and usePointerCell binds on mount). Chessboard chrome reads
+   PAL, so it re-themes exactly as the DOM cells' C tokens did. */
+function KtBoardCanvas({ visited, currentPos, validMvs, done, onCell }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: 8, rows: 8, minCell: 28, maxCell: 60 });
+  const side = cell * 8;
+  const liveRef = useRef({});
+  liveRef.current = { visited, currentPos, validMvs, done, cell };
+
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const s = liveRef.current;
+      const c = Math.floor(p.x / s.cell), r = Math.floor(p.y / s.cell);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      const idx = r * 8 + c;
+      const isValid = !s.done && idx !== s.currentPos && s.validMvs.includes(idx);
+      const canPlace = s.currentPos === null && !(s.visited[idx] > 0);
+      if (canPlace || isValid) onCell(idx);
+    },
+  });
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [visited, currentPos, done, cell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let idx = 0; idx < 64; idx++) {
+        const r = Math.floor(idx / 8), c = idx % 8;
+        const x = c * cell, y = r * cell;
+        const isLight = (r + c) % 2 === 0;
+        const isCurrent = idx === currentPos;
+        const isVisited = visited[idx] > 0;
+        const isValid = !done && !isCurrent && validMvs.includes(idx);
+        ctx.fillStyle = isLight ? PAL.surface : PAL.card;
+        ctx.fillRect(x, y, cell, cell);
+        if (isValid) { ctx.fillStyle = 'rgba(58,110,205,0.25)'; ctx.fillRect(x, y, cell, cell); }
+        if (isCurrent) {
+          ctx.fillStyle = 'rgba(58,110,205,0.15)';
+          ctx.fillRect(x, y, cell, cell);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = PAL.accent;
+          ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+        }
+        const cx = x + cell / 2, cy = y + cell / 2;
+        if (isCurrent) {
+          ctx.font = `${Math.round(cell * 0.55)}px system-ui, sans-serif`;
+          ctx.fillStyle = PAL.text;
+          ctx.fillText('♞', cx, cy + 1);
+        } else if (isVisited) {
+          ctx.font = `600 ${Math.max(9, Math.round(cell * 0.28))}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = PAL.muted;
+          ctx.fillText(String(visited[idx]), cx, cy);
+        }
+      }
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.strokeRect(1, 1, side - 2, side - 2);
+    },
+  });
+
+  return (
+    <div className="kt-boardbox" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="kt-canvas board-canvas"
+        role="grid"
+        aria-label={`Knight's Tour board — ${visited.filter((v) => v > 0).length} of 64 squares visited`}
+      />
+    </div>
+  );
 }
 
 function KnightsTourGame({ onWin, onStepChange, resetKey }) {
@@ -15406,64 +14827,35 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
     <div>
       {activeTab === 'game' && (
         <div className="kt-wrap">
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{ktFmtTime(elapsed)}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue" style={stuck ? { color: C.rose } : {}}>{moves}/64</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Left</div>
-              <div className="pvalue">{64 - moves}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: ktFmtTime(elapsed), gold: true },
+              { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: `${moves}/64`, color: stuck ? PAL.rose : undefined },
+              { id: 'p-left', kind: 'pill', r: pr[2], label: 'Left', value: 64 - moves },
+            ];
+          }} />
 
-          <div className="kt-board">
-            {Array.from({ length: 64 }, (_, idx) => {
-              const r = Math.floor(idx / 8), c = idx % 8;
-              const isLight    = (r + c) % 2 === 0;
-              const isCurrent  = idx === currentPos;
-              const isVisited  = visited[idx] > 0;
-              const isValid    = !done && !isCurrent && validMvs.includes(idx);
-              const canPlace   = currentPos === null && !isVisited;
+          <KtBoardCanvas
+            visited={visited}
+            currentPos={currentPos}
+            validMvs={validMvs}
+            done={done}
+            onCell={handleCellClick}
+          />
 
-              let cls = 'kt-cell ' + (isLight ? 'kt-light' : 'kt-dark');
-              if (isCurrent)      cls += ' kt-current';
-              else if (isVisited) cls += ' kt-visited';
-              else if (isValid)   cls += ' kt-valid';
-
-              return (
-                <div
-                  key={idx}
-                  className={cls}
-                  style={(canPlace || isValid) ? { cursor: 'pointer' } : {}}
-                  onClick={() => (canPlace || isValid) && handleCellClick(idx)}
-                >
-                  {isCurrent  ? <span className="kt-knight">♞</span>
-                   : isVisited ? <span className="kt-num">{visited[idx]}</span>
-                   : null}
-                </div>
-              );
-            })}
-          </div>
-
-          {stuck && <div className="kt-stuck-banner">No valid moves — try Undo or restart.</div>}
-
-          <div className="kt-actions">
-            <button
-              className="kt-undo-btn"
-              disabled={undoStack.length === 0 || done}
-              onClick={handleUndo}
-            >
-              ↩ Undo
-            </button>
-            {stuck && (
-              <button className="kt-new-btn" onClick={resetGame}>New Game</button>
-            )}
-          </div>
+          <CuiBar height={stuck ? 68 : 44} build={(W) => {
+            const out = [];
+            let y = 0;
+            if (stuck) {
+              out.push({ id: 'stuck', kind: 'label', r: [0, 0, W, 20], label: 'No valid moves — try Undo or restart.', color: PAL.rose, font: 12 });
+              y = 24;
+            }
+            const br = cuiRow(Math.floor(W * 0.1), y, Math.floor(W * 0.8), 40, stuck ? 2 : 1);
+            out.push({ id: 'undo', kind: 'button', r: br[0], label: '↩ Undo', disabled: undoStack.length === 0 || done, action: handleUndo });
+            if (stuck) out.push({ id: 'new', kind: 'button', r: br[1], label: 'New Game', primary: true, action: resetGame });
+            return out;
+          }} />
 
           {currentPos === null && (
             <div className="kt-hint">Tap any square to place the knight and begin.</div>
@@ -16191,40 +15583,27 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Score</div>
-              <div className="pvalue mono">{score.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Best</div>
-              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Lives</div>
-              <div className="pvalue">{'●'.repeat(Math.max(0, lives)) || '—'}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Level</div>
-              <div className="pvalue mono">{level}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
-            </div>
-            {activePowerups.map((ap, idx) => {
+          <CuiBar height={68} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 5);
+            const out = [
+              { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
+              { id: 'p-best', kind: 'pill', r: pr[1], label: 'Best', value: bestScore.toLocaleString() },
+              { id: 'p-lives', kind: 'pill', r: pr[2], label: 'Lives', value: '●'.repeat(Math.max(0, lives)) || '—' },
+              { id: 'p-level', kind: 'pill', r: pr[3], label: 'Level', value: level },
+              { id: 'p-time', kind: 'pill', r: pr[4], label: 'Time', value: fmtSecs(elapsedSecs), gold: true },
+            ];
+            if (activePowerups.length) {
               const now = Date.now();
-              const elapsed = now - ap.startedAt;
-              const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
-              return (
-                <div key={idx} className="pill" style={{ background: ca('emerald','22'), border: `1px solid ${C.emerald}` }}>
-                  <div className="plabel" style={{ fontSize: '0.75rem' }}>
-                    {POWERUP_ICONS[ap.type]} {remaining}s {ap.stacks > 1 ? `×${ap.stacks}` : ''}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+              out.push({
+                id: 'powerups', kind: 'label', r: [0, 50, W, 20], font: 12, color: PAL.emerald,
+                label: activePowerups.map((ap) => {
+                  const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - (now - ap.startedAt)) / 1000));
+                  return `${POWERUP_ICONS[ap.type]} ${remaining}s${ap.stacks > 1 ? ` ×${ap.stacks}` : ''}`;
+                }).join(' · '),
+              });
+            }
+            return out;
+          }} />
 
           <div className="bounce-board-wrap">
             <canvas
@@ -16243,36 +15622,20 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
             )}
           </div>
 
-          <div className="bounce-audio-row">
-            <button onClick={toggleSound}>
-              {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
-            </button>
-            <button
-              onClick={() => setMusicPaused(p => !p)}
-              disabled={!soundOn}
-            >
-              {!soundOn ? '🔇 Off' : musicPaused ? '▶ Resume' : '⏸ Pause'}
-            </button>
-          </div>
-
-          <div className="bounce-dpad">
-            <button
-              aria-label="Left"
-              onPointerDown={(e) => { e.preventDefault(); leftRef.current = true; }}
-              onPointerUp={() => { leftRef.current = false; }}
-              onPointerLeave={() => { leftRef.current = false; }}
-            >◀</button>
-            <button
-              aria-label="Right"
-              onPointerDown={(e) => { e.preventDefault(); rightRef.current = true; }}
-              onPointerUp={() => { rightRef.current = false; }}
-              onPointerLeave={() => { rightRef.current = false; }}
-            >▶</button>
-          </div>
-
-          <div className="bounce-controls">
-            <button onClick={handleNewGame}>↺ New Game</button>
-          </div>
+          <CuiBar height={44} build={(W) => {
+            const x0 = Math.floor(W * 0.02), usable = Math.floor(W * 0.96), g = 6;
+            const soundW = Math.floor(usable * 0.3), musicW = Math.floor(usable * 0.12);
+            const padW = Math.floor(usable * 0.13), newW = usable - soundW - musicW - padW * 2 - g * 4;
+            let x = x0;
+            const next = (w) => { const r = [x, 0, w, 40]; x += w + g; return r; };
+            return [
+              { id: 'sound', kind: 'button', r: next(soundW), label: soundOn ? '🔊 Sound On' : '🔇 Sound Off', font: 11, on: soundOn, action: toggleSound },
+              { id: 'music', kind: 'button', r: next(musicW), label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', font: 12, disabled: !soundOn, action: () => setMusicPaused(p => !p) },
+              { id: 'left', kind: 'button', r: next(padW), label: '◀', font: 15, holdDown: () => { leftRef.current = true; }, holdUp: () => { leftRef.current = false; } },
+              { id: 'right', kind: 'button', r: next(padW), label: '▶', font: 15, holdDown: () => { rightRef.current = true; }, holdUp: () => { rightRef.current = false; } },
+              { id: 'new', kind: 'button', r: next(newW), label: '↺ New', font: 12, action: handleNewGame },
+            ];
+          }} />
         </div>
       )}
 
@@ -17352,34 +16715,26 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   return (
     React.createElement('div', null,
       activeTab === 'game' && React.createElement('div', null,
-        React.createElement('div', { className: 'status-bar' },
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Score'),
-            React.createElement('div', { className: 'pvalue mono' }, score.toLocaleString())
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Level'),
-            React.createElement('div', { className: 'pvalue mono' }, level + '/3')
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Popped'),
-            React.createElement('div', { className: 'pvalue mono' }, ballsPopped)
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Time'),
-            React.createElement('div', { className: 'pvalue mono' }, fmtS(elapsedSecs))
-          ),
-          activePowerups.map((ap, idx) => {
+        React.createElement(CuiBar, { height: 68, build: (W) => {
+          const pr = cuiRow(0, 0, W, 46, 4);
+          const out = [
+            { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
+            { id: 'p-level', kind: 'pill', r: pr[1], label: 'Level', value: level + '/3' },
+            { id: 'p-popped', kind: 'pill', r: pr[2], label: 'Popped', value: ballsPopped },
+            { id: 'p-time', kind: 'pill', r: pr[3], label: 'Time', value: fmtS(elapsedSecs), gold: true },
+          ];
+          if (activePowerups.length) {
             const now = Date.now();
-            const elapsed = now - ap.startedAt;
-            const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
-            return React.createElement('div', { key: idx, className: 'pill', style: { background: ca('emerald','22'), border: `1px solid ${C.emerald}` } },
-              React.createElement('div', { className: 'plabel', style: { fontSize: '0.75rem' } },
-                POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '')
-              )
-            );
-          })
-        ),
+            out.push({
+              id: 'powerups', kind: 'label', r: [0, 50, W, 20], font: 12, color: PAL.emerald,
+              label: activePowerups.map((ap) => {
+                const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - (now - ap.startedAt)) / 1000));
+                return POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '');
+              }).join(' · '),
+            });
+          }
+          return out;
+        } }),
         React.createElement('div', { className: 'zuma-wrap' },
           React.createElement('canvas', {
             ref: canvasRef,
@@ -17390,9 +16745,9 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
             onTouchEnd: () => shoot(),
           })
         ),
-        React.createElement('div', { className: 'bounce-controls' },
-          React.createElement('button', { onClick: () => init() }, '↺ New Game')
-        )
+        React.createElement(CuiBar, { height: 44, build: (W) => ([
+          { id: 'new', kind: 'button', r: [Math.floor(W * 0.3), 0, Math.floor(W * 0.4), 40], label: '↺ New Game', action: () => init() },
+        ]) })
       ),
       activeTab === 'leaderboard' && React.createElement('div', null,
         lbLoading && React.createElement('div', { className: 'snake-lb-empty' }, 'Loading…'),
@@ -17434,6 +16789,103 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
 }
 
 // ---- Match-3 Campaign Game ----
+/* Match 3's tile board as a canvas (#170 treatment). Self-contained because
+   the game has campaign/loading phases — usePointerCell binds on mount, so
+   the canvas must exist when the hooks run. Tile palette/icons stay the
+   intrinsic M3 set; removed tiles keep their ✓ ghost. */
+function M3BoardCanvas({ tiles, bar, done, onTile }) {
+  const M3_ICONS = ['🔴', '🟠', '🟢', '🔵', '🟣'];
+  const M3_HEX = ['#CD4B3A', '#C9A227', '#2D9F66', '#3A6ECD', '#7C5CD6'];
+  const cols = 5;
+  const rows = Math.max(1, Math.ceil(tiles.length / cols));
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols, rows, minCell: 40, maxCell: 76, gap: 5 });
+  const step = cell + 5;
+  const bw = step * cols - 5, bh = step * rows - 5;
+  const liveRef = useRef({});
+  liveRef.current = { tiles, done, step };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      if (lv.done) return;
+      const c = Math.floor(p.x / lv.step), r = Math.floor(p.y / lv.step);
+      if (c < 0 || c >= cols || r < 0 || r >= rows) return;
+      const t = lv.tiles[r * cols + c];
+      if (t && !t.removed) onTile(t.id);
+    },
+  });
+  // The tray band draws under the board (controls wave) — same canvas.
+  const TRAY_H = 54, TRAY_GAP = 8;
+  const barFull = bar.length >= 6;
+  useCanvasBoard(canvasRef, {
+    width: bw,
+    height: bh + TRAY_GAP + TRAY_H,
+    deps: [tiles, bar, done, cell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < tiles.length; i++) {
+        const t = tiles[i];
+        const r = Math.floor(i / cols), c = i % cols;
+        const x = c * step, y = r * step;
+        const inBar = bar.indexOf(t.id) >= 0;
+        klRR(ctx, x, y, cell, cell, 10);
+        ctx.fillStyle = t.removed ? PAL.surface : M3_HEX[t.type % 5];
+        ctx.fill();
+        ctx.lineWidth = inBar ? 2.5 : 1;
+        ctx.strokeStyle = inBar ? PAL.accent : PAL.border;
+        ctx.stroke();
+        ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
+        if (t.removed) {
+          ctx.fillStyle = PAL.muted;
+          ctx.fillText('✓', x + cell / 2, y + cell / 2 + 1);
+        } else {
+          ctx.fillText(M3_ICONS[t.type % 5], x + cell / 2, y + cell / 2 + 1);
+        }
+      }
+      // Tray strip.
+      const ty = bh + TRAY_GAP;
+      klRR(ctx, 0, ty, bw, TRAY_H, 10);
+      ctx.fillStyle = PAL.card;
+      ctx.fill();
+      ctx.lineWidth = barFull ? 2 : 1;
+      ctx.strokeStyle = barFull ? PAL.rose : PAL.border;
+      ctx.stroke();
+      ctx.font = '600 9px ' + CUI_FONT;
+      ctx.fillStyle = barFull ? PAL.rose : PAL.muted;
+      ctx.fillText('TRAY', 22, ty + TRAY_H / 2 + 0.5);
+      if (bar.length === 0) {
+        ctx.font = '500 11px ' + CUI_FONT;
+        ctx.fillStyle = PAL.muted;
+        ctx.fillText('Match three of a kind to clear them', bw / 2 + 10, ty + TRAY_H / 2 + 0.5);
+      } else {
+        const u = Math.min(38, Math.floor((bw - 50) / 6) - 6);
+        bar.forEach((id, k) => {
+          const t = tiles.find((tile) => tile.id === id);
+          if (!t) return;
+          const x = 44 + k * (u + 6);
+          klRR(ctx, x, ty + (TRAY_H - u) / 2, u, u, 8);
+          ctx.fillStyle = M3_HEX[t.type % 5];
+          ctx.fill();
+          ctx.font = `${Math.round(u * 0.55)}px system-ui, sans-serif`;
+          ctx.fillText(M3_ICONS[t.type % 5], x + u / 2, ty + TRAY_H / 2 + 1);
+        });
+      }
+    },
+  });
+  return (
+    <div className="m3-grid" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="m3-canvas board-canvas"
+        role="grid"
+        aria-label={`Match 3 board — ${tiles.filter((t) => !t.removed).length} tiles left, ${bar.length} in tray`}
+      />
+    </div>
+  );
+}
+
 function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, resetKey }) {
   const [phase, setPhase] = useState('campaign'); // 'campaign' | 'playing' | 'won' | 'lost'
   const [selectedPuzzle, setSelectedPuzzle] = useState(1);
@@ -17714,9 +17166,6 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
      CgStatus / .m3-* / tray idiom the two Tile Match games use.
      Gameplay, scoring and MATCH3_PUZZLES are untouched: markup and CSS only. */
   if (phase === 'playing' && puzzleConfig) {
-    const M3_ICONS = ['🔴', '🟠', '🟢', '🔵', '🟣'];
-    const M3_COLORS = [C.rose, C.gold, C.emerald, C.accent, C.violet];
-    const barFull = bar.length >= 6;
     return React.createElement(
       'div',
       { className: 'm3-wrap fit-col', style: { alignItems: 'center', gap: '0.75rem' } },
@@ -17727,40 +17176,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
           { l: 'Time', v: `${secs}s` },
         ],
       }),
-      React.createElement(
-        'div',
-        { className: 'm3-grid' },
-        tiles.map(t => React.createElement(
-          'button',
-          Object.assign(
-            {
-              key: t.id,
-              className: 'm3-tile' + (t.removed ? ' gone' : '') + (bar.indexOf(t.id) >= 0 ? ' sel' : ''),
-              disabled: t.removed || done,
-              style: { background: t.removed ? C.surface : M3_COLORS[t.type % 5] },
-              'aria-label': `Tile ${t.type + 1}` + (t.removed ? ', cleared' : ''),
-            },
-            tapProps(() => selectTile(t.id), { disabled: t.removed || done })
-          ),
-          t.removed ? '✓' : M3_ICONS[t.type % 5]
-        ))
-      ),
-      React.createElement(
-        'div',
-        { className: 'm3-bar' + (barFull ? ' full' : '') },
-        React.createElement('span', { className: 'm3-bar-label' + (barFull ? ' full' : '') }, 'Tray'),
-        bar.length > 0
-          ? bar.map(id => {
-              const t = tiles.find(tile => tile.id === id);
-              if (!t) return null;
-              return React.createElement(
-                'div',
-                { key: id, className: 'm3-bar-tile', style: { background: M3_COLORS[t.type % 5] } },
-                M3_ICONS[t.type % 5]
-              );
-            })
-          : React.createElement('span', { className: 'm3-bar-empty' }, 'Match three of a kind to clear them')
-      )
+      React.createElement(M3BoardCanvas, { tiles, bar, done, onTile: selectTile })
     );
   }
 
@@ -17914,6 +17330,164 @@ function cnlRowCol(n) {
 
 // Center of a square as a percentage of the board box (for SVG + pawns).
 // Visual row 0 sits at the BOTTOM, so flip for top-origin coordinates.
+/* The Snakes & Ladders board as ONE canvas shared by local and online play
+   (#170 treatment): cells, the connector lines (Moksha's snakes keep their
+   slither curves), the square marks/names, and both pawns — which glide
+   between squares with the same 130ms ease the DOM transition gave them.
+   Display-only: the Roll buttons are the input. Chrome reads PAL; the two
+   pawn colors come from the callers, as before. */
+function CnlBoardCanvas({ V, isMoksha, SK, p1Pos, p2Pos, p1Color, p2Color, p2Glyph }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 10, rows: 10 });
+  const side = Math.max(0, Math.floor(boxW));
+
+  // Pawn glide: remember each pawn's previous square and lerp for 130ms.
+  const glideRef = useRef({ p1: { from: p1Pos, to: p1Pos, t0: 0 }, p2: { from: p2Pos, to: p2Pos, t0: 0 } });
+  const [, setGlideFrame] = useState(0);
+  useEffect(() => {
+    const g = glideRef.current;
+    let changed = false;
+    for (const [key, pos] of [['p1', p1Pos], ['p2', p2Pos]]) {
+      if (g[key].to !== pos) { g[key] = { from: g[key].to, to: pos, t0: performance.now() }; changed = true; }
+    }
+    if (!changed) return;
+    let raf = 0;
+    const tick = () => {
+      setGlideFrame((f) => f + 1);
+      const now = performance.now();
+      if (now - g.p1.t0 < 140 || now - g.p2.t0 < 140) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [p1Pos, p2Pos]);
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [p1Pos, p2Pos, V, isMoksha, side, SK && SK.label, p2Glyph],
+    draw: (ctx) => {
+      if (side < 80) return;
+      const pad = 4;
+      const inner = side - pad * 2;
+      const cs = inner / 10;
+      const pct = (p) => [pad + (p.x / 100) * inner, pad + (p.y / 100) * inner];
+      ctx.textBaseline = 'top';
+      for (let visualRow = 0; visualRow < 10; visualRow++) {
+        for (let col = 0; col < 10; col++) {
+          const row = 9 - visualRow;
+          const within = (row % 2 === 0) ? col : (9 - col);
+          const n = row * 10 + within + 1;
+          const x = pad + col * cs, y = pad + visualRow * cs;
+          ctx.fillStyle = n === 100 ? 'rgba(201,162,39,0.13)' : ((row + col) % 2 ? PAL.surface : PAL.card);
+          ctx.fillRect(x + 0.5, y + 0.5, cs - 1, cs - 1);
+          ctx.font = `600 ${Math.max(7, Math.round(cs * 0.24))}px 'JetBrains Mono', monospace`;
+          ctx.textAlign = 'left';
+          ctx.fillStyle = n === 100 ? PAL.gold : PAL.muted;
+          ctx.fillText(String(n), x + 3, y + 2);
+          const isL = V.ladders[n] !== undefined;
+          const mark = isL ? (SK ? SK.ladderMark : '🪜') : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : (SK ? SK.chuteMark : '🛝')) : null;
+          if (mark) {
+            ctx.font = `${Math.round(cs * 0.34)}px system-ui, sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.fillText(mark, x + cs - 2, y + cs - Math.round(cs * 0.38));
+          }
+          const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
+          if (meaning) {
+            ctx.font = `700 ${Math.max(5, Math.round(cs * 0.14))}px 'Space Grotesk', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = isL ? PAL.emerald : PAL.rose;
+            let name = meaning.name.toUpperCase();
+            while (name.length > 2 && ctx.measureText(name).width > cs - 3) name = name.slice(0, -1);
+            ctx.fillText(name, x + cs / 2, y + cs - Math.max(6, Math.round(cs * 0.17)));
+          }
+        }
+      }
+      // Connectors over the cells.
+      for (const k of Object.keys(V.jumps)) {
+        const from = parseInt(k, 10), to = V.jumps[from];
+        const [ax, ay] = pct(cnlCenterPct(from));
+        const [bx, by] = pct(cnlCenterPct(to));
+        const isLadder = V.ladders[from] !== undefined;
+        ctx.strokeStyle = isLadder ? PAL.emerald : PAL.rose;
+        ctx.lineCap = 'round';
+        ctx.globalAlpha = isMoksha && !isLadder ? 0.65 : 0.6;
+        ctx.lineWidth = Math.max(2, side * (isMoksha && !isLadder ? 0.014 : 0.011));
+        ctx.beginPath();
+        if (isMoksha && !isLadder) {
+          const mx = (ax + bx) / 2, my = (ay + by) / 2;
+          const dx = bx - ax, dy = by - ay;
+          const len = Math.max(Math.hypot(dx, dy), 0.001);
+          const off = Math.min(0.09 * side, len * 0.16);
+          const nx = -dy / len * off, ny = dx / len * off;
+          ctx.moveTo(ax, ay);
+          ctx.quadraticCurveTo((ax + mx) / 2 + nx, (ay + my) / 2 + ny, mx, my);
+          ctx.quadraticCurveTo((mx + bx) / 2 - nx, (my + by) / 2 - ny, bx, by);
+        } else {
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // Pawns, gliding between squares; nudged apart when sharing one.
+      const g = glideRef.current;
+      const now = performance.now();
+      const posOf = (gp) => {
+        const p = Math.min(1, (now - gp.t0) / 130);
+        const e = 1 - (1 - p) * (1 - p);
+        const [fx, fy] = pct(cnlCenterPct(gp.from));
+        const [tx, ty] = pct(cnlCenterPct(gp.to));
+        return [fx + (tx - fx) * e, fy + (ty - fy) * e];
+      };
+      let [x1, y1] = posOf(g.p1);
+      let [x2, y2] = posOf(g.p2);
+      if (g.p1.to === g.p2.to) { x1 -= side * 0.024; x2 += side * 0.024; }
+      const rp = side * 0.035;
+      const glyphs = { p1: '1', p2: p2Glyph || '2' };
+      for (const [key, x, y, color] of [['p1', x1, y1, p1Color], ['p2', x2, y2, p2Color]]) {
+        ctx.beginPath();
+        if (key === 'p2') {
+          // Diamond token: same shape identity as #175's DOM pawn, so the two
+          // players are tellable apart by form, not colour alone.
+          const rd = rp * 1.25;
+          ctx.moveTo(x, y - rd); ctx.lineTo(x + rd, y); ctx.lineTo(x, y + rd); ctx.lineTo(x - rd, y); ctx.closePath();
+        } else {
+          ctx.arc(x, y, rp, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = palOf(color, PAL.accent);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        ctx.font = `800 ${Math.max(7, Math.round(rp * 1.05))}px 'Space Grotesk', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(glyphs[key], x, y + 0.5);
+      }
+      ctx.textBaseline = 'top';
+      // Outer border.
+      klRR(ctx, 1, 1, side - 2, side - 2, 12);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+    },
+  });
+
+  return (
+    <div className="cnl-board-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="cnl-canvas board-canvas"
+        role="img"
+        data-cnl-p2="diamond"
+        aria-label={`Board — player 1 (round token) on square ${p1Pos || 0}, player 2 (diamond token${p2Glyph === '🤖' ? ', bot' : ''}) on square ${p2Pos || 0}`}
+      />
+    </div>
+  );
+}
+
 function cnlCenterPct(n) {
   if (n <= 0) return { x: 50, y: 104 }; // off-board: just below the board
   const { row, col } = cnlRowCol(n);
@@ -18109,77 +17683,6 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
     return () => clearTimeout(t);
   }, [vsBot, player, animating, rolling, done, resumeOffer]);
 
-  // Build the 10x10 cells (top row first for natural DOM order).
-  const cells = [];
-  for (let visualRow = 0; visualRow < 10; visualRow++) {
-    for (let col = 0; col < 10; col++) {
-      const row = 9 - visualRow;              // bottom-origin board row
-      const within = (row % 2 === 0) ? col : (9 - col);
-      const n = row * 10 + within + 1;
-      const isL = V.ladders[n] !== undefined;
-      const mark = isL ? (isMoksha ? '🪜' : SK.ladderMark)
-        : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : SK.chuteMark) : null;
-      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
-      cells.push(
-        <div
-          key={n}
-          className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
-          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}
-        >
-          <span>{n}</span>
-          {mark && <span className="cnl-cell-mark">{mark}</span>}
-          {/* On the Moksha board each special square is named on the board
-              itself, so the lesson is legible without opening the glossary. */}
-          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
-        </div>
-      );
-    }
-  }
-
-  // Connectors. Ladders stay straight; Moksha's snakes are drawn as a curve so
-  // they read as snakes rather than as chutes.
-  const lines = Object.keys(V.jumps).map(k => {
-    const from = parseInt(k, 10);
-    const to = V.jumps[from];
-    const a = cnlCenterPct(from);
-    const b = cnlCenterPct(to);
-    const isLadder = V.ladders[from] !== undefined;
-    const stroke = isLadder ? C.emerald : C.rose;
-    if (isMoksha && !isLadder) {
-      // Two opposing arcs through the midpoint give a slither; the control
-      // offset is perpendicular to the run so long snakes bend more.
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const len = Math.max(Math.hypot(dx, dy), 0.001);
-      const off = Math.min(9, len * 0.16);
-      const nx = -dy / len * off, ny = dx / len * off;
-      return (
-        <path
-          key={k}
-          d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`}
-          fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
-        />
-      );
-    }
-    return (
-      <line
-        key={k}
-        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-        stroke={stroke}
-        strokeWidth="1.1"
-        strokeLinecap="round"
-        opacity="0.6"
-      />
-    );
-  });
-
-  const p1c = cnlCenterPct(p1Pos);
-  const p2c = cnlCenterPct(p2Pos);
-  // Nudge pawns apart when sharing a square (incl. both off-board) so both stay visible.
-  const sameCell = p1Pos === p2Pos;
-  const p1x = sameCell ? p1c.x - 2.4 : p1c.x;
-  const p2x = sameCell ? p2c.x + 2.4 : p2c.x;
-
   const bannerActive = !!banner;
   const bannerColor = done ? C.muted : activeColor;
   const bannerToken = done ? 'muted' : activeToken;
@@ -18189,101 +17692,51 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
       {resumeOffer && (
         <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
       )}
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Turn</div>
-          <div className="pvalue" style={{ color: activeColor, fontSize: '0.95rem' }}>
-            {done ? pLabel(winner) : pLabel(player)}
-          </div>
-        </div>
-        <div className="pill">
-          <div className="plabel">{pLabel(1)}</div>
-          <div className="pvalue" style={{ color: p1Color, fontSize: '0.95rem' }}>{p1Pos}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">{pLabel(2)}</div>
-          <div className="pvalue" style={{ color: p2Color, fontSize: '0.95rem' }}>{p2Pos}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Rolls</div>
-          <div className="pvalue">{rolls}</div>
-        </div>
-        {isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>
-            📖 What do these mean?
-          </button>
-        )}
-        {!isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={cycleSkin} aria-label="Change board skin" title="Change board skin">
-            {SK.icon} {SK.label}
-          </button>
-        )}
-      </div>
+      <CuiBar height={96} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 5);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: done ? pLabel(winner) : pLabel(player), color: palOf(activeColor, undefined) },
+          { id: 'p-1', kind: 'pill', r: pr[2], label: pLabel(1), value: p1Pos, color: palOf(p1Color, undefined) },
+          { id: 'p-2', kind: 'pill', r: pr[3], label: pLabel(2), value: p2Pos, color: palOf(p2Color, undefined) },
+          { id: 'p-rolls', kind: 'pill', r: pr[4], label: 'Rolls', value: rolls },
+        ];
+        if (isMoksha) {
+          out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary });
+        } else {
+          // Cosmetic board skin (per-device, never sent to the server) — the
+          // same slot the Moksha board uses for its glossary button.
+          out.push({ id: 'skin', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: `${SK.icon} ${SK.label}`, font: 12, action: cycleSkin });
+        }
+        return out;
+      }} />
 
-      <div
-        className="cnl-banner"
-        style={{
-          color: bannerColor,
-          background: ca(bannerActive ? bannerToken : activeToken, '22'),
-          border: `1px solid ${ca(bannerActive ? bannerToken : activeToken, '44')}`,
-        }}
-      >
-        {done
+      <CuiBar height={30} build={(W) => ([{
+        id: 'banner', kind: 'label', r: [0, 0, W, 28], font: 13, bold: true,
+        color: palOf(bannerActive ? bannerColor : activeColor, undefined),
+        label: done
           ? `Game over — ${pLabel(winner)} win${vsBot && winner === 1 ? '' : 's'}! 🎉`
-          : (banner || `${pLabel(player)}'s turn`)}
-      </div>
+          : (banner || `${pLabel(player)}'s turn`),
+      }])} />
 
       <div className="cnl-board-wrap">
-        <div className="cnl-board">{cells}</div>
-        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {lines}
-        </svg>
-        <div className={'cnl-pawn p1'} style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn">
-          <span className="cnl-pawn-glyph">1</span>
-        </div>
-        <div className={'cnl-pawn p2'} style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn">
-          <span className="cnl-pawn-glyph">{vsBot ? '🤖' : '2'}</span>
-        </div>
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} SK={SK} p1Pos={p1Pos} p2Pos={p2Pos} p1Color={p1Color} p2Color={p2Color} p2Glyph={vsBot ? '🤖' : '2'} />
       </div>
 
-      <div className="cnl-die">
-        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: ca(activeToken, '88') }} aria-label={die == null ? 'Die not yet rolled' : `Die showing ${die}`}>
-          {die == null ? <span className="cnl-die-dash">·</span> : (
-            <span className={'cnl-die-pips n' + die}>
-              {CNL_DIE_PIPS[die].map((on, i) => <span key={i} className={'cnl-pip' + (on ? ' on' : '')} />)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="cnl-roll-buttons">
-        <button
-          className="cnl-roll-btn"
-          style={{ background: p1Color }}
-          onClick={() => roll(1)}
-          disabled={done || animating || rolling || player !== 1 || !!resumeOffer}
-        >
-          {vsBot ? 'Your' : 'Player 1 -'} Roll
-        </button>
-        {vsBot ? (
-          <button className="cnl-roll-btn" style={{ background: p2Color, opacity: 0.85 }} disabled>
-            {player === 2 && !done ? 'Bot rolling…' : 'Bot'}
-          </button>
-        ) : (
-          <button
-            className="cnl-roll-btn"
-            style={{ background: p2Color }}
-            onClick={() => roll(2)}
-            disabled={done || animating || rolling || player !== 2}
-          >
-            Player 2 - Roll
-          </button>
-        )}
-      </div>
+      <CuiBar height={54} build={(W) => {
+        const bw = Math.floor((W - 78) / 2) - 8;
+        return [
+          { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: die == null ? '·' : String(die), twinLabel: die == null ? 'Die not yet rolled' : `Die showing ${die}`, pips: die == null ? null : CNL_DIE_PIPS[die], font: 20, mono: true, disabled: true },
+          {
+            id: 'roll1', kind: 'button', r: [4, 7, bw, 40],
+            label: `${vsBot ? 'Your' : 'Player 1 -'} Roll`, solid: true, bg: palOf(p1Color, undefined), ink: '#fff',
+            disabled: done || animating || rolling || player !== 1 || !!resumeOffer, action: () => roll(1),
+          },
+          vsBot
+            ? { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: player === 2 && !done ? 'Bot rolling…' : 'Bot', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: true }
+            : { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: 'Player 2 - Roll', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: done || animating || rolling || player !== 2, action: () => roll(2) },
+        ];
+      }} />
     </div>
   );
 }
@@ -18458,91 +17911,36 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
     submitMove({ type: 'roll' });
   };
 
-  // Reuse the static board renderer by mapping positions onto pawns.
-  const cells = [];
-  for (let visualRow = 0; visualRow < 10; visualRow++) {
-    for (let col = 0; col < 10; col++) {
-      const row = 9 - visualRow;
-      const within = (row % 2 === 0) ? col : (9 - col);
-      const n = row * 10 + within + 1;
-      const isL = V.ladders[n] !== undefined;
-      const mark = isL ? SK.ladderMark : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : SK.chuteMark) : null;
-      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
-      cells.push(
-        <div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
-          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}>
-          <span>{n}</span>
-          {mark && <span className="cnl-cell-mark">{mark}</span>}
-          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
-        </div>
-      );
-    }
-  }
-  const lines = Object.keys(V.jumps).map(k => {
-    const from = parseInt(k, 10), to = V.jumps[from];
-    const a = cnlCenterPct(from), b = cnlCenterPct(to);
-    const isLadder = V.ladders[from] !== undefined;
-    const stroke = isLadder ? C.emerald : C.rose;
-    if (isMoksha && !isLadder) {
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const len = Math.max(Math.hypot(dx, dy), 0.001);
-      const off = Math.min(9, len * 0.16);
-      const nx = -dy / len * off, ny = dx / len * off;
-      return <path key={k} fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
-        d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`} />;
-    }
-    return <line key={k} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={stroke} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />;
-  });
-  const p1c = cnlCenterPct(st.p1Pos || 0), p2c = cnlCenterPct(st.p2Pos || 0);
-  const same = (st.p1Pos || 0) === (st.p2Pos || 0);
-  const p1x = same ? p1c.x - 2.4 : p1c.x, p2x = same ? p2c.x + 2.4 : p2c.x;
-
   const turnLabel = status === 'finished'
     ? (room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
     : isMyTurn ? 'Your turn' : "Opponent's turn";
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.95rem' }}>{myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0)}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
-        {isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>📖 What do these mean?</button>
-        )}
-        {!isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={cycleSkin} aria-label="Change board skin" title="Change board skin">
-            {SK.icon} {SK.label}
-          </button>
-        )}
-      </div>
-      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <CuiBar height={(opponentDisconnected ? 20 : 0) + 96} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0), color: palOf(myColor, undefined) },
+          { id: 'p-conn', kind: 'pill', r: pr[3], label: 'Online', value: '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        let y = 50;
+        if (isMoksha) { out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), y, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary }); y += 46; }
+        else { out.push({ id: 'skin', kind: 'button', r: [Math.floor(W * 0.2), y, Math.floor(W * 0.6), 40], label: `${SK.icon} ${SK.label}`, font: 12, action: cycleSkin }); y += 46; }
+        if (opponentDisconnected) out.push({ id: 'disc', kind: 'label', r: [0, y, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        return out;
+      }} />
       <div className="cnl-board-wrap">
-        <div className="cnl-board">{cells}</div>
-        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">{lines}</svg>
-        <div className={'cnl-pawn p1'} style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn">
-          <span className="cnl-pawn-glyph">1</span>
-        </div>
-        <div className={'cnl-pawn p2'} style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn">
-          <span className="cnl-pawn-glyph">2</span>
-        </div>
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} SK={SK} p1Pos={st.p1Pos || 0} p2Pos={st.p2Pos || 0} p1Color={p1Color} p2Color={p2Color} p2Glyph={'2'} />
       </div>
-      <div className="cnl-die">
-        <div className="cnl-die-face" style={{ borderColor: ca(myToken, '88') }} aria-label={st.die == null ? 'Die not yet rolled' : `Die showing ${st.die}`}>
-          {st.die == null ? <span className="cnl-die-dash">·</span> : (
-            <span className={'cnl-die-pips n' + st.die}>
-              {CNL_DIE_PIPS[st.die].map((on, i) => <span key={i} className={'cnl-pip' + (on ? ' on' : '')} />)}
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="cnl-roll-buttons">
-        <button className="cnl-roll-btn" style={{ background: myColor }} onClick={doRoll} disabled={!isMyTurn}>
-          {status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…'}
-        </button>
-      </div>
+      <CuiBar height={54} build={(W) => ([
+        { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: st.die == null ? '·' : String(st.die), twinLabel: st.die == null ? 'Die not yet rolled' : `Die showing ${st.die}`, pips: st.die == null ? null : CNL_DIE_PIPS[st.die], font: 20, mono: true, disabled: true },
+        { id: 'roll', kind: 'button', r: [W - Math.floor(W * 0.34) - 4, 7, Math.floor(W * 0.34), 40],
+          label: status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…',
+          solid: isMyTurn, bg: isMyTurn ? palOf(myColor, undefined) : undefined, ink: isMyTurn ? '#fff' : undefined,
+          disabled: !isMyTurn, action: doRoll },
+      ])} />
     </div>
   );
 }
@@ -18706,6 +18104,28 @@ function OnlineRoomSetup({ gameId, onReady }) {
 
 function ckOwnerOf(v) { return v === 1 || v === 3 ? 1 : v === 2 || v === 4 ? 2 : 0; }
 
+/* All five board-game views draw their boards on canvases now (#170
+   treatment) — the SAME components in the SAME BOARD_VIEWS registry, so
+   online rooms, pass-and-play and Versus Bot all inherit the change with
+   the move payloads untouched. Intrinsic art (checkers browns, Reversi
+   felt, the goban, Ludo seat colours) stays hardcoded per the palette
+   rules; only chrome reads PAL. The controls wave folded the notes, legends,
+   Gomoku's confirm bar and Ludo's move list into the same canvases, each
+   control twinned in the sr-only layer. */
+/* The box owns the WIDTH (per-board --brg-cap composed with the --cg-board
+   viewport cap in one max-width); the views derive their cell size from that
+   width alone, and since the controls wave their canvases carry the whole
+   frame (board + notes + legends + buttons), the box height simply follows
+   the canvas. `children` hosts the frame's CuiTwin. */
+function BrgBoardBox({ boxRef, canvasRef, className, cap, ariaLabel, children }) {
+  return (
+    <div className="brg-canvas-box" style={{ '--brg-cap': cap }} ref={boxRef}>
+      <canvas ref={canvasRef} className={className + ' board-canvas'} role="img" aria-label={ariaLabel} />
+      {children}
+    </div>
+  );
+}
+
 function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const [sel, setSel] = useState(null);
   const board = st.board || [];
@@ -18715,86 +18135,275 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     if (owner === myPlayerNum) { setSel(i === sel ? null : i); return; }
     if (sel != null && board[i] === 0) { submit({ from: sel, to: i }); setSel(null); }
   };
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(28, Math.min(48, Math.floor(Math.floor(boxW) / 8)));
+  const side = cell * 8;
+  const showNote = st.mustJumpFrom != null && isMyTurn;
+  const NOTE_H = showNote ? 22 : 0, LEG_H = 24;
+  const H = side + 4 + NOTE_H + LEG_H;
+  const controls = [];
+  if (showNote) controls.push({ id: 'note', kind: 'label', r: [0, side + 4, side, 20], label: 'Chain jump! Continue with the same piece.', gold: true, font: 12 });
+  controls.push({ id: 'legend', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: 'Player 1 (moves down) · Player 2 (moves up)' });
+  const liveRef = useRef({});
+  liveRef.current = { cell, board, isMyTurn };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const c = Math.floor(p.x / lv.cell), r = Math.floor(p.y / lv.cell);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      if ((r + c) % 2 === 1) click(r * 8 + c);
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [board, sel, cell, showNote],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const dark = (r + c) % 2 === 1;
+        const x = c * cell, y = r * cell;
+        ctx.fillStyle = dark ? '#7a5a3a' : '#d8c49a'; // intrinsic checkers browns
+        ctx.fillRect(x, y, cell, cell);
+        if (sel === i) {
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+        }
+        const owner = ckOwnerOf(board[i]);
+        if (owner !== 0) {
+          ctx.beginPath();
+          ctx.arc(x + cell / 2, y + cell / 2, cell * 0.37, 0, Math.PI * 2);
+          ctx.fillStyle = owner === 1 ? palOf(C.accent, '#3A6ECD') : '#2b2f3d';
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = owner === 1 ? 'rgba(0,0,0,0.35)' : '#555';
+          ctx.stroke();
+          if (board[i] > 2) {
+            ctx.font = `${Math.round(cell * 0.4)}px system-ui, sans-serif`;
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillText('\u265b', x + cell / 2, y + cell / 2 + 1);
+          }
+        }
+      }
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.strokeRect(1, 1, side - 2, side - 2);
+      cuiDrawControls(ctx, controls, null);
+      // Legend with drawn swatch dots.
+      const ly = side + 4 + NOTE_H + 11;
+      ctx.font = '500 11px ' + CUI_FONT;
+      ctx.textBaseline = 'middle';
+      const t1 = ' Player 1 (moves down)', t2 = ' Player 2 (moves up)';
+      const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width;
+      let lx = Math.max(4, (side - (w1 + w2 + 40)) / 2);
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.accent, '#3A6ECD'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.textAlign = 'left';
+      ctx.fillText(t1, lx + 14, ly);
+      lx += w1 + 34;
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = '#2b2f3d'; ctx.fill();
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = PAL.muted;
+      ctx.fillText(t2, lx + 14, ly);
+      ctx.textAlign = 'center';
+    },
+  });
   return (
-    <div>
-      {st.mustJumpFrom != null && isMyTurn && (
-        <div className="brg-note">Chain jump! Continue with the same piece.</div>
-      )}
-      <div className="ck-board">
-        {board.map((v, i) => {
-          const r = Math.floor(i / 8), c = i % 8;
-          const dark = (r + c) % 2 === 1;
-          const owner = ckOwnerOf(v);
-          return (
-            <div key={i} className={'ck-cell' + (dark ? ' dark' : '') + (sel === i ? ' sel' : '')} {...tapProps(() => dark && click(i))}>
-              {owner !== 0 && (
-                <div className={'ck-piece p' + owner + (v > 2 ? ' king' : '')}>{v > 2 ? '♛' : ''}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="brg-legend">
-        <span><span className="ck-piece-mini p1" /> Player 1 (moves down)</span>
-        <span><span className="ck-piece-mini p2" /> Player 2 (moves up)</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ck-canvas" cap="360px"
+      ariaLabel="Checkers board">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
+}
+
+// Reversi disc — the DOM disc's flat face + bottom inset shade, drawn.
+function rvDrawDisc(ctx, cx, cy, r, side) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = side === 1 ? '#171a24' : '#f2f0e8';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = side === 1 ? '#444' : 'rgba(0,0,0,0.25)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 1.5, Math.PI * 0.2, Math.PI * 0.8);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+  ctx.stroke();
 }
 
 function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
   const p1 = board.filter(x => x === 1).length;
   const p2 = board.filter(x => x === 2).length;
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(26, Math.min(44, Math.floor((Math.floor(boxW) - 4 - 14) / 8)));
+  const step = cell + 2;
+  const side = step * 8 - 2 + 4; // 2px gutters between felt cells + 2px frame
+  const NOTE_H = 24;
+  const H = NOTE_H + 4 + side;
+  const boardY = NOTE_H + 4;
+  const controls = [
+    { id: 'counts', kind: 'label', noDraw: true, r: [0, 0, 0, 0],
+      label: `Dark ${p1} · Light ${p2}${st.passed ? ' · Opponent had no move — you go again.' : ''}` },
+  ];
+  const liveRef = useRef({});
+  liveRef.current = { step, board, isMyTurn, boardY };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - lv.boardY - 2) / lv.step);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      const i = r * 8 + c;
+      if (lv.isMyTurn && lv.board[i] === 0) submit({ cell: i });
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [board, cell, st.passed],
+    draw: (ctx) => {
+      // Counts band: two drawn discs + live totals (+ the pass note).
+      ctx.textBaseline = 'middle';
+      ctx.font = '600 12px ' + CUI_FONT;
+      const passTxt = st.passed ? '   Opponent had no move — you go again.' : '';
+      const t1 = ` ${p1}`, t2 = ` ${p2}`;
+      const total = 16 + ctx.measureText(t1).width + 26 + 16 + ctx.measureText(t2).width + ctx.measureText(passTxt).width;
+      let lx = Math.max(4, (side - total) / 2);
+      const ly = NOTE_H / 2 + 2;
+      rvDrawDisc(ctx, lx + 7, ly, 7, 1);
+      ctx.fillStyle = PAL.text;
+      ctx.textAlign = 'left';
+      ctx.fillText(t1, lx + 16, ly);
+      lx += 16 + ctx.measureText(t1).width + 26;
+      rvDrawDisc(ctx, lx + 7, ly, 7, 2);
+      ctx.fillStyle = PAL.text;
+      ctx.fillText(t2, lx + 16, ly);
+      if (passTxt) {
+        ctx.fillStyle = PAL.gold;
+        ctx.fillText(passTxt, lx + 16 + ctx.measureText(t2).width, ly);
+      }
+      ctx.textAlign = 'center';
+      ctx.save();
+      ctx.translate(0, boardY);
+      klRR(ctx, 0, 0, side, side, 8);
+      ctx.fillStyle = PAL.border; // the gutter grid shows through between cells
+      ctx.fill();
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = 2 + c * step, y = 2 + r * step;
+        ctx.fillStyle = '#1d5c3a'; // intrinsic Reversi felt
+        ctx.fillRect(x, y, cell, cell);
+        if (board[i] !== 0) rvDrawDisc(ctx, x + cell / 2, y + cell / 2, cell * 0.38, board[i]);
+      }
+      ctx.restore();
+    },
+  });
   return (
-    <div>
-      <div className="brg-note">
-        <span className="rv-count"><span className="rv-disc-mini d1" /> {p1}</span>
-        <span className="rv-count"><span className="rv-disc-mini d2" /> {p2}</span>
-        {st.passed && <span style={{ marginLeft: '0.6rem' }}>Opponent had no move — you go again.</span>}
-      </div>
-      <div className="rv-board">
-        {board.map((v, i) => (
-          <div key={i} className="rv-cell" {...tapProps(() => isMyTurn && v === 0 && submit({ cell: i }))}>
-            {v !== 0 && <div className={'rv-disc d' + v} />}
-          </div>
-        ))}
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="rv-canvas" cap="360px"
+      ariaLabel={`Reversi board — ${p1} dark, ${p2} light`}>
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
 function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(30, Math.min(46, Math.floor((Math.floor(boxW) - 16 - 24) / 7)));
+  const step = cell + 4;
+  const W = step * 7 - 4 + 16, BH = step * 6 - 4 + 16;
+  const LEG_H = 24;
+  const H = BH + 4 + LEG_H;
+  const controls = [
+    { id: 'legend', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: 'Player 1 · Player 2 · Tap a column to drop' },
+  ];
+  const liveRef = useRef({});
+  liveRef.current = { step, isMyTurn };
+  usePointerCell(canvasRef, {
+    // The whole column is the target — a drop game wants the fattest hit area.
+    onTap: (p) => {
+      const lv = liveRef.current;
+      if (p.y > BH) return;
+      const col = Math.floor((p.x - 8) / lv.step);
+      if (col < 0 || col > 6 || !lv.isMyTurn) return;
+      submit({ col });
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [board, st.lastMove, cell],
+    draw: (ctx) => {
+      klRR(ctx, 0, 0, W, BH, 12);
+      ctx.fillStyle = '#22335e'; // intrinsic Four-in-a-Row panel blue
+      ctx.fill();
+      for (let i = 0; i < 42; i++) {
+        const r = Math.floor(i / 7), c = i % 7;
+        const cx = 8 + c * step + cell / 2, cy = 8 + r * step + cell / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cell / 2, 0, Math.PI * 2);
+        ctx.fillStyle = PAL.bg; // the punched-hole look
+        ctx.fill();
+        const v = board[i];
+        if (v !== 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.43, 0, Math.PI * 2);
+          ctx.fillStyle = v === 1 ? palOf(C.rose, '#CD4B3A') : palOf(C.gold, '#D9A54A');
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.43 - 1.5, Math.PI * 0.2, Math.PI * 0.8);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+          ctx.stroke();
+        }
+        if (st.lastMove === i) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell / 2 - 1, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.stroke();
+        }
+      }
+      // Legend band with drawn swatch discs.
+      const ly = BH + 4 + LEG_H / 2;
+      ctx.font = '500 11px ' + CUI_FONT;
+      ctx.textBaseline = 'middle';
+      const t1 = ' Player 1', t2 = ' Player 2', t3 = 'Tap a column to drop';
+      const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width, w3 = ctx.measureText(t3).width;
+      let lx = Math.max(4, (W - (w1 + w2 + w3 + 72)) / 2);
+      ctx.textAlign = 'left';
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.rose, '#CD4B3A'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.fillText(t1, lx + 14, ly);
+      lx += w1 + 32;
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.gold, '#D9A54A'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.fillText(t2, lx + 14, ly);
+      lx += w2 + 32;
+      ctx.fillText(t3, lx, ly);
+      ctx.textAlign = 'center';
+    },
+  });
   return (
-    <div>
-      <div className="fir-board">
-        {board.map((v, i) => (
-          <div
-            key={i}
-            className={'fir-cell' + (st.lastMove === i ? ' last' : '')}
-            {...tapProps(() => isMyTurn && submit({ col: i % 7 }))}
-          >
-            {v !== 0 && <div className={'fir-disc d' + v} />}
-          </div>
-        ))}
-      </div>
-      <div className="brg-legend">
-        <span><span className="fir-disc-mini d1" /> Player 1</span>
-        <span><span className="fir-disc-mini d2" /> Player 2</span>
-        <span style={{ color: C.muted }}>Tap a column to drop</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="fir-canvas" cap="340px"
+      ariaLabel="Four in a Row board">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
 /* PHASE 2 — Gomoku ghost-confirm.
-   15x15 inside min(92vw, 380px) is ~24px per intersection — about a quarter of a
-   fingertip — and the old single onClick committed a PERMANENT stone on the first
-   tap. Now the first tap only places a ghost; you can slide it around and then
-   confirm. The move payload and the server's applyMove contract are unchanged
-   (only WHEN submit fires), so online, pass-and-play and bot modes all behave
-   identically and lib/board-rules.js needed no change. */
+   15x15 is ~24px per intersection — about a quarter of a fingertip — and the
+   old single tap committed a PERMANENT stone. The first tap places a ghost;
+   slide it, then confirm. The confirm bar draws in the same canvas now
+   (controls wave); the move payload is unchanged. */
 function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
   const [pending, setPending] = useState(null);
@@ -18816,30 +18425,84 @@ function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     setPending(i);
   };
 
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(18, Math.min(26, Math.floor((Math.floor(boxW) - 4 - 14) / 15)));
+  const step = cell + 1;
+  const side = step * 15 - 1 + 4;
+  const BAR_H = isMyTurn ? 52 : 0;
+  const H = side + (BAR_H ? 6 + BAR_H : 0);
   const rc = pending == null ? null : [Math.floor(pending / 15) + 1, (pending % 15) + 1];
+  const controls = [];
+  if (isMyTurn) {
+    const br = cuiRow(2, side + 8, side - 4, 46, 2);
+    controls.push({ id: 'cancel', kind: 'button', r: br[0], label: 'Cancel', disabled: pending == null, action: () => setPending(null) });
+    controls.push({ id: 'place', kind: 'button', r: br[1], label: pending == null ? 'Tap a point' : `Place stone (row ${rc[0]}, col ${rc[1]})`, font: 13, solid: pending != null, disabled: pending == null, action: place });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  const liveRef = useRef({});
+  liveRef.current = { step, pick };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      if (p.y > side) return;
+      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - 2) / lv.step);
+      if (c < 0 || c > 14 || r < 0 || r > 14) return;
+      lv.pick(r * 15 + c);
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [board, pending, st.lastMove, cell, isMyTurn, pressedId],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      klRR(ctx, 0, 0, side, side, 6);
+      ctx.fillStyle = '#b08b4f'; // intrinsic goban wood
+      ctx.fill();
+      ctx.strokeStyle = PAL.border;
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 15; i++) {
+        const at = 2 + i * step - 0.5;
+        ctx.beginPath(); ctx.moveTo(at, 2); ctx.lineTo(at, side - 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(2, at); ctx.lineTo(side - 2, at); ctx.stroke();
+      }
+      for (let i = 0; i < 225; i++) {
+        const r = Math.floor(i / 15), c = i % 15;
+        const x = 2 + c * step, y = 2 + r * step;
+        const cx = x + cell / 2, cy = y + cell / 2;
+        const v = board[i];
+        if (v !== 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.39, 0, Math.PI * 2);
+          ctx.fillStyle = v === 1 ? '#171a24' : '#f2f0e8';
+          ctx.fill();
+          if (v === 2) { ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.stroke(); }
+        } else if (pending === i) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.31, 0, Math.PI * 2);
+          ctx.setLineDash([4, 3]);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        if (st.lastMove === i) {
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+        }
+      }
+    },
+  });
   return (
-    <div className="gmk-scroll">
-      <div className="gmk-board">
-        {board.map((v, i) => (
-          <div
-            key={i}
-            className={'gmk-cell' + (st.lastMove === i ? ' last' : '')}
-            {...tapProps(() => pick(i))}
-          >
-            {v !== 0 && <div className={'gmk-stone s' + v} />}
-            {v === 0 && pending === i && <div className="gmk-ghost" />}
-          </div>
-        ))}
-      </div>
-      {isMyTurn && (
-        <div className="brd-confirm-bar">
-          <button onClick={() => setPending(null)} disabled={pending == null}>Cancel</button>
-          <button className="go" onClick={place} disabled={pending == null}>
-            {pending == null ? 'Tap a point' : `Place stone (row ${rc[0]}, col ${rc[1]})`}
-          </button>
-        </div>
-      )}
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="gmk-canvas" cap="380px"
+      ariaLabel="Gomoku board, 15 by 15">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -18891,55 +18554,31 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     if (pos === -1) return st.die === 6;
     return pos + st.die <= 57;
   };
-  const cells = [];
-  // Ring — a start cell is safe (and tinted) only for seats actually playing.
-  LUDO_RING_XY.forEach(([x, y], i) => {
-    const startOwner = seatList.find(p => LUDO_START_ABS[p] === i) || 0;
-    const safe = i === 0 || i === 13 || i === 26 || i === 39;
-    cells.push(
-      <div key={'r' + i} className={'ludo-cell ring' + (safe ? ' safe' : '') + (startOwner ? ' start' + startOwner : '')}
-           style={{ gridColumn: x + 1, gridRow: y + 1 }}>{safe ? '★' : ''}</div>
-    );
-  });
-  // Home columns + center + bases (only for seats in this match)
+  // Tokens flattened in DRAW order (seat asc, token asc) — the tap hit-test
+  // walks this list in reverse so the topmost of a 5px-offset stack wins.
+  const toks = [];
   for (const p of seatList) {
-    LUDO_HOME_XY[p].forEach(([x, y], i) => {
-      cells.push(<div key={'h' + p + i} className={'ludo-cell home' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
-    });
-    LUDO_BASE_XY[p].forEach(([x, y], i) => {
-      cells.push(<div key={'b' + p + i} className={'ludo-cell base' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
-    });
-  }
-  cells.push(<div key="center" className="ludo-cell center" style={{ gridColumn: 8, gridRow: 8 }}>🏁</div>);
-  // Tokens (offset stacked tokens slightly so pile-ups stay visible)
-  const tokens = [];
-  for (const p of seatList) {
-    const toks = seats[p] || [];
     const out = forfeited.includes(p);
-    toks.forEach((pos, i) => {
-      const [x, y] = ludoTokenXY(p, pos, i);
-      const mine = p === myPlayerNum;
-      const movable = mine && !out && canMoveToken(pos);
-      tokens.push(
-        <div
-          key={'t' + p + i}
-          className={'ludo-token p' + p + (movable ? ' movable' : '') + (out ? ' forfeited' : '')}
-          style={{
-            gridColumn: x + 1, gridRow: y + 1,
-            transform: `translate(${(i % 2) * 5 - 2}px, ${Math.floor(i / 2) * 5 - 2}px)`,
-          }}
-          {...tapProps(() => movable && submit({ type: 'move', token: i }))}
-        >{i + 1}</div>
-      );
+    (seats[p] || []).forEach((pos, i) => {
+      const [gx, gy] = ludoTokenXY(p, pos, i);
+      toks.push({ p, i, pos, gx, gy, out, movable: p === myPlayerNum && !out && canMoveToken(pos) });
     });
   }
 
-  /* PHASE 2 — the movable-token pad.
-     The board tap targets a token INSIDE a ~25px cell, and tokens sharing a
-     square are offset by only 5px, so two of them overlap almost entirely —
-     there was no reliable way to pick the one you meant (and no accessible way
-     at all). This list is the unambiguous, full-size path; the board tap stays
-     as a shortcut. Same { type: 'move', token } payload either way. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(18, Math.min(26, Math.floor((Math.floor(boxW) - 6 - 14) / 15)));
+  const step = cell + 1;
+  const PADI = 3;
+  const side = step * 15 - 1 + PADI * 2;
+  const tokenC = (t) => [
+    PADI + t.gx * step + cell / 2 + (t.i % 2) * 5 - 2,
+    PADI + t.gy * step + cell / 2 + Math.floor(t.i / 2) * 5 - 2,
+  ];
+
+  // The move pad (the unambiguous full-size path for stacked tokens), the
+  // die, the roll button, the event notes and the legend all draw in-frame.
   const myTokens = (seats[myPlayerNum] || []);
   const movableList = phase === 'move' && isMyTurn && st.die != null
     ? myTokens.map((pos, i) => ({ i, pos })).filter(t => canMoveToken(t.pos))
@@ -18950,50 +18589,192 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     const dest = pos + st.die;
     return `step ${pos} → ${dest >= 51 ? 'home column' : dest}`;
   };
+  const notes = [];
+  if (st.lastEvent === 'no-move') notes.push('No legal move for that roll — turn passed.');
+  if (st.lastEvent === 'capture') notes.push('💥 Capture! Token sent back to base.');
+  if (forfeited.length > 0) notes.push(`${forfeited.map(p => 'P' + p).join(', ')} forfeited — the match continues.`);
+  if (nPlayers > 2 && !isMyTurn) notes.push(`Waiting on P${st.currentPlayer || 1}…`);
+
+  const MOVE_H = movableList.length ? 18 + movableList.length * 50 : 0;
+  const ROLL_H = 54;
+  const NOTES_H = notes.length * 18;
+  const LEG_H = 18;
+  const H = side + (MOVE_H ? 6 + MOVE_H : 0) + 6 + ROLL_H + (NOTES_H ? 4 + NOTES_H : 0) + 4 + LEG_H;
+  let by = side + 6;
+  const moveY = by; if (MOVE_H) by += MOVE_H + 6;
+  const rollY = by; by += ROLL_H + 4;
+  const notesY = by; if (NOTES_H) by += NOTES_H + 4;
+  const legY = by;
+
+  const controls = [];
+  if (movableList.length) {
+    controls.push({ id: 'ml-label', kind: 'label', r: [0, moveY, side, 16], label: `YOUR MOVES · ROLLED ${st.die}`, font: 10 });
+    movableList.forEach((t, k) => {
+      controls.push({
+        id: 'mv' + t.i, kind: 'button',
+        r: [Math.floor(side * 0.05), moveY + 18 + k * 50, Math.floor(side * 0.9), 46],
+        label: `Token ${t.i + 1}`, sub: describe(t.pos),
+        action: () => submit({ type: 'move', token: t.i }),
+      });
+    });
+  }
+  controls.push({ id: 'die', kind: 'button', r: [Math.floor(side / 2) - 24, rollY, 48, 48], label: st.die == null ? '·' : String(st.die), font: 20, mono: true, disabled: true });
+  const rollW = Math.floor(side * 0.34);
+  controls.push({
+    id: 'roll', kind: 'button', r: [side - rollW - 4, rollY + 4, rollW, 44],
+    label: !isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a token',
+    font: 13, solid: isMyTurn && phase === 'roll',
+    bg: isMyTurn && phase === 'roll' ? palOf(LUDO_SEAT_COLORS[myPlayerNum] || C.accent, '#3A6ECD') : undefined,
+    ink: isMyTurn && phase === 'roll' ? '#fff' : undefined,
+    disabled: !isMyTurn || phase !== 'roll',
+    action: () => submit({ type: 'roll' }),
+  });
+  notes.forEach((n, k) => controls.push({ id: 'note' + k, kind: 'label', r: [0, notesY + k * 18, side, 18], label: n, gold: true, font: 11.5 }));
+  controls.push({ id: 'legend', kind: 'label', r: [0, legY, side, 16], label: '🎲 6 leaves base & rolls again · ★ safe cells · Exact roll to finish', font: 10.5 });
+
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  const liveRef = useRef({});
+  liveRef.current = { toks, cell, tokenC };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (pt) => {
+      const lv = liveRef.current;
+      if (pt.y > side) return;
+      const rr = lv.cell * 0.425 + 8; // +8 = the old DOM token's hit-slop
+      for (let k = lv.toks.length - 1; k >= 0; k--) {
+        const t = lv.toks[k];
+        if (!t.movable) continue;
+        const [cx, cy] = lv.tokenC(t);
+        if ((pt.x - cx) * (pt.x - cx) + (pt.y - cy) * (pt.y - cy) <= rr * rr) {
+          submit({ type: 'move', token: t.i });
+          return;
+        }
+      }
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [st, cell, myPlayerNum, nPlayers, pressedId, isMyTurn],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      klRR(ctx, 0, 0, side, side, 10);
+      ctx.fillStyle = PAL.surface;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const seatColor = (p) => palOf(LUDO_SEAT_COLORS[p], '#888');
+      const cellRect = (gx, gy) => [PADI + gx * step, PADI + gy * step];
+      // Ring — a start cell is safe (and tinted) only for seats actually playing.
+      LUDO_RING_XY.forEach(([gx, gy], i) => {
+        const [x, y] = cellRect(gx, gy);
+        const startOwner = seatList.find(p => LUDO_START_ABS[p] === i) || 0;
+        const safe = i === 0 || i === 13 || i === 26 || i === 39;
+        klRR(ctx, x, y, cell, cell, 3);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        if (startOwner) {
+          ctx.save();
+          ctx.globalAlpha = 0.2;
+          ctx.fillStyle = seatColor(startOwner);
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = startOwner ? seatColor(startOwner) : PAL.border;
+        ctx.stroke();
+        if (safe) {
+          ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
+          ctx.fillStyle = palOf(C.gold, '#D9A54A');
+          ctx.fillText('★', x + cell / 2, y + cell / 2 + 0.5);
+        }
+      });
+      // Home columns + bases (only for seats in this match)
+      for (const p of seatList) {
+        const col = seatColor(p);
+        for (const [gx, gy] of LUDO_HOME_XY[p]) {
+          const [x, y] = cellRect(gx, gy);
+          klRR(ctx, x, y, cell, cell, 3);
+          ctx.save();
+          ctx.globalAlpha = 0.13;
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.globalAlpha = 0.4;
+          ctx.setLineDash([3, 2]);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+          ctx.restore();
+        }
+        for (const [gx, gy] of LUDO_BASE_XY[p]) {
+          const [x, y] = cellRect(gx, gy);
+          ctx.beginPath();
+          ctx.arc(x + cell / 2, y + cell / 2, cell / 2 - 0.5, 0, Math.PI * 2);
+          ctx.save();
+          ctx.globalAlpha = 0.1;
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.globalAlpha = 0.35;
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      { // center 🏁
+        const [x, y] = cellRect(7, 7);
+        klRR(ctx, x, y, cell, cell, 3);
+        ctx.save();
+        ctx.globalAlpha = 0.13;
+        ctx.fillStyle = palOf(C.gold, '#D9A54A');
+        ctx.fill();
+        ctx.restore();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+        ctx.stroke();
+        ctx.font = `${Math.round(cell * 0.7)}px system-ui, sans-serif`;
+        ctx.fillText('🏁', x + cell / 2, y + cell / 2 + 0.5);
+      }
+      // Tokens
+      for (const t of toks) {
+        const [cx, cy] = tokenC(t);
+        const r = cell * 0.425;
+        ctx.save();
+        if (t.out) ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = seatColor(t.p);
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.stroke();
+        if (t.movable) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 1.5, 0, Math.PI * 2);
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.shadowColor = palOf(C.gold, '#D9A54A');
+          ctx.shadowBlur = 6;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        ctx.font = `700 ${Math.max(8, Math.round(cell * 0.42))}px system-ui, sans-serif`;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(String(t.i + 1), cx, cy + 0.5);
+        ctx.restore();
+      }
+    },
+  });
 
   return (
-    <div>
-      <div className="ludo-board">{cells}{tokens}</div>
-      {movableList.length > 0 && (
-        <div className="brd-movelist">
-          <div className="brd-movelist-label">Your moves · rolled {st.die}</div>
-          {movableList.map(t => (
-            <button
-              key={t.i}
-              className="brd-move-btn"
-              {...tapProps(() => submit({ type: 'move', token: t.i }))}
-            >
-              <span>Token {t.i + 1}</span>
-              <span className="brd-move-sub">{describe(t.pos)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="cnl-die"><div className="cnl-die-face">{st.die == null ? '·' : st.die}</div></div>
-      {st.lastEvent === 'no-move' && <div className="brg-note">No legal move for that roll — turn passed.</div>}
-      {st.lastEvent === 'capture' && <div className="brg-note">💥 Capture! Token sent back to base.</div>}
-      {forfeited.length > 0 && (
-        <div className="brg-note">{forfeited.map(p => `P${p}`).join(', ')} forfeited — the match continues.</div>
-      )}
-      {nPlayers > 2 && !isMyTurn && (
-        <div className="brg-note">Waiting on P{st.currentPlayer || 1}…</div>
-      )}
-      <div className="cnl-roll-buttons">
-        <button
-          className="cnl-roll-btn"
-          style={{ background: LUDO_SEAT_COLORS[myPlayerNum] || C.accent }}
-          onClick={() => submit({ type: 'roll' })}
-          disabled={!isMyTurn || phase !== 'roll'}
-        >
-          {!isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a highlighted token'}
-        </button>
-      </div>
-      <div className="brg-legend">
-        <span>🎲 6 leaves base & rolls again</span>
-        <span>★ safe cells</span>
-        <span>Exact roll to finish</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ludo-canvas" cap="380px"
+      ariaLabel={`Ludo board, ${nPlayers} players`}>
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -19096,13 +18877,17 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.82rem' }}>P{myPlayerNum}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
-      </div>
-      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <CuiBar height={opponentDisconnected ? 68 : 46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: 'P' + myPlayerNum, color: palOf(myColor, undefined) },
+          { id: 'p-conn', kind: 'pill', r: pr[3], label: 'Online', value: '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        if (opponentDisconnected) out.push({ id: 'disc', kind: 'label', r: [0, 50, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        return out;
+      }} />
       {room.status === 'active' && (() => {
         // Correspondence turn timer: the server auto-forfeits the side to move
         // after turnTimeoutHours without a move — surface the remaining window.
@@ -19438,12 +19223,13 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
 
   return (
     <div>
-      <div className="brg-intro">
-        {over
+      <CuiBar height={36} build={(W) => ([{
+        id: 'intro', kind: 'label', r: [0, 4, W, 28], font: 13, bold: true, color: PAL.text,
+        label: over
           ? (over.winner === 'draw' ? "It's a draw." : `${label(Number(over.winner))} ${vsBot && over.winner === '1' ? 'win' : 'wins'}! 🎉`)
           : thinking ? 'Bot is thinking…'
-          : `${label(cur)} to move`}
-      </div>
+          : `${label(cur)} to move`,
+      }])} />
       {err && <div className="mnc-join-error">{err}</div>}
       <View
         st={state}
@@ -19946,7 +19732,8 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
    A small client-side engine every card/tile daily rides:
    seeded deck building + Fisher-Yates shuffling (mulberry32 via
    dailyRng, same PRNG family as lib/dapp.js's tile-match board
-   generator), a shared <CeCard> renderer, and a layered-tile
+   generator), the intrinsic-art card/tile draw helpers the canvas
+   boards share (klDrawCard and friends), and a layered-tile
    layout helper (free-tile rule + reverse-deal solvable dealing,
    the same layer/overlap model as lib/dapp.js's tileBoard).
    All phase-6 games are tier B server-side (snapshot + timing
@@ -19982,119 +19769,10 @@ function ceDeck(nDecks, suits, rng) {
   return rng ? ceShuffle(cards, rng) : cards;
 }
 
-// Shared card renderer. Face-down cards show a patterned back; face-up cards
-// show rank + suit in red/black. `sel` draws the selection ring.
-function CeCard({ card, sel, dim, onClick, style, onDragStart, dropTarget }) {
-  const cls = ['ce-card'];
-  if (!card.up) cls.push('down');
-  else cls.push(ceIsRed(card) ? 'red' : 'black');
-  if (sel) cls.push('selected'); // Phase 2 — a visible "this one is selected".
-  if (sel) cls.push('sel');
-  if (dim) cls.push('dim');
-  if (!card.up) cls.push('face-down');
-  return (
-    <div
-      className={cls.join(' ')}
-      style={style}
-      data-drop={dropTarget}
-      {...(onDragStart ? { onPointerDown: onDragStart } : {})}
-      {...tapProps(onClick)}
-    >
-      {card.up && (
-        <React.Fragment>
-          <div className="ce-rank">{CE_RANK_LABEL[card.r]}</div>
-          <div className="ce-suit">{CE_SUIT_GLYPH[card.s]}</div>
-        </React.Fragment>
-      )}
-    </div>
-  );
-}
-
-// An empty pile slot (foundation / empty column / stock base).
-function CeSlot({ label, onClick, className, dropTarget }) {
-  return (
-    <div
-      className={'ce-card ce-slot' + (className ? ' ' + className : '')}
-      data-drop={dropTarget}
-      {...tapProps(onClick)}
-    >
-      {label || ''}
-    </div>
-  );
-}
-
-/* PHASE 5 (#123) — finger drag for the DOM card games (Spider; Klondike's
-   canvas board hit-tests its own drags in board coordinates now, #170).
-   Tap-select/tap-destination was the only way to move a card, which is not how
-   anyone expects to play patience. Modelled on Block Fit's existing
-   .bb-drag-ghost rather than inventing a second drag idiom: a fixed-position
-   ghost tracks the pointer 1:1, and the drop target is resolved from
-   `data-drop` under the finger at release. If the pointer never travels past
-   the tolerance it is NOT a drag — the existing tap path runs instead, so both
-   input styles work and nothing regresses for mouse users. */
-const CE_DRAG_TOLERANCE = 8;
-
-function useCardDrag(onDrop) {
-  const [ghost, setGhost] = useState(null); // { cards, x, y }
-  const live = useRef(null);
-  const onDropRef = useRef(onDrop);
-  onDropRef.current = onDrop;
-
-  // Begin a potential drag. `payload` identifies the source; `cards` is what
-  // the ghost renders (a run, for a tableau grab).
-  const begin = (e, payload, cards) => {
-    if (!cards || !cards.length) return;
-    live.current = {
-      payload, cards, startX: e.clientX, startY: e.clientY, moved: false,
-      pointerId: e.pointerId,
-    };
-    // Deliberately NOT setPointerCapture on the card: capture would retarget
-    // every later event to the card and break elementFromPoint's usefulness.
-  };
-
-  useEffect(() => {
-    const onMove = (e) => {
-      const d = live.current;
-      if (!d) return;
-      if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < CE_DRAG_TOLERANCE) return;
-      d.moved = true;
-      d.lastX = e.clientX; d.lastY = e.clientY;
-      setGhost({ cards: d.cards, x: e.clientX, y: e.clientY });
-      if (e.cancelable) e.preventDefault();
-    };
-    const onUp = (e) => {
-      const d = live.current;
-      live.current = null;
-      setGhost(null);
-      if (!d || !d.moved) return; // a tap, not a drag — let tapProps handle it
-      // Hide the ghost before hit-testing or it eats the point (it is
-      // pointer-events: none, but elementFromPoint is cheaper to trust this way).
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const target = el && el.closest ? el.closest('[data-drop]') : null;
-      onDropRef.current && onDropRef.current(d.payload, target ? target.getAttribute('data-drop') : null);
-    };
-    window.addEventListener('pointermove', onMove, { passive: false });
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
-    };
-  }, []);
-
-  // True while a real drag is in flight — callers suppress their tap handling.
-  const dragging = !!ghost;
-  const ghostEl = ghost ? (
-    <div className="ce-drag-ghost" style={{ left: ghost.x, top: ghost.y }}>
-      {ghost.cards.map((c, i) => (
-        <CeCard key={c.id || i} card={c} style={{ marginTop: i ? -34 : 0 }} />
-      ))}
-    </div>
-  ) : null;
-
-  return { begin, dragging, ghostEl };
-}
+/* The DOM card renderer (CeCard/CeSlot) and the elementFromPoint drag hook
+   (useCardDrag) that carried the pre-canvas solitaires were REMOVED in the
+   wave-1 migration: Spider was their last consumer, and both solitaires now
+   hit-test drags in board coordinates on their canvases (#170's pattern). */
 
 /* ---- Klondike Solitaire (daily) -------------------------------------------
    Classic single-deck patience: 7 tableau columns, draw-1 stock with
@@ -20548,16 +20226,39 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     });
   };
 
-  /* #170 — canvas plumbing. The box is the fit column's flexible region;
-     useFitBox re-measures it on resize/rotate and the layout is recomputed
-     from the CURRENT state each render, so the fan tightens as columns grow. */
+  /* #170 — canvas plumbing, now the whole FRAME (controls wave): pills, the
+     board, the refusal note and Give up draw on one canvas. The box is the
+     fit column's flexible region; useFitBox re-measures it on resize/rotate
+     and the board layout is recomputed from the CURRENT state each render,
+     so the fan tightens as columns grow. */
   const canvasRef = useRef(null);
   const boxRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 7, rows: 1 });
   const W = Math.floor(boxW), H = Math.floor(boxH);
-  const ly = W > 80 && H > 80 ? klLayout(W, H, st) : null;
+  const KL_GAP = 8, KL_PILL_H = 46, KL_NOTE_H = 18, KL_BTN_H = 36;
+  const klChrome = KL_PILL_H + KL_GAP + KL_GAP + KL_NOTE_H + 4 + KL_BTN_H + 4;
+  const klBoardY = KL_PILL_H + KL_GAP;
+  const boardH = Math.max(80, H - klChrome);
+  const ly = W > 80 && H > 80 ? klLayout(W, boardH, st) : null;
   const lyRef = useRef(ly);
   lyRef.current = ly;
+  const klTopRef = useRef(klBoardY);
+  klTopRef.current = klBoardY;
+
+  const home = st.found.reduce((a, f) => a + f.length, 0);
+  const klControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, KL_PILL_H, 3);
+    klControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    klControls.push({ id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: st.moves });
+    klControls.push({ id: 'p-home', kind: 'pill', r: pr[2], label: 'Home', value: `${home}/52` });
+    const noteY = klBoardY + boardH + KL_GAP;
+    if (note) klControls.push({ id: 'note', kind: 'label', r: [0, noteY, W, KL_NOTE_H], label: note, gold: true, font: 12 });
+    klControls.push({ id: 'giveup', kind: 'button', r: [Math.floor(W * 0.28), noteY + KL_NOTE_H + 4, Math.floor(W * 0.44), KL_BTN_H], label: '🏳️ Give up', disabled: done, action: () => giveUp() });
+  }
+  const klCtlRef = useRef([]);
+  klCtlRef.current = klControls;
+  const [klPressed, setKlPressed] = useState(null);
 
   /* #123 — drag, now hit-tested in board coordinates. A press on the waste,
      a foundation top or a face-up tableau card arms a potential drag; pointer
@@ -20591,7 +20292,7 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     moveSelToTab(p, src);
   };
 
-  usePointerCell(canvasRef, {
+  usePointerCell(canvasRef, cuiWrapHandlers(klCtlRef, setKlPressed, cuiShiftHandlers({
     onDown: (pt) => {
       pendRef.current = null;
       if (dragRef.current) setDragBoth(null); // a cancelled drag left a ghost
@@ -20635,15 +20336,18 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
       else if (hit.z === 'found') tapFound(hit.p);
       else tapTab(hit.p, hit.i);
     },
-  }, { moveTolerance: 8 });
+  }, klTopRef)), { moveTolerance: 8 });
 
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [st, sel, drag, done, W, H, flipFrame],
+    deps: [st, sel, drag, done, W, H, flipFrame, fmt, note, klPressed],
     draw: (ctx) => {
+      cuiDrawControls(ctx, klCtlRef.current, klPressed);
       const l = lyRef.current;
       if (!l) return;
+      ctx.save();
+      ctx.translate(0, klTopRef.current);
       const dragSrc = drag && drag.src;
       const hideWaste = dragSrc && dragSrc.z === 'waste' ? 1 : 0;
       const hideFound = dragSrc && dragSrc.z === 'found' ? dragSrc.p : -1;
@@ -20708,18 +20412,13 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
         const dx = drag.x - drag.gx, dy = drag.y - drag.gy;
         drag.cards.forEach((c, i) => klDrawCard(ctx, l, dx, dy + i * l.upStep, c, { shadow: i === 0 }));
       }
+      ctx.restore();
     },
   });
 
-  const home = st.found.reduce((a, f) => a + f.length, 0);
   return (
     <div className="kl-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
-        <div className="pill"><div className="plabel">Home</div><div className="pvalue">{home}/52</div></div>
-      </div>
-      <div className="kl-board-box" ref={boxRef}>
+      <div className="kl-board-box cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="kl-canvas board-canvas"
@@ -20727,11 +20426,8 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
           aria-label={`Klondike board — ${home}/52 home, ${st.stock.length} in stock, ${st.moves} moves`}
         />
       </div>
-      <div className="kl-note">{note}</div>
+      <CuiTwin controls={klControls} />
       <div className="p6-hint">Drag a card (or tap it, then its destination). Tap a selected card again to send it home. Only a King starts an empty column.</div>
-      <div className="mj-controls">
-        <button onClick={() => giveUp()} disabled={done}>🏳️ Give up</button>
-      </div>
     </div>
   );
 }
@@ -20778,6 +20474,71 @@ function spSweep(n) {
     }
   }
   return swept;
+}
+
+/* The Spider board is a CANVAS now — the #170 Klondike treatment: the DOM
+   board fixed every column at 44px and FitScale-shrank the whole tableau,
+   so ten columns on a phone meant ~30px cards and elementFromPoint drag
+   hit-testing against scaled elements. The canvas sizes cards from the
+   measured box (they grow to fill a phone screen), the fan compresses
+   before the cards shrink, and drag/tap hit-testing is coordinate math in
+   the exact layout each frame was drawn from. Rules, state shape, progress
+   save/resume and scoring are unchanged; the cards reuse Klondike's
+   intrinsic deck art (klDrawCard/klDrawSlot read sizes off this layout). */
+function spLayout(w, h, st) {
+  const gap = Math.max(3, Math.min(8, Math.round(w * 0.01)));
+  const build = (cw) => {
+    const ch = Math.round(cw * 1.36);
+    const fontPx = Math.max(9, Math.min(15, Math.round(cw * 0.32)));
+    const totalW = cw * 10 + gap * 9;
+    const x0 = Math.floor((w - totalW) / 2);
+    let upStep = Math.max(fontPx + 6, Math.round(ch * 0.34));
+    let downStep = Math.max(4, Math.round(ch * 0.13));
+    const needed = (us, ds) => {
+      let need = ch;
+      for (const col of st.cols) {
+        let y = 0;
+        for (let i = 1; i < col.length; i++) y += col[i - 1].up ? us : ds;
+        need = Math.max(need, y + ch);
+      }
+      return need;
+    };
+    const avail = Math.max(0, h);
+    // Compress the fan before shrinking the cards (the Klondike rule): a
+    // readable top card beats a taller sliver of a buried one.
+    let guard = 0;
+    while (avail > 0 && needed(upStep, downStep) > avail && guard++ < 80) {
+      if (downStep > 4) downStep -= 1;
+      else if (upStep > 11) upStep -= 1;
+      else break;
+    }
+    const fits = avail === 0 || needed(upStep, downStep) <= avail;
+    return { w, h, gap, cw, ch, fontPx, x0, upStep, downStep, fits };
+  };
+  let cw = Math.min(60, Math.floor((w - gap * 9) / 10));
+  let ly = build(cw);
+  let guard = 0;
+  while (!ly.fits && cw > 24 && guard++ < 30) { cw -= 2; ly = build(cw); }
+  ly.colX = (p) => ly.x0 + p * (ly.cw + ly.gap);
+  // Absolute y of every card, shared by the draw pass and the hit-test.
+  ly.colYs = st.cols.map((col) => {
+    let y = 0;
+    return col.map((c) => { const yy = y; y += c.up ? ly.upStep : ly.downStep; return yy; });
+  });
+  return ly;
+}
+
+// Topmost card under a canvas point (i null = the empty column itself); a
+// point below a stack still targets the column, like the DOM board's
+// tap-the-column-background behaviour.
+function spHitAt(ly, st, x, y) {
+  const p = Math.floor((x - ly.x0 + ly.gap / 2) / (ly.cw + ly.gap));
+  if (p < 0 || p > 9) return null;
+  const col = st.cols[p];
+  for (let i = col.length - 1; i >= 0; i--) {
+    if (y >= ly.colYs[p][i] && y < ly.colYs[p][i] + ly.ch) return { p, i };
+  }
+  return { p, i: col.length ? col.length - 1 : null };
 }
 
 function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
@@ -20887,59 +20648,126 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
     });
   };
 
-  // #123 — drag (useCardDrag; Klondike moved to canvas-native dragging, #170).
-  const drag = useCardDrag((payload, dropId) => {
-    if (done || !dropId) return;
-    const [z, idx] = dropId.split(':');
-    if (z !== 'col') return;
-    moveRun(payload.p, payload.i, Number(idx));
+  /* #123/#170 — canvas plumbing + drag, the Klondike pattern: the box is the
+     fit column's flexible region, the layout is recomputed from the CURRENT
+     state each render, the authoritative drag lives in a ref (pointer events
+     outrun React renders) and the state copy only schedules repaints. */
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 10, rows: 1 });
+  const W = Math.floor(boxW), H = Math.floor(boxH);
+  const SP_GAP = 8, SP_PILL_H = 46, SP_NOTE_H = 18, SP_BTN_H = 36;
+  const spChrome = SP_PILL_H + SP_GAP + SP_GAP + SP_NOTE_H + 4 + SP_BTN_H + 4;
+  const spBoardY = SP_PILL_H + SP_GAP;
+  const spBoardH = Math.max(80, H - spChrome);
+  const ly = W > 80 && H > 80 ? spLayout(W, spBoardH, st) : null;
+  const lyRef = useRef(ly);
+  lyRef.current = ly;
+  const spTopRef = useRef(spBoardY);
+  spTopRef.current = spBoardY;
+
+  const spControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, SP_PILL_H, 4);
+    spControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    spControls.push({ id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: st.moves });
+    spControls.push({ id: 'p-runs', kind: 'pill', r: pr[2], label: 'Runs', value: `${st.done8}/8` });
+    spControls.push({ id: 'deal', kind: 'button', r: pr[3], label: `Deal +10 (${Math.floor(st.stock.length / 10)})`, font: 12, primary: true, disabled: !st.stock.length, action: dealRow });
+    const noteY = spBoardY + spBoardH + SP_GAP;
+    if (note) spControls.push({ id: 'note', kind: 'label', r: [0, noteY, W, SP_NOTE_H], label: note, gold: true, font: 12 });
+    spControls.push({ id: 'giveup', kind: 'button', r: [Math.floor(W * 0.28), noteY + SP_NOTE_H + 4, Math.floor(W * 0.44), SP_BTN_H], label: '🏳️ Give up', disabled: done, action: giveUp });
+  }
+  const spCtlRef = useRef([]);
+  spCtlRef.current = spControls;
+  const [spPressed, setSpPressed] = useState(null);
+
+  const [drag, setDrag] = useState(null); // { src:{p,i}, cards, x, y, gx, gy }
+  const dragRef = useRef(null);
+  const pendRef = useRef(null);
+  const setDragBoth = (d) => { dragRef.current = d; setDrag(d); };
+
+  usePointerCell(canvasRef, cuiWrapHandlers(spCtlRef, setSpPressed, cuiShiftHandlers({
+    onDown: (pt) => {
+      pendRef.current = null;
+      if (dragRef.current) setDragBoth(null); // a cancelled drag left a ghost
+      const l = lyRef.current;
+      if (done || !l) return;
+      const hit = spHitAt(l, st, pt.x, pt.y);
+      if (!hit || hit.i == null) return;
+      if (!runOk(st.cols[hit.p], hit.i)) return;
+      pendRef.current = {
+        src: { p: hit.p, i: hit.i }, cards: st.cols[hit.p].slice(hit.i),
+        x0: l.colX(hit.p), y0: l.colYs[hit.p][hit.i], px: pt.x, py: pt.y,
+      };
+    },
+    onDrag: (pt, info) => {
+      const pend = pendRef.current;
+      if (done || !pend || !info.moved) return;
+      const d = dragRef.current ||
+        { src: pend.src, cards: pend.cards, gx: pend.px - pend.x0, gy: pend.py - pend.y0 };
+      setDragBoth({ ...d, x: pt.x, y: pt.y });
+    },
+    onUp: (pt) => {
+      pendRef.current = null;
+      const d = dragRef.current;
+      if (!d) return;
+      setDragBoth(null);
+      if (done) return;
+      const l = lyRef.current;
+      if (!l) return;
+      const p = Math.max(0, Math.min(9, Math.floor((pt.x - l.x0 + l.gap / 2) / (l.cw + l.gap))));
+      moveRun(d.src.p, d.src.i, p); // refusals explain themselves in moveRun
+    },
+    onTap: (pt) => {
+      const l = lyRef.current;
+      if (done || !l) return;
+      const hit = spHitAt(l, st, pt.x, pt.y);
+      if (!hit) { setSel(null); return; }
+      tapCol(hit.p, hit.i);
+    },
+  }, spTopRef)), { moveTolerance: 8 });
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [st, sel, drag, done, W, H, fmt, note, spPressed],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, spCtlRef.current, spPressed);
+      const l = lyRef.current;
+      if (!l) return;
+      ctx.save();
+      ctx.translate(0, spTopRef.current);
+      const dragSrc = drag && drag.src;
+      for (let p = 0; p < 10; p++) {
+        const col = st.cols[p];
+        const hideFrom = dragSrc && dragSrc.p === p ? dragSrc.i : Infinity;
+        if (!col.length || hideFrom === 0) klDrawSlot(ctx, l, l.colX(p), 0);
+        for (let i = 0; i < col.length && i < hideFrom; i++) {
+          klDrawCard(ctx, l, l.colX(p), l.colYs[p][i], col[i],
+            { sel: sel && sel.p === p && i >= sel.i });
+        }
+      }
+      // The dragged run rides the finger, drawn last so it's on top.
+      if (drag) {
+        const dx = drag.x - drag.gx, dy = drag.y - drag.gy;
+        drag.cards.forEach((c, i) => klDrawCard(ctx, l, dx, dy + i * l.upStep, c, { shadow: i === 0 }));
+      }
+      ctx.restore();
+    },
   });
 
-  const maxCol = Math.max(...st.cols.map((c) => c.length), 1);
-  // Raised from a fixed 13px so the exposed strip of a buried card is aimable.
-  const step = maxCol > 16 ? 14 : maxCol > 12 ? 18 : 22;
   return (
     <div className="sp-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
-        <div className="pill"><div className="plabel">Runs</div><div className="pvalue">{st.done8}/8</div></div>
-        <button className="p6-btn" onClick={dealRow} disabled={!st.stock.length}>
-          Deal +10 ({Math.floor(st.stock.length / 10)})
-        </button>
+      <div className="sp-board-box cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="sp-canvas board-canvas"
+          role="img"
+          aria-label={`Spider board — ${st.done8}/8 runs cleared, ${Math.floor(st.stock.length / 10)} deals left, ${st.moves} moves`}
+        />
       </div>
-      <FitScale>
-      <div className="sp-tab">
-        {st.cols.map((col, p) => (
-          <div
-            key={p}
-            className="sp-col"
-            data-drop={'col:' + p}
-            style={{ height: 54 + (maxCol - 1) * step }}
-            onClick={(e) => { if (e.target === e.currentTarget) tapCol(p, col.length ? col.length - 1 : null); }}
-          >
-            {col.length === 0 && <CeSlot className="sm" onClick={() => tapCol(p, null)} dropTarget={'col:' + p} />}
-            {col.map((c, i) => (
-              <CeCard
-                key={c.id}
-                card={c}
-                sel={sel && sel.p === p && i >= sel.i}
-                onClick={() => tapCol(p, i)}
-                onDragStart={runOk(col, i) ? (e) => drag.begin(e, { p, i }, col.slice(i)) : undefined}
-                dropTarget={'col:' + p}
-                style={{ position: 'absolute', top: i * step, left: 0, zIndex: i }}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-      </FitScale>
-      <div className="kl-note">{note}</div>
+      <CuiTwin controls={spControls} />
       <div className="p6-hint">One suit: drag (or tap) any descending run. Build K→A to clear a run — 8 clears win.</div>
-      <div className="mj-controls">
-        <button onClick={giveUp} disabled={done}>🏳️ Give up</button>
-      </div>
-      {drag.ghostEl}
     </div>
   );
 }
@@ -21122,6 +20950,90 @@ function mjHasMove(faces, removed, layout, freeSet) {
   return !!mjFindPair(faces, removed, layout, freeSet);
 }
 
+/* The Mahjong board is a CANVAS now (#170 treatment): the DOM board
+   positioned 60 absolutely-placed 44px tiles at fixed pixel offsets and
+   FitScale-shrank the whole stack, so phones got sub-fingertip tiles.
+   Tiles now size from the measured box, and the tap hit-test walks the
+   same painter's order the frame was drawn in, so overlapping layers
+   resolve exactly as they look. Layout coords are half-tile units
+   (p.x, p.y); a layer lifts p.z * lift px, like the DOM's -5px steps. */
+function mjGeom(w, h, L) {
+  let maxX = 0, maxY = 0, maxZ = 0;
+  for (const p of L) { maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); maxZ = Math.max(maxZ, p.z); }
+  const padX = 6;
+  const build = (tw) => {
+    const th = Math.round(tw * 1.27);
+    const lift = Math.max(3, Math.round(th * 0.09));
+    return { tw, th, lift, bw: maxX * (tw / 2) + tw + padX * 2, bh: maxY * (th / 2) + th + maxZ * lift + 10 };
+  };
+  let tw = Math.min(56, Math.floor((w - padX * 2) / (maxX / 2 + 1)));
+  let g = build(tw);
+  let guard = 0;
+  while (g.bh > h && tw > 20 && guard++ < 60) { tw -= 1; g = build(tw); }
+  const ox = Math.floor((w - g.bw) / 2) + padX;
+  const oy = maxZ * g.lift + 4;
+  const at = (p) => [ox + p.x * (g.tw / 2), oy + p.y * (g.th / 2) - p.z * g.lift];
+  return { ...g, w, h, ox, oy, at, glyphPx: Math.round(g.tw * 0.52) };
+}
+
+// Painter's order — z asc, then y, then x — matching the DOM zIndex rule
+// (z*100 + y). Hit-testing walks it in reverse so the topmost tile wins.
+function mjPaintOrder(L) {
+  return L.map((_, i) => i).sort((a, b) =>
+    (L[a].z - L[b].z) || (L[a].y - L[b].y) || (L[a].x - L[b].x));
+}
+
+function mjHitAt(geo, L, removed, order, x, y) {
+  for (let k = order.length - 1; k >= 0; k--) {
+    const i = order[k];
+    if (removed[i]) continue;
+    const [tx, ty] = geo.at(L[i]);
+    if (x >= tx && x < tx + geo.tw && y >= ty && y < ty + geo.th) return i;
+  }
+  return null;
+}
+
+// Intrinsic tile art (the DOM .mj-tile look, hardcoded like every deck in
+// the app): edge-colour rounded rect with a 3px bottom lip, ivory vertical
+// gradient face, centred emoji glyph. Chrome states (selection ring, hint
+// glow, blocked scrim, refusal flash) draw over it; only they read PAL.
+const MJ_EDGE_BY_Z = ['#B7C2D8', '#A3B0CB', '#8E9DBD', '#8E9DBD', '#8E9DBD'];
+function mjDrawTile(ctx, geo, p, x, y, glyph, o) {
+  const { tw, th } = geo;
+  const r = Math.max(3, Math.round(tw * 0.13));
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 3;
+  klRR(ctx, x, y, tw, th, r);
+  ctx.fillStyle = MJ_EDGE_BY_Z[Math.min(p.z, MJ_EDGE_BY_Z.length - 1)];
+  ctx.fill();
+  ctx.restore();
+  const grad = ctx.createLinearGradient(0, y, 0, y + th);
+  grad.addColorStop(0, '#F8FAFF');
+  grad.addColorStop(1, '#DDE4F2');
+  klRR(ctx, x + 1, y + 1, tw - 2, th - 4, Math.max(2, r - 1));
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.font = geo.glyphPx + 'px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#1E293B';
+  ctx.fillText(glyph, x + tw / 2, y + th / 2 - 1);
+  if (o && o.blocked) {
+    klRR(ctx, x, y, tw, th, r);
+    ctx.fillStyle = 'rgba(9,14,24,0.38)'; // ≈ the DOM brightness(.62) dim
+    ctx.fill();
+  }
+  if (o && (o.sel || o.hinted || o.flash)) {
+    klRR(ctx, x - 1.5, y - 1.5, tw + 3, th + 3, r + 1);
+    ctx.lineWidth = o.hinted ? 3 : 2.5;
+    ctx.strokeStyle = o.flash ? PAL.rose : PAL.gold;
+    ctx.stroke();
+  }
+}
+
 function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   const seedBase = useRef(null);
@@ -21182,6 +21094,44 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
   const freeSet = React.useMemo(() => mjFreeSet(removed, L), [removed, L]);
   const stuck = !done && remaining > 0 && !mjHasMove(faces, removed, L, freeSet);
 
+  // Canvas plumbing — the whole FRAME (controls wave): pills, banner/warn,
+  // board and the Undo/Hint/Shuffle row draw on one canvas.
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 9, rows: 5 });
+  const W = Math.floor(boxW), H = Math.floor(boxH);
+  const MJ_GAPY = 8, MJ_PILL_H = 46, MJ_MSG_H = 20, MJ_BTN_H = 44;
+  const showBanner = stuck && shuffles > 0;
+  // The message band is ALWAYS reserved so the board never jumps when a
+  // warn/banner appears mid-game (warn wins when both fire).
+  const mjChrome = MJ_PILL_H + MJ_GAPY + MJ_MSG_H + 4 + MJ_GAPY + MJ_BTN_H + 4;
+  const mjBoardY = MJ_PILL_H + MJ_GAPY + MJ_MSG_H + 4;
+  const mjBoardH = Math.max(80, H - mjChrome);
+  const geo = W > 80 && H > 80 ? mjGeom(W, mjBoardH, L) : null;
+  const geoRef = useRef(geo);
+  geoRef.current = geo;
+  const order = React.useMemo(() => mjPaintOrder(L), [L]);
+  const mjTopRef = useRef(mjBoardY);
+  mjTopRef.current = mjBoardY;
+
+  // #120's blocked-tap feedback, canvas edition: a brief rose ring on the
+  // tile next to the warn line. One repaint per rAF while the flash lives.
+  const flashRef = useRef(null); // { i, t0 }
+  const [flashSeq, setFlashSeq] = useState(0);
+  const [flashFrame, setFlashFrame] = useState(0);
+  useEffect(() => {
+    if (!flashRef.current) return;
+    let raf = 0;
+    const tick = () => {
+      if (!flashRef.current) return;
+      if (performance.now() - flashRef.current.t0 >= 450) flashRef.current = null;
+      setFlashFrame((f) => f + 1);
+      if (flashRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [flashSeq]);
+
   const stateRef = useRef({});
   stateRef.current = { faces, removed, shuffles, pairs, secs, undos, layerPts, chainPts };
   const buildProgress = () => ({
@@ -21210,10 +21160,12 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
   const tap = (i) => {
     if (done || removed[i] || !freeSet.has(i)) {
       // #120 — a blocked tile used to absorb the tap silently, which is
-      // indistinguishable from an unresponsive board. Now it says so.
+      // indistinguishable from an unresponsive board. Now it says so: the
+      // warn line plus a brief flash ring on the tile (canvas edition of
+      // the old DOM nudge shake).
       if (!done && !removed[i]) {
-        const el = document.querySelector(`[data-mj="${i}"]`);
-        if (el) { el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); }
+        flashRef.current = { i, t0: performance.now() };
+        setFlashSeq((q) => q + 1);
         setWarn('That tile is covered or blocked on both sides.');
         setTimeout(() => setWarn(''), 1600);
       }
@@ -21307,50 +21259,72 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     }
   }, [stuck, shuffles, done]);
 
-  const TW = 44, TH = 56; // Phase 2 — up from 36x46.
-  const maxX = L.reduce((m, p) => Math.max(m, p.x), 0);
-  const maxY = L.reduce((m, p) => Math.max(m, p.y), 0);
-  const boardW = maxX * (TW / 2) + TW + 8;
-  const boardH = maxY * (TH / 2) + TH + 16;
+  const mjControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, MJ_PILL_H, 4);
+    mjControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    mjControls.push({ id: 'p-tiles', kind: 'pill', r: pr[1], label: 'Tiles', value: `${remaining}/${L.length}` });
+    mjControls.push({ id: 'p-chain', kind: 'pill', r: pr[2], label: 'Chain', value: `×${Math.min(chain, 6)}` });
+    mjControls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: layout.current.name });
+    const msgY = MJ_PILL_H + MJ_GAPY;
+    if (warn) mjControls.push({ id: 'warn', kind: 'label', r: [0, msgY, W, MJ_MSG_H], label: warn, color: PAL.rose, font: 12 });
+    else if (showBanner) mjControls.push({ id: 'banner', kind: 'label', r: [0, msgY, W, MJ_MSG_H], label: 'No free pair left — use your shuffle to keep going.', gold: true, font: 12 });
+    const btnY = mjBoardY + mjBoardH + MJ_GAPY;
+    const br = cuiRow(Math.floor(W * 0.02), btnY, Math.floor(W * 0.96), MJ_BTN_H, 3);
+    mjControls.push({ id: 'undo', kind: 'button', r: br[0], label: `↶ Undo (${undos})`, font: 13, disabled: undos <= 0 || !history.current.length || done, action: doUndo });
+    mjControls.push({ id: 'hint', kind: 'button', r: br[1], label: `💡 Hint (${hints.hintsLeft})`, font: 13, disabled: done || hints.exhausted || hints.buying, action: buyHint });
+    mjControls.push({ id: 'shuffle', kind: 'button', r: br[2], label: `🔀 Shuffle (${shuffles})`, font: 13, disabled: shuffles <= 0 || done, action: doShuffle });
+  }
+  const mjCtlRef = useRef([]);
+  mjCtlRef.current = mjControls;
+  const [mjPressed, setMjPressed] = useState(null);
+
+  usePointerCell(canvasRef, cuiWrapHandlers(mjCtlRef, setMjPressed, cuiShiftHandlers({
+    onTap: (pt) => {
+      const g = geoRef.current;
+      if (done || !g) return;
+      const i = mjHitAt(g, L, removed, order, pt.x, pt.y);
+      if (i == null) { setSel(null); return; }
+      tap(i);
+    },
+  }, mjTopRef)), { moveTolerance: 10 });
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [faces, removed, sel, hintPair, done, W, H, flashFrame, fmt, warn, showBanner, undos, shuffles, hints.hintsLeft, mjPressed],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, mjCtlRef.current, mjPressed);
+      const g = geoRef.current;
+      if (!g) return;
+      ctx.save();
+      ctx.translate(0, mjTopRef.current);
+      const flash = flashRef.current;
+      for (const i of order) {
+        if (removed[i]) continue;
+        const [tx, ty] = g.at(L[i]);
+        mjDrawTile(ctx, g, L[i], tx, ty, MJ_FACES[faces[i]], {
+          blocked: !freeSet.has(i),
+          sel: sel === i,
+          hinted: hintPair && (hintPair[0] === i || hintPair[1] === i),
+          flash: flash && flash.i === i,
+        });
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     <div className="mj-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Tiles</div><div className="pvalue">{remaining}/{L.length}</div></div>
-        <div className="pill"><div className="plabel">Chain</div><div className="pvalue">×{Math.min(chain, 6)}</div></div>
-        <div className="pill"><div className="plabel">Board</div><div className="pvalue">{layout.current.name}</div></div>
+      <div className="mj-board-box cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="mj-canvas board-canvas"
+          role="img"
+          aria-label={`Mahjong board — ${remaining}/${L.length} tiles left, ${layout.current.name} layout`}
+        />
       </div>
-      {stuck && shuffles > 0 && (
-        <div className="p6-banner">No free pair left — use your shuffle to keep going.</div>
-      )}
-      {warn && <div className="mj-warn">{warn}</div>}
-      <FitScale>
-      <div className="mj-board" style={{ width: boardW, height: boardH }}>
-        {L.map((p, i) => {
-          if (removed[i]) return null;
-          const free = freeSet.has(i);
-          const hinted = hintPair && (hintPair[0] === i || hintPair[1] === i);
-          return (
-            <div
-              key={i}
-              data-mj={i}
-              className={'mj-tile' + (free ? '' : ' blocked') + (sel === i ? ' sel' : '') + (hinted ? ' hinted' : '') + (p.z > 0 ? ' up' + p.z : '')}
-              style={{
-                left: p.x * (TW / 2),
-                top: p.y * (TH / 2) - p.z * 5,
-                zIndex: p.z * 100 + p.y,
-              }}
-              {...tapProps(() => tap(i))}
-            >{MJ_FACES[faces[i]]}</div>
-          );
-        })}
-      </div>
-      </FitScale>
-      <div className="mj-controls">
-        <button onClick={doUndo} disabled={undos <= 0 || !history.current.length || done}>↶ Undo ({undos})</button>
-        <button onClick={buyHint} disabled={done || hints.exhausted || hints.buying}>💡 Hint ({hints.hintsLeft})</button>
-        <button onClick={doShuffle} disabled={shuffles <= 0 || done}>🔀 Shuffle ({shuffles})</button>
-      </div>
+      <CuiTwin controls={mjControls} />
       <div className="p6-hint">
         Tap two matching free tiles (uncovered, with an open side). Upper-layer clears and
         hint-free chains are worth more — undos and shuffles cost points.
@@ -21437,26 +21411,33 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     return true;
   };
 
-  // ---- Responsive canvas board (slice 5) ----------------------------------
-  // Clue gutters live inside the canvas, so the whole thing scales as one unit
-  // instead of the old auto-auto CSS grid with three fixed-34px tracks.
+  // ---- Responsive canvas frame (controls wave) ----------------------------
+  // Clue gutters live inside the canvas, and now so do the pills and the
+  // Fill/Mark toggle — the whole frame scales as one unit. The gutters are
+  // sized in cells (2 wide for row clues, 2 tall for column clues), so the
+  // fit is over a 10×10 board and the clue text scales with it.
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  // The gutters are sized in cells (2 wide for row clues, 2 tall for column
-  // clues), so the fit is over a 10×10 board and the clue text scales with it.
-  const { cell } = useFitBox(boxRef, {
-    cols: 10, rows: 10, minCell: 20, maxCell: 42, gap: NG_GAP, padX: 4, padY: 4,
-  });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, MODE_H = 48;
+  const chrome = PILL_H + MODE_H + GAP * 2;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome)) - 8;
+  const cell = Math.max(20, Math.min(42, Math.floor((availB - NG_GAP * 9) / 10)));
   const cellStep = cell + NG_GAP;
   const gutter = cellStep * 2;
   const boardPx = gutter + cellStep * 8 - NG_GAP;
+  const H = chrome + boardPx;
+  const boardX = Math.floor((W - boardPx) / 2);
+  const boardY = PILL_H + GAP;
+  const modesY = boardY + boardPx + GAP;
 
   const liveRef = useRef({});
-  liveRef.current = { grid, mode, done, steps, secs, cellStep, gutter };
+  liveRef.current = { grid, mode, done, steps, secs, cellStep, gutter, boardX, boardY };
 
   const cellAt = (p) => {
-    const { cellStep: cs, gutter: gu } = liveRef.current;
-    const c = Math.floor((p.x - gu) / cs), r = Math.floor((p.y - gu) / cs);
+    const { cellStep: cs, gutter: gu, boardX: bx, boardY: by } = liveRef.current;
+    const c = Math.floor((p.x - bx - gu) / cs), r = Math.floor((p.y - by - gu) / cs);
     if (c < 0 || c > 7 || r < 0 || r > 7) return null;
     return { r, c };
   };
@@ -21487,7 +21468,23 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     }
   };
 
-  usePointerCell(canvasRef, {
+  const filled = grid.reduce((n, row) => n + row.filter((v) => v === 1).length, 0);
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
+    controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: filled });
+    const bw = Math.min(170, Math.floor((W - GAP) / 2));
+    const bx = Math.floor((W - bw * 2 - GAP) / 2);
+    controls.push({ id: 'mode-fill', kind: 'button', r: [bx, modesY, bw, MODE_H], label: '⬛ Fill', on: mode === 'fill', action: () => setMode('fill') });
+    controls.push({ id: 'mode-mark', kind: 'button', r: [bx + bw + GAP, modesY, bw, MODE_H], label: '✗ Mark', on: mode === 'mark', action: () => setMode('mark') });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
     // Long-press = the opposite tool, same idiom as Mine Finder.
     onLongPress: (p) => {
@@ -21495,13 +21492,16 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       if (t) apply(t.r, t.c, liveRef.current.mode === 'fill' ? 'mark' : 'fill');
     },
     onContext: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, 'mark'); },
-  });
+  }));
 
   useCanvasBoard(canvasRef, {
-    width: boardPx,
-    height: boardPx,
-    deps: [cell, grid, done],
+    width: W,
+    height: H,
+    deps: [cell, grid, done, W, fmt, steps, mode, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       const radius = Math.max(2, Math.round(cell * 0.14));
       const clueFont = Math.max(9, Math.round(cell * 0.42));
       ctx.textAlign = 'center';
@@ -21551,19 +21551,13 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
         ctx.beginPath(); ctx.moveTo(off, gutter - NG_GAP); ctx.lineTo(off, boardPx); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(gutter - NG_GAP, off); ctx.lineTo(boardPx, off); ctx.stroke();
       }
+      ctx.restore();
     },
   });
 
-  const filled = grid.reduce((n, row) => n + row.filter((v) => v === 1).length, 0);
-
   return (
     <div className="ng-game">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
-        <div className="pill"><div className="plabel">Filled</div><div className="pvalue">{filled}</div></div>
-      </div>
-      <div className="ng-boardbox" ref={boxRef}>
+      <div className="ng-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="ng-canvas board-canvas"
@@ -21571,10 +21565,7 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           aria-label={`Nonogram, 8 by 8 picture grid, ${filled} cells filled`}
         />
       </div>
-      <div className="ng-modes">
-        <button className={'ng-mode-btn' + (mode === 'fill' ? ' on' : '')} onClick={() => setMode('fill')}>⬛ Fill</button>
-        <button className={'ng-mode-btn' + (mode === 'mark' ? ' on' : '')} onClick={() => setMode('mark')}>✗ Mark</button>
-      </div>
+      <CuiTwin controls={controls} />
       <div className="p6-hint">
         Numbers are runs of filled cells, in order. Long-press uses the other tool.
       </div>
@@ -21686,23 +21677,30 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const saveNow = (rv, fl, ns) =>
     onSaveProgress && onSaveProgress({ dayNum, revealed: [...rv], flags: [...fl] }, ns, secs);
 
-  // ---- Responsive canvas geometry -----------------------------------------
+  // ---- Responsive canvas frame (controls wave) ----------------------------
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, {
-    cols: 9, rows: 9, minCell: 24, maxCell: 46, gap: MF_GAP, padX: 4, padY: 4,
-  });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, MODE_H = 48;
+  const chrome = PILL_H + MODE_H + GAP * 2;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome)) - 8;
+  const cell = Math.max(24, Math.min(46, Math.floor((availB - MF_GAP * 8) / 9)));
   const cellStep = cell + MF_GAP;
   const boardPx = cellStep * 9 - MF_GAP;
+  const H = chrome + boardPx;
+  const boardX = Math.floor((W - boardPx) / 2);
+  const boardY = PILL_H + GAP;
+  const modeY = boardY + boardPx + GAP;
 
   // Mutable snapshot the pointer handlers read — usePointerCell binds its
   // listeners once, so it must not close over stale render state.
   const liveRef = useRef({});
-  liveRef.current = { revealed, flags, flagMode, done, steps, secs, cellStep };
+  liveRef.current = { revealed, flags, flagMode, done, steps, secs, cellStep, boardX, boardY };
 
   const idxAt = (p) => {
-    const { cellStep: cs } = liveRef.current;
-    const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
+    const { cellStep: cs, boardX: bx, boardY: by } = liveRef.current;
+    const c = Math.floor((p.x - bx) / cs), r = Math.floor((p.y - by) / cs);
     if (c < 0 || c > 8 || r < 0 || r > 8) return -1;
     return r * 9 + c;
   };
@@ -21799,7 +21797,26 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
     return true;
   };
 
-  usePointerCell(canvasRef, {
+  const minesLeftLive = Math.max(10 - flags.size, 0);
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-mines', kind: 'pill', r: pr[1], label: 'Mines', value: minesLeftLive });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[2], label: 'Steps', value: steps });
+    const bw = Math.min(260, W - 20);
+    controls.push({
+      id: 'mode', kind: 'button', r: [Math.floor((W - bw) / 2), modeY, bw, MODE_H],
+      label: `${flagMode ? '🚩' : '⛏'} Mode: ${flagMode ? 'Flag' : 'Dig'}`,
+      sub: 'tap to switch', on: flagMode,
+      action: () => setFlagMode(m => !m),
+    });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => {
       const i = idxAt(p);
       if (i < 0 || liveRef.current.done) return;
@@ -21818,14 +21835,17 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
       doFlag(i);
     },
-  });
+  }));
 
   // ---- Draw ----------------------------------------------------------------
   useCanvasBoard(canvasRef, {
-    width: boardPx,
-    height: boardPx,
-    deps: [cell, revealed, flags, boom, pulse, done],
+    width: W,
+    height: H,
+    deps: [cell, revealed, flags, boom, pulse, done, W, fmt, steps, flagMode, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const radius = Math.max(3, Math.round(cell * 0.16));
@@ -21864,19 +21884,15 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
           ctx.fillText('🚩', cx, cy + 1);
         }
       }
+      ctx.restore();
     },
   });
 
-  const minesLeft = Math.max(10 - flags.size, 0);
+  const minesLeft = minesLeftLive;
 
   return (
     <div className="mf-game">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Mines</div><div className="pvalue">{minesLeft}</div></div>
-        <div className="pill"><div className="plabel">Steps</div><div className="pvalue">{steps}</div></div>
-      </div>
-      <div className="mf-boardbox" ref={boxRef}>
+      <div className="mf-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="mf-canvas board-canvas"
@@ -21884,18 +21900,8 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
           aria-label={`Mine Finder, 9 by 9 field, ${minesLeft} mines unflagged, ${revealed.size} of 71 safe cells uncovered`}
         />
       </div>
+      <CuiTwin controls={controls} />
       <div className="sr-only" aria-live="polite">{announce}</div>
-      <div className="mf-controls">
-        <button
-          className={'mf-mode-btn ' + (flagMode ? 'flag' : 'dig')}
-          aria-pressed={flagMode}
-          onClick={() => setFlagMode(m => !m)}
-        >
-          <span>{flagMode ? '🚩' : '⛏'}</span>
-          <span>Mode: {flagMode ? 'Flag' : 'Dig'}</span>
-          <span className="mf-mode-label">tap to switch</span>
-        </button>
-      </div>
       <div className="p6-hint">
         Numbers count adjacent mines. Long-press does the opposite of the current mode
         (right-click flags). Tap a number whose flags all match to clear around it.
@@ -22003,38 +22009,161 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     }
   };
 
+  /* The whole frame is ONE canvas (controls wave): pills, word-progress
+     chips, slots + rack, and the Undo/Submit buttons draw together; only
+     the hint paragraph stays DOM. Tap a rack tile to place its letter, tap
+     anywhere on the slot row to take one back — the DOM grammar exactly.
+     A wrong guess wiggles the slot row in rose. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: Math.max(word.length, 5), rows: 2 });
+  const anGap = 6;
+  const anW = Math.max(120, Math.floor(boxW));
+  const tileW = Math.max(34, Math.min(52, Math.floor((anW - anGap * (word.length - 1)) / word.length)));
+  const tileH = Math.round(tileW * 1.12);
+  const bandGap = 16;
+  const anBW = tileW * word.length + anGap * (word.length - 1);
+  const anBH = tileH * 2 + bandGap;
+  const anX0 = Math.floor((anW - anBW) / 2);
+  const GAP = 8, PILL_H = 46, DOTS_H = 26, ACT_H = 44;
+  const dotsY = PILL_H + GAP;
+  const boardY = dotsY + DOTS_H + GAP;
+  const actY = boardY + anBH + GAP;
+  const H = actY + ACT_H;
+
+  const controls = [];
+  if (anW > 80) {
+    const pr = cuiRow(0, 0, anW, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-word', kind: 'pill', r: pr[1], label: 'Word', value: `${Math.min(solvedCount + 1, words.length)}/${words.length}` });
+    controls.push({ id: 'p-tries', kind: 'pill', r: pr[2], label: 'Tries', value: steps });
+    const ar = cuiRow(0, actY, anW, ACT_H, 2);
+    controls.push({ id: 'undo', kind: 'button', r: ar[0], label: '⌫ Undo letter', disabled: !picked.length, action: backspace });
+    controls.push({ id: 'submit', kind: 'button', r: ar[1], label: 'Submit', primary: true, disabled: picked.length !== word.length, action: submit });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const flashRef = useRef(null);
+  const [flashFrame, setFlashFrame] = useState(0);
+  useEffect(() => {
+    if (!flash) { flashRef.current = null; return; }
+    flashRef.current = { t0: performance.now() };
+    let raf = 0;
+    const tick = () => {
+      if (!flashRef.current) return;
+      if (performance.now() - flashRef.current.t0 >= 450) flashRef.current = null;
+      setFlashFrame((f) => f + 1);
+      if (flashRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [flash]);
+
+  const anGeoRef = useRef({});
+  anGeoRef.current = { tileW, tileH, bandGap, anX0, gap: anGap, n: word.length, boardY };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (p) => {
+      const g = anGeoRef.current;
+      if (done) return;
+      const y = p.y - g.boardY;
+      if (y < -4) return;
+      if (y <= g.tileH + 4) { backspace(); return; }
+      if (y >= g.tileH + g.bandGap - 4 && y <= g.tileH * 2 + g.bandGap + 4) {
+        const i = Math.floor((p.x - g.anX0 + g.gap / 2) / (g.tileW + g.gap));
+        if (i >= 0 && i < g.n) tapTile(i);
+      }
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: anW,
+    height: H,
+    deps: [picked, wordIdx, done, tileW, flashFrame, fmt, steps, solvedCount, pressedId, anW],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Word-progress chips (display only): solved words spelled out, the
+      // rest as letter counts, the live word ringed in accent.
+      {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `600 11px 'JetBrains Mono', monospace`;
+        const labels = words.map((w, i) => (i < solvedCount ? w : String(w.length)));
+        const pad = 10, gapC = 6;
+        const widths = labels.map((t) => Math.ceil(ctx.measureText(t).width) + pad * 2);
+        let x = Math.max(2, Math.floor((anW - (widths.reduce((a, b) => a + b, 0) + gapC * (labels.length - 1))) / 2));
+        labels.forEach((t, i) => {
+          const cw = widths[i];
+          klRR(ctx, x, dotsY, cw, DOTS_H, 12);
+          ctx.fillStyle = i < solvedCount ? 'rgba(45,159,102,0.12)' : PAL.card;
+          ctx.fill();
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = i < solvedCount ? PAL.emerald : (i === wordIdx && !done) ? PAL.accent : PAL.border;
+          ctx.stroke();
+          ctx.fillStyle = i < solvedCount ? PAL.emerald : (i === wordIdx && !done) ? PAL.text : PAL.muted;
+          ctx.fillText(t, x + cw / 2, dotsY + DOTS_H / 2 + 0.5);
+          x += cw + gapC;
+        });
+      }
+      ctx.save();
+      ctx.translate(0, boardY);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const fl = flashRef.current;
+      const p01 = fl ? (performance.now() - fl.t0) / 450 : 1;
+      const wiggle = fl ? Math.sin(p01 * Math.PI * 4) * 4 * (1 - p01) : 0;
+      ctx.font = `700 ${Math.round(tileW * 0.42)}px 'JetBrains Mono', monospace`;
+      for (let i = 0; i < word.length; i++) {
+        const x = anX0 + i * (tileW + anGap) + (picked[i] ? wiggle : 0);
+        const has = !!picked[i];
+        klRR(ctx, x + 1, 1, tileW - 2, tileH - 2, 8);
+        if (has) {
+          ctx.fillStyle = fl ? 'rgba(205,75,58,0.12)' : 'rgba(58,110,205,0.10)';
+          ctx.fill();
+          ctx.setLineDash([]);
+          ctx.strokeStyle = fl ? PAL.rose : PAL.accent;
+        } else {
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = PAL.dim;
+        }
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (has) {
+          ctx.fillStyle = PAL.text;
+          ctx.fillText(picked[i].ch, x + tileW / 2, tileH / 2 + 1);
+        }
+      }
+      const ry = tileH + bandGap;
+      for (let i = 0; i < rack.length; i++) {
+        const x = anX0 + i * (tileW + anGap);
+        ctx.save();
+        if (usedSet.has(i)) ctx.globalAlpha = 0.25;
+        klRR(ctx, x + 1, ry + 1, tileW - 2, tileH - 2, 8);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        ctx.fillStyle = PAL.text;
+        ctx.fillText(rack[i].ch, x + tileW / 2, ry + tileH / 2 + 1);
+        ctx.restore();
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     <div className="an-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Word</div><div className="pvalue">{Math.min(solvedCount + 1, words.length)}/{words.length}</div></div>
-        <div className="pill"><div className="plabel">Tries</div><div className="pvalue">{steps}</div></div>
+      <div className="an-boardbox cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="an-canvas board-canvas"
+          role="img"
+          aria-label={`Anagram — ${picked.length} of ${word.length} letters placed, word ${Math.min(solvedCount + 1, words.length)} of ${words.length}`}
+        />
       </div>
-      <div className="an-dots">
-        {words.map((w, i) => (
-          <span key={i} className={'an-dot' + (i < solvedCount ? ' solved' : i === wordIdx && !done ? ' cur' : '')}>
-            {i < solvedCount ? w : w.length}
-          </span>
-        ))}
-      </div>
-      <div className={'an-slots' + (flash ? ' bad' : '')}>
-        {Array.from({ length: word.length }, (_, i) => (
-          <div key={i} className={'an-slot' + (picked[i] ? ' has' : '')} onClick={backspace}>
-            {picked[i] ? picked[i].ch : ''}
-          </div>
-        ))}
-      </div>
-      <div className="an-rack">
-        {rack.map((t, i) => (
-          <button key={i} className={'an-tile' + (usedSet.has(i) ? ' used' : '')} onClick={() => tapTile(i)}>
-            {t.ch}
-          </button>
-        ))}
-      </div>
-      <div className="an-actions">
-        <button className="p6-btn" onClick={backspace} disabled={!picked.length}>⌫ Undo letter</button>
-        <button className="p6-btn primary" onClick={submit} disabled={picked.length !== word.length}>Submit</button>
-      </div>
+      <CuiTwin controls={controls} />
       <div className="p6-hint">Tap letters to build the word, tap a slot to take one back. Wrong guesses cost tries, never the day.</div>
     </div>
   );
@@ -22214,44 +22343,106 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const cells = [];
-  for (let y = 0; y < level.h; y++) {
-    for (let x = 0; x < level.w; x++) {
-      const key = x + ',' + y;
-      const wall = level.walls.has(key);
-      const goal = level.goals.has(key);
-      const crate = crateAt(crates, x, y) >= 0;
-      const isP = player[0] === x && player[1] === y;
-      cells.push(
-        <div key={key} className={'cp-cell' + (wall ? ' wall' : '') + (goal ? ' goal' : '')}>
-          {crate ? <span className={'cp-crate' + (goal ? ' ongoal' : '')}>📦</span> : isP ? '🧍' : ''}
-        </div>
-      );
-    }
+  /* The whole frame is ONE canvas (controls wave): pills, the room, the
+     D-pad and Undo/Restart draw together (arrow keys still work); only the
+     hint paragraph stays DOM. Room cells were never tappable — the D-pad and
+     arrow keys are the input — so the board region is pure display:
+     walls/goals read PAL, the crate/player stay emoji, and a crate on its
+     pad gets a green ring. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: level.w, rows: level.h });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, KEY_H = 44, ACT_H = 40;
+  const padH = KEY_H * 2 + 6;
+  const chrome = PILL_H + padH + ACT_H + GAP * 3;
+  const cpCell = Math.max(18, Math.min(46,
+    Math.floor(Math.min((W - 4) / level.w, (((Math.floor(boxH) || 300) - chrome) - 4) / level.h))));
+  const cpW = cpCell * level.w, cpH = cpCell * level.h;
+  const H = chrome + cpH;
+  const boardX = Math.floor((W - cpW) / 2);
+  const boardY = PILL_H + GAP;
+  const padY = boardY + cpH + GAP;
+  const actY = padY + padH + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves });
+    controls.push({ id: 'p-room', kind: 'pill', r: pr[2], label: 'Room', value: '#' + (levelIdx.current + 1) });
+    const kw = 52, kg = 6;
+    const px0 = Math.floor((W - kw * 3 - kg * 2) / 2);
+    controls.push({ id: 'up', kind: 'button', r: [px0 + kw + kg, padY, kw, KEY_H], label: '▲', font: 16, action: () => move(0, -1) });
+    controls.push({ id: 'left', kind: 'button', r: [px0, padY + KEY_H + 6, kw, KEY_H], label: '◀', font: 16, action: () => move(-1, 0) });
+    controls.push({ id: 'down', kind: 'button', r: [px0 + kw + kg, padY + KEY_H + 6, kw, KEY_H], label: '▼', font: 16, action: () => move(0, 1) });
+    controls.push({ id: 'right', kind: 'button', r: [px0 + (kw + kg) * 2, padY + KEY_H + 6, kw, KEY_H], label: '▶', font: 16, action: () => move(1, 0) });
+    const ar = cuiRow(Math.floor(W * 0.1), actY, Math.floor(W * 0.8), ACT_H, 2);
+    controls.push({ id: 'undo', kind: 'button', r: ar[0], label: '↶ Undo', disabled: !hist.length, action: undo });
+    controls.push({ id: 'restart', kind: 'button', r: ar[1], label: '⟲ Restart', action: restart });
   }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [player, crates, done, cpCell, W, fmt, moves, hist.length, pressedId],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let y = 0; y < level.h; y++) {
+        for (let x = 0; x < level.w; x++) {
+          const key = x + ',' + y;
+          const px = x * cpCell, py = y * cpCell;
+          if (level.walls.has(key)) {
+            klRR(ctx, px + 1, py + 1, cpCell - 2, cpCell - 2, 3);
+            ctx.fillStyle = PAL.dim;
+            ctx.fill();
+          } else if (level.goals.has(key)) {
+            ctx.fillStyle = 'rgba(45,159,102,0.14)';
+            ctx.fillRect(px, py, cpCell, cpCell);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(45,159,102,0.45)';
+            ctx.strokeRect(px + 1.5, py + 1.5, cpCell - 3, cpCell - 3);
+          }
+        }
+      }
+      const glyph = (g, x, y, scale) => {
+        ctx.font = `${Math.round(cpCell * scale)}px system-ui, sans-serif`;
+        ctx.fillText(g, x * cpCell + cpCell / 2, y * cpCell + cpCell / 2 + 1);
+      };
+      for (const [cx, cy] of crates) {
+        if (level.goals.has(cx + ',' + cy)) {
+          ctx.beginPath();
+          ctx.arc(cx * cpCell + cpCell / 2, cy * cpCell + cpCell / 2, cpCell * 0.46, 0, Math.PI * 2);
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = PAL.emerald;
+          ctx.stroke();
+        }
+        glyph('📦', cx, cy, 0.72);
+      }
+      glyph('🧍', player[0], player[1], 0.72);
+      ctx.restore();
+    },
+  });
 
   return (
     <div className="cp-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
-        <div className="pill"><div className="plabel">Room</div><div className="pvalue">#{levelIdx.current + 1}</div></div>
+      <div className="cp-boardbox cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="cp-canvas board-canvas"
+          role="img"
+          aria-label={`Crate Push room ${levelIdx.current + 1} — ${crates.filter(([cx, cy]) => level.goals.has(cx + ',' + cy)).length}/${crates.length} crates home, ${moves} moves`}
+        />
       </div>
-      <FitScale>
-        <div className="cp-grid" style={{ gridTemplateColumns: `repeat(${level.w}, 34px)` }}>{cells}</div>
-      </FitScale>
-      <div className="cp-pad">
-        <div />
-        <button className="p6-btn" onClick={() => move(0, -1)}>▲</button>
-        <div />
-        <button className="p6-btn" onClick={() => move(-1, 0)}>◀</button>
-        <button className="p6-btn" onClick={() => move(0, 1)}>▼</button>
-        <button className="p6-btn" onClick={() => move(1, 0)}>▶</button>
-      </div>
-      <div className="an-actions">
-        <button className="p6-btn" onClick={undo} disabled={!hist.length}>↶ Undo</button>
-        <button className="p6-btn" onClick={restart}>⟲ Restart</button>
-      </div>
+      <CuiTwin controls={controls} />
       <div className="p6-hint">Push every crate onto a green pad. You can push one crate at a time — never pull.</div>
     </div>
   );
@@ -22540,24 +22731,72 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
     return () => window.removeEventListener('keydown', onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- Responsive canvas well ---------------------------------------------
+  // ---- Responsive canvas FRAME (controls wave) ----------------------------
+  // Pills, the well, the Next queue, the Hold button and the D-pad draw on
+  // one canvas; only the hint paragraph (and the level-flash overlay) stay
+  // DOM. The well keeps its drag/tap/flick grammar, guarded to its region.
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, {
-    cols: DS_W, rows: DS_H, minCell: 12, maxCell: 34, gap: DS_GAP, padX: 4, padY: 4,
-  });
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const DS_GAPY = 8, DS_PILL_H = 46, DS_PAD_H = 44, DS_SIDE_W = 96, DS_NEXT_H = 116, DS_HOLD_H = 64;
+  const dsChrome = DS_PILL_H + DS_GAPY + DS_GAPY + DS_PAD_H + 4;
+  const availWell = Math.max(60, Math.floor(boxH) - dsChrome);
+  const wellAvailW = Math.max(60, W - DS_SIDE_W - 8);
+  const cell = Math.max(12, Math.min(34, Math.floor(Math.min(
+    (wellAvailW - 8 - DS_GAP * (DS_W - 1)) / DS_W,
+    (availWell - 8 - DS_GAP * (DS_H - 1)) / DS_H
+  ))));
   const cellStep = cell + DS_GAP;
   const wellW = cellStep * DS_W - DS_GAP;
   const wellH = cellStep * DS_H - DS_GAP;
+  const groupW = wellW + 8 + DS_SIDE_W;
+  const gx0 = Math.max(0, Math.floor((W - groupW) / 2));
+  const boardY = DS_PILL_H + DS_GAPY;
+  const sideX = gx0 + wellW + 8;
+  const padY = boardY + wellH + DS_GAPY;
+  const H = padY + DS_PAD_H + 4;
+  const dsGeoRef = useRef({});
+  dsGeoRef.current = { gx0, boardY, wellW, wellH };
+
+  const dsControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, DS_PILL_H, 5);
+    dsControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    dsControls.push({ id: 'p-level', kind: 'pill', r: pr[1], label: 'Level', value: level });
+    dsControls.push({ id: 'p-lines', kind: 'pill', r: pr[2], label: 'Lines', value: lines });
+    dsControls.push({ id: 'p-points', kind: 'pill', r: pr[3], label: 'Points', value: points });
+    dsControls.push({ id: 'p-piece', kind: 'pill', r: pr[4], label: 'Piece', value: `${Math.min(pieceIdx + 1, DS_PIECES)}/${DS_PIECES}` });
+    dsControls.push({
+      id: 'hold', kind: 'button', r: [sideX, boardY + DS_NEXT_H + 8, DS_SIDE_W, DS_HOLD_H],
+      label: 'Hold', font: 11, on: hold != null && !holdUsed,
+      disabled: holdUsed || done, action: doHold,
+    });
+    const kr = cuiRow(Math.floor(W * 0.04), padY, Math.floor(W * 0.92), DS_PAD_H, 4);
+    dsControls.push({ id: 'left', kind: 'button', r: kr[0], label: '◀', font: 16, action: () => nudge(-1) });
+    dsControls.push({ id: 'rot', kind: 'button', r: kr[1], label: '⟳', font: 16, action: rotate });
+    dsControls.push({ id: 'right', kind: 'button', r: kr[2], label: '▶', font: 16, action: () => nudge(1) });
+    dsControls.push({ id: 'drop', kind: 'button', r: kr[3], label: '⬇ Drop', font: 14, primary: true, action: hardDrop });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = dsControls;
+  const [pressedId, setPressedId] = useState(null);
 
   // Drag maps finger travel to columns; a fast downward flick hard-drops; a
-  // tap that never became a drag rotates.
+  // tap that never became a drag rotates. Guarded to the well region so a
+  // stray tap on the Next panel doesn't rotate.
   const dragRef = useRef({ startCol: 0, moved: false });
-  usePointerCell(canvasRef, {
-    onDown: () => { dragRef.current = { startCol: liveRef.current.clampedCol, moved: false }; },
+  const dsInWell = (pt) => {
+    const g = dsGeoRef.current;
+    return pt.x >= g.gx0 && pt.x <= g.gx0 + g.wellW && pt.y >= g.boardY && pt.y <= g.boardY + g.wellH;
+  };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onDown: (pt) => {
+      dragRef.current = { startCol: liveRef.current.clampedCol, moved: false, armed: dsInWell(pt) };
+    },
     onDrag: (_p, info) => {
       const cur = liveRef.current;
-      if (cur.done) return;
+      if (cur.done || !dragRef.current.armed) return;
       const steps = Math.round(info.dx / Math.max(cellStep, 1));
       const target = Math.min(Math.max(dragRef.current.startCol + steps, 0), DS_W - cur.shapeW);
       if (target !== cur.clampedCol && canPlace(cur.grid, target, Math.floor(fallYRef.current), cur.cells)) {
@@ -22577,16 +22816,57 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
     },
     // A press that never moved is a rotate. No long-press action on the well,
     // so the timer is effectively disabled.
-    onTap: () => { if (!dragRef.current.moved) rotate(); },
-  }, { moveTolerance: 6 });
+    onTap: () => { if (dragRef.current.armed && !dragRef.current.moved) rotate(); },
+  }), { moveTolerance: 6 });
 
   const ghostY = landingY(grid, clampedCol);
+  const nextThree = [1, 2, 3]
+    .map((n) => (pieceIdx + n < DS_PIECES ? seq.current[pieceIdx + n] : null));
+
+  // Side-panel mini pieces, drawn (the DOM 9px-cell idiom on canvas).
+  const dsDrawMini = (ctx, idx, cx, cy, boxW2, boxH2) => {
+    if (idx == null) {
+      ctx.font = '600 12px ' + CUI_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = PAL.muted;
+      ctx.fillText('—', cx + boxW2 / 2, cy + boxH2 / 2);
+      return;
+    }
+    const cs = dsCells(idx, 0);
+    const w = Math.max(...cs.map(([x]) => x)) + 1;
+    const h = Math.max(...cs.map(([, y]) => y)) + 1;
+    const u = 9;
+    const x0 = cx + (boxW2 - w * u) / 2, y0 = cy + (boxH2 - h * u) / 2;
+    for (const [x, y] of cs) {
+      ctx.fillStyle = DS_SHAPES[idx].color;
+      ctx.fillRect(x0 + x * u, y0 + y * u, u - 1, u - 1);
+    }
+  };
 
   useCanvasBoard(canvasRef, {
-    width: wellW,
-    height: wellH,
-    deps: [cell, grid, clampedCol, rot, fallY, pieceIdx, done],
+    width: W,
+    height: H,
+    deps: [cell, grid, clampedCol, rot, fallY, pieceIdx, done, W, fmt, level, lines, points, hold, holdUsed, pressedId],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Next panel (display) + the queued minis; the Hold button's mini
+      // draws over its control face.
+      klRR(ctx, sideX, boardY, DS_SIDE_W, DS_NEXT_H, 10);
+      ctx.fillStyle = PAL.card;
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+      ctx.font = '600 9px ' + CUI_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = PAL.muted;
+      ctx.fillText('NEXT', sideX + DS_SIDE_W / 2, boardY + 14);
+      nextThree.forEach((n, k) => dsDrawMini(ctx, n, sideX + 4, boardY + 18 + k * 32, DS_SIDE_W - 8, 30));
+      dsDrawMini(ctx, hold, sideX + 4, boardY + DS_NEXT_H + 8 + 24, DS_SIDE_W - 8, DS_HOLD_H - 30);
+      ctx.save();
+      ctx.translate(gx0, boardY);
       const radius = Math.max(2, Math.round(cell * 0.18));
       const box = (x, y, fill, stroke, alpha) => {
         ctx.globalAlpha = alpha == null ? 1 : alpha;
@@ -22617,69 +22897,22 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
           box((clampedCol + dx) * cellStep, (y0 + dy) * cellStep, color, null);
         }
       }
+      ctx.restore();
     },
   });
 
-  const miniPiece = (idx, key) => {
-    if (idx == null) return <span key={key} className="ds-mini-empty">—</span>;
-    const cs = dsCells(idx, 0);
-    const w = Math.max(...cs.map(([x]) => x)) + 1;
-    const h = Math.max(...cs.map(([, y]) => y)) + 1;
-    return (
-      <span key={key} className="ds-mini-piece" style={{ width: w * 9, height: h * 9 }}>
-        {cs.map(([x, y], k) => (
-          <span key={k} className="ds-mini-cell"
-            style={{ background: DS_SHAPES[idx].color, left: x * 9, top: y * 9 }} />
-        ))}
-      </span>
-    );
-  };
-  const nextThree = [1, 2, 3]
-    .map((n) => (pieceIdx + n < DS_PIECES ? seq.current[pieceIdx + n] : null));
-
   return (
     <div className="ds-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Level</div><div className="pvalue">{level}</div></div>
-        <div className="pill"><div className="plabel">Lines</div><div className="pvalue">{lines}</div></div>
-        <div className="pill"><div className="plabel">Points</div><div className="pvalue">{points}</div></div>
-        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">{Math.min(pieceIdx + 1, DS_PIECES)}/{DS_PIECES}</div></div>
+      <div className="ds-boardbox cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="ds-canvas board-canvas"
+          role="grid"
+          aria-label={`Drop Stack well, level ${level}, ${lines} lines cleared, piece ${Math.min(pieceIdx + 1, DS_PIECES)} of ${DS_PIECES}`}
+        />
+        {levelFlash > 0 && <div className="ds-level-flash">Level {levelFlash}</div>}
       </div>
-
-      <div className="ds-main">
-        <div className="ds-boardbox" ref={boxRef}>
-          <canvas
-            ref={canvasRef}
-            className="ds-canvas board-canvas"
-            role="grid"
-            aria-label={`Drop Stack well, level ${level}, ${lines} lines cleared, piece ${Math.min(pieceIdx + 1, DS_PIECES)} of ${DS_PIECES}`}
-          />
-          {levelFlash > 0 && <div className="ds-level-flash">Level {levelFlash}</div>}
-        </div>
-        <div className="ds-side">
-          <div className="ds-panel">
-            <div className="ds-panel-label">Next</div>
-            <div className="ds-queue">{nextThree.map((n, k) => miniPiece(n, k))}</div>
-          </div>
-          <button
-            className={'ds-panel ds-hold' + (holdUsed ? ' used' : '')}
-            onClick={doHold}
-            disabled={holdUsed || done}
-            title="Bank this piece (once per piece)"
-          >
-            <div className="ds-panel-label">Hold</div>
-            <div className="ds-queue">{miniPiece(hold, 'h')}</div>
-          </button>
-        </div>
-      </div>
-
-      <div className="ds-pad">
-        <button className="p6-btn" onClick={() => nudge(-1)}>◀</button>
-        <button className="p6-btn" onClick={rotate}>⟳</button>
-        <button className="p6-btn" onClick={() => nudge(1)}>▶</button>
-        <button className="p6-btn primary" onClick={hardDrop}>⬇ Drop</button>
-      </div>
+      <CuiTwin controls={dsControls} />
       <div className="p6-hint">
         Drag to slide, tap to rotate, swipe down to drop. Speed rises every {DS_LINES_PER_LEVEL} lines.
       </div>
@@ -23030,41 +23263,109 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
 
   const fmtLeft = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
 
+  /* The whole frame is ONE canvas (controls wave): pills, letter grid, the
+     live trace word, the feedback line and Clear/Submit draw together; only
+     the found-words scroll strip stays DOM. Same tap grammar — start
+     anywhere, extend to an adjacent tile, tap an earlier tile to backtrack,
+     tap the last tile again to submit. Tile chrome reads PAL. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, WORD_H = 26, MSG_H = 18, ACT_H = 44;
+  const chrome = PILL_H + WORD_H + MSG_H + ACT_H + GAP * 4;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const wsprCell = Math.max(44, Math.min(76, Math.floor((availB - 6 * (WSPR_SIZE - 1)) / WSPR_SIZE)));
+  const wsprStep = wsprCell + 6;
+  const wsprSide = wsprStep * WSPR_SIZE - 6;
+  const H = chrome + wsprSide;
+  const boardX = Math.floor((W - wsprSide) / 2);
+  const boardY = PILL_H + GAP;
+  const wordY = boardY + wsprSide + GAP;
+  const msgY = wordY + WORD_H;
+  const actY = msgY + MSG_H + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-left', kind: 'pill', r: pr[0], label: 'Left', value: fmtLeft, color: remaining <= 10 ? PAL.rose : PAL.gold });
+    controls.push({ id: 'p-words', kind: 'pill', r: pr[1], label: 'Words', value: found.length });
+    controls.push({ id: 'p-score', kind: 'pill', r: pr[2], label: 'Score', value: score });
+    controls.push({ id: 'word', kind: 'label', r: [0, wordY, W, WORD_H], label: word || ' ', font: 17, mono: true, bold: true, color: PAL.text });
+    if (msg) controls.push({ id: 'msg', kind: 'label', r: [0, msgY, W, MSG_H], label: msg.text, font: 12, color: msg.kind === 'good' ? PAL.emerald : PAL.rose });
+    const ar = cuiRow(Math.floor(W * 0.08), actY, Math.floor(W * 0.84), ACT_H, 2);
+    controls.push({ id: 'clear', kind: 'button', r: ar[0], label: 'Clear', disabled: done || path.length === 0, action: () => { setPath([]); setMsg(null); } });
+    controls.push({ id: 'submit', kind: 'button', r: ar[1], label: 'Submit', primary: true, disabled: done || word.length < 3, action: submit });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const geomRef = useRef({});
+  geomRef.current = { wsprStep, boardX, boardY };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (p) => {
+      const g = geomRef.current;
+      const c = Math.floor((p.x - g.boardX) / g.wsprStep), r = Math.floor((p.y - g.boardY) / g.wsprStep);
+      if (c < 0 || c >= WSPR_SIZE || r < 0 || r >= WSPR_SIZE) return;
+      const i = r * WSPR_SIZE + c;
+      const onPath = path.includes(i);
+      const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
+      if (selectable) tap(i);
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [path, done, wsprCell, W, fmtLeft, found, msg, pressedId],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < WSPR_SIZE * WSPR_SIZE; i++) {
+        const r = Math.floor(i / WSPR_SIZE), c = i % WSPR_SIZE;
+        const x = c * wsprStep, y = r * wsprStep;
+        const onPath = path.includes(i);
+        const isLast = path.length > 0 && path[path.length - 1] === i;
+        const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
+        ctx.save();
+        if (!selectable) ctx.globalAlpha = 0.45;
+        klRR(ctx, x, y, wsprCell, wsprCell, 10);
+        ctx.fillStyle = onPath ? PAL.accent : PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = onPath ? PAL.accent : PAL.border;
+        ctx.stroke();
+        ctx.font = `700 ${Math.round(wsprCell * 0.42)}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = onPath ? '#fff' : PAL.text;
+        ctx.fillText(L[i], x + wsprCell / 2, y + wsprCell / 2 + 1);
+        ctx.restore();
+        if (isLast) {
+          klRR(ctx, x - 1.5, y - 1.5, wsprCell + 3, wsprCell + 3, 11);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     // PHASE 3 (#131) — .fit-col + fitShell: true stops the page scrolling as the
     // found-words list grows (that list now has its own scroll strip).
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Left</div>
-          <div className="pvalue time" style={remaining <= 10 ? { color: C.rose } : undefined}>{fmtLeft}</div>
-        </div>
-        <div className="pill"><div className="plabel">Words</div><div className="pvalue">{found.length}</div></div>
-        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
+      <div className="wspr-grid cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="wspr-canvas board-canvas"
+          role="grid"
+          aria-label={`Word Sprint letters — tracing ${word || 'nothing'}, ${found.length} words found`}
+        />
       </div>
-
-      <div className="wspr-grid">
-        {L.map((ch, i) => {
-          const onPath = path.includes(i);
-          const isLast = path.length > 0 && path[path.length - 1] === i;
-          const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
-          return (
-            <div
-              key={i}
-              className={'wspr-tile' + (onPath ? ' onpath' : '') + (isLast ? ' pathlast' : '') + (!selectable ? ' dim' : '')}
-              {...tapProps(() => selectable && tap(i))}
-            >{ch}</div>
-          );
-        })}
-      </div>
-
-      <div className="wspr-word">{word || ' '}</div>
-      <div className={'wspr-msg' + (msg ? ' ' + msg.kind : '')}>{msg ? msg.text : ' '}</div>
-
-      <div className="wspr-actions">
-        <button className="wspr-btn" onClick={() => { setPath([]); setMsg(null); }} disabled={done || path.length === 0}>Clear</button>
-        <button className="wspr-btn primary" onClick={submit} disabled={done || word.length < 3}>Submit</button>
-      </div>
+      <CuiTwin controls={controls} />
 
       {found.length > 0 && (
         <div className="wspr-found">
@@ -23086,7 +23387,7 @@ const DSNK_N = 13;
 const DSNK_TARGET = 20;
 
 function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
-  const [, render] = useState(0);
+  const [tick, render] = useState(0);
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
   const [eaten, setEaten] = useState(0);
@@ -23197,29 +23498,21 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
   }, [started]);
 
   const s = st.current;
-  const occ = {};
-  s.snake.forEach((seg, i) => { occ[seg.y * DSNK_N + seg.x] = i === 0 ? 'head' : 'body'; });
-  const fi = s.food.y * DSNK_N + s.food.x;
-  const cells = [];
-  for (let i = 0; i < DSNK_N * DSNK_N; i++) {
-    cells.push(<div key={i} className={'dsnk-cell' + (occ[i] ? ' ' + occ[i] : '') + (i === fi ? ' food' : '')} />);
-  }
   const fmt = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 
   return (
     // PHASE 3 — fit column so a swipe on the board never pulls the page.
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Apples</div><div className="pvalue">{eaten}/{DSNK_TARGET}</div></div>
-        <div className="pill"><div className="plabel">Length</div><div className="pvalue">{s.snake.length}</div></div>
-      </div>
-      <div
-        className="dsnk-board"
-        ref={boardRef}
-        style={{ gridTemplateColumns: `repeat(${DSNK_N}, 1fr)`, gridTemplateRows: `repeat(${DSNK_N}, 1fr)` }}
-      >
-        {cells}
+      <CuiBar height={46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 3);
+        return [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-apples', kind: 'pill', r: pr[1], label: 'Apples', value: `${eaten}/${DSNK_TARGET}` },
+          { id: 'p-length', kind: 'pill', r: pr[2], label: 'Length', value: s.snake.length },
+        ];
+      }} />
+      <div className="dsnk-board" ref={boardRef}>
+        <SnakeCanvas n={DSNK_N} stRef={st} tick={tick} skin="daily" ariaLabel={`Daily Snake board — ${eaten}/${DSNK_TARGET} apples`} />
       </div>
       <div className="dsnk-hint">
         {done ? 'Run over' : started ? `Eat ${DSNK_TARGET} apples — one crash ends the day` : 'Swipe (or arrow keys) to start — everyone gets the same apple trail today'}
@@ -23599,19 +23892,22 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
 
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
-        <div className="pill"><div className="plabel">Balls</div><div className="pvalue">{'●'.repeat(Math.max(0, balls))}{'○'.repeat(DBNC_BALLS - Math.max(0, balls))}</div></div>
-        <div className="pill"><div className="plabel">Bricks</div><div className="pvalue">{s.total - s.bricks.length}/{s.total}</div></div>
-      </div>
-      {effectLabels.length > 0 && (
-        <div className="dbnc-effects">
-          {effectLabels.map(t => (
-            <span key={t} className="dbnc-effect">{POWERUP_ICONS[t] || '✨'} {t.replace(/-/g, ' ')}</span>
-          ))}
-        </div>
-      )}
+      <CuiBar height={68} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-score', kind: 'pill', r: pr[1], label: 'Score', value: score },
+          { id: 'p-balls', kind: 'pill', r: pr[2], label: 'Balls', value: `${'●'.repeat(Math.max(0, balls))}${'○'.repeat(DBNC_BALLS - Math.max(0, balls))}` },
+          { id: 'p-bricks', kind: 'pill', r: pr[3], label: 'Bricks', value: `${s.total - s.bricks.length}/${s.total}` },
+        ];
+        if (effectLabels.length) {
+          out.push({
+            id: 'effects', kind: 'label', r: [0, 48, W, 20], gold: true, font: 12,
+            label: effectLabels.map(t => `${POWERUP_ICONS[t] || '✨'} ${t.replace(/-/g, ' ')}`).join(' · '),
+          });
+        }
+        return out;
+      }} />
       <div className="dbnc-wrap">
         <canvas ref={canvasRef} className="dbnc-canvas" />
       </div>
@@ -25804,9 +26100,9 @@ function App() {
                 it overflow:hidden would CLIP a tall setup screen rather than fit
                 it, which is the exact failure Daily Cipher had. What stops the
                 scrolling is upstream — useScrollLock owns the document while a
-                run is live, and the five phase-5 board games now honour the
-                --cg-board viewport cap (see the .ck-board/.rv-board/... rules),
-                so board + status + legend fit at 390x844 without moving. */}
+                run is live, and the five phase-5 board games honour the
+                --cg-board viewport cap (folded into .brg-canvas-box's
+                max-width), so board + status + legend fit at 390x844. */}
             <div className="cg-stage cg-scroll">
               <GameComponent
                 onWin={handleWin}

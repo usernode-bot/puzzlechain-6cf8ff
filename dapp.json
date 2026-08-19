@@ -453,7 +453,8 @@
     {
       "name": "Mine Finder resumes into the canvas board from a claimed attempt",
       "path": "/?demo=minefinder&game=minefinder&play=1",
-      "expectSelector": ".mf-mode-btn"
+      "expectSelector": ".mf-boardbox canvas.mf-canvas",
+      "expectText": "Mode: Dig"
     },
     {
       "name": "Anagram Sprint pre-game screen",
@@ -680,12 +681,13 @@
     {
       "name": "Drop Stack shows the Hold slot",
       "path": "/?game=dropstack&practice=1",
-      "expectSelector": ".ds-hold"
+      "expectSelector": ".ds-boardbox canvas.ds-canvas",
+      "expectText": "Hold"
     },
     {
       "name": "Drop Stack resumes a seeded run",
       "path": "/?demo=dropstack&game=dropstack&play=1",
-      "expectSelector": ".ds-queue"
+      "expectSelector": ".ds-boardbox canvas.ds-canvas"
     },
     {
       "name": "Chutes & Ladders board-style pills render",
@@ -700,17 +702,17 @@
     {
       "name": "Chutes & Ladders bot mode deep-links straight into a running board",
       "path": "/?game=chutes-ladders&mode=bot",
-      "expectSelector": ".cnl-board"
+      "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
     },
     {
       "name": "Chutes & Ladders 2p mode deep-links straight into a running board",
       "path": "/?game=chutes-ladders&mode=2p",
-      "expectSelector": ".cnl-board"
+      "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
     },
     {
       "name": "Chutes & Ladders P2 pawn renders as a diamond token",
       "path": "/?game=chutes-ladders&mode=bot",
-      "expectSelector": ".cnl-pawn.p2"
+      "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"
     },
     {
       "name": "Chutes & Ladders Jungle Vine skin deep-link renders",
@@ -735,12 +737,12 @@
     {
       "name": "Daily Tile Match shows the day difficulty label",
       "path": "/?game=tilematchingdaily&practice=1",
-      "expectSelector": ".tm-daylabel"
+      "expectText": "Today's board:"
     },
     {
       "name": "Daily Tile Match resumes a seeded run",
       "path": "/?demo=tilematch&game=tilematchingdaily&play=1",
-      "expectSelector": ".tm-board-container"
+      "expectSelector": "canvas.tm-canvas"
     },
     {
       "name": "Review demo seeds the nonogram board",
@@ -773,9 +775,10 @@
       "expectText": "Start mining"
     },
     {
-      "name": "Daily Cipher keyboard renders full-size keys",
+      "name": "Daily Cipher keyboard is drawn with key twins",
       "path": "/?game=cryptowordle&practice=1",
-      "expectSelector": ".cw-key"
+      "expectSelector": ".cw-board canvas.cw-canvas",
+      "expectText": "Enter"
     },
     {
       "name": "Daily Cipher Enter key is on screen",
@@ -808,6 +811,16 @@
       "expectText": "Give up"
     },
     {
+      "name": "Spider renders its canvas board",
+      "path": "/?game=spider&practice=1",
+      "expectSelector": "canvas.sp-canvas"
+    },
+    {
+      "name": "Mahjong renders its canvas board",
+      "path": "/?game=mahjongsol&practice=1",
+      "expectSelector": "canvas.mj-canvas"
+    },
+    {
       "name": "Gomoku pass-and-play confirms before placing",
       "path": "/?game=gomoku&mode=2p",
       "expectText": "Tap a point"
@@ -815,7 +828,7 @@
     {
       "name": "Ludo pass-and-play board renders",
       "path": "/?game=ludo&mode=2p",
-      "expectSelector": ".ludo-board"
+      "expectSelector": "canvas.ludo-canvas"
     },
     {
       "name": "Word Sprint found-list has its own scroll strip",
@@ -835,12 +848,12 @@
     {
       "name": "Daily Cipher runs in the fit column",
       "path": "/?game=cryptowordle&practice=1",
-      "expectSelector": ".fit-col .cw-kbd"
+      "expectSelector": ".fit-col .cw-board canvas.cw-canvas"
     },
     {
       "name": "Checkers board is capped to the viewport",
       "path": "/?game=checkers&mode=2p",
-      "expectSelector": ".cg-stage .ck-board"
+      "expectSelector": ".cg-stage .brg-canvas-box canvas.ck-canvas"
     },
     {
       "name": "Locked day shows today's result, not just a countdown",
@@ -940,7 +953,7 @@
     {
       "name": "Versus Bot match starts locally",
       "path": "/?game=fourinarow&mode=bot",
-      "expectSelector": ".fir-board"
+      "expectSelector": "canvas.fir-canvas"
     },
     {
       "name": "Rules registry is reachable from the browser",
@@ -1050,17 +1063,18 @@
     {
       "name": "Sudoku 9x9 board is deep-linkable and fills its column",
       "path": "/?game=sudoku&practice=1&sdk=9",
-      "expectSelector": ".sudoku.s9 .scell"
+      "expectSelector": ".sudoku.s9 canvas.sdk-canvas"
     },
     {
-      "name": "Sudoku 9x9 keypad renders full-width digit keys",
+      "name": "Sudoku 9x9 keypad is drawn with key twins",
       "path": "/?game=sudoku&practice=1&sdk=9",
-      "expectSelector": ".numpad .numkey"
+      "expectSelector": ".sudoku.s9 canvas.sdk-canvas",
+      "expectText": "Erase"
     },
     {
       "name": "Sudoku 6x6 Mini board is deep-linkable",
       "path": "/?game=sudoku&practice=1&sdk=6",
-      "expectSelector": ".sudoku .scell"
+      "expectSelector": ".sudoku canvas.sdk-canvas"
     },
     {
       "name": "Sudoku difficulty chooser still renders without ?sdk",
@@ -1070,7 +1084,7 @@
     {
       "name": "Word Search board renders",
       "path": "/?game=wordhunt&practice=1",
-      "expectSelector": ".wordsearch .wcell"
+      "expectSelector": ".wordsearch canvas.ws-canvas"
     },
     {
       "name": "Daily Snake board renders",
@@ -1080,7 +1094,7 @@
     {
       "name": "Word Sprint grid renders",
       "path": "/?game=wordsprint&practice=1",
-      "expectSelector": ".wspr-grid .wspr-tile"
+      "expectSelector": ".wspr-grid canvas.wspr-canvas"
     },
     {
       "name": "Daily Bounce canvas fits its column",
@@ -1156,6 +1170,66 @@
       "name": "Paired card mode buttons render side by side",
       "path": "/",
       "expectSelector": ".grid > .card .card-modes .card-mode-btn"
+    },
+    {
+      "name": "Minesweeper board is a canvas",
+      "path": "/?game=minesweeper",
+      "expectSelector": "canvas.ms-canvas"
+    },
+    {
+      "name": "Knight's Tour board is a canvas",
+      "path": "/?game=knights-tour",
+      "expectSelector": "canvas.kt-canvas"
+    },
+    {
+      "name": "Crate Push room is a canvas",
+      "path": "/?game=cratepush&practice=1",
+      "expectSelector": "canvas.cp-canvas"
+    },
+    {
+      "name": "Daily Cipher guess grid is a canvas",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectSelector": ".cw-board canvas.cw-canvas"
+    },
+    {
+      "name": "Diamond Rush gem board is a canvas",
+      "path": "/?game=diamondrush",
+      "expectSelector": ".dr-grid canvas.dr-canvas"
+    },
+    {
+      "name": "Anagram Sprint slots + rack are a canvas",
+      "path": "/?game=anagrams&practice=1",
+      "expectSelector": ".an-boardbox canvas.an-canvas"
+    },
+    {
+      "name": "Snake board is a canvas",
+      "path": "/?game=snake&snake=normal",
+      "expectSelector": ".snake-board canvas.snake-canvas"
+    },
+    {
+      "name": "Daily Snake board is a canvas",
+      "path": "/?game=snakedaily&practice=1",
+      "expectSelector": ".dsnk-board canvas.snake-canvas"
+    },
+    {
+      "name": "2048 board is a canvas",
+      "path": "/?game=2048&result=1",
+      "expectSelector": ".game-body.frozen .t2048-grid canvas.t2048-canvas"
+    },
+    {
+      "name": "Block Fit well is a canvas",
+      "path": "/?game=blockblast&result=1",
+      "expectSelector": "canvas.bb-canvas"
+    },
+    {
+      "name": "Reversi pass-and-play board is a canvas",
+      "path": "/?game=reversi&mode=2p",
+      "expectSelector": "canvas.rv-canvas"
+    },
+    {
+      "name": "Gomoku board is a canvas (confirm bar stays)",
+      "path": "/?game=gomoku&mode=2p",
+      "expectSelector": "canvas.gmk-canvas"
     }
   ],
   "visibility": {

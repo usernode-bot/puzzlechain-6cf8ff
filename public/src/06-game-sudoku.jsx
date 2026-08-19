@@ -185,6 +185,380 @@ function sdkDeepLinkDifficulty() {
   return null;
 }
 
+
+/* ============================================================
+   Sudoku difficulty rating (#176) — technique-graded solving
+   ============================================================
+   The pilot for every difficulty band in the app, and the cheapest one: a
+   Sudoku's difficulty is exactly "which human techniques does it force you to
+   use", and that is decidable in milliseconds. So Sudoku needs NO rated-seed
+   corpus at all — story and arcade generate a board, rate it, and keep it if
+   it lands in the band that was asked for.
+
+   The ladder is the technique list itself, hardest-required first:
+
+     0 naked single    the cell has one candidate left
+     1 hidden single   a digit fits only one cell in its row / column / box
+     2 naked pair      two cells in a unit share the same two candidates
+     3 pointing pair   a digit is confined to one line within a box
+     4 box-line        a digit is confined to one box within a line
+     5 X-wing          two rows share a digit in the same two columns
+
+   A puzzle's rating is the HARDEST technique it forces, not the count of
+   techniques used, because that is what a player experiences as difficulty:
+   one X-wing makes a puzzle hard however many singles surround it.
+
+   Anything the list cannot finish would need guessing, so it is rejected
+   outright rather than shipped as "very hard" — a puzzle that needs a guess
+   is not harder, it is broken.
+   ============================================================ */
+
+// Unit geometry for both board sizes. 6×6 uses 2×3 boxes, 9×9 uses 3×3.
+function sdkUnits(size) {
+  const bh = size === 9 ? 3 : 2;   // box height in rows
+  const bw = 3;                    // box width in cols (both sizes)
+  const units = [];
+  for (let r = 0; r < size; r++) units.push(Array.from({ length: size }, (_, c) => [r, c]));
+  for (let c = 0; c < size; c++) units.push(Array.from({ length: size }, (_, r) => [r, c]));
+  for (let br = 0; br < size / bh; br++) {
+    for (let bc = 0; bc < size / bw; bc++) {
+      const cells = [];
+      for (let r = 0; r < bh; r++) for (let c = 0; c < bw; c++) cells.push([br * bh + r, bc * bw + c]);
+      units.push(cells);
+    }
+  }
+  return units;
+}
+const SDK_UNITS = { 6: sdkUnits(6), 9: sdkUnits(9) };
+
+// Candidate sets for every empty cell, as an array of Sets indexed r*size+c.
+function sdkCandidates(grid, size) {
+  const cand = new Array(size * size).fill(null);
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (grid[r][c]) continue;
+      const s = new Set();
+      for (let v = 1; v <= size; v++) s.add(v);
+      for (let i = 0; i < size; i++) {
+        s.delete(grid[r][i]);
+        s.delete(grid[i][c]);
+      }
+      const bh = size === 9 ? 3 : 2;
+      const r0 = Math.floor(r / bh) * bh, c0 = Math.floor(c / 3) * 3;
+      for (let i = 0; i < bh; i++) for (let j = 0; j < 3; j++) s.delete(grid[r0 + i][c0 + j]);
+      cand[r * size + c] = s;
+    }
+  }
+  return cand;
+}
+
+/* Solve with human techniques only, reporting the hardest one needed.
+   Returns { solved, hardest } — `hardest` is -1 for an already-complete grid
+   and SDK_TECHNIQUES.length when the technique list stalls (needs a guess). */
+const SDK_TECHNIQUES = ['naked-single', 'hidden-single', 'naked-pair', 'pointing', 'box-line', 'x-wing'];
+
+function sdkSolveGraded(puzzle, size) {
+  const grid = puzzle.map(row => row.slice());
+  const units = SDK_UNITS[size];
+  let hardest = -1;
+
+  const place = (r, c, v) => { grid[r][c] = v; };
+
+  for (;;) {
+    const empties = [];
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (!grid[r][c]) empties.push([r, c]);
+    if (!empties.length) return { solved: true, hardest: Math.max(hardest, 0) };
+
+    const cand = sdkCandidates(grid, size);
+    // A cell with no candidates means the grid is already contradictory.
+    for (const [r, c] of empties) if (cand[r * size + c].size === 0) return { solved: false, hardest: SDK_TECHNIQUES.length };
+
+    let acted = false;
+
+    // 0 — naked single
+    for (const [r, c] of empties) {
+      const s = cand[r * size + c];
+      if (s.size === 1) { place(r, c, [...s][0]); hardest = Math.max(hardest, 0); acted = true; break; }
+    }
+    if (acted) continue;
+
+    // 1 — hidden single
+    for (const unit of units) {
+      for (let v = 1; v <= size && !acted; v++) {
+        const spots = unit.filter(([r, c]) => !grid[r][c] && cand[r * size + c].has(v));
+        if (spots.length === 1) {
+          place(spots[0][0], spots[0][1], v); hardest = Math.max(hardest, 1); acted = true;
+        }
+      }
+      if (acted) break;
+    }
+    if (acted) continue;
+
+    /* From here the techniques ELIMINATE candidates rather than place digits,
+       so they mutate `cand` and loop back to let the singles above finish the
+       job. `elim` tracks whether anything actually changed — a technique that
+       fires but removes nothing must not count toward the rating. */
+    let elim = false;
+    const drop = (r, c, v) => {
+      const s = cand[r * size + c];
+      if (s && s.has(v)) { s.delete(v); elim = true; return true; }
+      return false;
+    };
+
+    // 2 — naked pair
+    for (const unit of units) {
+      const open = unit.filter(([r, c]) => !grid[r][c]);
+      for (let i = 0; i < open.length && !elim; i++) {
+        const a = cand[open[i][0] * size + open[i][1]];
+        if (a.size !== 2) continue;
+        for (let j = i + 1; j < open.length; j++) {
+          const b = cand[open[j][0] * size + open[j][1]];
+          if (b.size !== 2) continue;
+          const same = [...a].every(v => b.has(v));
+          if (!same) continue;
+          for (const [r, c] of open) {
+            if ((r === open[i][0] && c === open[i][1]) || (r === open[j][0] && c === open[j][1])) continue;
+            for (const v of a) drop(r, c, v);
+          }
+          if (elim) { hardest = Math.max(hardest, 2); break; }
+        }
+      }
+      if (elim) break;
+    }
+    if (elim) continue;
+
+    // 3 / 4 — pointing pair and box-line reduction, both "a digit is confined
+    // to the intersection of a box and a line", read in the two directions.
+    const bh = size === 9 ? 3 : 2;
+    for (let b = 0; b < size && !elim; b++) {
+      const r0 = Math.floor(b / (size / 3)) * bh, c0 = (b % (size / 3)) * 3;
+      const boxCells = [];
+      for (let i = 0; i < bh; i++) for (let j = 0; j < 3; j++) boxCells.push([r0 + i, c0 + j]);
+      for (let v = 1; v <= size && !elim; v++) {
+        const spots = boxCells.filter(([r, c]) => !grid[r][c] && cand[r * size + c].has(v));
+        if (spots.length < 2) continue;
+        const rows = new Set(spots.map(s => s[0])), cols = new Set(spots.map(s => s[1]));
+        if (rows.size === 1) {
+          const r = [...rows][0];
+          for (let c = 0; c < size; c++) if (c < c0 || c >= c0 + 3) if (!grid[r][c]) drop(r, c, v);
+        } else if (cols.size === 1) {
+          const c = [...cols][0];
+          for (let r = 0; r < size; r++) if (r < r0 || r >= r0 + bh) if (!grid[r][c]) drop(r, c, v);
+        }
+        if (elim) hardest = Math.max(hardest, 3);
+      }
+    }
+    if (elim) continue;
+
+    for (let line = 0; line < size && !elim; line++) {
+      for (let v = 1; v <= size && !elim; v++) {
+        for (const horiz of [true, false]) {
+          const spots = [];
+          for (let i = 0; i < size; i++) {
+            const r = horiz ? line : i, c = horiz ? i : line;
+            if (!grid[r][c] && cand[r * size + c].has(v)) spots.push([r, c]);
+          }
+          if (spots.length < 2) continue;
+          const boxes = new Set(spots.map(([r, c]) => boxAt(r, c, size)));
+          if (boxes.size !== 1) continue;
+          const bb = [...boxes][0];
+          const br0 = Math.floor(bb / (size / 3)) * bh, bc0 = (bb % (size / 3)) * 3;
+          for (let i = 0; i < bh; i++) for (let j = 0; j < 3; j++) {
+            const r = br0 + i, c = bc0 + j;
+            const onLine = horiz ? r === line : c === line;
+            if (!onLine && !grid[r][c]) drop(r, c, v);
+          }
+          if (elim) { hardest = Math.max(hardest, 4); break; }
+        }
+      }
+    }
+    if (elim) continue;
+
+    // 5 — X-wing: a digit confined to the same two columns in two rows (and
+    // the transpose) can be removed from those columns everywhere else.
+    for (let v = 1; v <= size && !elim; v++) {
+      for (const horiz of [true, false]) {
+        const linesWithTwo = [];
+        for (let line = 0; line < size; line++) {
+          const spots = [];
+          for (let i = 0; i < size; i++) {
+            const r = horiz ? line : i, c = horiz ? i : line;
+            if (!grid[r][c] && cand[r * size + c].has(v)) spots.push(i);
+          }
+          if (spots.length === 2) linesWithTwo.push([line, spots]);
+        }
+        for (let i = 0; i < linesWithTwo.length && !elim; i++) {
+          for (let j = i + 1; j < linesWithTwo.length; j++) {
+            const [l1, s1] = linesWithTwo[i], [l2, s2] = linesWithTwo[j];
+            if (s1[0] !== s2[0] || s1[1] !== s2[1]) continue;
+            for (const cross of s1) {
+              for (let k = 0; k < size; k++) {
+                if (k === l1 || k === l2) continue;
+                const r = horiz ? k : cross, c = horiz ? cross : k;
+                if (!grid[r][c]) drop(r, c, v);
+              }
+            }
+            if (elim) { hardest = Math.max(hardest, 5); break; }
+          }
+        }
+        if (elim) break;
+      }
+    }
+    if (elim) continue;
+
+    // Nothing fired: the technique list is exhausted and a guess is required.
+    return { solved: false, hardest: SDK_TECHNIQUES.length };
+  }
+}
+
+/* Uniqueness check for either board size, generalised from the 9×9-only
+   counter above. This is what the DIG uses, because "does the puzzle still
+   have exactly one solution" is the correct criterion for removing a cell —
+   and a bitmask search answers it orders of magnitude faster than running the
+   technique-graded solver per removal, which is what a first cut did and what
+   made generation far too slow to run on the client. */
+function sdkCountSolutions(g, size, cap = 2, nodeBudget = 20000) {
+  const bh = size === 9 ? 3 : 2;
+  const nBoxes = size;
+  const rows = new Array(size).fill(0), cols = new Array(size).fill(0), boxes = new Array(nBoxes).fill(0);
+  const empties = [];
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+    const v = g[r][c], b = boxAt(r, c, size);
+    if (v) { const bit = 1 << v; rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit; }
+    else empties.push(r * size + c);
+  }
+  let count = 0;
+  /* Counting solutions on a nearly-empty grid is unbounded work, and the dig
+     calls this once per candidate removal — a first cut without this budget
+     took ~8 SECONDS per 9×9 board, which is not a thing that can run at mount
+     time. Exhausting the budget returns -1 ("don't know"), and the dig treats
+     that as "keep the cell": a puzzle is only allowed to lose a given when
+     uniqueness was actually PROVEN, so the cap can only ever make boards
+     easier, never wrong. */
+  let nodes = 0;
+  let bankrupt = false;
+  const rec = () => {
+    if (count >= cap || bankrupt) return;
+    if (++nodes > nodeBudget) { bankrupt = true; return; }
+    let bestI = -1, bestOpts = size + 1;
+    for (let i = 0; i < empties.length; i++) {
+      const e = empties[i];
+      if (e < 0) continue;
+      const r = (e / size) | 0, c = e % size;
+      const used = rows[r] | cols[c] | boxes[boxAt(r, c, size)];
+      let opts = 0;
+      for (let v = 1; v <= size; v++) if (!(used & (1 << v))) opts++;
+      if (opts === 0) return;
+      if (opts < bestOpts) { bestOpts = opts; bestI = i; if (opts === 1) break; }
+    }
+    if (bestI === -1) { count++; return; }
+    const e = empties[bestI];
+    empties[bestI] = -1;
+    const r = (e / size) | 0, c = e % size, b = boxAt(r, c, size);
+    for (let v = 1; v <= size; v++) {
+      const bit = 1 << v;
+      if ((rows[r] | cols[c] | boxes[b]) & bit) continue;
+      rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit;
+      g[r][c] = v;
+      rec();
+      g[r][c] = 0;
+      rows[r] &= ~bit; cols[c] &= ~bit; boxes[b] &= ~bit;
+      if (count >= cap) break;
+    }
+    empties[bestI] = e;
+  };
+  rec();
+  return bankrupt ? -1 : count;
+}
+
+/* Dig toward a hole count, never breaking uniqueness. Difficulty is RATED
+   afterwards rather than steered here: how hard a puzzle plays is a property
+   of which techniques the remaining givens force, not of how many were
+   removed, and conflating the two is what makes hand-tuned generators produce
+   "hard" boards that are actually just sparse. */
+function sdkDigUnique(solution, size, holes, rng) {
+  const puzzle = solution.map(row => row.slice());
+  const order = shuffle(Array.from({ length: size * size }, (_, i) => i), rng);
+  let removed = 0;
+  for (const p of order) {
+    if (removed >= holes) break;
+    const r = Math.floor(p / size), c = p % size;
+    if (!puzzle[r][c]) continue;
+    const keep = puzzle[r][c];
+    puzzle[r][c] = 0;
+    if (sdkCountSolutions(puzzle, size, 2) === 1) removed += 1;
+    else puzzle[r][c] = keep;   // that cell was load-bearing — put it back
+  }
+  return puzzle;
+}
+
+/* ============================================================
+   Band selection — MEASURED, not assumed
+   ============================================================
+   The first cut banded by "which technique does this force", which is how
+   Sudoku difficulty is normally described. Measurement killed it:
+
+     - 6×6: over 80 maximally-dug boards, 96% needed nothing beyond naked
+       singles. A 2×3-box board with six digits is too tightly constrained for
+       a technique ladder to exist at all. Sudoku Mini therefore bands by
+       GIVENS — which is what a player actually feels there: how long it takes.
+     - 9×9: uniqueness-preserving digs at 36–46 holes run in ~1ms and land on
+       naked/hidden singles ~90% of the time. Reaching X-wing-grade boards
+       needs a targeted search that costs seconds per board, which cannot run
+       at mount time.
+
+   So the ladder is GIVENS for both sizes, and the technique grader keeps two
+   jobs it is genuinely good at: rejecting boards that need a GUESS (it found
+   that 7 of 40 boards from the old 6×6 generator were unsolvable by logic —
+   a real pre-existing bug), and reporting the hardest technique so the
+   pre-game screen can name what a band demands.
+
+   Re-measure before retuning these numbers rather than eyeballing them; hole
+   count alone predicts felt difficulty better than silhouette does, but only
+   inside the range that was actually sampled. */
+// Rung counts, mirroring STORY_BANDS in server.js — the server owns what a
+// band is WORTH, the client owns what it looks like, and they must agree on
+// how many there are.
+const SDK_BAND_COUNT = { sudoku: 6, sudokumini: 5 };
+// Arcade's three bands map onto the same ladder, so Easy/Normal/Hard are the
+// bottom, middle and top of the story range rather than a second scale.
+const ARCADE_BAND_ORDER = ['easy', 'normal', 'hard'];
+
+const SDK_HOLE_RANGE = {
+  6: { min: 10, max: 20 },
+  9: { min: 34, max: 46 },
+};
+
+function sdkGenerateForBand(rng, size, band, bandCount) {
+  const range = SDK_HOLE_RANGE[size] || SDK_HOLE_RANGE[9];
+  const t = bandCount > 1 ? band / (bandCount - 1) : 0;
+  const holes = Math.round(range.min + (range.max - range.min) * t);
+
+  let fallback = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const base = size === 9 ? generateSudoku9(rng) : generateSudoku6(rng);
+    const puzzle = sdkDigUnique(base.solution, size, holes, rng);
+    const graded = sdkSolveGraded(puzzle, size);
+    const givens = size * size - puzzle.flat().filter(v => !v).length;
+    const out = { solution: base.solution, puzzle, hardest: graded.hardest, givens };
+    // A board that needs a guess is not "harder" — it is broken. Reject it.
+    if (graded.solved) return out;
+    if (!fallback) fallback = out;
+  }
+  /* Every attempt needed a guess, which is vanishingly unlikely but must not
+     hang the mount. Hand back the last board rather than looping forever; it
+     is still a valid puzzle, just not guaranteed logic-only. */
+  return fallback;
+}
+
+// What a band demands, for the pre-game screen. Named from the grader so the
+// copy cannot drift from what the board actually is.
+function sdkBandLabel(size, band, bandCount) {
+  const names = ['Gentle', 'Easy', 'Steady', 'Tricky', 'Tough', 'Fiendish'];
+  const i = Math.min(names.length - 1, Math.round((band / Math.max(1, bandCount - 1)) * (names.length - 1)));
+  return names[i];
+}
+
 function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, gameId, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   /* #176 — the registry entry decides the board size now. Sudoku is the 9×9
@@ -212,10 +586,32 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     if (resumedDiff) return resumedDiff;
     return sdkDeepLinkDifficulty();
   });
+  /* #176 — one board source for all three modes. The daily reads today's
+     server seed; story derives a STABLE board per band, so leaving a rung and
+     coming back gives the same puzzle rather than a reroll; arcade rolls a
+     fresh seed and keeps it so the run can be replayed.
+
+     Story and arcade go through sdkGenerateForBand, which digs to the band's
+     measured hole count and rejects any board that would need a guess. The
+     daily keeps the original generators untouched so today's board is
+     unchanged by any of this. */
+  const bandCount = SDK_BAND_COUNT[seedKey] || 6;
+  const arcadeIdx = playMode === 'arcade'
+    ? Math.max(0, ARCADE_BAND_ORDER.indexOf(band))
+    : 0;
+  const effBand = playMode === 'story' ? (band || 0)
+    : playMode === 'arcade' ? Math.round((arcadeIdx / 2) * (bandCount - 1))
+    : 0;
+  const seedRef = useRef(null);
   const boardsRef = useRef({});
   const getBoard = (diff) => {
     if (!boardsRef.current[diff]) {
-      if (diff === 'mini') {
+      const size = diff === 'mini' ? 6 : 9;
+      if (playMode === 'story' || playMode === 'arcade') {
+        const { rng, seed } = modeSeed(playMode, seedKey, effBand, offset);
+        seedRef.current = seed;
+        boardsRef.current[diff] = sdkGenerateForBand(rng, size, effBand, bandCount);
+      } else if (size === 6) {
         boardsRef.current[diff] = generateSudoku6(dailyRng(offset, seedKey));
       } else {
         /* The 9×9 used to derive a SECOND stream from the 6×6's seed, because

@@ -881,6 +881,45 @@ function App() {
       });
       return;
     }
+    /* #176 — story and arcade settle on their OWN endpoints and never touch
+       the daily's attempt row, streak or badges. Dispatching here rather than
+       in each game component is what let ~20 games gain two modes without one
+       of them changing its finish path: a game still just calls onWin(), and
+       the shell decides what that means in the mode it was opened in. */
+    if (playMode === 'story') {
+      const bandIdx = typeof storyBand === 'number' ? storyBand : 0;
+      await handleBandCleared(bandIdx, { score, steps, timeSecs });
+      const total = (storyProgress[currentGame.id] || {}).total || 0;
+      setWinData({
+        score, bonus: 0, finalScore: score, steps, timeSecs,
+        multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
+        modeLabel: 'Story', bandIndex: bandIdx, bandTotal: total,
+      });
+      return;
+    }
+    if (playMode === 'arcade') {
+      const band = arcadeBandId;
+      const { ok, body } = await api(`/api/arcade/${currentGame.id}/finish`, {
+        method: 'POST',
+        body: JSON.stringify({
+          band, score, timeSecs, steps,
+          seed: (meta && meta.seed) || 0,
+          moves: (meta && meta.moves) || undefined,
+        }),
+      }).catch(() => ({ ok: false, body: null }));
+      if (ok && body && body.awarded) setTotalScore(t => t + body.awarded);
+      setWinData({
+        score, bonus: 0, finalScore: score, steps, timeSecs,
+        multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
+        modeLabel: 'Arcade', arcadeBand: band,
+        arcadeRank: ok && body ? body.rank : null,
+        arcadePrevBest: ok && body ? body.previousBest : null,
+        arcadeBeatBest: ok && body ? body.beatBest : false,
+        arcadeFirstRun: ok && body ? body.isFirstRun : false,
+        arcadeAwarded: ok && body ? body.awarded : 0,
+      });
+      return;
+    }
     try {
       // Non-daily games skip the server, streak, and totalScore nav update.
       if (currentGame && !currentGame.daily) {
@@ -1073,6 +1112,29 @@ function App() {
         score: lostScore, steps, timeSecs,
         share: meta && meta.share, answer: meta && meta.answer, won: false,
         gameId: currentGame ? currentGame.id : null,
+      });
+      return;
+    }
+    /* #176 — a story or arcade loss must never touch the daily's attempt row.
+       Story pays nothing for a failed band (the rung stays unticked, which is
+       the whole point of a ladder); arcade still records the run, because run
+       history is meant to hold everything you played, but a losing run can
+       only ever tie a personal best, never beat one. */
+    if (playMode === 'story' || playMode === 'arcade') {
+      if (playMode === 'arcade') {
+        await api(`/api/arcade/${currentGame.id}/finish`, {
+          method: 'POST',
+          body: JSON.stringify({
+            band: arcadeBandId, score: lostScore, timeSecs, steps,
+            seed: (meta && meta.seed) || 0,
+          }),
+        }).catch(() => {});
+      }
+      setLoseData({
+        steps, timeSecs, score: lostScore, finalScore: lostScore,
+        share: meta && meta.share, answer: meta && meta.answer,
+        scoreLabel: meta && meta.scoreLabel, scoreValue: meta && meta.scoreValue,
+        modeLabel: playMode === 'story' ? 'Story' : 'Arcade',
       });
       return;
     }

@@ -91,6 +91,39 @@ function dailyRng(offset, gameId) {
   return mulberry32(seed >>> 0);
 }
 
+/* ============================================================
+   Play-mode seeding (#176)
+   ============================================================
+   Every generator in this app already takes an rng, which is what makes all
+   three modes fall out of one helper rather than three code paths per game:
+
+     daily   — today's server-issued seed. Everyone gets the same board.
+     story   — derived from (game, band), so a rung is STABLE: leave it and
+               come back and it is the same board, which is what makes
+               "clear this band" a thing you can retry rather than a reroll.
+     arcade  — fresh per run. The seed is returned so the finished run can be
+               stored and replayed: a run is a seed plus a move list, not a
+               board, which is why run history costs a few hundred bytes.
+
+   Returns { rng, seed } — `seed` is null for the daily, whose seed already
+   lives server-side on the daily_seeds row.
+   ============================================================ */
+function modeSeed(playMode, gameId, band, offset) {
+  if (playMode === 'story') {
+    const s = (hashStr(gameId + ':story:' + band) >>> 0);
+    return { rng: mulberry32(s), seed: s };
+  }
+  if (playMode === 'arcade') {
+    // Math.random is correct here and nowhere else in a generator: an arcade
+    // board is SUPPOSED to differ per player and per run. It is captured as a
+    // concrete seed immediately so the run stays reproducible.
+    const s = Math.floor(Math.random() * 4294967295) >>> 0;
+    return { rng: mulberry32(s), seed: s };
+  }
+  return { rng: dailyRng(offset, gameId), seed: null };
+}
+
+
 // Mancala Daily Challenge opening board, derived from the server-anchored UTC
 // day. Deals 24 stones into one side via the daily seed, then mirrors them
 // rotationally (pit i ↔ opposite 12-i) so both players start from an identical,

@@ -972,7 +972,46 @@ ${emitTapHighlightRules()}
 }
 .pregame-stat .v { font-weight: 700; font-size: 1rem; }
 .pregame-deal {
-  font-size: 0.82rem; color: ${C.text}; background: ${ca('accent','14')};
+  font-size: 0.82rem; color: ${C.text}
+
+/* #176 — the band pickers. Story's is a numbered ladder walked in order
+   (cleared behind you, one open rung ahead, the rest locked); arcade's is
+   three wide buttons with no lock at all, because all three difficulties are
+   open from the first run and the recommendation steers instead of gating. */
+.pregame-bands { margin-top: 0.9rem; text-align: left; }
+.pregame-bands-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem;
+  letter-spacing: 0.12em; text-transform: uppercase; color: ${C.muted};
+  margin-bottom: 0.4rem;
+}
+.pregame-band-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.pregame-band-row.wide { display: grid; grid-template-columns: repeat(3, 1fr); }
+.pregame-band {
+  min-width: 44px; min-height: 44px; padding: 0.4rem 0.6rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600;
+  color: ${C.text}; background: ${C.card};
+  border: 1px solid ${C.border}; border-radius: 10px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.pregame-band.wide { font-family: inherit; font-size: 0.8rem; }
+.pregame-band.on {
+  border-color: var(--accent, ${C.accent});
+  background: ${ca('accent', '14')};
+  color: var(--accent, ${C.accent});
+}
+.pregame-band.done { color: ${C.emerald}; border-color: ${ca('emerald', '55')}; }
+.pregame-band.locked { opacity: 0.4; cursor: not-allowed; }
+.pregame-band[data-pressed] { background: ${C.well}; }
+.pregame-band .rec {
+  display: block; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: ${C.muted}; margin-top: 0.1rem;
+}
+.pregame-band-note {
+  margin-top: 0.45rem; font-size: 0.72rem; line-height: 1.4; color: ${C.muted};
+}; background: ${ca('accent','14')};
   border: 1px solid ${ca('accent','44')}; border-radius: 10px;
   padding: 0.6rem 0.8rem; margin-bottom: 1rem;
 }

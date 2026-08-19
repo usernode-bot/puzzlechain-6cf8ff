@@ -607,10 +607,23 @@ function ChatPanel({ game, user, onClose }) {
 }
 
 
-function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat }) {
+function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
+                         playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const resuming = !!(attempt && !attempt.finishedAt);
   const m = game.manifest || {};
+  /* #176 — ONE component, three fillings. The screen keeps a fixed rhetorical
+     shape — what am I playing · where do I stand · what's at stake — and each
+     mode answers those three its own way. Forking it per mode would have meant
+     three screens to keep in step; leaving it daily-shaped would have left
+     story and arcade staring at a reset countdown that means nothing to them. */
+  const mode = playMode || (game.daily ? 'daily' : null);
+  const isDaily = mode === 'daily';
+  const isStory = mode === 'story';
+  const isArcade = mode === 'arcade';
+  const prog = (storyProgress && storyProgress[game.id]) || null;
+  const bandTotal = prog ? prog.total : 0;
+  const bandCleared = prog ? prog.cleared : 0;
   return (
     <div className="pregame-card" style={{ '--accent': game.tagColor || C.accent }}>
       <div className="pregame-icon">{game.icon}</div>
@@ -626,23 +639,98 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
       </div>
       <div className="pregame-stats">
         <div className="pregame-stat">
-          <div className="l">Personal best</div>
-          <div className="v mono">{best && best.score != null ? `+${best.score}` : '—'}</div>
+          <div className="l">{isArcade ? 'Best on this band' : 'Personal best'}</div>
+          <div className="v mono">
+            {isArcade
+              ? (arcadeBest && arcadeBest.score ? `+${arcadeBest.score}` : '—')
+              : (best && best.score != null ? `+${best.score}` : '—')}
+          </div>
         </div>
-        <div className="pregame-stat">
-          <div className="l">Streak</div>
-          <div className="v mono">{authOk ? `${streak}d` : '—'}</div>
-        </div>
-        {game.daily && nextResetUtc && (
+        {/* Streak is a DAILY idea — consecutive days played — so it appears
+            only there rather than showing a number that cannot move. */}
+        {isDaily && (
+          <div className="pregame-stat">
+            <div className="l">Streak</div>
+            <div className="v mono">{authOk ? `${streak}d` : '—'}</div>
+          </div>
+        )}
+        {isStory && bandTotal > 0 && (
+          <div className="pregame-stat">
+            <div className="l">Cleared</div>
+            <div className="v mono">{bandCleared}/{bandTotal}</div>
+          </div>
+        )}
+        {isArcade && (
+          <div className="pregame-stat">
+            <div className="l">Your rank</div>
+            <div className="v mono">{arcadeBest && arcadeBest.rank ? `#${arcadeBest.rank}` : '—'}</div>
+          </div>
+        )}
+        {isDaily && nextResetUtc && (
           <div className="pregame-stat">
             <div className="l">New deal in</div>
             <div className="v mono">{countdown}</div>
           </div>
         )}
       </div>
-      {game.daily && (
+      {isDaily && (
         <div className="pregame-deal">
           🌍 Everyone plays this <strong>exact deal</strong> today — one attempt, same board for all.
+        </div>
+      )}
+      {isStory && bandTotal > 0 && (
+        <div className="pregame-bands" role="group" aria-label="Choose a band">
+          <div className="pregame-bands-label">Band</div>
+          <div className="pregame-band-row">
+            {Array.from({ length: bandTotal }, (_, i) => {
+              const done = i < bandCleared;
+              const locked = i > bandCleared;   // the ladder is walked in order
+              return (
+                <button
+                  key={i}
+                  className={'pregame-band tappable' + (i === storyBand ? ' on' : '') + (done ? ' done' : '') + (locked ? ' locked' : '')}
+                  disabled={locked}
+                  aria-label={`Band ${i + 1}${done ? ', cleared' : ''}`}
+                  {...tapProps(() => { if (!locked) onStoryBand && onStoryBand(i); })}
+                >{done ? '✓' : i + 1}</button>
+              );
+            })}
+          </div>
+          <div className="pregame-band-note">
+            {bandCleared >= bandTotal
+              ? 'Ladder complete — replay any band for practice. Points are paid once, on first clear.'
+              : 'Clearing a band for the first time pays. Replays are for practice.'}
+          </div>
+        </div>
+      )}
+      {isArcade && (
+        <div className="pregame-bands" role="group" aria-label="Choose a difficulty">
+          <div className="pregame-bands-label">Difficulty</div>
+          <div className="pregame-band-row wide">
+            {ARCADE_BANDS.map(b => {
+              /* All three are open from the first run. The recommendation is
+                 STEERING, not gating: a player who picks Hard on a game they
+                 have never touched gets a hard board and concludes the game is
+                 broken, so the band matching their ladder progress is marked
+                 rather than the others being locked. */
+              const rec = bandTotal > 0 &&
+                b.id === (bandCleared === 0 ? 'easy' : bandCleared >= bandTotal ? 'hard' : 'normal');
+              return (
+                <button
+                  key={b.id}
+                  className={'pregame-band wide tappable' + (b.id === arcadeBandId ? ' on' : '')}
+                  aria-label={`${b.label}${rec ? ', recommended' : ''}`}
+                  {...tapProps(() => onArcadeBand && onArcadeBand(b.id))}
+                >
+                  {b.label}{rec && <span className="rec">recommended</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="pregame-band-note">
+            A fresh board every run. Beating your own best on this band scores;
+            so does reaching the top 10, top 3 or #1 — once each.
+          </div>
         </div>
       )}
       {resuming && (

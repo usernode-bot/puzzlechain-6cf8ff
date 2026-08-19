@@ -42,6 +42,9 @@ function App() {
   const [storyBand, setStoryBand] = useState(0);
   // gameId -> { cleared, total } for the card state line and the story picker.
   const [storyProgress, setStoryProgress] = useState({});
+  // The viewer's standing on the arcade band currently selected, so the
+  // pre-game screen can show what there is to beat before the run starts.
+  const [arcadeBest, setArcadeBest] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
   // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
@@ -449,7 +452,7 @@ function App() {
   };
 
   // Opening a game lands on the shell-owned PRE-GAME screen (phase 3) — the
-  // day's attempt is only claimed when the player hits Play (startDailyRun),
+  // day's attempt is only claimed when the player hits Play (startRun),
   // so browsing the pre-game screen never burns the attempt. The How-to-Play
   // cards auto-open on a player's first-ever open of each game; because timed
   // dailies only mount (and start their clock) after Play, the auto-shown
@@ -457,6 +460,22 @@ function App() {
   /* Story opens on the first band you have not cleared, not on band 0 — the
      ladder is a progression, so re-entering it should carry on rather than
      restart. Falls back to 0 before progress has loaded. */
+  /* Pull the viewer's standing on the selected arcade band whenever the
+     pre-game screen is showing one. Kept out of loadDaily on purpose: it is
+     per-band and changes as the picker moves, so it belongs to the screen
+     rather than to the day. */
+  useEffect(() => {
+    if (screen !== 'pregame' || playMode !== 'arcade' || !currentGame || !authOk) {
+      setArcadeBest(null);
+      return;
+    }
+    let live = true;
+    api(`/api/arcade/${currentGame.id}/leaderboard?band=${encodeURIComponent(arcadeBandId)}`)
+      .then(r => { if (live && r.ok && r.body) setArcadeBest(r.body.me || null); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [screen, playMode, currentGame, arcadeBandId, authOk]);
+
   const nextUnclearedBand = (gameId) => {
     const p = storyProgress[gameId];
     if (!p || !p.total) return 0;
@@ -473,6 +492,18 @@ function App() {
     const pm = isPlayMode(mode) ? mode : defaultPlayMode(game);
     setPlayMode(pm);
     if (pm === 'story') setStoryBand(nextUnclearedBand(game.id));
+    /* Story and arcade land on the pre-game screen too, because both need a
+       choice made before the board exists: which rung, or which band. Only a
+       game with NO play modes at all (the head-to-head cards) mounts straight
+       into play, which is exactly how classics behaved before #176. */
+    if (pm === 'story' || pm === 'arcade') {
+      setCurrentGame(game);
+      setWinData(null);
+      setLoseData(null);
+      setScreen('pregame');
+      if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
+      return;
+    }
     if (pm !== 'daily') {
       setCurrentGame(game);
       setStepCount(0);
@@ -505,8 +536,19 @@ function App() {
 
   // Claim (or resume) the day's single attempt and mount the game. Extracted
   // from launchGame so the pre-game screen's Play button owns consume-on-start.
-  const startDailyRun = async (game) => {
+  const startRun = async (game) => {
     allowProgressSave(game.id); // claiming/resuming a run lifts the finish guard
+    /* #176 — only the DAILY consumes anything. Story and arcade have no
+       once-a-day claim to make, so they mount straight away; the pre-game
+       screen was there to pick a band, not to gate an attempt. */
+    if (playMode === 'story' || playMode === 'arcade') {
+      setCurrentGame(game);
+      setStepCount(0);
+      setWinData(null);
+      setLoseData(null);
+      setScreen('game');
+      return;
+    }
     // Guest mode (phase 8): a signed-out visitor plays today's board from the
     // public seed with NO server claim — the one-play lock is account-keyed
     // and can't apply to guests (§6.7's structural defense: the board only
@@ -604,7 +646,7 @@ function App() {
     // claims/mounts immediately — used by proposal tests that assert on
     // in-game UI, and by "jump straight in" share links.
     if (params.get('play') === '1') {
-      if (g.daily) { startDailyRun(g); return; }
+      if (g.daily) { startRun(g); return; }
       launchGame(g);
       setHowToGame(null); // suppress the classic first-open auto-show too
       return;
@@ -1243,7 +1285,7 @@ function App() {
      Mounts the SAME component with the SAME dailyRng seed (so it is genuinely
      today's puzzle, not a random one) and a bumped resetKey, but with
      practiceMode on: handleWin/handleLose bail out before any endpoint, and no
-     /start claim happens because we never call startDailyRun. */
+     /start claim happens because we never call startRun. */
   const startPractice = (game) => {
     if (!game) return;
     setCurrentGame(game);
@@ -1943,7 +1985,14 @@ function App() {
             nextResetUtc={nextResetUtc}
             offset={offset}
             onReset={onReset}
-            onPlay={() => startDailyRun(currentGame)}
+            onPlay={() => startRun(currentGame)}
+            playMode={playMode}
+            storyProgress={storyProgress}
+            storyBand={storyBand}
+            onStoryBand={setStoryBand}
+            arcadeBandId={arcadeBandId}
+            onArcadeBand={setArcadeBandId}
+            arcadeBest={arcadeBest}
             onHowTo={() => setHowToGame(currentGame)}
             onChat={authOk ? () => setChatGame(currentGame) : undefined}
           />

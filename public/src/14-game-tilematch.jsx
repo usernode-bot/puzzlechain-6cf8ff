@@ -189,9 +189,23 @@ function TileMatchLeaderboard({ user }) {
 }
 
 
-function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
-  const [phase, setPhase] = useState('select'); // 'select' | 'playing' | 'levelWon'
-  const [selectedLevel, setSelectedLevel] = useState(1);
+function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offset }) {
+  /* #176 — this game already had the largest ladder in the app (1000 levels
+     across 10 named tiers) and it FORGOT all of it: completions lived in
+     component state, so leaving the game wiped them. Story mode maps the ten
+     tiers onto ten persisted bands, so the ladder finally survives.
+
+     Band i starts at the first level of tier i. The levels inside a tier are
+     still the content you play; the band is what gets ticked off. */
+  const storyLevel = playMode === 'story'
+    ? Math.min(1000, Math.max(0, band || 0) * 100 + 1)
+    : null;
+  const arcadeLevel = playMode === 'arcade'
+    ? [120, 480, 860][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))] || 480
+    : null;
+  const forcedLevel = storyLevel != null ? storyLevel : arcadeLevel;
+  const [phase, setPhase] = useState(forcedLevel != null ? 'playing' : 'select');
+  const [selectedLevel, setSelectedLevel] = useState(forcedLevel != null ? forcedLevel : 1);
   const [tierPage, setTierPage] = useState(null); // null = overview, 0-9 = tier index
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
@@ -253,9 +267,26 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
     levelStartSecsRef.current = 0;
   }, [resetKey]);
 
+  // A forced level (story band / arcade difficulty) skips the picker entirely:
+  // the choice was already made on the pre-game screen.
+  const bootedRef = useRef(false);
+  useEffect(() => {
+    if (forcedLevel != null && !bootedRef.current) {
+      bootedRef.current = true;
+      startLevel(forcedLevel);
+    }
+  }, [forcedLevel]);
+
   const startLevel = (lvl) => {
     const cfg = tmGetLevelConfig(lvl);
-    const newTiles = tmGenerateLevel(cfg, lvl * 17 + 3);
+    /* Story keeps the level's fixed seed so a band is the SAME board every
+       time you come back to it — a rung you can retry, not a reroll. Arcade
+       rolls a fresh one, which is the whole difference between the two modes
+       on a shared generator. */
+    const seed = playMode === 'arcade'
+      ? (Math.floor(Math.random() * 4294967295) >>> 0)
+      : lvl * 17 + 3;
+    const newTiles = tmGenerateLevel(cfg, seed);
     const ls = Math.min(50 + Math.floor((lvl - 1) / 10) * 2, 200);
     const limit = tmLevelTimeLimit(lvl, cfg);
     setSelectedLevel(lvl);

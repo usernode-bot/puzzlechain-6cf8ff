@@ -850,20 +850,39 @@ function mjHasMove(faces, removed, layout, freeSet) {
   return !!mjFindPair(faces, removed, layout, freeSet);
 }
 
-function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* #176 — the cheapest story ladder in the app: MJ_LAYOUTS is ALREADY
+     ordered by a measured boosterless solver win rate (Courtyard 35.8% down
+     to Bridge 27.3%), so "play them in order" is a real difficulty
+     progression with no new content and no rating work. Band index is the
+     layout index. Arcade maps its three difficulties onto the same ordering
+     rather than inventing a second scale. */
+  const bandIdx = playMode === 'story'
+    ? Math.min(MJ_LAYOUTS.length - 1, Math.max(0, band || 0))
+    : playMode === 'arcade'
+      ? Math.round((Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band)) / 2) * (MJ_LAYOUTS.length - 1))
+      : null;
   const seedBase = useRef(null);
   if (seedBase.current == null) {
-    const srv = serverDailySeed('mahjongsol');
-    seedBase.current = srv != null ? srv : ((utcDayNum(offset) + hashStr('mahjongsol')) >>> 0);
+    if (playMode === 'story' || playMode === 'arcade') {
+      seedBase.current = modeSeed(playMode, 'mahjongsol', bandIdx, offset).seed >>> 0;
+    } else {
+      const srv = serverDailySeed('mahjongsol');
+      seedBase.current = srv != null ? srv : ((utcDayNum(offset) + hashStr('mahjongsol')) >>> 0);
+    }
   }
   // PHASE 8 — today's silhouette. Saved progress carries the layout name so a
   // resumed board is the one you left, even if the ladder is retuned later.
   const layout = useRef(null);
   if (!layout.current) {
-    const saved = savedProgress && savedProgress.dayNum === dayNum && savedProgress.layout
-      ? MJ_LAYOUTS.find(l => l.name === savedProgress.layout) : null;
-    layout.current = saved || mjLayoutForDay(dayNum);
+    if (bandIdx != null) {
+      layout.current = MJ_LAYOUTS[bandIdx];
+    } else {
+      const saved = savedProgress && savedProgress.dayNum === dayNum && savedProgress.layout
+        ? MJ_LAYOUTS.find(l => l.name === savedProgress.layout) : null;
+      layout.current = saved || mjLayoutForDay(dayNum);
+    }
   }
   const L = layout.current.pos;
 

@@ -8,6 +8,7 @@ const ZUMA_SHOT_SPEED = 300;
 const FROG_X = 150, FROG_Y = 218;
 const ZUMA_COLORS_ALL = ['#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
 
+const ZUMA_STORY_BANDS = 5;
 const ZUMA_PATH_S = [
   {x:28,y:32},{x:75,y:25},{x:135,y:22},{x:195,y:25},{x:250,y:34},
   {x:276,y:58},{x:278,y:100},{x:268,y:138},{x:245,y:162},
@@ -31,6 +32,22 @@ const ZUMA_PATH_L3 = [
   {x:26,y:300},{x:32,y:328},{x:52,y:350},{x:88,y:368},
   {x:125,y:377},{x:148,y:380},
 ];
+
+/* #176 — the three authored levels stay as the free-play run, and a
+   PARAMETRIC ladder sits beside them for story and arcade. The bottleneck here
+   was always paths (the path IS the level, and there are two), so the ladder
+   varies the things that actually change difficulty on a fixed track — ball
+   count, chain speed and colour count — and alternates the two paths so
+   consecutive rungs do not look identical. */
+function zumaLevelForBand(band, bandCount) {
+  const t = bandCount > 1 ? band / (bandCount - 1) : 0;
+  return {
+    path: band % 2 === 0 ? ZUMA_PATH_S : ZUMA_PATH_L3,
+    ballCount: Math.round(20 + 22 * t),
+    speed: Math.round(9 + 20 * t),
+    colors: t < 0.34 ? 4 : t < 0.75 ? 5 : 6,
+  };
+}
 
 const ZUMA_LEVELS = [
   { path: ZUMA_PATH_S,  ballCount: 20, speed: 9,  colors: 4 },
@@ -95,8 +112,21 @@ function zumaCheckMatches(chain, idx) {
   return runLen + extra;
 }
 
-function ZumaGame({ onWin, onStepChange, resetKey }) {
+function ZumaGame({ onWin, onStepChange, resetKey, playMode, band }) {
   const { useState, useEffect, useRef } = React;
+  /* One level, chosen by mode. Story plays exactly its band; arcade maps its
+     three difficulties onto the same ladder; free play keeps the original
+     three-level run untouched. */
+  const modeLevels = useRef(null);
+  if (!modeLevels.current) {
+    if (playMode === 'story') {
+      modeLevels.current = [zumaLevelForBand(Math.max(0, band || 0), ZUMA_STORY_BANDS)];
+    } else if (playMode === 'arcade') {
+      const i = Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band));
+      modeLevels.current = [zumaLevelForBand(Math.round((i / 2) * (ZUMA_STORY_BANDS - 1)), ZUMA_STORY_BANDS)];
+    }
+  }
+  const LEVELS = modeLevels.current || ZUMA_LEVELS;
   const [activeTab, setActiveTab] = useState('game');
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
@@ -133,7 +163,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
 
   function initLevel(lvlNum) {
-    const lvl = ZUMA_LEVELS[lvlNum - 1];
+    const lvl = LEVELS[Math.min(lvlNum, LEVELS.length) - 1];
     pathDataRef.current = zumaComputePathData(lvl.path);
     chainRef.current = zumaBuildChain(lvl.ballCount, lvl.colors);
     curColorRef.current = zumaRandColor(lvl.colors);
@@ -331,7 +361,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
 
       const chain = chainRef.current;
       const pd = pathDataRef.current;
-      const lv = ZUMA_LEVELS[levelRef.current - 1];
+      const lv = LEVELS[Math.min(levelRef.current, LEVELS.length) - 1];
 
       // Advance chain
       for (let i = 0; i < chain.length; i++) chain[i].dist += lv.speed * dt;
@@ -345,7 +375,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
       if (chain.length === 0 && !shotRef.current) {
         scoreRef.current += 500 * levelRef.current;
         setScore(scoreRef.current);
-        if (levelRef.current >= 3) { triggerEnd(true); drawFrame(); return; }
+        if (levelRef.current >= LEVELS.length) { triggerEnd(true); drawFrame(); return; }
         levelRef.current++;
         setLevel(levelRef.current);
         initLevel(levelRef.current);
@@ -455,7 +485,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   const shoot = () => {
     if (doneRef.current || shotRef.current) return;
     if (!startedRef.current) { startedRef.current = true; setStarted(true); }
-    const lv = ZUMA_LEVELS[levelRef.current - 1];
+    const lv = LEVELS[Math.min(levelRef.current, LEVELS.length) - 1];
     const angle = frogAngleRef.current;
     const fasterPower = activePowerupsRef.current.find(p => p.type === 'faster-shot');
     const currentSpeed = fasterPower ? ZUMA_SHOT_SPEED * Math.pow(1.4, fasterPower.stacks) : ZUMA_SHOT_SPEED;

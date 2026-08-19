@@ -673,8 +673,7 @@ body {
    Miss one of these and it gets crushed to zero height by the board. */
 .fit-col .status-bar, .fit-col .p6-hint,
 .fit-col .word-list,
-.fit-col .cw-hint-bar, .fit-col .p6-banner,
-.fit-col .tm-daylabel, .fit-col .ds-pad,
+.fit-col .p6-banner, .fit-col .ds-pad,
 /* PHASE 3 — Daily Cipher never opted into the fit column, so its 8-row board
    plus 3-row keyboard was CLIPPED by the fit shell's overflow:hidden rather
    than fitted; players lost sight of Enter on long words. Everything except the
@@ -1332,37 +1331,7 @@ ${emitTapHighlightRules()}
 }
 
 /* ---- Crypto Wordle ---- */
-.cw-hint-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  max-width: 460px;
-  margin: 0 auto 0.9rem;
-}
-.cw-hint-btn {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #fff;
-  background: ${C.gold};
-  border: none;
-  border-radius: 8px;
-  padding: 0.45rem 0.8rem;
-  cursor: pointer;
-  transition: filter 0.1s ease, opacity 0.1s ease;
-}
-.cw-hint-btn:hover:not(:disabled) { filter: brightness(1.08); }
-.cw-hint-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.cw-hint-balance {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.74rem;
-  color: ${C.muted};
-}
-.cw-hint-msg {
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: ${C.rose};
+
 }
 /* The guess grid is a canvas; the box stays the ONE flexible child inside the
    fit column (PHASE 3's rule) so the keyboard, clue and tracker keep their
@@ -2433,94 +2402,7 @@ ${emitTapHighlightRules()}
 .tm-canvas { border-radius: 8px; }
 /* Today's layout + difficulty band (slice 8), so the shape and the weekly
    curve are legible before the first tap. */
-.tm-daylabel {
-  flex: 0 0 auto; text-align: center; color: ${C.muted};
-  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
-  letter-spacing: 0.08em; text-transform: uppercase;
-}
-.tm-wrap.fit-col .tm-bar, .tm-wrap.fit-col .tm-bar-label,
-.tm-wrap.fit-col .tm-boosters, .tm-wrap.fit-col .hint-bar { flex: 0 0 auto; }
-.tm-bar {
-  display: flex;
-  gap: 5px;
-  justify-content: center;
-  margin: 1rem auto 0;
-  max-width: 360px;
-  padding: 0.5rem;
-  background: ${C.surface};
-  border: 1px solid ${C.border};
-  border-radius: 12px;
-  transition: border-color 0.2s;
-}
-.tm-bar.bar-full { animation: tm-bar-flash 0.4s ease; border-color: ${C.rose}; }
-@keyframes tm-bar-flash {
-  0%, 100% { border-color: ${C.rose}; }
-  50%  { border-color: ${C.rose}; box-shadow: 0 0 12px ${ca('rose','66')}; }
-}
-.tm-slot {
-  width: 44px;
-  height: 44px;
-  border: 2px dashed ${C.dim};
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  transition: border-color 0.15s, background 0.15s;
-  flex-shrink: 0;
-}
-.tm-slot.filled { border-style: solid; border-color: ${ca('accent','33')}; background: ${C.card}; }
-.tm-slot.clear-target {
-  cursor: pointer;
-  border-color: ${C.rose};
-  background: ${ca('rose','1a')};
-  animation: tm-slot-pulse 0.7s ease infinite alternate;
-}
-.tm-slot.clear-target:hover { background: ${ca('rose','33')}; }
-@keyframes tm-slot-pulse {
-  from { box-shadow: 0 0 0 0 ${ca('rose','44')}; }
-  to   { box-shadow: 0 0 0 4px ${ca('rose','00')}; }
-}
-.tm-bar-label {
-  text-align: center;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: ${C.muted};
-  margin-top: 0.3rem;
-}
-.tm-bar-label.full { color: ${C.rose}; font-weight: 600; }
-.tm-boosters {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 360px;
-  margin: 0.7rem auto 0;
-}
-.tm-booster-btn {
-  flex: 1;
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  color: ${C.text};
-  border-radius: 10px;
-  padding: 0.45rem 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 500;
-  transition: border-color 0.12s, background 0.12s;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-}
-.tm-booster-btn:hover:not(:disabled) { border-color: ${C.accent}; background: ${ca('accent','10')}; }
-.tm-booster-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.tm-booster-btn.active { border-color: ${C.rose}; background: ${ca('rose','15')}; }
-.tm-booster-icon { font-size: 1rem; }
-.tm-booster-count {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.6rem;
-  color: ${C.muted};
+
 }
 .tm-level-select { max-width: 400px; margin: 0 auto; }
 .tm-level-select h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.2rem; }
@@ -2635,10 +2517,6 @@ ${emitTapHighlightRules()}
 }
 .tm-end-btn:hover { border-color: ${C.accent}; }
 /* Timer pill */
-.tm-timer-pill {
-  transition: background 0.3s, color 0.3s;
-}
-.tm-timer-pill.warning {
   background: ${ca('rose','22')} !important;
   color: ${C.rose} !important;
   animation: tm-timer-pulse 0.9s ease infinite alternate;
@@ -3208,7 +3086,6 @@ ${emitTapHighlightRules()}
      actually gets that everywhere, including the two animations this phase
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
-  .tm-bar.bar-full,
   .cnl-roll-btn, .gm-mode-btn {
     animation: none !important;
     transition: none !important;
@@ -6506,22 +6383,8 @@ async function dappAnchor(session) {
 // is retired) but capped per day and counted server-side. Behaviour-free: the
 // parent owns the hint state and passes a `buy` handler (kept identical across
 // all four daily games so the control looks and feels the same everywhere).
-function HintBar({ hintsLeft, exhausted, buying, onBuy, msg, label }) {
-  return (
-    <div className="cw-hint-bar">
-      <button
-        className="cw-hint-btn"
-        onClick={onBuy}
-        disabled={buying || exhausted}
-      >
-        {exhausted
-          ? `💡 ${label || 'No more hints'}`
-          : <>💡 Hint{Number.isFinite(hintsLeft) ? ` · ${hintsLeft} left` : ''}</>}
-      </button>
-      {msg && <span className="cw-hint-msg">{msg}</span>}
-    </div>
-  );
-}
+/* HintBar retired (controls wave) — hint buttons draw on each game
+   frame via the cui kit; useDailyHints below is unchanged. */
 
 // Shared hint state hook for the daily games that use a generic "reveal"
 // (Sudoku cell, Word Hunt start, Tile Match nudge). Reads today's
@@ -13710,7 +13573,14 @@ function tmDrawTile(ctx, geo, x, y, tt, o) {
    without it the canvas takes its natural height and the shell scrolls
    (classic). Tap dispatch goes through the parent's own selectTile, which
    keeps every rule/guard where it always lived. */
-function TmBoardCanvas({ tiles, hintTileId, fitH, disabled, onTile }) {
+/* The one Tile Match FRAME (controls wave): pills, day label, the tile
+   board, the 7-slot tray, its label, the booster row and the optional hint
+   bar all draw on ONE canvas, shared verbatim by the classic and daily
+   games. `fitH` fits the board region to the leftover box height (daily);
+   classic mode takes the board's natural height. */
+function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onTile,
+                         bar, tilesMap, barFull, clearSlotMode, onClearSlotTile,
+                         boosterBtns, hintBtn }) {
   const canvasRef = useRef(null);
   const boxRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 8, rows: 6 });
@@ -13718,29 +13588,115 @@ function TmBoardCanvas({ tiles, hintTileId, fitH, disabled, onTile }) {
   const H0 = Math.floor(boxH);
   const boardTiles = tiles.filter((t) => !t.removed && !t.inBar);
   const ordered = tmPaintOrder(boardTiles);
-  const geo = W > 60 && (!fitH || H0 > 60) && boardTiles.length
-    ? tmGeom(W, fitH ? H0 : 1e9, boardTiles, fitH) : null;
-  const H = fitH ? H0 : (geo ? geo.bh + 4 : 120);
+
+  const GAP = 8, PILL_H = 46, DAY_H = dayLabel ? 18 : 0, TRAY_H = 50, BARL_H = 16, BOOST_H = 54;
+  const HINT_H = hintBtn ? 36 : 0;
+  const chrome = PILL_H + GAP + (DAY_H ? DAY_H + GAP : 0) + GAP + TRAY_H + 4 + BARL_H + GAP + BOOST_H + (HINT_H ? GAP + HINT_H : 0);
+  const boardAvail = fitH ? Math.max(80, H0 - chrome) : 1e9;
+  const geo = W > 60 && boardTiles.length
+    ? tmGeom(W, boardAvail, boardTiles, fitH) : null;
+  const boardH = fitH ? Math.max(80, H0 - chrome) : (geo ? geo.bh + 4 : 120);
+  const H = chrome + boardH;
+  const boardY = PILL_H + GAP + (DAY_H ? DAY_H + GAP : 0);
+  const trayY = boardY + boardH + GAP;
+  const barlY = trayY + TRAY_H + 4;
+  const boostY = barlY + BARL_H + GAP;
+  const hintY = boostY + BOOST_H + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, pills.length);
+    pills.forEach((p, i) => controls.push({
+      id: 'p' + i, kind: 'pill', r: pr[i], label: p.label, value: p.value,
+      gold: p.gold, color: p.warn ? PAL.rose : undefined,
+    }));
+    if (dayLabel) controls.push({ id: 'day', kind: 'label', r: [0, PILL_H + GAP, W, DAY_H], label: dayLabel, font: 11 });
+    controls.push({
+      id: 'barl', kind: 'label', r: [0, barlY, W, BARL_H],
+      label: barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`,
+      font: 11, color: barFull ? PAL.rose : undefined,
+    });
+    // Tray slots become controls only in clear mode (tap removes that tile).
+    const slotW = 44, slotGap = 6;
+    const tx0 = Math.floor((W - slotW * 7 - slotGap * 6) / 2);
+    if (clearSlotMode) {
+      for (let i = 0; i < 7; i++) {
+        const tid = bar[i];
+        if (tid == null) continue;
+        controls.push({
+          id: 'slot' + i, kind: 'button', noDraw: true,
+          r: [tx0 + i * (slotW + slotGap), trayY, slotW, TRAY_H],
+          label: 'Remove tray tile ' + (i + 1),
+          action: () => onClearSlotTile(tid),
+        });
+      }
+    }
+    const br = cuiRow(Math.floor(W * 0.02), boostY, Math.floor(W * 0.96), BOOST_H, boosterBtns.length);
+    boosterBtns.forEach((b, i) => controls.push({
+      id: b.id, kind: 'button', r: br[i],
+      label: `${b.icon} ${b.label}`, sub: b.count != null ? `${b.count} left` : b.sub,
+      disabled: b.disabled, on: b.active, action: b.action, font: 13,
+    }));
+    if (hintBtn) {
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hintBtn.msg ? 0 : Math.floor(W * 0.2), hintY, hintBtn.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: hintBtn.label, disabled: hintBtn.disabled, action: hintBtn.action,
+      });
+      if (hintBtn.msg) controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hintBtn.msg, font: 11 });
+    }
+  }
+  const ctlRef = useRef([]); ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
   const geoRef = useRef(null); geoRef.current = geo;
   const ordRef = useRef(null); ordRef.current = ordered;
-  const stRef = useRef(null); stRef.current = { tiles, hintTileId, disabled };
+  const stRef = useRef(null); stRef.current = { tiles, hintTileId, disabled, boardY };
 
-  usePointerCell(canvasRef, {
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (pt) => {
       const g = geoRef.current, s = stRef.current;
       if (!g || s.disabled) return;
-      const t = tmHitAt(g, ordRef.current, pt.x, pt.y);
+      const t = tmHitAt(g, ordRef.current, pt.x, pt.y - s.boardY);
       if (t) onTile(t.id);
     },
-  }, { moveTolerance: 10 });
+  }), { moveTolerance: 10 });
 
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [tiles, hintTileId, W, H],
+    deps: [tiles, hintTileId, W, H, pills, barFull, clearSlotMode, pressedId, bar],
     draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Tray slots.
+      {
+        const slotW = 44, slotGap = 6;
+        const tx0 = Math.floor((W - slotW * 7 - slotGap * 6) / 2);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let i = 0; i < 7; i++) {
+          const x = tx0 + i * (slotW + slotGap);
+          const tid = bar[i];
+          const t = tid != null ? tilesMap[tid] : null;
+          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
+          const isClear = clearSlotMode && t != null;
+          klRR(ctx, x, trayY, slotW, TRAY_H, 8);
+          ctx.fillStyle = t ? PAL.card : PAL.surface;
+          ctx.fill();
+          ctx.lineWidth = isClear ? 2 : 1;
+          ctx.strokeStyle = isClear ? PAL.rose : (barFull ? PAL.rose : PAL.border);
+          ctx.stroke();
+          if (tt) {
+            ctx.font = `${Math.round(slotW * 0.6)}px system-ui, sans-serif`;
+            ctx.fillText(tt.icon, x + slotW / 2, trayY + TRAY_H / 2 + 1);
+          }
+        }
+      }
+      // Board.
       const g = geoRef.current;
       if (!g) return;
+      ctx.save();
+      ctx.translate(0, stRef.current.boardY);
       for (const t of ordRef.current) {
         const [x, y] = g.at(t);
         tmDrawTile(ctx, g, x, y, TM_TILE_TYPES[t.type % TM_TILE_TYPES.length], {
@@ -13748,17 +13704,19 @@ function TmBoardCanvas({ tiles, hintTileId, fitH, disabled, onTile }) {
           hint: stRef.current.hintTileId === t.id,
         });
       }
+      ctx.restore();
     },
   });
 
   return (
-    <div className={'tm-board-box' + (fitH ? ' tm-board-fit' : '')} ref={boxRef}>
+    <div className={'tm-board-box cui-frame' + (fitH ? ' tm-board-fit' : '')} ref={boxRef}>
       <canvas
         ref={canvasRef}
         className="tm-canvas board-canvas"
         role="img"
-        aria-label={`Tile board — ${boardTiles.length} tiles left`}
+        aria-label={`Tile board — ${boardTiles.length} tiles left, ${bar.length} of 7 tray slots used`}
       />
+      <CuiTwin controls={controls} />
     </div>
   );
 }
@@ -14193,76 +14151,28 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey }) {
 
   return (
     <div className="tm-wrap">
-      <div className="status-bar">
-        <div className={`pill tm-timer-pill${timeLow ? ' warning' : ''}`}>
-          <div className="plabel">Time</div>
-          <div className="pvalue">{tmFmtSecs(timeRemaining === Infinity ? 0 : timeRemaining)}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Moves</div>
-          <div className="pvalue">{moves}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Tiles Left</div>
-          <div className="pvalue">{tilesLeft}</div>
-        </div>
-      </div>
-
-      <TmBoardCanvas tiles={tiles} fitH={false} disabled={done} onTile={selectTile} />
-
-      <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
-        {Array.from({ length: 7 }, (_, i) => {
-          const tid = bar[i];
-          const t = tid != null ? tilesMap[tid] : null;
-          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
-          const isClear = clearSlotMode && t != null;
-          return (
-            <div
-              key={i}
-              className={`tm-slot${t ? ' filled' : ''}${isClear ? ' clear-target' : ''}`}
-              onClick={isClear ? () => clearSlotTile(tid) : undefined}
-            >
-              {tt ? tt.icon : ''}
-            </div>
-          );
-        })}
-      </div>
-      <div className={`tm-bar-label${barFull ? ' full' : ''}`}>
-        {barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`}
-      </div>
-
-      <div className="tm-boosters">
-        <button
-          className="tm-booster-btn"
-          disabled={boosters.undo <= 0 || !lastBarEntry}
-          onClick={doUndo}
-          title="Return last tile to board"
-        >
-          <span className="tm-booster-icon">↩</span>
-          <span>Undo</span>
-          <span className="tm-booster-count">{boosters.undo} left</span>
-        </button>
-        <button
-          className="tm-booster-btn"
-          disabled={boosters.shuffle <= 0}
-          onClick={doShuffle}
-          title="Shuffle board tiles"
-        >
-          <span className="tm-booster-icon">🔀</span>
-          <span>Shuffle</span>
-          <span className="tm-booster-count">{boosters.shuffle} left</span>
-        </button>
-        <button
-          className={`tm-booster-btn${clearSlotMode ? ' active' : ''}`}
-          disabled={boosters.clear <= 0 || bar.length === 0}
-          onClick={clearSlotMode ? () => setClearSlotMode(false) : doClearMode}
-          title="Remove a tile from bar"
-        >
-          <span className="tm-booster-icon">✕</span>
-          <span>{clearSlotMode ? 'Cancel' : 'Clear'}</span>
-          <span className="tm-booster-count">{boosters.clear} left</span>
-        </button>
-      </div>
+      <TmFrameCanvas
+        pills={[
+          { label: 'Time', value: tmFmtSecs(timeRemaining === Infinity ? 0 : timeRemaining), warn: timeLow },
+          { label: 'Moves', value: moves },
+          { label: 'Tiles Left', value: tilesLeft },
+        ]}
+        tiles={tiles}
+        fitH={false}
+        disabled={done}
+        onTile={selectTile}
+        bar={bar}
+        tilesMap={tilesMap}
+        barFull={barFull}
+        clearSlotMode={clearSlotMode}
+        onClearSlotTile={clearSlotTile}
+        boosterBtns={[
+          { id: 'undo', icon: '\u21a9', label: 'Undo', count: boosters.undo, disabled: boosters.undo <= 0 || !lastBarEntry, action: doUndo },
+          { id: 'shuffle', icon: '\ud83d\udd00', label: 'Shuffle', count: boosters.shuffle, disabled: boosters.shuffle <= 0, action: doShuffle },
+          { id: 'clear', icon: '\u2715', label: clearSlotMode ? 'Cancel' : 'Clear', count: boosters.clear, disabled: boosters.clear <= 0 || bar.length === 0, active: clearSlotMode, action: clearSlotMode ? () => setClearSlotMode(false) : doClearMode },
+        ]}
+        hintBtn={null}
+      />
     </div>
   );
 }
@@ -14880,79 +14790,37 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
 
   return (
     <div className="tm-wrap fit-col">
-      <div className="status-bar">
-        <div className={`pill tm-timer-pill${timeLow ? ' warning' : ''}`}>
-          <div className="plabel">Time</div>
-          <div className="pvalue">{tmFmtSecs(remaining)}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Moves</div>
-          <div className="pvalue">{moves}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Tiles Left</div>
-          <div className="pvalue">{boardTiles.length}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Free</div>
-          <div className="pvalue">{freeCount}</div>
-        </div>
-      </div>
-      <div className="tm-daylabel">
-        {dayCfg.layout.name} · {dayCfg.difficulty}
-      </div>
-
-      <TmBoardCanvas tiles={tiles} hintTileId={hintTileId} fitH disabled={done} onTile={selectTile} />
-
-      <div className={`tm-bar${barFull ? ' bar-full' : ''}`}>
-        {Array.from({ length: 7 }, (_, i) => {
-          const tid = bar[i];
-          const t = tid != null ? tilesMap[tid] : null;
-          const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
-          const isClear = clearSlotMode && t != null;
-          return (
-            <div
-              key={i}
-              className={`tm-slot${t ? ' filled' : ''}${isClear ? ' clear-target' : ''}`}
-              onClick={isClear ? () => clearSlotTile(tid) : undefined}
-            >
-              {tt ? tt.icon : ''}
-            </div>
-          );
-        })}
-      </div>
-      <div className={`tm-bar-label${barFull ? ' full' : ''}`}>
-        {barFull ? '⚠ Bar Full! Use a booster.' : `${bar.length}/7 slots used`}
-      </div>
-
-      <div className="tm-boosters">
-        <button className="tm-booster-btn" disabled={boosters.undo <= 0 || !lastBarEntry} onClick={doUndo} title="Return last tile to board">
-          <span className="tm-booster-icon">↩</span>
-          <span>Undo</span>
-          <span className="tm-booster-count">{boosters.undo} left</span>
-        </button>
-        <button className="tm-booster-btn" disabled={boosters.shuffle <= 0} onClick={doShuffle} title="Shuffle board tiles">
-          <span className="tm-booster-icon">🔀</span>
-          <span>Shuffle</span>
-          <span className="tm-booster-count">{boosters.shuffle} left</span>
-        </button>
-        <button className={`tm-booster-btn${clearSlotMode ? ' active' : ''}`} disabled={boosters.clear <= 0 || bar.length === 0} onClick={clearSlotMode ? () => setClearSlotMode(false) : doClearMode} title="Remove a tile from bar">
-          <span className="tm-booster-icon">✕</span>
-          <span>{clearSlotMode ? 'Cancel' : 'Clear'}</span>
-          <span className="tm-booster-count">{boosters.clear} left</span>
-        </button>
-      </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={tmHints.hintsLeft}
-          exhausted={tmHints.exhausted || boardTiles.length === 0}
-          buying={tmHints.buying}
-          onBuy={buyTmHint}
-          msg={tmHints.msg}
-          label="No more hints"
-        />
-      )}
+      <TmFrameCanvas
+        pills={[
+          { label: 'Time', value: tmFmtSecs(remaining), warn: timeLow },
+          { label: 'Moves', value: moves },
+          { label: 'Tiles Left', value: boardTiles.length },
+          { label: 'Free', value: freeCount },
+        ]}
+        dayLabel={`${dayCfg.layout.name} · ${dayCfg.difficulty}`}
+        tiles={tiles}
+        hintTileId={hintTileId}
+        fitH
+        disabled={done}
+        onTile={selectTile}
+        bar={bar}
+        tilesMap={tilesMap}
+        barFull={barFull}
+        clearSlotMode={clearSlotMode}
+        onClearSlotTile={clearSlotTile}
+        boosterBtns={[
+          { id: 'undo', icon: '↩', label: 'Undo', count: boosters.undo, disabled: boosters.undo <= 0 || !lastBarEntry, action: doUndo },
+          { id: 'shuffle', icon: '🔀', label: 'Shuffle', count: boosters.shuffle, disabled: boosters.shuffle <= 0, action: doShuffle },
+          { id: 'clear', icon: '✕', label: clearSlotMode ? 'Cancel' : 'Clear', count: boosters.clear, disabled: boosters.clear <= 0 || bar.length === 0, active: clearSlotMode, action: clearSlotMode ? () => setClearSlotMode(false) : doClearMode },
+        ]}
+        hintBtn={done ? null : {
+          label: (tmHints.exhausted || boardTiles.length === 0) ? '💡 No more hints'
+            : `💡 Hint${Number.isFinite(tmHints.hintsLeft) ? ` · ${tmHints.hintsLeft} left` : ''}`,
+          disabled: tmHints.buying || tmHints.exhausted || boardTiles.length === 0,
+          action: buyTmHint,
+          msg: tmHints.msg,
+        }}
+      />
     </div>
   );
 }

@@ -1990,17 +1990,56 @@ const AN_POOL_5 = ['APPLE', 'BEACH', 'CANDY', 'DANCE', 'EAGLE', 'FLAME', 'GRAPE'
 const AN_POOL_6 = ['ANCHOR', 'BASKET', 'CAMERA', 'DRAGON', 'FOREST', 'GARDEN', 'HAMMER', 'ISLAND', 'JUNGLE', 'KERNEL', 'LEGEND', 'MARBLE', 'NECTAR', 'ORCHID', 'PLANET', 'RIDDLE', 'SILVER', 'TEMPLE', 'VELVET', 'WINTER', 'WIZARD', 'YELLOW', 'BREEZE', 'CASTLE', 'FALCON'];
 const AN_POOL_7 = ['ANTIQUE', 'BALLOON', 'CAPTAIN', 'DOLPHIN', 'EMERALD', 'FORTUNE', 'GRANITE', 'HARVEST', 'IMAGINE', 'JOURNEY', 'KINGDOM', 'LIBRARY', 'MACHINE', 'NETWORK', 'OCTOPUS', 'PYRAMID', 'RAINBOW', 'SUNRISE', 'THUNDER', 'VILLAGE', 'WHISPER', 'CRYSTAL', 'LANTERN', 'PENGUIN', 'MONSOON'];
 
-function anPickWords(rng) {
-  const pick = (pool) => pool[Math.floor(rng() * pool.length)];
+/* #176 — the three curated pools above are 75 words in total, i.e. about
+   twelve days of non-overlapping play, which is why this game repeated itself
+   so quickly. Word Sprint already ships a 3,477-word dictionary in the same
+   bundle, so Anagram Sprint borrows it rather than growing a second list: one
+   vocabulary, two games.
+
+   The curated pools are KEPT as a preferred head. They are hand-picked to be
+   pleasant to unscramble (no awkward letter runs), so drawing from them first
+   and falling back to the dictionary gives breadth without losing the feel.
+
+   Built lazily because WSPR_WORDS_RAW is declared in a later file: everything
+   here runs at render time, long after every file has evaluated. */
+const _anPoolCache = {};
+function anPoolFor(len) {
+  if (_anPoolCache[len]) return _anPoolCache[len];
+  const curated = len === 5 ? AN_POOL_5 : len === 6 ? AN_POOL_6 : len === 7 ? AN_POOL_7 : [];
+  let extra = [];
+  try {
+    extra = WSPR_WORDS_RAW.split(/\s+/)
+      .map(w => w.replace(/[^a-z]/g, '').toUpperCase())
+      .filter(w => w.length === len);
+  } catch (e) { extra = []; }
+  const seen = new Set(curated);
+  _anPoolCache[len] = curated.concat(extra.filter(w => !seen.has(w) && (seen.add(w), true)));
+  return _anPoolCache[len];
+}
+
+/* Word length mix per band — the ladder is length plus count, which is what
+   actually makes an anagram harder. Band 0 is five short words; the top band
+   is seven, weighted long. */
+const AN_BANDS = [
+  [4, 4, 5, 5, 5],
+  [5, 5, 5, 6, 6],
+  [5, 5, 6, 6, 7],
+  [5, 6, 6, 7, 7],
+  [6, 6, 7, 7, 7],
+];
+
+function anPickWords(rng, bandIdx) {
+  const lens = AN_BANDS[Math.min(AN_BANDS.length - 1, Math.max(0, bandIdx == null ? 2 : bandIdx))];
   const words = [];
   const used = new Set();
-  const take = (pool) => {
-    let w = pick(pool);
-    for (let g = 0; g < 20 && used.has(w); g++) w = pick(pool);
+  for (const len of lens) {
+    const pool = anPoolFor(len);
+    if (!pool.length) continue;
+    let w = pool[Math.floor(rng() * pool.length)];
+    for (let g = 0; g < 30 && used.has(w); g++) w = pool[Math.floor(rng() * pool.length)];
     used.add(w);
     words.push(w);
-  };
-  take(AN_POOL_5); take(AN_POOL_5); take(AN_POOL_6); take(AN_POOL_6); take(AN_POOL_7);
+  }
   return words;
 }
 
@@ -2015,12 +2054,18 @@ function anScramble(word, rng) {
   return rot.map((ch) => ({ ch, used: false }));
 }
 
-function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  const anBand = playMode === 'story' ? Math.max(0, band || 0)
+    : playMode === 'arcade'
+      ? [0, 2, 4][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      : 2;
   const deal = useRef(null);
   if (!deal.current) {
-    const rng = dailyRng(offset, 'anagrams');
-    const words = anPickWords(rng);
+    const { rng } = playMode === 'story' || playMode === 'arcade'
+      ? modeSeed(playMode, 'anagrams', anBand, offset)
+      : { rng: dailyRng(offset, 'anagrams') };
+    const words = anPickWords(rng, anBand);
     deal.current = { words, tiles: words.map((w) => anScramble(w, rng)) };
   }
   const { words, tiles } = deal.current;

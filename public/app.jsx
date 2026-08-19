@@ -681,7 +681,7 @@ body {
    growing lists get their own scroll strip below. */
 .fit-col .wspr-found, .fit-col .an-solved,
 .fit-col .dsnk-hint, .fit-col .dbnc-effects,
-.fit-col .mj-controls, .fit-col .kl-note { flex: 0 0 auto; }
+
 /* Growing lists must never push the board off screen (#131, #130). */
 .fit-col .wspr-found, .fit-col .an-solved, .fit-col .word-list {
   max-height: 5.2rem; overflow-y: auto; overscroll-behavior: contain;
@@ -3536,27 +3536,12 @@ ${emitTapHighlightRules()}
   background: transparent; border: 1px solid ${C.rose}; border-radius: 12px;
   color: ${C.rose}; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
 }
-/* PHASE 8 — Mahjong controls (undo / hint / shuffle) + Daily Bounce effects. */
-.mj-controls {
-  display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
-}
-.mj-controls button {
-  min-height: 44px; min-width: 84px; padding: 0 0.8rem; border-radius: 12px;
-  background: ${C.card}; border: 1.5px solid ${C.border}; color: ${C.text};
-  font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.mj-controls button:active { transform: scale(0.98); }
-.mj-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
-.mj-warn { color: ${C.rose}; font-size: 0.82rem; font-weight: 600; text-align: center; }
 .dbnc-effects { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
 .dbnc-effect {
   font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.5rem;
   border-radius: 999px; background: ${ca('gold', '22')}; color: ${C.gold};
   text-transform: capitalize;
 }
-.kl-note {
-  text-align: center; font-size: 0.8rem; font-weight: 600; color: ${C.rose};
   min-height: 1.1rem;
 }
 /* PHASE 4 — practice replay ribbon (#133). */
@@ -6121,6 +6106,19 @@ function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
       h.onContext(p, e);
     } : undefined,
   };
+}
+
+// Shift a board's pointer handlers below the frame's top bands: the handlers
+// keep their own coordinate space (verbatim code), the frame subtracts its
+// band height once here. topRef.current = the board region's y offset.
+function cuiShiftHandlers(h, topRef) {
+  const out = {};
+  for (const k of Object.keys(h)) {
+    const fn = h[k];
+    if (typeof fn !== 'function') continue;
+    out[k] = (pt, a, b) => fn({ x: pt.x, y: pt.y - (topRef.current || 0) }, a, b);
+  }
+  return out;
 }
 
 // The accessibility twin: real buttons and live text, visually clipped. One
@@ -20317,16 +20315,39 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     });
   };
 
-  /* #170 — canvas plumbing. The box is the fit column's flexible region;
-     useFitBox re-measures it on resize/rotate and the layout is recomputed
-     from the CURRENT state each render, so the fan tightens as columns grow. */
+  /* #170 — canvas plumbing, now the whole FRAME (controls wave): pills, the
+     board, the refusal note and Give up draw on one canvas. The box is the
+     fit column's flexible region; useFitBox re-measures it on resize/rotate
+     and the board layout is recomputed from the CURRENT state each render,
+     so the fan tightens as columns grow. */
   const canvasRef = useRef(null);
   const boxRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 7, rows: 1 });
   const W = Math.floor(boxW), H = Math.floor(boxH);
-  const ly = W > 80 && H > 80 ? klLayout(W, H, st) : null;
+  const KL_GAP = 8, KL_PILL_H = 46, KL_NOTE_H = 18, KL_BTN_H = 36;
+  const klChrome = KL_PILL_H + KL_GAP + KL_GAP + KL_NOTE_H + 4 + KL_BTN_H + 4;
+  const klBoardY = KL_PILL_H + KL_GAP;
+  const boardH = Math.max(80, H - klChrome);
+  const ly = W > 80 && H > 80 ? klLayout(W, boardH, st) : null;
   const lyRef = useRef(ly);
   lyRef.current = ly;
+  const klTopRef = useRef(klBoardY);
+  klTopRef.current = klBoardY;
+
+  const home = st.found.reduce((a, f) => a + f.length, 0);
+  const klControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, KL_PILL_H, 3);
+    klControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    klControls.push({ id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: st.moves });
+    klControls.push({ id: 'p-home', kind: 'pill', r: pr[2], label: 'Home', value: `${home}/52` });
+    const noteY = klBoardY + boardH + KL_GAP;
+    if (note) klControls.push({ id: 'note', kind: 'label', r: [0, noteY, W, KL_NOTE_H], label: note, gold: true, font: 12 });
+    klControls.push({ id: 'giveup', kind: 'button', r: [Math.floor(W * 0.28), noteY + KL_NOTE_H + 4, Math.floor(W * 0.44), KL_BTN_H], label: '🏳️ Give up', disabled: done, action: () => giveUp() });
+  }
+  const klCtlRef = useRef([]);
+  klCtlRef.current = klControls;
+  const [klPressed, setKlPressed] = useState(null);
 
   /* #123 — drag, now hit-tested in board coordinates. A press on the waste,
      a foundation top or a face-up tableau card arms a potential drag; pointer
@@ -20360,7 +20381,7 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
     moveSelToTab(p, src);
   };
 
-  usePointerCell(canvasRef, {
+  usePointerCell(canvasRef, cuiWrapHandlers(klCtlRef, setKlPressed, cuiShiftHandlers({
     onDown: (pt) => {
       pendRef.current = null;
       if (dragRef.current) setDragBoth(null); // a cancelled drag left a ghost
@@ -20404,15 +20425,18 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
       else if (hit.z === 'found') tapFound(hit.p);
       else tapTab(hit.p, hit.i);
     },
-  }, { moveTolerance: 8 });
+  }, klTopRef)), { moveTolerance: 8 });
 
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [st, sel, drag, done, W, H, flipFrame],
+    deps: [st, sel, drag, done, W, H, flipFrame, fmt, note, klPressed],
     draw: (ctx) => {
+      cuiDrawControls(ctx, klCtlRef.current, klPressed);
       const l = lyRef.current;
       if (!l) return;
+      ctx.save();
+      ctx.translate(0, klTopRef.current);
       const dragSrc = drag && drag.src;
       const hideWaste = dragSrc && dragSrc.z === 'waste' ? 1 : 0;
       const hideFound = dragSrc && dragSrc.z === 'found' ? dragSrc.p : -1;
@@ -20477,18 +20501,13 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
         const dx = drag.x - drag.gx, dy = drag.y - drag.gy;
         drag.cards.forEach((c, i) => klDrawCard(ctx, l, dx, dy + i * l.upStep, c, { shadow: i === 0 }));
       }
+      ctx.restore();
     },
   });
 
-  const home = st.found.reduce((a, f) => a + f.length, 0);
   return (
     <div className="kl-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
-        <div className="pill"><div className="plabel">Home</div><div className="pvalue">{home}/52</div></div>
-      </div>
-      <div className="kl-board-box" ref={boxRef}>
+      <div className="kl-board-box cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="kl-canvas board-canvas"
@@ -20496,11 +20515,8 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
           aria-label={`Klondike board — ${home}/52 home, ${st.stock.length} in stock, ${st.moves} moves`}
         />
       </div>
-      <div className="kl-note">{note}</div>
+      <CuiTwin controls={klControls} />
       <div className="p6-hint">Drag a card (or tap it, then its destination). Tap a selected card again to send it home. Only a King starts an empty column.</div>
-      <div className="mj-controls">
-        <button onClick={() => giveUp()} disabled={done}>🏳️ Give up</button>
-      </div>
     </div>
   );
 }
@@ -20729,16 +20745,37 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
   const boxRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 10, rows: 1 });
   const W = Math.floor(boxW), H = Math.floor(boxH);
-  const ly = W > 80 && H > 80 ? spLayout(W, H, st) : null;
+  const SP_GAP = 8, SP_PILL_H = 46, SP_NOTE_H = 18, SP_BTN_H = 36;
+  const spChrome = SP_PILL_H + SP_GAP + SP_GAP + SP_NOTE_H + 4 + SP_BTN_H + 4;
+  const spBoardY = SP_PILL_H + SP_GAP;
+  const spBoardH = Math.max(80, H - spChrome);
+  const ly = W > 80 && H > 80 ? spLayout(W, spBoardH, st) : null;
   const lyRef = useRef(ly);
   lyRef.current = ly;
+  const spTopRef = useRef(spBoardY);
+  spTopRef.current = spBoardY;
+
+  const spControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, SP_PILL_H, 4);
+    spControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    spControls.push({ id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: st.moves });
+    spControls.push({ id: 'p-runs', kind: 'pill', r: pr[2], label: 'Runs', value: `${st.done8}/8` });
+    spControls.push({ id: 'deal', kind: 'button', r: pr[3], label: `Deal +10 (${Math.floor(st.stock.length / 10)})`, font: 12, primary: true, disabled: !st.stock.length, action: dealRow });
+    const noteY = spBoardY + spBoardH + SP_GAP;
+    if (note) spControls.push({ id: 'note', kind: 'label', r: [0, noteY, W, SP_NOTE_H], label: note, gold: true, font: 12 });
+    spControls.push({ id: 'giveup', kind: 'button', r: [Math.floor(W * 0.28), noteY + SP_NOTE_H + 4, Math.floor(W * 0.44), SP_BTN_H], label: '🏳️ Give up', disabled: done, action: giveUp });
+  }
+  const spCtlRef = useRef([]);
+  spCtlRef.current = spControls;
+  const [spPressed, setSpPressed] = useState(null);
 
   const [drag, setDrag] = useState(null); // { src:{p,i}, cards, x, y, gx, gy }
   const dragRef = useRef(null);
   const pendRef = useRef(null);
   const setDragBoth = (d) => { dragRef.current = d; setDrag(d); };
 
-  usePointerCell(canvasRef, {
+  usePointerCell(canvasRef, cuiWrapHandlers(spCtlRef, setSpPressed, cuiShiftHandlers({
     onDown: (pt) => {
       pendRef.current = null;
       if (dragRef.current) setDragBoth(null); // a cancelled drag left a ghost
@@ -20777,15 +20814,18 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
       if (!hit) { setSel(null); return; }
       tapCol(hit.p, hit.i);
     },
-  }, { moveTolerance: 8 });
+  }, spTopRef)), { moveTolerance: 8 });
 
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [st, sel, drag, done, W, H],
+    deps: [st, sel, drag, done, W, H, fmt, note, spPressed],
     draw: (ctx) => {
+      cuiDrawControls(ctx, spCtlRef.current, spPressed);
       const l = lyRef.current;
       if (!l) return;
+      ctx.save();
+      ctx.translate(0, spTopRef.current);
       const dragSrc = drag && drag.src;
       for (let p = 0; p < 10; p++) {
         const col = st.cols[p];
@@ -20801,20 +20841,13 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
         const dx = drag.x - drag.gx, dy = drag.y - drag.gy;
         drag.cards.forEach((c, i) => klDrawCard(ctx, l, dx, dy + i * l.upStep, c, { shadow: i === 0 }));
       }
+      ctx.restore();
     },
   });
 
   return (
     <div className="sp-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{st.moves}</div></div>
-        <div className="pill"><div className="plabel">Runs</div><div className="pvalue">{st.done8}/8</div></div>
-        <button className="p6-btn" onClick={dealRow} disabled={!st.stock.length}>
-          Deal +10 ({Math.floor(st.stock.length / 10)})
-        </button>
-      </div>
-      <div className="sp-board-box" ref={boxRef}>
+      <div className="sp-board-box cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="sp-canvas board-canvas"
@@ -20822,11 +20855,8 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
           aria-label={`Spider board — ${st.done8}/8 runs cleared, ${Math.floor(st.stock.length / 10)} deals left, ${st.moves} moves`}
         />
       </div>
-      <div className="kl-note">{note}</div>
+      <CuiTwin controls={spControls} />
       <div className="p6-hint">One suit: drag (or tap) any descending run. Build K→A to clear a run — 8 clears win.</div>
-      <div className="mj-controls">
-        <button onClick={giveUp} disabled={done}>🏳️ Give up</button>
-      </div>
     </div>
   );
 }
@@ -21153,15 +21183,23 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
   const freeSet = React.useMemo(() => mjFreeSet(removed, L), [removed, L]);
   const stuck = !done && remaining > 0 && !mjHasMove(faces, removed, L, freeSet);
 
-  // Canvas plumbing (#170 pattern). Paint order is fixed per layout.
+  // Canvas plumbing — the whole FRAME (controls wave): pills, banner/warn,
+  // board and the Undo/Hint/Shuffle row draw on one canvas.
   const canvasRef = useRef(null);
   const boxRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 9, rows: 5 });
   const W = Math.floor(boxW), H = Math.floor(boxH);
-  const geo = W > 80 && H > 80 ? mjGeom(W, H, L) : null;
+  const MJ_GAPY = 8, MJ_PILL_H = 46, MJ_MSG_H = 20, MJ_BTN_H = 44;
+  const showBanner = stuck && shuffles > 0;
+  const mjChrome = MJ_PILL_H + MJ_GAPY + (showBanner ? MJ_MSG_H + 4 : 0) + (warn ? MJ_MSG_H + 4 : 0) + MJ_GAPY + MJ_BTN_H + 4;
+  const mjBoardY = MJ_PILL_H + MJ_GAPY + (showBanner ? MJ_MSG_H + 4 : 0) + (warn ? MJ_MSG_H + 4 : 0);
+  const mjBoardH = Math.max(80, H - mjChrome);
+  const geo = W > 80 && H > 80 ? mjGeom(W, mjBoardH, L) : null;
   const geoRef = useRef(geo);
   geoRef.current = geo;
   const order = React.useMemo(() => mjPaintOrder(L), [L]);
+  const mjTopRef = useRef(mjBoardY);
+  mjTopRef.current = mjBoardY;
 
   // #120's blocked-tap feedback, canvas edition: a brief rose ring on the
   // tile next to the warn line. One repaint per rAF while the flash lives.
@@ -21308,7 +21346,30 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     }
   }, [stuck, shuffles, done]);
 
-  usePointerCell(canvasRef, {
+  const mjControls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, MJ_PILL_H, 4);
+    mjControls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    mjControls.push({ id: 'p-tiles', kind: 'pill', r: pr[1], label: 'Tiles', value: `${remaining}/${L.length}` });
+    mjControls.push({ id: 'p-chain', kind: 'pill', r: pr[2], label: 'Chain', value: `×${Math.min(chain, 6)}` });
+    mjControls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: layout.current.name });
+    let msgY = MJ_PILL_H + MJ_GAPY;
+    if (showBanner) {
+      mjControls.push({ id: 'banner', kind: 'label', r: [0, msgY, W, MJ_MSG_H], label: 'No free pair left — use your shuffle to keep going.', gold: true, font: 12 });
+      msgY += MJ_MSG_H + 4;
+    }
+    if (warn) mjControls.push({ id: 'warn', kind: 'label', r: [0, msgY, W, MJ_MSG_H], label: warn, color: PAL.rose, font: 12 });
+    const btnY = mjBoardY + mjBoardH + MJ_GAPY;
+    const br = cuiRow(Math.floor(W * 0.02), btnY, Math.floor(W * 0.96), MJ_BTN_H, 3);
+    mjControls.push({ id: 'undo', kind: 'button', r: br[0], label: `↶ Undo (${undos})`, font: 13, disabled: undos <= 0 || !history.current.length || done, action: doUndo });
+    mjControls.push({ id: 'hint', kind: 'button', r: br[1], label: `💡 Hint (${hints.hintsLeft})`, font: 13, disabled: done || hints.exhausted || hints.buying, action: buyHint });
+    mjControls.push({ id: 'shuffle', kind: 'button', r: br[2], label: `🔀 Shuffle (${shuffles})`, font: 13, disabled: shuffles <= 0 || done, action: doShuffle });
+  }
+  const mjCtlRef = useRef([]);
+  mjCtlRef.current = mjControls;
+  const [mjPressed, setMjPressed] = useState(null);
+
+  usePointerCell(canvasRef, cuiWrapHandlers(mjCtlRef, setMjPressed, cuiShiftHandlers({
     onTap: (pt) => {
       const g = geoRef.current;
       if (done || !g) return;
@@ -21316,15 +21377,18 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
       if (i == null) { setSel(null); return; }
       tap(i);
     },
-  }, { moveTolerance: 10 });
+  }, mjTopRef)), { moveTolerance: 10 });
 
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [faces, removed, sel, hintPair, done, W, H, flashFrame],
+    deps: [faces, removed, sel, hintPair, done, W, H, flashFrame, fmt, warn, showBanner, undos, shuffles, hints.hintsLeft, mjPressed],
     draw: (ctx) => {
+      cuiDrawControls(ctx, mjCtlRef.current, mjPressed);
       const g = geoRef.current;
       if (!g) return;
+      ctx.save();
+      ctx.translate(0, mjTopRef.current);
       const flash = flashRef.current;
       for (const i of order) {
         if (removed[i]) continue;
@@ -21336,22 +21400,13 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
           flash: flash && flash.i === i,
         });
       }
+      ctx.restore();
     },
   });
 
   return (
     <div className="mj-game fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Tiles</div><div className="pvalue">{remaining}/{L.length}</div></div>
-        <div className="pill"><div className="plabel">Chain</div><div className="pvalue">×{Math.min(chain, 6)}</div></div>
-        <div className="pill"><div className="plabel">Board</div><div className="pvalue">{layout.current.name}</div></div>
-      </div>
-      {stuck && shuffles > 0 && (
-        <div className="p6-banner">No free pair left — use your shuffle to keep going.</div>
-      )}
-      {warn && <div className="mj-warn">{warn}</div>}
-      <div className="mj-board-box" ref={boxRef}>
+      <div className="mj-board-box cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="mj-canvas board-canvas"
@@ -21359,11 +21414,7 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
           aria-label={`Mahjong board — ${remaining}/${L.length} tiles left, ${layout.current.name} layout`}
         />
       </div>
-      <div className="mj-controls">
-        <button onClick={doUndo} disabled={undos <= 0 || !history.current.length || done}>↶ Undo ({undos})</button>
-        <button onClick={buyHint} disabled={done || hints.exhausted || hints.buying}>💡 Hint ({hints.hintsLeft})</button>
-        <button onClick={doShuffle} disabled={shuffles <= 0 || done}>🔀 Shuffle ({shuffles})</button>
-      </div>
+      <CuiTwin controls={mjControls} />
       <div className="p6-hint">
         Tap two matching free tiles (uncovered, with an open side). Upper-layer clears and
         hint-free chains are worth more — undos and shuffles cost points.

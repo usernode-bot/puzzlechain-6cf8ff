@@ -33,6 +33,15 @@ function App() {
   });
   const openReceipt = (sid) => { setReceiptSessionId(sid); setScreen('session'); };
   const [currentGame, setCurrentGame] = useState(null);
+  /* #176 — which of the three play modes the current game was opened in.
+     null means "no play-mode axis": the head-to-head games, whose axis is the
+     opponent picker inside the game. `arcadeBandId` is only meaningful while
+     playMode === 'arcade'; `storyBand` only while playMode === 'story'. */
+  const [playMode, setPlayMode] = useState(null);
+  const [arcadeBandId, setArcadeBandId] = useState('normal');
+  const [storyBand, setStoryBand] = useState(0);
+  // gameId -> { cleared, total } for the card state line and the story picker.
+  const [storyProgress, setStoryProgress] = useState({});
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
   // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
@@ -318,6 +327,13 @@ function App() {
       // (they do: games launch from the lobby, which renders after loading).
       SERVER_DAILY_SEEDS = body.seeds || {};
       setBests(body.bests || {});
+      /* #176 — story progress is loaded alongside the daily state rather than
+         folded into it: it is not day-scoped, so it does not belong on a route
+         whose whole contract is "today". Failure is silent because the home
+         grid degrades to showing no ladder counts rather than not rendering. */
+      api('/api/story').then(r => {
+        if (r.ok && r.body && r.body.progress) setStoryProgress(r.body.progress);
+      }).catch(() => {});
       setFeatured(body.featured || null);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
@@ -438,9 +454,26 @@ function App() {
   // cards auto-open on a player's first-ever open of each game; because timed
   // dailies only mount (and start their clock) after Play, the auto-shown
   // how-to can never eat into the timer.
-  const launchGame = (game) => {
+  /* Story opens on the first band you have not cleared, not on band 0 — the
+     ladder is a progression, so re-entering it should carry on rather than
+     restart. Falls back to 0 before progress has loaded. */
+  const nextUnclearedBand = (gameId) => {
+    const p = storyProgress[gameId];
+    if (!p || !p.total) return 0;
+    return Math.min(p.cleared, p.total - 1);
+  };
+
+  const launchGame = (game, mode) => {
     allowProgressSave(game.id); // a new run lifts any prior finish guard
-    if (!game.daily) {
+    /* #176 — `mode` is the play mode the card button asked for. It is
+       authoritative over the registry's legacy `daily` flag: Block Fit is a
+       classic entry that now has a daily, and Tile Match's free-play entry
+       serves both story and arcade. Fall back to the entry's own default so
+       every pre-#176 call site (deep links, resume, practice) still works. */
+    const pm = isPlayMode(mode) ? mode : defaultPlayMode(game);
+    setPlayMode(pm);
+    if (pm === 'story') setStoryBand(nextUnclearedBand(game.id));
+    if (pm !== 'daily') {
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -803,6 +836,31 @@ function App() {
       setWinData(prev => prev ? { ...prev, syncError: true } : prev);
     }
     return ok;
+  };
+
+  /* #176 story — a rung is ticked off by the SERVER, once, on first clear.
+     total_score is an incrementing column (`total_score = total_score + $n`),
+     so it is not idempotent and a retry would double-credit. The award is
+     therefore gated on the progression row's claim succeeding, exactly the way
+     the daily's consume-on-start claim works. A replay of a cleared band is
+     inert by design: story pays the first time and never again. */
+  const handleBandCleared = async (bandIndex, meta) => {
+    if (practiceMode || !authOk) return;
+    const gameId = currentGame && currentGame.id;
+    if (!gameId) return;
+    const { ok, body } = await api(`/api/story/${gameId}/clear`, {
+      method: 'POST',
+      body: JSON.stringify({
+        band: bandIndex,
+        score: (meta && meta.score) || 0,
+        timeSecs: (meta && meta.timeSecs) || 0,
+        steps: (meta && meta.steps) || 0,
+      }),
+    }).catch(() => ({ ok: false, body: null }));
+    if (ok && body) {
+      setStoryProgress(prev => ({ ...prev, [gameId]: { cleared: body.cleared, total: body.total } }));
+      if (body.awarded) setTotalScore(t => t + body.awarded);
+    }
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
@@ -1265,11 +1323,27 @@ function App() {
   // into one switch — adding a game is now purely a matter of its registry entry.
   const renderGameBody = () => {
     if (!currentGame) return null;
+    /* #176 — every shell hands the game the same mode context, so a game
+       component never has to know which shell it is under to know how it was
+       opened. Games that predate the play-mode axis ignore all four and behave
+       exactly as before, which is what keeps this backward-compatible.
+         playMode  — 'daily' | 'story' | 'arcade' | null
+         band      — story: the rung index; arcade: the Easy/Normal/Hard id
+         gameId    — the registry id, so a component shared by two entries
+                     (Sudoku and Sudoku Mini) can tell which one it is
+         onBandCleared — story only: report a rung finished so it can be ticked */
+    const modeProps = {
+      gameId: currentGame.id,
+      playMode,
+      band: playMode === 'arcade' ? arcadeBandId : playMode === 'story' ? storyBand : null,
+      onBandCleared: playMode === 'story' ? handleBandCleared : undefined,
+    };
     switch (currentGame.shell) {
       case 'self':
         // Full-screen, gesture-first game that renders its own ClassicShell.
         return (
           <GameComponent
+            {...modeProps}
             game={currentGame}
             onBack={() => backToLobby('classic')}
             onWin={handleWin}
@@ -1312,6 +1386,7 @@ function App() {
                 so board + status + legend fit at 390x844 without moving. */}
             <div className="cg-stage cg-scroll">
               <GameComponent
+                {...modeProps}
                 onWin={handleWin}
                 onLose={handleLose}
                 onStepChange={setStepCount}
@@ -1367,6 +1442,7 @@ function App() {
               <div className="practice-ribbon">🎲 Practice — not scored</div>
             )}
             <GameComponent
+              {...modeProps}
               onWin={handleWin}
               onLose={handleLose}
               onStepChange={logsOwnMoves ? setStepCount : (n) => {
@@ -1720,47 +1796,30 @@ function App() {
                    is both daily and classic, so it passes every chip. Filtering
                    GAMES first would break the walk under the 'classic' chip
                    (the daily half would be gone and the card would move). */
-                const emittedPairs = new Set();
-                const items = [];
-                for (const g of registryOrder) {
-                  const pair = PAIR_BY_DAILY_ID[g.id] || PAIR_BY_REGULAR_ID[g.id];
-                  if (pair) {
-                    if (emittedPairs.has(pair.key)) continue;
-                    emittedPairs.add(pair.key);
-                    items.push({ pair });
-                  } else {
-                    items.push({ game: g });
-                  }
-                }
-                const ordered = items.filter(it => it.pair
-                  || homeFilter === 'all'
-                  || (homeFilter === 'daily'
-                    ? it.game.category === 'daily'
-                    : it.game.category !== 'daily'));
-                // Launch the free-play half of a pair (same path the plain card takes).
-                const playPairRegular = (pair) => {
-                  const g = GAMES.find(x => x.id === pair.regular.gameId);
+                /* #176 — the grid is a walk over GAME_CARDS, which is already
+                   in registry order and already merges the four two-id games.
+                   A card with a daily mode passes the Daily chip; one with any
+                   non-daily mode passes Classic; a card with both passes both,
+                   which is why filtering happens on modes rather than on the
+                   registry's category field. */
+                const ordered = GAME_CARDS.filter(c => {
+                  if (homeFilter === 'all') return true;
+                  const hasDaily = c.modes.some(m => m.mode === 'daily');
+                  if (homeFilter === 'daily') return hasDaily;
+                  return !hasDaily || c.modes.some(m => m.mode !== 'daily');
+                });
+                /* One launcher for every card button. `mode` is null for the
+                   head-to-head cards, whose axis is the opponent picker inside
+                   the game rather than this one. launchGame routes a finished
+                   daily to the locked result screen and everything else to the
+                   pre-game screen, so the day's attempt is still claimed only
+                   by the pre-game Play button. */
+                const playCardMode = (gameId, mode) => {
+                  const g = GAMES.find(x => x.id === gameId);
                   if (!g) return;
-                  if (g.preLaunchModal) { setPreLaunchGame(g); return; }
-                  setClassicGameMode(null);
-                  setClassicGameModeOpts(null);
-                  launchGame(g);
-                };
-                // Launch the daily half. For registry-backed dailies launchGame
-                // already routes finished → locked result screen and everything
-                // else → pre-game (so the day's attempt is still only claimed by
-                // the pre-game Play button). Mancala pre-seats its in-component
-                // Daily Challenge mode through gameModeOpts instead.
-                const playPairDaily = (pair) => {
-                  const g = GAMES.find(x => x.id === pair.daily.gameId);
-                  if (!g) return;
-                  if (pair.daily.startMode) {
-                    setClassicGameMode(null);
-                    setClassicGameModeOpts({ startMode: pair.daily.startMode });
-                    launchGame(g);
-                    return;
-                  }
-                  launchGame(g);
+                  if (!mode && g.preLaunchModal) { setPreLaunchGame(g); return; }
+                  if (!mode) { setClassicGameMode(null); setClassicGameModeOpts(null); }
+                  launchGame(g, mode);
                 };
                 return (
                   <React.Fragment>
@@ -1785,18 +1844,17 @@ function App() {
                       ))}
                     </div>
                     <div className="grid">
-                      {ordered.map(it => it.pair ? (
-                        <PairedGameCard
-                          key={it.pair.key}
-                          pair={it.pair}
+                      {ordered.map(c => (
+                        <GameCard
+                          key={c.key}
+                          card={c}
                           attempts={attempts}
-                          nextResetUtc={nextResetUtc}
-                          offset={offset}
+                          bests={bests}
+                          storyProgress={storyProgress}
                           loading={loading}
-                          onPlayRegular={playPairRegular}
-                          onPlayDaily={playPairDaily}
+                          onPlay={playCardMode}
                         />
-                      ) : gameCard(it.game))}
+                      ))}
                     </div>
                   </React.Fragment>
                 );

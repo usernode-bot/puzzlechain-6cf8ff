@@ -1058,9 +1058,34 @@ ${emitTapHighlightRules()}
    grid used to let cards hug their content (see .grid). Two equal columns with
    a clamped label/caption bring the paired card within a tile's padding of a
    single one, so one uniform height suits both. */
+/* #176 — a card can now carry one, two or THREE mode buttons. Three across a
+   200px column would leave ~50px of text each, which ellipsises to nothing, so
+   the three-up case drops to a 2+1 grid: the two most-used modes share the top
+   row and the third spans beneath. Column count is explicit per arity rather
+   than auto-fit, because auto-fit would silently reflow to 1-up at the narrow
+   end and tower the card again (the exact regression #167 fixed). */
 .card-modes {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 0.4rem; margin-top: 0.7rem;
+}
+.card-modes.n1 { grid-template-columns: 1fr; }
+.card-modes.n3 > :last-child { grid-column: 1 / -1; }
+/* The state line replaces per-button chatter: the card says where you stand,
+   and the buttons say where you can go. Tabular figures so "Story 4/8" does not
+   jitter as the numerator grows. */
+.card-state {
+  margin-top: 0.5rem; font-size: 0.62rem; letter-spacing: 0.04em;
+  color: ${C.dim}; font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* A card with no play modes (the head-to-head games) is one big tap target
+   rather than a card with a single redundant "Play" button under it. */
+.card-plain-hit {
+  display: flex; flex-direction: column; align-items: inherit;
+  gap: inherit; width: 100%; height: 100%;
+  background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; color: inherit; text-align: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 .card-mode-btn {
   display: flex; flex-direction: column; justify-content: center;
@@ -1080,8 +1105,8 @@ ${emitTapHighlightRules()}
 /* One line each, ellipsised. At the grid's narrowest column (200px) the two
    buttons share ~166px, i.e. ~74px of text each, so anything that wraps costs
    every OTHER tile in the grid the same height (see .grid). The ellipsis is the
-   safety net, not the plan — keep the label/caption copy in GAME_PAIRS, and the
-   dynamic strings in PairedGameCard, inside that budget. The full captions live
+   safety net, not the plan — keep the caption copy in GAME_CARDS, and the
+   dynamic strings in GameCard, inside that budget. The full captions live
    on the pre-game screen. */
 .cmb-label, .cmb-caption {
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1091,8 +1116,9 @@ ${emitTapHighlightRules()}
   font-size: 0.62rem; line-height: 1.25; margin-top: 0.05rem;
   color: ${C.muted};
 }
-.card-mode-btn.regular:hover { border-color: var(--accent, ${C.accent}); }
-.card-mode-btn.regular:hover .cmb-label { color: var(--accent, ${C.accent}); }
+.card-mode-btn.story:hover, .card-mode-btn.arcade:hover { border-color: var(--accent, ${C.accent}); }
+.card-mode-btn.story:hover .cmb-label,
+.card-mode-btn.arcade:hover .cmb-label { color: var(--accent, ${C.accent}); }
 .card-mode-btn.daily.fresh {
   background: var(--accent, ${C.accent});
   border-color: var(--accent, ${C.accent});

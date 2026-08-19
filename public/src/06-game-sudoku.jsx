@@ -185,8 +185,16 @@ function sdkDeepLinkDifficulty() {
   return null;
 }
 
-function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, gameId, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* #176 — the registry entry decides the board size now. Sudoku is the 9×9
+     card and Sudoku Mini the 6×6 one, so the in-game chooser is gone: a player
+     who wanted the small board picked it on the home screen. The two entries
+     also seed from their OWN game id, so they are genuinely separate dailies
+     rather than two views of one board. */
+  const fixedDifficulty = gameId === 'sudokumini' ? 'mini'
+    : gameId === 'sudoku' ? 'classic' : null;
+  const seedKey = gameId || 'sudoku';
   const resumedDiff = savedProgress && savedProgress.dayNum === dayNum &&
     (savedProgress.difficulty === 'classic' || savedProgress.difficulty === 'mini')
     ? savedProgress.difficulty
@@ -200,6 +208,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
      difficulty still wins, and this deliberately does NOT write progress:
      it only seeds the initial view. */
   const [difficulty, setDifficulty] = useState(() => {
+    if (fixedDifficulty) return fixedDifficulty;
     if (resumedDiff) return resumedDiff;
     return sdkDeepLinkDifficulty();
   });
@@ -207,12 +216,14 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   const getBoard = (diff) => {
     if (!boardsRef.current[diff]) {
       if (diff === 'mini') {
-        boardsRef.current[diff] = generateSudoku6(dailyRng(offset, 'sudoku'));
+        boardsRef.current[diff] = generateSudoku6(dailyRng(offset, seedKey));
       } else {
-        // Second deterministic stream derived from the same server-anchored
-        // daily seed, so everyone's 9×9 matches without a new seed row.
-        const draw = dailyRng(offset, 'sudoku');
-        boardsRef.current[diff] = generateSudoku9(mulberry32(((draw() * 4294967296) ^ 0x9E3779B9) >>> 0));
+        /* The 9×9 used to derive a SECOND stream from the 6×6's seed, because
+           one registry entry served both boards and they could not share one.
+           Sudoku is 9×9-only now (Sudoku Mini is its own entry with its own
+           seed row), so it reads its own daily seed directly. Nothing mirrors
+           this generator server-side, so the simplification is free. */
+        boardsRef.current[diff] = generateSudoku9(dailyRng(offset, seedKey));
       }
     }
     return boardsRef.current[diff];

@@ -402,7 +402,12 @@ function runClientSelfTests(styleReady) {
   // is really on the tree. (Real-time dailies that render their own shell are
   // out of scope; every category:'daily' game here uses shell:'daily'.)
   check('registry-fitshell', () => {
-    const missing = GAMES.filter(g => g.category === 'daily' && !g.fitShell).map(g => g.id);
+    /* #176 — the gate is now "declares a daily play mode", not category. Block
+       Fit and 2048 are classic entries that gained a daily, and a daily that
+       renders without .fit-col clips instead of fitting whatever its category
+       says. Entries that render their own shell are out of scope. */
+    const missing = GAMES.filter(g =>
+      supportsMode(g.id, 'daily') && g.shell !== 'self' && !g.fitShell).map(g => g.id);
     if (missing.length) throw new Error('dailies missing fitShell: ' + missing.join(', '));
     const wrap = document.querySelector('.game-wrap.fit');
     if (wrap && !wrap.querySelector('.fit-col')) {
@@ -575,30 +580,43 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
-  // #146 — a merged dual-mode card is assembled by id, so a rename that misses
-  // GAME_PAIRS would silently DROP both halves from the home grid (the walk
-  // would never match the pair, and the pair's card would never be emitted).
-  check('registry-pairs', () => {
+  /* #176 — the home grid is a walk over GAME_CARDS, so a card that names an
+     id the registry does not have would silently drop that game from the grid
+     entirely (the walk emits nothing, and there is no fallback card). This
+     also guards the four merged cards, whose whole point is that two registry
+     ids share one card without either id moving. */
+  check('registry-cards', () => {
     const ids = new Set(GAMES.map(g => g.id));
     const seen = new Set();
-    for (const p of GAME_PAIRS) {
-      if (ids.has(p.key)) throw new Error('pair key collides with a game id: ' + p.key);
-      for (const side of ['regular', 'daily']) {
-        const d = p[side];
-        if (!ids.has(d.gameId)) throw new Error(p.key + '.' + side + ' → unknown game ' + d.gameId);
+    for (const c of GAME_CARDS) {
+      if (ids.has(c.key)) throw new Error('card key collides with a game id: ' + c.key);
+      if (!c.modes.length) {
+        if (!c.gameId || !ids.has(c.gameId)) throw new Error(c.key + ' has no modes and no valid gameId');
+        continue;
       }
-      // The daily half must really be a daily — except the Mancala form, whose
-      // daily is an in-component mode of a classic entry.
-      if (!p.daily.startMode) {
-        const dg = GAMES.find(g => g.id === p.daily.gameId);
-        if (dg.category !== 'daily') throw new Error(p.key + '.daily is not category daily');
-        const rg = GAMES.find(g => g.id === p.regular.gameId);
-        if (rg.category === 'daily') throw new Error(p.key + '.regular must not be a daily');
+      for (const m of c.modes) {
+        if (!isPlayMode(m.mode)) throw new Error(c.key + ' → unknown play mode ' + m.mode);
+        if (!ids.has(m.gameId)) throw new Error(c.key + ' → unknown game ' + m.gameId);
+        if (!supportsMode(m.gameId, m.mode)) {
+          throw new Error(c.key + ': ' + m.gameId + ' does not declare ' + m.mode);
+        }
+        const key = m.gameId + ':' + m.mode;
+        if (seen.has(key)) throw new Error('mode listed on two cards: ' + key);
+        seen.add(key);
       }
-      for (const id of new Set([p.regular.gameId, p.daily.gameId])) {
-        if (seen.has(id)) throw new Error('game in more than one pair: ' + id);
-        seen.add(id);
+    }
+    // Every declared mode must reach the grid, or it is unplayable.
+    for (const id of Object.keys(PLAY_MODES_BY_ID)) {
+      if (!ids.has(id)) throw new Error('PLAY_MODES_BY_ID names unknown game ' + id);
+      for (const mode of playModesFor(id)) {
+        if (!seen.has(id + ':' + mode)) throw new Error('no card surfaces ' + id + ':' + mode);
       }
+    }
+    // And every registry entry must have an opinion, so a new game cannot be
+    // added without deciding what it offers.
+    const undeclared = GAMES.filter(g => !Object.prototype.hasOwnProperty.call(PLAY_MODES_BY_ID, g.id));
+    if (undeclared.length) {
+      throw new Error('games missing from PLAY_MODES_BY_ID: ' + undeclared.map(g => g.id).join(', '));
     }
     return true;
   });

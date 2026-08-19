@@ -6,7 +6,13 @@ const GAMES = [
     category: 'daily',
     shell: 'daily',
     daily: true,
-    desc: 'Pick your board — full 9×9 Classic (×2 points) or the quick 6×6 Mini.',
+    /* #176 — the 6×6 left this entry's in-game chooser and became its own card
+       (`sudokumini`). Two board sizes are two different games sharing a
+       component, not one game with a setting: they deserve separate dailies,
+       separate ladders and separate boards. `fixedDifficulty` is what tells the
+       shared component which one it is, so the chooser never renders. */
+    fixedDifficulty: 'classic',
+    desc: 'The full 9×9 grid. Every row, column and box holds 1–9 exactly once.',
     tag: 'Logic',
     tagColor: GA.sky,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
@@ -15,6 +21,26 @@ const GAMES = [
       { title: 'Pick a board', body: 'Choose 9×9 Classic (worth double points) or the quick 6×6 Mini. The clock only starts once you pick.' },
       { title: 'Fill the grid', body: 'Tap a cell, then pick a number. Every row, column, and box must contain each number exactly once. Overwrite freely — mistakes cost steps, not the game.' },
       { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone gets the same boards today.' },
+    ],
+    component: SudokuGame,
+  },
+  {
+    id: 'sudokumini',
+    name: 'Sudoku Mini',
+    icon: '🔡',
+    category: 'daily',
+    shell: 'daily',
+    daily: true,
+    fixedDifficulty: 'mini',
+    desc: 'The quick 6×6 board — same rules, a fraction of the time.',
+    tag: 'Logic',
+    tagColor: GA.teal,
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'free' },
+    fitShell: true,
+    howToPlay: [
+      { title: 'Fill the grid', body: 'Tap a cell, then pick a number. Every row, column and 3×2 box must contain 1–6 exactly once.' },
+      { title: 'Quick by design', body: 'Six columns instead of nine — a couple of minutes rather than ten. The full 9×9 lives on its own card.' },
+      { title: 'Score', body: 'Faster solves with fewer steps score higher. Everyone gets the same board today.' },
     ],
     component: SudokuGame,
   },

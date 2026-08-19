@@ -127,6 +127,8 @@ let migrationsReady = false;
 const GAME_REGISTRY = {
   sudoku:            { name: 'Sudoku',            category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+  sudokumini:        { name: 'Sudoku Mini',        category: 'daily',   tier: 'A',
+    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'free' } },
   wordhunt:          { name: 'Word Search',       category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag',     undo: 'none' } },
   cryptowordle:      { name: 'Daily Cipher',     category: 'daily',   tier: 'A',
@@ -224,6 +226,56 @@ const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
 const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
+
+/* ============================================================
+   Play modes (#176) — story ladders and arcade bands
+   ============================================================
+   Mirrors PLAY_MODES_BY_ID in public/src/29-cards.jsx. The client owns the
+   card copy; the server owns what a mode is worth and whether a rung has
+   already been claimed, because both are cheatable from the client.
+
+   STORY_BANDS is the rung count per game. Bands, not levels: Tile Match
+   generates 1000 levels and Mahjong has 6 layouts, so paying per level would
+   make one game worth a hundred times another for the same "finished the
+   story" achievement. Every ladder is normalised to 4–8 rungs here, and
+   storyBandAward below spends the SAME total budget on every game however
+   many rungs it has — later bands simply weigh more than earlier ones. */
+const STORY_BANDS = {
+  sudoku: 6, sudokumini: 5, wordhunt: 6, cryptowordle: 6,
+  klondike: 5, spider: 3, mahjongsol: 6, anagrams: 5,
+  nonogram: 6, cratepush: 8, minefinder: 6,
+  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 5,
+  hashrush: 5, match3: 5, 'knights-tour': 6,
+};
+const storyBandCount = (gameId) => STORY_BANDS[gameId] || 0;
+
+// Every game's story is worth the same in total. Weight w(i) = i+1 so the last
+// rung pays the most, then normalise to STORY_TOTAL_POINTS.
+const STORY_TOTAL_POINTS = 2000;
+function storyBandAward(gameId, band) {
+  const n = storyBandCount(gameId);
+  if (!n || band < 0 || band >= n) return 0;
+  const denom = (n * (n + 1)) / 2;       // sum of 1..n
+  return Math.round(STORY_TOTAL_POINTS * ((band + 1) / denom));
+}
+
+/* Arcade bands — three for every game, all open from the start (no story
+   gate). ARCADE_BAND_MULT scales what a personal best is worth so that
+   farming the Easy board is not the optimal strategy, which it would be if a
+   single mixed board paid the same everywhere. */
+const ARCADE_BANDS = ['easy', 'normal', 'hard'];
+const ARCADE_BAND_MULT = { easy: 0.6, normal: 1.0, hard: 1.6 };
+const isArcadeBand = (b) => ARCADE_BANDS.indexOf(b) !== -1;
+
+/* Rank thresholds pay ONCE each, ever, per (user, game, band). Paying for rank
+   POSITION instead would let a player drift up as other scores decay, or
+   oscillate across a boundary and collect repeatedly. */
+const ARCADE_RANK_THRESHOLDS = [
+  { rank: 1,  key: 'top1',  points: 400 },
+  { rank: 3,  key: 'top3',  points: 200 },
+  { rank: 10, key: 'top10', points: 100 },
+];
+
 
 // Classic games that support online "race" multiplayer (each player plays
 // their own board; highest final score wins) over classic_rooms.
@@ -638,6 +690,78 @@ const MATCH3_PUZZLES = [
 // resets implicitly: a new UTC date yields a new attempt_date, so
 // yesterday's rows simply stop matching today's lookups.
 async function migrate() {
+  /* game_progress is PUBLIC — story-ladder state, gameplay only.
+     One row per (user, game, band). The row's EXISTENCE is the claim: story
+     pays on first clear and never again, and total_score is an incrementing
+     column, so the award has to be gated on winning the insert rather than on
+     the client saying "this was my first time". Same shape as the daily's
+     consume-on-start claim. best_* are updated on replays; awarded_points
+     never is. */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_progress (
+      user_id        TEXT    NOT NULL,
+      game_id        TEXT    NOT NULL,
+      band           INTEGER NOT NULL,
+      cleared_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      awarded_points INTEGER NOT NULL DEFAULT 0,
+      best_score     INTEGER,
+      best_time_secs INTEGER,
+      best_steps     INTEGER,
+      plays          INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (user_id, game_id, band)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS game_progress_game_idx ON game_progress (game_id, band)`);
+
+  /* arcade_bests is PUBLIC — one row per (user, game, band): the personal best
+     that arcade actually pays on, plus which rank thresholds have already been
+     collected. Storing the claimed thresholds as a text[] is what makes each
+     one payable exactly once ever, rather than every time the player crosses
+     the boundary again. */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS arcade_bests (
+      user_id      TEXT    NOT NULL,
+      username     TEXT,
+      game_id      TEXT    NOT NULL,
+      band         TEXT    NOT NULL,
+      best_score   INTEGER NOT NULL DEFAULT 0,
+      best_time_secs INTEGER,
+      best_steps   INTEGER,
+      runs         INTEGER NOT NULL DEFAULT 0,
+      claimed_ranks TEXT[] NOT NULL DEFAULT '{}',
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id, band)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS arcade_bests_board_idx
+      ON arcade_bests (game_id, band, best_score DESC, updated_at ASC)
+  `);
+
+  /* arcade_runs is PUBLIC — the run history #176 asks arcade to have ("see the
+     history to share / replay"). A run is a SEED plus a move list, which is a
+     few hundred bytes, because every generator in this app is seeded and
+     deterministic: the board is re-derived rather than stored. */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS arcade_runs (
+      id         SERIAL PRIMARY KEY,
+      user_id    TEXT    NOT NULL,
+      username   TEXT,
+      game_id    TEXT    NOT NULL,
+      band       TEXT    NOT NULL,
+      seed       BIGINT  NOT NULL,
+      score      INTEGER NOT NULL DEFAULT 0,
+      time_secs  INTEGER,
+      steps      INTEGER,
+      moves      JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS arcade_runs_user_idx
+      ON arcade_runs (user_id, game_id, created_at DESC)
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS daily_attempts (
       id           SERIAL PRIMARY KEY,
@@ -2017,6 +2141,11 @@ const PUBLIC_API_GET = [
   /^\/api\/daily\/leaderboard\/today$/,
   /^\/api\/classic\/[A-Za-z0-9_-]+\/leaderboard$/,
   /^\/api\/ladder\/[A-Za-z0-9_-]+$/,      // rating ladder (null-guards req.user)
+  // #176 — the per-band arcade boards are reads of the same shape as the daily
+  // ones, so they open to anonymous callers on the same terms: the handler
+  // null-guards req.user (anonymous ⇒ me: null, isCurrentUser: false). The
+  // arcade FINISH route stays auth-gated — it pays points.
+  /^\/api\/arcade\/[A-Za-z0-9_-]+\/leaderboard$/,
 ];
 
 // Simple in-memory per-IP sliding window over the public GET surface — the
@@ -3892,6 +4021,298 @@ app.post('/api/daily/:gameId/progress', async (req, res) => {
 // as a final deterministic tiebreak. Returns the top N plus the current user's
 // own row/rank (present even when outside the top N).
 const LEADERBOARD_LIMIT = 20;
+/* ============================================================
+   Story mode (#176) — the ladder, and the once-ever award
+   ============================================================ */
+
+// GET /api/story — every band this user has cleared, keyed by game. Feeds the
+// home cards' "Story 4/8" state line and the band picker's start position.
+app.get('/api/story', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT game_id, band, best_score, best_time_secs FROM game_progress WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const byGame = {};
+    for (const gameId of Object.keys(STORY_BANDS)) {
+      byGame[gameId] = { cleared: 0, total: storyBandCount(gameId), bands: {} };
+    }
+    for (const r of rows) {
+      if (!byGame[r.game_id]) continue;
+      byGame[r.game_id].bands[r.band] = {
+        score: r.best_score, timeSecs: r.best_time_secs,
+      };
+    }
+    // `cleared` is the length of the unbroken run from band 0, not the raw row
+    // count: the ladder is a progression, so a band cleared out of order (which
+    // nothing offers today, but a future deep link might) must not read as
+    // further progress than the player actually has.
+    for (const gameId of Object.keys(byGame)) {
+      const g = byGame[gameId];
+      let n = 0;
+      while (n < g.total && g.bands[n]) n += 1;
+      g.cleared = n;
+    }
+    res.json({ progress: byGame });
+  } catch (e) {
+    console.error('[story] load failed:', e.message);
+    res.status(500).json({ error: 'Could not load story progress' });
+  }
+});
+
+/* POST /api/story/:gameId/clear { band, score, timeSecs, steps }
+   Marks a rung cleared. The award is gated on the INSERT winning, not on the
+   client's word: story pays the first time and never again, and total_score is
+   `total_score = total_score + $n`, so a retry that skipped the claim would
+   silently double-credit. Replays fall through to the best_* update and are
+   worth nothing, which is the rule. */
+app.post('/api/story/:gameId/clear', async (req, res) => {
+  const { gameId } = req.params;
+  const total = storyBandCount(gameId);
+  if (!total) return res.status(400).json({ error: 'Game has no story ladder' });
+
+  const band = Number(req.body && req.body.band);
+  if (!Number.isInteger(band) || band < 0 || band >= total) {
+    return res.status(400).json({ error: 'Unknown band' });
+  }
+  const score = Math.max(0, Math.min(1e7, Number(req.body && req.body.score) || 0));
+  const timeSecs = Math.max(0, Math.min(86400, Number(req.body && req.body.timeSecs) || 0));
+  const steps = Math.max(0, Math.min(1e6, Number(req.body && req.body.steps) || 0));
+
+  try {
+    const award = storyBandAward(gameId, band);
+    const claim = await pool.query(
+      `INSERT INTO game_progress
+         (user_id, game_id, band, awarded_points, best_score, best_time_secs, best_steps, plays)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+       ON CONFLICT (user_id, game_id, band) DO NOTHING
+       RETURNING awarded_points`,
+      [req.user.id, gameId, band, award, score, timeSecs, steps]
+    );
+    const firstClear = claim.rows.length > 0;
+
+    if (!firstClear) {
+      // Replay: keep the best figures, pay nothing.
+      await pool.query(
+        `UPDATE game_progress
+            SET best_score = GREATEST(COALESCE(best_score, 0), $4),
+                best_time_secs = LEAST(COALESCE(best_time_secs, 2147483647), $5),
+                best_steps = LEAST(COALESCE(best_steps, 2147483647), $6),
+                plays = plays + 1
+          WHERE user_id = $1 AND game_id = $2 AND band = $3`,
+        [req.user.id, gameId, band, score, timeSecs, steps]
+      );
+    } else if (award > 0) {
+      await pool.query(
+        `INSERT INTO user_stats_snapshot (user_id, username, total_score, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (user_id) DO UPDATE
+           SET total_score = user_stats_snapshot.total_score + $3, updated_at = now()`,
+        [req.user.id, req.user.username || null, award]
+      );
+    }
+
+    const { rows } = await pool.query(
+      `SELECT band FROM game_progress WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]
+    );
+    const have = new Set(rows.map(r => r.band));
+    let cleared = 0;
+    while (cleared < total && have.has(cleared)) cleared += 1;
+
+    res.json({ ok: true, band, total, cleared, awarded: firstClear ? award : 0, firstClear });
+  } catch (e) {
+    console.error('[story] clear failed:', e.message);
+    res.status(500).json({ error: 'Could not record band' });
+  }
+});
+
+/* ============================================================
+   Arcade mode (#176) — personal bests and one-time rank bonuses
+   ============================================================ */
+
+/* POST /api/arcade/:gameId/finish { band, seed, score, timeSecs, steps, moves? }
+   Arcade pays ONLY for landing higher, in two parts:
+     - beating your own previous best on this game+band pays the base, scaled
+       by band so farming Easy is not the optimal strategy;
+     - crossing a rank threshold pays a one-time bonus, once ever.
+   A player's FIRST run in a band sets the baseline and pays no personal-best
+   component — it cannot beat their best because it is their best. Without that
+   rule, "play once in every band of every game" would be a free harvest now
+   that all three bands are open from the start. Rank bonuses still fire, so a
+   strong debut is not unrewarded. */
+app.post('/api/arcade/:gameId/finish', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const band = String((req.body && req.body.band) || '');
+  if (!isArcadeBand(band)) return res.status(400).json({ error: 'Unknown band' });
+
+  const score = Math.max(0, Math.min(1e7, Number(req.body && req.body.score) || 0));
+  const timeSecs = Math.max(0, Math.min(86400, Number(req.body && req.body.timeSecs) || 0));
+  const steps = Math.max(0, Math.min(1e6, Number(req.body && req.body.steps) || 0));
+  const seed = Math.max(0, Math.min(4294967295, Number(req.body && req.body.seed) || 0));
+  const moves = Array.isArray(req.body && req.body.moves) ? req.body.moves.slice(0, 800) : null;
+
+  try {
+    const prev = await pool.query(
+      `SELECT best_score, claimed_ranks FROM arcade_bests
+        WHERE user_id = $1 AND game_id = $2 AND band = $3`,
+      [req.user.id, gameId, band]
+    );
+    const isFirstRun = prev.rows.length === 0;
+    const prevBest = isFirstRun ? 0 : (prev.rows[0].best_score || 0);
+    const claimed = new Set(isFirstRun ? [] : (prev.rows[0].claimed_ranks || []));
+
+    const beatBest = !isFirstRun && score > prevBest;
+    const pbAward = beatBest
+      ? Math.round((score - prevBest) * (ARCADE_BAND_MULT[band] || 1))
+      : 0;
+
+    await pool.query(
+      `INSERT INTO arcade_bests
+         (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, now())
+       ON CONFLICT (user_id, game_id, band) DO UPDATE
+         SET best_score = GREATEST(arcade_bests.best_score, $5),
+             best_time_secs = CASE WHEN $5 > arcade_bests.best_score THEN $6 ELSE arcade_bests.best_time_secs END,
+             best_steps = CASE WHEN $5 > arcade_bests.best_score THEN $7 ELSE arcade_bests.best_steps END,
+             runs = arcade_bests.runs + 1,
+             username = COALESCE($2, arcade_bests.username),
+             updated_at = now()`,
+      [req.user.id, req.user.username || null, gameId, band, score, timeSecs, steps]
+    );
+
+    await pool.query(
+      `INSERT INTO arcade_runs (user_id, username, game_id, band, seed, score, time_secs, steps, moves)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [req.user.id, req.user.username || null, gameId, band, seed, score, timeSecs, steps,
+       moves ? JSON.stringify(moves) : null]
+    );
+
+    // Rank AFTER the write, so the row the player just set is the one ranked.
+    const rankRes = await pool.query(
+      `SELECT COUNT(*)::int AS ahead FROM arcade_bests
+        WHERE game_id = $1 AND band = $2 AND best_score > $3`,
+      [gameId, band, Math.max(score, prevBest)]
+    );
+    const rank = (rankRes.rows[0] ? rankRes.rows[0].ahead : 0) + 1;
+
+    let rankAward = 0;
+    const newlyClaimed = [];
+    for (const t of ARCADE_RANK_THRESHOLDS) {
+      if (rank <= t.rank && !claimed.has(t.key)) {
+        rankAward += t.points;
+        newlyClaimed.push(t.key);
+      }
+    }
+    if (newlyClaimed.length) {
+      await pool.query(
+        `UPDATE arcade_bests SET claimed_ranks = claimed_ranks || $4::text[]
+          WHERE user_id = $1 AND game_id = $2 AND band = $3`,
+        [req.user.id, gameId, band, newlyClaimed]
+      );
+    }
+
+    const awarded = pbAward + rankAward;
+    if (awarded > 0) {
+      await pool.query(
+        `INSERT INTO user_stats_snapshot (user_id, username, total_score, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (user_id) DO UPDATE
+           SET total_score = user_stats_snapshot.total_score + $3, updated_at = now()`,
+        [req.user.id, req.user.username || null, awarded]
+      );
+    }
+
+    res.json({
+      ok: true, rank, band, score,
+      previousBest: prevBest, beatBest, isFirstRun,
+      awarded, pbAward, rankAward, newRanks: newlyClaimed,
+    });
+  } catch (e) {
+    console.error('[arcade] finish failed:', e.message);
+    res.status(500).json({ error: 'Could not record run' });
+  }
+});
+
+// GET /api/arcade/:gameId/leaderboard?band=normal — one board PER BAND, which
+// the reward rule forces: with a single mixed board the optimal play would be
+// to drop to Easy and top that.
+app.get('/api/arcade/:gameId/leaderboard', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const band = String(req.query.band || 'normal');
+  if (!isArcadeBand(band)) return res.status(400).json({ error: 'Unknown band' });
+  const uid = req.user ? req.user.id : null;
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, username, best_score, best_time_secs, runs
+         FROM arcade_bests
+        WHERE game_id = $1 AND band = $2 AND best_score > 0
+        ORDER BY best_score DESC, updated_at ASC
+        LIMIT 20`,
+      [gameId, band]
+    );
+    const entries = rows.map((r, i) => ({
+      rank: i + 1, userId: r.user_id, username: r.username || 'Player',
+      score: r.best_score, timeSecs: r.best_time_secs, runs: r.runs,
+      isCurrentUser: !!uid && r.user_id === uid,
+    }));
+    let me = entries.find(e => e.isCurrentUser) || null;
+    if (!me && uid) {
+      const mine = await pool.query(
+        `SELECT best_score, best_time_secs, runs FROM arcade_bests
+          WHERE user_id = $1 AND game_id = $2 AND band = $3 AND best_score > 0`,
+        [uid, gameId, band]
+      );
+      if (mine.rows.length) {
+        const ahead = await pool.query(
+          `SELECT COUNT(*)::int AS n FROM arcade_bests
+            WHERE game_id = $1 AND band = $2 AND best_score > $3`,
+          [gameId, band, mine.rows[0].best_score]
+        );
+        me = {
+          rank: ahead.rows[0].n + 1, userId: uid, username: req.user.username || 'You',
+          score: mine.rows[0].best_score, timeSecs: mine.rows[0].best_time_secs,
+          runs: mine.rows[0].runs, isCurrentUser: true,
+        };
+      }
+    }
+    const totalRes = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM arcade_bests WHERE game_id = $1 AND band = $2 AND best_score > 0`,
+      [gameId, band]
+    );
+    res.json({ entries, me, total: totalRes.rows[0].n, band });
+  } catch (e) {
+    console.error('[arcade] leaderboard failed:', e.message);
+    res.status(500).json({ error: 'Could not load board' });
+  }
+});
+
+// GET /api/arcade/:gameId/runs — the player's own run history, newest first.
+// A run is a seed plus a move list, so replaying one re-derives the board.
+app.get('/api/arcade/:gameId/runs', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, band, seed, score, time_secs, steps, created_at
+         FROM arcade_runs WHERE user_id = $1 AND game_id = $2
+        ORDER BY created_at DESC LIMIT 25`,
+      [req.user.id, gameId]
+    );
+    res.json({
+      runs: rows.map(r => ({
+        id: r.id, band: r.band, seed: Number(r.seed), score: r.score,
+        timeSecs: r.time_secs, steps: r.steps, at: r.created_at,
+      })),
+    });
+  } catch (e) {
+    console.error('[arcade] runs failed:', e.message);
+    res.status(500).json({ error: 'Could not load runs' });
+  }
+});
+
 app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   const { gameId } = req.params;
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });

@@ -5796,16 +5796,20 @@ function cuiShiftHandlers(h, topRef) {
 function CuiTwin({ controls, extra }) {
   return (
     <div className="sr-only">
-      {controls.map((c) => c.action ? (
-        <button
-          key={c.id}
-          type="button"
-          disabled={!!c.disabled}
-          aria-pressed={c.on != null ? !!c.on : undefined}
-          onClick={() => { if (!c.disabled) c.action(); }}
-        >{String(c.label != null ? c.label : c.id) + (c.sub ? ' — ' + c.sub : '') + (c.value != null ? ' ' + c.value : '')}</button>
-      ) : (
-        <span key={c.id}>{(c.label != null ? String(c.label) + ' ' : '') + (c.value != null ? c.value : '')}</span>
+      {controls.map((c) => (
+        // One block per control so innerText keeps line breaks between them.
+        <div key={c.id}>
+          {c.action ? (
+            <button
+              type="button"
+              disabled={!!c.disabled}
+              aria-pressed={c.on != null ? !!c.on : undefined}
+              onClick={() => { if (!c.disabled) c.action(); }}
+            >{String(c.label != null ? c.label : c.id) + (c.sub ? ' — ' + c.sub : '') + (c.value != null ? ' ' + c.value : '')}</button>
+          ) : (
+            <span>{(c.label != null ? String(c.label) + ' ' : '') + (c.value != null ? c.value : '')}</span>
+          )}
+        </div>
       ))}
       {extra || null}
     </div>
@@ -12470,7 +12474,9 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
         const px0 = x0 + (slotW - (maxC + 1) * u) / 2;
         const py0 = (BB_TRAY_H - (maxR + 1) * u) / 2;
         for (const [r, c] of p.cells) {
-          ctx.fillStyle = p.color;
+          // BB_COLORS are C.* var() tokens (the DOM tray + the well's DOM-era
+          // cells read them via CSS); the canvas resolves them through palOf.
+          ctx.fillStyle = palOf(p.color, '#3A6ECD');
           ctx.beginPath();
           if (ctx.roundRect) ctx.roundRect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5, 2);
           else ctx.rect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5);
@@ -15385,7 +15391,7 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
       {activeTab === 'game' && (
         <div>
-          <CuiBar height={activePowerups.length ? 72 : 46} build={(W) => {
+          <CuiBar height={68} build={(W) => {
             const pr = cuiRow(0, 0, W, 46, 5);
             const out = [
               { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
@@ -15425,13 +15431,17 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
           </div>
 
           <CuiBar height={44} build={(W) => {
-            const br = cuiRow(Math.floor(W * 0.04), 0, Math.floor(W * 0.92), 40, 5);
+            const x0 = Math.floor(W * 0.02), usable = Math.floor(W * 0.96), g = 6;
+            const soundW = Math.floor(usable * 0.3), musicW = Math.floor(usable * 0.12);
+            const padW = Math.floor(usable * 0.13), newW = usable - soundW - musicW - padW * 2 - g * 4;
+            let x = x0;
+            const next = (w) => { const r = [x, 0, w, 40]; x += w + g; return r; };
             return [
-              { id: 'sound', kind: 'button', r: br[0], label: soundOn ? '🔊 On' : '🔇 Off', font: 12, on: soundOn, action: toggleSound },
-              { id: 'music', kind: 'button', r: br[1], label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', font: 12, disabled: !soundOn, action: () => setMusicPaused(p => !p) },
-              { id: 'left', kind: 'button', r: br[2], label: '◀', font: 15, holdDown: () => { leftRef.current = true; }, holdUp: () => { leftRef.current = false; } },
-              { id: 'right', kind: 'button', r: br[3], label: '▶', font: 15, holdDown: () => { rightRef.current = true; }, holdUp: () => { rightRef.current = false; } },
-              { id: 'new', kind: 'button', r: br[4], label: '↺ New', font: 12, action: handleNewGame },
+              { id: 'sound', kind: 'button', r: next(soundW), label: soundOn ? '🔊 Sound On' : '🔇 Sound Off', font: 11, on: soundOn, action: toggleSound },
+              { id: 'music', kind: 'button', r: next(musicW), label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', font: 12, disabled: !soundOn, action: () => setMusicPaused(p => !p) },
+              { id: 'left', kind: 'button', r: next(padW), label: '◀', font: 15, holdDown: () => { leftRef.current = true; }, holdUp: () => { leftRef.current = false; } },
+              { id: 'right', kind: 'button', r: next(padW), label: '▶', font: 15, holdDown: () => { rightRef.current = true; }, holdUp: () => { rightRef.current = false; } },
+              { id: 'new', kind: 'button', r: next(newW), label: '↺ New', font: 12, action: handleNewGame },
             ];
           }} />
         </div>
@@ -16513,7 +16523,7 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   return (
     React.createElement('div', null,
       activeTab === 'game' && React.createElement('div', null,
-        React.createElement(CuiBar, { height: activePowerups.length ? 72 : 46, build: (W) => {
+        React.createElement(CuiBar, { height: 68, build: (W) => {
           const pr = cuiRow(0, 0, W, 46, 4);
           const out = [
             { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
@@ -20799,8 +20809,10 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
   const W = Math.floor(boxW), H = Math.floor(boxH);
   const MJ_GAPY = 8, MJ_PILL_H = 46, MJ_MSG_H = 20, MJ_BTN_H = 44;
   const showBanner = stuck && shuffles > 0;
-  const mjChrome = MJ_PILL_H + MJ_GAPY + (showBanner ? MJ_MSG_H + 4 : 0) + (warn ? MJ_MSG_H + 4 : 0) + MJ_GAPY + MJ_BTN_H + 4;
-  const mjBoardY = MJ_PILL_H + MJ_GAPY + (showBanner ? MJ_MSG_H + 4 : 0) + (warn ? MJ_MSG_H + 4 : 0);
+  // The message band is ALWAYS reserved so the board never jumps when a
+  // warn/banner appears mid-game (warn wins when both fire).
+  const mjChrome = MJ_PILL_H + MJ_GAPY + MJ_MSG_H + 4 + MJ_GAPY + MJ_BTN_H + 4;
+  const mjBoardY = MJ_PILL_H + MJ_GAPY + MJ_MSG_H + 4;
   const mjBoardH = Math.max(80, H - mjChrome);
   const geo = W > 80 && H > 80 ? mjGeom(W, mjBoardH, L) : null;
   const geoRef = useRef(geo);
@@ -20961,12 +20973,9 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     mjControls.push({ id: 'p-tiles', kind: 'pill', r: pr[1], label: 'Tiles', value: `${remaining}/${L.length}` });
     mjControls.push({ id: 'p-chain', kind: 'pill', r: pr[2], label: 'Chain', value: `×${Math.min(chain, 6)}` });
     mjControls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: layout.current.name });
-    let msgY = MJ_PILL_H + MJ_GAPY;
-    if (showBanner) {
-      mjControls.push({ id: 'banner', kind: 'label', r: [0, msgY, W, MJ_MSG_H], label: 'No free pair left — use your shuffle to keep going.', gold: true, font: 12 });
-      msgY += MJ_MSG_H + 4;
-    }
+    const msgY = MJ_PILL_H + MJ_GAPY;
     if (warn) mjControls.push({ id: 'warn', kind: 'label', r: [0, msgY, W, MJ_MSG_H], label: warn, color: PAL.rose, font: 12 });
+    else if (showBanner) mjControls.push({ id: 'banner', kind: 'label', r: [0, msgY, W, MJ_MSG_H], label: 'No free pair left — use your shuffle to keep going.', gold: true, font: 12 });
     const btnY = mjBoardY + mjBoardH + MJ_GAPY;
     const br = cuiRow(Math.floor(W * 0.02), btnY, Math.floor(W * 0.96), MJ_BTN_H, 3);
     mjControls.push({ id: 'undo', kind: 'button', r: br[0], label: `↶ Undo (${undos})`, font: 13, disabled: undos <= 0 || !history.current.length || done, action: doUndo });
@@ -23590,7 +23599,7 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
 
   return (
     <div className="fit-col">
-      <CuiBar height={effectLabels.length ? 68 : 46} build={(W) => {
+      <CuiBar height={68} build={(W) => {
         const pr = cuiRow(0, 0, W, 46, 4);
         const out = [
           { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },

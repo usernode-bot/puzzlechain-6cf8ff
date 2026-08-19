@@ -2012,6 +2012,9 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
    top out and the day is lost. */
 
 const DS_W = 9, DS_H = 16, DS_PIECES = 200;
+/* Arcade's bag is long enough that no real run reaches the end — "endless" in
+   practice, without an unbounded array or a refill seam mid-run. */
+const DS_ARCADE_PIECES = 20000;
 const DS_SHAPES = [
   { cells: [[0, 0], [1, 0], [2, 0], [3, 0]], color: '#38BDF8' },
   { cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: '#FBBF24' },
@@ -2026,12 +2029,12 @@ const DS_GAP = 2;
 
 // Deterministic 7-bag: every consecutive window of 7 is a permutation of the
 // seven shapes, so the day's sequence is fair AND identical for every player.
-function dsSequence(rng) {
+function dsSequence(rng, n = DS_PIECES) {
   const seq = [];
-  while (seq.length < DS_PIECES) {
+  while (seq.length < n) {
     seq.push(...ceShuffle([0, 1, 2, 3, 4, 5, 6], rng));
   }
-  return seq.slice(0, DS_PIECES);
+  return seq.slice(0, n);
 }
 
 // Rotate a shape's cells 90° clockwise `rot` times, normalized to (0,0).
@@ -2051,10 +2054,24 @@ function dsLevelFor(lines) { return 1 + Math.floor(lines / DS_LINES_PER_LEVEL); 
 // so the top levels stay playable rather than impossible.
 function dsGravityMs(level) { return Math.max(80, Math.round(1000 * Math.pow(0.85, level - 1))); }
 
-function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* #176 — the daily is a FIXED 200-piece bag you either clear or top out of;
+     arcade is the same game with an endless one. That is the whole difference,
+     which is why this was one of the cheapest modes in the plan: the piece
+     generator never cared how long the sequence was. */
+  const isArcade = playMode === 'arcade';
+  const seedRef = useRef(null);
   const seq = useRef(null);
-  if (!seq.current) seq.current = dsSequence(dailyRng(offset, 'dropstack'));
+  if (!seq.current) {
+    if (isArcade) {
+      const { rng, seed } = modeSeed('arcade', 'dropstack', 0, offset);
+      seedRef.current = seed;
+      seq.current = dsSequence(rng, DS_ARCADE_PIECES);
+    } else {
+      seq.current = dsSequence(dailyRng(offset, 'dropstack'));
+    }
+  }
 
   // Resume tolerates the pre-rebuild progress shape: rows saved by the old
   // turn-based version carry no level/hold, so derive level from lines and
@@ -2102,7 +2119,8 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
   });
   useAutosave(onSaveProgress, buildProgress, !done);
 
-  const shapeIdx = pieceIdx < DS_PIECES ? seq.current[pieceIdx] : 0;
+  const bagLen = seq.current.length;
+  const shapeIdx = pieceIdx < bagLen ? seq.current[pieceIdx] : 0;
   const cells = dsCells(shapeIdx, rot);
   const shapeW = Math.max(...cells.map(([x]) => x)) + 1;
   const clampedCol = Math.min(Math.max(col, 0), DS_W - shapeW);
@@ -2158,7 +2176,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
       setLevelFlash(dsLevelFor(nl));
       setTimeout(() => setLevelFlash(0), 900);
     }
-    const won = np >= DS_PIECES;
+    const won = np >= seq.current.length;
     if (!won && onSaveProgress) {
       onSaveProgress(
         { dayNum, grid: g, pieceIdx: np, lines: nl, points: npts, level: dsLevelFor(nl), hold: cur.hold },
@@ -2169,7 +2187,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
       setDone(true);
       const score = npts + nl * 10 + dsLevelFor(nl) * 50 + 500;
       onWin(score, np, cur.secs, {
-        share: `Game Corner Drop Stack — cleared the full ${DS_PIECES}-piece bag, ${nl} lines, level ${dsLevelFor(nl)} 🧱`,
+        share: `Game Corner Drop Stack — cleared the full ${seq.current.length}-piece bag, ${nl} lines, level ${dsLevelFor(nl)} 🧱`,
       });
     }
   };
@@ -2196,7 +2214,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
       last = t;
       if (document.visibilityState === 'hidden') return;
       const cur = liveRef.current;
-      if (cur.done || cur.pieceIdx >= DS_PIECES) return;
+      if (cur.done || cur.pieceIdx >= bagLen) return;
       acc += dt;
       const interval = dsGravityMs(dsLevelFor(cur.lines));
       while (acc >= interval) {
@@ -2221,7 +2239,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
 
   const hardDrop = () => {
     const cur = liveRef.current;
-    if (cur.done || cur.pieceIdx >= DS_PIECES) return;
+    if (cur.done || cur.pieceIdx >= bagLen) return;
     const y = landingY(cur.grid, cur.clampedCol, cur.cells);
     if (y < 0) { topOut(); return; }
     lockPiece(y);
@@ -2251,7 +2269,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
   // can't be used to stall gravity indefinitely.
   const doHold = () => {
     const cur = liveRef.current;
-    if (cur.done || holdUsed || cur.pieceIdx >= DS_PIECES) return;
+    if (cur.done || holdUsed || cur.pieceIdx >= bagLen) return;
     const incoming = cur.hold;
     setHold(cur.shapeIdx);
     setHoldUsed(true);
@@ -2262,7 +2280,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
     if (incoming == null) {
       // Nothing banked yet: consume the current piece from the bag.
       const np = cur.pieceIdx + 1;
-      if (np >= DS_PIECES) { setPieceIdx(np); return; }
+      if (np >= seq.current.length) { setPieceIdx(np); return; }
       setPieceIdx(np);
       onStepChange(np);
     } else {
@@ -2351,7 +2369,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
         // well repaint in the previous frame's piece colour.
         box(c * cellStep, r * cellStep, v ? DS_SHAPES[v - 1].color : PAL.card, v ? null : PAL.border);
       }
-      if (!done && pieceIdx < DS_PIECES) {
+      if (!done && pieceIdx < bagLen) {
         const color = DS_SHAPES[shapeIdx].color;
         if (ghostY >= 0) {
           for (const [dx, dy] of cells) {
@@ -2382,7 +2400,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
     );
   };
   const nextThree = [1, 2, 3]
-    .map((n) => (pieceIdx + n < DS_PIECES ? seq.current[pieceIdx + n] : null));
+    .map((n) => (pieceIdx + n < bagLen ? seq.current[pieceIdx + n] : null));
 
   return (
     <div className="ds-game fit-col">
@@ -2391,7 +2409,11 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
         <div className="pill"><div className="plabel">Level</div><div className="pvalue">{level}</div></div>
         <div className="pill"><div className="plabel">Lines</div><div className="pvalue">{lines}</div></div>
         <div className="pill"><div className="plabel">Points</div><div className="pvalue">{points}</div></div>
-        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">{Math.min(pieceIdx + 1, DS_PIECES)}/{DS_PIECES}</div></div>
+        <div className="pill"><div className="plabel">Piece</div><div className="pvalue">
+          {/* Arcade's bag is effectively endless, so counting toward its
+              length would read as a target that does not exist. */}
+          {isArcade ? Math.min(pieceIdx + 1, bagLen) : `${Math.min(pieceIdx + 1, bagLen)}/${bagLen}`}
+        </div></div>
       </div>
 
       <div className="ds-main">

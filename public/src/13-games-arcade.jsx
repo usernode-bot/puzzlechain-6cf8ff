@@ -288,9 +288,15 @@ const BB_SHAPES = [
   [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0]],
 ];
 const BB_COLORS = [C.accent, C.emerald, C.gold, C.violet, C.rose];
-function bbRandPiece() {
-  const cells = BB_SHAPES[Math.floor(Math.random() * BB_SHAPES.length)];
-  return { cells, color: BB_COLORS[Math.floor(Math.random() * BB_COLORS.length)] };
+/* #176 — Block Fit's daily is the CLEANEST of the two new classic dailies:
+   the piece-offer sequence does not depend on board state, so seeding it makes
+   every player's run genuinely identical, not merely similarly-supplied. (2048
+   cannot promise that — see t2048_addRandom.) A null rng keeps free play on
+   Math.random, so nothing about the classic mode changes. */
+function bbRandPiece(rng) {
+  const r = rng || Math.random;
+  const cells = BB_SHAPES[Math.floor(r() * BB_SHAPES.length)];
+  return { cells, color: BB_COLORS[Math.floor(r() * BB_COLORS.length)] };
 }
 function bbCanPlace(grid, cells, or, oc) {
   return cells.every(([r, c]) => {
@@ -309,10 +315,20 @@ function bbCanPlaceAny(grid, tray) {
 // game-over it calls onEnd(score, placed, secs); the parent decides what to do
 // (solo submits the global score + shows the overlay; the race host posts to
 // the room). The board itself never touches scoring endpoints.
-function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
+function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, offset }) {
   const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
+  /* One rng for the whole run so the offer sequence is reproducible: the daily
+     seeds from today's server seed, arcade from a fresh per-run seed that is
+     kept for replay, and free play stays on Math.random (null). */
+  const rngRef = useRef(undefined);
+  if (rngRef.current === undefined) {
+    rngRef.current = (playMode === 'daily' || playMode === 'arcade')
+      ? modeSeed(playMode, 'blockblast', 0, offset).rng
+      : null;
+  }
+  const bbRng = rngRef.current;
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
-  const [tray, setTray] = useState(() => [bbRandPiece(), bbRandPiece(), bbRandPiece()]);
+  const [tray, setTray] = useState(() => [bbRandPiece(bbRng), bbRandPiece(bbRng), bbRandPiece(bbRng)]);
   const [score, setScore] = useState(0);
   const [drag, setDrag] = useState(null); // { idx, cells, color, x, y }
   const [done, setDone] = useState(false);
@@ -326,7 +342,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
 
   const init = () => {
     setGrid(new Array(64).fill(null));
-    setTray([bbRandPiece(), bbRandPiece(), bbRandPiece()]);
+    setTray([bbRandPiece(bbRng), bbRandPiece(bbRng), bbRandPiece(bbRng)]);
     setScore(0); setDone(false); setDrag(null);
     doneRef.current = false; placedRef.current = 0; linesRef.current = 0;
   };
@@ -372,7 +388,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
     // consume tray slot
     let nt = tray.slice();
     if (piece.idx != null) nt[piece.idx] = null;
-    if (nt.every(p => !p)) nt = [bbRandPiece(), bbRandPiece(), bbRandPiece()];
+    if (nt.every(p => !p)) nt = [bbRandPiece(bbRng), bbRandPiece(bbRng), bbRandPiece(bbRng)];
     setGrid(g);
     setTray(nt);
     // game-over check next frame
@@ -474,7 +490,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
 
 // Block Blast entry — solo (own board + leaderboard sheet) or the online-race
 // host. Both wrap the shared BlockBlastBoard in the standard ClassicShell.
-function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, gameMode, gameModeOpts }) {
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, gameMode, gameModeOpts, playMode, offset }) {
   const [nkey, setNkey] = useState(0);
   const boardKey = `${resetKey || 0}:${nkey}`;
   const hist = cgLoadHistory(BB_KEY);
@@ -508,8 +524,14 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
         <BlockBlastBoard
           onStepChange={onStepChange}
           resetKey={boardKey}
+          playMode={playMode}
+          offset={offset}
           onEnd={(sc, placed, secs) => {
-            submitClassicScore('blockblast', sc);
+            /* Only free play feeds the all-time classic board. A daily run is
+               settled by the shell's daily pipeline and an arcade run by the
+               per-band board, so submitting here too would put one run on two
+               ladders. */
+            if (!playMode) submitClassicScore('blockblast', sc);
             onWin(sc, placed, secs, { winnerLabel: 'Game Over', share: `🧱 Block Fit — ${sc} pts` });
           }}
         />

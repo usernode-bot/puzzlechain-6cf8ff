@@ -248,10 +248,26 @@ function wsprGrid(rng) {
   return dice.map(d => d[Math.floor(rng() * d.length)]);
 }
 
-function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* #176 — this was already the closest daily to arcade: the clock ends the
+     run and the score genuinely varies, so a fresh grid per run was the only
+     thing missing. Arcade also widens the clock by band, since 90 seconds is
+     the daily's fixed contract rather than a property of the game. */
+  const isArcade = playMode === 'arcade';
+  const bandIdx = isArcade ? Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band)) : 1;
+  const secsForRun = isArcade ? [120, 90, 60][bandIdx] : WSPR_SECS;
+  const seedRef = useRef(null);
   const letters = useRef(null);
-  if (!letters.current) letters.current = wsprGrid(dailyRng(offset, 'wordsprint'));
+  if (!letters.current) {
+    if (isArcade) {
+      const { rng, seed } = modeSeed('arcade', 'wordsprint', bandIdx, offset);
+      seedRef.current = seed;
+      letters.current = wsprGrid(rng);
+    } else {
+      letters.current = wsprGrid(dailyRng(offset, 'wordsprint'));
+    }
+  }
   const L = letters.current;
 
   const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.found)
@@ -262,9 +278,9 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
   const [msg, setMsg] = useState(null); // { kind: 'good'|'bad', text }
   const [done, setDone] = useState(false);
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs)
-    ? Math.min(savedProgress.elapsedSecs, WSPR_SECS) : 0;
+    ? Math.min(savedProgress.elapsedSecs, secsForRun) : 0;
   const { secs } = useTimer(!done, initialSecs);
-  const remaining = Math.max(0, WSPR_SECS - secs);
+  const remaining = Math.max(0, secsForRun - secs);
 
   const score = found.reduce((s, w) => s + wsprPoints(w.length), 0);
   const scoreRef = useRef(score); scoreRef.current = score;
@@ -292,7 +308,7 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
     const words = foundRef.current;
     const sc = scoreRef.current;
     const best = words.reduce((m, w) => (w.length > m.length ? w : m), '');
-    onWin(sc, words.length, WSPR_SECS, {
+    onWin(sc, words.length, secsForRun, {
       share: `🔠 Word Sprint — ${words.length} words · ${sc} pts${best ? ` · best "${best.toLowerCase()}"` : ''}`,
     });
   }, [remaining]);

@@ -590,6 +590,49 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
 
 // A bot is a pure function (state, player) -> move | null. One strength per
 // game; difficulty tiers are deferred. Each is deliberately beatable.
+/* #176 — bot difficulty tiers.
+   Search DEPTH was always a plain argument to boardNegamax, so wiring a
+   selector to it is trivial. What is NOT trivial, and is the actual work here:
+   SHALLOW IS NOT EASY. A depth-1 Four in a Row bot still blocks every
+   immediate threat and still wins the centre — to a beginner it is
+   indistinguishable from the depth-4 one. A believable easy tier needs a
+   deliberate BLUNDER RATE: some fraction of the time it plays a legal move
+   that is not the best one it found.
+
+   Mancala already shipped Easy/Medium/Hard (it is the only bot in the app that
+   did), so its selector is the UI pattern the five others copy. */
+const BOARD_BOT_LEVELS = [
+  { id: 'easy',   label: 'Easy',   depthDelta: -2, blunder: 0.45 },
+  { id: 'medium', label: 'Medium', depthDelta: -1, blunder: 0.15 },
+  { id: 'hard',   label: 'Hard',   depthDelta: 0,  blunder: 0 },
+];
+const boardBotLevel = (id) => BOARD_BOT_LEVELS.find(l => l.id === id) || BOARD_BOT_LEVELS[2];
+
+/* Wrap a bot so it sometimes plays a legal-but-not-best move.
+   Candidates come from the SAME move generators the search uses, and each one
+   is then validated against the real rules module by calling applyMove and
+   catching its throw — so a blundering bot can only ever play badly, never
+   illegally. A game with no generator here (Reversi's weighted bot, Ludo's
+   dice) simply keeps its pick and gets its difficulty from depth alone. */
+const BOARD_BOT_MOVES = {
+  fourinarow: (state) => firMoves(state),
+  gomoku: (state) => gmkMoves(state),
+  checkers: (state, me) => ckMoves(state, me),
+  reversi: (state) => (state.board || []).map((_, i) => ({ cell: i })),
+};
+function boardBlunder(gameId, rules, state, me, best, rate) {
+  if (!rate || Math.random() >= rate) return best;
+  const gen = BOARD_BOT_MOVES[gameId];
+  if (!gen) return best;
+  let candidates = [];
+  try { candidates = gen(state, me) || []; } catch (e) { return best; }
+  const legal = candidates.filter((mv) => {
+    try { rules.applyMove(state, me, mv); return true; } catch (e) { return false; }
+  });
+  if (legal.length < 2) return best;   // no alternative to blunder into
+  return legal[Math.floor(Math.random() * legal.length)];
+}
+
 const BOARD_BOTS = {
   // Reversi: positional weights (corners high, X-squares poisonous) with a
   // 1-ply lookahead over the flip count.
@@ -617,14 +660,14 @@ const BOARD_BOTS = {
   },
 
   // Four in a Row: shallow negamax over a threat heuristic.
-  fourinarow: (rules, state, me) => boardNegamax(rules, state, me, 4, firScore, firMoves),
+  fourinarow: (rules, state, me, lvl) => boardNegamax(rules, state, me, Math.max(1, 4 + boardBotLevel(lvl).depthDelta), firScore, firMoves),
 
   // Gomoku: the same search, shallower (15x15 branching is 225 wide) with a
   // candidate filter to cells near existing stones.
-  gomoku: (rules, state, me) => boardNegamax(rules, state, me, 2, gmkScore, gmkMoves),
+  gomoku: (rules, state, me, lvl) => boardNegamax(rules, state, me, Math.max(1, 2 + boardBotLevel(lvl).depthDelta), gmkScore, gmkMoves),
 
   // Checkers: negamax over material + kings + advancement.
-  checkers: (rules, state, me) => boardNegamax(rules, state, me, 3, ckScore, ckMoves),
+  checkers: (rules, state, me, lvl) => boardNegamax(rules, state, me, Math.max(1, 3 + boardBotLevel(lvl).depthDelta), ckScore, ckMoves),
 
   // Ludo: pure move ordering — capture > finish > leave base > advance leader.
   // (No search: the dice make deep lookahead worthless.)
@@ -799,10 +842,17 @@ function ckScore(state, me) {
   return s;
 }
 
-function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
+function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey, seats, botLevel }) {
   const rules = (window.boardRules && window.boardRules.getRules)
     ? window.boardRules.getRules(gameId) : null;
-  const [state, setState] = useState(() => (rules ? rules.initialState() : null));
+  /* #176 — local play was 2-seat ONLY because this called initialState() with
+     no argument. The ludo rules module has always been seat-generic
+     (`initialState(nPlayers = 2)`, `maxPlayers: 4`) and online has always
+     offered 2–4, so local was the odd one out for no reason but a missing
+     parameter. Games whose rules take no argument ignore it. */
+  const nSeats = Math.min(rules && rules.maxPlayers ? rules.maxPlayers : 2,
+                          Math.max(2, Number(seats) || 2));
+  const [state, setState] = useState(() => (rules ? rules.initialState(nSeats) : null));
   const [over, setOver] = useState(null); // { winner }
   const [err, setErr] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -812,10 +862,10 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
 
   useEffect(() => {
     if (!rules) return;
-    setState(rules.initialState());
+    setState(rules.initialState(nSeats));
     setOver(null); setErr(''); setMoves(0); setThinking(false);
     submittedRef.current = false;
-  }, [resetKey, gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resetKey, gameId, nSeats]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rules) {
     return (
@@ -831,7 +881,7 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
     if (submittedRef.current) return;
     submittedRef.current = true;
     const label = winner === 'draw' ? 'Draw'
-      : vsBot ? (winner === '1' ? 'You win! 🎉' : 'Bot wins')
+      : vsBot ? (String(winner) === '1' ? 'You win! 🎉' : 'Bot wins')
       : `Player ${winner} wins! 🎉`;
     // Unrated and unscored on purpose — a local result must not sit on the same
     // board as online matches (and the ladder is server-side only anyway).
@@ -867,7 +917,9 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
       if (!alive) return;
       setThinking(false);
       const pick = BOARD_BOTS[gameId];
-      const mv = pick ? pick(rules, state, botPlayer) : null;
+      const lvl = botLevel || 'hard';
+      const raw = pick ? pick(rules, state, botPlayer, lvl) : null;
+      const mv = raw ? boardBlunder(gameId, rules, state, botPlayer, raw, boardBotLevel(lvl).blunder) : null;
       if (!mv) {
         // No legal move the bot can find — Ludo rolls again, others concede.
         if (gameId === 'ludo') apply(botPlayer, { type: 'roll' });
@@ -876,7 +928,7 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey }) {
       apply(botPlayer, mv);
     }, 350);
     return () => { alive = false; clearTimeout(t); setThinking(false); };
-  }, [state, vsBot, over]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state, vsBot, over, botLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const View = BOARD_VIEWS[gameId];
   const cur = Number(state.currentPlayer) || 1;
@@ -927,6 +979,8 @@ function BoardRoomGame({ gameId, onWin, onStepChange, resetKey, gameMode, gameMo
         onWin={onWin}
         onStepChange={onStepChange}
         resetKey={resetKey}
+        botLevel={(gameModeOpts && gameModeOpts.botLevel) || 'medium'}
+        seats={(gameModeOpts && gameModeOpts.seats) || 2}
       />
     );
   }

@@ -48,19 +48,28 @@ function t2048_emptyCells(grid) {
   return out;
 }
 
-function t2048_addRandom(grid) {
+/* #176 — 2048's daily seeds the SPAWN STREAM, not the board.
+   Spawns land in whichever cells happen to be free, so two players making
+   different moves diverge immediately: this game cannot promise "everyone
+   plays the same board" the way a dealt puzzle can. What it CAN promise is the
+   same stream of (value, index-into-free-cells) draws, which keeps the run
+   fair without pretending to a stronger guarantee. That is a deliberate
+   product call — a fun thing for the day rather than a strict shared deal —
+   and the pre-game copy says so rather than letting it read as a bug. */
+function t2048_addRandom(grid, rng) {
+  const r0 = rng || Math.random;
   const empties = t2048_emptyCells(grid);
   if (!empties.length) return grid;
-  const [r, c] = empties[Math.floor(Math.random() * empties.length)];
+  const [r, c] = empties[Math.floor(r0() * empties.length)];
   const next = grid.map(row => [...row]);
-  next[r][c] = t2048_newTile(Math.random() < 0.9 ? 2 : 4, true, false);
+  next[r][c] = t2048_newTile(r0() < 0.9 ? 2 : 4, true, false);
   return next;
 }
 
-function t2048_initGrid() {
+function t2048_initGrid(rng) {
   let g = [[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]];
-  g = t2048_addRandom(g);
-  g = t2048_addRandom(g);
+  g = t2048_addRandom(g, rng);
+  g = t2048_addRandom(g, rng);
   return g;
 }
 
@@ -191,11 +200,25 @@ function t2048SaveBest(v) {
 /* ============================================================
    T2048Game component
    ============================================================ */
-function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
+function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode, offset }) {
+  /* One spawn stream for the run. Free play keeps Math.random (null), so the
+     saved-board resume and the all-time leaderboard behave exactly as before. */
+  const rngRef = useRef(undefined);
+  if (rngRef.current === undefined) {
+    rngRef.current = (playMode === 'daily' || playMode === 'arcade')
+      ? modeSeed(playMode, '2048', 0, offset).rng
+      : null;
+  }
+  const t2048Rng = rngRef.current;
   const raceMode = !!onRaceEnd;
-  const _saved = raceMode ? null : t2048LoadSavedBoard();
+  /* The saved board is a single localStorage key belonging to FREE PLAY. A
+     daily or arcade run must not hydrate from it (it would replace the seeded
+     opening with someone's half-finished classic game) and must not write to
+     it (it would clobber that game). Both modes are self-contained runs. */
+  const seededRun = playMode === 'daily' || playMode === 'arcade';
+  const _saved = (raceMode || seededRun) ? null : t2048LoadSavedBoard();
 
-  const [grid, setGrid]               = useState(() => _saved ? _saved.grid : t2048_initGrid());
+  const [grid, setGrid]               = useState(() => _saved ? _saved.grid : t2048_initGrid(t2048Rng));
   const [score, setScore]             = useState(() => _saved ? _saved.score || 0 : 0);
   const [moves, setMoves]             = useState(() => _saved ? _saved.moves || 0 : 0);
   const [elapsedSecs, setElapsedSecs] = useState(() => _saved ? _saved.elapsed || 0 : 0);
@@ -267,7 +290,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
   const handleNewGame = () => {
     t2048ClearBoard();
     try { localStorage.removeItem(T2048_UNDO_KEY); } catch {}
-    setGrid(t2048_initGrid());
+    setGrid(t2048_initGrid(t2048Rng));
     setScore(0);
     setMoves(0);
     setElapsedSecs(0);
@@ -287,7 +310,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
       ? [{ grid: t2048_stripAnim(grid), score, moves }, ...undoStack].slice(0, 10)
       : undoStack;
 
-    const withTile  = t2048_addRandom(movedGrid);
+    const withTile  = t2048_addRandom(movedGrid, t2048Rng);
     const newScore  = score + delta;
     const newMoves  = moves + 1;
 
@@ -303,7 +326,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
     }
 
     if (newScore > bestScore) { setBestScore(newScore); t2048SaveBest(newScore); }
-    t2048SaveBoard(withTile, newScore, elapsedSecs, hasWon, newMoves);
+    if (!seededRun) t2048SaveBoard(withTile, newScore, elapsedSecs, hasWon, newMoves);
     if (isMock) {
       try { localStorage.setItem(T2048_UNDO_KEY, JSON.stringify(newUndo)); } catch {}
     }
@@ -586,7 +609,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
 // 2048 entry: solo board, or the online-race host when launched via the mode
 // modal in Online Race mode.
-function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOpts, onBack }) {
+function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOpts, onBack, playMode, offset }) {
   if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
     return (
       <ClassicRaceGame
@@ -600,5 +623,5 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOp
       />
     );
   }
-  return <T2048Solo onWin={onWin} onLose={onLose} onStepChange={onStepChange} resetKey={resetKey} />;
+  return <T2048Solo onWin={onWin} onLose={onLose} onStepChange={onStepChange} resetKey={resetKey} playMode={playMode} offset={offset} />;
 }

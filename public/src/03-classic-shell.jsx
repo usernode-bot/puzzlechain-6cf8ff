@@ -159,6 +159,10 @@ function useClassicRoom(gameId, roomId) {
 }
 
 // Per-mode display metadata for the inline mode picker.
+// The five games refereed by lib/board-rules.js, which are the ones whose
+// bots take a strength. Mancala keeps its own long-standing selector.
+const BOARD_RULE_GAME_IDS_CLIENT = new Set(['checkers', 'reversi', 'fourinarow', 'gomoku', 'ludo']);
+
 const CLASSIC_MODE_META = {
   solo:   { icon: '🎯', name: 'Classic Solo',      desc: 'Play solo and chase your best score' },
   bot:    { icon: '🤖', name: 'Versus Bot',        desc: 'Play against the computer' },
@@ -170,6 +174,13 @@ const CLASSIC_MODE_META = {
 // their modes through the menu (e.g. Chutes & Ladders). Calls onPlay(mode, opts).
 function ClassicModePicker({ game, onPlay }) {
   const [mode, setMode] = useState(null);
+  /* #176 — bot strength and local seat count. Both are per-mode options that
+     only make sense once a mode is chosen, so they render under the picker
+     rather than beside it. `medium` is the default rather than `hard`: the
+     bots were all previously single-strength AND at full depth, which is the
+     thing players were actually complaining about. */
+  const [botLevel, setBotLevel] = useState('medium');
+  const [seats, setSeats] = useState(2);
   const [onlineAction, setOnlineAction] = useState(null);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
@@ -177,7 +188,7 @@ function ClassicModePicker({ game, onPlay }) {
 
   const handlePlay = async () => {
     if (!mode) return;
-    if (mode !== 'online') { onPlay(mode, {}); return; }
+    if (mode !== 'online') { onPlay(mode, { botLevel, seats }); return; }
     if (onlineAction === 'create') {
       setBusy(true);
       const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
@@ -210,6 +221,30 @@ function ClassicModePicker({ game, onPlay }) {
           </span>
         </button>
       ))}
+      {/* Bot strength — every board game had exactly ONE, at full search
+          depth. Easy shortens the search AND blunders on purpose, because a
+          shallow search is not the same thing as a beatable opponent. */}
+      {mode === 'bot' && BOARD_RULE_GAME_IDS_CLIENT.has(game.id) && (
+        <div className="mnc-mode-sub">
+          {BOARD_BOT_LEVELS.map(l => (
+            <button key={l.id}
+              className={'mnc-difficulty-pill' + (botLevel === l.id ? ' active' : '')}
+              onClick={() => setBotLevel(l.id)}>{l.label}</button>
+          ))}
+        </div>
+      )}
+      {/* Local seat count — Ludo online has always offered 2–4 while local was
+          stuck at 2, purely because the rules module was called without its
+          seat argument. */}
+      {mode === '2p' && game.id === 'ludo' && (
+        <div className="mnc-mode-sub">
+          {[2, 3, 4].map(n => (
+            <button key={n}
+              className={'mnc-difficulty-pill' + (seats === n ? ' active' : '')}
+              onClick={() => setSeats(n)}>{n} players</button>
+          ))}
+        </div>
+      )}
       {mode === 'online' && (
         <div className="mnc-online-actions">
           <div className="mnc-mode-sub">

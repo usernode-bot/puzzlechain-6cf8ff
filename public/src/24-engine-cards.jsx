@@ -1754,7 +1754,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
     },
   });
 
-  const minesLeft = Math.max(10 - flags.size, 0);
+  const minesLeft = Math.max(mines.size - flags.size, 0);
 
   return (
     <div className="mf-game">

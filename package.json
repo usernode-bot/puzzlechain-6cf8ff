@@ -7,8 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "build": "node scripts/build.js",
-    "check": "node scripts/check-jsx.js",
-    "test:mnc": "node scripts/mancala-daily-selftest.js"
+    "check": "node scripts/check-jsx.js"
   },
   "dependencies": {
     "express": "^4.21.0",

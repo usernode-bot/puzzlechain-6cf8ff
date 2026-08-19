@@ -124,23 +124,6 @@ function modeSeed(playMode, gameId, band, offset) {
 }
 
 
-// Mancala Daily Challenge opening board, derived from the server-anchored UTC
-// day. Deals 24 stones into one side via the daily seed, then mirrors them
-// rotationally (pit i ↔ opposite 12-i) so both players start from an identical,
-// fair position; stores (6, 13) stay empty. MUST match srvMncDailyBoard in
-// server.js byte-for-byte or verification fails.
-function mncDailyBoard(offset) {
-  const rng = dailyRng(offset, 'mancaladaily');
-  const side = [0, 0, 0, 0, 0, 0];
-  for (let s = 0; s < 24; s++) side[Math.floor(rng() * 6)]++;
-  const board = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  for (let i = 0; i < 6; i++) {
-    board[i] = side[i];
-    board[12 - i] = side[i];
-  }
-  return board;
-}
-
 // Periodically persist a game's in-progress state so a resumed attempt picks up
 // the exact board, step count, and accumulated timer. `getState()` returns
 // `{ progress, steps, secs }`; it's read through a ref so the interval and the

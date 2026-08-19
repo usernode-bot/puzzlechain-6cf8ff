@@ -2951,15 +2951,6 @@ ${emitTapHighlightRules()}
   max-width: 94vw;
   min-height: 5rem;
 }
-.bb-piece {
-  display: grid;
-  gap: 2px;
-  cursor: grab;
-  touch-action: none;
-  padding: 0.3rem;
-}
-.bb-piece.dragging { opacity: 0.3; }
-.bb-piece.used { opacity: 0; pointer-events: none; }
 .bb-pcell { width: clamp(0.7rem, 3.5vw, 1.1rem); height: clamp(0.7rem, 3.5vw, 1.1rem); border-radius: 3px; }
 .bb-pcell.on { background: ${C.accent}; }
 .bb-drag-ghost { position: fixed; z-index: 60; pointer-events: none; display: grid; gap: 2px; opacity: 0.9; }
@@ -4976,13 +4967,17 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
 }
 
 // Shared status-bar helper for new games.
+/* The classic-shell status row draws on a CuiBar canvas now (controls wave):
+   every CgStatus caller — Snake, Block Fit, Diamond Rush, Zuma, and co —
+   inherits the drawn pills + the sr-only twin in one move. */
 function CgStatus({ items }) {
   return (
-    <div className="cg-statusbar">
-      {items.map((it, i) => (
-        <div className="cg-stat" key={i}><div className="l">{it.l}</div><div className="v">{it.v}</div></div>
-      ))}
-    </div>
+    <CuiBar height={46} build={(W) => {
+      const pr = cuiRow(0, 0, W, 46, items.length);
+      return items.map((it, i) => ({
+        id: 'cg' + i, kind: 'pill', r: pr[i], label: it.l, value: it.v, gold: /time/i.test(String(it.l)),
+      }));
+    }} />
   );
 }
 
@@ -6057,11 +6052,27 @@ function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
     ...h,
     onDown: (p, e) => {
       const c = cuiHitAt(ctlRef.current || [], p.x, p.y);
-      if (c) { ctlRef.pressed = c.id; setPressed(c.id); cgHaptic(8); return; }
+      if (c) {
+        ctlRef.pressed = c.id;
+        setPressed(c.id);
+        cgHaptic(8);
+        if (c.holdDown) c.holdDown(); // hold-to-act controls (D-pads) engage on DOWN
+        return;
+      }
       if (h.onDown) h.onDown(p, e);
     },
     onDrag: (p, d, e) => {
-      if (ctlRef.pressed) return;
+      if (ctlRef.pressed) {
+        // A hold control releases if the finger slides off it (the DOM
+        // pointerleave contract) — capture means leave never fires.
+        const c = (ctlRef.current || []).find(x => x.id === ctlRef.pressed);
+        if (c && c.holdDown && !cuiInRect(c.r, p.x, p.y)) {
+          if (c.holdUp) c.holdUp();
+          ctlRef.pressed = null;
+          setPressed(null);
+        }
+        return;
+      }
       if (h.onDrag) h.onDrag(p, d, e);
     },
     onUp: (p, e) => {
@@ -6072,6 +6083,7 @@ function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
         const c = (ctlRef.current || []).find(x => x.id === ctlRef.pressed);
         ctlRef.pressed = null;
         setPressed(null);
+        if (c && c.holdDown) { if (c.holdUp) c.holdUp(); return; }
         if (c && !c.disabled && c.action && cuiInRect(c.r, p.x, p.y)) c.action();
         return;
       }
@@ -9529,39 +9541,23 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{timeFmt}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Mines Left</div>
-              <div className="pvalue">{minesLeft}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Safe Revealed</div>
-              <div className="pvalue">{safeRevealed}/{MS_SAFE}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: timeFmt, gold: true },
+              { id: 'p-mines', kind: 'pill', r: pr[1], label: 'Mines Left', value: minesLeft },
+              { id: 'p-safe', kind: 'pill', r: pr[2], label: 'Safe Revealed', value: `${safeRevealed}/${MS_SAFE}` },
+            ];
+          }} />
 
-          {/* #136 — flag/dig toggle. Mirrors the daily Mine Finder's
-              .mf-mode-btn pair so the two mine games read the same. */}
-          <div className="mf-controls" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-            <button
-              className={'mf-mode-btn' + (flagMode ? '' : ' on')}
-              onClick={() => setFlagMode(false)}
-              aria-pressed={!flagMode}
-            >
-              ⛏️ Dig<span className="mf-mode-label">tap to reveal</span>
-            </button>
-            <button
-              className={'mf-mode-btn flag' + (flagMode ? ' on' : '')}
-              onClick={() => setFlagMode(true)}
-              aria-pressed={flagMode}
-            >
-              🚩 Flag<span className="mf-mode-label">tap to mark</span>
-            </button>
-          </div>
+          {/* #136 — flag/dig toggle, drawn; the two mine games read the same. */}
+          <CuiBar height={52} build={(W) => {
+            const br = cuiRow(Math.floor(W * 0.06), 2, Math.floor(W * 0.88), 48, 2);
+            return [
+              { id: 'dig', kind: 'button', r: br[0], label: '⛏️ Dig', sub: 'tap to reveal', on: !flagMode, action: () => setFlagMode(false) },
+              { id: 'flag', kind: 'button', r: br[1], label: '🚩 Flag', sub: 'tap to mark', on: flagMode, action: () => setFlagMode(true) },
+            ];
+          }} />
           {/* #136 — chording was completely undiscoverable: tapping a revealed
               number simply did nothing, with no hint that it ever would. */}
           <div className="p6-hint" style={{ textAlign: 'center' }}>
@@ -9582,31 +9578,18 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
             onCellAlt={(idx) => { if (flagMode) handleReveal(idx); else handleFlag(idx); cgHaptic(12); }}
           />
 
-          <div className="ms-action-row">
-            <div className="ms-cashout-wrap">
-              <button
-                className={'ms-cashout-btn' + (cashOutActive ? '' : ' disabled')}
-                onClick={handleCashOut}
-                disabled={!cashOutActive}
-              >
-                Lock In 🔒 ×{cashoutMultiplier}
-              </button>
-            </div>
-            <button
-              className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
-              onClick={() => setMusicPaused(p => !p)}
-              disabled={!soundOn}
-              title={!soundOn ? 'Sound is off (Settings)' : musicPaused ? 'Resume music' : 'Pause music'}
-              aria-label={!soundOn ? 'Sound off' : musicPaused ? 'Resume music' : 'Pause music'}
-            >
-              {!soundOn ? '🔇' : musicPaused ? '▶' : '⏸'}
-            </button>
-            <button className="ms-newgame-btn" onClick={() => {
-              setMineSet(null); setAdjacency(null); setRevealed(new Set());
-              setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
-              setMusicPaused(false);
-            }}>↺ New</button>
-          </div>
+          <CuiBar height={50} build={(W) => {
+            const br = cuiRow(Math.floor(W * 0.04), 4, Math.floor(W * 0.92), 42, 3);
+            return [
+              { id: 'lockin', kind: 'button', r: [br[0][0], 4, br[0][2] + br[1][2] * 0.35, 42], label: `Lock In 🔒 ×${cashoutMultiplier}`, solid: cashOutActive, disabled: !cashOutActive, action: handleCashOut },
+              { id: 'music', kind: 'button', r: [br[1][0] + br[1][2] * 0.45, 4, br[1][2] * 0.55, 42], label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', disabled: !soundOn, action: () => setMusicPaused(p => !p) },
+              { id: 'new', kind: 'button', r: br[2], label: '↺ New', action: () => {
+                setMineSet(null); setAdjacency(null); setRevealed(new Set());
+                setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+                setMusicPaused(false);
+              } },
+            ];
+          }} />
         </div>
       )}
 
@@ -12222,31 +12205,16 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill" style={{ position: 'relative' }}>
-              <div className="plabel">Score</div>
-              <div className="pvalue mono">
-                {score.toLocaleString()}
-                {scoreDelta !== null && <span className="t2048-score-delta">+{scoreDelta}</span>}
-              </div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Best</div>
-              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Tile</div>
-              <div className="pvalue mono">{maxTile || '—'}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue">{moves}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 5);
+            return [
+              { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() + (scoreDelta !== null ? ` +${scoreDelta}` : '') },
+              { id: 'p-best', kind: 'pill', r: pr[1], label: 'Best', value: bestScore.toLocaleString() },
+              { id: 'p-tile', kind: 'pill', r: pr[2], label: 'Tile', value: maxTile || '—' },
+              { id: 'p-moves', kind: 'pill', r: pr[3], label: 'Moves', value: moves },
+              { id: 'p-time', kind: 'pill', r: pr[4], label: 'Time', value: fmtSecs(elapsedSecs), gold: true },
+            ];
+          }} />
 
           <div
             className="t2048-board-wrap"
@@ -12271,9 +12239,9 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd }) {
             )}
           </div>
 
-          <div className="t2048-controls">
-            <button onClick={handleNewGame}>↺ New Game</button>
-          </div>
+          <CuiBar height={44} build={(W) => ([
+            { id: 'new', kind: 'button', r: [Math.floor(W * 0.3), 0, Math.floor(W * 0.4), 40], label: '↺ New Game', action: handleNewGame },
+          ])} />
         </div>
       )}
 
@@ -12629,21 +12597,14 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
           )}
         </div>
         <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
-        <div className="snake-controls">
-          {!started && <button onClick={() => init()}>Restart</button>}
-          {started && !paused && !done && (
-            <>
-              <button onClick={() => { setPaused(true); setPausedSecs(secs); }}>Pause</button>
-              <button onClick={() => init()}>Restart</button>
-            </>
-          )}
-          {paused && !done && (
-            <>
-              <button onClick={() => { setPaused(false); }}>Resume</button>
-              <button onClick={() => init()}>Restart</button>
-            </>
-          )}
-        </div>
+        <CuiBar height={44} build={(W) => {
+          const btns = [];
+          if (started && !paused && !done) btns.push({ id: 'pause', label: 'Pause', action: () => { setPaused(true); setPausedSecs(secs); } });
+          if (paused && !done) btns.push({ id: 'resume', label: 'Resume', primary: true, action: () => setPaused(false) });
+          btns.push({ id: 'restart', label: 'Restart', action: () => init() });
+          const br = cuiRow(Math.floor(W * 0.14), 0, Math.floor(W * 0.72), 40, btns.length);
+          return btns.map((b, i) => ({ ...b, kind: 'button', r: br[i] }));
+        }} />
       </div>
     </ClassicShell>
   );
@@ -12881,6 +12842,50 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
     cgSound('click');
     setDrag({ idx, cells: tray[idx].cells, color: tray[idx].color, x, y });
   };
+
+  // The tray draws on canvas too (controls wave): three piece slots, hit by
+  // thirds; the piece lifts into the existing DOM ghost on pointerdown, so
+  // the drag/drop pipeline (window-level move/up + originFromPointer against
+  // the well) is untouched.
+  const trayBoxRef = useRef(null);
+  const trayCanvasRef = useRef(null);
+  const { boxW: trayW0 } = useFitBox(trayBoxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const trayW = Math.floor(trayW0);
+  const BB_TRAY_H = 92;
+  useCanvasBoard(trayCanvasRef, {
+    width: trayW,
+    height: BB_TRAY_H,
+    deps: [tray, drag, trayW],
+    draw: (ctx) => {
+      const slotW = trayW / 3;
+      for (let i = 0; i < 3; i++) {
+        const p = tray[i];
+        const x0 = i * slotW;
+        klRR(ctx, x0 + 4, 4, slotW - 8, BB_TRAY_H - 8, 10);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        if (!p) continue;
+        ctx.save();
+        if (drag && drag.idx === i) ctx.globalAlpha = 0.3;
+        const maxR = Math.max(...p.cells.map((c) => c[0]));
+        const maxC = Math.max(...p.cells.map((c) => c[1]));
+        const u = Math.min(16, Math.floor((slotW - 24) / (maxC + 1)), Math.floor((BB_TRAY_H - 24) / (maxR + 1)));
+        const px0 = x0 + (slotW - (maxC + 1) * u) / 2;
+        const py0 = (BB_TRAY_H - (maxR + 1) * u) / 2;
+        for (const [r, c] of p.cells) {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5, 2);
+          else ctx.rect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    },
+  });
   // preview cells
   let preview = null;
   if (drag) {
@@ -12897,24 +12902,18 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd }) {
       <div className="bb-grid" ref={gridRef}>
         <BbGridCanvas grid={grid} preview={preview} />
       </div>
-      <div className="bb-tray">
-        {tray.map((p, idx) => (
-          <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
-            style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
-            onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
-            {p && (() => {
-              const maxR = Math.max(...p.cells.map(c => c[0]));
-              const maxC = Math.max(...p.cells.map(c => c[1]));
-              const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
-              const out = [];
-              for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
-                const on = set.has(r * 10 + c);
-                out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
-              }
-              return out;
-            })()}
-          </div>
-        ))}
+      <div className="bb-tray" ref={trayBoxRef}>
+        <canvas
+          ref={trayCanvasRef}
+          className="bb-tray-canvas board-canvas"
+          role="img"
+          aria-label={`Piece tray — ${tray.filter(Boolean).length} of 3 pieces left`}
+          onPointerDown={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const idx = Math.max(0, Math.min(2, Math.floor((e.clientX - rect.left) / (rect.width / 3))));
+            startDrag(e, idx);
+          }}
+        />
       </div>
       {drag && (
         <div className="bb-drag-ghost" style={{
@@ -13360,20 +13359,16 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="dr-powerups-bar">
-          {['hint', 'shuffle', 'extraTime'].map(type => (
-            <button
-              key={type}
-              className={`dr-powerup-btn ${powerUps[type] > 0 ? 'owned' : 'empty'}`}
-              onClick={() => usePowerUp(type)}
-              disabled={powerUps[type] === 0 || done}
-              title={`${type.charAt(0).toUpperCase() + type.slice(1)} (${powerUps[type]} owned)`}
-            >
-              <span className="icon">{DR_POWER_UP_ICONS[type]}</span>
-              <span className="count">{powerUps[type]}</span>
-            </button>
-          ))}
-        </div>
+        <CuiBar height={44} build={(W) => {
+          const br = cuiRow(Math.floor(W * 0.08), 0, Math.floor(W * 0.84), 40, 3);
+          return ['hint', 'shuffle', 'extraTime'].map((type, i) => ({
+            id: 'pw-' + type, kind: 'button', r: br[i],
+            label: `${DR_POWER_UP_ICONS[type]} ${powerUps[type]}`,
+            disabled: powerUps[type] === 0 || done,
+            on: powerUps[type] > 0,
+            action: () => usePowerUp(type),
+          }));
+        }} />
         <div className="dr-grid" ref={drBoxRef}>
           <canvas
             ref={drCanvasRef}
@@ -15040,20 +15035,14 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
     <div>
       {activeTab === 'game' && (
         <div className="kt-wrap">
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{ktFmtTime(elapsed)}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue" style={stuck ? { color: C.rose } : {}}>{moves}/64</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Left</div>
-              <div className="pvalue">{64 - moves}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: ktFmtTime(elapsed), gold: true },
+              { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: `${moves}/64`, color: stuck ? PAL.rose : undefined },
+              { id: 'p-left', kind: 'pill', r: pr[2], label: 'Left', value: 64 - moves },
+            ];
+          }} />
 
           <KtBoardCanvas
             visited={visited}
@@ -15063,20 +15052,18 @@ function KnightsTourGame({ onWin, onStepChange, resetKey }) {
             onCell={handleCellClick}
           />
 
-          {stuck && <div className="kt-stuck-banner">No valid moves — try Undo or restart.</div>}
-
-          <div className="kt-actions">
-            <button
-              className="kt-undo-btn"
-              disabled={undoStack.length === 0 || done}
-              onClick={handleUndo}
-            >
-              ↩ Undo
-            </button>
-            {stuck && (
-              <button className="kt-new-btn" onClick={resetGame}>New Game</button>
-            )}
-          </div>
+          <CuiBar height={stuck ? 68 : 44} build={(W) => {
+            const out = [];
+            let y = 0;
+            if (stuck) {
+              out.push({ id: 'stuck', kind: 'label', r: [0, 0, W, 20], label: 'No valid moves — try Undo or restart.', color: PAL.rose, font: 12 });
+              y = 24;
+            }
+            const br = cuiRow(Math.floor(W * 0.1), y, Math.floor(W * 0.8), 40, stuck ? 2 : 1);
+            out.push({ id: 'undo', kind: 'button', r: br[0], label: '↩ Undo', disabled: undoStack.length === 0 || done, action: handleUndo });
+            if (stuck) out.push({ id: 'new', kind: 'button', r: br[1], label: 'New Game', primary: true, action: resetGame });
+            return out;
+          }} />
 
           {currentPos === null && (
             <div className="kt-hint">Tap any square to place the knight and begin.</div>
@@ -15804,40 +15791,27 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Score</div>
-              <div className="pvalue mono">{score.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Best</div>
-              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Lives</div>
-              <div className="pvalue">{'●'.repeat(Math.max(0, lives)) || '—'}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Level</div>
-              <div className="pvalue mono">{level}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
-            </div>
-            {activePowerups.map((ap, idx) => {
+          <CuiBar height={activePowerups.length ? 72 : 46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 5);
+            const out = [
+              { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
+              { id: 'p-best', kind: 'pill', r: pr[1], label: 'Best', value: bestScore.toLocaleString() },
+              { id: 'p-lives', kind: 'pill', r: pr[2], label: 'Lives', value: '●'.repeat(Math.max(0, lives)) || '—' },
+              { id: 'p-level', kind: 'pill', r: pr[3], label: 'Level', value: level },
+              { id: 'p-time', kind: 'pill', r: pr[4], label: 'Time', value: fmtSecs(elapsedSecs), gold: true },
+            ];
+            if (activePowerups.length) {
               const now = Date.now();
-              const elapsed = now - ap.startedAt;
-              const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
-              return (
-                <div key={idx} className="pill" style={{ background: ca('emerald','22'), border: `1px solid ${C.emerald}` }}>
-                  <div className="plabel" style={{ fontSize: '0.75rem' }}>
-                    {POWERUP_ICONS[ap.type]} {remaining}s {ap.stacks > 1 ? `×${ap.stacks}` : ''}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+              out.push({
+                id: 'powerups', kind: 'label', r: [0, 50, W, 20], font: 12, color: PAL.emerald,
+                label: activePowerups.map((ap) => {
+                  const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - (now - ap.startedAt)) / 1000));
+                  return `${POWERUP_ICONS[ap.type]} ${remaining}s${ap.stacks > 1 ? ` ×${ap.stacks}` : ''}`;
+                }).join(' · '),
+              });
+            }
+            return out;
+          }} />
 
           <div className="bounce-board-wrap">
             <canvas
@@ -15856,36 +15830,16 @@ function BounceGame({ onWin, onStepChange, resetKey }) {
             )}
           </div>
 
-          <div className="bounce-audio-row">
-            <button onClick={toggleSound}>
-              {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
-            </button>
-            <button
-              onClick={() => setMusicPaused(p => !p)}
-              disabled={!soundOn}
-            >
-              {!soundOn ? '🔇 Off' : musicPaused ? '▶ Resume' : '⏸ Pause'}
-            </button>
-          </div>
-
-          <div className="bounce-dpad">
-            <button
-              aria-label="Left"
-              onPointerDown={(e) => { e.preventDefault(); leftRef.current = true; }}
-              onPointerUp={() => { leftRef.current = false; }}
-              onPointerLeave={() => { leftRef.current = false; }}
-            >◀</button>
-            <button
-              aria-label="Right"
-              onPointerDown={(e) => { e.preventDefault(); rightRef.current = true; }}
-              onPointerUp={() => { rightRef.current = false; }}
-              onPointerLeave={() => { rightRef.current = false; }}
-            >▶</button>
-          </div>
-
-          <div className="bounce-controls">
-            <button onClick={handleNewGame}>↺ New Game</button>
-          </div>
+          <CuiBar height={44} build={(W) => {
+            const br = cuiRow(Math.floor(W * 0.04), 0, Math.floor(W * 0.92), 40, 5);
+            return [
+              { id: 'sound', kind: 'button', r: br[0], label: soundOn ? '🔊 On' : '🔇 Off', font: 12, on: soundOn, action: toggleSound },
+              { id: 'music', kind: 'button', r: br[1], label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', font: 12, disabled: !soundOn, action: () => setMusicPaused(p => !p) },
+              { id: 'left', kind: 'button', r: br[2], label: '◀', font: 15, holdDown: () => { leftRef.current = true; }, holdUp: () => { leftRef.current = false; } },
+              { id: 'right', kind: 'button', r: br[3], label: '▶', font: 15, holdDown: () => { rightRef.current = true; }, holdUp: () => { rightRef.current = false; } },
+              { id: 'new', kind: 'button', r: br[4], label: '↺ New', font: 12, action: handleNewGame },
+            ];
+          }} />
         </div>
       )}
 
@@ -16965,34 +16919,26 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
   return (
     React.createElement('div', null,
       activeTab === 'game' && React.createElement('div', null,
-        React.createElement('div', { className: 'status-bar' },
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Score'),
-            React.createElement('div', { className: 'pvalue mono' }, score.toLocaleString())
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Level'),
-            React.createElement('div', { className: 'pvalue mono' }, level + '/3')
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Popped'),
-            React.createElement('div', { className: 'pvalue mono' }, ballsPopped)
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Time'),
-            React.createElement('div', { className: 'pvalue mono' }, fmtS(elapsedSecs))
-          ),
-          activePowerups.map((ap, idx) => {
+        React.createElement(CuiBar, { height: activePowerups.length ? 72 : 46, build: (W) => {
+          const pr = cuiRow(0, 0, W, 46, 4);
+          const out = [
+            { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
+            { id: 'p-level', kind: 'pill', r: pr[1], label: 'Level', value: level + '/3' },
+            { id: 'p-popped', kind: 'pill', r: pr[2], label: 'Popped', value: ballsPopped },
+            { id: 'p-time', kind: 'pill', r: pr[3], label: 'Time', value: fmtS(elapsedSecs), gold: true },
+          ];
+          if (activePowerups.length) {
             const now = Date.now();
-            const elapsed = now - ap.startedAt;
-            const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
-            return React.createElement('div', { key: idx, className: 'pill', style: { background: ca('emerald','22'), border: `1px solid ${C.emerald}` } },
-              React.createElement('div', { className: 'plabel', style: { fontSize: '0.75rem' } },
-                POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '')
-              )
-            );
-          })
-        ),
+            out.push({
+              id: 'powerups', kind: 'label', r: [0, 50, W, 20], font: 12, color: PAL.emerald,
+              label: activePowerups.map((ap) => {
+                const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - (now - ap.startedAt)) / 1000));
+                return POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '');
+              }).join(' · '),
+            });
+          }
+          return out;
+        } }),
         React.createElement('div', { className: 'zuma-wrap' },
           React.createElement('canvas', {
             ref: canvasRef,
@@ -17003,9 +16949,9 @@ function ZumaGame({ onWin, onStepChange, resetKey }) {
             onTouchEnd: () => shoot(),
           })
         ),
-        React.createElement('div', { className: 'bounce-controls' },
-          React.createElement('button', { onClick: () => init() }, '↺ New Game')
-        )
+        React.createElement(CuiBar, { height: 44, build: (W) => ([
+          { id: 'new', kind: 'button', r: [Math.floor(W * 0.3), 0, Math.floor(W * 0.4), 40], label: '↺ New Game', action: () => init() },
+        ]) })
       ),
       activeTab === 'leaderboard' && React.createElement('div', null,
         lbLoading && React.createElement('div', { className: 'snake-lb-empty' }, 'Loading…'),
@@ -17073,9 +17019,12 @@ function M3BoardCanvas({ tiles, bar, done, onTile }) {
       if (t && !t.removed) onTile(t.id);
     },
   });
+  // The tray band draws under the board (controls wave) — same canvas.
+  const TRAY_H = 54, TRAY_GAP = 8;
+  const barFull = bar.length >= 6;
   useCanvasBoard(canvasRef, {
     width: bw,
-    height: bh,
+    height: bh + TRAY_GAP + TRAY_H,
     deps: [tiles, bar, done, cell],
     draw: (ctx) => {
       ctx.textAlign = 'center';
@@ -17099,6 +17048,34 @@ function M3BoardCanvas({ tiles, bar, done, onTile }) {
           ctx.fillText(M3_ICONS[t.type % 5], x + cell / 2, y + cell / 2 + 1);
         }
       }
+      // Tray strip.
+      const ty = bh + TRAY_GAP;
+      klRR(ctx, 0, ty, bw, TRAY_H, 10);
+      ctx.fillStyle = PAL.card;
+      ctx.fill();
+      ctx.lineWidth = barFull ? 2 : 1;
+      ctx.strokeStyle = barFull ? PAL.rose : PAL.border;
+      ctx.stroke();
+      ctx.font = '600 9px ' + CUI_FONT;
+      ctx.fillStyle = barFull ? PAL.rose : PAL.muted;
+      ctx.fillText('TRAY', 22, ty + TRAY_H / 2 + 0.5);
+      if (bar.length === 0) {
+        ctx.font = '500 11px ' + CUI_FONT;
+        ctx.fillStyle = PAL.muted;
+        ctx.fillText('Match three of a kind to clear them', bw / 2 + 10, ty + TRAY_H / 2 + 0.5);
+      } else {
+        const u = Math.min(38, Math.floor((bw - 50) / 6) - 6);
+        bar.forEach((id, k) => {
+          const t = tiles.find((tile) => tile.id === id);
+          if (!t) return;
+          const x = 44 + k * (u + 6);
+          klRR(ctx, x, ty + (TRAY_H - u) / 2, u, u, 8);
+          ctx.fillStyle = M3_HEX[t.type % 5];
+          ctx.fill();
+          ctx.font = `${Math.round(u * 0.55)}px system-ui, sans-serif`;
+          ctx.fillText(M3_ICONS[t.type % 5], x + u / 2, ty + TRAY_H / 2 + 1);
+        });
+      }
     },
   });
   return (
@@ -17107,7 +17084,7 @@ function M3BoardCanvas({ tiles, bar, done, onTile }) {
         ref={canvasRef}
         className="m3-canvas board-canvas"
         role="grid"
-        aria-label={`Match 3 board — ${tiles.filter((t) => !t.removed).length} tiles left`}
+        aria-label={`Match 3 board — ${tiles.filter((t) => !t.removed).length} tiles left, ${bar.length} in tray`}
       />
     </div>
   );
@@ -17393,9 +17370,6 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
      CgStatus / .m3-* / tray idiom the two Tile Match games use.
      Gameplay, scoring and MATCH3_PUZZLES are untouched: markup and CSS only. */
   if (phase === 'playing' && puzzleConfig) {
-    const M3_ICONS = ['🔴', '🟠', '🟢', '🔵', '🟣'];
-    const M3_COLORS = [C.rose, C.gold, C.emerald, C.accent, C.violet];
-    const barFull = bar.length >= 6;
     return React.createElement(
       'div',
       { className: 'm3-wrap fit-col', style: { alignItems: 'center', gap: '0.75rem' } },
@@ -17406,23 +17380,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
           { l: 'Time', v: `${secs}s` },
         ],
       }),
-      React.createElement(M3BoardCanvas, { tiles, bar, done, onTile: selectTile }),
-      React.createElement(
-        'div',
-        { className: 'm3-bar' + (barFull ? ' full' : '') },
-        React.createElement('span', { className: 'm3-bar-label' + (barFull ? ' full' : '') }, 'Tray'),
-        bar.length > 0
-          ? bar.map(id => {
-              const t = tiles.find(tile => tile.id === id);
-              if (!t) return null;
-              return React.createElement(
-                'div',
-                { key: id, className: 'm3-bar-tile', style: { background: M3_COLORS[t.type % 5] } },
-                M3_ICONS[t.type % 5]
-              );
-            })
-          : React.createElement('span', { className: 'm3-bar-empty' }, 'Match three of a kind to clear them')
-      )
+      React.createElement(M3BoardCanvas, { tiles, bar, done, onTile: selectTile })
     );
   }
 

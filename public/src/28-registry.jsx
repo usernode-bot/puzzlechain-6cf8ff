@@ -118,7 +118,15 @@ const GAMES = [
     ],
     component: MancalaGame,
     modes: ['bot', '2p', 'online'],
+    modeSelect: true,
     supportsSave: true,
+    // The bot has a verified-session leaderboard of its own, so a win there
+    // counts — unlike the five board games, whose bot modes are unrated.
+    rankedModes: ['bot'],
+    // Mancala's online rooms predate the generic classic_rooms table and keep
+    // their own routes; declaring the base is all the shared opponent picker
+    // needs to drive them.
+    roomApiBase: '/api/mancala',
   },
   {
     id: 'chutes-ladders',
@@ -136,6 +144,7 @@ const GAMES = [
     ],
     component: ChutesLaddersGame,
     modes: ['bot', '2p', 'online'],
+    modeSelect: true,
     supportsSave: true,
     menuModePicker: true,
     variantPicker: {
@@ -168,7 +177,7 @@ const GAMES = [
     ],
     component: T2048Game,
     modes: ['solo', 'online'],
-    preLaunchModal: true,
+    modeSelect: true,
     leaderboard: true,
   },
   {
@@ -219,7 +228,7 @@ const GAMES = [
     ],
     component: BlockBlastGame,
     modes: ['solo', 'online'],
-    preLaunchModal: true,
+    modeSelect: true,
     leaderboard: true,
   },
   {
@@ -342,7 +351,7 @@ const GAMES = [
     // modes referee with the SERVER'S rules module (window.boardRules) and are
     // deliberately unrated: only online head-to-head touches the ladder.
     modes: ['bot', '2p', 'online'],
-    preLaunchModal: true,
+    modeSelect: true,
   },
   {
     id: 'reversi',
@@ -364,7 +373,7 @@ const GAMES = [
     // modes referee with the SERVER'S rules module (window.boardRules) and are
     // deliberately unrated: only online head-to-head touches the ladder.
     modes: ['bot', '2p', 'online'],
-    preLaunchModal: true,
+    modeSelect: true,
   },
   {
     id: 'fourinarow',
@@ -385,7 +394,7 @@ const GAMES = [
     // modes referee with the SERVER'S rules module (window.boardRules) and are
     // deliberately unrated: only online head-to-head touches the ladder.
     modes: ['bot', '2p', 'online'],
-    preLaunchModal: true,
+    modeSelect: true,
   },
   {
     id: 'gomoku',
@@ -406,7 +415,7 @@ const GAMES = [
     // modes referee with the SERVER'S rules module (window.boardRules) and are
     // deliberately unrated: only online head-to-head touches the ladder.
     modes: ['bot', '2p', 'online'],
-    preLaunchModal: true,
+    modeSelect: true,
   },
   {
     id: 'ludo',
@@ -428,7 +437,7 @@ const GAMES = [
     // modes referee with the SERVER'S rules module (window.boardRules) and are
     // deliberately unrated: only online head-to-head touches the ladder.
     modes: ['bot', '2p', 'online'],
-    preLaunchModal: true,
+    modeSelect: true,
   },
   {
     id: 'tilematchingdaily',

@@ -251,8 +251,6 @@ function mncDistribute(pits, pitIdx, player) {
 /* ============================================================
    Mancala — AI Engine (pure functions, no side effects)
    ============================================================ */
-const MNC_AI_DIFF_KEY = 'puzzlechain_mancala_ai_difficulty';
-
 function mncGetValidMoves(pits, player) {
   const min = player === 1 ? 0 : 7;
   const max = player === 1 ? 5 : 12;
@@ -1224,6 +1222,37 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
   const { room, pollingError, opponentDisconnected, submitMove } = useMancalaRoom(roomId);
   const [myMoves, setMyMoves] = useState(0);
   const winCalledRef = useRef(false);
+  /* #145 — concede / close. The button below has been in this branch since
+     #145 but its state never was, so reaching the waiting room threw a
+     ReferenceError at mount (valid syntax, invisible to `npm run check`).
+     Declared here because both the waiting-room branch and the live-match
+     branch return early, exactly as in BoardOnlineRoom. */
+  const [ending, setEnding] = useState(false);
+  const endGame = async (isWaitingRoom) => {
+    const other = myPlayerNum === 1 ? 2 : 1;
+    const msg = isWaitingRoom
+      ? 'Close this room? Nobody has joined yet, so nothing is rated.'
+      : 'End this game? Your opponent wins and it counts on the Ladder.';
+    if (window.unNative && window.unNative.alert) {
+      const r = await window.unNative.alert({
+        title: isWaitingRoom ? 'Close room' : 'End game',
+        message: msg,
+        buttons: [
+          { label: 'Cancel', style: 'cancel' },
+          { label: isWaitingRoom ? 'Close' : 'End game', style: 'destructive' },
+        ],
+      });
+      if (!r || !r.button || r.button.style !== 'destructive') return;
+    } else if (!window.confirm(msg)) {
+      return;
+    }
+    setEnding(true);
+    await api(`/api/mancala/rooms/${roomId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify(isWaitingRoom ? {} : { winner: String(other) }),
+    });
+    setEnding(false);
+  };
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
   const secsRef = useRef(0);
   secsRef.current = secs;
@@ -1327,117 +1356,11 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
         labelR={myPlayerNum === 1 ? 'You' : oppName}
         onPit={handleClick}
       />
-    </div>
-  );
-}
-
-/* ============================================================
-   Game 5d — Mancala Mode Selector
-   ============================================================ */
-function MancalaModeSelect({ onSelectLocal, onSelectAI, onSelectOnline }) {
-  const [mode, setMode]             = useState(null);
-  const [difficulty, setDifficulty] = useState(() => localStorage.getItem(MNC_AI_DIFF_KEY) || 'medium');
-  const [onlineAction, setOnlineAction] = useState(null);
-  const [joinCode, setJoinCode]     = useState('');
-  const [joinError, setJoinError]   = useState('');
-  const [busy, setBusy]             = useState(false);
-
-  const handleStart = async () => {
-    if (!mode) return;
-    if (mode === 'local') { onSelectLocal(); return; }
-    if (mode === 'ai') {
-      try { localStorage.setItem(MNC_AI_DIFF_KEY, difficulty); } catch {}
-      onSelectAI(difficulty);
-      return;
-    }
-    if (mode === 'online') {
-      if (onlineAction === 'create') {
-        setBusy(true);
-        const { ok, body } = await api('/api/mancala/rooms', { method: 'POST' });
-        setBusy(false);
-        if (ok && body) { onSelectOnline(1, body.roomId); }
-        else { setJoinError('Could not create room. Try again.'); }
-      } else if (onlineAction === 'join') {
-        const code = joinCode.trim().toUpperCase();
-        if (code.length < 4) { setJoinError('Enter a valid room code.'); return; }
-        setBusy(true);
-        const { ok, status, body } = await api('/api/mancala/rooms/' + code + '/join', { method: 'POST' });
-        setBusy(false);
-        if (ok && body)        { onSelectOnline(2, code); }
-        else if (status === 404) { setJoinError('Room not found. Check the code.'); }
-        else if (status === 409) { setJoinError('Room is full or you created it.'); }
-        else                     { setJoinError('Could not join. Try again.'); }
-      }
-    }
-  };
-
-  const modes = [
-    { id: 'local',  icon: '👥', name: 'Local 2-Player', desc: 'Pass and play on this device' },
-    { id: 'ai',     icon: '🤖', name: 'vs AI Bot',       desc: 'Challenge the computer', ranked: true },
-    { id: 'online', icon: '🌐', name: 'Online',          desc: 'Play with a friend via room code' },
-  ];
-
-  const canStart = mode && (
-    mode !== 'online' ||
-    (onlineAction === 'create') ||
-    (onlineAction === 'join' && joinCode.trim().length >= 4)
-  );
-
-  return (
-    <div className="mnc-mode-select">
-      {modes.map(m => (
-        <button key={m.id} className={'mnc-mode-btn' + (mode === m.id ? ' active' : '')} onClick={() => { setMode(m.id); setJoinError(''); }}>
-          <span className="mnc-mode-icon">{m.icon}</span>
-          <span className="mnc-mode-text">
-            <span className="mnc-mode-name">
-              {m.name}
-              {m.ranked && <span style={{ marginLeft: '0.4rem', fontSize: '0.68rem', background: ca('gold','33'), color: C.gold, border: `1px solid ${ca('gold','55')}`, borderRadius: '999px', padding: '0.1rem 0.4rem', verticalAlign: 'middle', fontWeight: 700 }}>🏆 Ranked</span>}
-            </span>
-            <span className="mnc-mode-desc">{m.desc}{m.ranked ? ' — wins post to leaderboard' : ''}</span>
-          </span>
-        </button>
-      ))}
-
-      {mode === 'ai' && (
-        <div className="mnc-difficulty-row">
-          {['easy', 'medium', 'hard'].map(d => (
-            <button key={d} className={'mnc-difficulty-pill' + (difficulty === d ? ' active' : '')} onClick={() => setDifficulty(d)}>
-              {d.charAt(0).toUpperCase() + d.slice(1)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {mode === 'online' && (
-        <div className="mnc-online-actions">
-          <div className="mnc-mode-sub">
-            <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')}
-              onClick={() => { setOnlineAction('create'); setJoinError(''); }}>
-              Create Room
-            </button>
-            <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')}
-              onClick={() => { setOnlineAction('join'); setJoinError(''); }}>
-              Join Room
-            </button>
-          </div>
-          {onlineAction === 'join' && (
-            <div className="mnc-join-form">
-              <input
-                className="mnc-join-input"
-                placeholder="Room code (e.g. AB3K7P)"
-                value={joinCode}
-                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(''); }}
-                maxLength={8}
-              />
-            </div>
-          )}
-          {joinError && <div className="mnc-join-error">{joinError}</div>}
-        </div>
-      )}
-
-      {mode && (
-        <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>
-          {busy ? 'Please wait…' : 'Play'}
+      {/* #145 — same concede affordance the five board games have; without it
+          the only exit from a live match is the 48h turn timer. */}
+      {status === 'active' && (
+        <button className="brd-endgame" onClick={() => endGame(false)} disabled={ending}>
+          {ending ? 'Ending…' : '🏳️ End game'}
         </button>
       )}
     </div>
@@ -1452,38 +1375,58 @@ function MancalaGame({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, on
      daily system: its own table, routes, resume, record-streak and Today /
      All-Time leaderboard, none of it wired into daily_attempts. Rather than
      converge two daily systems, Mancala goes back to being purely a
-     head-to-head game — its axis is the opponent, not the play mode. */
-  const [mode, setMode]               = useState(null);
-  const [difficulty, setDifficulty]   = useState(null);
-  const [roomId, setRoomId]           = useState(null);
-  const [myPlayerNum, setMyPlayerNum] = useState(null);
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
+     head-to-head game — its axis is the opponent, not the play mode.
 
-  // On "Play Again" / Game-Menu New Game (resetKey change), return to the mode
-  // selector.
-  const firstReset = useRef(true);
+     The opponent is now chosen BEFORE the game mounts, on the shared opponent
+     screen, exactly as it is for the other six head-to-head games. Mancala
+     therefore reads `gameMode` / `gameModeOpts` instead of asking again — the
+     same contract ChutesLaddersGame uses. Its internal names predate the
+     shared ones, hence the one-line translation. */
+  const modeFromProps = (m) => (m === 'bot' ? 'ai' : m === '2p' ? 'local' : m === 'online' ? 'online' : null);
+  const [mode, setMode]               = useState(() => modeFromProps(gameMode));
+  const [difficulty, setDifficulty]   = useState((gameModeOpts && gameModeOpts.botLevel) || 'medium');
+  const [roomId, setRoomId]           = useState((gameModeOpts && gameModeOpts.roomId) || null);
+  const [myPlayerNum, setMyPlayerNum] = useState(
+    gameModeOpts && gameModeOpts.myPlayerNum
+      ? gameModeOpts.myPlayerNum
+      : gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1
+  );
+
+  // Re-derive on "Play Again" / Game-Menu New Game: the menu's picker is the
+  // same ClassicModePicker, so a new choice arrives as new props.
   useEffect(() => {
-    if (firstReset.current) { firstReset.current = false; return; }
-    setMode(null);
-    setRoomId(null);
-    setMyPlayerNum(null);
-  }, [resetKey]);
+    setMode(modeFromProps(gameMode));
+    if (gameModeOpts && gameModeOpts.botLevel) setDifficulty(gameModeOpts.botLevel);
+    if (gameModeOpts && gameModeOpts.roomId) {
+      setRoomId(gameModeOpts.roomId);
+      setMyPlayerNum(gameModeOpts.myPlayerNum || (gameModeOpts.roomAction === 'join' ? 2 : 1));
+    }
+  }, [gameMode, gameModeOpts, resetKey]);
 
   // Report the active mode upward so the top-bar pill + Save toggle reflect it.
-  // 'ai' → 'bot' (saveable), 'local' → '2p'; null is the selector itself.
   useEffect(() => {
     if (!onModeChange) return;
     onModeChange(mode === 'ai' ? 'bot' : mode === 'local' ? '2p' : mode === 'online' ? 'online' : null);
   }, [mode]);
 
+  // No mode yet means the player reached the board without passing the
+  // opponent screen (a bare deep link). Send them back to it rather than
+  // rendering a second, divergent picker here.
   if (!mode) {
     return (
-      <MancalaModeSelect
-        onSelectLocal={() => setMode('local')}
-        onSelectAI={(diff) => { setDifficulty(diff); setMode('ai'); }}
-        onSelectOnline={(playerNum, rId) => { setMyPlayerNum(playerNum); setRoomId(rId); setMode('online'); }}
-      />
+      <div className="mnc-mode-select" style={{ padding: 0 }}>
+        <ClassicModePicker
+          game={GAMES.find(g => g.id === 'mancala')}
+          onPlay={(m, opts) => {
+            setDifficulty((opts && opts.botLevel) || 'medium');
+            if (opts && opts.roomId) {
+              setRoomId(opts.roomId);
+              setMyPlayerNum(opts.myPlayerNum || (opts.roomAction === 'join' ? 2 : 1));
+            }
+            setMode(modeFromProps(m));
+          }}
+        />
+      </div>
     );
   }
 

@@ -193,7 +193,7 @@ bugs above were caught by it and nothing else. Run it after any retune.
 `?pmode=daily|story|arcade` opens a card in a play mode; `?band=` picks
 the rung (story: 1-based) or difficulty (arcade: `easy|normal|hard`);
 `&play=1` mounts the board. Deliberately not `?mode=`, which already pins
-a classic's opponent. Checked BEFORE the pre-launch modal, or 2048 and
+a classic's opponent. Checked BEFORE the mode-select branch, or 2048 and
 Block Fit surface the opponent chooser instead.
 
 Without these the story ladder, the band pickers and every board behind
@@ -201,6 +201,70 @@ them are reachable only by TAPPING a card button — which navigation-driven
 proposal checks and screenshots cannot do, so none of #176 would have been
 verifiable. `demo=modes` seeds a half-walked ladder plus arcade rivals and
 run history.
+
+### Every card entry point is a BUTTON, and there is one of them per mode
+
+A card's tap target is its mode buttons — never the card itself. The
+single-mode games (the seven head-to-head ones) used to have no button at
+all: the whole card was one hit area, which made them read as a different
+kind of thing to their neighbours and gave the player nothing to aim at.
+`29-cards.jsx` synthesises a one-entry mode list for them
+(`{ mode: null, label: 'Play' }`) so the same `.card-mode-btn` markup and
+the same `tapProps` press feedback cover all 34 games. `.card-plain-hit`
+is gone; a card without a button is a bug, not a layout variant.
+
+The daily button is **outlined, not filled**. A filled accent block on
+every daily card turned the grid into a wall of colour, which is the
+opposite of the emphasis it was meant to carry — the state (fresh /
+in-progress / done) reads from the border and label instead.
+
+### One opponent screen for all seven head-to-head games
+
+`OpponentScreen` (`07-ui-chrome.jsx`, `screen === 'opponent'`) is the
+pre-game screen for a game whose axis is the opponent rather than the play
+mode. Before it there were **two** first screens and neither was good:
+Mancala and Snakes & Ladders dropped you onto the board, which then
+rendered its own full-page picker; the five phase-5 board games opened a
+modal over the lobby that listed the modes and nothing else. The modal was
+also where bot difficulty went missing — the tiers existed and were plumbed
+through to the search, and simply had no control on that path, which is why
+Checkers and Gomoku only ever played at full depth.
+
+- **One picker: `ClassicModePicker`.** It already handled bot strength,
+  Ludo's 2–4 local seats, online create/join and Snakes & Ladders' board
+  variants. Add the next per-mode option there and every game gets it, at
+  first launch and from the ☰ menu's New Game alike.
+- **`MancalaModeSelect` is deleted, deliberately.** It was a second copy of
+  the same screen that predated the shared one, and it is what made Mancala
+  look unlike the other six. `MancalaGame` now reads `gameMode` /
+  `gameModeOpts` like `ChutesLaddersGame` does. **Don't re-add a per-game
+  picker** — a game that needs something the shared picker lacks should
+  declare it (see `variantPicker`, `roomApiBase`).
+- **`roomApiBase`** is the whole accommodation for Mancala's older room
+  routes (`/api/mancala/rooms`, its own table): the flow, the copy and the
+  error handling stay shared. Create responses are read as
+  `body.id || body.roomId` because the two shapes differ.
+- **`rankedModes`** says which of a game's opponents post a score. Only
+  Mancala's bot does (it has a verified-session leaderboard of its own);
+  the five board games' bots are unrated by construction. Its old picker
+  spelled that out with a 🏆 Ranked pill, so the shared one does too —
+  moving a game onto a shared screen must not quietly drop the thing that
+  told a player their result counts.
+- It is a SCREEN and not a popup because it can then say what the game is —
+  the first two `howToPlay` cards render inline as `.opp-brief` — before
+  asking who you want to play against.
+- **2048 and Block Fit land here too** (nine games in all, the nine with a
+  `modes` list). Their axis is a score race rather than an opponent, so the
+  chips and the heading come off `modes` — "Choose how to play", not
+  "Choose an opponent". They also keep the retired modal's one good extra,
+  the all-time leaderboard preview (`.opp-lb`).
+
+### The How-to-Play modal never opens by itself
+
+Phase 3's first-open auto-show is removed, along with its
+`pc_howto_seen_v1` key. A modal in front of a board you just tapped is
+something to dismiss, not onboarding; the pre-game and opponent screens
+carry the short version inline and "❓ How to play" is always one tap away.
 
 ## App-specific conventions
 
@@ -565,25 +629,25 @@ pieces (all under `public/src/`):
   bests come from `GET /api/daily`'s new `bests` map
   (`{ gameId: { score, timeSecs } }`, all-time, server-computed).
 - **How-to-Play modal (`HowToPlayModal`).** Renders the manifest's
-  `howToPlay` cards. Auto-opens on a player's **first-ever open** of
-  each game (tracked per-browser in localStorage `pc_howto_seen_v1` —
-  deliberately device-local onboarding state, not server state) and is
-  always reachable from a "?" in the daily in-game header and the
-  ClassicShell topbar (`onHowTo` prop). **Timed dailies can't tick
-  under the auto-show**: it appears on the pre-game screen, and the
-  game (with its timer) only mounts after Play.
+  `howToPlay` cards, reachable from the "?" on the pre-game / opponent
+  screen, the daily in-game header and the ClassicShell topbar
+  (`onHowTo` prop). It **never opens by itself** — the phase-3
+  first-open auto-show and its `pc_howto_seen_v1` localStorage key were
+  removed, because a modal in front of a game you just tapped is a
+  thing to dismiss before playing, not onboarding. The pre-game and
+  opponent screens carry the short version inline instead; the modal is
+  the long form, on request.
 - **End screen.** The existing shell-owned win overlay is the standard
   end screen (score breakdown: base → streak bonus → earned; share
   CTA; leaderboard; Verified badge). Phase 3 added the personal-best
   row ("🏅 New personal best!" when beaten, sourced from `bests`).
-- **`?play=1` deep-link param** skips the pre-game screen (and the
-  first-open auto-show) and claims/mounts immediately — the
-  pre-phase-3 behaviour. Proposal tests that assert on in-game UI use
-  it; plain `?game=` deep links land on the pre-game screen.
+- **`?play=1` deep-link param** skips the pre-game screen and
+  claims/mounts immediately — the pre-phase-3 behaviour. Proposal tests
+  that assert on in-game UI use it; plain `?game=` deep links land on
+  the pre-game screen.
 - Classic `shell: 'self'` games (Snake, Block Blast, Diamond Rush,
-  Hash Rush) render their own shell and only get the first-open
-  auto-show for now — extending the "?" affordance into their headers
-  is the remaining game-by-game work.
+  Hash Rush) render their own shell — extending the "?" affordance into
+  their headers is the remaining game-by-game work.
 
 ## Game Corner phase 4 — leaderboard upgrades
 
@@ -1270,7 +1334,7 @@ frozen board (`&review=1` lands collapsed into the minibar instead). It writes
 NOTHING — dailies go through the inert `practiceMode` path, classics set local
 `loseData` only — so it is deliberately **not** staging-gated and needs no seed
 data (the "before" screenshot comes from production). It is checked **before**
-the `preLaunchModal` branch in the deep-link effect, or 2048/Block Fit would
+the `modeSelect` branch in the deep-link effect, or 2048/Block Fit would
 surface the mode chooser instead. `?snake=easy|normal|hard` preselects Snake's
 difficulty so the board itself is URL-reachable (same role as `?sdk=9`); note
 `SnakeGame`'s reset-to-chooser effect now skips its mount pass, which would

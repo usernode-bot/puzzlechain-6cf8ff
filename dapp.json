@@ -156,24 +156,24 @@
       "expectText": "Start mining"
     },
     {
-      "name": "2048 mode modal offers Online Race",
+      "name": "2048 opponent screen offers Online Race",
       "path": "/?game=2048",
       "expectText": "Online Race"
     },
     {
-      "name": "Block Fit mode modal offers Online Race",
+      "name": "Block Fit opponent screen offers Online Race",
       "path": "/?game=blockblast",
       "expectText": "Online Race"
     },
     {
-      "name": "2048 mode modal shows seeded leaderboard player",
+      "name": "Opponent screen shows the seeded leaderboard player",
       "path": "/?game=2048&demo=classic-scores",
       "expectText": "Staging demo Ada"
     },
     {
-      "name": "Classic mode modal renders mode chooser",
+      "name": "Score-race classic opens the shared opponent screen",
       "path": "/?game=2048",
-      "expectText": "Choose a mode"
+      "expectText": "Choose how to play"
     },
     {
       "name": "Boots with integration secret empty (no dApps chrome)",
@@ -296,9 +296,9 @@
       "expectText": "Personal best"
     },
     {
-      "name": "How-to-Play cards auto-open on first visit",
+      "name": "How-to-Play stays behind its button on the pre-game screen",
       "path": "/?game=tilematchingdaily",
-      "expectText": "How to play Daily Tile Match"
+      "expectSelector": ".pregame-howto-btn"
     },
     {
       "name": "Snakes & Ladders mode select offers Versus Bot",
@@ -306,9 +306,9 @@
       "expectText": "Versus Bot"
     },
     {
-      "name": "Snakes & Ladders mode select offers Online Multiplayer",
+      "name": "Snakes & Ladders opponent screen offers online play",
       "path": "/?game=chutes-ladders",
-      "expectText": "Online Multiplayer"
+      "expectText": "take turns on one board"
     },
     {
       "name": "Minesweeper game screen renders (audio controls load cleanly)",
@@ -962,7 +962,7 @@
     },
     {
       "name": "Daily Bounce how-to lists the power-ups",
-      "path": "/?game=bouncedaily",
+      "path": "/?howto=bouncedaily",
       "expectText": "power-ups"
     },
     {
@@ -978,7 +978,22 @@
     {
       "name": "Board games open a mode picker before Online",
       "path": "/?game=checkers",
-      "expectText": "Choose a mode"
+      "expectText": "Choose an opponent"
+    },
+    {
+      "name": "Mancala uses the same opponent screen as the board games",
+      "path": "/?game=mancala",
+      "expectText": "Choose an opponent"
+    },
+    {
+      "name": "Opponent screen carries the game brief, not just a mode list",
+      "path": "/?game=gomoku",
+      "expectSelector": ".opp-brief"
+    },
+    {
+      "name": "How to play is a button on the opponent screen, not a popup",
+      "path": "/?game=checkers",
+      "expectSelector": ".pregame-howto-btn"
     },
     {
       "name": "Gomoku offers pass-and-play from the picker",
@@ -1036,9 +1051,9 @@
       "expectText": "Mine Finder Classic"
     },
     {
-      "name": "Single-mode cards render unchanged",
+      "name": "Single-mode cards carry one Play button",
       "path": "/",
-      "expectSelector": ".card:not(.paired) .tag"
+      "expectSelector": ".card-mode-btn.single"
     },
     {
       "name": "Merged card in dark theme",

@@ -159,9 +159,13 @@ function useClassicRoom(gameId, roomId) {
 }
 
 // Per-mode display metadata for the inline mode picker.
-// The five games refereed by lib/board-rules.js, which are the ones whose
-// bots take a strength. Mancala keeps its own long-standing selector.
+// The five games refereed by lib/board-rules.js.
 const BOARD_RULE_GAME_IDS_CLIENT = new Set(['checkers', 'reversi', 'fourinarow', 'gomoku', 'ludo']);
+// Every head-to-head game whose bot takes a strength. Mancala used to run its
+// own parallel selector (MancalaModeSelect) purely because it predates this
+// one; that second copy is why Mancala's first screen never looked like the
+// other six. It is gone, and Mancala's three levels are declared here instead.
+const BOT_LEVEL_GAME_IDS = new Set([...BOARD_RULE_GAME_IDS_CLIENT, 'mancala']);
 
 const CLASSIC_MODE_META = {
   solo:   { icon: '🎯', name: 'Classic Solo',      desc: 'Play solo and chase your best score' },
@@ -170,13 +174,25 @@ const CLASSIC_MODE_META = {
   online: { icon: '🌐', name: 'Online Race',       desc: 'Race a friend via room code — highest score wins' },
 };
 
+/* "Online" means two different things and the shared picker now serves both.
+   2048 and Block Fit are score RACES — separate boards, highest score wins.
+   The seven head-to-head games share one board and take turns. A game with a
+   bot opponent is one of the latter, so it gets the turn-taking copy; calling
+   a game of Checkers a race was the kind of wrong that only shows up once one
+   screen has to speak for every game. */
+const classicModeMeta = (game, m) => {
+  const base = CLASSIC_MODE_META[m];
+  if (m !== 'online' || !(game.modes || []).includes('bot')) return base;
+  return { icon: base.icon, name: 'Online', desc: 'Play a friend via room code — take turns on one board' };
+};
+
 // Inline mode picker shown by the Game Menu's "New Game" for games that route
 // their modes through the menu (e.g. Chutes & Ladders). Calls onPlay(mode, opts).
 // game.variantPicker (optional): { label, options: [{ id, name, note? }], default }
 // — an opt-in, purely mechanical board-style choice (today: Chutes & Ladders'
 // Classic/Moksha Patam tables). When present, this generic picker renders the
-// same Board-style sub-section ChutesLaddersModeSelect uses for first launch,
-// so "New Game" from the ☰ menu can reach it too, not just the initial pick.
+// same Board-style sub-section for every entry point — first launch, the
+// opponent screen, and "New Game" from the ☰ menu.
 function ClassicModePicker({ game, onPlay, onGlossary }) {
   const [mode, setMode] = useState(null);
   /* #176 — bot strength and local seat count. Both are per-mode options that
@@ -197,21 +213,26 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
     if (!mode) return;
     const variantOpts = vp ? { variant } : {};
     if (mode !== 'online') { onPlay(mode, { botLevel, seats, ...variantOpts }); return; }
+    /* Mancala's rooms live under their own table and their own routes, which
+       is the second reason it had its own picker. `roomApiBase` is the whole
+       accommodation: the flow, the copy and the error handling are shared. */
+    const roomBase = game.roomApiBase || `/api/classic/${game.id}`;
     if (onlineAction === 'create') {
       setBusy(true);
-      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, {
+      const { ok, body } = await api(`${roomBase}/rooms`, {
         method: 'POST', body: JSON.stringify(variantOpts),
       });
       setBusy(false);
-      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id, ...variantOpts });
+      // Classic rooms return `id`; mancala's shapeRoom returns `roomId`.
+      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id || body.roomId, myPlayerNum: 1, ...variantOpts });
       else setError('Could not create room. Try again.');
     } else if (onlineAction === 'join') {
       const code = joinCode.trim().toUpperCase();
       if (code.length < 4) { setError('Enter a valid room code.'); return; }
       setBusy(true);
-      const { ok, status } = await api(`/api/classic/${game.id}/rooms/${code}/join`, { method: 'POST' });
+      const { ok, status, body } = await api(`${roomBase}/rooms/${code}/join`, { method: 'POST' });
       setBusy(false);
-      if (ok) onPlay('online', { roomAction: 'join', roomId: code });
+      if (ok) onPlay('online', { roomAction: 'join', roomId: code, myPlayerNum: (body && body.yourPlayerNum) || 2 });
       else if (status === 404) setError('Room not found. Check the code.');
       else if (status === 409) setError('Room is full or you created it.');
       else setError('Could not join. Try again.');
@@ -222,19 +243,34 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
 
   return (
     <div className="mnc-mode-select" style={{ padding: 0 }}>
-      {(game.modes || []).map(m => (
-        <button key={m} className={'mnc-mode-btn' + (mode === m ? ' active' : '')} onClick={() => { setMode(m); setError(''); }}>
-          <span className="mnc-mode-icon">{CLASSIC_MODE_META[m].icon}</span>
-          <span className="mnc-mode-text">
-            <span className="mnc-mode-name">{CLASSIC_MODE_META[m].name}</span>
-            <span className="mnc-mode-desc">{CLASSIC_MODE_META[m].desc}</span>
-          </span>
-        </button>
-      ))}
+      {(game.modes || []).map(m => {
+        /* `rankedModes` is how a game says one of its opponents posts a score.
+           Mancala's bot does (it has a verified-session leaderboard of its
+           own); the five board games' bots deliberately don't. The old
+           per-game selector spelled this out and the shared one has to too, or
+           moving Mancala onto it quietly drops the one thing that told a
+           player their result counts. */
+        const ranked = (game.rankedModes || []).indexOf(m) !== -1;
+        const meta = classicModeMeta(game, m);
+        return (
+          <button key={m} className={'mnc-mode-btn' + (mode === m ? ' active' : '')} onClick={() => { setMode(m); setError(''); }}>
+            <span className="mnc-mode-icon">{meta.icon}</span>
+            <span className="mnc-mode-text">
+              <span className="mnc-mode-name">
+                {meta.name}
+                {ranked && <span className="mnc-ranked-pill">🏆 Ranked</span>}
+              </span>
+              <span className="mnc-mode-desc">
+                {meta.desc}{ranked ? ' — wins post to the leaderboard' : ''}
+              </span>
+            </span>
+          </button>
+        );
+      })}
       {/* Bot strength — every board game had exactly ONE, at full search
           depth. Easy shortens the search AND blunders on purpose, because a
           shallow search is not the same thing as a beatable opponent. */}
-      {mode === 'bot' && BOARD_RULE_GAME_IDS_CLIENT.has(game.id) && (
+      {mode === 'bot' && BOT_LEVEL_GAME_IDS.has(game.id) && (
         <div className="mnc-mode-sub">
           {BOARD_BOT_LEVELS.map(l => (
             <button key={l.id}
@@ -287,96 +323,6 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
       )}
       {error && <div className="mnc-join-error">{error}</div>}
       {mode && <button className="mnc-mode-start-btn" onClick={handlePlay} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
-    </div>
-  );
-}
-
-// Unified pre-launch mode-selection modal for multi-mode classic games
-// (today: 2048 + Block Blast, modes ['solo','online']). Shows the game's
-// modes, an Online create/join sub-panel, and — for games with a global
-// leaderboard — a "Top players" preview. Calls onStart(mode, opts) to launch.
-function GameModeModal({ game, onStart, onClose }) {
-  const [mode, setMode] = useState(null);
-  const [onlineAction, setOnlineAction] = useState(null);
-  const [joinCode, setJoinCode] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const modes = game.modes || [];
-
-  const handlePlay = async () => {
-    if (!mode || busy) return;
-    if (mode !== 'online') { onStart(mode, {}); return; }
-    if (onlineAction === 'create') {
-      setBusy(true);
-      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
-      setBusy(false);
-      if (ok && body) onStart('online', { roomAction: 'create', roomId: body.id });
-      else setError('Could not create room. Try again.');
-    } else if (onlineAction === 'join') {
-      const code = joinCode.trim().toUpperCase();
-      if (code.length < 4) { setError('Enter a valid room code.'); return; }
-      setBusy(true);
-      const { ok, status } = await api(`/api/classic/${game.id}/rooms/${code}/join`, { method: 'POST' });
-      setBusy(false);
-      if (ok) onStart('online', { roomAction: 'join', roomId: code });
-      else if (status === 404) setError('Room not found. Check the code.');
-      else if (status === 409) setError('Room is full or you created it.');
-      else setError('Could not join. Try again.');
-    }
-  };
-
-  const canStart = mode && (mode !== 'online' || onlineAction === 'create' || (onlineAction === 'join' && joinCode.trim().length >= 4));
-
-  return (
-    <div className="gm-modal-backdrop" onClick={onClose}>
-      <div className="gm-modal" onClick={e => e.stopPropagation()} style={{ '--accent': game.tagColor || C.accent }}>
-        <button className="gm-modal-close" onClick={onClose} aria-label="Close">✕</button>
-        <div className="gm-modal-head">
-          <span className="gm-modal-icon">{game.icon}</span>
-          <div>
-            <div className="gm-modal-title">{game.name}</div>
-            <div className="gm-modal-desc">{game.desc}</div>
-          </div>
-        </div>
-        <div className="gm-modal-label">Choose a mode</div>
-        <div className="gm-modes">
-          {modes.map(m => {
-            const meta = CLASSIC_MODE_META[m] || { icon: '🎮', name: m, desc: '' };
-            return (
-              <button key={m} className={'gm-mode-btn' + (mode === m ? ' active' : '')}
-                onClick={() => { setMode(m); setOnlineAction(null); setError(''); }}>
-                <span className="gm-mode-icon">{meta.icon}</span>
-                <span className="gm-mode-text">
-                  <span className="gm-mode-name">{meta.name}</span>
-                  <span className="gm-mode-desc">{meta.desc}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        {mode === 'online' && (
-          <div className="gm-online">
-            <div className="gm-online-actions">
-              <button className={'mnc-difficulty-pill' + (onlineAction === 'create' ? ' active' : '')} onClick={() => { setOnlineAction('create'); setError(''); }}>Create Room</button>
-              <button className={'mnc-difficulty-pill' + (onlineAction === 'join' ? ' active' : '')} onClick={() => { setOnlineAction('join'); setError(''); }}>Join Room</button>
-            </div>
-            {onlineAction === 'join' && (
-              <input className="mnc-join-input" placeholder="Room code (e.g. AB3K7P)" value={joinCode}
-                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
-            )}
-            {onlineAction === 'create' && (
-              <div className="gm-online-hint">A room code will be generated — share it with a friend, then they pick Join Room.</div>
-            )}
-          </div>
-        )}
-        {error && <div className="mnc-join-error">{error}</div>}
-        <button className="gm-play-btn" onClick={handlePlay} disabled={!canStart || busy}>
-          {busy ? 'Please wait…' : 'Play'}
-        </button>
-        {game.leaderboard && (
-          <div className="gm-modal-lb"><ClassicLeaderboard gameId={game.id} /></div>
-        )}
-      </div>
     </div>
   );
 }

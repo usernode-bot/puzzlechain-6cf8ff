@@ -332,27 +332,20 @@ function BadgeStrip({ badges, achievements, streak, solveCount }) {
    Shell-owned game chrome (phase 3) — How-to-Play + pre-game screen
    ============================================================ */
 
-// First-open tracking for the auto-shown How-to-Play cards, persisted per
-// browser in localStorage (deliberately per-device: the how-to is an
-// onboarding aid, not server state).
-const HOWTO_SEEN_KEY = 'pc_howto_seen_v1';
-function howtoSeen(gameId) {
-  try { return !!(JSON.parse(localStorage.getItem(HOWTO_SEEN_KEY) || '{}'))[gameId]; }
-  catch { return false; }
-}
-function markHowtoSeen(gameId) {
-  try {
-    const seen = JSON.parse(localStorage.getItem(HOWTO_SEEN_KEY) || '{}');
-    seen[gameId] = true;
-    localStorage.setItem(HOWTO_SEEN_KEY, JSON.stringify(seen));
-  } catch {}
-}
+/* The How-to-Play cards NEVER open by themselves. They used to auto-show on a
+   player's first open of each game, which meant every game began by covering
+   itself with a modal you had not asked for — and on the pre-game screen it
+   sat on top of the thing you were about to choose. It is reachable from the
+   "?" in the daily header, the ClassicShell topbar, the pre-game screen and
+   the opponent screen; that is enough.
+
+   The per-browser "first open" record that gated it went with it: nothing
+   reads it now, and a stored flag nobody consults is just a thing that can
+   drift out of sync with the behaviour it claims to describe. */
 
 // How-to-Play modal, rendered from the game's manifest `howToPlay` cards.
-// Shell-owned: auto-shown on a player's first-ever open of each game and
-// always reachable from the "?" in the in-game header. Timed dailies can't
-// tick under the auto-show — it appears on the PRE-GAME screen, and the game
-// (with its timer) only mounts after Play.
+// Shell-owned and opened only on request, from the "?" in the in-game header,
+// the ClassicShell topbar, the pre-game screen or the opponent screen.
 function HowToPlayModal({ game, onClose }) {
   const cards = game.howToPlay || [];
   return (
@@ -657,6 +650,98 @@ function ArcadeRuns({ gameId, authOk, onReplay }) {
       <div className="pregame-band-note">
         A replay is the same board again, for practice — it never moves a best or a rank.
       </div>
+    </div>
+  );
+}
+
+
+/* ============================================================
+   Opponent screen — the pre-game screen for a head-to-head game
+   ============================================================
+   The seven opponent games had TWO different first screens. Mancala and
+   Snakes & Ladders dropped you into the game, which then rendered its own
+   full mode picker inline; the five phase-5 board games opened a MODAL over
+   the lobby. The modal was also the poorer of the two: it offered the modes
+   and nothing else, so Versus Bot on Checkers or Gomoku started at full search
+   depth with no way to pick a level — the difficulty tiers existed, were
+   plumbed all the way through to the search, and simply had no control
+   attached to them on that path.
+
+   So there is one screen now, and it is a SCREEN rather than a popup: it can
+   afford to say what the game is before asking who you want to play against,
+   which a modal sized to a mode list cannot. It renders ClassicModePicker —
+   the picker that already handled bot strength, Ludo's 2-4 seats, online
+   create/join and Snakes & Ladders' board variants — so the options are the
+   same wherever you reach them from, and there is one place to add the next
+   one.
+   ============================================================ */
+function OpponentScreen({ game, onPlay, onHowTo, onChat }) {
+  /* The variant glossary belongs to this screen while it is the one asking the
+     question, so it is local state rather than another app-level overlay —
+     Snakes & Ladders is the only game with a board variant, and its own
+     in-game header already owns the same modal once a match is running. */
+  const [glossary, setGlossary] = useState(false);
+  const m = game.manifest || {};
+  const modes = game.modes || [];
+  const hasBot = modes.indexOf('bot') !== -1;
+  const hasLocal2p = modes.indexOf('2p') !== -1;
+  /* 2048 and Block Fit reach this screen too, and their axis is a score race
+     rather than an opponent across a board — so the chips and the heading come
+     off `modes` instead of being hardcoded for the five board games. */
+  const heading = hasBot || hasLocal2p ? 'Choose an opponent' : 'Choose how to play';
+  return (
+    <div className="pregame-card" style={{ '--accent': game.tagColor || C.accent }}>
+      <div className="pregame-icon">{game.icon}</div>
+      <h2>{game.name}</h2>
+      <div className="sub">{game.desc}</div>
+      <div className="pregame-chips">
+        {m.sessionLength && SESSION_LENGTH_LABEL[m.sessionLength] && (
+          <span className="pregame-chip">⏱ {SESSION_LENGTH_LABEL[m.sessionLength]}</span>
+        )}
+        {m.input && INPUT_LABEL[m.input] && <span className="pregame-chip">{INPUT_LABEL[m.input]}</span>}
+        {hasLocal2p && <span className="pregame-chip">👥 2 players</span>}
+        {hasBot && <span className="pregame-chip">🤖 Bot: 3 levels</span>}
+        {modes.indexOf('online') !== -1 && <span className="pregame-chip">🌐 Online</span>}
+      </div>
+
+      {/* What the game actually is, in the player's own terms. The how-to
+          cards are the long form behind the "?" — this is the one-line version
+          you need before choosing an opponent. */}
+      {game.howToPlay && game.howToPlay.length > 0 && (
+        <div className="opp-brief">
+          {game.howToPlay.slice(0, 2).map((c, i) => (
+            <div className="opp-brief-row" key={i}>
+              <span className="opp-brief-n">{i + 1}</span>
+              <span><b>{c.title}</b> {c.body}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="pregame-bands-label">{heading}</div>
+      <ClassicModePicker
+        game={game}
+        onPlay={onPlay}
+        onGlossary={game.variantPicker ? () => setGlossary(true) : undefined}
+      />
+      {glossary && <MokshaGlossaryModal onClose={() => setGlossary(false)} />}
+
+      {/* The retired modal showed a "Top players" preview for the two games
+          with an all-time board; keeping it here is the one thing that screen
+          had which this one otherwise wouldn't. */}
+      {game.leaderboard && (
+        <div className="opp-lb">
+          <ClassicLeaderboard
+            gameId={game.id}
+            url={game.leaderboardOpts && game.leaderboardOpts.url}
+            valueLabel={(game.leaderboardOpts && game.leaderboardOpts.valueLabel) || 'Score'}
+            valueFmt={game.leaderboardOpts && game.leaderboardOpts.valueFmt}
+          />
+        </div>
+      )}
+
+      <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+      {onChat && <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>}
     </div>
   );
 }

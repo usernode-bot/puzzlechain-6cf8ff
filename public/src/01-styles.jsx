@@ -1019,15 +1019,6 @@ ${emitTapHighlightRules()}
   color: ${C.dim}; font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* A card with no play modes (the head-to-head games) is one big tap target
-   rather than a card with a single redundant "Play" button under it. */
-.card-plain-hit {
-  display: flex; flex-direction: column; align-items: inherit;
-  gap: inherit; width: 100%; height: 100%;
-  background: none; border: 0; padding: 0; margin: 0;
-  font: inherit; color: inherit; text-align: inherit; cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
 .card-mode-btn {
   display: flex; flex-direction: column; justify-content: center;
   width: 100%; min-width: 0; text-align: center;
@@ -1060,13 +1051,16 @@ ${emitTapHighlightRules()}
 .card-mode-btn.story:hover, .card-mode-btn.arcade:hover { border-color: var(--accent, ${C.accent}); }
 .card-mode-btn.story:hover .cmb-label,
 .card-mode-btn.arcade:hover .cmb-label { color: var(--accent, ${C.accent}); }
+/* An unplayed daily is marked by its BORDER and its label, not by a filled
+   accent panel. Every card carried one, so the grid read as a wall of colour
+   competing with the game art, and the daily looked like the only real button
+   on a card that has three. The NEW TODAY badge above it already says the
+   same thing. */
 .card-mode-btn.daily.fresh {
-  background: var(--accent, ${C.accent});
   border-color: var(--accent, ${C.accent});
 }
-.card-mode-btn.daily.fresh .cmb-label { color: #fff; }
-.card-mode-btn.daily.fresh .cmb-caption { color: rgba(255,255,255,0.85); }
-.card-mode-btn.daily.fresh:hover { filter: brightness(0.9); }
+.card-mode-btn.daily.fresh .cmb-label { color: var(--accent, ${C.accent}); }
+.card-mode-btn.daily.fresh:hover { border-color: var(--accent, ${C.accent}); }
 .card-mode-btn.daily.resume {
   background: ${ca('gold', '16')};
   border-color: ${ca('gold', '35')};
@@ -2738,7 +2732,7 @@ ${emitTapHighlightRules()}
      actually gets that everywhere, including the two animations this phase
      adds (the 2048 tile slide and the Marble Loop insertion, which falls back
      to the old instant splice). */
-  .cnl-roll-btn, .gm-mode-btn {
+  .cnl-roll-btn {
     animation: none !important;
     transition: none !important;
   }
@@ -3184,55 +3178,21 @@ ${emitTapHighlightRules()}
 .mok-dest { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-left: 0.4rem; }
 .mok-blurb { color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; }
 
-/* ---- Pre-launch Game Mode Modal ---- */
-.gm-modal-backdrop {
-  position: fixed; inset: 0; z-index: 1000;
-  background: var(--c-scrim); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
-  animation: gmFade 0.18s ease-out;
-}
-@keyframes gmFade { from { opacity: 0; } to { opacity: 1; } }
-.gm-modal {
-  position: relative; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto;
-  background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 18px; padding: 1.4rem 1.2rem 1.2rem; box-shadow: 0 20px 50px var(--c-shadow-lg);
-}
-.gm-modal-close {
-  position: absolute; top: 0.75rem; right: 0.75rem; width: 2rem; height: 2rem;
-  border: none; border-radius: 50%; background: ${C.bg}; color: ${C.muted};
-  font-size: 1rem; cursor: pointer;
-}
-.gm-modal-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem; }
-.gm-modal-icon { font-size: 2.4rem; }
-.gm-modal-title { font-size: 1.3rem; font-weight: 700; }
-.gm-modal-desc { font-size: 0.82rem; color: ${C.muted}; margin-top: 0.15rem; }
-.gm-modal-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: ${C.muted}; margin-bottom: 0.5rem; }
-.gm-modes { display: flex; flex-direction: column; gap: 0.6rem; }
-.gm-mode-btn {
-  display: flex; align-items: center; gap: 0.8rem; text-align: left;
-  padding: 0.8rem 0.9rem; border-radius: 12px; cursor: pointer;
-  background: ${C.bg}; border: 2px solid ${C.border}; color: ${C.text};
-  transition: border-color 0.15s, transform 0.1s;
-}
-.gm-mode-btn:active { transform: scale(0.99); }
-.gm-mode-btn.active { border-color: var(--accent, ${C.accent}); background: ${C.bg}; }
-.gm-mode-icon { font-size: 1.6rem; }
-.gm-mode-text { display: flex; flex-direction: column; }
-.gm-mode-name { font-weight: 700; font-size: 0.95rem; }
-.gm-mode-desc { font-size: 0.78rem; color: ${C.muted}; }
-.gm-online { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.gm-online-actions { display: flex; gap: 0.5rem; }
-.gm-online-hint { font-size: 0.76rem; color: ${C.muted}; }
+/* ---- Online race common ---- */
+/* These two OUTLIVED the pre-launch modal they were named for: the online-race
+   screens and Hash Rush's start panel use them as their primary / secondary
+   button. Kept under the old names rather than renamed, because the names are
+   in six call sites and nothing about them is modal-specific. */
 .gm-play-btn {
   width: 100%; margin-top: 1rem; padding: 0.8rem; border: none; border-radius: 12px;
   background: var(--accent, ${C.accent}); color: #fff; font-weight: 700; font-size: 1rem;
   cursor: pointer; font-family: 'Space Grotesk', sans-serif;
 }
 .gm-play-btn:disabled { opacity: 0.4; cursor: default; }
-.gm-link-btn { background: none; border: none; color: ${C.muted}; cursor: pointer; margin-top: 0.6rem; text-decoration: underline; font-size: 0.82rem; }
-.gm-modal-lb { margin-top: 1.1rem; border-top: 1px solid ${C.border}; padding-top: 0.8rem; }
-
-/* ---- Online race common ---- */
+.gm-link-btn {
+  background: none; border: none; color: ${C.muted}; cursor: pointer;
+  margin-top: 0.6rem; text-decoration: underline; font-size: 0.82rem;
+}
 .gm-race-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 2rem 1rem; min-height: 50vh; }
 .gm-race-title { font-size: 1.3rem; font-weight: 700; }
 .gm-race-sub { font-size: 0.9rem; color: ${C.muted}; }
@@ -3487,7 +3447,7 @@ ${emitTapHighlightRules()}
 
 /* Serif display type on the shell's headline moments. */
 .nav-brand, .lobby-head h1, .home-section-title, .gotd-name,
-.pregame-card h2, .win-card h2, .locked-card h2, .gm-modal h2,
+.pregame-card h2, .win-card h2, .locked-card h2,
 .howto-head h3, .chat-title {
   font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
   letter-spacing: 0;
@@ -3550,10 +3510,10 @@ ${emitTapHighlightRules()}
 
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
-.lboard, .howto-card, .gm-modal {
+.lboard, .howto-card {
   box-shadow: 0 1px 2px var(--c-shadow-sm), 0 6px 18px var(--c-shadow-sm);
 }
-.win-card, .howto-card, .gm-modal { box-shadow: 0 20px 50px var(--c-shadow-lg); }
+.win-card, .howto-card { box-shadow: 0 20px 50px var(--c-shadow-lg); }
 
 /* GotD hero reads as the front-page lead story. */
 .gotd-hero { background: ${C.card}; }
@@ -3568,10 +3528,10 @@ ${emitTapHighlightRules()}
 
 /* Per-game chrome picks up the game's accent (set as --accent inline on
    the lobby card, hero, and modal): accent Play buttons + tag pills. */
-.gotd-play, .gm-modal .primary-btn, .pregame-card .pregame-play {
+.gotd-play, .pregame-card .pregame-play {
   background: var(--accent, ${C.accent});
 }
-.gotd-play:hover, .gm-modal .primary-btn:hover, .pregame-card .pregame-play:hover {
+.gotd-play:hover, .pregame-card .pregame-play:hover {
   background: var(--accent, ${C.accent}); filter: brightness(0.88);
 }
 .pregame-card { border-top: 3px solid var(--accent, ${C.accent}); }
@@ -3635,4 +3595,26 @@ ${emitTapHighlightRules()}
 }
 .mode-result-title { font-weight: 700; font-size: .86rem; color: ${C.text}; }
 .mode-result-note { margin-top: .2rem; font-size: .78rem; color: ${C.muted}; line-height: 1.35; }
+
+/* Opponent screen — the two-line "what is this game" brief above the picker. */
+.opp-brief {
+  width: 100%; margin: .15rem 0 .35rem;
+  display: flex; flex-direction: column; gap: .4rem;
+  padding: .6rem .7rem; border-radius: 12px; background: var(--c-well);
+  text-align: left; font-size: .8rem; line-height: 1.4; color: ${C.muted};
+}
+.opp-brief-row { display: flex; gap: .5rem; align-items: baseline; }
+.opp-brief-row b { color: ${C.text}; font-weight: 600; }
+.opp-brief-n {
+  flex: 0 0 auto; width: 1.1rem; height: 1.1rem; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: ${ca('accent', '24')}; color: ${C.accent};
+  font-size: .62rem; font-weight: 700;
+}
+.opp-lb { margin-top: 1.1rem; border-top: 1px solid ${C.border}; padding-top: 0.8rem; }
+.mnc-ranked-pill {
+  margin-left: .4rem; font-size: .68rem; font-weight: 700; vertical-align: middle;
+  padding: .1rem .4rem; border-radius: 999px;
+  background: ${ca('gold', '33')}; color: ${C.gold}; border: 1px solid ${ca('gold', '55')};
+}
 `;

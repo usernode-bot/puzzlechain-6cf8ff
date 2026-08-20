@@ -148,8 +148,24 @@ function App() {
   const [classicGameMode, setClassicGameMode] = useState(null);
   const [classicGameModeOpts, setClassicGameModeOpts] = useState(null);
   const [classicLastResult, setClassicLastResult] = useState(null);
-  // Pre-launch game-mode modal (multi-mode classic games, e.g. 2048 / Block Blast)
+  // The game whose opponent screen is open (multi-mode classic games — the
+  // five board games, Mancala, Snakes & Ladders, 2048, Block Fit).
   const [preLaunchGame, setPreLaunchGame] = useState(null);
+  /* Opening the opponent screen is two pieces of state — which game, and the
+     screen itself — so it gets one function. Setting only the first is how the
+     old modal worked and there is no reason to keep that shape now it is a
+     screen the back button and history have to know about. */
+  const openOpponentScreen = (g) => {
+    if (!g) return;
+    setCurrentGame(g);
+    setPreLaunchGame(g);
+    setClassicGameMode(null);
+    setClassicGameModeOpts(null);
+    setWinData(null);
+    setLoseData(null);
+    setPracticeMode(false);
+    setScreen('opponent');
+  };
   // Shell-owned chrome (phase 3): all-time personal bests per daily game
   // (from /api/daily), and the game whose How-to-Play modal is open (null =
   // closed). The modal renders above every screen/shell.
@@ -248,9 +264,15 @@ function App() {
       setPlayMode(isPlayMode(s.playMode) ? s.playMode : null);
       setStoryBand(Number.isFinite(s.storyBand) ? s.storyBand : 0);
       setArcadeBandId(ARCADE_BAND_IDS.indexOf(s.arcadeBandId) !== -1 ? s.arcadeBandId : 'normal');
-      if (s.screen === 'game' || s.screen === 'pregame' || s.screen === 'locked') {
+      if (s.screen === 'game' || s.screen === 'pregame' || s.screen === 'locked' || s.screen === 'opponent') {
         const g = GAMES.find(x => x.id === s.gameId);
-        if (g) { setCurrentGame(g); setScreen(s.screen); }
+        if (g) {
+          setCurrentGame(g);
+          // The opponent screen reads preLaunchGame, so a pop back onto it has
+          // to restore that too or it renders nothing.
+          setPreLaunchGame(s.screen === 'opponent' ? g : null);
+          setScreen(s.screen);
+        }
         else { setCurrentGame(null); setScreen('lobby'); }
       } else {
         setCurrentGame(null);
@@ -460,8 +482,9 @@ function App() {
   }, [loading]);
 
   // ?howto=<gameId> deep link opens that game's How-to-Play cards the same
-  // way — proposal tests assert on manifest copy through it (the modal is
-  // otherwise tap-only once a browser has marked the game seen).
+  // way. It is the ONLY way navigation can reach them now that nothing
+  // auto-shows the modal, so proposal tests asserting on manifest copy have to
+  // go through it.
   useEffect(() => {
     if (loading) return;
     const hid = new URLSearchParams(window.location.search).get('howto');
@@ -560,7 +583,6 @@ function App() {
       setPracticeMode(false);
       setArcadeReplaySeed(null);
       setScreen('pregame');
-      if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
       return;
     }
     if (pm !== 'daily') {
@@ -569,14 +591,6 @@ function App() {
       setWinData(null);
       setLoseData(null);
       setScreen('game');
-      // Classic games mount immediately, so the first-open how-to overlays
-      // the running game (none of the in-scope classics are hard-timed).
-      // Suppressed when ?sheet= asked for a specific sheet tab: the player named
-      // the screen they wanted, so covering it with an unrequested modal is
-      // wrong (and it hid the leaderboard in the deep link's screenshot).
-      if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id) && !classicSheetDeepLink()) {
-        setHowToGame(game);
-      }
       return;
     }
     const existing = attempts[game.id];
@@ -590,7 +604,6 @@ function App() {
     setWinData(null);
     setLoseData(null);
     setScreen('pregame');
-    if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
   };
 
   // Claim (or resume) the day's single attempt and mount the game. Extracted
@@ -773,20 +786,16 @@ function App() {
       }
       return;
     }
-    // Multi-mode classic games open the pre-launch modal unless a mode is
-    // pinned via ?mmode= (then launch straight into it).
-    if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
-    if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
-    // Non-modal classic games (Mancala, Snakes & Ladders) skip the pre-launch
-    // modal entirely and pick their mode from their own mode-select screen —
-    // so ?mode=bot/2p needs to pin it here too, or a deep link can only ever
-    // land on that screen instead of the running match it names.
-    if (!g.preLaunchModal && mmode && mmode !== 'online' && (g.modes || []).includes(mmode)) {
-      setClassicGameMode(mmode);
-    }
-    // ?play=1 skips the pre-game screen (and the first-open how-to) and
-    // claims/mounts immediately — used by proposal tests that assert on
-    // in-game UI, and by "jump straight in" share links.
+    // A multi-mode classic lands on the shared opponent screen unless the mode
+    // is pinned via ?mode= (then launch straight into it). All nine of them go
+    // through this one branch now — Mancala and Snakes & Ladders used to fall
+    // through to their own in-game pickers, which is exactly the split the
+    // opponent screen exists to close.
+    if (g.modeSelect && !mmode) { openOpponentScreen(g); return; }
+    if (g.modeSelect && mmode) { setClassicGameMode(mmode); }
+    // ?play=1 skips the pre-game screen and claims/mounts immediately — used
+    // by proposal tests that assert on in-game UI, and by "jump straight in"
+    // share links.
     if (params.get('play') === '1') {
       if (g.daily) { startRun(g); return; }
       launchGame(g);
@@ -2016,7 +2025,7 @@ function App() {
                       style={{ '--accent': g.tagColor }}
                       onClick={() => {
                         if (loading) return;
-                        if (g.preLaunchModal) { setPreLaunchGame(g); return; }
+                        if (g.modeSelect) { openOpponentScreen(g); return; }
                         launchGame(g);
                       }}
                     >
@@ -2087,7 +2096,7 @@ function App() {
                 const playCardMode = (gameId, mode) => {
                   const g = GAMES.find(x => x.id === gameId);
                   if (!g) return;
-                  if (!mode && g.preLaunchModal) { setPreLaunchGame(g); return; }
+                  if (!mode && g.modeSelect) { openOpponentScreen(g); return; }
                   if (!mode) { setClassicGameMode(null); setClassicGameModeOpts(null); }
                   launchGame(g, mode);
                 };
@@ -2166,6 +2175,29 @@ function App() {
         </div>
       )}
 
+      {screen === 'opponent' && preLaunchGame && (
+        <div className="game-wrap">
+          <div className="game-head">
+            <button className="back-btn" onClick={() => backToLobby('classic')}>← Back</button>
+            <div className="game-title">
+              <span>{preLaunchGame.icon}</span> {preLaunchGame.name}
+            </div>
+          </div>
+          <OpponentScreen
+            game={preLaunchGame}
+            onHowTo={() => setHowToGame(preLaunchGame)}
+            onChat={authOk ? () => setChatGame(preLaunchGame) : undefined}
+            onPlay={(mode, opts) => {
+              const g = preLaunchGame;
+              setClassicGameMode(mode === 'solo' ? null : mode);
+              setClassicGameModeOpts(opts || null);
+              setPreLaunchGame(null);
+              launchGame(g);
+            }}
+          />
+        </div>
+      )}
+
       {screen === 'locked' && currentGame && (
         <div className={'game-wrap' + (lockedReviewable ? ' fit' : '')}>
           <div className="game-head">
@@ -2211,20 +2243,6 @@ function App() {
             </button>
           )}
         </div>
-      )}
-
-      {preLaunchGame && (
-        <GameModeModal
-          game={preLaunchGame}
-          onClose={() => setPreLaunchGame(null)}
-          onStart={(mode, opts) => {
-            const g = preLaunchGame;
-            setPreLaunchGame(null);
-            setClassicGameMode(mode === 'solo' ? null : mode);
-            setClassicGameModeOpts(opts || null);
-            launchGame(g);
-          }}
-        />
       )}
 
       {/* The finished board stays MOUNTED under the results card (slice 4) so
@@ -2606,7 +2624,7 @@ function App() {
       {howToGame && (
         <HowToPlayModal
           game={howToGame}
-          onClose={() => { markHowtoSeen(howToGame.id); setHowToGame(null); }}
+          onClose={() => setHowToGame(null)}
         />
       )}
     </div>

@@ -4515,6 +4515,51 @@ app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
   }
 });
 
+// Mark a mancala room finished early (concede / close an unjoined room).
+// Idempotent, and the mirror of /api/classic/:gameId/rooms/:roomId/finish —
+// mancala keeps its own room table, so it needs its own copy of the route the
+// shared "End game" / "Close this room" button calls.
+app.post('/api/mancala/rooms/:roomId/finish', async (req, res) => {
+  const { roomId } = req.params;
+  const { winner } = req.body || {};
+  try {
+    // Only a player in the room may concede it. Conceding declares a winner
+    // and moves Elo, so a third party must not be able to reach for it.
+    const { rows: pre } = await pool.query(
+      'SELECT player1_id, player2_id FROM mancala_rooms WHERE id = $1', [roomId]
+    );
+    if (pre.length === 0) return res.status(404).json({ error: 'Room not found' });
+    if (pre[0].player1_id !== req.user.id && pre[0].player2_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not a player in this room' });
+    }
+    // Rate only on the real active->finished transition; a repeat call just
+    // echoes the room. A WAITING room has no opponent, so player2_id being
+    // null is what keeps closing one off the ladder — no special case needed.
+    const { rows: transitioned } = await pool.query(
+      `UPDATE mancala_rooms
+         SET status = 'finished', winner = COALESCE(winner, $2), last_move_at = now()
+       WHERE id = $1 AND status <> 'finished'
+       RETURNING *`,
+      [roomId, winner != null ? String(winner) : null]
+    );
+    let room = transitioned[0];
+    if (room && room.winner && room.player2_id) {
+      rateMatch('mancala',
+        { id: room.player1_id, name: room.player1_name },
+        { id: room.player2_id, name: room.player2_name }, room.winner);
+    }
+    if (!room) {
+      const { rows } = await pool.query('SELECT * FROM mancala_rooms WHERE id = $1', [roomId]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+      room = rows[0];
+    }
+    res.json(shapeRoom(room));
+  } catch (err) {
+    console.error('[mancala] finish failed:', err.message);
+    res.status(500).json({ error: 'Failed to finish room' });
+  }
+});
+
 // Poll room state. Any authenticated user can poll (supports reconnect).
 app.get('/api/mancala/rooms/:roomId', async (req, res) => {
   const { roomId } = req.params;

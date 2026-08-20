@@ -202,6 +202,9 @@ const MERGED_CARDS = [
 const MERGED_IDS = new Set();
 for (const c of MERGED_CARDS) for (const m of c.modes) MERGED_IDS.add(m.gameId);
 
+// Short forms of the opponent modes, for the single-button card caption.
+const OPPONENT_CAPTION = { bot: 'Bot', '2p': '2P', online: 'Online', solo: 'Solo' };
+
 /* Assemble the ordered card list once, at load. A merged card is emitted at
    the position of the FIRST of its ids in GAMES, so the home grid keeps the
    registry's ordering rather than floating the merged ones to the top. */
@@ -222,8 +225,12 @@ function buildGameCards(games) {
       tag: g.tag,
       tagColor: g.tagColor,
       desc: g.desc,
-      modes,          // [] for the head-to-head games — a plain, single-action card
-      gameId: g.id,   // set only for unmerged cards; the plain-card tap target
+      modes,          // [] for the head-to-head games — one Play button, below
+      gameId: g.id,   // set only for unmerged cards; the single button's target
+      // Caption under that one button. DERIVED from the registry's opponent
+      // list rather than written out, so a game that gains or loses an
+      // opponent can't leave its card claiming otherwise.
+      playCaption: (g.modes || []).map(m => OPPONENT_CAPTION[m]).filter(Boolean).join(' · ') || null,
     });
   }
   return out;
@@ -264,24 +271,15 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay }) {
     else bits.push('Story');
   }
 
-  if (!card.modes.length) {
-    return (
-      <div className="card" style={{ '--accent': card.tagColor }} role="group" aria-label={card.name}>
-        <button
-          className="card-plain-hit tappable"
-          aria-label={card.name}
-          {...tapProps(() => { if (!loading) onPlay(card.gameId, null); })}
-        >
-          <div className="card-icon">{card.icon}</div>
-          <div className="card-name">{card.name}</div>
-          <div className="card-desc">{card.desc}</div>
-          <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
-            {card.tag}
-          </span>
-        </button>
-      </div>
-    );
-  }
+  /* EVERY CARD ENDS IN A BUTTON. A card with one way to play used to be one
+     big tap target instead, which made the grid inconsistent to read and to
+     use: two cards side by side, one with labelled buttons and one where the
+     art itself is the button, and no way to tell which without trying. The
+     head-to-head games have exactly one way to play — against an opponent —
+     so they get exactly one button that says so. */
+  const singleModes = card.modes.length
+    ? card.modes
+    : [{ mode: null, gameId: card.gameId, caption: card.playCaption, label: 'Play' }];
 
   return (
     <div className="card paired" style={{ '--accent': card.tagColor }} role="group" aria-label={card.name}>
@@ -297,18 +295,18 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay }) {
         {card.tag}
       </span>
       {bits.length > 0 && <div className="card-state mono">{bits.join(' · ')}</div>}
-      <div className={'card-modes n' + card.modes.length}>
-        {card.modes.map(m => {
+      <div className={'card-modes n' + singleModes.length}>
+        {singleModes.map(m => {
           const isDaily = m.mode === 'daily';
           const state = isDaily ? (finished ? 'done' : inProgress ? 'resume' : 'fresh') : '';
-          const label = PLAY_MODES[m.mode].label;
+          const label = m.label || PLAY_MODES[m.mode].label;
           const caption = m.caption
             || (isDaily ? (finished ? 'Played' : inProgress ? 'Resume' : 'One try') : null)
-            || (m.mode === 'story' ? 'Ladder' : 'Endless');
+            || (m.mode === 'story' ? 'Ladder' : m.mode === 'arcade' ? 'Endless' : null);
           return (
             <button
-              key={m.mode}
-              className={`card-mode-btn tappable ${m.mode} ${state}`}
+              key={m.mode || 'play'}
+              className={`card-mode-btn tappable ${m.mode || 'single'} ${state}`}
               aria-label={`${card.name} — ${label}`}
               {...tapProps(() => { if (!loading) onPlay(m.gameId, m.mode); })}
             >

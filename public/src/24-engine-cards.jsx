@@ -3269,16 +3269,15 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
   // Resume tolerates the pre-rebuild progress shape: rows saved by the old
   // turn-based version carry no level/hold, so derive level from lines and
   // start with an empty hold rather than refusing to resume mid-day.
-  /* The saved grid has to MATCH THIS BOARD, not merely be an array. #176 made
-     the board size a band property (5x5 up to 15x15), so a snapshot from a
-     different band — or a staging fixture that hardcodes one size — hydrates a
-     grid the draw loop then indexes out of bounds: `grid[r][c]` on a missing
-     row throws at mount, and a mount-time throw is a blank screen, not a
-     graceful fallback. Dimensions are cheap to check; a wrong-sized snapshot
-     is simply not a resume. */
-  const ngFits = (g) => Array.isArray(g) && g.length === NG_ROWS &&
-    g.every((row) => Array.isArray(row) && row.length === NG_COLS);
-  const resumed = savedProgress && savedProgress.dayNum === dayNum && ngFits(savedProgress.grid)
+  /* The saved well must be a grid of ROWS, checked before anything indexes
+     into it — `grid[r][c]` against a missing row throws at mount, and a
+     mount-time throw is a blank screen rather than a graceful fallback. Unlike
+     the other resumable boards this one NORMALISES rather than rejects: the
+     well is a fixed DS_W x DS_H, and a snapshot from the pre-rebuild 14-row
+     well is padded to today's height just below. So the shape is what is
+     checked here; the size is handled. */
+  const dsFits = (g) => Array.isArray(g) && g.length > 0 && g.every((row) => Array.isArray(row));
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && dsFits(savedProgress.grid)
     ? savedProgress : null;
   const resumedGrid = resumed
     // An old 14-row well is padded at the TOP to today's 16 rows, so the stack

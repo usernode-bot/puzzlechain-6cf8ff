@@ -1440,15 +1440,24 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
     ? <MokshaGlossaryModal onClose={() => setGlossary(false)} />
     : null;
 
+  /* No mode means the board was reached without passing the opponent screen
+     (a bare deep link). Fall back to the SAME picker that screen renders —
+     Snakes & Ladders used to have its own copy here, and a second picker is
+     how the two screens drift apart. Its board style lives in the registry's
+     `variantPicker` now; the cosmetic skin was never mode-selection at all and
+     stays where it is used, on the ☰ cycle inside the game. */
   if (!mode) {
     return (
       <React.Fragment>
-        <ChutesLaddersModeSelect
-          game={{ id: 'chutes-ladders' }}
+        <ClassicModePicker
+          game={GAMES.find(g => g.id === 'chutes-ladders')}
           onGlossary={() => setGlossary(true)}
-          onPick={(m, opts) => {
+          onPlay={(m, opts) => {
             if (opts && opts.variant) setVariant(opts.variant);
-            if (m === 'online') { setRoomId(opts.roomId); setMyPlayerNum(opts.roomAction === 'join' ? 2 : 1); }
+            if (m === 'online') {
+              setRoomId(opts.roomId);
+              setMyPlayerNum(opts.myPlayerNum || (opts.roomAction === 'join' ? 2 : 1));
+            }
             setMode(m);
           }}
         />

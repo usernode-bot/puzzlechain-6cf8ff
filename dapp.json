@@ -156,24 +156,24 @@
       "expectText": "Start mining"
     },
     {
-      "name": "2048 mode modal offers Online Race",
+      "name": "2048 opponent screen offers Online Race",
       "path": "/?game=2048",
       "expectText": "Online Race"
     },
     {
-      "name": "Block Fit mode modal offers Online Race",
+      "name": "Block Fit opponent screen offers Online Race",
       "path": "/?game=blockblast",
       "expectText": "Online Race"
     },
     {
-      "name": "2048 mode modal shows seeded leaderboard player",
+      "name": "Opponent screen shows the seeded leaderboard player",
       "path": "/?game=2048&demo=classic-scores",
       "expectText": "Staging demo Ada"
     },
     {
-      "name": "Classic mode modal renders mode chooser",
+      "name": "Score-race classic opens the shared opponent screen",
       "path": "/?game=2048",
-      "expectText": "Choose a mode"
+      "expectText": "Choose how to play"
     },
     {
       "name": "Boots with integration secret empty (no dApps chrome)",
@@ -271,9 +271,9 @@
       "expectText": "Daily Cipher"
     },
     {
-      "name": "Sudoku difficulty chooser renders",
-      "path": "/?game=sudoku&practice=1",
-      "expectText": "9×9 Classic"
+      "name": "Sudoku ships as two boards, one card each",
+      "path": "/",
+      "expectText": "Sudoku Mini"
     },
     {
       "name": "Word Search shows Hint bar",
@@ -296,19 +296,9 @@
       "expectText": "Personal best"
     },
     {
-      "name": "How-to-Play cards auto-open on first visit",
+      "name": "How-to-Play stays behind its button on the pre-game screen",
       "path": "/?game=tilematchingdaily",
-      "expectText": "How to play Daily Tile Match"
-    },
-    {
-      "name": "Mancala mode picker offers Daily Challenge",
-      "path": "/?game=mancala",
-      "expectText": "Daily Challenge"
-    },
-    {
-      "name": "Mancala Daily Challenge screen loads",
-      "path": "/?game=mancala&mmode=daily&demo=mancaladaily",
-      "expectText": "Daily Challenge"
+      "expectSelector": ".pregame-howto-btn"
     },
     {
       "name": "Snakes & Ladders mode select offers Versus Bot",
@@ -316,9 +306,9 @@
       "expectText": "Versus Bot"
     },
     {
-      "name": "Snakes & Ladders mode select offers Online Multiplayer",
+      "name": "Snakes & Ladders opponent screen offers online play",
       "path": "/?game=chutes-ladders",
-      "expectText": "Online Multiplayer"
+      "expectText": "take turns on one board"
     },
     {
       "name": "Minesweeper game screen renders (audio controls load cleanly)",
@@ -972,7 +962,7 @@
     },
     {
       "name": "Daily Bounce how-to lists the power-ups",
-      "path": "/?game=bouncedaily",
+      "path": "/?howto=bouncedaily",
       "expectText": "power-ups"
     },
     {
@@ -988,7 +978,22 @@
     {
       "name": "Board games open a mode picker before Online",
       "path": "/?game=checkers",
-      "expectText": "Choose a mode"
+      "expectText": "Choose an opponent"
+    },
+    {
+      "name": "Mancala uses the same opponent screen as the board games",
+      "path": "/?game=mancala",
+      "expectText": "Choose an opponent"
+    },
+    {
+      "name": "Opponent screen carries the game brief, not just a mode list",
+      "path": "/?game=gomoku",
+      "expectSelector": ".opp-brief"
+    },
+    {
+      "name": "How to play is a button on the opponent screen, not a popup",
+      "path": "/?game=checkers",
+      "expectSelector": ".pregame-howto-btn"
     },
     {
       "name": "Gomoku offers pass-and-play from the picker",
@@ -1016,9 +1021,9 @@
       "expectSelector": ".card.paired .card-mode-btn.daily.fresh"
     },
     {
-      "name": "Paired cards appear under the Daily filter",
+      "name": "Merged cards show a button per play mode",
       "path": "/?tab=daily",
-      "expectSelector": ".card.paired .card-mode-btn.regular"
+      "expectSelector": ".card.paired .card-modes .card-mode-btn.daily"
     },
     {
       "name": "Paired cards appear under the Classic filter",
@@ -1028,12 +1033,12 @@
     {
       "name": "A finished daily mutes only its own button",
       "path": "/?demo=dualmode",
-      "expectSelector": ".card.paired .card-mode-btn.daily.played"
+      "expectSelector": ".card.paired .card-mode-btn.daily.done"
     },
     {
       "name": "Free play stays live after the daily is done",
       "path": "/?demo=dualmode",
-      "expectSelector": ".card.paired:not(.done) .card-mode-btn.regular"
+      "expectSelector": ".card.paired .card-mode-btn.daily.done ~ .card-mode-btn:not(.done)"
     },
     {
       "name": "An unfinished daily offers Resume on the card",
@@ -1046,14 +1051,9 @@
       "expectText": "Mine Finder Classic"
     },
     {
-      "name": "Mancala card surfaces the Daily Challenge",
+      "name": "Single-mode cards carry one Play button",
       "path": "/",
-      "expectText": "Daily Challenge"
-    },
-    {
-      "name": "Single-mode cards render unchanged",
-      "path": "/",
-      "expectSelector": ".card:not(.paired) .tag"
+      "expectSelector": ".card-mode-btn.single"
     },
     {
       "name": "Merged card in dark theme",
@@ -1077,9 +1077,9 @@
       "expectSelector": ".sudoku canvas.sdk-canvas"
     },
     {
-      "name": "Sudoku difficulty chooser still renders without ?sdk",
-      "path": "/?game=sudoku&practice=1",
-      "expectSelector": ".fit-col .sdk-choose .sdk-choice"
+      "name": "Sudoku Mini mounts its own 6x6 board",
+      "path": "/?game=sudokumini&practice=1",
+      "expectSelector": ".fit-col .sudoku"
     },
     {
       "name": "Word Search board renders",
@@ -1230,6 +1230,36 @@
       "name": "Gomoku board is a canvas (confirm bar stays)",
       "path": "/?game=gomoku&mode=2p",
       "expectSelector": "canvas.gmk-canvas"
+    },
+    {
+      "name": "Story ladder pre-game screen",
+      "path": "/?game=sudoku&pmode=story&demo=modes",
+      "expectSelector": ".pregame-band"
+    },
+    {
+      "name": "Story band deep link mounts its board",
+      "path": "/?game=cratepush&pmode=story&band=8&play=1",
+      "expectSelector": ".cp-game"
+    },
+    {
+      "name": "Arcade pre-game offers three bands",
+      "path": "/?game=2048&pmode=arcade&demo=modes",
+      "expectSelector": ".pregame-band.wide"
+    },
+    {
+      "name": "Arcade run history is shareable and replayable",
+      "path": "/?game=2048&pmode=arcade&demo=modes",
+      "expectText": "Your recent runs"
+    },
+    {
+      "name": "Home card offers all three play modes",
+      "path": "/",
+      "expectSelector": ".card-mode-btn.arcade"
+    },
+    {
+      "name": "Arcade deep link mounts a board",
+      "path": "/?game=wordsprint&pmode=arcade&band=hard&play=1",
+      "expectSelector": ".wspr-grid, .wspr-tile, canvas"
     }
   ],
   "visibility": {

@@ -30,39 +30,277 @@ tables you've marked private), etc.
 
 Game Corner (renamed from PuzzleChain via dapp.json's `name` — the repo
 slug stays `puzzlechain-6cf8ff` and localStorage keys keep their
-`puzzlechain_`/`pc_` prefixes on purpose) is a **daily-puzzle hub** — a "chain" of bite-size puzzle
-games sharing one lobby. You play each game **once per day**, earn
-points for solving it (fast/efficient solves score higher), and build
-a **streak** that adds a bonus to every subsequent win. Solving pops a
-"Solved!" celebration, then the lobby card locks until the next day.
-Ships with **Mini Sudoku** (6×6) and **Word Hunt** (8×8 word search);
-more games slot into the same registry.
+`puzzlechain_`/`pc_` prefixes on purpose) is a **games hub** — a "chain"
+of bite-size games sharing one lobby, each offering up to **three ways
+to play** (#176):
+
+- **Daily** — one seeded deal a day, ranked, the same board for
+  everyone, one attempt. Solving pops a "Solved!" celebration and the
+  card locks until midnight UTC. Wins build a **streak** that multiplies
+  points.
+- **Story** — a ladder of difficulty bands you clear and tick off. Pays
+  once, on first clear.
+- **Arcade** — endless, a fresh board every run, three difficulty bands.
+  Pays only for landing higher: beating your own best, or crossing a
+  rank threshold for the first time.
+
+34 registry entries, 62 (game, mode) pairs. See "Play modes (#176)"
+below — the mode table is the single declaration of what exists.
+
+## Play modes (#176) — daily / story / arcade
+
+**A play mode is a property of a CARD, not of a registry entry.** That
+distinction is what keeps the whole feature cheap, and it is the first
+thing to understand before touching any of it.
+
+- **Registry ids never move.** `daily_attempts`, `classic_scores`, chat,
+  leaderboards, badges and every deep link key off them. The four games
+  that ship as two ids (Snake / Daily Snake, Bounce / Daily Bounce, Tile
+  Match / Daily Tile Match, Mine Finder / Mine Finder Classic) keep BOTH
+  and merge only on the home card. Nothing migrated.
+- **`PLAY_MODES_BY_ID` (`public/src/29-cards.jsx`) is the declaration.**
+  The home grid, the pre-game screen, the deep links and the self-tests
+  all read it. Omissions there are decisions, and the comment says why
+  for each one.
+- **`scripts/check-registry.js` enforces the client↔server agreement**
+  at build time (it runs as part of `npm run check`): the id sets match,
+  every id declaring `daily` is in the server's `GAME_IDS`, and every id
+  declaring `story` has a `STORY_BANDS` rung count. This pair used to be
+  hand-mirrored under a "keep these in sync" comment. It is not any more
+  — do not add a third copy of the same claim, extend the check.
+
+### Things that are easy to get wrong here
+
+- **Branch on the MODE, never on `game.daily`.** Seven classics (2048,
+  Knight's Tour, Block Fit, Diamond Rush, Marble Loop, Hash Rush,
+  Match-3) have a daily while keeping `daily: false` and their classic
+  shell. `handleWin`/`handleLose` reading the registry flag sent their
+  daily runs down the classic path, where they recorded nothing. Server
+  side those entries carry `dailyMode: true`, and `GAME_IDS` derives
+  from it.
+- **Only a daily resumes.** `savedProgress`/`onSaveProgress` are the
+  daily attempt row. A story run saving into it 409s, and READING from
+  it would hydrate a half-finished daily into a rung that is supposed to
+  be a fixed retryable deal. `resumable` in `renderGameBody` is the gate.
+- **A real-time game's "Game Over" is a WIN everywhere but story.**
+  Marble Loop, Bounce, Snake and Hash Rush report both endings through
+  `onWin` because the score is the result. In story that ticks the rung
+  you just failed, so they route through **`reportRunEnd`**, which sends
+  an uncleared story run to `onLose` and leaves every other mode alone.
+  A story rung must also END when its content is cleared — Bounce used
+  to rebuild the same wall forever, so the rung could only be ticked by
+  dying.
+- **The arcade seed belongs to the RUN, and the shell owns the run.**
+  `beginArcadeRun()` / `currentArcadeSeed()` in `05-core-lib.jsx`. A game
+  that rolled its own seed inside `modeSeed` left the finish with nothing
+  to store, so there was no board to replay — and games that call
+  `modeSeed` twice for one run would have got two unrelated boards.
+- **A story rung's board must be STABLE** (same seed every visit, so it
+  is a rung you can retry) and an arcade board must not be (fresh per
+  run). `modeSeed` is the one place that decides this.
+
+### Arcade settlement
+
+Arcade pays for leaderboard position, so a run is **anchored** before it
+is played: `POST /api/arcade/:gameId/start` stamps `started_at`, and the
+finish compares the claimed `timeSecs` against the server's own clock
+(`ARCADE_TIME_GRACE_SECS`, 30s, generous — it only has to catch a claim
+that could not have been played). A run that is unanchored, replayed
+against a finished row, or claims materially more time than passed is
+recorded **unverified**: it stays in the player's own history and it does
+NOT touch `arcade_bests`, the rank, or the point total. The rule is
+about the CLOCK, deliberately — a per-game score ceiling would be a
+second copy of every game's scoring formula, and the daily's replay
+harness already exists for the games that warrant that depth.
+
+`arcade_runs` is trimmed to 50 rows per (user, game); the history screen
+shows 25. Nothing else bounds that table — arcade is unlimited by design,
+so it has no equivalent of the daily's uniqueness constraint.
+
+### Replays are inert
+
+Replaying a past arcade run goes through `practiceMode`, so `handleWin`
+/`handleLose` stop before any endpoint. Without that, the cheapest way to
+top an arcade board would be to replay the friendliest seed you ever drew
+until you played it perfectly — the opposite of what a fresh-board mode
+is for. The practice ribbon is rendered **once, pinned, at the game-screen
+level** so it appears over all three shells; it used to live inside the
+daily shell, which is why replaying 2048 showed no marker at all.
+
+### A parameterised board and a canvas renderer
+
+#176 made several boards VARY in size or length — Word Search runs 8×8 to 15×15,
+Knight's Tour 5×5 to 8×8 with blocked squares, Drop Stack's arcade bag is 20000
+pieces against the daily's 200, Mine Finder's ladder runs 6 to 38 mines. The
+canvas renderers those games gained in #173 were written against the fixed
+originals, so every one of them had a constant baked into the drawing loop, the
+hit test, the pill row and the aria-label at once.
+
+**A canvas board reads its dimensions from the run, never from the module
+constant.** The constant stays as the free-play default; the component derives
+`size`/`total`/`bagLen` from the board it was actually given and threads that
+through `useFitBox`, the draw loop and the pointer math together — miss one and
+the board draws at one size and is clicked at another. This bug class is silent:
+it neither throws nor fails a parser, and at the default band it looks correct.
+
+Related, and the reason the browser sweep exists: a merge that keeps the tail of
+a block and drops the head leaves an identifier referenced but undeclared. That
+is a `ReferenceError` at mount, which `npm run check` cannot see (it is valid
+syntax) and which only mounting the game reveals.
+
+### Offline-generated content
+
+Two games cannot rate their own content at mount time and ship a corpus
+in `public/corpus/` instead:
+
+- **Klondike / Spider** (`scripts/rate-seeds.js`) ship rated SEEDS —
+  `[[seed, band], …]` — because the deal is cheap to re-derive and it was
+  RATING it that cost a search.
+- **Crate Push** (`scripts/gen-sokoban.js`) ships LEVELS, because Sokoban
+  generation is a search either way. 200 rooms across 8 bands, 3 pushes
+  up to ~35, each carrying its exact minimum solution length.
+
+`loadCorpus` handles both shapes and caches per game. **`startRun` and
+`startPractice` await it**; the pre-game screen only WARMS it. That is
+not belt-and-braces: `?game=cratepush&play=1` skips the pre-game screen,
+and when the warm-up was the only fetch it dealt from the hand-built
+fallback rooms every time — silently, because a graceful fallback is by
+design invisible.
+
+**How gen-sokoban works, and why it is worth reading before touching it.**
+A push and a pull are exact inverses, so breadth-first expanding the
+SOLVED position under pulls walks the forward push-graph backwards. Every
+position it reaches is solvable by construction, and its BFS depth IS the
+exact minimum solution length in pushes — one search per room instead of
+one per candidate. Two rules fall out, both learned the hard way:
+
+- **The search bound must fall BETWEEN whole levels.** Sampling states
+  within a level means their successors are not discovered there and turn
+  up later by a longer route: an earlier build shipped levels recorded at
+  35 pushes that a forward solver cracked in 16.
+- **Expanding a state and normalising its successors need SEPARATE reach
+  buffers.** Sharing one meant the first successor's scan destroyed the
+  map the move loop was still iterating against, silently allowing and
+  forbidding later moves. It was present in both directions at once, and
+  only the two disagreeing exposed it.
+
+`node scripts/gen-sokoban.js --verify` re-solves the shipped corpus
+FORWARD with an independent search and checks the recorded depths. Both
+bugs above were caught by it and nothing else. Run it after any retune.
+
+### Deep links
+
+`?pmode=daily|story|arcade` opens a card in a play mode; `?band=` picks
+the rung (story: 1-based) or difficulty (arcade: `easy|normal|hard`);
+`&play=1` mounts the board. Deliberately not `?mode=`, which already pins
+a classic's opponent. Checked BEFORE the mode-select branch, or 2048 and
+Block Fit surface the opponent chooser instead.
+
+Without these the story ladder, the band pickers and every board behind
+them are reachable only by TAPPING a card button — which navigation-driven
+proposal checks and screenshots cannot do, so none of #176 would have been
+verifiable. `demo=modes` seeds a half-walked ladder plus arcade rivals and
+run history.
+
+### Every card entry point is a BUTTON, and there is one of them per mode
+
+A card's tap target is its mode buttons — never the card itself. The
+single-mode games (the seven head-to-head ones) used to have no button at
+all: the whole card was one hit area, which made them read as a different
+kind of thing to their neighbours and gave the player nothing to aim at.
+`29-cards.jsx` synthesises a one-entry mode list for them
+(`{ mode: null, label: 'Play' }`) so the same `.card-mode-btn` markup and
+the same `tapProps` press feedback cover all 34 games. `.card-plain-hit`
+is gone; a card without a button is a bug, not a layout variant.
+
+The daily button is **outlined, not filled**. A filled accent block on
+every daily card turned the grid into a wall of colour, which is the
+opposite of the emphasis it was meant to carry — the state (fresh /
+in-progress / done) reads from the border and label instead.
+
+### One opponent screen for all seven head-to-head games
+
+`OpponentScreen` (`07-ui-chrome.jsx`, `screen === 'opponent'`) is the
+pre-game screen for a game whose axis is the opponent rather than the play
+mode. Before it there were **two** first screens and neither was good:
+Mancala and Snakes & Ladders dropped you onto the board, which then
+rendered its own full-page picker; the five phase-5 board games opened a
+modal over the lobby that listed the modes and nothing else. The modal was
+also where bot difficulty went missing — the tiers existed and were plumbed
+through to the search, and simply had no control on that path, which is why
+Checkers and Gomoku only ever played at full depth.
+
+- **One picker: `ClassicModePicker`.** It already handled bot strength,
+  Ludo's 2–4 local seats, online create/join and Snakes & Ladders' board
+  variants. Add the next per-mode option there and every game gets it, at
+  first launch and from the ☰ menu's New Game alike.
+- **`MancalaModeSelect` is deleted, deliberately.** It was a second copy of
+  the same screen that predated the shared one, and it is what made Mancala
+  look unlike the other six. `MancalaGame` now reads `gameMode` /
+  `gameModeOpts` like `ChutesLaddersGame` does. **Don't re-add a per-game
+  picker** — a game that needs something the shared picker lacks should
+  declare it (see `variantPicker`, `roomApiBase`).
+- **`roomApiBase`** is the whole accommodation for Mancala's older room
+  routes (`/api/mancala/rooms`, its own table): the flow, the copy and the
+  error handling stay shared. Create responses are read as
+  `body.id || body.roomId` because the two shapes differ.
+- **`rankedModes`** says which of a game's opponents post a score. Only
+  Mancala's bot does (it has a verified-session leaderboard of its own);
+  the five board games' bots are unrated by construction. Its old picker
+  spelled that out with a 🏆 Ranked pill, so the shared one does too —
+  moving a game onto a shared screen must not quietly drop the thing that
+  told a player their result counts.
+- It is a SCREEN and not a popup because it can then say what the game is —
+  the first two `howToPlay` cards render inline as `.opp-brief` — before
+  asking who you want to play against.
+- **2048 and Block Fit land here too** (nine games in all, the nine with a
+  `modes` list). Their axis is a score race rather than an opponent, so the
+  chips and the heading come off `modes` — "Choose how to play", not
+  "Choose an opponent". They also keep the retired modal's one good extra,
+  the all-time leaderboard preview (`.opp-lb`).
+
+### The How-to-Play modal never opens by itself
+
+Phase 3's first-open auto-show is removed, along with its
+`pc_howto_seen_v1` key. A modal in front of a board you just tapped is
+something to dismiss, not onboarding; the pre-game and opponent screens
+carry the short version inline and "❓ How to play" is always one tap away.
 
 ## App-specific conventions
 
-This is a **single-page React 18 app with NO build step**. Read this
-before editing the frontend — the loading mechanism is unusual on
-purpose.
+This is a **single-page React 18 app** built by concatenation rather
+than by a module bundler. Read this before editing the frontend — the
+loading mechanism is unusual on purpose.
 
-- **`public/app.jsx` is the entire frontend** — one file. React,
-  hooks, the design system, every game component, the registry, and
-  the root `App` all live here.
-- **In-browser compile.** `public/index.html` loads React 18 UMD +
-  ReactDOM + Babel Standalone from unpkg, then fetches `/app.jsx` and
-  compiles it with `Babel.transform(src, { presets: ['react'],
-  sourceType: 'script' })` — classic `React.createElement` runtime,
-  **not** ES modules. Consequences:
-  - **Never add `import` or `export`** to `app.jsx`. It runs as a
-    classic script in global scope.
+- **The frontend is `public/src/*.jsx` — 31 files, concatenated.**
+  `scripts/build.js` joins them in the order declared by
+  `public/src/ORDER` and runs esbuild's JSX transform over the result,
+  emitting `public/app.js`. `index.html` loads that as a plain script.
+  Run `npm run build`; the Dockerfile does it at image build time.
+  (Before Aug 2026 this was a single 26k-line `public/app.jsx`. The
+  split is provably behaviour-preserving: at that commit the
+  concatenation was byte-identical to the old file and the compiled
+  `app.js` did not change by one byte.)
+  - **Still never add `import` or `export`.** The files are
+    concatenated, not linked — one classic script, one global scope,
+    exactly as before. Cross-file references just work.
+  - **`ORDER` is load-bearing.** Anything read at evaluation time —
+    the `css` template reads the palette, `GAMES` names every game
+    component — must be declared in an earlier file. A new file that
+    isn't listed in `ORDER` fails the build rather than silently not
+    shipping.
   - Use the globals: `const { useState, useEffect, useRef } = React;`
     and mount with `ReactDOM.createRoot`. `React`/`ReactDOM` are on
     `window`.
-- **Don't touch these parts of `index.html`:** the deterministic
-  fetch→compile→inject bootstrap, the `// usernode-dev-console@1`
+  - `npm run check` compiles the same concatenation with Babel — a
+    second, independent parser as a syntax backstop.
+- **Don't touch these parts of `index.html`:** the `<script src="/app.js">`
+  load and its watchdog/error shell, the `// usernode-dev-console@1`
   block (platform log forwarder), and the inline data-URI favicon
   (its absence triggers a `/favicon.ico` 401 that logs a console
   error and trips the no-console-errors check).
-- **Design system lives in `app.jsx`:** a `const C` color-palette
+- **Design system lives in `public/src/00-palette.jsx` and
+  `01-styles.jsx`:** a `const C` color-palette
   object and a single global `css` template literal injected via
   `<style>{css}</style>`. Add component styles to `css` and reuse `C`
   tokens (e.g. `${C.accent}`); don't introduce a second stylesheet.
@@ -99,7 +337,8 @@ purpose.
   - `public/index.html` carries an **inline pre-paint script** that sets
     `data-theme` before the first style block (no ivory flash for
     dark-mode players) plus a self-contained dark boot-shell block. It
-    duplicates the storage key and resolution rule from `app.jsx` on
+    duplicates the storage key and resolution rule from
+    `public/src/02-prefs-theme.jsx` on
     purpose — **keep the two in sync**. `?theme=` and `?settings=1` are
     the deep links proposal tests use.
   - The control is `ThemeChoice` (a System/Light/Dark segmented control),
@@ -300,7 +539,7 @@ prior days via `seedFeaturedStreakDays` (featured-game attempts + their
 `daily_featured` rows) so they hold under the new rule.
 
 The streak multiplies points via **tiers**, defined once in
-`STREAK_TIERS` (`public/app.jsx`) and applied client-side in
+`STREAK_TIERS` (`public/src/05-core-lib.jsx`) and applied client-side in
 `streakMultiplier(streak)`:
 
 | Streak (consecutive days) | Multiplier |
@@ -334,7 +573,7 @@ Phase 2 of the Game Corner evolution added four things; keep them in
 mind when touching the daily flow:
 
 - **Registry manifest metadata.** Both `GAME_REGISTRY` (`server.js`)
-  and `GAMES` (`public/app.jsx`) now carry a per-game `manifest`:
+  and `GAMES` (`public/src/28-registry.jsx`) now carry a per-game `manifest`:
   `{ scoreDirection, tieBreak, sessionLength, input, undo }` — the
   machine-relevant fields **must match by id across the two files**.
   The client entries additionally carry `howToPlay` card copy
@@ -378,7 +617,7 @@ mind when touching the daily flow:
 ## Game Corner phase 3 — shell-owned chrome
 
 Phase 3 gave the daily flow standard, shell-owned furniture. Key
-pieces (all in `public/app.jsx`):
+pieces (all under `public/src/`):
 
 - **Pre-game screen (`PreGameScreen`).** Opening a daily game now lands
   on `screen === 'pregame'` — game identity, manifest chips
@@ -390,25 +629,25 @@ pieces (all in `public/app.jsx`):
   bests come from `GET /api/daily`'s new `bests` map
   (`{ gameId: { score, timeSecs } }`, all-time, server-computed).
 - **How-to-Play modal (`HowToPlayModal`).** Renders the manifest's
-  `howToPlay` cards. Auto-opens on a player's **first-ever open** of
-  each game (tracked per-browser in localStorage `pc_howto_seen_v1` —
-  deliberately device-local onboarding state, not server state) and is
-  always reachable from a "?" in the daily in-game header and the
-  ClassicShell topbar (`onHowTo` prop). **Timed dailies can't tick
-  under the auto-show**: it appears on the pre-game screen, and the
-  game (with its timer) only mounts after Play.
+  `howToPlay` cards, reachable from the "?" on the pre-game / opponent
+  screen, the daily in-game header and the ClassicShell topbar
+  (`onHowTo` prop). It **never opens by itself** — the phase-3
+  first-open auto-show and its `pc_howto_seen_v1` localStorage key were
+  removed, because a modal in front of a game you just tapped is a
+  thing to dismiss before playing, not onboarding. The pre-game and
+  opponent screens carry the short version inline instead; the modal is
+  the long form, on request.
 - **End screen.** The existing shell-owned win overlay is the standard
   end screen (score breakdown: base → streak bonus → earned; share
   CTA; leaderboard; Verified badge). Phase 3 added the personal-best
   row ("🏅 New personal best!" when beaten, sourced from `bests`).
-- **`?play=1` deep-link param** skips the pre-game screen (and the
-  first-open auto-show) and claims/mounts immediately — the
-  pre-phase-3 behaviour. Proposal tests that assert on in-game UI use
-  it; plain `?game=` deep links land on the pre-game screen.
+- **`?play=1` deep-link param** skips the pre-game screen and
+  claims/mounts immediately — the pre-phase-3 behaviour. Proposal tests
+  that assert on in-game UI use it; plain `?game=` deep links land on
+  the pre-game screen.
 - Classic `shell: 'self'` games (Snake, Block Blast, Diamond Rush,
-  Hash Rush) render their own shell and only get the first-open
-  auto-show for now — extending the "?" affordance into their headers
-  is the remaining game-by-game work.
+  Hash Rush) render their own shell — extending the "?" affordance into
+  their headers is the remaining game-by-game work.
 
 ## Game Corner phase 4 — leaderboard upgrades
 
@@ -495,7 +734,7 @@ pieces (all in `public/app.jsx`):
 ## Game Corner phase 6 — shared card/tile engine + Lane A dailies
 
 Phase 6 added a small client-side **card/tile engine** and eight new
-daily games riding it (all in `public/app.jsx`, section "Phase 6 —
+daily games riding it (`public/src/24-engine-cards.jsx`, "Phase 6 —
 Shared card/tile engine + Lane A daily games"):
 
 - **Engine primitives:** `ceDeck(nDecks, suits, rng)` /
@@ -543,9 +782,8 @@ Shared card/tile engine + Lane A daily games"):
   moves }`, dropstack `{ dayNum, grid, pieceIdx, lines, points, level,
   hold }` (the last two added by the phase-9 rebuild; hydration still
   accepts the old shape and derives `level` from `lines`).
-- The single-file `app.jsx` (~19k lines) is still esbuild-compiled in
-  one pass; the spec's deferred file-split remains available if it
-  grows past comfortable, but was not needed for this phase.
+- The frontend was a single `app.jsx` through this phase; it was split
+  into `public/src/*.jsx` in Aug 2026 (see "App-specific conventions").
 
 ### What makes a good Daily Tile Match board (issue #116)
 
@@ -977,7 +1215,8 @@ by self-tests; the fourth is the kind of bug only a mounted browser shows.
 
 ### 1. `TAPPABLE_CLASSES` is the single source of truth for fast taps
 
-`TAPPABLE_CLASSES` (top of `app.jsx`, above `css`) is the ONE list. Both
+`TAPPABLE_CLASSES` (`public/src/00-palette.jsx`, before `css`) is the ONE
+list. Both
 `touch-action: manipulation` and `-webkit-tap-highlight-color` are **generated**
 from it (`emitTouchActionRules()` / `emitTapHighlightRules()`), and the
 `registry-touch-action` self-test probes that same array. **Adding a game means
@@ -1095,7 +1334,7 @@ frozen board (`&review=1` lands collapsed into the minibar instead). It writes
 NOTHING — dailies go through the inert `practiceMode` path, classics set local
 `loseData` only — so it is deliberately **not** staging-gated and needs no seed
 data (the "before" screenshot comes from production). It is checked **before**
-the `preLaunchModal` branch in the deep-link effect, or 2048/Block Fit would
+the `modeSelect` branch in the deep-link effect, or 2048/Block Fit would
 surface the mode chooser instead. `?snake=easy|normal|hard` preselects Snake's
 difficulty so the board itself is URL-reachable (same role as `?sdk=9`); note
 `SnakeGame`'s reset-to-chooser effect now skips its mount pass, which would

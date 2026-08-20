@@ -153,6 +153,28 @@ function OnlineRoomSetup({ gameId, onReady }) {
 
 function ckOwnerOf(v) { return v === 1 || v === 3 ? 1 : v === 2 || v === 4 ? 2 : 0; }
 
+/* All five board-game views draw their boards on canvases now (#170
+   treatment) — the SAME components in the SAME BOARD_VIEWS registry, so
+   online rooms, pass-and-play and Versus Bot all inherit the change with
+   the move payloads untouched. Intrinsic art (checkers browns, Reversi
+   felt, the goban, Ludo seat colours) stays hardcoded per the palette
+   rules; only chrome reads PAL. The controls wave folded the notes, legends,
+   Gomoku's confirm bar and Ludo's move list into the same canvases, each
+   control twinned in the sr-only layer. */
+/* The box owns the WIDTH (per-board --brg-cap composed with the --cg-board
+   viewport cap in one max-width); the views derive their cell size from that
+   width alone, and since the controls wave their canvases carry the whole
+   frame (board + notes + legends + buttons), the box height simply follows
+   the canvas. `children` hosts the frame's CuiTwin. */
+function BrgBoardBox({ boxRef, canvasRef, className, cap, ariaLabel, children }) {
+  return (
+    <div className="brg-canvas-box" style={{ '--brg-cap': cap }} ref={boxRef}>
+      <canvas ref={canvasRef} className={className + ' board-canvas'} role="img" aria-label={ariaLabel} />
+      {children}
+    </div>
+  );
+}
+
 function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const [sel, setSel] = useState(null);
   const board = st.board || [];
@@ -162,86 +184,275 @@ function CheckersBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     if (owner === myPlayerNum) { setSel(i === sel ? null : i); return; }
     if (sel != null && board[i] === 0) { submit({ from: sel, to: i }); setSel(null); }
   };
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(28, Math.min(48, Math.floor(Math.floor(boxW) / 8)));
+  const side = cell * 8;
+  const showNote = st.mustJumpFrom != null && isMyTurn;
+  const NOTE_H = showNote ? 22 : 0, LEG_H = 24;
+  const H = side + 4 + NOTE_H + LEG_H;
+  const controls = [];
+  if (showNote) controls.push({ id: 'note', kind: 'label', r: [0, side + 4, side, 20], label: 'Chain jump! Continue with the same piece.', gold: true, font: 12 });
+  controls.push({ id: 'legend', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: 'Player 1 (moves down) · Player 2 (moves up)' });
+  const liveRef = useRef({});
+  liveRef.current = { cell, board, isMyTurn };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const c = Math.floor(p.x / lv.cell), r = Math.floor(p.y / lv.cell);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      if ((r + c) % 2 === 1) click(r * 8 + c);
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [board, sel, cell, showNote],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const dark = (r + c) % 2 === 1;
+        const x = c * cell, y = r * cell;
+        ctx.fillStyle = dark ? '#7a5a3a' : '#d8c49a'; // intrinsic checkers browns
+        ctx.fillRect(x, y, cell, cell);
+        if (sel === i) {
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+        }
+        const owner = ckOwnerOf(board[i]);
+        if (owner !== 0) {
+          ctx.beginPath();
+          ctx.arc(x + cell / 2, y + cell / 2, cell * 0.37, 0, Math.PI * 2);
+          ctx.fillStyle = owner === 1 ? palOf(C.accent, '#3A6ECD') : '#2b2f3d';
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = owner === 1 ? 'rgba(0,0,0,0.35)' : '#555';
+          ctx.stroke();
+          if (board[i] > 2) {
+            ctx.font = `${Math.round(cell * 0.4)}px system-ui, sans-serif`;
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillText('\u265b', x + cell / 2, y + cell / 2 + 1);
+          }
+        }
+      }
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.strokeRect(1, 1, side - 2, side - 2);
+      cuiDrawControls(ctx, controls, null);
+      // Legend with drawn swatch dots.
+      const ly = side + 4 + NOTE_H + 11;
+      ctx.font = '500 11px ' + CUI_FONT;
+      ctx.textBaseline = 'middle';
+      const t1 = ' Player 1 (moves down)', t2 = ' Player 2 (moves up)';
+      const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width;
+      let lx = Math.max(4, (side - (w1 + w2 + 40)) / 2);
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.accent, '#3A6ECD'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.textAlign = 'left';
+      ctx.fillText(t1, lx + 14, ly);
+      lx += w1 + 34;
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = '#2b2f3d'; ctx.fill();
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = PAL.muted;
+      ctx.fillText(t2, lx + 14, ly);
+      ctx.textAlign = 'center';
+    },
+  });
   return (
-    <div>
-      {st.mustJumpFrom != null && isMyTurn && (
-        <div className="brg-note">Chain jump! Continue with the same piece.</div>
-      )}
-      <div className="ck-board">
-        {board.map((v, i) => {
-          const r = Math.floor(i / 8), c = i % 8;
-          const dark = (r + c) % 2 === 1;
-          const owner = ckOwnerOf(v);
-          return (
-            <div key={i} className={'ck-cell' + (dark ? ' dark' : '') + (sel === i ? ' sel' : '')} {...tapProps(() => dark && click(i))}>
-              {owner !== 0 && (
-                <div className={'ck-piece p' + owner + (v > 2 ? ' king' : '')}>{v > 2 ? '♛' : ''}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="brg-legend">
-        <span><span className="ck-piece-mini p1" /> Player 1 (moves down)</span>
-        <span><span className="ck-piece-mini p2" /> Player 2 (moves up)</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ck-canvas" cap="360px"
+      ariaLabel="Checkers board">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
+}
+
+// Reversi disc — the DOM disc's flat face + bottom inset shade, drawn.
+function rvDrawDisc(ctx, cx, cy, r, side) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = side === 1 ? '#171a24' : '#f2f0e8';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = side === 1 ? '#444' : 'rgba(0,0,0,0.25)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 1.5, Math.PI * 0.2, Math.PI * 0.8);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+  ctx.stroke();
 }
 
 function ReversiBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
   const p1 = board.filter(x => x === 1).length;
   const p2 = board.filter(x => x === 2).length;
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(26, Math.min(44, Math.floor((Math.floor(boxW) - 4 - 14) / 8)));
+  const step = cell + 2;
+  const side = step * 8 - 2 + 4; // 2px gutters between felt cells + 2px frame
+  const NOTE_H = 24;
+  const H = NOTE_H + 4 + side;
+  const boardY = NOTE_H + 4;
+  const controls = [
+    { id: 'counts', kind: 'label', noDraw: true, r: [0, 0, 0, 0],
+      label: `Dark ${p1} · Light ${p2}${st.passed ? ' · Opponent had no move — you go again.' : ''}` },
+  ];
+  const liveRef = useRef({});
+  liveRef.current = { step, board, isMyTurn, boardY };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - lv.boardY - 2) / lv.step);
+      if (c < 0 || c > 7 || r < 0 || r > 7) return;
+      const i = r * 8 + c;
+      if (lv.isMyTurn && lv.board[i] === 0) submit({ cell: i });
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [board, cell, st.passed],
+    draw: (ctx) => {
+      // Counts band: two drawn discs + live totals (+ the pass note).
+      ctx.textBaseline = 'middle';
+      ctx.font = '600 12px ' + CUI_FONT;
+      const passTxt = st.passed ? '   Opponent had no move — you go again.' : '';
+      const t1 = ` ${p1}`, t2 = ` ${p2}`;
+      const total = 16 + ctx.measureText(t1).width + 26 + 16 + ctx.measureText(t2).width + ctx.measureText(passTxt).width;
+      let lx = Math.max(4, (side - total) / 2);
+      const ly = NOTE_H / 2 + 2;
+      rvDrawDisc(ctx, lx + 7, ly, 7, 1);
+      ctx.fillStyle = PAL.text;
+      ctx.textAlign = 'left';
+      ctx.fillText(t1, lx + 16, ly);
+      lx += 16 + ctx.measureText(t1).width + 26;
+      rvDrawDisc(ctx, lx + 7, ly, 7, 2);
+      ctx.fillStyle = PAL.text;
+      ctx.fillText(t2, lx + 16, ly);
+      if (passTxt) {
+        ctx.fillStyle = PAL.gold;
+        ctx.fillText(passTxt, lx + 16 + ctx.measureText(t2).width, ly);
+      }
+      ctx.textAlign = 'center';
+      ctx.save();
+      ctx.translate(0, boardY);
+      klRR(ctx, 0, 0, side, side, 8);
+      ctx.fillStyle = PAL.border; // the gutter grid shows through between cells
+      ctx.fill();
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = 2 + c * step, y = 2 + r * step;
+        ctx.fillStyle = '#1d5c3a'; // intrinsic Reversi felt
+        ctx.fillRect(x, y, cell, cell);
+        if (board[i] !== 0) rvDrawDisc(ctx, x + cell / 2, y + cell / 2, cell * 0.38, board[i]);
+      }
+      ctx.restore();
+    },
+  });
   return (
-    <div>
-      <div className="brg-note">
-        <span className="rv-count"><span className="rv-disc-mini d1" /> {p1}</span>
-        <span className="rv-count"><span className="rv-disc-mini d2" /> {p2}</span>
-        {st.passed && <span style={{ marginLeft: '0.6rem' }}>Opponent had no move — you go again.</span>}
-      </div>
-      <div className="rv-board">
-        {board.map((v, i) => (
-          <div key={i} className="rv-cell" {...tapProps(() => isMyTurn && v === 0 && submit({ cell: i }))}>
-            {v !== 0 && <div className={'rv-disc d' + v} />}
-          </div>
-        ))}
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="rv-canvas" cap="360px"
+      ariaLabel={`Reversi board — ${p1} dark, ${p2} light`}>
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
 function FourInARowView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(30, Math.min(46, Math.floor((Math.floor(boxW) - 16 - 24) / 7)));
+  const step = cell + 4;
+  const W = step * 7 - 4 + 16, BH = step * 6 - 4 + 16;
+  const LEG_H = 24;
+  const H = BH + 4 + LEG_H;
+  const controls = [
+    { id: 'legend', kind: 'label', noDraw: true, r: [0, 0, 0, 0], label: 'Player 1 · Player 2 · Tap a column to drop' },
+  ];
+  const liveRef = useRef({});
+  liveRef.current = { step, isMyTurn };
+  usePointerCell(canvasRef, {
+    // The whole column is the target — a drop game wants the fattest hit area.
+    onTap: (p) => {
+      const lv = liveRef.current;
+      if (p.y > BH) return;
+      const col = Math.floor((p.x - 8) / lv.step);
+      if (col < 0 || col > 6 || !lv.isMyTurn) return;
+      submit({ col });
+    },
+  });
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [board, st.lastMove, cell],
+    draw: (ctx) => {
+      klRR(ctx, 0, 0, W, BH, 12);
+      ctx.fillStyle = '#22335e'; // intrinsic Four-in-a-Row panel blue
+      ctx.fill();
+      for (let i = 0; i < 42; i++) {
+        const r = Math.floor(i / 7), c = i % 7;
+        const cx = 8 + c * step + cell / 2, cy = 8 + r * step + cell / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cell / 2, 0, Math.PI * 2);
+        ctx.fillStyle = PAL.bg; // the punched-hole look
+        ctx.fill();
+        const v = board[i];
+        if (v !== 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.43, 0, Math.PI * 2);
+          ctx.fillStyle = v === 1 ? palOf(C.rose, '#CD4B3A') : palOf(C.gold, '#D9A54A');
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.43 - 1.5, Math.PI * 0.2, Math.PI * 0.8);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+          ctx.stroke();
+        }
+        if (st.lastMove === i) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell / 2 - 1, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.stroke();
+        }
+      }
+      // Legend band with drawn swatch discs.
+      const ly = BH + 4 + LEG_H / 2;
+      ctx.font = '500 11px ' + CUI_FONT;
+      ctx.textBaseline = 'middle';
+      const t1 = ' Player 1', t2 = ' Player 2', t3 = 'Tap a column to drop';
+      const w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width, w3 = ctx.measureText(t3).width;
+      let lx = Math.max(4, (W - (w1 + w2 + w3 + 72)) / 2);
+      ctx.textAlign = 'left';
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.rose, '#CD4B3A'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.fillText(t1, lx + 14, ly);
+      lx += w1 + 32;
+      ctx.beginPath(); ctx.arc(lx + 6, ly, 6, 0, Math.PI * 2); ctx.fillStyle = palOf(C.gold, '#D9A54A'); ctx.fill();
+      ctx.fillStyle = PAL.muted; ctx.fillText(t2, lx + 14, ly);
+      lx += w2 + 32;
+      ctx.fillText(t3, lx, ly);
+      ctx.textAlign = 'center';
+    },
+  });
   return (
-    <div>
-      <div className="fir-board">
-        {board.map((v, i) => (
-          <div
-            key={i}
-            className={'fir-cell' + (st.lastMove === i ? ' last' : '')}
-            {...tapProps(() => isMyTurn && submit({ col: i % 7 }))}
-          >
-            {v !== 0 && <div className={'fir-disc d' + v} />}
-          </div>
-        ))}
-      </div>
-      <div className="brg-legend">
-        <span><span className="fir-disc-mini d1" /> Player 1</span>
-        <span><span className="fir-disc-mini d2" /> Player 2</span>
-        <span style={{ color: C.muted }}>Tap a column to drop</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="fir-canvas" cap="340px"
+      ariaLabel="Four in a Row board">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
 /* PHASE 2 — Gomoku ghost-confirm.
-   15x15 inside min(92vw, 380px) is ~24px per intersection — about a quarter of a
-   fingertip — and the old single onClick committed a PERMANENT stone on the first
-   tap. Now the first tap only places a ghost; you can slide it around and then
-   confirm. The move payload and the server's applyMove contract are unchanged
-   (only WHEN submit fires), so online, pass-and-play and bot modes all behave
-   identically and lib/board-rules.js needed no change. */
+   15x15 is ~24px per intersection — about a quarter of a fingertip — and the
+   old single tap committed a PERMANENT stone. The first tap places a ghost;
+   slide it, then confirm. The confirm bar draws in the same canvas now
+   (controls wave); the move payload is unchanged. */
 function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const board = st.board || [];
   const [pending, setPending] = useState(null);
@@ -263,30 +474,84 @@ function GomokuBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     setPending(i);
   };
 
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(18, Math.min(26, Math.floor((Math.floor(boxW) - 4 - 14) / 15)));
+  const step = cell + 1;
+  const side = step * 15 - 1 + 4;
+  const BAR_H = isMyTurn ? 52 : 0;
+  const H = side + (BAR_H ? 6 + BAR_H : 0);
   const rc = pending == null ? null : [Math.floor(pending / 15) + 1, (pending % 15) + 1];
+  const controls = [];
+  if (isMyTurn) {
+    const br = cuiRow(2, side + 8, side - 4, 46, 2);
+    controls.push({ id: 'cancel', kind: 'button', r: br[0], label: 'Cancel', disabled: pending == null, action: () => setPending(null) });
+    controls.push({ id: 'place', kind: 'button', r: br[1], label: pending == null ? 'Tap a point' : `Place stone (row ${rc[0]}, col ${rc[1]})`, font: 13, solid: pending != null, disabled: pending == null, action: place });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  const liveRef = useRef({});
+  liveRef.current = { step, pick };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      if (p.y > side) return;
+      const c = Math.floor((p.x - 2) / lv.step), r = Math.floor((p.y - 2) / lv.step);
+      if (c < 0 || c > 14 || r < 0 || r > 14) return;
+      lv.pick(r * 15 + c);
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [board, pending, st.lastMove, cell, isMyTurn, pressedId],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      klRR(ctx, 0, 0, side, side, 6);
+      ctx.fillStyle = '#b08b4f'; // intrinsic goban wood
+      ctx.fill();
+      ctx.strokeStyle = PAL.border;
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 15; i++) {
+        const at = 2 + i * step - 0.5;
+        ctx.beginPath(); ctx.moveTo(at, 2); ctx.lineTo(at, side - 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(2, at); ctx.lineTo(side - 2, at); ctx.stroke();
+      }
+      for (let i = 0; i < 225; i++) {
+        const r = Math.floor(i / 15), c = i % 15;
+        const x = 2 + c * step, y = 2 + r * step;
+        const cx = x + cell / 2, cy = y + cell / 2;
+        const v = board[i];
+        if (v !== 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.39, 0, Math.PI * 2);
+          ctx.fillStyle = v === 1 ? '#171a24' : '#f2f0e8';
+          ctx.fill();
+          if (v === 2) { ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.stroke(); }
+        } else if (pending === i) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, cell * 0.31, 0, Math.PI * 2);
+          ctx.setLineDash([4, 3]);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        if (st.lastMove === i) {
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+        }
+      }
+    },
+  });
   return (
-    <div className="gmk-scroll">
-      <div className="gmk-board">
-        {board.map((v, i) => (
-          <div
-            key={i}
-            className={'gmk-cell' + (st.lastMove === i ? ' last' : '')}
-            {...tapProps(() => pick(i))}
-          >
-            {v !== 0 && <div className={'gmk-stone s' + v} />}
-            {v === 0 && pending === i && <div className="gmk-ghost" />}
-          </div>
-        ))}
-      </div>
-      {isMyTurn && (
-        <div className="brd-confirm-bar">
-          <button onClick={() => setPending(null)} disabled={pending == null}>Cancel</button>
-          <button className="go" onClick={place} disabled={pending == null}>
-            {pending == null ? 'Tap a point' : `Place stone (row ${rc[0]}, col ${rc[1]})`}
-          </button>
-        </div>
-      )}
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="gmk-canvas" cap="380px"
+      ariaLabel="Gomoku board, 15 by 15">
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -338,55 +603,31 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     if (pos === -1) return st.die === 6;
     return pos + st.die <= 57;
   };
-  const cells = [];
-  // Ring — a start cell is safe (and tinted) only for seats actually playing.
-  LUDO_RING_XY.forEach(([x, y], i) => {
-    const startOwner = seatList.find(p => LUDO_START_ABS[p] === i) || 0;
-    const safe = i === 0 || i === 13 || i === 26 || i === 39;
-    cells.push(
-      <div key={'r' + i} className={'ludo-cell ring' + (safe ? ' safe' : '') + (startOwner ? ' start' + startOwner : '')}
-           style={{ gridColumn: x + 1, gridRow: y + 1 }}>{safe ? '★' : ''}</div>
-    );
-  });
-  // Home columns + center + bases (only for seats in this match)
+  // Tokens flattened in DRAW order (seat asc, token asc) — the tap hit-test
+  // walks this list in reverse so the topmost of a 5px-offset stack wins.
+  const toks = [];
   for (const p of seatList) {
-    LUDO_HOME_XY[p].forEach(([x, y], i) => {
-      cells.push(<div key={'h' + p + i} className={'ludo-cell home' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
-    });
-    LUDO_BASE_XY[p].forEach(([x, y], i) => {
-      cells.push(<div key={'b' + p + i} className={'ludo-cell base' + p} style={{ gridColumn: x + 1, gridRow: y + 1 }} />);
-    });
-  }
-  cells.push(<div key="center" className="ludo-cell center" style={{ gridColumn: 8, gridRow: 8 }}>🏁</div>);
-  // Tokens (offset stacked tokens slightly so pile-ups stay visible)
-  const tokens = [];
-  for (const p of seatList) {
-    const toks = seats[p] || [];
     const out = forfeited.includes(p);
-    toks.forEach((pos, i) => {
-      const [x, y] = ludoTokenXY(p, pos, i);
-      const mine = p === myPlayerNum;
-      const movable = mine && !out && canMoveToken(pos);
-      tokens.push(
-        <div
-          key={'t' + p + i}
-          className={'ludo-token p' + p + (movable ? ' movable' : '') + (out ? ' forfeited' : '')}
-          style={{
-            gridColumn: x + 1, gridRow: y + 1,
-            transform: `translate(${(i % 2) * 5 - 2}px, ${Math.floor(i / 2) * 5 - 2}px)`,
-          }}
-          {...tapProps(() => movable && submit({ type: 'move', token: i }))}
-        >{i + 1}</div>
-      );
+    (seats[p] || []).forEach((pos, i) => {
+      const [gx, gy] = ludoTokenXY(p, pos, i);
+      toks.push({ p, i, pos, gx, gy, out, movable: p === myPlayerNum && !out && canMoveToken(pos) });
     });
   }
 
-  /* PHASE 2 — the movable-token pad.
-     The board tap targets a token INSIDE a ~25px cell, and tokens sharing a
-     square are offset by only 5px, so two of them overlap almost entirely —
-     there was no reliable way to pick the one you meant (and no accessible way
-     at all). This list is the unambiguous, full-size path; the board tap stays
-     as a shortcut. Same { type: 'move', token } payload either way. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const cell = Math.max(18, Math.min(26, Math.floor((Math.floor(boxW) - 6 - 14) / 15)));
+  const step = cell + 1;
+  const PADI = 3;
+  const side = step * 15 - 1 + PADI * 2;
+  const tokenC = (t) => [
+    PADI + t.gx * step + cell / 2 + (t.i % 2) * 5 - 2,
+    PADI + t.gy * step + cell / 2 + Math.floor(t.i / 2) * 5 - 2,
+  ];
+
+  // The move pad (the unambiguous full-size path for stacked tokens), the
+  // die, the roll button, the event notes and the legend all draw in-frame.
   const myTokens = (seats[myPlayerNum] || []);
   const movableList = phase === 'move' && isMyTurn && st.die != null
     ? myTokens.map((pos, i) => ({ i, pos })).filter(t => canMoveToken(t.pos))
@@ -397,50 +638,192 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     const dest = pos + st.die;
     return `step ${pos} → ${dest >= 51 ? 'home column' : dest}`;
   };
+  const notes = [];
+  if (st.lastEvent === 'no-move') notes.push('No legal move for that roll — turn passed.');
+  if (st.lastEvent === 'capture') notes.push('💥 Capture! Token sent back to base.');
+  if (forfeited.length > 0) notes.push(`${forfeited.map(p => 'P' + p).join(', ')} forfeited — the match continues.`);
+  if (nPlayers > 2 && !isMyTurn) notes.push(`Waiting on P${st.currentPlayer || 1}…`);
+
+  const MOVE_H = movableList.length ? 18 + movableList.length * 50 : 0;
+  const ROLL_H = 54;
+  const NOTES_H = notes.length * 18;
+  const LEG_H = 18;
+  const H = side + (MOVE_H ? 6 + MOVE_H : 0) + 6 + ROLL_H + (NOTES_H ? 4 + NOTES_H : 0) + 4 + LEG_H;
+  let by = side + 6;
+  const moveY = by; if (MOVE_H) by += MOVE_H + 6;
+  const rollY = by; by += ROLL_H + 4;
+  const notesY = by; if (NOTES_H) by += NOTES_H + 4;
+  const legY = by;
+
+  const controls = [];
+  if (movableList.length) {
+    controls.push({ id: 'ml-label', kind: 'label', r: [0, moveY, side, 16], label: `YOUR MOVES · ROLLED ${st.die}`, font: 10 });
+    movableList.forEach((t, k) => {
+      controls.push({
+        id: 'mv' + t.i, kind: 'button',
+        r: [Math.floor(side * 0.05), moveY + 18 + k * 50, Math.floor(side * 0.9), 46],
+        label: `Token ${t.i + 1}`, sub: describe(t.pos),
+        action: () => submit({ type: 'move', token: t.i }),
+      });
+    });
+  }
+  controls.push({ id: 'die', kind: 'button', r: [Math.floor(side / 2) - 24, rollY, 48, 48], label: st.die == null ? '·' : String(st.die), font: 20, mono: true, disabled: true });
+  const rollW = Math.floor(side * 0.34);
+  controls.push({
+    id: 'roll', kind: 'button', r: [side - rollW - 4, rollY + 4, rollW, 44],
+    label: !isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a token',
+    font: 13, solid: isMyTurn && phase === 'roll',
+    bg: isMyTurn && phase === 'roll' ? palOf(LUDO_SEAT_COLORS[myPlayerNum] || C.accent, '#3A6ECD') : undefined,
+    ink: isMyTurn && phase === 'roll' ? '#fff' : undefined,
+    disabled: !isMyTurn || phase !== 'roll',
+    action: () => submit({ type: 'roll' }),
+  });
+  notes.forEach((n, k) => controls.push({ id: 'note' + k, kind: 'label', r: [0, notesY + k * 18, side, 18], label: n, gold: true, font: 11.5 }));
+  controls.push({ id: 'legend', kind: 'label', r: [0, legY, side, 16], label: '🎲 6 leaves base & rolls again · ★ safe cells · Exact roll to finish', font: 10.5 });
+
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  const liveRef = useRef({});
+  liveRef.current = { toks, cell, tokenC };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (pt) => {
+      const lv = liveRef.current;
+      if (pt.y > side) return;
+      const rr = lv.cell * 0.425 + 8; // +8 = the old DOM token's hit-slop
+      for (let k = lv.toks.length - 1; k >= 0; k--) {
+        const t = lv.toks[k];
+        if (!t.movable) continue;
+        const [cx, cy] = lv.tokenC(t);
+        if ((pt.x - cx) * (pt.x - cx) + (pt.y - cy) * (pt.y - cy) <= rr * rr) {
+          submit({ type: 'move', token: t.i });
+          return;
+        }
+      }
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: H,
+    deps: [st, cell, myPlayerNum, nPlayers, pressedId, isMyTurn],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      klRR(ctx, 0, 0, side, side, 10);
+      ctx.fillStyle = PAL.surface;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const seatColor = (p) => palOf(LUDO_SEAT_COLORS[p], '#888');
+      const cellRect = (gx, gy) => [PADI + gx * step, PADI + gy * step];
+      // Ring — a start cell is safe (and tinted) only for seats actually playing.
+      LUDO_RING_XY.forEach(([gx, gy], i) => {
+        const [x, y] = cellRect(gx, gy);
+        const startOwner = seatList.find(p => LUDO_START_ABS[p] === i) || 0;
+        const safe = i === 0 || i === 13 || i === 26 || i === 39;
+        klRR(ctx, x, y, cell, cell, 3);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        if (startOwner) {
+          ctx.save();
+          ctx.globalAlpha = 0.2;
+          ctx.fillStyle = seatColor(startOwner);
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = startOwner ? seatColor(startOwner) : PAL.border;
+        ctx.stroke();
+        if (safe) {
+          ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
+          ctx.fillStyle = palOf(C.gold, '#D9A54A');
+          ctx.fillText('★', x + cell / 2, y + cell / 2 + 0.5);
+        }
+      });
+      // Home columns + bases (only for seats in this match)
+      for (const p of seatList) {
+        const col = seatColor(p);
+        for (const [gx, gy] of LUDO_HOME_XY[p]) {
+          const [x, y] = cellRect(gx, gy);
+          klRR(ctx, x, y, cell, cell, 3);
+          ctx.save();
+          ctx.globalAlpha = 0.13;
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.globalAlpha = 0.4;
+          ctx.setLineDash([3, 2]);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+          ctx.restore();
+        }
+        for (const [gx, gy] of LUDO_BASE_XY[p]) {
+          const [x, y] = cellRect(gx, gy);
+          ctx.beginPath();
+          ctx.arc(x + cell / 2, y + cell / 2, cell / 2 - 0.5, 0, Math.PI * 2);
+          ctx.save();
+          ctx.globalAlpha = 0.1;
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.globalAlpha = 0.35;
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      { // center 🏁
+        const [x, y] = cellRect(7, 7);
+        klRR(ctx, x, y, cell, cell, 3);
+        ctx.save();
+        ctx.globalAlpha = 0.13;
+        ctx.fillStyle = palOf(C.gold, '#D9A54A');
+        ctx.fill();
+        ctx.restore();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+        ctx.stroke();
+        ctx.font = `${Math.round(cell * 0.7)}px system-ui, sans-serif`;
+        ctx.fillText('🏁', x + cell / 2, y + cell / 2 + 0.5);
+      }
+      // Tokens
+      for (const t of toks) {
+        const [cx, cy] = tokenC(t);
+        const r = cell * 0.425;
+        ctx.save();
+        if (t.out) ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = seatColor(t.p);
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.stroke();
+        if (t.movable) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 1.5, 0, Math.PI * 2);
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = palOf(C.gold, '#D9A54A');
+          ctx.shadowColor = palOf(C.gold, '#D9A54A');
+          ctx.shadowBlur = 6;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        ctx.font = `700 ${Math.max(8, Math.round(cell * 0.42))}px system-ui, sans-serif`;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(String(t.i + 1), cx, cy + 0.5);
+        ctx.restore();
+      }
+    },
+  });
 
   return (
-    <div>
-      <div className="ludo-board">{cells}{tokens}</div>
-      {movableList.length > 0 && (
-        <div className="brd-movelist">
-          <div className="brd-movelist-label">Your moves · rolled {st.die}</div>
-          {movableList.map(t => (
-            <button
-              key={t.i}
-              className="brd-move-btn"
-              {...tapProps(() => submit({ type: 'move', token: t.i }))}
-            >
-              <span>Token {t.i + 1}</span>
-              <span className="brd-move-sub">{describe(t.pos)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="cnl-die"><div className="cnl-die-face">{st.die == null ? '·' : st.die}</div></div>
-      {st.lastEvent === 'no-move' && <div className="brg-note">No legal move for that roll — turn passed.</div>}
-      {st.lastEvent === 'capture' && <div className="brg-note">💥 Capture! Token sent back to base.</div>}
-      {forfeited.length > 0 && (
-        <div className="brg-note">{forfeited.map(p => `P${p}`).join(', ')} forfeited — the match continues.</div>
-      )}
-      {nPlayers > 2 && !isMyTurn && (
-        <div className="brg-note">Waiting on P{st.currentPlayer || 1}…</div>
-      )}
-      <div className="cnl-roll-buttons">
-        <button
-          className="cnl-roll-btn"
-          style={{ background: LUDO_SEAT_COLORS[myPlayerNum] || C.accent }}
-          onClick={() => submit({ type: 'roll' })}
-          disabled={!isMyTurn || phase !== 'roll'}
-        >
-          {!isMyTurn ? 'Waiting…' : phase === 'roll' ? 'Roll' : 'Pick a highlighted token'}
-        </button>
-      </div>
-      <div className="brg-legend">
-        <span>🎲 6 leaves base & rolls again</span>
-        <span>★ safe cells</span>
-        <span>Exact roll to finish</span>
-      </div>
-    </div>
+    <BrgBoardBox boxRef={boxRef} canvasRef={canvasRef} className="ludo-canvas" cap="380px"
+      ariaLabel={`Ludo board, ${nPlayers} players`}>
+      <CuiTwin controls={controls} />
+    </BrgBoardBox>
   );
 }
 
@@ -543,13 +926,17 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.82rem' }}>P{myPlayerNum}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
-      </div>
-      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <CuiBar height={opponentDisconnected ? 68 : 46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: 'P' + myPlayerNum, color: palOf(myColor, undefined) },
+          { id: 'p-conn', kind: 'pill', r: pr[3], label: 'Online', value: '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        if (opponentDisconnected) out.push({ id: 'disc', kind: 'label', r: [0, 50, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        return out;
+      }} />
       {room.status === 'active' && (() => {
         // Correspondence turn timer: the server auto-forfeits the side to move
         // after turnTimeoutHours without a move — surface the remaining window.
@@ -937,12 +1324,13 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey, seats, b
 
   return (
     <div>
-      <div className="brg-intro">
-        {over
+      <CuiBar height={36} build={(W) => ([{
+        id: 'intro', kind: 'label', r: [0, 4, W, 28], font: 13, bold: true, color: PAL.text,
+        label: over
           ? (over.winner === 'draw' ? "It's a draw." : `${label(Number(over.winner))} ${vsBot && over.winner === '1' ? 'win' : 'wins'}! 🎉`)
           : thinking ? 'Bot is thinking…'
-          : `${label(cur)} to move`}
-      </div>
+          : `${label(cur)} to move`,
+      }])} />
       {err && <div className="mnc-join-error">{err}</div>}
       <View
         st={state}
@@ -1027,6 +1415,7 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   // Sync mode from the Game Menu's New Game selection.
   useEffect(() => {
     setMode(gameMode || null);
+    if (gameModeOpts && gameModeOpts.variant) setVariant(gameModeOpts.variant);
     if (gameModeOpts && gameModeOpts.roomId) {
       setRoomId(gameModeOpts.roomId);
       setMyPlayerNum(gameModeOpts.roomAction === 'join' ? 2 : 1);

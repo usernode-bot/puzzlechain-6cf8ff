@@ -344,67 +344,120 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const selSet = new Set(sel);
 
+  /* The whole frame is ONE canvas (controls wave): pills, theme line, letter
+     grid and hint bar draw together; only the found-words chip list stays
+     DOM (read-only content, scrolls). The canvas keeps pointer capture, so a
+     fast diagonal swipe can't skip cells; letters render uppercase as the
+     DOM's text-transform did. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, THEME_H = 22, HINT_H = 36;
+  const chrome = PILL_H + THEME_H + HINT_H + GAP * 3;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  /* #176 — the grid is 8x8 to 15x15 now (the ladder's first real knob), so the
+     cell size is derived from THIS board's size, not the 10x10 default. The
+     floor drops with the size: a 15x15 board at a 24px minimum would not fit a
+     390px phone. */
+  const wsCell = Math.max(16, Math.min(42, Math.floor((availB - (WS_N - 1)) / WS_N)));
+  const wsStep = wsCell + 1;
+  const wsSide = wsStep * WS_N - 1;
+  const H = chrome + wsSide;
+  const boardX = Math.floor((W - wsSide) / 2);
+  const boardY = PILL_H + GAP + THEME_H + GAP;
+  const hintY = boardY + wsSide + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-found', kind: 'pill', r: pr[1], label: 'Found', value: `${found.size}/${total}` });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[2], label: 'Steps', value: steps });
+    controls.push({ id: 'theme', kind: 'label', r: [0, PILL_H + GAP, W, THEME_H], label: `Theme: ${theme} · drag across letters to find each word`, font: 12 });
+    if (!done) {
+      const exhausted = hints.exhausted || hintsExhausted;
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hints.msg ? 0 : Math.floor(W * 0.2), hintY, hints.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: exhausted ? '💡 No more hints'
+          : `💡 Hint${Number.isFinite(hints.hintsLeft) ? ` · ${hints.hintsLeft} left` : ''}`,
+        disabled: hints.buying || exhausted,
+        action: buyHint,
+      });
+      if (hints.msg) {
+        controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hints.msg, font: 11 });
+      }
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const wsGeoRef = useRef({});
+  wsGeoRef.current = { wsStep, boardX, boardY };
+  const wsCellAt = (p) => {
+    const g = wsGeoRef.current;
+    const c = Math.max(0, Math.min(WS_N - 1, Math.floor((p.x - g.boardX) / g.wsStep)));
+    const r = Math.max(0, Math.min(WS_N - 1, Math.floor((p.y - g.boardY) / g.wsStep)));
+    return [r, c];
+  };
+  const wsInBoard = (p) => {
+    const g = wsGeoRef.current;
+    return p.y >= g.boardY && p.y < g.boardY + wsSide + 8;
+  };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onDown: (p) => { if (!wsInBoard(p)) return; const [r, c] = wsCellAt(p); startSel(r, c); },
+    onDrag: (p) => { const [r, c] = wsCellAt(p); moveSel(r, c); },
+    onUp: () => endSel(),
+  }), { moveTolerance: 3 });
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [foundCells, hintedStarts, sel, done, wsCell, W, fmt, steps, found, pressedId, hints.hintsLeft, hints.msg, hints.buying],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
+      ctx.fillStyle = PAL.border; // the 1px gridline gaps
+      ctx.fillRect(0, 0, wsSide, wsSide);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let r = 0; r < WS_N; r++) {
+        for (let c = 0; c < WS_N; c++) {
+          const i = idx(r, c);
+          const x = c * wsStep, y = r * wsStep;
+          const isFound = foundCells.has(i);
+          const isHinted = !isFound && hintedStarts.has(i);
+          const isSel = selSet.has(i);
+          ctx.fillStyle = isFound ? 'rgba(45,159,102,0.20)' : isHinted ? 'rgba(201,162,39,0.20)' : PAL.card;
+          ctx.fillRect(x, y, wsCell, wsCell);
+          if (isSel) { ctx.fillStyle = 'rgba(58,110,205,0.55)'; ctx.fillRect(x, y, wsCell, wsCell); }
+          if (isHinted) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = PAL.gold;
+            ctx.strokeRect(x + 1, y + 1, wsCell - 2, wsCell - 2);
+          }
+          ctx.font = `600 ${Math.round(wsCell * 0.5)}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = isSel ? '#fff' : isFound ? PAL.emerald : PAL.text;
+          ctx.fillText(String(letters[r][c]).toUpperCase(), x + wsCell / 2, y + wsCell / 2 + 1);
+        }
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Found</div>
-          <div className="pvalue">{found.size}/{total}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Steps</div>
-          <div className="pvalue">{steps}</div>
-        </div>
-      </div>
-
-      <div className="word-theme">Theme: <b>{theme}</b> · drag across letters to find each word</div>
-
-      <div className="fit-scale-box">
-      <div className="wordsearch" style={{ '--ws-size': WS_N }} onPointerUp={endSel} onPointerLeave={endSel}>
-        {letters.map((row, r) =>
-          row.map((ch, c) => {
-            const i = idx(r, c);
-            const cls = ['wcell'];
-            if (foundCells.has(i)) cls.push('found');
-            else if (hintedStarts.has(i)) cls.push('hinted');
-            if (selSet.has(i)) cls.push('sel');
-            return (
-              <div
-                key={i}
-                className={cls.join(' ')}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  // Release implicit touch pointer-capture so pointerenter
-                  // fires on sibling cells as the finger drags across them.
-                  if (e.target.releasePointerCapture && e.target.hasPointerCapture && e.target.hasPointerCapture(e.pointerId)) {
-                    e.target.releasePointerCapture(e.pointerId);
-                  }
-                  startSel(r, c);
-                }}
-                onPointerEnter={() => moveSel(r, c)}
-              >
-                {ch}
-              </div>
-            );
-          })
-        )}
-      </div>
-      </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={hints.hintsLeft}
-          exhausted={hints.exhausted || hintsExhausted}
-          buying={hints.buying}
-          onBuy={buyHint}
-          msg={hints.msg}
-          label="No more hints"
+      <div className="wordsearch cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="ws-canvas board-canvas"
+          role="grid"
+          aria-label={`Word search grid — ${found.size} of ${total} words found`}
         />
-      )}
+      </div>
+      <CuiTwin controls={controls} />
 
       <div className="word-list">
         {words.map(w => (

@@ -29,13 +29,6 @@ function t2048_tileStyle(value) {
   return { bg: palette[Math.floor(Math.log2(value)) % palette.length], color: '#FFF' };
 }
 
-function t2048_tileFontSize(v) {
-  if (v < 100)   return '1.4rem';
-  if (v < 1000)  return '1.15rem';
-  if (v < 10000) return '0.92rem';
-  return '0.72rem';
-}
-
 function t2048_newTile(value, isNew, isMerged) {
   return { value, id: ++t2048TileCounter, isNew: !!isNew, isMerged: !!isMerged };
 }
@@ -211,6 +204,125 @@ function t2048SaveBest(v) {
 /* ============================================================
    T2048Game component
    ============================================================ */
+/* The 2048 board as a canvas (#170 treatment), keeping #142's animation
+   contract: tiles are tracked BY ID, so a move draws each tile sliding from
+   its previous cell to its new one (100ms), new tiles pop in and merges
+   bump — and input is never gated on the animation (executeMove stays
+   synchronous; the drawing catches up). Tile faces keep the intrinsic 2048
+   palette; the backdrop reads PAL. Reduced-motion players get instant
+   placement, matching the old CSS media block. */
+function T2048BoardCanvas({ grid }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 4, rows: 4 });
+  const side = Math.max(0, Math.floor(boxW));
+  const pad = 8, gap = 6;
+  const cell = (side - pad * 2 - gap * 3) / 4;
+
+  const animRef = useRef({ prev: {}, t0: 0, reduced: false });
+  const [, setFrame] = useState(0);
+  useEffect(() => {
+    const a = animRef.current;
+    const targets = {};
+    grid.forEach((row, r) => row.forEach((t, c) => { if (t) targets[t.id] = { r, c }; }));
+    a.from = a.prev;
+    a.targets = targets;
+    a.prev = targets;
+    a.reduced = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    a.t0 = a.reduced ? -1e9 : performance.now();
+    if (a.reduced) { setFrame((f) => f + 1); return; }
+    let raf = 0;
+    const tick = () => {
+      setFrame((f) => f + 1);
+      if (performance.now() - a.t0 < 170) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [grid]);
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [grid, side],
+    draw: (ctx) => {
+      if (side < 60) return;
+      const a = animRef.current;
+      const now = performance.now();
+      const slideP = Math.min(1, (now - a.t0) / 100);
+      const ease = 1 - (1 - slideP) * (1 - slideP);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Static 4x4 backdrop.
+      for (let i = 0; i < 16; i++) {
+        const r = Math.floor(i / 4), c = i % 4;
+        const x = pad + c * (cell + gap), y = pad + r * (cell + gap);
+        klRR(ctx, x, y, cell, cell, 8);
+        ctx.fillStyle = PAL.bg;
+        ctx.fill();
+        ctx.save();
+        ctx.globalAlpha = 0.27;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        ctx.restore();
+      }
+      const at = (r, c) => [pad + c * (cell + gap), pad + r * (cell + gap)];
+      grid.forEach((row, r) => row.forEach((t, c) => {
+        if (!t) return;
+        const from = a.from && a.from[t.id];
+        const [tx, ty] = at(r, c);
+        let x = tx, y = ty;
+        if (from && (from.r !== r || from.c !== c)) {
+          const [fx, fy] = at(from.r, from.c);
+          x = fx + (tx - fx) * ease;
+          y = fy + (ty - fy) * ease;
+        }
+        let scale = 1, alpha = 1;
+        if (!a.reduced) {
+          if (t.isNew && !from) {
+            const p = Math.min(1, (now - a.t0) / 120);
+            scale = 0.5 + 0.5 * p;
+            alpha = p;
+          } else if (t.isMerged) {
+            const p = Math.min(1, (now - a.t0) / 150);
+            scale = 1 + 0.18 * Math.sin(p * Math.PI);
+          }
+        }
+        const { bg, color } = t2048_tileStyle(t.value);
+        const cx = x + cell / 2, cy = y + cell / 2;
+        const s = cell * scale;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        klRR(ctx, cx - s / 2, cy - s / 2, s, s, 8 * scale);
+        ctx.fillStyle = bg;
+        if (t.value === 2048) {
+          ctx.shadowColor = 'rgba(245,158,11,0.55)';
+          ctx.shadowBlur = 14;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        const len = String(t.value).length;
+        ctx.font = `700 ${Math.round(cell * (len <= 2 ? 0.45 : len === 3 ? 0.37 : len === 4 ? 0.3 : 0.24))}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = color;
+        ctx.fillText(String(t.value), cx, cy + 1);
+        ctx.restore();
+      }));
+    },
+  });
+
+  return (
+    <div className="t2048-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="t2048-canvas board-canvas"
+        role="img"
+        aria-label={`2048 board — highest tile ${t2048_maxTile(grid) || 0}`}
+      />
+    </div>
+  );
+}
+
 function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode, band, offset }) {
   // Arcade picks a four-rate; every other mode plays the standard one.
   const fourRate = playMode === 'arcade'
@@ -240,11 +352,9 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
   const [done, setDone]               = useState(false);
   const [hasWon, setHasWon]           = useState(() => _saved ? _saved.won || false : false);
   const [victoryVisible, setVictoryVisible] = useState(false);
-  const [isMock, setIsMock]           = useState(false);
   const [activeTab, setActiveTab]     = useState('game');
   const [history, setHistory]         = useState(() => t2048LoadHistory());
   const [bestScore, setBestScore]     = useState(() => t2048LoadBest());
-  const [undoStack, setUndoStack]     = useState([]);
   const [scoreDelta, setScoreDelta]   = useState(null);
 
   const touchStartRef  = useRef(null);
@@ -258,12 +368,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
     const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
     return () => clearInterval(id);
   }, [gameRunning]);
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   useEffect(() => {
     if (!resetKey) return;
@@ -312,7 +416,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
     setDone(false);
     setHasWon(false);
     setVictoryVisible(false);
-    setUndoStack([]);
     setScoreDelta(null);
   };
 
@@ -321,10 +424,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
     const { grid: movedGrid, delta, moved } = t2048_move(grid, dir);
     if (!moved) return;
 
-    const newUndo = isMock
-      ? [{ grid: t2048_stripAnim(grid), score, moves }, ...undoStack].slice(0, 10)
-      : undoStack;
-
     const withTile  = t2048_addRandom(movedGrid, t2048Rng, fourRate);
     const newScore  = score + delta;
     const newMoves  = moves + 1;
@@ -332,7 +431,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
     setGrid(withTile);
     setScore(newScore);
     setMoves(newMoves);
-    setUndoStack(newUndo);
 
     if (delta > 0) {
       if (deltaTimerRef.current) clearTimeout(deltaTimerRef.current);
@@ -342,9 +440,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
 
     if (newScore > bestScore) { setBestScore(newScore); t2048SaveBest(newScore); }
     if (!seededRun) t2048SaveBoard(withTile, newScore, elapsedSecs, hasWon, newMoves);
-    if (isMock) {
-      try { localStorage.setItem(T2048_UNDO_KEY, JSON.stringify(newUndo)); } catch {}
-    }
     onStepChange && onStepChange(newMoves);
 
     const maxT = t2048_maxTile(withTile);
@@ -385,16 +480,6 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
 
   // Keep ref fresh on every render so the keyboard handler always calls the latest closure
   executeMoveRef.current = executeMove;
-
-  const handleUndo = () => {
-    if (!undoStack.length || done) return;
-    const [prev, ...rest] = undoStack;
-    setGrid(prev.grid);
-    setScore(prev.score);
-    setMoves(prev.moves);
-    setUndoStack(rest);
-    try { if (isMock) localStorage.setItem(T2048_UNDO_KEY, JSON.stringify(rest)); } catch {}
-  };
 
   const handleFinish = () => {
     const maxT = t2048_maxTile(grid);
@@ -450,35 +535,19 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
 
   return (
     <div>
-      {isMock && <div className="t2048-banner">Local storage — will sync to chain when live</div>}
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill" style={{ position: 'relative' }}>
-              <div className="plabel">Score</div>
-              <div className="pvalue mono">
-                {score.toLocaleString()}
-                {scoreDelta !== null && <span className="t2048-score-delta">+{scoreDelta}</span>}
-              </div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Best</div>
-              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Tile</div>
-              <div className="pvalue mono">{maxTile || '—'}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue">{moves}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 5);
+            return [
+              { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() + (scoreDelta !== null ? ` +${scoreDelta}` : '') },
+              { id: 'p-best', kind: 'pill', r: pr[1], label: 'Best', value: bestScore.toLocaleString() },
+              { id: 'p-tile', kind: 'pill', r: pr[2], label: 'Tile', value: maxTile || '—' },
+              { id: 'p-moves', kind: 'pill', r: pr[3], label: 'Moves', value: moves },
+              { id: 'p-time', kind: 'pill', r: pr[4], label: 'Time', value: fmtSecs(elapsedSecs), gold: true },
+            ];
+          }} />
 
           <div
             className="t2048-board-wrap"
@@ -486,35 +555,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
             onTouchEnd={handleTouchEnd}
           >
             <div className="t2048-grid">
-              {/* Static 4x4 backdrop. */}
-              {Array.from({ length: 16 }, (_, i) => <div key={'c' + i} className="t2048-cell" />)}
-              {/* Tiles ride above it, keyed by id so DOM identity survives a
-                  move and the browser can transition the transform (#142). */}
-              <div className="t2048-layer">
-                {grid.flatMap((row, r) => row.map((cell, c) => {
-                  if (!cell) return null;
-                  const { bg, color } = t2048_tileStyle(cell.value);
-                  return (
-                    <div
-                      key={'t' + cell.id}
-                      className={'t2048-tile' + (cell.isNew ? ' is-new' : '') + (cell.isMerged ? ' is-merged' : '')}
-                      style={{ transform: `translate(calc(${c} * (100% + 6px)), calc(${r} * (100% + 6px)))` }}
-                    >
-                      <div
-                        className="t2048-tile-inner"
-                        style={{
-                          background: bg,
-                          color,
-                          fontSize: t2048_tileFontSize(cell.value),
-                          boxShadow: cell.value === 2048 ? '0 0 14px #F59E0B88' : 'none',
-                        }}
-                      >
-                        {cell.value}
-                      </div>
-                    </div>
-                  );
-                })).filter(Boolean)}
-              </div>
+              <T2048BoardCanvas grid={grid} />
             </div>
 
             {victoryVisible && (
@@ -531,12 +572,9 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
             )}
           </div>
 
-          <div className="t2048-controls">
-            <button onClick={handleNewGame}>↺ New Game</button>
-            {isMock && (
-              <button onClick={handleUndo} disabled={undoStack.length === 0 || done}>↩ Undo</button>
-            )}
-          </div>
+          <CuiBar height={44} build={(W) => ([
+            { id: 'new', kind: 'button', r: [Math.floor(W * 0.3), 0, Math.floor(W * 0.4), 40], label: '↺ New Game', action: handleNewGame },
+          ])} />
         </div>
       )}
 

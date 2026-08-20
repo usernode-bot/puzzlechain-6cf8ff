@@ -128,6 +128,11 @@ function palOf(nameOrLiteral, fallback) {
   if (!nameOrLiteral) return fallback || PAL.text;
   if (typeof nameOrLiteral !== 'string') return fallback || PAL.text;
   if (PAL[nameOrLiteral] != null) return PAL[nameOrLiteral];
+  // A C.* token ('var(--c-x)') handed to canvas code resolves through PAL —
+  // components that share one colour between DOM chrome and a canvas board
+  // (the Snakes & Ladders pawns) pass the token form of both.
+  const m = /^var\(--c-([a-z0-9-]+)\)$/.exec(nameOrLiteral);
+  if (m && PAL[m[1]] != null) return PAL[m[1]];
   return nameOrLiteral;
 }
 
@@ -248,7 +253,10 @@ function cgSound(name, pitch) {
 }
 function cgHaptic(ms) {
   if (!cgPrefs.haptics) return;
-  try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch {}
+  try {
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    if (navigator.vibrate) navigator.vibrate(ms || 12);
+  } catch {}
 }
 
 /* ============================================================

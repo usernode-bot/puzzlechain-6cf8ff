@@ -74,50 +74,12 @@ function useFitBox(ref, { cols, rows, minCell = 16, maxCell = 64, gap = 0, padX 
   return { cell, boxW: box.w, boxH: box.h, ready: box.w > 0 && box.h > 0 };
 }
 
-// Scale-to-fit wrapper (slice 5). Measures its own available box AND its
-// content's natural size, then applies a single `transform: scale(k)` so the
-// content always fits without scrolling. This is the general answer for the
-// dailies whose boards are absolutely positioned at fixed pixel offsets
-// (Mahjong's layered tiles, the solitaire card columns) — those can't be
-// re-expressed as a fluid grid, but they scale perfectly as one unit, and
-// every existing click handler keeps working under a CSS transform.
-// Never scales ABOVE 1: a small board on a big screen stays its natural size.
-function FitScale({ children, className }) {
-  const boxRef = useRef(null);
-  const contentRef = useRef(null);
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const box = boxRef.current, content = contentRef.current;
-    if (!box || !content) return;
-    const measure = () => {
-      const b = box.getBoundingClientRect();
-      // offsetWidth/Height are the UNSCALED layout size — getBoundingClientRect
-      // on the content would already include our own transform and oscillate.
-      const cw = content.offsetWidth, ch = content.offsetHeight;
-      if (!cw || !ch || (b.width < 1 && b.height < 1)) return;
-      const k = Math.min(1, b.width / cw, b.height / ch);
-      setScale((prev) => (Math.abs(prev - k) < 0.005 ? prev : k));
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', measure);
-      return () => window.removeEventListener('resize', measure);
-    }
-    const ro = new ResizeObserver(measure);
-    ro.observe(box);
-    ro.observe(content);
-    return () => ro.disconnect();
-  }, []);
-
-  return (
-    <div className={'fit-scale-box' + (className ? ' ' + className : '')} ref={boxRef}>
-      <div className="fit-scale-content" ref={contentRef} style={{ transform: `scale(${scale})` }}>
-        {children}
-      </div>
-    </div>
-  );
-}
+/* The FitScale scale-to-fit wrapper (slice 5) is GONE: its last riders
+   (Mahjong, Spider, the Tile Match pair, Crate Push) all draw canvases sized
+   from the measured box now, so nothing shrinks a fixed-pixel board with a
+   transform any more. The .fit-scale-box CSS class stays — Word Search uses
+   it as a plain flex box, and describeAppStylesheet() keys on the
+   .fit-scale-content rule to recognize the app's own stylesheet. */
 
 // DPR-correct canvas sizing + redraw scheduling. `draw(ctx, geom)` is called
 // on a rAF whenever `deps` change or the element resizes; `geom` carries the
@@ -195,9 +157,41 @@ function useScrollLock(active) {
    `data-pressed` is cleared on up/cancel/lostpointercapture so it can never
    stick. Mouse and keyboard paths are preserved (onClick still fires for
    non-touch, guarded against double-firing). */
+/* The touch/click de-dupe guard lives at MODULE scope, not in tapProps'
+   closure. That distinction is the whole bug behind "one tap types two
+   letters" (Daily Cipher's LENDING -> LLEENND):
+
+     pointerup -> onTap() -> setState -> React 18 flushes the re-render
+     SYNCHRONOUSLY (pointerup is a discrete event) -> the element's props are
+     replaced by a FRESH tapProps(...) object -> the browser's compatibility
+     `click` then dispatches against that new object, whose per-render
+     `handledPointer` is back to false -> onTap() fires a SECOND time.
+
+   Any tappable that changes state on tap hit this on every touch device, so
+   the guard has to outlive the render. We record which element consumed a
+   touch and when; the compat click that follows (always within a few ms) is
+   swallowed. Asserted by the `tap-dedupe-survives-rerender` self-test. */
+let _tapHandledEl = null;
+let _tapHandledAt = 0;
+const TAP_CLICK_SUPPRESS_MS = 700;
+
+function tapMarkHandled(el) {
+  _tapHandledEl = el || null;
+  _tapHandledAt = Date.now();
+}
+function tapWasHandled(el) {
+  if (!_tapHandledEl || _tapHandledEl !== el) return false;
+  if (Date.now() - _tapHandledAt > TAP_CLICK_SUPPRESS_MS) {
+    _tapHandledEl = null;
+    return false;
+  }
+  // One-shot: consume it so a later genuine click on the same element works.
+  _tapHandledEl = null;
+  return true;
+}
+
 function tapProps(onTap, { disabled = false } = {}) {
   if (disabled) return {};
-  let handledPointer = false;
   return {
     onPointerDown: (e) => {
       if (e.currentTarget.setAttribute) e.currentTarget.setAttribute('data-pressed', '1');
@@ -207,7 +201,9 @@ function tapProps(onTap, { disabled = false } = {}) {
       // Touch/pen act on release-in-place; mouse falls through to onClick so
       // text selection and drag handlers elsewhere keep working.
       if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-        handledPointer = true;
+        // Mark BEFORE running the action: onTap re-renders, and the compat
+        // click is dispatched against whatever props exist by then.
+        tapMarkHandled(e.currentTarget);
         onTap && onTap(e);
       }
     },
@@ -218,7 +214,7 @@ function tapProps(onTap, { disabled = false } = {}) {
       if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
     },
     onClick: (e) => {
-      if (handledPointer) { handledPointer = false; return; }
+      if (tapWasHandled(e.currentTarget)) return;
       onTap && onTap(e);
     },
   };
@@ -330,6 +326,30 @@ function runClientSelfTests(styleReady) {
 
   // Phase 1 — canvas colours.
   check('canvas-colors', canvasColorSelfTest);
+
+  /* The double-input regression guard. One TOUCH tap = exactly one action,
+     even though the action's setState re-renders the element and replaces its
+     handler props before the compatibility `click` arrives. The old per-render
+     `handledPointer` closure failed exactly here, which is why typing LENDING
+     in Daily Cipher produced LLEENND. Simulated with plain objects: the second
+     tapProps(...) stands in for the post-render props object. */
+  check('tap-dedupe-survives-rerender', () => {
+    const el = { _attrs: {}, setAttribute(k, v) { this._attrs[k] = v; }, removeAttribute(k) { delete this._attrs[k]; } };
+    let fired = 0;
+    const onTap = () => { fired++; };
+    const first = tapProps(onTap);
+    first.onPointerDown({ currentTarget: el, pointerType: 'touch' });
+    first.onPointerUp({ currentTarget: el, pointerType: 'touch' });
+    if (fired !== 1) throw new Error('touch pointerup fired ' + fired + ' times, expected 1');
+    // The re-render the action just caused: brand-new props object, same node.
+    const afterRerender = tapProps(onTap);
+    afterRerender.onClick({ currentTarget: el });
+    if (fired !== 1) throw new Error('compat click after re-render fired again (' + fired + ' total)');
+    // A genuine MOUSE click on the same element afterwards must still work.
+    tapProps(onTap).onClick({ currentTarget: el });
+    if (fired !== 2) throw new Error('mouse click was swallowed (' + fired + ' total, expected 2)');
+    return true;
+  });
 
   // Phase 5 (#143) — 2048 vertical swipes were inverted. A lone tile at the
   // bottom row swiped 'up' must reach row 0, and vice versa.
@@ -490,7 +510,7 @@ function runClientSelfTests(styleReady) {
      that sets an auto SIDE margin without a definite width is the bug class;
      inside .fit-col that always collapses the board. */
   check('fitcol-auto-margin', () => {
-    const BOARDS = ['sudoku', 'wordsearch', 'wspr-grid', 'dsnk-board', 'numpad'];
+    const BOARDS = ['sudoku', 'wordsearch', 'wspr-grid', 'dsnk-board'];
     const bad = [];
     for (const cls of BOARDS) {
       // Grab the .fit-col-scoped rule bodies for this class.
@@ -729,4 +749,275 @@ function usePointerCell(ref, handlers, { longPressMs = 450, moveTolerance = 10 }
       el.removeEventListener('contextmenu', onCtx);
     };
   }, [ref, longPressMs, moveTolerance]);
+}
+
+/* ================= cui — the canvas control kit (controls wave) =============
+   Draws the in-frame chrome — status pills, buttons, key grids — INTO a
+   game's canvas, so a running game is one uninterrupted surface. Every drawn
+   control is backed by a REAL, visually-hidden DOM twin (<CuiTwin/>): screen
+   readers, hardware focus and innerText-based checks keep working, because
+   .sr-only clips the box without unrendering the text. Menus, sheets,
+   overlays, hint paragraphs and scroll-away content lists stay DOM on
+   purpose — they are prose or navigation, not play-surface controls.
+
+   A game builds `controls` fresh each render (geometry from its fit box):
+     { id, kind: 'pill' | 'button' | 'label',
+       r: [x, y, w, h], label, value, sub, gold, mono, font,
+       primary, on, solid, disabled, action }
+   and threads the SAME array through three places:
+     draw:    cuiDrawControls(ctx, controls, pressedId)
+     pointer: usePointerCell(ref, cuiWrapHandlers(ctlRef, setPressed, boardHandlers))
+     JSX:     <CuiTwin controls={controls} />                                 */
+const CUI_FONT = "'Space Grotesk', system-ui, sans-serif";
+const CUI_MONO = "'JetBrains Mono', monospace";
+
+function cuiInRect(r, x, y) { return x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3]; }
+
+function cuiHitAt(controls, x, y) {
+  for (let i = controls.length - 1; i >= 0; i--) {
+    const c = controls[i];
+    if (c.action && !c.disabled && cuiInRect(c.r, x, y)) return c;
+  }
+  return null;
+}
+
+// Split a horizontal band into n equal rects with a gap — the .status-bar /
+// button-row layout, minus the DOM.
+function cuiRow(x, y, w, h, n, gap = 8) {
+  const cw = (w - gap * (n - 1)) / n;
+  return Array.from({ length: n }, (_, i) => [x + i * (cw + gap), y, cw, h]);
+}
+
+// The .pill look: card capsule, uppercase muted label over a mono value.
+function cuiDrawPill(ctx, c) {
+  const [x, y, w, h] = c.r;
+  klRR(ctx, x, y, w, h, 10);
+  ctx.fillStyle = PAL.card;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = PAL.border;
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = '600 9px ' + CUI_FONT;
+  ctx.fillStyle = PAL.muted;
+  ctx.fillText(String(c.label || '').toUpperCase(), x + w / 2, y + h * 0.4, w - 8);
+  ctx.font = '600 ' + Math.max(13, Math.round(h * 0.34)) + 'px ' + CUI_MONO;
+  ctx.fillStyle = c.color || (c.gold ? PAL.gold : PAL.text);
+  ctx.fillText(String(c.value != null ? c.value : ''), x + w / 2, y + h * 0.85, w - 8);
+}
+
+// The .p6-btn look (card + border, accent tint when primary/on, solid accent
+// for the one big CTA), with the pressed state drawn since :active can't be.
+function cuiDrawButton(ctx, c, pressed) {
+  const [x, y, w, h] = c.r;
+  ctx.save();
+  if (c.disabled) ctx.globalAlpha = 0.4;
+  klRR(ctx, x, y, w, h, c.radius != null ? c.radius : Math.min(12, h * 0.3));
+  ctx.fillStyle = c.bg ? c.bg : (c.solid ? palOf(C.accent, '#3A6ECD') : PAL.card);
+  ctx.fill();
+  if ((c.primary || c.on) && !c.solid && !c.bg) {
+    ctx.save(); ctx.globalAlpha *= 0.14; ctx.fillStyle = palOf(C.accent, '#3A6ECD'); ctx.fill(); ctx.restore();
+  }
+  if (pressed && !c.disabled) {
+    ctx.save(); ctx.globalAlpha *= 0.18; ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+  }
+  if (!c.noBorder) {
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = (c.primary || c.on || c.solid) ? palOf(C.accent, '#3A6ECD') : PAL.border;
+    ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fs = c.font || Math.min(15, Math.max(12, Math.round(h * 0.3)));
+  ctx.font = '600 ' + fs + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
+  ctx.fillStyle = c.ink || (c.solid ? '#fff' : PAL.text);
+  if (c.pips) {
+    // Die face: 3x3 pip grid (row-major booleans) instead of the label text.
+    const pr = Math.max(2, Math.min(w, h) * 0.075);
+    for (let i = 0; i < 9; i++) {
+      if (!c.pips[i]) continue;
+      const px = x + w * (0.28 + 0.22 * (i % 3));
+      const py = y + h * (0.28 + 0.22 * Math.floor(i / 3));
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, c.sub ? y + h / 2 - fs * 0.42 : y + h / 2 + 0.5, w - 10);
+  }
+  if (c.sub) {
+    ctx.font = '500 ' + Math.max(9, Math.round(fs * 0.72)) + 'px ' + CUI_FONT;
+    ctx.fillStyle = c.solid ? 'rgba(255,255,255,0.85)' : PAL.muted;
+    ctx.fillText(String(c.sub), x + w / 2, y + h / 2 + fs * 0.58, w - 10);
+  }
+  ctx.restore();
+}
+
+// Plain centred text (the brg-note / warn-line role).
+function cuiDrawLabel(ctx, c) {
+  const [x, y, w, h] = c.r;
+  ctx.font = (c.bold ? '700 ' : '') + (c.font || 12) + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = c.color || (c.gold ? PAL.gold : PAL.muted);
+  ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, y + h / 2, w - 4);
+}
+
+function cuiDrawControls(ctx, controls, pressedId) {
+  for (const c of controls) {
+    if (c.noDraw) continue; // twin-only entry (prose the draw pass renders itself)
+    if (c.kind === 'pill') cuiDrawPill(ctx, c);
+    else if (c.kind === 'label') cuiDrawLabel(ctx, c);
+    else cuiDrawButton(ctx, c, pressedId === c.id);
+  }
+}
+
+// Wrapped prose on canvas (clue lines): naive word wrap via measureText.
+function cuiWrapText(ctx, text, x, y, maxW, lineH, maxLines) {
+  const words = String(text).split(/\s+/);
+  let line = '', lines = [];
+  for (const w of words) {
+    const probe = line ? line + ' ' + w : w;
+    if (ctx.measureText(probe).width > maxW && line) { lines.push(line); line = w; }
+    else line = probe;
+  }
+  if (line) lines.push(line);
+  if (maxLines && lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    lines[maxLines - 1] += '…';
+  }
+  lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineH));
+  return lines.length;
+}
+
+/* Route the pointer stream: controls first (press feedback on finger-DOWN,
+   action on the release, exactly tapProps' contract), board handlers only
+   when no control claims the point. `ctlRef.current` must always hold the
+   render's live controls array. */
+function cuiWrapHandlers(ctlRef, setPressed, h = {}) {
+  return {
+    ...h,
+    onDown: (p, e) => {
+      const c = cuiHitAt(ctlRef.current || [], p.x, p.y);
+      if (c) {
+        ctlRef.pressed = c.id;
+        setPressed(c.id);
+        cgHaptic(8);
+        if (c.holdDown) c.holdDown(); // hold-to-act controls (D-pads) engage on DOWN
+        return;
+      }
+      if (h.onDown) h.onDown(p, e);
+    },
+    onDrag: (p, d, e) => {
+      if (ctlRef.pressed) {
+        // A hold control releases if the finger slides off it (the DOM
+        // pointerleave contract) — capture means leave never fires.
+        const c = (ctlRef.current || []).find(x => x.id === ctlRef.pressed);
+        if (c && c.holdDown && !cuiInRect(c.r, p.x, p.y)) {
+          if (c.holdUp) c.holdUp();
+          ctlRef.pressed = null;
+          setPressed(null);
+        }
+        return;
+      }
+      if (h.onDrag) h.onDrag(p, d, e);
+    },
+    onUp: (p, e) => {
+      // A control fires on press + release-in-rect (the DOM button contract),
+      // NOT via onTap — a board's tight moveTolerance would otherwise eat
+      // slightly-jittery finger taps on buttons.
+      if (ctlRef.pressed) {
+        const c = (ctlRef.current || []).find(x => x.id === ctlRef.pressed);
+        ctlRef.pressed = null;
+        setPressed(null);
+        if (c && c.holdDown) { if (c.holdUp) c.holdUp(); return; }
+        if (c && !c.disabled && c.action && cuiInRect(c.r, p.x, p.y)) c.action();
+        return;
+      }
+      if (h.onUp) h.onUp(p, e);
+    },
+    onTap: (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return; // fired in onUp
+      if (h.onTap) h.onTap(p, e);
+    },
+    onLongPress: h.onLongPress ? (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return;
+      h.onLongPress(p, e);
+    } : undefined,
+    onContext: h.onContext ? (p, e) => {
+      if (cuiHitAt(ctlRef.current || [], p.x, p.y)) return;
+      h.onContext(p, e);
+    } : undefined,
+  };
+}
+
+/* A self-contained control STRIP on its own canvas — for games whose board
+   canvas is a hand-rolled real-time loop (Daily Snake/Bounce, the classic
+   arcade games) where splicing bands into the loop would be surgery. The
+   strip draws pills/labels/buttons, wires presses, and carries its twin;
+   stacked over the board canvas it reads as one surface. */
+function CuiBar({ height, build }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const controls = W > 40 ? build(W) : [];
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
+  // Redraw key = the controls' FULL visual state (functions dropped): a change
+  // to only sub/color/bg/solid or a rect must repaint even with labels constant.
+  const key = JSON.stringify(controls, (k, v) => (typeof v === 'function' ? undefined : v));
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height,
+    deps: [key, W, height, pressedId],
+    draw: (ctx) => cuiDrawControls(ctx, ctlRef.current, pressedId),
+  });
+  return (
+    <div className="cui-bar" ref={boxRef}>
+      <canvas ref={canvasRef} className="cui-bar-canvas" aria-hidden="true" />
+      <CuiTwin controls={controls} />
+    </div>
+  );
+}
+
+// Shift a board's pointer handlers below the frame's top bands: the handlers
+// keep their own coordinate space (verbatim code), the frame subtracts its
+// band height once here. topRef.current = the board region's y offset.
+function cuiShiftHandlers(h, topRef) {
+  const out = {};
+  for (const k of Object.keys(h)) {
+    const fn = h[k];
+    if (typeof fn !== 'function') continue;
+    out[k] = (pt, a, b) => fn({ x: pt.x, y: pt.y - (topRef.current || 0) }, a, b);
+  }
+  return out;
+}
+
+// The accessibility twin: real buttons and live text, visually clipped. One
+// per game frame, fed the same controls array the canvas drew.
+function CuiTwin({ controls, extra }) {
+  return (
+    <div className="cui-twin sr-only">
+      {controls.map((c) => (
+        // One block per control so innerText keeps line breaks between them.
+        <div key={c.id}>
+          {c.action ? (
+            <button
+              type="button"
+              disabled={!!c.disabled}
+              aria-pressed={c.on != null ? !!c.on : undefined}
+              onClick={() => { if (!c.disabled) c.action(); }}
+            >{String(c.twinLabel != null ? c.twinLabel : (c.label != null ? c.label : c.id)) + (c.sub ? ' — ' + c.sub : '') + (c.value != null ? ' ' + c.value : '')}</button>
+          ) : (
+            <span>{((c.twinLabel != null ? String(c.twinLabel) : (c.label != null ? String(c.label) : '')) + ' ' + (c.value != null ? c.value : '')).trim()}</span>
+          )}
+        </div>
+      ))}
+      {extra || null}
+    </div>
+  );
 }

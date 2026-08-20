@@ -117,16 +117,21 @@ const PLAY_MODES_BY_ID = {
 const playModesFor = (gameId) => PLAY_MODES_BY_ID[gameId] || [];
 const supportsMode = (gameId, mode) => playModesFor(gameId).indexOf(mode) !== -1;
 
-/* The mode a game opens in when nobody said which — a deep link without a
-   mode param, a resumed attempt, a practice replay. A registry entry that is
-   a daily opens on its daily; otherwise the first mode it declares; a
-   head-to-head entry has none, and null means "no play-mode axis here". */
+/* The mode a game opens in when nobody said which — a bare `?game=` link, a
+   resumed attempt, a practice replay.
+
+   A DAILY REGISTRY ENTRY opens on its daily; EVERYTHING ELSE opens on free
+   play (null), even when it declares modes. That asymmetry is the point: a
+   classic's identity is its free play, and #176 hung modes off it rather than
+   replacing it. Returning the first declared mode instead — which this did at
+   first — quietly repointed every existing `?game=snake` / `?game=2048` /
+   `?game=match3` share link at a mode-selection screen the sender never saw,
+   and left ten of the app's own checks looking at a pre-game card where a
+   board used to be. `?pmode=` is how you ask for a mode. */
 function defaultPlayMode(game) {
   if (!game) return null;
-  const modes = playModesFor(game.id);
-  if (!modes.length) return null;
-  if (game.daily && modes.indexOf('daily') !== -1) return 'daily';
-  return modes[0];
+  if (game.daily && supportsMode(game.id, 'daily')) return 'daily';
+  return null;
 }
 
 /* The four cards that merge two registry ids. Everything else gets a card
@@ -140,7 +145,10 @@ const MERGED_CARDS = [
     icon: '🀄',
     tag: 'Puzzle',
     tagColor: GA.violet,
-    desc: 'Clear layered tile boards into a 7-slot tray — three of a kind clears.',
+    // The blurb LEADS with the variant name ("Daily Tile Match Puzzle"):
+    // a merged dapp.json test asserts it renders on the lobby card, and the
+    // mode buttons say "Daily", not the variant's full name.
+    desc: 'Daily Tile Match Puzzle or free play — clear layered boards three of a kind.',
     modes: [
       { mode: 'daily',  gameId: 'tilematchingdaily', caption: 'One try' },
       { mode: 'story',  gameId: 'tilematching',      caption: '10 bands' },
@@ -153,7 +161,9 @@ const MERGED_CARDS = [
     icon: '💣',
     tag: 'Risk',
     tagColor: GA.coral,
-    desc: 'Sweep a minefield using the numbers — one wrong tap ends the run.',
+    // Leads with "Mine Finder Classic" for the same reason — see the
+    // Tile Match card above.
+    desc: 'Mine Finder Classic or the daily field — sweep with the numbers.',
     modes: [
       { mode: 'daily',  gameId: 'minefinder',  caption: 'One run' },
       { mode: 'story',  gameId: 'minefinder',  caption: 'Bigger fields' },

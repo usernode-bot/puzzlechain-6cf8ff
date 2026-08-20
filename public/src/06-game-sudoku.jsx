@@ -792,87 +792,136 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   const boldRight = (c) => size === 9 ? (c === 2 || c === 5) : c === 2;
   const boldBottom = (r) => size === 9 ? (r === 2 || r === 5) : (r === 1 || r === 3);
 
+  /* The whole game frame is ONE canvas now (controls wave): pills, grid,
+     hint bar and numpad draw together, with <CuiTwin> carrying the real
+     hidden buttons. Cell chrome reads PAL; the box separators keep #149's
+     rule (they out-read the 1px gridlines by using the muted tone). */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, HINT_H = 36, KEY_H = 44, ERASE_H = 38;
+  const chrome = PILL_H + HINT_H + KEY_H + ERASE_H + GAP * 4;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const sdkCell = Math.max(24, Math.min(size === 9 ? 44 : 56, Math.floor((availB - (size - 1)) / size)));
+  const sdkStep = sdkCell + 1;
+  const sdkSide = sdkStep * size - 1;
+  const H = chrome + sdkSide;
+  const boardX = Math.floor((W - sdkSide) / 2);
+  const boardY = PILL_H + GAP;
+  const hintY = boardY + sdkSide + GAP;
+  const keysY = hintY + HINT_H + GAP;
+  const eraseY = keysY + KEY_H + GAP;
+
+  const filled = grid.flat().filter(v => v !== 0).length;
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 4);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
+    controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: `${filled}/${size * size}` });
+    controls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: size === 9 ? '9×9 ×2' : '6×6' });
+    if (!done) {
+      const exhausted = hints.exhausted || noEmpty;
+      controls.push({
+        id: 'hint', kind: 'button',
+        r: [hints.msg ? 0 : Math.floor(W * 0.2), hintY, hints.msg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINT_H],
+        label: exhausted ? `💡 ${noEmpty ? 'Board full' : 'No more hints'}`
+          : `💡 Hint${Number.isFinite(hints.hintsLeft) ? ` · ${hints.hintsLeft} left` : ''}`,
+        disabled: hints.buying || exhausted,
+        action: buyHint,
+      });
+      if (hints.msg) {
+        controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintY, Math.floor(W * 0.5), HINT_H], label: hints.msg, font: 11 });
+      }
+      const kr = cuiRow(0, keysY, W, KEY_H, size, 6);
+      for (let n = 1; n <= size; n++) {
+        controls.push({ id: 'k' + n, kind: 'button', r: kr[n - 1], label: String(n), mono: true, font: 18, action: () => place(n) });
+      }
+      controls.push({ id: 'erase', kind: 'button', r: [0, eraseY, W, ERASE_H], label: 'Erase', action: () => place(0) });
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const sdkGeoRef = useRef({});
+  sdkGeoRef.current = { sdkStep, size, done, boardX, boardY, sdkSide };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (p) => {
+      const g = sdkGeoRef.current;
+      if (g.done) return;
+      const c = Math.floor((p.x - g.boardX) / g.sdkStep), r = Math.floor((p.y - g.boardY) / g.sdkStep);
+      if (c < 0 || c >= g.size || r < 0 || r >= g.size) return;
+      const locked = isGiven(r, c) || hintedCells.has(cellKey(r, c));
+      if (!locked) setSelected([r, c]);
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [grid, selected, errors, hintedCells, done, sdkCell, W, fmt, steps, pressedId, hints.hintsLeft, hints.msg, hints.buying],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
+      ctx.fillStyle = PAL.border; // 1px gridlines (#149's gap idiom, drawn)
+      ctx.fillRect(0, 0, sdkSide, sdkSide);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const key = `${r},${c}`;
+          const x = c * sdkStep, y = r * sdkStep;
+          const given = isGiven(r, c);
+          const hinted = hintedCells.has(cellKey(r, c));
+          const isSel = selKey === key;
+          const isHl = !isSel && selected &&
+            (selected[0] === r || selected[1] === c || boxAt(r, c, size) === selBox);
+          const isErr = errors.has(key);
+          let bg = PAL.card;
+          if (isErr) bg = 'rgba(205,75,58,0.12)';
+          else if (isSel) bg = 'rgba(58,110,205,0.28)';
+          else if (isHl) bg = 'rgba(58,110,205,0.06)';
+          else if (hinted) bg = 'rgba(201,162,39,0.12)';
+          ctx.fillStyle = bg;
+          ctx.fillRect(x, y, sdkCell, sdkCell);
+          const v = grid[r][c];
+          if (v !== 0) {
+            ctx.font = `600 ${Math.round(sdkCell * (size === 9 ? 0.5 : 0.55))}px 'JetBrains Mono', monospace`;
+            ctx.fillStyle = isErr ? PAL.rose : given ? PAL.text : hinted ? PAL.gold : PAL.accent;
+            ctx.fillText(String(v), x + sdkCell / 2, y + sdkCell / 2 + 1);
+          }
+        }
+      }
+      // Box separators over the gridlines (the #149 contrast rule).
+      ctx.strokeStyle = PAL.muted;
+      ctx.lineWidth = 2;
+      for (let c = 0; c < size; c++) {
+        if (!boldRight(c)) continue;
+        const x = (c + 1) * sdkStep - 0.5;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, sdkSide); ctx.stroke();
+      }
+      for (let r = 0; r < size; r++) {
+        if (!boldBottom(r)) continue;
+        const y = (r + 1) * sdkStep - 0.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sdkSide, y); ctx.stroke();
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Steps</div>
-          <div className="pvalue">{steps}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Filled</div>
-          <div className="pvalue">
-            {grid.flat().filter(v => v !== 0).length}/{size * size}
-          </div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Board</div>
-          <div className="pvalue" style={{ fontSize: '0.82rem' }}>{size === 9 ? '9×9 ×2' : '6×6'}</div>
-        </div>
-      </div>
-
-      <div
-        className={'sudoku' + (size === 9 ? ' s9' : '')}
-        style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, maxWidth: size === 9 ? 420 : 360 }}
-      >
-        {grid.map((row, r) =>
-          row.map((v, c) => {
-            const key = `${r},${c}`;
-            const given = isGiven(r, c);
-            const hinted = hintedCells.has(cellKey(r, c));
-            const locked = given || hinted;
-            const isSel = selKey === key;
-            const isHl = !isSel && selected &&
-              (selected[0] === r || selected[1] === c || boxAt(r, c, size) === selBox);
-            const isErr = errors.has(key);
-            const cls = ['scell'];
-            if (given) cls.push('given'); else if (hinted) cls.push('hinted'); else if (v !== 0) cls.push('user');
-            if (isSel) cls.push('sel'); else if (isHl) cls.push('hl');
-            if (isErr) cls.push('err');
-            return (
-              <div
-                key={key}
-                className={cls.join(' ')}
-                /* Box separators must out-read the 1px cell gridlines the grid's
-                   own gap now draws (#149) — in C.border, the same colour, the
-                   3×3 structure was invisible on the 9×9 board. C.muted is the
-                   next step up the palette's contrast ladder and re-themes. */
-                style={{
-                  borderRight: boldRight(c) ? `2px solid ${C.muted}` : undefined,
-                  borderBottom: boldBottom(r) ? `2px solid ${C.muted}` : undefined,
-                }}
-                {...tapProps(() => !locked && !done && setSelected([r, c]))}
-              >
-                {v !== 0 ? v : ''}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {!done && (
-        <HintBar
-          hintsLeft={hints.hintsLeft}
-          exhausted={hints.exhausted || noEmpty}
-          buying={hints.buying}
-          onBuy={buyHint}
-          msg={hints.msg}
-          label={noEmpty ? 'Board full' : 'No more hints'}
+      <div className={'sudoku cui-frame' + (size === 9 ? ' s9' : '')} ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="sdk-canvas board-canvas"
+          role="grid"
+          aria-label={`Sudoku ${size} by ${size} board — ${filled} of ${size * size} filled`}
         />
-      )}
-
-      <div className="numpad" style={size === 9 ? { gridTemplateColumns: 'repeat(9, 1fr)' } : undefined}>
-        {Array.from({ length: size }, (_, i) => i + 1).map(n => (
-          <button key={n} className="numkey" {...tapProps(() => place(n))}>{n}</button>
-        ))}
       </div>
-      <div className="numpad" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-        <button className="numkey erase" {...tapProps(() => place(0))}>Erase</button>
-      </div>
+      <CuiTwin controls={controls} />
     </div>
   );
 }

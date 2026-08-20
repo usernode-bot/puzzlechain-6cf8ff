@@ -438,6 +438,47 @@ function cwDailyRounds(offset) {
   return cwRoundsForDay(cwDayNum(offset));
 }
 
+/* CwBoardCanvas was absorbed into CryptoWordleGame's single frame canvas
+   (controls wave) — pills, theme, tracker, clues, hint bar, guess grid and
+   the keyboard all draw together; see the frame block in the component. */
+
+/* Screenshot-state + regression deep link: `?cwtype=LEND-`.
+   dapp.json checks can only NAVIGATE — they never tap — so the double-input
+   bug ("one tap types two letters") was invisible to every check we had. This
+   replays a REAL touch pointer sequence (pointerdown -> pointerup -> compat
+   click, exactly what a phone dispatches) against the frame canvas at each
+   drawn key's position, so the guess row ends up holding the typed string and
+   a check can assert on it via `.cw-board[data-cw-typed="LEND"]`. A `-` means
+   backspace. Writes nothing — typing never claims, saves or submits — so it
+   is safe in every environment (the "before" screenshot comes from
+   production). */
+function cwTypeScript() {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('cwtype') || '';
+    return raw.toUpperCase().replace(/[^A-Z-]/g, '').slice(0, 20);
+  } catch (e) { return ''; }
+}
+
+function cwSimulateTouchTapAt(el, clientX, clientY) {
+  const opts = {
+    bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1,
+    isPrimary: true, clientX, clientY,
+  };
+  const PE = window.PointerEvent;
+  const fire = (type) => {
+    let ev;
+    try { ev = PE ? new PE(type, opts) : new MouseEvent(type, opts); }
+    catch (e) { ev = new MouseEvent(type, opts); }
+    if (!('pointerType' in ev)) { try { Object.defineProperty(ev, 'pointerType', { value: 'touch' }); } catch (e2) {} }
+    el.dispatchEvent(ev);
+  };
+  fire('pointerdown');
+  fire('pointerup');
+  // The browser's compatibility click, which is the half that used to double
+  // on the DOM keyboard. The canvas has no click handler, so it must no-op.
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX, clientY }));
+}
+
 function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
   const dayNum = useRef(cwDayNum(offset)).current;
   // The day's stack of independent word rounds (stable for the render lifetime).
@@ -616,16 +657,37 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     finishIfDone(resolveRounds(newRoundGuesses));
   };
 
-  const typeLetter = (ch) => { if (!done && active && cur.length < active.def.word.length) setCur(cur + ch); };
-  const backspace = () => { if (!done) setCur(cur.slice(0, -1)); };
+  // Functional updates: the length cap is evaluated against the LIVE value, so
+  // even if two calls ever land in one batch the word can never overflow its
+  // boxes (the visible symptom of the double-input bug).
+  const maxLen = active ? active.def.word.length : 0;
+  const typeLetter = (ch) => {
+    if (done || !active) return;
+    setCur((prev) => (prev.length < maxLen ? prev + ch : prev));
+  };
+  const backspace = () => {
+    if (done) return;
+    setCur((prev) => prev.slice(0, -1));
+  };
 
   // Physical keyboard, dispatched through a ref so each keypress runs the latest closure.
   const apiRef = useRef({});
   apiRef.current = { submit, typeLetter, backspace };
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); return; }
-      if (e.key === 'Backspace') { apiRef.current.backspace(); return; }
+      // Held keys auto-repeat: one PRESS must be one letter, so ignore repeats
+      // (and any modifier combo, which is a browser shortcut, not a guess).
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      // Enter/Space on a FOCUSED on-screen key already fires that button's own
+      // click. Running the window handler too would submit AND type from one
+      // press, so let the button own those two keys while it has focus.
+      const inKbd = e.target && e.target.closest && e.target.closest('.cui-twin');
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        if (inKbd) return;
+        if (e.key === 'Enter') { e.preventDefault(); apiRef.current.submit(); }
+        return;
+      }
+      if (e.key === 'Backspace') { e.preventDefault(); apiRef.current.backspace(); return; }
       const ch = (e.key || '').toUpperCase();
       if (ch.length === 1 && ch >= 'A' && ch <= 'Z') apiRef.current.typeLetter(ch);
     };
@@ -633,137 +695,248 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // `?cwtype=` — replay real touch taps once the drawn keyboard is on screen.
+  // Keys are canvas controls now, so each tap is a coordinate-carrying pointer
+  // sequence at the key's drawn rect, through the same usePointerCell ->
+  // cuiWrapHandlers path a finger takes (twin buttons are the CLICK path and
+  // would sidestep the hit-test this exists to regress).
+  useEffect(() => {
+    const script = cwTypeScript();
+    if (!script) return;
+    let tries = 0, timer = null, cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      const canvas = canvasRef.current;
+      const hasKeys = ctlRef.current.some((c) => c.id === 'bksp');
+      if (!canvas || !hasKeys) {
+        if (tries++ < 40) timer = setTimeout(run, 50);
+        return;
+      }
+      for (const ch of script) {
+        const id = ch === '-' ? 'bksp' : 'k' + ch;
+        const c = ctlRef.current.find((k) => k.id === id);
+        if (!c) continue;
+        const rect = canvas.getBoundingClientRect();
+        const scale = rect.width / (parseFloat(canvas.style.width) || rect.width);
+        cwSimulateTouchTapAt(
+          canvas,
+          rect.left + (c.r[0] + c.r[2] / 2) * scale,
+          rect.top + (c.r[1] + c.r[3] / 2) * scale
+        );
+      }
+    };
+    timer = setTimeout(run, 60);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, []);
+
   const wordLen = active ? active.def.word.length : 5;
   const maxGuesses = active ? active.maxG : 6;
-  const rowsLeft = active ? Math.max(maxGuesses - active.guesses.length, 0) : 0;
   const boardWidth = Math.min(wordLen * 52, 440);
 
+  /* ---- The whole frame is ONE canvas (controls wave) --------------------
+     Pills, theme line, round tracker, clue prose (wrapped on canvas), hint
+     bar, the guess grid AND the keyboard draw together; the hardware
+     keyboard listener above still types. CuiTwin carries every key. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, THEME_H = 20, TRACK_H = 24, CLUE_H = 34, XCLUE_H = 28, HINTB_H = 36, KEY_H = 46, KGAP = 4;
+  const kbdH = KEY_H * 3 + KGAP * 2;
+  const activeXtra = active ? revealedExtra : 0;
+  const hasHintBar = !!(active && activeHints.length > 0 && !done);
+  const chrome = PILL_H + GAP + THEME_H + GAP + TRACK_H + GAP
+    + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + kbdH + GAP : 0)
+    + (allResolved ? 34 : 0);
+  const gapPx = 5;
+  const availB = Math.max(90, Math.floor(boxH) - chrome);
+  const tile = active ? Math.max(20, Math.min(56, Math.floor(Math.min(
+    (Math.min(W, boardWidth) - gapPx * (wordLen - 1)) / wordLen,
+    (availB - gapPx * (maxGuesses - 1)) / maxGuesses
+  )))) : 0;
+  const bw = active ? tile * wordLen + gapPx * (wordLen - 1) : 0;
+  const bh = active ? tile * maxGuesses + gapPx * (maxGuesses - 1) : 0;
+  const H = chrome + bh;
+  let cwY = PILL_H + GAP;
+  const themeY = cwY; cwY += THEME_H + GAP;
+  const trackY = cwY; cwY += TRACK_H + GAP;
+  const clueY = cwY; if (active) cwY += CLUE_H + activeXtra * XCLUE_H + GAP;
+  const hintbY = cwY; if (hasHintBar) cwY += HINTB_H + GAP;
+  const boardY = cwY; if (active) cwY += bh + GAP;
+  const kbdY = cwY;
+  const boardX = Math.floor((W - bw) / 2);
+
+  // The shake: rAF-driven wiggle for 400ms when `shake` flips true.
+  const shakeRef = useRef(null);
+  const [shakeFrame, setShakeFrame] = useState(0);
+  useEffect(() => {
+    if (!shake) { shakeRef.current = null; return; }
+    shakeRef.current = { t0: performance.now() };
+    let raf = 0;
+    const tick = () => {
+      if (!shakeRef.current) return;
+      if (performance.now() - shakeRef.current.t0 >= 400) shakeRef.current = null;
+      setShakeFrame((f) => f + 1);
+      if (shakeRef.current) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [shake]);
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 4);
+    controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
+    controls.push({ id: 'p-word', kind: 'pill', r: pr[1], label: 'Word', value: `${Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/${roundsDef.length}` });
+    controls.push({ id: 'p-solved', kind: 'pill', r: pr[2], label: 'Solved', value: `${solvedCount}/${roundsDef.length}` });
+    controls.push({ id: 'p-points', kind: 'pill', r: pr[3], label: 'Points', value: totalScore });
+    controls.push({ id: 'theme', kind: 'label', r: [0, themeY, W, THEME_H], label: `Today's theme: ${cwThemeForDay(dayNum)}`, font: 12 });
+    if (active) {
+      // Clue prose is custom-drawn (wrapped); twin-only entries carry the text.
+      controls.push({ id: 'clue', kind: 'label', noDraw: true, r: [0, clueY, W, CLUE_H], label: `Clue: ${active.def.clue} · ${wordLen} letters` });
+      activeHints.slice(0, revealedExtra).forEach((h, i) => {
+        controls.push({ id: 'xclue' + i, kind: 'label', noDraw: true, r: [0, clueY + CLUE_H + i * XCLUE_H, W, XCLUE_H], label: `Hint ${i + 1}: ${h}` });
+      });
+      if (hasHintBar) {
+        const exhausted = cluesLeft <= 0;
+        controls.push({
+          id: 'hint', kind: 'button',
+          r: [hintMsg ? 0 : Math.floor(W * 0.2), hintbY, hintMsg ? Math.floor(W * 0.48) : Math.floor(W * 0.6), HINTB_H],
+          label: exhausted ? '💡 No more clues' : `💡 Hint${Number.isFinite(cluesLeft) ? ` · ${cluesLeft} left` : ''}`,
+          disabled: buying || exhausted,
+          action: buyHint,
+        });
+        if (hintMsg) controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintbY, Math.floor(W * 0.5), HINTB_H], label: hintMsg, font: 11 });
+      }
+      // Keyboard: 3 rows, wide Enter/⌫ flanking the bottom row.
+      const kbW = Math.min(W, 480);
+      const kbX0 = Math.floor((W - kbW) / 2);
+      const keyBg = (ch) => keyState[ch] === 'green' ? PAL.emerald
+        : keyState[ch] === 'yellow' ? PAL.gold
+        : keyState[ch] === 'gray' ? PAL.dim : PAL.border;
+      const keyInk = (ch) => keyState[ch] === 'gray' ? PAL.muted
+        : keyState[ch] ? '#fff' : PAL.text;
+      CW_KEYS.forEach((row, ri) => {
+        const y = kbdY + ri * (KEY_H + KGAP);
+        const units = row.length + (ri === 2 ? 3.2 : 0); // two 1.6-wide keys
+        const uw = (kbW - KGAP * (row.length - 1 + (ri === 2 ? 2 : 0))) / units;
+        let x = kbX0 + (ri === 1 ? uw / 2 : 0);
+        if (ri === 2) {
+          controls.push({ id: 'enter', kind: 'button', r: [x, y, uw * 1.6, KEY_H], label: 'Enter', font: 11, noBorder: true, bg: PAL.border, radius: 6, action: submit });
+          x += uw * 1.6 + KGAP;
+        }
+        for (const ch of row.split('')) {
+          controls.push({ id: 'k' + ch, kind: 'button', r: [x, y, uw, KEY_H], label: ch, font: 13, noBorder: true, radius: 6, bg: keyBg(ch), ink: keyInk(ch), action: () => typeLetter(ch) });
+          x += uw + KGAP;
+        }
+        if (ri === 2) {
+          controls.push({ id: 'bksp', kind: 'button', r: [x, y, uw * 1.6, KEY_H], label: '⌫', font: 14, noBorder: true, bg: PAL.border, radius: 6, action: backspace });
+        }
+      });
+    }
+    if (allResolved) {
+      controls.push({ id: 'alldone', kind: 'label', r: [0, trackY + TRACK_H + GAP, W, 30], label: `Puzzle complete — ${solvedCount}/${roundsDef.length} words · ${totalScore} pts`, font: 14, color: PAL.text, bold: true });
+    }
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {}));
+
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [roundGuesses, cur, done, tile, shakeFrame, W, fmt, solvedCount, totalScore, revealedExtra, cluesLeft, buying, hintMsg, pressedId, activeIdx],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      // Round tracker dots.
+      {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '600 13px ' + CUI_MONO;
+        const n = roundState.length;
+        const stepX = 26;
+        let x = Math.floor(W / 2 - ((n - 1) * stepX) / 2);
+        roundState.forEach((r, i) => {
+          ctx.fillStyle = r.solved ? PAL.emerald : r.missed ? PAL.rose : i === activeIdx ? PAL.accent : PAL.dim;
+          ctx.fillText(r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○', x, trackY + TRACK_H / 2);
+          x += stepX;
+        });
+      }
+      if (active) {
+        // Clue prose, wrapped.
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = '600 12px ' + CUI_FONT;
+        ctx.fillStyle = PAL.text;
+        cuiWrapText(ctx, `Clue: ${active.def.clue} · ${wordLen} letters`, W / 2, clueY + 14, W - 16, 15, 2);
+        ctx.fillStyle = PAL.gold;
+        ctx.font = '500 11.5px ' + CUI_FONT;
+        activeHints.slice(0, revealedExtra).forEach((h, i) => {
+          cuiWrapText(ctx, `Hint ${i + 1}: ${h}`, W / 2, clueY + CLUE_H + i * XCLUE_H + 12, W - 16, 13, 2);
+        });
+        // Guess grid.
+        ctx.save();
+        ctx.translate(boardX, boardY);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const sh = shakeRef.current;
+        const shakeP = sh ? (performance.now() - sh.t0) / 400 : 1;
+        const wiggle = sh ? Math.sin(shakeP * Math.PI * 4) * 6 * (1 - shakeP) : 0;
+        const guesses = active.guesses;
+        for (let r = 0; r < maxGuesses; r++) {
+          const g = guesses[r];
+          const isCurrent = !g && r === guesses.length && !done;
+          const letters = g ? g.word : (isCurrent ? cur : '');
+          const dx = isCurrent ? wiggle : 0;
+          for (let c = 0; c < wordLen; c++) {
+            const ch = letters[c] || '';
+            const x = c * (tile + gapPx) + dx, y = r * (tile + gapPx);
+            const state = g ? g.result[c] : (ch ? 'filled' : '');
+            let bg = PAL.card, border = PAL.dim, ink = PAL.text;
+            if (state === 'filled') border = PAL.muted;
+            else if (state === 'green') { bg = PAL.emerald; border = PAL.emerald; ink = '#fff'; }
+            else if (state === 'yellow') { bg = PAL.gold; border = PAL.gold; ink = '#fff'; }
+            else if (state === 'gray') { bg = PAL.dim; border = PAL.dim; }
+            klRR(ctx, x + 1, y + 1, tile - 2, tile - 2, 8);
+            ctx.fillStyle = bg;
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = border;
+            ctx.stroke();
+            if (ch) {
+              ctx.font = `600 ${Math.round(tile * 0.5)}px 'JetBrains Mono', monospace`;
+              ctx.fillStyle = ink;
+              ctx.fillText(String(ch).toUpperCase(), x + tile / 2, y + tile / 2 + 1);
+            }
+          }
+        }
+        ctx.restore();
+      }
+    },
+  });
+
   return (
-    // PHASE 3 — this root was a bare <div> despite the game carrying
-    // fitShell: true, so .game-wrap.fit's overflow:hidden CLIPPED the board +
-    // keyboard on long words instead of fitting them. .fit-col makes the board
-    // the one flexible child; the keyboard/clue/tracker are pinned in the
-    // flex: 0 0 auto list.
+    // PHASE 3 — .fit-col keeps the frame the one flexible child (fitShell).
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Word</div>
-          <div className="pvalue">{Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/{roundsDef.length}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Solved</div>
-          <div className="pvalue">{solvedCount}/{roundsDef.length}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Points</div>
-          <div className="pvalue">{totalScore}</div>
-        </div>
+      <div
+        className="cw-board cui-frame"
+        ref={boxRef}
+        /* The live entry, verbatim. A check asserts
+           `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
+           the double-input bug it would read "LLEENN" and the check fails. */
+        data-cw-typed={cur}
+      >
+        <canvas
+          ref={canvasRef}
+          className="cw-canvas board-canvas"
+          role="img"
+          aria-label={active
+            ? `Daily Cipher — word ${activeIdx + 1} of ${roundsDef.length}, ${active.guesses.length} of ${maxGuesses} guesses used`
+            : `Daily Cipher — puzzle complete, ${solvedCount} of ${roundsDef.length} words`}
+        />
       </div>
-
-      {/* #138 — naming the theme is half the "it feels different today" fix. */}
-      <div className="word-theme">Today's theme: <b>{cwThemeForDay(dayNum)}</b></div>
-
-      <div className="cw-tracker">
-        {roundState.map((r, i) => {
-          let cls = 'cw-dot';
-          if (r.solved) cls += ' solved';
-          else if (r.missed) cls += ' missed';
-          else if (i === activeIdx) cls += ' active';
-          return (
-            <span
-              key={i}
-              className={cls}
-              title={r.resolved ? `Word ${i + 1}: ${r.def.word}` : `Word ${i + 1}`}
-            >
-              {r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○'}
-            </span>
-          );
-        })}
-      </div>
-
-      {active && (
-        <>
-          <div className="cw-clue">
-            <span className="cw-clue-label">Clue</span>
-            <span className="cw-clue-text">{active.def.clue}</span>
-            <span className="cw-clue-len">{wordLen} letters</span>
-          </div>
-
-          {activeHints.slice(0, revealedExtra).map((h, i) => (
-            <div key={i} className="cw-clue cw-clue-extra">
-              <span className="cw-clue-label">Hint {i + 1}</span>
-              <span className="cw-clue-text">{h}</span>
-            </div>
-          ))}
-
-          {activeHints.length > 0 && (
-            <HintBar
-              hintsLeft={cluesLeft}
-              exhausted={cluesLeft <= 0}
-              buying={buying}
-              onBuy={buyHint}
-              msg={hintMsg}
-              label="No more clues"
-            />
-          )}
-
-          {/* The guess grid is the one flexible region: it shrinks so the
-              keyboard, clue and tracker (all flex: 0 0 auto) keep their place.
-              Deliberately NOT wrapped in fit-scale-box — that box is width-free,
-              which collapses a percentage-sized grid to min-content. */}
-          <div
-            className="cw-board"
-            style={{ gridTemplateRows: `repeat(${maxGuesses}, 1fr)`, maxWidth: `${boardWidth}px` }}
-          >
-            {Array.from({ length: maxGuesses }).map((_, r) => {
-              const g = active.guesses[r];
-              const isCurrent = !g && r === active.guesses.length && !done;
-              const letters = g ? g.word : (isCurrent ? cur : '');
-              return (
-                <div
-                  key={r}
-                  className={`cw-row${isCurrent && shake ? ' shake' : ''}`}
-                  style={{ gridTemplateColumns: `repeat(${wordLen}, 1fr)` }}
-                >
-                  {Array.from({ length: wordLen }).map((__, c) => {
-                    const ch = letters[c] || '';
-                    const cls = ['cw-tile'];
-                    if (g) cls.push(g.result[c]);
-                    else if (ch) cls.push('filled');
-                    return <div key={c} className={cls.join(' ')}>{ch}</div>;
-                  })}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="cw-kbd">
-            {CW_KEYS.map((row, ri) => (
-              <div key={ri} className="cw-kbd-row">
-                {ri === 2 && <button className="cw-key wide" {...tapProps(submit)}>Enter</button>}
-                {row.split('').map(ch => (
-                  <button
-                    key={ch}
-                    className={`cw-key${keyState[ch] ? ' ' + keyState[ch] : ''}`}
-                    {...tapProps(() => typeLetter(ch))}
-                  >
-                    {ch}
-                  </button>
-                ))}
-                {ri === 2 && <button className="cw-key wide" {...tapProps(backspace)}>⌫</button>}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {allResolved && (
-        <div className="cw-alldone">Puzzle complete — {solvedCount}/{roundsDef.length} words · {totalScore} pts</div>
-      )}
+      <CuiTwin controls={controls} />
     </div>
   );
 }

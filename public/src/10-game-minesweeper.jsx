@@ -14,6 +14,42 @@ const MS_TAB_LABELS = { game: 'Game', history: 'My Best Runs', leaderboard: 'Lea
 function msLoadHistory() { return loadHistory(MS_HISTORY_KEY); }
 function msSaveEntry(entry) { saveHistory(MS_HISTORY_KEY, entry, MS_HISTORY_MAX); }
 
+/* Minesweeper's legacy in-game tab strip is hidden inside the classic shell
+   (the `.cg-stage .ms-bottom-nav { display: none }` sweep), which orphaned
+   the renamed "My Best Runs" history — no in-frame surface could reach it at
+   all. The ☰ sheet is the shell's surface for exactly this, so the history
+   lives there now, under the label the rename shipped. Registry-driven via
+   the minesweeper entry's `sheetExtras`; `?sheet=history` deep-links it. */
+function msBestRunsSection() {
+  return {
+    id: 'history',
+    label: 'My Best Runs',
+    render: () => {
+      const rows = msLoadHistory();
+      const fmtD = (d) => { const [y, m, day] = String(d || '').split('-'); return m ? `${m}/${day}/${y.slice(2)}` : ''; };
+      return (
+        <div>
+          <h4>My Best Runs</h4>
+          {rows.length === 0
+            ? <div className="cg-sheet-empty">No games recorded yet — play one!</div>
+            : (
+              <div className="cg-sheet-list">
+                {rows.map((h) => (
+                  <div className="cg-sheet-row" key={h.id}>
+                    <span className={`ms-outcome-chip ${h.outcome}`}>{h.outcome === 'win' ? 'Win' : 'Loss'}</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtD(h.date)}</span>
+                    <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/54 · {h.secs}s</span>
+                  </div>
+                ))}
+              </div>
+            )}
+        </div>
+      );
+    },
+  };
+}
+
 function generateMines(firstR, firstC) {
   const protected_ = new Set();
   for (let dr = -1; dr <= 1; dr++) {
@@ -70,6 +106,102 @@ function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
   return next;
 }
 
+/* The Minesweeper board is a canvas — Mine Finder's exact pattern (they are
+   the same family on purpose). Self-contained because the board lives behind
+   the ☰ tab switch: usePointerCell binds on mount, so the canvas must exist
+   when its hooks run. The board's light/dark look still keys off the RESOLVED
+   theme (the old data-ms-theme pair), not the raw palette: base art is dark,
+   light pins its own greys — intrinsic to this board, like the daily's. */
+const MS_LIGHT = { grid: '#9ca3af', hidden: '#e5e7eb', revealed: '#f9fafb', mineDead: '#fca5a5', exploded: '#f87171' };
+function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverMine, done, onCellTap, onCellFlag, onCellAlt }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: MS_COLS, rows: MS_ROWS, minCell: 26, maxCell: 46, gap: 2 });
+  const cellStep = cell + 2;
+  const boardPx = cellStep * MS_COLS - 2;
+
+  const liveRef = useRef({});
+  liveRef.current = { revealed, flagged, done, cellStep };
+  const idxAt = (p) => {
+    const cs = liveRef.current.cellStep;
+    const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
+    if (c < 0 || c >= MS_COLS || r < 0 || r >= MS_ROWS) return -1;
+    return r * MS_COLS + c;
+  };
+  usePointerCell(canvasRef, {
+    onTap: (p) => { const i = idxAt(p); if (i >= 0 && !liveRef.current.done) onCellTap(i); },
+    onLongPress: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      onCellAlt(i);
+    },
+    onContext: (p) => {
+      const i = idxAt(p);
+      if (i < 0 || liveRef.current.done || liveRef.current.revealed.has(i)) return;
+      onCellFlag(i);
+    },
+  });
+
+  useCanvasBoard(canvasRef, {
+    width: boardPx,
+    height: boardPx,
+    deps: [cell, revealed, flagged, mineSet, gameOverMine, done, theme],
+    draw: (ctx) => {
+      const light = theme === 'light';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const radius = Math.max(3, Math.round(cell * 0.16));
+      for (let i = 0; i < MS_ROWS * MS_COLS; i++) {
+        const r = Math.floor(i / MS_COLS), c = i % MS_COLS;
+        const x = c * cellStep, y = r * cellStep;
+        const isRev = revealed.has(i);
+        const isFlag = flagged.has(i);
+        const isMineVisible = done && mineSet && mineSet.has(i) && !isRev;
+        const isExploded = gameOverMine === i;
+        const adjVal = adjacency ? adjacency[i] : 0;
+
+        let fill = light ? MS_LIGHT.hidden : PAL.card;
+        if (isRev) fill = light ? MS_LIGHT.revealed : PAL.surface;
+        if (isMineVisible) fill = light ? MS_LIGHT.mineDead : 'rgba(205,75,58,.25)';
+        if (isExploded) fill = light ? MS_LIGHT.exploded : 'rgba(205,75,58,.60)';
+        klRR(ctx, x, y, cell, cell, radius);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = light ? MS_LIGHT.grid : PAL.border;
+        ctx.stroke();
+
+        const cx = x + cell / 2, cy = y + cell / 2;
+        if (isExploded) {
+          ctx.font = `${Math.round(cell * 0.6)}px system-ui, sans-serif`;
+          ctx.fillText('💥', cx, cy + 1);
+        } else if (isMineVisible) {
+          ctx.font = `${Math.round(cell * 0.58)}px system-ui, sans-serif`;
+          ctx.fillText('💣', cx, cy + 1);
+        } else if (isRev && adjVal > 0) {
+          ctx.font = `700 ${Math.round(cell * 0.5)}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = palOf(MF_NUM_COLORS[adjVal], PAL.text);
+          ctx.fillText(String(adjVal), cx, cy + 1);
+        } else if (isFlag) {
+          ctx.font = `${Math.round(cell * 0.55)}px system-ui, sans-serif`;
+          ctx.fillText('🚩', cx, cy + 1);
+        }
+      }
+    },
+  });
+
+  return (
+    <div className="ms-boardbox" ref={boxRef} onContextMenu={(e) => e.preventDefault()}>
+      <canvas
+        ref={canvasRef}
+        className="ms-canvas board-canvas"
+        role="grid"
+        aria-label={`Minesweeper, 8 by 8 board, ${revealed.size} cells revealed`}
+      />
+    </div>
+  );
+}
+
 function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   // The board follows the APP theme now (its own light/dark button is gone —
   // one control, in Settings). Base .ms-* rules are dark and
@@ -83,15 +215,12 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
   const [done, setDone] = useState(false);
   const [gameOverMine, setGameOverMine] = useState(null);
   const [steps, setSteps] = useState(0);
-  const [isMock, setIsMock] = useState(false);
-  const [walletAddr, setWalletAddr] = useState(null);
   const [gameHistory, setGameHistory] = useState(() => msLoadHistory());
   // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
   // both SFX and music); `musicPaused` is the player's in-game music pause that
   // leaves SFX untouched.
   const [soundOn, setSoundOn] = useState(() => cgPrefs.sound);
   const [musicPaused, setMusicPaused] = useState(false);
-  const flagTimerRef = useRef(null);
   const { secs, fmt: timeFmt } = useTimer(!done && mineSet !== null);
 
   // Reset when parent increments resetKey
@@ -127,16 +256,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     cgSetPref('sound', next);
     setSoundOn(next);
   };
-
-  // Bridge: detect mock mode and fetch wallet address
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-    if (window.usernode && typeof window.usernode.getNodeAddress === 'function') {
-      window.usernode.getNodeAddress().then(addr => { if (addr) setWalletAddr(addr); }).catch(() => {});
-    }
-  }, []);
 
   const safeRevealed = mineSet
     ? Array.from(revealed).filter(i => !mineSet.has(i)).length
@@ -312,17 +431,6 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     handleReveal(idx);
   };
 
-  // Long-press stays as the INVERSE of the current mode, so both gestures work.
-  const onPointerDown = (idx) => {
-    flagTimerRef.current = setTimeout(() => {
-      flagTimerRef.current = null;
-      if (revealed.has(idx)) return;
-      if (flagMode) handleReveal(idx); else handleFlag(idx);
-      cgHaptic(12);
-    }, 500);
-  };
-  const onPointerUp = () => { if (flagTimerRef.current) { clearTimeout(flagTimerRef.current); flagTimerRef.current = null; } };
-
   const minesLeft = MS_MINES - flagged.size;
 
   const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
@@ -332,39 +440,23 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{timeFmt}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Mines Left</div>
-              <div className="pvalue">{minesLeft}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Safe Revealed</div>
-              <div className="pvalue">{safeRevealed}/{MS_SAFE}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: timeFmt, gold: true },
+              { id: 'p-mines', kind: 'pill', r: pr[1], label: 'Mines Left', value: minesLeft },
+              { id: 'p-safe', kind: 'pill', r: pr[2], label: 'Safe Revealed', value: `${safeRevealed}/${MS_SAFE}` },
+            ];
+          }} />
 
-          {/* #136 — flag/dig toggle. Mirrors the daily Mine Finder's
-              .mf-mode-btn pair so the two mine games read the same. */}
-          <div className="mf-controls" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-            <button
-              className={'mf-mode-btn' + (flagMode ? '' : ' on')}
-              onClick={() => setFlagMode(false)}
-              aria-pressed={!flagMode}
-            >
-              ⛏️ Dig<span className="mf-mode-label">tap to reveal</span>
-            </button>
-            <button
-              className={'mf-mode-btn flag' + (flagMode ? ' on' : '')}
-              onClick={() => setFlagMode(true)}
-              aria-pressed={flagMode}
-            >
-              🚩 Flag<span className="mf-mode-label">tap to mark</span>
-            </button>
-          </div>
+          {/* #136 — flag/dig toggle, drawn; the two mine games read the same. */}
+          <CuiBar height={52} build={(W) => {
+            const br = cuiRow(Math.floor(W * 0.06), 2, Math.floor(W * 0.88), 48, 2);
+            return [
+              { id: 'dig', kind: 'button', r: br[0], label: '⛏️ Dig', sub: 'tap to reveal', on: !flagMode, action: () => setFlagMode(false) },
+              { id: 'flag', kind: 'button', r: br[1], label: '🚩 Flag', sub: 'tap to mark', on: flagMode, action: () => setFlagMode(true) },
+            ];
+          }} />
           {/* #136 — chording was completely undiscoverable: tapping a revealed
               number simply did nothing, with no hint that it ever would. */}
           <div className="p6-hint" style={{ textAlign: 'center' }}>
@@ -372,81 +464,36 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
             Tap a number whose flags all match to clear around it.
           </div>
 
-          <div
-            className="ms-grid"
-            data-ms-theme={theme}
-            onContextMenu={e => e.preventDefault()}
-          >
-            {Array.from({ length: MS_ROWS * MS_COLS }, (_, idx) => {
-              const isRevealed = revealed.has(idx);
-              const isFlagged = flagged.has(idx);
-              const isMine = mineSet && mineSet.has(idx);
-              const isExploded = gameOverMine === idx;
-              const isMineVisible = done && mineSet && mineSet.has(idx) && !isRevealed;
-              const adjVal = adjacency && adjacency[idx];
+          <MsBoardCanvas
+            theme={theme}
+            revealed={revealed}
+            flagged={flagged}
+            mineSet={mineSet}
+            adjacency={adjacency}
+            gameOverMine={gameOverMine}
+            done={done}
+            onCellTap={handleCellTap}
+            onCellFlag={handleFlag}
+            onCellAlt={(idx) => { if (flagMode) handleReveal(idx); else handleFlag(idx); cgHaptic(12); }}
+          />
 
-              let cls = 'ms-cell';
-              if (isExploded) cls += ' ms-exploded';
-              else if (isMineVisible) cls += ' ms-mine-dead';
-              else if (isRevealed) { cls += ' ms-revealed'; if (adjVal > 0) cls += ` ms-n${adjVal}`; }
-              else if (isFlagged) cls += ' ms-flagged';
-              else cls += ' ms-hidden';
-
-              let content = '';
-              if (isExploded) content = '💥';
-              else if (isMineVisible) content = '💣';
-              else if (isRevealed && adjVal > 0) content = adjVal;
-              else if (isRevealed && adjVal === 0) content = '';
-              else if (isFlagged) content = '🚩';
-
-              return (
-                <div
-                  key={idx}
-                  className={cls}
-                  onClick={() => handleCellTap(idx)}
-                  onContextMenu={e => { e.preventDefault(); handleFlag(idx); }}
-                  onPointerDown={() => onPointerDown(idx)}
-                  onPointerUp={onPointerUp}
-                  onPointerLeave={onPointerUp}
-                >
-                  {content}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="ms-action-row">
-            <div className="ms-cashout-wrap">
-              <button
-                className={'ms-cashout-btn' + (cashOutActive ? '' : ' disabled')}
-                onClick={handleCashOut}
-                disabled={!cashOutActive}
-              >
-                Lock In 🔒 ×{cashoutMultiplier}
-              </button>
-              {isMock && <div className="ms-dev-badge">Dev — simulated</div>}
-            </div>
-            <button
-              className={'ms-music-btn' + (!soundOn ? ' off' : musicPaused ? ' paused' : '')}
-              onClick={() => setMusicPaused(p => !p)}
-              disabled={!soundOn}
-              title={!soundOn ? 'Sound is off (Settings)' : musicPaused ? 'Resume music' : 'Pause music'}
-              aria-label={!soundOn ? 'Sound off' : musicPaused ? 'Resume music' : 'Pause music'}
-            >
-              {!soundOn ? '🔇' : musicPaused ? '▶' : '⏸'}
-            </button>
-            <button className="ms-newgame-btn" onClick={() => {
-              setMineSet(null); setAdjacency(null); setRevealed(new Set());
-              setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
-              setMusicPaused(false);
-            }}>↺ New</button>
-          </div>
+          <CuiBar height={50} build={(W) => {
+            const br = cuiRow(Math.floor(W * 0.04), 4, Math.floor(W * 0.92), 42, 3);
+            return [
+              { id: 'lockin', kind: 'button', r: [br[0][0], 4, br[0][2] + br[1][2] * 0.35, 42], label: `Lock In 🔒 ×${cashoutMultiplier}`, solid: cashOutActive, disabled: !cashOutActive, action: handleCashOut },
+              { id: 'music', kind: 'button', r: [br[1][0] + br[1][2] * 0.45, 4, br[1][2] * 0.55, 42], label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', disabled: !soundOn, action: () => setMusicPaused(p => !p) },
+              { id: 'new', kind: 'button', r: br[2], label: '↺ New', action: () => {
+                setMineSet(null); setAdjacency(null); setRevealed(new Set());
+                setFlagged(new Set()); setDone(false); setGameOverMine(null); setSteps(0);
+                setMusicPaused(false);
+              } },
+            ];
+          }} />
         </div>
       )}
 
       {activeTab === 'history' && (
         <div>
-          {isMock && <div className="ms-dev-label">Local storage — will sync to chain when live</div>}
           <div className="ms-history-list">
             {gameHistory.length === 0
               ? <div className="ms-empty-state">No games recorded yet</div>

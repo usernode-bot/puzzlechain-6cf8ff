@@ -176,7 +176,6 @@ function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, off
   const [activeTab, setActiveTab] = useState('game');
   const [bestScore, setBestScore] = useState(() => bounceLoadBest());
   const [elapsedSecs, setElapsedSecs] = useState(0);
-  const [isMock, setIsMock] = useState(false);
   const [activePowerups, setActivePowerups] = useState([]);
   // Audio: `soundOn` mirrors the shared cgPrefs.sound master switch (controls
   // both SFX and music); `musicPaused` is the player's in-game music pause
@@ -229,12 +228,6 @@ function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, off
   const timerRunning = started && !done && activeTab === 'game';
 
   const fmtSecs = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-
-  useEffect(() => {
-    if (window.usernode && typeof window.usernode.isMockEnabled === 'function') {
-      window.usernode.isMockEnabled().then(m => setIsMock(!!m)).catch(() => {});
-    }
-  }, []);
 
   // Elapsed-time clock (pauses when not actively playing).
   useEffect(() => {
@@ -661,44 +654,30 @@ function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, off
 
   return (
     <div>
-      {isMock && <div className="t2048-banner">Local best score — leaderboard syncs to your account when live</div>}
 
       {activeTab === 'game' && (
         <div>
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Score</div>
-              <div className="pvalue mono">{score.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Best</div>
-              <div className="pvalue mono">{bestScore.toLocaleString()}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Lives</div>
-              <div className="pvalue">{'●'.repeat(Math.max(0, lives)) || '—'}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Level</div>
-              <div className="pvalue mono">{level}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{fmtSecs(elapsedSecs)}</div>
-            </div>
-            {activePowerups.map((ap, idx) => {
+          <CuiBar height={68} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 5);
+            const out = [
+              { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
+              { id: 'p-best', kind: 'pill', r: pr[1], label: 'Best', value: bestScore.toLocaleString() },
+              { id: 'p-lives', kind: 'pill', r: pr[2], label: 'Lives', value: '●'.repeat(Math.max(0, lives)) || '—' },
+              { id: 'p-level', kind: 'pill', r: pr[3], label: 'Level', value: level },
+              { id: 'p-time', kind: 'pill', r: pr[4], label: 'Time', value: fmtSecs(elapsedSecs), gold: true },
+            ];
+            if (activePowerups.length) {
               const now = Date.now();
-              const elapsed = now - ap.startedAt;
-              const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
-              return (
-                <div key={idx} className="pill" style={{ background: ca('emerald','22'), border: `1px solid ${C.emerald}` }}>
-                  <div className="plabel" style={{ fontSize: '0.75rem' }}>
-                    {POWERUP_ICONS[ap.type]} {remaining}s {ap.stacks > 1 ? `×${ap.stacks}` : ''}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+              out.push({
+                id: 'powerups', kind: 'label', r: [0, 50, W, 20], font: 12, color: PAL.emerald,
+                label: activePowerups.map((ap) => {
+                  const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - (now - ap.startedAt)) / 1000));
+                  return `${POWERUP_ICONS[ap.type]} ${remaining}s${ap.stacks > 1 ? ` ×${ap.stacks}` : ''}`;
+                }).join(' · '),
+              });
+            }
+            return out;
+          }} />
 
           <div className="bounce-board-wrap">
             <canvas
@@ -717,36 +696,20 @@ function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, off
             )}
           </div>
 
-          <div className="bounce-audio-row">
-            <button onClick={toggleSound}>
-              {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
-            </button>
-            <button
-              onClick={() => setMusicPaused(p => !p)}
-              disabled={!soundOn}
-            >
-              {!soundOn ? '🔇 Off' : musicPaused ? '▶ Resume' : '⏸ Pause'}
-            </button>
-          </div>
-
-          <div className="bounce-dpad">
-            <button
-              aria-label="Left"
-              onPointerDown={(e) => { e.preventDefault(); leftRef.current = true; }}
-              onPointerUp={() => { leftRef.current = false; }}
-              onPointerLeave={() => { leftRef.current = false; }}
-            >◀</button>
-            <button
-              aria-label="Right"
-              onPointerDown={(e) => { e.preventDefault(); rightRef.current = true; }}
-              onPointerUp={() => { rightRef.current = false; }}
-              onPointerLeave={() => { rightRef.current = false; }}
-            >▶</button>
-          </div>
-
-          <div className="bounce-controls">
-            <button onClick={handleNewGame}>↺ New Game</button>
-          </div>
+          <CuiBar height={44} build={(W) => {
+            const x0 = Math.floor(W * 0.02), usable = Math.floor(W * 0.96), g = 6;
+            const soundW = Math.floor(usable * 0.3), musicW = Math.floor(usable * 0.12);
+            const padW = Math.floor(usable * 0.13), newW = usable - soundW - musicW - padW * 2 - g * 4;
+            let x = x0;
+            const next = (w) => { const r = [x, 0, w, 40]; x += w + g; return r; };
+            return [
+              { id: 'sound', kind: 'button', r: next(soundW), label: soundOn ? '🔊 Sound On' : '🔇 Sound Off', font: 11, on: soundOn, action: toggleSound },
+              { id: 'music', kind: 'button', r: next(musicW), label: !soundOn ? '🔇' : musicPaused ? '▶' : '⏸', font: 12, disabled: !soundOn, action: () => setMusicPaused(p => !p) },
+              { id: 'left', kind: 'button', r: next(padW), label: '◀', font: 15, holdDown: () => { leftRef.current = true; }, holdUp: () => { leftRef.current = false; } },
+              { id: 'right', kind: 'button', r: next(padW), label: '▶', font: 15, holdDown: () => { rightRef.current = true; }, holdUp: () => { rightRef.current = false; } },
+              { id: 'new', kind: 'button', r: next(newW), label: '↺ New', font: 12, action: handleNewGame },
+            ];
+          }} />
         </div>
       )}
 

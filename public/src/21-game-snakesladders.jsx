@@ -51,6 +51,48 @@ const CNL_VARIANTS = {
 };
 function cnlVariant(v) { return CNL_VARIANTS[v] ? v : 'classic'; }
 
+// Standard 1-6 pip layouts on a 3x3 grid (row-major, 1 = pip present).
+const CNL_DIE_PIPS = {
+  1: [0, 0, 0, 0, 1, 0, 0, 0, 0],
+  2: [1, 0, 0, 0, 0, 0, 0, 0, 1],
+  3: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  4: [1, 0, 1, 0, 0, 0, 1, 0, 1],
+  5: [1, 0, 1, 0, 1, 0, 1, 0, 1],
+  6: [1, 0, 1, 1, 0, 1, 1, 0, 1],
+};
+
+// Cosmetic (client-only, per-device) Classic-board skins. These substitute
+// only the ladder/chute glyphs and the label shown in the picker — the
+// mechanical variant (ladders/chutes tables) is untouched, so a skin never
+// needs to reach the server. Disabled when the mechanical variant is
+// 'moksha' (which has its own snake/virtue art baked into the board).
+const CNL_SKINS = {
+  plain:   { label: 'Classic', icon: '🪜', ladderMark: '🪜', chuteMark: '🛝' },
+  jungle:  { label: 'Jungle Vine', icon: '🌿', ladderMark: '🌿', chuteMark: '🐊' },
+  space:   { label: 'Star Voyage', icon: '🚀', ladderMark: '🚀', chuteMark: '☄️' },
+  pirate:  { label: 'Treasure Trail', icon: '🏴‍☠️', ladderMark: '⚓', chuteMark: '🦑' },
+};
+const CNL_SKIN_KEY = 'puzzlechain_cnl_skin';
+function cnlSkinId(v) { return CNL_SKINS[v] ? v : 'plain'; }
+function useCnlSkin() {
+  const [skin, setSkinState] = useState(() => {
+    // ?cnlskin=<id> is a screenshot-state deep link — it lets proposal tests
+    // and before/after captures reach a skin that's otherwise only chosen by
+    // clicking a pill, and it wins over the stored device preference.
+    try {
+      const q = new URLSearchParams(window.location.search).get('cnlskin');
+      if (q && CNL_SKINS[q]) return q;
+    } catch (e) {}
+    try { return cnlSkinId(localStorage.getItem(CNL_SKIN_KEY)); } catch (e) { return 'plain'; }
+  });
+  const setSkin = (v) => {
+    const id = cnlSkinId(v);
+    setSkinState(id);
+    try { localStorage.setItem(CNL_SKIN_KEY, id); } catch (e) {}
+  };
+  return [skin, setSkin];
+}
+
 // The glossary — reachable from the mode picker and the in-game header, so a
 // player can read what a square means before or during a game.
 function MokshaGlossaryModal({ onClose }) {
@@ -103,6 +145,164 @@ function cnlRowCol(n) {
 
 // Center of a square as a percentage of the board box (for SVG + pawns).
 // Visual row 0 sits at the BOTTOM, so flip for top-origin coordinates.
+/* The Snakes & Ladders board as ONE canvas shared by local and online play
+   (#170 treatment): cells, the connector lines (Moksha's snakes keep their
+   slither curves), the square marks/names, and both pawns — which glide
+   between squares with the same 130ms ease the DOM transition gave them.
+   Display-only: the Roll buttons are the input. Chrome reads PAL; the two
+   pawn colors come from the callers, as before. */
+function CnlBoardCanvas({ V, isMoksha, SK, p1Pos, p2Pos, p1Color, p2Color, p2Glyph }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 10, rows: 10 });
+  const side = Math.max(0, Math.floor(boxW));
+
+  // Pawn glide: remember each pawn's previous square and lerp for 130ms.
+  const glideRef = useRef({ p1: { from: p1Pos, to: p1Pos, t0: 0 }, p2: { from: p2Pos, to: p2Pos, t0: 0 } });
+  const [, setGlideFrame] = useState(0);
+  useEffect(() => {
+    const g = glideRef.current;
+    let changed = false;
+    for (const [key, pos] of [['p1', p1Pos], ['p2', p2Pos]]) {
+      if (g[key].to !== pos) { g[key] = { from: g[key].to, to: pos, t0: performance.now() }; changed = true; }
+    }
+    if (!changed) return;
+    let raf = 0;
+    const tick = () => {
+      setGlideFrame((f) => f + 1);
+      const now = performance.now();
+      if (now - g.p1.t0 < 140 || now - g.p2.t0 < 140) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [p1Pos, p2Pos]);
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [p1Pos, p2Pos, V, isMoksha, side, SK && SK.label, p2Glyph],
+    draw: (ctx) => {
+      if (side < 80) return;
+      const pad = 4;
+      const inner = side - pad * 2;
+      const cs = inner / 10;
+      const pct = (p) => [pad + (p.x / 100) * inner, pad + (p.y / 100) * inner];
+      ctx.textBaseline = 'top';
+      for (let visualRow = 0; visualRow < 10; visualRow++) {
+        for (let col = 0; col < 10; col++) {
+          const row = 9 - visualRow;
+          const within = (row % 2 === 0) ? col : (9 - col);
+          const n = row * 10 + within + 1;
+          const x = pad + col * cs, y = pad + visualRow * cs;
+          ctx.fillStyle = n === 100 ? 'rgba(201,162,39,0.13)' : ((row + col) % 2 ? PAL.surface : PAL.card);
+          ctx.fillRect(x + 0.5, y + 0.5, cs - 1, cs - 1);
+          ctx.font = `600 ${Math.max(7, Math.round(cs * 0.24))}px 'JetBrains Mono', monospace`;
+          ctx.textAlign = 'left';
+          ctx.fillStyle = n === 100 ? PAL.gold : PAL.muted;
+          ctx.fillText(String(n), x + 3, y + 2);
+          const isL = V.ladders[n] !== undefined;
+          const mark = isL ? (SK ? SK.ladderMark : '🪜') : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : (SK ? SK.chuteMark : '🛝')) : null;
+          if (mark) {
+            ctx.font = `${Math.round(cs * 0.34)}px system-ui, sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.fillText(mark, x + cs - 2, y + cs - Math.round(cs * 0.38));
+          }
+          const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
+          if (meaning) {
+            ctx.font = `700 ${Math.max(5, Math.round(cs * 0.14))}px 'Space Grotesk', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = isL ? PAL.emerald : PAL.rose;
+            let name = meaning.name.toUpperCase();
+            while (name.length > 2 && ctx.measureText(name).width > cs - 3) name = name.slice(0, -1);
+            ctx.fillText(name, x + cs / 2, y + cs - Math.max(6, Math.round(cs * 0.17)));
+          }
+        }
+      }
+      // Connectors over the cells.
+      for (const k of Object.keys(V.jumps)) {
+        const from = parseInt(k, 10), to = V.jumps[from];
+        const [ax, ay] = pct(cnlCenterPct(from));
+        const [bx, by] = pct(cnlCenterPct(to));
+        const isLadder = V.ladders[from] !== undefined;
+        ctx.strokeStyle = isLadder ? PAL.emerald : PAL.rose;
+        ctx.lineCap = 'round';
+        ctx.globalAlpha = isMoksha && !isLadder ? 0.65 : 0.6;
+        ctx.lineWidth = Math.max(2, side * (isMoksha && !isLadder ? 0.014 : 0.011));
+        ctx.beginPath();
+        if (isMoksha && !isLadder) {
+          const mx = (ax + bx) / 2, my = (ay + by) / 2;
+          const dx = bx - ax, dy = by - ay;
+          const len = Math.max(Math.hypot(dx, dy), 0.001);
+          const off = Math.min(0.09 * side, len * 0.16);
+          const nx = -dy / len * off, ny = dx / len * off;
+          ctx.moveTo(ax, ay);
+          ctx.quadraticCurveTo((ax + mx) / 2 + nx, (ay + my) / 2 + ny, mx, my);
+          ctx.quadraticCurveTo((mx + bx) / 2 - nx, (my + by) / 2 - ny, bx, by);
+        } else {
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // Pawns, gliding between squares; nudged apart when sharing one.
+      const g = glideRef.current;
+      const now = performance.now();
+      const posOf = (gp) => {
+        const p = Math.min(1, (now - gp.t0) / 130);
+        const e = 1 - (1 - p) * (1 - p);
+        const [fx, fy] = pct(cnlCenterPct(gp.from));
+        const [tx, ty] = pct(cnlCenterPct(gp.to));
+        return [fx + (tx - fx) * e, fy + (ty - fy) * e];
+      };
+      let [x1, y1] = posOf(g.p1);
+      let [x2, y2] = posOf(g.p2);
+      if (g.p1.to === g.p2.to) { x1 -= side * 0.024; x2 += side * 0.024; }
+      const rp = side * 0.035;
+      const glyphs = { p1: '1', p2: p2Glyph || '2' };
+      for (const [key, x, y, color] of [['p1', x1, y1, p1Color], ['p2', x2, y2, p2Color]]) {
+        ctx.beginPath();
+        if (key === 'p2') {
+          // Diamond token: same shape identity as #175's DOM pawn, so the two
+          // players are tellable apart by form, not colour alone.
+          const rd = rp * 1.25;
+          ctx.moveTo(x, y - rd); ctx.lineTo(x + rd, y); ctx.lineTo(x, y + rd); ctx.lineTo(x - rd, y); ctx.closePath();
+        } else {
+          ctx.arc(x, y, rp, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = palOf(color, PAL.accent);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        ctx.font = `800 ${Math.max(7, Math.round(rp * 1.05))}px 'Space Grotesk', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(glyphs[key], x, y + 0.5);
+      }
+      ctx.textBaseline = 'top';
+      // Outer border.
+      klRR(ctx, 1, 1, side - 2, side - 2, 12);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.stroke();
+    },
+  });
+
+  return (
+    <div className="cnl-board-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="cnl-canvas board-canvas"
+        role="img"
+        data-cnl-p2="diamond"
+        aria-label={`Board — player 1 (round token) on square ${p1Pos || 0}, player 2 (diamond token${p2Glyph === '🤖' ? ', bot' : ''}) on square ${p2Pos || 0}`}
+      />
+    </div>
+  );
+}
+
 function cnlCenterPct(n) {
   if (n <= 0) return { x: 50, y: 104 }; // off-board: just below the board
   const { row, col } = cnlRowCol(n);
@@ -117,6 +317,14 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   const vkey = cnlVariant(variant);
   const V = CNL_VARIANTS[vkey];
   const isMoksha = vkey === 'moksha';
+  // Cosmetic board skin — a local per-device preference, independent of the
+  // server-synced mechanical variant. Only applies on the Classic board.
+  const [skin, setSkin] = useCnlSkin();
+  const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
+  const cycleSkin = () => {
+    const ids = Object.keys(CNL_SKINS);
+    setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
+  };
   const [p1Pos, setP1Pos]   = useState(0);
   const [p2Pos, setP2Pos]   = useState(0);
   const [player, setPlayer] = useState(1);
@@ -175,16 +383,23 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
   useEffect(() => () => clearTimers(), []);
 
   const p1Color = C.accent;
-  const p2Color = C.rose;
+  const p2Color = C.violet;
+  const p1Token = 'accent';
+  const p2Token = 'violet';
   const activeColor = done ? C.muted : (player === 1 ? p1Color : p2Color);
+  const activeToken = done ? 'muted' : (player === 1 ? p1Token : p2Token);
 
   const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
 
   const finishTurn = (who, landed) => {
     const jump = V.jumps[landed];
+    // The win check must look at where the turn actually ENDS. A jump (e.g.
+    // the 80->100 ladder) moves the pawn past `landed`, so checking `landed`
+    // itself misses every jump-into-100 case and soft-locks the game.
+    const finalSquare = jump !== undefined ? jump : landed;
     const settle = () => {
       // Win check: must land exactly on 100 (no chute sits on 100).
-      if (landed === 100) {
+      if (finalSquare === 100) {
         setDone(true);
         setWinner(who);
         if (onClearSave) onClearSave();
@@ -283,166 +498,60 @@ function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialS
     return () => clearTimeout(t);
   }, [vsBot, player, animating, rolling, done, resumeOffer]);
 
-  // Build the 10x10 cells (top row first for natural DOM order).
-  const cells = [];
-  for (let visualRow = 0; visualRow < 10; visualRow++) {
-    for (let col = 0; col < 10; col++) {
-      const row = 9 - visualRow;              // bottom-origin board row
-      const within = (row % 2 === 0) ? col : (9 - col);
-      const n = row * 10 + within + 1;
-      const isL = V.ladders[n] !== undefined;
-      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
-      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
-      cells.push(
-        <div
-          key={n}
-          className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
-          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}
-        >
-          <span>{n}</span>
-          {mark && <span className="cnl-cell-mark">{mark}</span>}
-          {/* On the Moksha board each special square is named on the board
-              itself, so the lesson is legible without opening the glossary. */}
-          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
-        </div>
-      );
-    }
-  }
-
-  // Connectors. Ladders stay straight; Moksha's snakes are drawn as a curve so
-  // they read as snakes rather than as chutes.
-  const lines = Object.keys(V.jumps).map(k => {
-    const from = parseInt(k, 10);
-    const to = V.jumps[from];
-    const a = cnlCenterPct(from);
-    const b = cnlCenterPct(to);
-    const isLadder = V.ladders[from] !== undefined;
-    const stroke = isLadder ? C.emerald : C.rose;
-    if (isMoksha && !isLadder) {
-      // Two opposing arcs through the midpoint give a slither; the control
-      // offset is perpendicular to the run so long snakes bend more.
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const len = Math.max(Math.hypot(dx, dy), 0.001);
-      const off = Math.min(9, len * 0.16);
-      const nx = -dy / len * off, ny = dx / len * off;
-      return (
-        <path
-          key={k}
-          d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`}
-          fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
-        />
-      );
-    }
-    return (
-      <line
-        key={k}
-        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-        stroke={stroke}
-        strokeWidth="1.1"
-        strokeLinecap="round"
-        opacity="0.6"
-      />
-    );
-  });
-
-  const p1c = cnlCenterPct(p1Pos);
-  const p2c = cnlCenterPct(p2Pos);
-  // Nudge pawns apart when sharing a square (incl. both off-board) so both stay visible.
-  const sameCell = p1Pos === p2Pos;
-  const p1x = sameCell ? p1c.x - 2.4 : p1c.x;
-  const p2x = sameCell ? p2c.x + 2.4 : p2c.x;
-
   const bannerActive = !!banner;
   const bannerColor = done ? C.muted : activeColor;
+  const bannerToken = done ? 'muted' : activeToken;
 
   return (
     <div>
       {resumeOffer && (
         <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
       )}
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Time</div>
-          <div className="pvalue time">{fmt}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Turn</div>
-          <div className="pvalue" style={{ color: activeColor, fontSize: '0.95rem' }}>
-            {done ? pLabel(winner) : pLabel(player)}
-          </div>
-        </div>
-        <div className="pill">
-          <div className="plabel">{pLabel(1)}</div>
-          <div className="pvalue" style={{ color: p1Color, fontSize: '0.95rem' }}>{p1Pos}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">{pLabel(2)}</div>
-          <div className="pvalue" style={{ color: p2Color, fontSize: '0.95rem' }}>{p2Pos}</div>
-        </div>
-        <div className="pill">
-          <div className="plabel">Rolls</div>
-          <div className="pvalue">{rolls}</div>
-        </div>
-        {isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>
-            📖 What do these mean?
-          </button>
-        )}
-      </div>
+      <CuiBar height={96} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 5);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: done ? pLabel(winner) : pLabel(player), color: palOf(activeColor, undefined) },
+          { id: 'p-1', kind: 'pill', r: pr[2], label: pLabel(1), value: p1Pos, color: palOf(p1Color, undefined) },
+          { id: 'p-2', kind: 'pill', r: pr[3], label: pLabel(2), value: p2Pos, color: palOf(p2Color, undefined) },
+          { id: 'p-rolls', kind: 'pill', r: pr[4], label: 'Rolls', value: rolls },
+        ];
+        if (isMoksha) {
+          out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary });
+        } else {
+          // Cosmetic board skin (per-device, never sent to the server) — the
+          // same slot the Moksha board uses for its glossary button.
+          out.push({ id: 'skin', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: `${SK.icon} ${SK.label}`, font: 12, action: cycleSkin });
+        }
+        return out;
+      }} />
 
-      <div
-        className="cnl-banner"
-        style={{
-          color: bannerColor,
-          background: (bannerActive ? bannerColor : activeColor) + '22',
-          border: `1px solid ${(bannerActive ? bannerColor : activeColor)}44`,
-        }}
-      >
-        {done
+      <CuiBar height={30} build={(W) => ([{
+        id: 'banner', kind: 'label', r: [0, 0, W, 28], font: 13, bold: true,
+        color: palOf(bannerActive ? bannerColor : activeColor, undefined),
+        label: done
           ? `Game over — ${pLabel(winner)} win${vsBot && winner === 1 ? '' : 's'}! 🎉`
-          : (banner || `${pLabel(player)}'s turn`)}
-      </div>
+          : (banner || `${pLabel(player)}'s turn`),
+      }])} />
 
       <div className="cnl-board-wrap">
-        <div className="cnl-board">{cells}</div>
-        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {lines}
-        </svg>
-        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} aria-label="Player 1 pawn" />
-        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} aria-label="Player 2 pawn" />
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} SK={SK} p1Pos={p1Pos} p2Pos={p2Pos} p1Color={p1Color} p2Color={p2Color} p2Glyph={vsBot ? '🤖' : '2'} />
       </div>
 
-      <div className="cnl-die">
-        <div className={'cnl-die-face' + (rolling ? ' rolling' : '')} style={{ borderColor: activeColor + '88' }}>
-          {die == null ? '·' : die}
-        </div>
-      </div>
-
-      <div className="cnl-roll-buttons">
-        <button
-          className="cnl-roll-btn"
-          style={{ background: p1Color }}
-          onClick={() => roll(1)}
-          disabled={done || animating || rolling || player !== 1 || !!resumeOffer}
-        >
-          {vsBot ? 'Your' : 'Player 1 -'} Roll
-        </button>
-        {vsBot ? (
-          <button className="cnl-roll-btn" style={{ background: p2Color, opacity: 0.85 }} disabled>
-            {player === 2 && !done ? 'Bot rolling…' : 'Bot'}
-          </button>
-        ) : (
-          <button
-            className="cnl-roll-btn"
-            style={{ background: p2Color }}
-            onClick={() => roll(2)}
-            disabled={done || animating || rolling || player !== 2}
-          >
-            Player 2 - Roll
-          </button>
-        )}
-      </div>
+      <CuiBar height={54} build={(W) => {
+        const bw = Math.floor((W - 78) / 2) - 8;
+        return [
+          { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: die == null ? '·' : String(die), twinLabel: die == null ? 'Die not yet rolled' : `Die showing ${die}`, pips: die == null ? null : CNL_DIE_PIPS[die], font: 20, mono: true, disabled: true },
+          {
+            id: 'roll1', kind: 'button', r: [4, 7, bw, 40],
+            label: `${vsBot ? 'Your' : 'Player 1 -'} Roll`, solid: true, bg: palOf(p1Color, undefined), ink: '#fff',
+            disabled: done || animating || rolling || player !== 1 || !!resumeOffer, action: () => roll(1),
+          },
+          vsBot
+            ? { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: player === 2 && !done ? 'Bot rolling…' : 'Bot', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: true }
+            : { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: 'Player 2 - Roll', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: done || animating || rolling || player !== 2, action: () => roll(2) },
+        ];
+      }} />
     </div>
   );
 }
@@ -458,6 +567,10 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
   // Board style is independent of the play mode; Classic stays the default
   // because the Moksha board is deliberately a longer game.
   const [variant, setVariant] = useState('classic');
+  // Cosmetic skin is a separate, per-device preference (never sent to the
+  // server) — hidden once Moksha is picked since that board has its own
+  // baked-in virtue/vice art and isn't skinnable.
+  const [skin, setSkin] = useCnlSkin();
 
   const modes = [
     { id: '2p',     icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
@@ -534,6 +647,17 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
           </div>
         )}
       </div>
+      {variant !== 'moksha' && (
+        <div className="cnl-variant-block">
+          <div className="cnl-variant-label">Board skin</div>
+          <div className="mnc-mode-sub">
+            {Object.keys(CNL_SKINS).map(id => (
+              <button key={id} className={'mnc-difficulty-pill' + (skin === id ? ' active' : '')}
+                onClick={() => setSkin(id)}>{CNL_SKINS[id].icon} {CNL_SKINS[id].label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       {error && <div className="mnc-join-error">{error}</div>}
       {mode && <button className="mnc-mode-start-btn" onClick={handleStart} disabled={!canStart || busy}>{busy ? 'Please wait…' : 'Play'}</button>}
     </div>
@@ -548,6 +672,11 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
   const secsRef = useRef(0); secsRef.current = secs;
   const movesRef = useRef(0);
+  const [skin, setSkin] = useCnlSkin();
+  const cycleSkin = () => {
+    const ids = Object.keys(CNL_SKINS);
+    setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
+  };
 
   useEffect(() => {
     if (!room || room.status !== 'finished' || winCalledRef.current) return;
@@ -584,10 +713,12 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
   const vkey = cnlVariant(st.variant);
   const V = CNL_VARIANTS[vkey];
   const isMoksha = vkey === 'moksha';
+  const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
   const cur = st.currentPlayer || 1;
   const isMyTurn = status === 'active' && cur === myPlayerNum;
-  const p1Color = C.accent, p2Color = C.rose;
+  const p1Color = C.accent, p2Color = C.violet;
   const myColor = myPlayerNum === 1 ? p1Color : p2Color;
+  const myToken = myPlayerNum === 1 ? 'accent' : 'violet';
 
   const doRoll = () => {
     if (!isMyTurn) return;
@@ -595,76 +726,36 @@ function ChutesLaddersOnlineGame({ onWin, onStepChange, roomId, myPlayerNum, onG
     submitMove({ type: 'roll' });
   };
 
-  // Reuse the static board renderer by mapping positions onto pawns.
-  const cells = [];
-  for (let visualRow = 0; visualRow < 10; visualRow++) {
-    for (let col = 0; col < 10; col++) {
-      const row = 9 - visualRow;
-      const within = (row % 2 === 0) ? col : (9 - col);
-      const n = row * 10 + within + 1;
-      const isL = V.ladders[n] !== undefined;
-      const mark = isL ? '🪜' : V.chutes[n] !== undefined ? (isMoksha ? '🐍' : '🛝') : null;
-      const meaning = isMoksha ? CNL_MOKSHA_MEANINGS[n] : null;
-      cells.push(
-        <div key={n} className={'cnl-cell' + ((row + col) % 2 ? ' alt' : '') + (n === 100 ? ' cnl-goal' : '')}
-          title={meaning ? `${n} — ${meaning.name} (${meaning.sanskrit})` : undefined}>
-          <span>{n}</span>
-          {mark && <span className="cnl-cell-mark">{mark}</span>}
-          {meaning && <span className={'cnl-cell-name' + (isL ? ' up' : ' down')}>{meaning.name}</span>}
-        </div>
-      );
-    }
-  }
-  const lines = Object.keys(V.jumps).map(k => {
-    const from = parseInt(k, 10), to = V.jumps[from];
-    const a = cnlCenterPct(from), b = cnlCenterPct(to);
-    const isLadder = V.ladders[from] !== undefined;
-    const stroke = isLadder ? C.emerald : C.rose;
-    if (isMoksha && !isLadder) {
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const len = Math.max(Math.hypot(dx, dy), 0.001);
-      const off = Math.min(9, len * 0.16);
-      const nx = -dy / len * off, ny = dx / len * off;
-      return <path key={k} fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" opacity="0.65"
-        d={`M ${a.x} ${a.y} Q ${(a.x + mx) / 2 + nx} ${(a.y + my) / 2 + ny} ${mx} ${my} Q ${(mx + b.x) / 2 - nx} ${(my + b.y) / 2 - ny} ${b.x} ${b.y}`} />;
-    }
-    return <line key={k} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={stroke} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />;
-  });
-  const p1c = cnlCenterPct(st.p1Pos || 0), p2c = cnlCenterPct(st.p2Pos || 0);
-  const same = (st.p1Pos || 0) === (st.p2Pos || 0);
-  const p1x = same ? p1c.x - 2.4 : p1c.x, p2x = same ? p2c.x + 2.4 : p2c.x;
-
   const turnLabel = status === 'finished'
     ? (room.winner === String(myPlayerNum) ? 'You win! 🎉' : 'Opponent wins')
     : isMyTurn ? 'Your turn' : "Opponent's turn";
 
   return (
     <div>
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Turn</div><div className="pvalue" style={{ color: isMyTurn ? myColor : C.muted, fontSize: '0.82rem' }}>{turnLabel}</div></div>
-        <div className="pill"><div className="plabel">You</div><div className="pvalue" style={{ color: myColor, fontSize: '0.95rem' }}>{myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0)}</div></div>
-        <div className="pill" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span className={'mnc-conn-dot ' + (opponentDisconnected ? 'amber' : 'green')} /><div className="plabel">Online</div></div>
-        {isMoksha && (
-          <button className="p6-btn cnl-glossary-btn" onClick={onGlossary}>📖 What do these mean?</button>
-        )}
-      </div>
-      {opponentDisconnected && <div style={{ textAlign: 'center', color: C.gold, fontSize: '0.8rem', marginBottom: '0.5rem' }}>Opponent connection lost — waiting for reconnect…</div>}
+      <CuiBar height={(opponentDisconnected ? 20 : 0) + 96} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-you', kind: 'pill', r: pr[2], label: 'You', value: myPlayerNum === 1 ? (st.p1Pos || 0) : (st.p2Pos || 0), color: palOf(myColor, undefined) },
+          { id: 'p-conn', kind: 'pill', r: pr[3], label: 'Online', value: '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+        ];
+        let y = 50;
+        if (isMoksha) { out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), y, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary }); y += 46; }
+        else { out.push({ id: 'skin', kind: 'button', r: [Math.floor(W * 0.2), y, Math.floor(W * 0.6), 40], label: `${SK.icon} ${SK.label}`, font: 12, action: cycleSkin }); y += 46; }
+        if (opponentDisconnected) out.push({ id: 'disc', kind: 'label', r: [0, y, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });
+        return out;
+      }} />
       <div className="cnl-board-wrap">
-        <div className="cnl-board">{cells}</div>
-        <svg className="cnl-svg" viewBox="0 0 100 100" preserveAspectRatio="none">{lines}</svg>
-        <div className="cnl-pawn" style={{ left: p1x + '%', top: p1c.y + '%', background: p1Color }} />
-        <div className="cnl-pawn" style={{ left: p2x + '%', top: p2c.y + '%', background: p2Color }} />
+        <CnlBoardCanvas V={V} isMoksha={isMoksha} SK={SK} p1Pos={st.p1Pos || 0} p2Pos={st.p2Pos || 0} p1Color={p1Color} p2Color={p2Color} p2Glyph={'2'} />
       </div>
-      <div className="cnl-die">
-        <div className="cnl-die-face" style={{ borderColor: myColor + '88' }}>{st.die == null ? '·' : st.die}</div>
-      </div>
-      <div className="cnl-roll-buttons">
-        <button className="cnl-roll-btn" style={{ background: myColor }} onClick={doRoll} disabled={!isMyTurn}>
-          {status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…'}
-        </button>
-      </div>
+      <CuiBar height={54} build={(W) => ([
+        { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: st.die == null ? '·' : String(st.die), twinLabel: st.die == null ? 'Die not yet rolled' : `Die showing ${st.die}`, pips: st.die == null ? null : CNL_DIE_PIPS[st.die], font: 20, mono: true, disabled: true },
+        { id: 'roll', kind: 'button', r: [W - Math.floor(W * 0.34) - 4, 7, Math.floor(W * 0.34), 40],
+          label: status === 'finished' ? 'Game over' : isMyTurn ? 'Roll' : 'Waiting…',
+          solid: isMyTurn, bg: isMyTurn ? palOf(myColor, undefined) : undefined, ink: isMyTurn ? '#fff' : undefined,
+          disabled: !isMyTurn, action: doRoll },
+      ])} />
     </div>
   );
 }

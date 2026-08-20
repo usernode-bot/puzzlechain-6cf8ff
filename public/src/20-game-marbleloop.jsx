@@ -594,34 +594,26 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
   return (
     React.createElement('div', null,
       activeTab === 'game' && React.createElement('div', null,
-        React.createElement('div', { className: 'status-bar' },
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Score'),
-            React.createElement('div', { className: 'pvalue mono' }, score.toLocaleString())
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Level'),
-            React.createElement('div', { className: 'pvalue mono' }, level + '/3')
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Popped'),
-            React.createElement('div', { className: 'pvalue mono' }, ballsPopped)
-          ),
-          React.createElement('div', { className: 'pill' },
-            React.createElement('div', { className: 'plabel' }, 'Time'),
-            React.createElement('div', { className: 'pvalue mono' }, fmtS(elapsedSecs))
-          ),
-          activePowerups.map((ap, idx) => {
+        React.createElement(CuiBar, { height: 68, build: (W) => {
+          const pr = cuiRow(0, 0, W, 46, 4);
+          const out = [
+            { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() },
+            { id: 'p-level', kind: 'pill', r: pr[1], label: 'Level', value: level + '/3' },
+            { id: 'p-popped', kind: 'pill', r: pr[2], label: 'Popped', value: ballsPopped },
+            { id: 'p-time', kind: 'pill', r: pr[3], label: 'Time', value: fmtS(elapsedSecs), gold: true },
+          ];
+          if (activePowerups.length) {
             const now = Date.now();
-            const elapsed = now - ap.startedAt;
-            const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - elapsed) / 1000));
-            return React.createElement('div', { key: idx, className: 'pill', style: { background: ca('emerald','22'), border: `1px solid ${C.emerald}` } },
-              React.createElement('div', { className: 'plabel', style: { fontSize: '0.75rem' } },
-                POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '')
-              )
-            );
-          })
-        ),
+            out.push({
+              id: 'powerups', kind: 'label', r: [0, 50, W, 20], font: 12, color: PAL.emerald,
+              label: activePowerups.map((ap) => {
+                const remaining = Math.max(0, Math.ceil((POWERUP_DURATION_MS - (now - ap.startedAt)) / 1000));
+                return POWERUP_ICONS[ap.type] + ' ' + remaining + 's' + (ap.stacks > 1 ? ' ×' + ap.stacks : '');
+              }).join(' · '),
+            });
+          }
+          return out;
+        } }),
         React.createElement('div', { className: 'zuma-wrap' },
           React.createElement('canvas', {
             ref: canvasRef,
@@ -632,9 +624,9 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
             onTouchEnd: () => shoot(),
           })
         ),
-        React.createElement('div', { className: 'bounce-controls' },
-          React.createElement('button', { onClick: () => init() }, '↺ New Game')
-        )
+        React.createElement(CuiBar, { height: 44, build: (W) => ([
+          { id: 'new', kind: 'button', r: [Math.floor(W * 0.3), 0, Math.floor(W * 0.4), 40], label: '↺ New Game', action: () => init() },
+        ]) })
       ),
       activeTab === 'leaderboard' && React.createElement('div', null,
         lbLoading && React.createElement('div', { className: 'snake-lb-empty' }, 'Loading…'),
@@ -676,6 +668,103 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
 }
 
 // ---- Match-3 Campaign Game ----
+/* Match 3's tile board as a canvas (#170 treatment). Self-contained because
+   the game has campaign/loading phases — usePointerCell binds on mount, so
+   the canvas must exist when the hooks run. Tile palette/icons stay the
+   intrinsic M3 set; removed tiles keep their ✓ ghost. */
+function M3BoardCanvas({ tiles, bar, done, onTile }) {
+  const M3_ICONS = ['🔴', '🟠', '🟢', '🔵', '🟣'];
+  const M3_HEX = ['#CD4B3A', '#C9A227', '#2D9F66', '#3A6ECD', '#7C5CD6'];
+  const cols = 5;
+  const rows = Math.max(1, Math.ceil(tiles.length / cols));
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols, rows, minCell: 40, maxCell: 76, gap: 5 });
+  const step = cell + 5;
+  const bw = step * cols - 5, bh = step * rows - 5;
+  const liveRef = useRef({});
+  liveRef.current = { tiles, done, step };
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const lv = liveRef.current;
+      if (lv.done) return;
+      const c = Math.floor(p.x / lv.step), r = Math.floor(p.y / lv.step);
+      if (c < 0 || c >= cols || r < 0 || r >= rows) return;
+      const t = lv.tiles[r * cols + c];
+      if (t && !t.removed) onTile(t.id);
+    },
+  });
+  // The tray band draws under the board (controls wave) — same canvas.
+  const TRAY_H = 54, TRAY_GAP = 8;
+  const barFull = bar.length >= 6;
+  useCanvasBoard(canvasRef, {
+    width: bw,
+    height: bh + TRAY_GAP + TRAY_H,
+    deps: [tiles, bar, done, cell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < tiles.length; i++) {
+        const t = tiles[i];
+        const r = Math.floor(i / cols), c = i % cols;
+        const x = c * step, y = r * step;
+        const inBar = bar.indexOf(t.id) >= 0;
+        klRR(ctx, x, y, cell, cell, 10);
+        ctx.fillStyle = t.removed ? PAL.surface : M3_HEX[t.type % 5];
+        ctx.fill();
+        ctx.lineWidth = inBar ? 2.5 : 1;
+        ctx.strokeStyle = inBar ? PAL.accent : PAL.border;
+        ctx.stroke();
+        ctx.font = `${Math.round(cell * 0.5)}px system-ui, sans-serif`;
+        if (t.removed) {
+          ctx.fillStyle = PAL.muted;
+          ctx.fillText('✓', x + cell / 2, y + cell / 2 + 1);
+        } else {
+          ctx.fillText(M3_ICONS[t.type % 5], x + cell / 2, y + cell / 2 + 1);
+        }
+      }
+      // Tray strip.
+      const ty = bh + TRAY_GAP;
+      klRR(ctx, 0, ty, bw, TRAY_H, 10);
+      ctx.fillStyle = PAL.card;
+      ctx.fill();
+      ctx.lineWidth = barFull ? 2 : 1;
+      ctx.strokeStyle = barFull ? PAL.rose : PAL.border;
+      ctx.stroke();
+      ctx.font = '600 9px ' + CUI_FONT;
+      ctx.fillStyle = barFull ? PAL.rose : PAL.muted;
+      ctx.fillText('TRAY', 22, ty + TRAY_H / 2 + 0.5);
+      if (bar.length === 0) {
+        ctx.font = '500 11px ' + CUI_FONT;
+        ctx.fillStyle = PAL.muted;
+        ctx.fillText('Match three of a kind to clear them', bw / 2 + 10, ty + TRAY_H / 2 + 0.5);
+      } else {
+        const u = Math.min(38, Math.floor((bw - 50) / 6) - 6);
+        bar.forEach((id, k) => {
+          const t = tiles.find((tile) => tile.id === id);
+          if (!t) return;
+          const x = 44 + k * (u + 6);
+          klRR(ctx, x, ty + (TRAY_H - u) / 2, u, u, 8);
+          ctx.fillStyle = M3_HEX[t.type % 5];
+          ctx.fill();
+          ctx.font = `${Math.round(u * 0.55)}px system-ui, sans-serif`;
+          ctx.fillText(M3_ICONS[t.type % 5], x + u / 2, ty + TRAY_H / 2 + 1);
+        });
+      }
+    },
+  });
+  return (
+    <div className="m3-grid" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="m3-canvas board-canvas"
+        role="grid"
+        aria-label={`Match 3 board — ${tiles.filter((t) => !t.removed).length} tiles left, ${bar.length} in tray`}
+      />
+    </div>
+  );
+}
+
 function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, resetKey, playMode, band }) {
   /* #176 — the campaign CONVERGES onto the shared progression at the layer
      that matters: rewards. Its fifty authored puzzles group into five story
@@ -699,7 +788,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
     ? [12, 28, 46][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))] || 28
     : null;
   const forcedPuzzle = bandPuzzle || dailyPuzzle || arcadePuzzle;
-  const [phase, setPhase] = useState(forcedPuzzle ? 'playing' : 'campaign');
+  const [phase, setPhase] = useState(forcedPuzzle ? 'playing' : 'campaign'); // 'campaign' | 'playing' | 'won' | 'lost'
   const [selectedPuzzle, setSelectedPuzzle] = useState(forcedPuzzle || 1);
   const [puzzleConfig, setPuzzleConfig] = useState(null);
   const [tiles, setTiles] = useState([]);
@@ -987,9 +1076,6 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
      CgStatus / .m3-* / tray idiom the two Tile Match games use.
      Gameplay, scoring and MATCH3_PUZZLES are untouched: markup and CSS only. */
   if (phase === 'playing' && puzzleConfig) {
-    const M3_ICONS = ['🔴', '🟠', '🟢', '🔵', '🟣'];
-    const M3_COLORS = [C.rose, C.gold, C.emerald, C.accent, C.violet];
-    const barFull = bar.length >= 6;
     return React.createElement(
       'div',
       { className: 'm3-wrap fit-col', style: { alignItems: 'center', gap: '0.75rem' } },
@@ -1000,40 +1086,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
           { l: 'Time', v: `${secs}s` },
         ],
       }),
-      React.createElement(
-        'div',
-        { className: 'm3-grid' },
-        tiles.map(t => React.createElement(
-          'button',
-          Object.assign(
-            {
-              key: t.id,
-              className: 'm3-tile' + (t.removed ? ' gone' : '') + (bar.indexOf(t.id) >= 0 ? ' sel' : ''),
-              disabled: t.removed || done,
-              style: { background: t.removed ? C.surface : M3_COLORS[t.type % 5] },
-              'aria-label': `Tile ${t.type + 1}` + (t.removed ? ', cleared' : ''),
-            },
-            tapProps(() => selectTile(t.id), { disabled: t.removed || done })
-          ),
-          t.removed ? '✓' : M3_ICONS[t.type % 5]
-        ))
-      ),
-      React.createElement(
-        'div',
-        { className: 'm3-bar' + (barFull ? ' full' : '') },
-        React.createElement('span', { className: 'm3-bar-label' + (barFull ? ' full' : '') }, 'Tray'),
-        bar.length > 0
-          ? bar.map(id => {
-              const t = tiles.find(tile => tile.id === id);
-              if (!t) return null;
-              return React.createElement(
-                'div',
-                { key: id, className: 'm3-bar-tile', style: { background: M3_COLORS[t.type % 5] } },
-                M3_ICONS[t.type % 5]
-              );
-            })
-          : React.createElement('span', { className: 'm3-bar-empty' }, 'Match three of a kind to clear them')
-      )
+      React.createElement(M3BoardCanvas, { tiles, bar, done, onTile: selectTile })
     );
   }
 

@@ -351,41 +351,109 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
 
   const fmtLeft = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
 
+  /* The whole frame is ONE canvas (controls wave): pills, letter grid, the
+     live trace word, the feedback line and Clear/Submit draw together; only
+     the found-words scroll strip stays DOM. Same tap grammar — start
+     anywhere, extend to an adjacent tile, tap an earlier tile to backtrack,
+     tap the last tile again to submit. Tile chrome reads PAL. */
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const W = Math.floor(boxW);
+  const GAP = 8, PILL_H = 46, WORD_H = 26, MSG_H = 18, ACT_H = 44;
+  const chrome = PILL_H + WORD_H + MSG_H + ACT_H + GAP * 4;
+  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
+  const wsprCell = Math.max(44, Math.min(76, Math.floor((availB - 6 * (WSPR_SIZE - 1)) / WSPR_SIZE)));
+  const wsprStep = wsprCell + 6;
+  const wsprSide = wsprStep * WSPR_SIZE - 6;
+  const H = chrome + wsprSide;
+  const boardX = Math.floor((W - wsprSide) / 2);
+  const boardY = PILL_H + GAP;
+  const wordY = boardY + wsprSide + GAP;
+  const msgY = wordY + WORD_H;
+  const actY = msgY + MSG_H + GAP;
+
+  const controls = [];
+  if (W > 80) {
+    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    controls.push({ id: 'p-left', kind: 'pill', r: pr[0], label: 'Left', value: fmtLeft, color: remaining <= 10 ? PAL.rose : PAL.gold });
+    controls.push({ id: 'p-words', kind: 'pill', r: pr[1], label: 'Words', value: found.length });
+    controls.push({ id: 'p-score', kind: 'pill', r: pr[2], label: 'Score', value: score });
+    controls.push({ id: 'word', kind: 'label', r: [0, wordY, W, WORD_H], label: word || ' ', font: 17, mono: true, bold: true, color: PAL.text });
+    if (msg) controls.push({ id: 'msg', kind: 'label', r: [0, msgY, W, MSG_H], label: msg.text, font: 12, color: msg.kind === 'good' ? PAL.emerald : PAL.rose });
+    const ar = cuiRow(Math.floor(W * 0.08), actY, Math.floor(W * 0.84), ACT_H, 2);
+    controls.push({ id: 'clear', kind: 'button', r: ar[0], label: 'Clear', disabled: done || path.length === 0, action: () => { setPath([]); setMsg(null); } });
+    controls.push({ id: 'submit', kind: 'button', r: ar[1], label: 'Submit', primary: true, disabled: done || word.length < 3, action: submit });
+  }
+  const ctlRef = useRef([]);
+  ctlRef.current = controls;
+  const [pressedId, setPressedId] = useState(null);
+
+  const geomRef = useRef({});
+  geomRef.current = { wsprStep, boardX, boardY };
+  usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
+    onTap: (p) => {
+      const g = geomRef.current;
+      const c = Math.floor((p.x - g.boardX) / g.wsprStep), r = Math.floor((p.y - g.boardY) / g.wsprStep);
+      if (c < 0 || c >= WSPR_SIZE || r < 0 || r >= WSPR_SIZE) return;
+      const i = r * WSPR_SIZE + c;
+      const onPath = path.includes(i);
+      const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
+      if (selectable) tap(i);
+    },
+  }));
+  useCanvasBoard(canvasRef, {
+    width: W,
+    height: H,
+    deps: [path, done, wsprCell, W, fmtLeft, found, msg, pressedId],
+    draw: (ctx) => {
+      cuiDrawControls(ctx, ctlRef.current, pressedId);
+      ctx.save();
+      ctx.translate(boardX, boardY);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < WSPR_SIZE * WSPR_SIZE; i++) {
+        const r = Math.floor(i / WSPR_SIZE), c = i % WSPR_SIZE;
+        const x = c * wsprStep, y = r * wsprStep;
+        const onPath = path.includes(i);
+        const isLast = path.length > 0 && path[path.length - 1] === i;
+        const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
+        ctx.save();
+        if (!selectable) ctx.globalAlpha = 0.45;
+        klRR(ctx, x, y, wsprCell, wsprCell, 10);
+        ctx.fillStyle = onPath ? PAL.accent : PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = onPath ? PAL.accent : PAL.border;
+        ctx.stroke();
+        ctx.font = `700 ${Math.round(wsprCell * 0.42)}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = onPath ? '#fff' : PAL.text;
+        ctx.fillText(L[i], x + wsprCell / 2, y + wsprCell / 2 + 1);
+        ctx.restore();
+        if (isLast) {
+          klRR(ctx, x - 1.5, y - 1.5, wsprCell + 3, wsprCell + 3, 11);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    },
+  });
+
   return (
     // PHASE 3 (#131) — .fit-col + fitShell: true stops the page scrolling as the
     // found-words list grows (that list now has its own scroll strip).
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill">
-          <div className="plabel">Left</div>
-          <div className="pvalue time" style={remaining <= 10 ? { color: C.rose } : undefined}>{fmtLeft}</div>
-        </div>
-        <div className="pill"><div className="plabel">Words</div><div className="pvalue">{found.length}</div></div>
-        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
+      <div className="wspr-grid cui-frame" ref={boxRef}>
+        <canvas
+          ref={canvasRef}
+          className="wspr-canvas board-canvas"
+          role="grid"
+          aria-label={`Word Sprint letters — tracing ${word || 'nothing'}, ${found.length} words found`}
+        />
       </div>
-
-      <div className="wspr-grid">
-        {L.map((ch, i) => {
-          const onPath = path.includes(i);
-          const isLast = path.length > 0 && path[path.length - 1] === i;
-          const selectable = !done && (path.length === 0 || onPath || adjacent(path[path.length - 1], i));
-          return (
-            <div
-              key={i}
-              className={'wspr-tile' + (onPath ? ' onpath' : '') + (isLast ? ' pathlast' : '') + (!selectable ? ' dim' : '')}
-              {...tapProps(() => selectable && tap(i))}
-            >{ch}</div>
-          );
-        })}
-      </div>
-
-      <div className="wspr-word">{word || ' '}</div>
-      <div className={'wspr-msg' + (msg ? ' ' + msg.kind : '')}>{msg ? msg.text : ' '}</div>
-
-      <div className="wspr-actions">
-        <button className="wspr-btn" onClick={() => { setPath([]); setMsg(null); }} disabled={done || path.length === 0}>Clear</button>
-        <button className="wspr-btn primary" onClick={submit} disabled={done || word.length < 3}>Submit</button>
-      </div>
+      <CuiTwin controls={controls} />
 
       {found.length > 0 && (
         <div className="wspr-found">

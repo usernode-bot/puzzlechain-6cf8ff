@@ -387,22 +387,8 @@ async function dappAnchor(session) {
 // is retired) but capped per day and counted server-side. Behaviour-free: the
 // parent owns the hint state and passes a `buy` handler (kept identical across
 // all four daily games so the control looks and feels the same everywhere).
-function HintBar({ hintsLeft, exhausted, buying, onBuy, msg, label }) {
-  return (
-    <div className="cw-hint-bar">
-      <button
-        className="cw-hint-btn"
-        onClick={onBuy}
-        disabled={buying || exhausted}
-      >
-        {exhausted
-          ? `💡 ${label || 'No more hints'}`
-          : <>💡 Hint{Number.isFinite(hintsLeft) ? ` · ${hintsLeft} left` : ''}</>}
-      </button>
-      {msg && <span className="cw-hint-msg">{msg}</span>}
-    </div>
-  );
-}
+/* HintBar retired (controls wave) — hint buttons draw on each game
+   frame via the cui kit; useDailyHints below is unchanged. */
 
 // Shared hint state hook for the daily games that use a generic "reveal"
 // (Sudoku cell, Word Hunt start, Tile Match nudge). Reads today's

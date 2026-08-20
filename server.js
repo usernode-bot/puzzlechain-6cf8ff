@@ -2052,7 +2052,15 @@ app.use((req, res, next) => {
         audience: 'usernode:app:' + process.env.USERNODE_APP_ID,
       });
       // Platform iframe tokens only — reject any other purpose.
-      if (payload && payload.pur === 'iframe') req.user = payload;
+      if (payload && payload.pur === 'iframe') {
+        req.user = payload;
+        // The platform signs `id` as a NUMBER, but every *_id column here is
+        // TEXT, so pg returns strings. SQL params cast fine either way, but
+        // JS-side strict comparisons against row values (roomSeatOf, the
+        // leaderboard me-pinning, isOwnProfile via the echoed /api/daily
+        // user) silently miss on 7 === '7'. Normalize once at the boundary.
+        if (req.user.id != null) req.user.id = String(req.user.id);
+      }
     } catch {}
   }
 
@@ -2368,11 +2376,22 @@ app.get('/api/daily', async (req, res) => {
     // for today so they immediately see the locked screen + countdown.
     // Idempotent, obviously fake (round score), strict no-op in production.
     if (IS_STAGING && req.query.demo === 'locked') {
+      /* DO UPDATE, not DO NOTHING. This fixture exists to produce a FINISHED
+         row, and DO NOTHING cannot: an earlier route in the same run that
+         merely OPENED the game leaves a claimed-but-unfinished row behind, the
+         insert no-ops against it, and the fixture silently arms nothing — the
+         locked screen renders as the pre-game screen instead. The whole suite
+         shares one staging database and one viewer, so which tests ran first
+         decided whether this one worked (the order-dependence trap in
+         CLAUDE.md, in its other direction). Finishing whatever is there is
+         both idempotent and what the fixture is named for. */
       await pool.query(
         `INSERT INTO daily_attempts
            (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
          VALUES ($1, $2, 'sudoku', (now() AT TIME ZONE 'utc')::date, 980, 17, 132, now())
-         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET score = 980, steps = 17, time_secs = 132,
+               finished_at = COALESCE(daily_attempts.finished_at, now())`,
         [req.user.id, req.user.username || 'staging-demo-user']
       );
       // Crypto Wordle finished-attempt seed so its locked card/screen is
@@ -2381,7 +2400,9 @@ app.get('/api/daily', async (req, res) => {
         `INSERT INTO daily_attempts
            (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
          VALUES ($1, $2, 'cryptowordle', (now() AT TIME ZONE 'utc')::date, 820, 4, 95, now())
-         ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET score = 820, steps = 4, time_secs = 95,
+               finished_at = COALESCE(daily_attempts.finished_at, now())`,
         [req.user.id, req.user.username || 'staging-demo-user']
       );
     }
@@ -2503,7 +2524,17 @@ app.get('/api/daily', async (req, res) => {
         { name: 'Staging demo Evy',  time: 121, steps: 30, games: 2 },
         { name: 'Staging demo Finn', time: 210, steps: 44, games: 1 },
       ];
-      const dailyGameList = Array.from(GAME_IDS);
+      /* TODAY'S FEATURED GAME FIRST. Every user here is seeded on the first
+         `games` entries of this list, and the home board this fixture feeds is
+         GAME-OF-THE-DAY-scoped — so with the list in plain registry order,
+         whether the board had any rows at all depended on where today's
+         featured game happened to fall in it. That held only while the daily
+         pool was small and fixed; #176 added seven dailies and it stopped
+         holding. Putting the featured game at index 0 makes the fixture say
+         what it means: everyone seeded here is on today's board. */
+      const featuredForLb = await ensureDailyFeatured();
+      const dailyGameList = [featuredForLb.gameId]
+        .concat(Array.from(GAME_IDS).filter(g => g !== featuredForLb.gameId));
       for (let gi = 0; gi < dailyGameList.length; gi++) {
         const g = dailyGameList[gi];
         for (let i = 0; i < lbSeed.length; i++) {

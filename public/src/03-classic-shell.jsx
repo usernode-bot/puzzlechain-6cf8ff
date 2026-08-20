@@ -172,7 +172,12 @@ const CLASSIC_MODE_META = {
 
 // Inline mode picker shown by the Game Menu's "New Game" for games that route
 // their modes through the menu (e.g. Chutes & Ladders). Calls onPlay(mode, opts).
-function ClassicModePicker({ game, onPlay }) {
+// game.variantPicker (optional): { label, options: [{ id, name, note? }], default }
+// — an opt-in, purely mechanical board-style choice (today: Chutes & Ladders'
+// Classic/Moksha Patam tables). When present, this generic picker renders the
+// same Board-style sub-section ChutesLaddersModeSelect uses for first launch,
+// so "New Game" from the ☰ menu can reach it too, not just the initial pick.
+function ClassicModePicker({ game, onPlay, onGlossary }) {
   const [mode, setMode] = useState(null);
   /* #176 — bot strength and local seat count. Both are per-mode options that
      only make sense once a mode is chosen, so they render under the picker
@@ -185,15 +190,20 @@ function ClassicModePicker({ game, onPlay }) {
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const vp = game.variantPicker;
+  const [variant, setVariant] = useState(vp ? vp.default : null);
 
   const handlePlay = async () => {
     if (!mode) return;
-    if (mode !== 'online') { onPlay(mode, { botLevel, seats }); return; }
+    const variantOpts = vp ? { variant } : {};
+    if (mode !== 'online') { onPlay(mode, { botLevel, seats, ...variantOpts }); return; }
     if (onlineAction === 'create') {
       setBusy(true);
-      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, { method: 'POST' });
+      const { ok, body } = await api(`/api/classic/${game.id}/rooms`, {
+        method: 'POST', body: JSON.stringify(variantOpts),
+      });
       setBusy(false);
-      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id });
+      if (ok && body) onPlay('online', { roomAction: 'create', roomId: body.id, ...variantOpts });
       else setError('Could not create room. Try again.');
     } else if (onlineAction === 'join') {
       const code = joinCode.trim().toUpperCase();
@@ -257,6 +267,22 @@ function ClassicModePicker({ game, onPlay }) {
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }} maxLength={8} />
             </div>
           )}
+        </div>
+      )}
+      {vp && (
+        <div className="cnl-variant-block">
+          <div className="cnl-variant-label">{vp.label}</div>
+          <div className="mnc-mode-sub">
+            {vp.options.map(o => (
+              <button key={o.id} className={'mnc-difficulty-pill' + (variant === o.id ? ' active' : '')}
+                onClick={() => setVariant(o.id)}>{o.name}</button>
+            ))}
+          </div>
+          {(() => { const active = vp.options.find(o => o.id === variant); return active && active.note ? (
+            <div className="cnl-variant-note">
+              {active.note}{onGlossary && <> <button className="cnl-variant-link" onClick={onGlossary}>📖 What do these mean?</button></>}
+            </div>
+          ) : null; })()}
         </div>
       )}
       {error && <div className="mnc-join-error">{error}</div>}
@@ -357,7 +383,7 @@ function GameModeModal({ game, onStart, onClose }) {
 
 // The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
 // only), and Post to Feed (after a result).
-function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose }) {
+function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose, onGlossary }) {
   const [picking, setPicking] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain'
   const modes = game.modes || [];
@@ -386,7 +412,7 @@ function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onS
       <div className="cg-menu-label">New game</div>
       {usePicker ? (
         picking
-          ? <ClassicModePicker game={game} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
+          ? <ClassicModePicker game={game} onGlossary={onGlossary} onPlay={(mode, opts) => { setPicking(false); onNewGameMode(mode, opts); onClose && onClose(); }} />
           : <button className="cg-sheet-action" onClick={() => setPicking(true)}>↺ New Game</button>
       ) : (
         <button className="cg-sheet-action" onClick={() => { onNewGameMode(defaultMode, {}); onClose && onClose(); }}>↺ New Game</button>
@@ -490,13 +516,17 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
 }
 
 // Shared status-bar helper for new games.
+/* The classic-shell status row draws on a CuiBar canvas now (controls wave):
+   every CgStatus caller — Snake, Block Fit, Diamond Rush, Zuma, and co —
+   inherits the drawn pills + the sr-only twin in one move. */
 function CgStatus({ items }) {
   return (
-    <div className="cg-statusbar">
-      {items.map((it, i) => (
-        <div className="cg-stat" key={i}><div className="l">{it.l}</div><div className="v">{it.v}</div></div>
-      ))}
-    </div>
+    <CuiBar height={46} build={(W) => {
+      const pr = cuiRow(0, 0, W, 46, items.length);
+      return items.map((it, i) => ({
+        id: 'cg' + i, kind: 'pill', r: pr[i], label: it.l, value: it.v, gold: /time/i.test(String(it.l)),
+      }));
+    }} />
   );
 }
 

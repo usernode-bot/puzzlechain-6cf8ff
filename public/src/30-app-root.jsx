@@ -334,7 +334,16 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo');
     const path = '/api/daily' + (demo ? `?demo=${encodeURIComponent(demo)}` : '');
-    const { ok, status, body } = await api(path);
+    // ?demo=signedout: render the guest lobby WITHOUT making the call at all.
+    // The server fixture answers it 401 on purpose, but the browser logs every
+    // 4xx response as a console error, and the platform's per-test console
+    // gate fails the route for it — the fixture's own mechanics failed the
+    // screen it exists to demonstrate. Skipping straight to the guest branch
+    // renders the identical state with a clean console; the server fixture
+    // stays for direct API checks.
+    const { ok, status, body } = demo === 'signedout'
+      ? { ok: false, status: 401, body: null }
+      : await api(path);
     if (ok && body) {
       GUEST_MODE = false;
       setAuthOk(true);
@@ -448,6 +457,17 @@ function App() {
     if (!cid) return;
     const g = GAMES.find((x) => x.id === cid);
     if (g) setChatGame(g);
+  }, [loading]);
+
+  // ?howto=<gameId> deep link opens that game's How-to-Play cards the same
+  // way — proposal tests assert on manifest copy through it (the modal is
+  // otherwise tap-only once a browser has marked the game seen).
+  useEffect(() => {
+    if (loading) return;
+    const hid = new URLSearchParams(window.location.search).get('howto');
+    if (!hid) return;
+    const g = GAMES.find((x) => x.id === hid);
+    if (g) setHowToGame(g);
   }, [loading]);
 
   // Theme test hooks (also useful as share/deep links):
@@ -757,6 +777,13 @@ function App() {
     // pinned via ?mmode= (then launch straight into it).
     if (g.preLaunchModal && !mmode) { setPreLaunchGame(g); return; }
     if (g.preLaunchModal && mmode) { setClassicGameMode(mmode); }
+    // Non-modal classic games (Mancala, Snakes & Ladders) skip the pre-launch
+    // modal entirely and pick their mode from their own mode-select screen —
+    // so ?mode=bot/2p needs to pin it here too, or a deep link can only ever
+    // land on that screen instead of the running match it names.
+    if (!g.preLaunchModal && mmode && mmode !== 'online' && (g.modes || []).includes(mmode)) {
+      setClassicGameMode(mmode);
+    }
     // ?play=1 skips the pre-game screen (and the first-open how-to) and
     // claims/mounts immediately — used by proposal tests that assert on
     // in-game UI, and by "jump straight in" share links.
@@ -1605,9 +1632,14 @@ function App() {
         );
       case 'classic': {
         // In-frame classic game wrapped in the shared ClassicShell.
-        const classicSections = currentGame.leaderboard
-          ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
-          : [];
+        const classicSections = [
+          ...(currentGame.leaderboard
+            ? [cgLeaderboardSection(currentGame.id, currentGame.leaderboardOpts)]
+            : []),
+          // Registry-declared extra sheet sections (e.g. Minesweeper's
+          // "My Best Runs" history) — same declarative pattern as the flags.
+          ...(typeof currentGame.sheetExtras === 'function' ? currentGame.sheetExtras() : []),
+        ];
         return (
           <ClassicShell
             game={currentGame}
@@ -1623,9 +1655,9 @@ function App() {
                 it overflow:hidden would CLIP a tall setup screen rather than fit
                 it, which is the exact failure Daily Cipher had. What stops the
                 scrolling is upstream — useScrollLock owns the document while a
-                run is live, and the five phase-5 board games now honour the
-                --cg-board viewport cap (see the .ck-board/.rv-board/... rules),
-                so board + status + legend fit at 390x844 without moving. */}
+                run is live, and the five phase-5 board games honour the
+                --cg-board viewport cap (folded into .brg-canvas-box's
+                max-width), so board + status + legend fit at 390x844. */}
             <div className="cg-stage cg-scroll">
               <GameComponent
                 {...modeProps}

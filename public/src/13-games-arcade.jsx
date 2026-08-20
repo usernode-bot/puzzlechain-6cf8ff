@@ -66,9 +66,66 @@ function SnakeGameModeSelect({ onSelectDifficulty }) {
 }
 
 /* ---- Snake — Gameplay ---- */
+/* Snake boards (classic 15×15, daily 13×13) draw to ONE canvas now: the DOM
+   grids re-reconciled 225/169 cell divs on every movement tick, which was the
+   whole cost of the game loop. The outer .snake-board/.dsnk-board boxes stay
+   (their sizing, background, border and the fit-col rules are unchanged, and
+   gestures still bind to them); this fills them with a canvas that redraws
+   once per tick. Colors read PAL — board chrome follows the theme exactly as
+   the DOM cells' C tokens did. */
+function SnakeCanvas({ n, stRef, tick, skin, ariaLabel }) {
+  const canvasRef = useRef(null);
+  const boxRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: n, rows: n });
+  const side = Math.min(Math.floor(boxW) || 0, Math.floor(boxH) || Math.floor(boxW) || 0);
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [tick, side, n],
+    draw: (ctx) => {
+      if (side < 40) return;
+      const pad = 6;
+      const cs = (side - pad * 2) / n;
+      const cellRect = (gx, gy, color, r) => {
+        klRR(ctx, pad + gx * cs + 0.5, pad + gy * cs + 0.5, cs - 1, cs - 1, r);
+        ctx.fillStyle = color;
+        ctx.fill();
+      };
+      if (skin === 'classic') {
+        // The classic board's darker empty-cell wash.
+        for (let gy = 0; gy < n; gy++) for (let gx = 0; gx < n; gx++) cellRect(gx, gy, PAL.bg, 2);
+      } else {
+        // The daily board's faint hairline grid.
+        ctx.strokeStyle = PAL.border;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.55;
+        for (let i = 1; i < n; i++) {
+          ctx.beginPath(); ctx.moveTo(pad + i * cs, pad); ctx.lineTo(pad + i * cs, side - pad); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(pad, pad + i * cs); ctx.lineTo(side - pad, pad + i * cs); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      const s = stRef.current;
+      if (!s) return;
+      const bodyColor = skin === 'classic' ? PAL.emerald : GA.lime;
+      for (let i = s.snake.length - 1; i >= 1; i--) cellRect(s.snake[i].x, s.snake[i].y, bodyColor, 3);
+      cellRect(s.snake[0].x, s.snake[0].y, PAL.accent, 4);
+      ctx.beginPath();
+      ctx.arc(pad + s.food.x * cs + cs / 2, pad + s.food.y * cs + cs / 2, cs * 0.38, 0, Math.PI * 2);
+      ctx.fillStyle = PAL.rose;
+      ctx.fill();
+    },
+  });
+  return (
+    <div className="snake-canvas-fill" ref={boxRef}>
+      <canvas ref={canvasRef} className="snake-canvas board-canvas" role="img" aria-label={ariaLabel} />
+    </div>
+  );
+}
+
 function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty, menuConfig }) {
   const N = 15;
-  const [, render] = useState(0);
+  const [tick, render] = useState(0);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState(0);
   const [started, setStarted] = useState(false);
@@ -165,16 +222,6 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   }, [started]);
 
   const s = st.current;
-  const cells = [];
-  if (s) {
-    const occ = {};
-    s.snake.forEach((seg, i) => { occ[seg.y * N + seg.x] = i === 0 ? 'head' : 'body'; });
-    const fi = s.food.y * N + s.food.x;
-    for (let i = 0; i < N * N; i++) {
-      const o = occ[i];
-      cells.push(<div key={i} className={'snake-cell' + (o ? ' ' + o : '') + (i === fi ? ' food' : '')} />);
-    }
-  }
   const hist = cgLoadHistory(SNAKE_KEY);
   const best = hist.reduce((m, r) => Math.max(m, r.score || 0), 0);
   const longest = hist.reduce((m, r) => Math.max(m, r.len || 0), 0);
@@ -192,8 +239,8 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: score }, { l: 'Length', v: s ? s.snake.length : 0 }, { l: 'Time', v: cgFmt(secs) }]} />
         <div className="snake-board-wrap">
-          <div className="snake-board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
-            {cells}
+          <div className="snake-board" ref={boardRef}>
+            <SnakeCanvas n={N} stRef={st} tick={tick} skin="classic" ariaLabel={`Snake board — score ${score}, length ${s ? s.snake.length : 0}`} />
           </div>
           {paused && !done && (
             <div className="snake-pause-overlay">
@@ -202,21 +249,14 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
           )}
         </div>
         <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
-        <div className="snake-controls">
-          {!started && <button onClick={() => init()}>Restart</button>}
-          {started && !paused && !done && (
-            <>
-              <button onClick={() => { setPaused(true); setPausedSecs(secs); }}>Pause</button>
-              <button onClick={() => init()}>Restart</button>
-            </>
-          )}
-          {paused && !done && (
-            <>
-              <button onClick={() => { setPaused(false); }}>Resume</button>
-              <button onClick={() => init()}>Restart</button>
-            </>
-          )}
-        </div>
+        <CuiBar height={44} build={(W) => {
+          const btns = [];
+          if (started && !paused && !done) btns.push({ id: 'pause', label: 'Pause', action: () => { setPaused(true); setPausedSecs(secs); } });
+          if (paused && !done) btns.push({ id: 'resume', label: 'Resume', primary: true, action: () => setPaused(false) });
+          btns.push({ id: 'restart', label: 'Restart', action: () => init() });
+          const br = cuiRow(Math.floor(W * 0.14), 0, Math.floor(W * 0.72), 40, btns.length);
+          return btns.map((b, i) => ({ ...b, kind: 'button', r: br[i] }));
+        }} />
       </div>
     </ClassicShell>
   );
@@ -329,6 +369,50 @@ function bbCanPlaceAny(grid, tray) {
 // game-over it calls onEnd(score, placed, secs); the parent decides what to do
 // (solo submits the global score + shows the overlay; the race host posts to
 // the room). The board itself never touches scoring endpoints.
+/* Block Fit's 8×8 well as a canvas (#170 treatment). Pure display: the tray
+   pieces stay DOM drag sources, the floating ghost stays DOM, and the drop
+   origin keeps its getBoundingClientRect math against the same grid box —
+   only the 64 cell divs became one draw pass. Piece colors are intrinsic. */
+function BbGridCanvas({ grid, preview }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW, boxH } = useFitBox(boxRef, { cols: 8, rows: 8 });
+  const side = Math.max(0, Math.min(Math.floor(boxW), Math.floor(boxH) || Math.floor(boxW)));
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [grid, preview, side],
+    draw: (ctx) => {
+      if (side < 60) return;
+      const gapPx = 3;
+      const cs = (side - gapPx * 7) / 8;
+      for (let i = 0; i < 64; i++) {
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = c * (cs + gapPx), y = r * (cs + gapPx);
+        const pv = preview && preview[i];
+        klRR(ctx, x, y, cs, cs, 4);
+        ctx.fillStyle = grid[i] || PAL.bg;
+        ctx.fill();
+        if (pv) {
+          klRR(ctx, x, y, cs, cs, 4);
+          ctx.fillStyle = pv === 'preview' ? 'rgba(58,110,205,0.40)' : 'rgba(205,75,58,0.33)';
+          ctx.fill();
+        }
+      }
+    },
+  });
+  return (
+    <div className="snake-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="bb-canvas board-canvas"
+        role="img"
+        aria-label={`Block Fit board — ${grid.filter(Boolean).length} of 64 cells filled`}
+      />
+    </div>
+  );
+}
+
 function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, band, offset }) {
   // Only arcade narrows the pool; the daily and free play use all of it.
   const bbBand = playMode === 'arcade' ? band : null;
@@ -442,6 +526,52 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, band, offset
     cgSound('click');
     setDrag({ idx, cells: tray[idx].cells, color: tray[idx].color, x, y });
   };
+
+  // The tray draws on canvas too (controls wave): three piece slots, hit by
+  // thirds; the piece lifts into the existing DOM ghost on pointerdown, so
+  // the drag/drop pipeline (window-level move/up + originFromPointer against
+  // the well) is untouched.
+  const trayBoxRef = useRef(null);
+  const trayCanvasRef = useRef(null);
+  const { boxW: trayW0 } = useFitBox(trayBoxRef, { cols: 1, rows: 1, maxCell: 100000 });
+  const trayW = Math.floor(trayW0);
+  const BB_TRAY_H = 92;
+  useCanvasBoard(trayCanvasRef, {
+    width: trayW,
+    height: BB_TRAY_H,
+    deps: [tray, drag, trayW],
+    draw: (ctx) => {
+      const slotW = trayW / 3;
+      for (let i = 0; i < 3; i++) {
+        const p = tray[i];
+        const x0 = i * slotW;
+        klRR(ctx, x0 + 4, 4, slotW - 8, BB_TRAY_H - 8, 10);
+        ctx.fillStyle = PAL.card;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = PAL.border;
+        ctx.stroke();
+        if (!p) continue;
+        ctx.save();
+        if (drag && drag.idx === i) ctx.globalAlpha = 0.3;
+        const maxR = Math.max(...p.cells.map((c) => c[0]));
+        const maxC = Math.max(...p.cells.map((c) => c[1]));
+        const u = Math.min(16, Math.floor((slotW - 24) / (maxC + 1)), Math.floor((BB_TRAY_H - 24) / (maxR + 1)));
+        const px0 = x0 + (slotW - (maxC + 1) * u) / 2;
+        const py0 = (BB_TRAY_H - (maxR + 1) * u) / 2;
+        for (const [r, c] of p.cells) {
+          // BB_COLORS are C.* var() tokens (the DOM tray + the well's DOM-era
+          // cells read them via CSS); the canvas resolves them through palOf.
+          ctx.fillStyle = palOf(p.color, '#3A6ECD');
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5, 2);
+          else ctx.rect(px0 + c * u, py0 + r * u, u - 1.5, u - 1.5);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    },
+  });
   // preview cells
   let preview = null;
   if (drag) {
@@ -456,30 +586,20 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, band, offset
     <>
       <CgStatus items={[{ l: 'Score', v: score }, { l: 'Time', v: cgFmt(secs) }]} />
       <div className="bb-grid" ref={gridRef}>
-        {grid.map((cell, i) => {
-          const pv = preview && preview[i];
-          return <div key={i} className={'bb-cell' + (cell ? ' filled' : '') + (pv ? ' ' + pv : '')}
-            style={cell ? { background: cell } : undefined} />;
-        })}
+        <BbGridCanvas grid={grid} preview={preview} />
       </div>
-      <div className="bb-tray">
-        {tray.map((p, idx) => (
-          <div key={idx} className={'bb-piece' + (!p ? ' used' : '') + (drag && drag.idx === idx ? ' dragging' : '')}
-            style={p ? { gridTemplateColumns: `repeat(${Math.max(...p.cells.map(c => c[1])) + 1}, auto)` } : undefined}
-            onMouseDown={(e) => startDrag(e, idx)} onTouchStart={(e) => startDrag(e, idx)}>
-            {p && (() => {
-              const maxR = Math.max(...p.cells.map(c => c[0]));
-              const maxC = Math.max(...p.cells.map(c => c[1]));
-              const set = new Set(p.cells.map(([r, c]) => r * 10 + c));
-              const out = [];
-              for (let r = 0; r <= maxR; r++) for (let c = 0; c <= maxC; c++) {
-                const on = set.has(r * 10 + c);
-                out.push(<div key={r + '-' + c} className={'bb-pcell' + (on ? ' on' : '')} style={on ? { background: p.color } : { background: 'transparent' }} />);
-              }
-              return out;
-            })()}
-          </div>
-        ))}
+      <div className="bb-tray" ref={trayBoxRef}>
+        <canvas
+          ref={trayCanvasRef}
+          className="bb-tray-canvas board-canvas"
+          role="img"
+          aria-label={`Piece tray — ${tray.filter(Boolean).length} of 3 pieces left`}
+          onPointerDown={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const idx = Math.max(0, Math.min(2, Math.floor((e.clientX - rect.left) / (rect.width / 3))));
+            startDrag(e, idx);
+          }}
+        />
       </div>
       {drag && (
         <div className="bb-drag-ghost" style={{
@@ -834,26 +954,88 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     if (ns >= TARGET) { setTimeout(() => finish(ns, true, nm), 150); }
     else if (nm <= 0) { setTimeout(() => finish(ns, false, nm), 150); }
   };
-  const onGemDown = (e, i) => { const p = pointerXY(e); touch.current = { i, x: p.x, y: p.y }; };
-  const onGemUp = (e, i) => {
-    const start = touch.current; touch.current = null;
-    if (!start) { return; }
-    const p = pointerXY(e);
-    const dx = p.x - start.x, dy = p.y - start.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
-      // swipe from start.i toward neighbor
-      const r = Math.floor(start.i / 8), c = start.i % 8;
-      let nr = r, nc = c;
-      if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
-      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
-      else setSel(-1);
-      return;
-    }
-    // tap
-    if (sel === -1) { setSel(start.i); cgSound('click'); }
-    else if (sel === start.i) { setSel(-1); }
-    else trySwap(sel, start.i);
+  /* The board is a CANVAS (#170 treatment) — same tap-or-swipe grammar as the
+     DOM gems: press a gem and release nearby to select/swap-with-selection,
+     or flick past the threshold to swap toward the flick. */
+  const drBoxRef = useRef(null);
+  const drCanvasRef = useRef(null);
+  const { cell: drCell } = useFitBox(drBoxRef, { cols: 8, rows: 8, minCell: 28, maxCell: 56, gap: 2 });
+  const drStep = drCell + 2;
+  const drSide = drStep * 8 - 2;
+  const drGeoRef = useRef(0);
+  drGeoRef.current = drStep;
+  const drCellAt = (p) => {
+    const stp = drGeoRef.current;
+    const c = Math.floor(p.x / stp), r = Math.floor(p.y / stp);
+    if (c < 0 || c > 7 || r < 0 || r > 7) return -1;
+    return r * 8 + c;
   };
+  usePointerCell(drCanvasRef, {
+    onDown: (p) => {
+      const i = drCellAt(p);
+      touch.current = i >= 0 ? { i, x: p.x, y: p.y } : null;
+    },
+    onUp: (p) => {
+      const start = touch.current; touch.current = null;
+      if (!start || done) return;
+      const dx = p.x - start.x, dy = p.y - start.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > 18) {
+        const r = Math.floor(start.i / 8), c = start.i % 8;
+        let nr = r, nc = c;
+        if (Math.abs(dx) > Math.abs(dy)) nc += dx > 0 ? 1 : -1; else nr += dy > 0 ? 1 : -1;
+        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) trySwap(start.i, nr * 8 + nc);
+        else setSel(-1);
+        return;
+      }
+      if (sel === -1) { setSel(start.i); cgSound('click'); }
+      else if (sel === start.i) { setSel(-1); }
+      else trySwap(sel, start.i);
+    },
+  }, { moveTolerance: 4 });
+  useCanvasBoard(drCanvasRef, {
+    width: drSide,
+    height: drSide,
+    deps: [grid, sel, hintIndices, done, drCell],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const GLOW = { 6: 'rgba(255,193,7,0.5)', 7: 'rgba(100,200,255,0.6)', 8: 'rgba(200,100,255,0.55)' };
+      for (let i = 0; i < 64; i++) {
+        const v = grid[i];
+        if (v == null) continue;
+        const r = Math.floor(i / 8), c = i % 8;
+        const x = c * drStep, y = r * drStep;
+        const cx = x + drCell / 2, cy = y + drCell / 2;
+        if (v >= 6) {
+          // Intrinsic special-gem glow (bomb / lightning / rainbow).
+          klRR(ctx, x, y, drCell, drCell, 6);
+          ctx.fillStyle = v === 6 ? 'rgba(255,193,7,0.15)' : v === 7 ? 'rgba(100,200,255,0.15)' : 'rgba(200,100,255,0.15)';
+          ctx.fill();
+          ctx.save();
+          ctx.shadowColor = GLOW[v];
+          ctx.shadowBlur = 12;
+          ctx.font = `${Math.round(drCell * 0.62)}px system-ui, sans-serif`;
+          ctx.fillText(DR_GEMS[v], cx, cy + 1);
+          ctx.restore();
+        } else {
+          ctx.font = `${Math.round(drCell * 0.62)}px system-ui, sans-serif`;
+          ctx.fillText(DR_GEMS[v], cx, cy + 1);
+        }
+        if (sel === i) {
+          klRR(ctx, x + 1, y + 1, drCell - 2, drCell - 2, 6);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+        }
+        if (hintIndices.includes(i)) {
+          klRR(ctx, x - 1, y - 1, drCell + 2, drCell + 2, 7);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = PAL.gold;
+          ctx.stroke();
+        }
+      }
+    },
+  });
   const usePowerUp = (type) => {
     if (done || powerUps[type] <= 0) return;
     if (type === 'hint') {
@@ -899,32 +1081,23 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
         <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
-        <div className="dr-powerups-bar">
-          {['hint', 'shuffle', 'extraTime'].map(type => (
-            <button
-              key={type}
-              className={`dr-powerup-btn ${powerUps[type] > 0 ? 'owned' : 'empty'}`}
-              onClick={() => usePowerUp(type)}
-              disabled={powerUps[type] === 0 || done}
-              title={`${type.charAt(0).toUpperCase() + type.slice(1)} (${powerUps[type]} owned)`}
-            >
-              <span className="icon">{DR_POWER_UP_ICONS[type]}</span>
-              <span className="count">{powerUps[type]}</span>
-            </button>
-          ))}
-        </div>
-        <div className="dr-grid">
-          {grid.map((v, i) => {
-            const isSpecial = v >= 6 ? ['bomb', 'lightning', 'rainbow'][v - 6] : null;
-            return (
-              <div key={i} className={'dr-gem' + (sel === i ? ' sel' : '') + (isSpecial ? ' ' + isSpecial : '') + (hintIndices.includes(i) ? ' hint-target' : '')}
-                data-special={isSpecial}
-                onMouseDown={(e) => onGemDown(e, i)} onMouseUp={(e) => onGemUp(e, i)}
-                onTouchStart={(e) => onGemDown(e, i)} onTouchEnd={(e) => onGemUp(e, i)}>
-                {DR_GEMS[v]}
-              </div>
-            );
-          })}
+        <CuiBar height={44} build={(W) => {
+          const br = cuiRow(Math.floor(W * 0.08), 0, Math.floor(W * 0.84), 40, 3);
+          return ['hint', 'shuffle', 'extraTime'].map((type, i) => ({
+            id: 'pw-' + type, kind: 'button', r: br[i],
+            label: `${DR_POWER_UP_ICONS[type]} ${powerUps[type]}`,
+            disabled: powerUps[type] === 0 || done,
+            on: powerUps[type] > 0,
+            action: () => usePowerUp(type),
+          }));
+        }} />
+        <div className="dr-grid" ref={drBoxRef}>
+          <canvas
+            ref={drCanvasRef}
+            className="dr-canvas board-canvas"
+            role="grid"
+            aria-label={`Diamond Rush board — score ${score} of ${TARGET}, ${moves} moves left`}
+          />
         </div>
         {timeBoost && <div className="dr-time-boost">+30 sec</div>}
       </div>

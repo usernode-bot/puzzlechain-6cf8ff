@@ -155,18 +155,14 @@ const GA = {
    class, and the self-test then names that one class. */
 const TAPPABLE_CLASSES = [
   'tappable',
-  'mf-cell', 'ng-cell', 'ds-cell', 'cp-cell', 'an-tile', 'an-slot', 'p6-btn',
   'mf-canvas', 'board-canvas',
-  'mj-tile', 'wspr-tile', 'ce-card', 'kl-col', 'sp-col', 'scell', 'numkey',
-  'wcell', 'cw-key', 'ms-cell', 'mnc-pit', 'kt-cell',
-  'ck-cell', 'rv-cell', 'fir-cell', 'gmk-cell', 'ludo-token',
-  'tm-tile', 'm3-tile',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
-   (.an-rack button) can't live in TAPPABLE_CLASSES — that array is probed with
-   a bare class name — so they're appended verbatim by the emitters below. */
-const TAP_HIGHLIGHT_EXTRA_SELECTORS = ['.an-rack button'];
+   can't live in TAPPABLE_CLASSES — that array is probed with a bare class
+   name — so they're appended verbatim by the emitters below. (Empty since the
+   anagram rack moved onto its canvas; the plumbing stays for the next one.) */
+const TAP_HIGHLIGHT_EXTRA_SELECTORS = [];
 
 /* The canary is emitted from the SAME generator as the real rules, so probing
    it answers "is this stylesheet applying at all?" independently of whether any

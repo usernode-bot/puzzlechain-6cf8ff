@@ -127,6 +127,27 @@ is for. The practice ribbon is rendered **once, pinned, at the game-screen
 level** so it appears over all three shells; it used to live inside the
 daily shell, which is why replaying 2048 showed no marker at all.
 
+### A parameterised board and a canvas renderer
+
+#176 made several boards VARY in size or length — Word Search runs 8×8 to 15×15,
+Knight's Tour 5×5 to 8×8 with blocked squares, Drop Stack's arcade bag is 20000
+pieces against the daily's 200, Mine Finder's ladder runs 6 to 38 mines. The
+canvas renderers those games gained in #173 were written against the fixed
+originals, so every one of them had a constant baked into the drawing loop, the
+hit test, the pill row and the aria-label at once.
+
+**A canvas board reads its dimensions from the run, never from the module
+constant.** The constant stays as the free-play default; the component derives
+`size`/`total`/`bagLen` from the board it was actually given and threads that
+through `useFitBox`, the draw loop and the pointer math together — miss one and
+the board draws at one size and is clicked at another. This bug class is silent:
+it neither throws nor fails a parser, and at the default band it looks correct.
+
+Related, and the reason the browser sweep exists: a merge that keeps the tail of
+a block and drops the head leaves an identifier referenced but undeclared. That
+is a `ReferenceError` at mount, which `npm run check` cannot see (it is valid
+syntax) and which only mounting the game reveals.
+
 ### Offline-generated content
 
 Two games cannot rate their own content at mount time and ship a corpus
@@ -1155,6 +1176,44 @@ drift (the old hand-copied probe list was missing 8 classes the CSS covered).
   tab, which silently skipped the whole suite.
 - `touch-action-rules-emitted` is the static half: it fails even when the sheet
   is dead, proving the array and the emitted CSS are the same list.
+
+### 1b. `tapProps`' de-dupe guard must OUTLIVE the render (#one-tap-two-letters)
+
+`tapProps` fires the action on touch `pointerup` and then swallows the browser's
+compatibility `click`. The guard that does the swallowing lived in the function's
+own closure — and that is a **use-after-rerender** bug, because the action's
+`setState` re-renders before the click arrives:
+
+```
+pointerup -> onTap() -> setState -> React 18 flushes SYNCHRONOUSLY (pointerup is
+a discrete event) -> the element's props are replaced by a FRESH tapProps(...)
+object -> the compat `click` dispatches against THAT object, whose per-render
+`handledPointer` is back to false -> onTap() fires a SECOND time.
+```
+
+So **every tappable that changes state fired twice on every touch device** —
+reported as Daily Cipher typing `LLEENND` instead of `LENDING`, but the Cipher
+keyboard was only the most legible symptom, not the scope. The guard is now
+module scope (`_tapHandledEl` / `_tapHandledAt`, one-shot, 700 ms window), so it
+survives the re-render. Standing rules:
+
+- **A tap guard may never be a per-render closure.** Anything that must span
+  pointerup → click spans a re-render by construction.
+- `tap-dedupe-survives-rerender` asserts it by simulating exactly that swap (two
+  separate `tapProps(...)` objects against one element).
+- Desktop had a second double path: with an on-screen key focused, Enter/Space
+  fires that button's own click AND the window `keydown`. Daily Cipher's handler
+  now ignores `e.repeat`/modifiers and defers Enter/Space to the focused button
+  when `e.target.closest('.cw-kbd')` matches.
+- `typeLetter`/`backspace` use **functional** `setCur`, so the length cap is
+  evaluated against the live value and a batched double can never overflow the
+  boxes.
+- **`?cwtype=LEN-`** replays a real touch tap sequence (pointerdown → pointerup →
+  compat click) against the on-screen keys at boot, and `.cw-board` carries
+  `data-cw-typed`. That pair is what makes this testable at all: `dapp.json`
+  checks can only navigate, so before it no check could see a tap-driven bug. A
+  `-` means backspace. Keep the asserted strings **≤ 3 letters** — the day's word
+  length varies (min 3) and `typeLetter` caps at it.
 
 ### 2. The `.game-body` wrapper is UNCONDITIONAL — never toggle it in/out
 

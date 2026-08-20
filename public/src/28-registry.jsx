@@ -97,6 +97,9 @@ const GAMES = [
       { title: 'Clear around a number', body: "Once a number's mines are all flagged, tap the number to open every remaining square around it in one go." },
       { title: 'Lock in or push on', body: 'Lock In early to bank a smaller multiplier, or keep clearing for a bigger score — one mine ends the run.' },
     ],
+    // Extra ☰ sheet sections beyond the registry-standard ones — here the
+    // "My Best Runs" history the hidden legacy tab strip stranded.
+    sheetExtras: () => [msBestRunsSection()],
     component: MinesweeperGame,
   },
   {
@@ -135,6 +138,17 @@ const GAMES = [
     modes: ['bot', '2p', 'online'],
     supportsSave: true,
     menuModePicker: true,
+    variantPicker: {
+      label: 'Board style',
+      default: 'classic',
+      options: [
+        { id: 'classic', name: 'Classic' },
+        {
+          id: 'moksha', name: 'Moksha Patam (original)',
+          note: 'The Indian original: ladders on virtues, snakes on vices — 11 vices to 5 virtues, so the climb is a slower one.',
+        },
+      ],
+    },
     leaderboard: true,
     leaderboardOpts: { valueLabel: 'Best Streak' },
   },
@@ -453,7 +467,7 @@ const GAMES = [
     fitShell: true,
     howToPlay: [
       { title: 'Build down, alternate colors', body: 'Drag a card (or tap it, then its destination). Tableau piles build downward in alternating colors; only a King moves to an empty column — empty columns show a faint K. An illegal move tells you why.' },
-      { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
+      { title: 'Send cards home', body: 'Foundations build up by suit from Ace to King — each suit has its own slot, marked on the board. Tap a selected top card again to auto-send it home. Tap the stock to draw; it recycles when empty.' },
       { title: 'Score', body: 'Fill all four foundations to win. Fewer moves and faster solves score higher — same deal for everyone today.' },
       { title: 'Stuck?', body: 'Give up closes the day at zero and reveals the deal. It does NOT break your streak.' },
     ],

@@ -369,19 +369,22 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
 
   return (
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Score</div><div className="pvalue">{score}</div></div>
-        <div className="pill"><div className="plabel">Balls</div><div className="pvalue">{'●'.repeat(Math.max(0, balls))}{'○'.repeat(DBNC_BALLS - Math.max(0, balls))}</div></div>
-        <div className="pill"><div className="plabel">Bricks</div><div className="pvalue">{s.total - s.bricks.length}/{s.total}</div></div>
-      </div>
-      {effectLabels.length > 0 && (
-        <div className="dbnc-effects">
-          {effectLabels.map(t => (
-            <span key={t} className="dbnc-effect">{POWERUP_ICONS[t] || '✨'} {t.replace(/-/g, ' ')}</span>
-          ))}
-        </div>
-      )}
+      <CuiBar height={68} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 4);
+        const out = [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-score', kind: 'pill', r: pr[1], label: 'Score', value: score },
+          { id: 'p-balls', kind: 'pill', r: pr[2], label: 'Balls', value: `${'●'.repeat(Math.max(0, balls))}${'○'.repeat(DBNC_BALLS - Math.max(0, balls))}` },
+          { id: 'p-bricks', kind: 'pill', r: pr[3], label: 'Bricks', value: `${s.total - s.bricks.length}/${s.total}` },
+        ];
+        if (effectLabels.length) {
+          out.push({
+            id: 'effects', kind: 'label', r: [0, 48, W, 20], gold: true, font: 12,
+            label: effectLabels.map(t => `${POWERUP_ICONS[t] || '✨'} ${t.replace(/-/g, ' ')}`).join(' · '),
+          });
+        }
+        return out;
+      }} />
       <div className="dbnc-wrap">
         <canvas ref={canvasRef} className="dbnc-canvas" />
       </div>

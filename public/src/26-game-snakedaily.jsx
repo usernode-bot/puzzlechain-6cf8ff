@@ -9,7 +9,7 @@ const DSNK_N = 13;
 const DSNK_TARGET = 20;
 
 function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
-  const [, render] = useState(0);
+  const [tick, render] = useState(0);
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
   const [eaten, setEaten] = useState(0);
@@ -120,29 +120,21 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
   }, [started]);
 
   const s = st.current;
-  const occ = {};
-  s.snake.forEach((seg, i) => { occ[seg.y * DSNK_N + seg.x] = i === 0 ? 'head' : 'body'; });
-  const fi = s.food.y * DSNK_N + s.food.x;
-  const cells = [];
-  for (let i = 0; i < DSNK_N * DSNK_N; i++) {
-    cells.push(<div key={i} className={'dsnk-cell' + (occ[i] ? ' ' + occ[i] : '') + (i === fi ? ' food' : '')} />);
-  }
   const fmt = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 
   return (
     // PHASE 3 — fit column so a swipe on the board never pulls the page.
     <div className="fit-col">
-      <div className="status-bar">
-        <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
-        <div className="pill"><div className="plabel">Apples</div><div className="pvalue">{eaten}/{DSNK_TARGET}</div></div>
-        <div className="pill"><div className="plabel">Length</div><div className="pvalue">{s.snake.length}</div></div>
-      </div>
-      <div
-        className="dsnk-board"
-        ref={boardRef}
-        style={{ gridTemplateColumns: `repeat(${DSNK_N}, 1fr)`, gridTemplateRows: `repeat(${DSNK_N}, 1fr)` }}
-      >
-        {cells}
+      <CuiBar height={46} build={(W) => {
+        const pr = cuiRow(0, 0, W, 46, 3);
+        return [
+          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
+          { id: 'p-apples', kind: 'pill', r: pr[1], label: 'Apples', value: `${eaten}/${DSNK_TARGET}` },
+          { id: 'p-length', kind: 'pill', r: pr[2], label: 'Length', value: s.snake.length },
+        ];
+      }} />
+      <div className="dsnk-board" ref={boardRef}>
+        <SnakeCanvas n={DSNK_N} stRef={st} tick={tick} skin="daily" ariaLabel={`Daily Snake board — ${eaten}/${DSNK_TARGET} apples`} />
       </div>
       <div className="dsnk-hint">
         {done ? 'Run over' : started ? `Eat ${DSNK_TARGET} apples — one crash ends the day` : 'Swipe (or arrow keys) to start — everyone gets the same apple trail today'}

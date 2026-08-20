@@ -87,6 +87,103 @@ function ktFmtDate(iso) {
   return `${m}/${d}/${y.slice(2)}`;
 }
 
+/* The Knight's Tour board is a canvas (self-contained: it lives behind the ☰
+   tab switch, and usePointerCell binds on mount). Chessboard chrome reads
+   PAL, so it re-themes exactly as the DOM cells' C tokens did. */
+/* #176 — the board is 5x5 to 8x8 with blocked squares on the top rungs, so
+   every 8 and 64 that used to be baked in here comes from the board the ladder
+   built. `blocked` squares are drawn as part of the board (hatched, like the
+   DOM version's repeating-linear-gradient) rather than left as holes — a board
+   with gaps in it reads as broken rather than as harder. */
+function KtBoardCanvas({ size, blocked, visited, currentPos, validMvs, done, onCell }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { cell } = useFitBox(boxRef, { cols: size, rows: size, minCell: 28, maxCell: 60 });
+  const side = cell * size;
+  const liveRef = useRef({});
+  liveRef.current = { visited, currentPos, validMvs, done, cell, size, blocked };
+
+  usePointerCell(canvasRef, {
+    onTap: (p) => {
+      const s = liveRef.current;
+      const c = Math.floor(p.x / s.cell), r = Math.floor(p.y / s.cell);
+      if (c < 0 || c >= s.size || r < 0 || r >= s.size) return;
+      const idx = r * s.size + c;
+      if (s.blocked && s.blocked.has(idx)) return;
+      const isValid = !s.done && idx !== s.currentPos && s.validMvs.includes(idx);
+      const canPlace = s.currentPos === null && !(s.visited[idx] > 0);
+      if (canPlace || isValid) onCell(idx);
+    },
+  });
+
+  useCanvasBoard(canvasRef, {
+    width: side,
+    height: side,
+    deps: [visited, currentPos, done, cell, size, blocked],
+    draw: (ctx) => {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let idx = 0; idx < size * size; idx++) {
+        const r = Math.floor(idx / size), c = idx % size;
+        const x = c * cell, y = r * cell;
+        const isLight = (r + c) % 2 === 0;
+        const isCurrent = idx === currentPos;
+        const isVisited = visited[idx] > 0;
+        const isBlocked = !!(blocked && blocked.has(idx));
+        const isValid = !done && !isCurrent && !isBlocked && validMvs.includes(idx);
+        ctx.fillStyle = isLight ? PAL.surface : PAL.card;
+        ctx.fillRect(x, y, cell, cell);
+        if (isBlocked) {
+          ctx.fillStyle = PAL.well;
+          ctx.fillRect(x, y, cell, cell);
+          ctx.save();
+          ctx.beginPath(); ctx.rect(x, y, cell, cell); ctx.clip();
+          ctx.strokeStyle = PAL.muted;
+          ctx.globalAlpha = 0.35;
+          ctx.lineWidth = 2;
+          for (let d = -cell; d < cell * 2; d += 8) {
+            ctx.beginPath(); ctx.moveTo(x + d, y); ctx.lineTo(x + d + cell, y + cell); ctx.stroke();
+          }
+          ctx.restore();
+          continue;
+        }
+        if (isValid) { ctx.fillStyle = 'rgba(58,110,205,0.25)'; ctx.fillRect(x, y, cell, cell); }
+        if (isCurrent) {
+          ctx.fillStyle = 'rgba(58,110,205,0.15)';
+          ctx.fillRect(x, y, cell, cell);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = PAL.accent;
+          ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+        }
+        const cx = x + cell / 2, cy = y + cell / 2;
+        if (isCurrent) {
+          ctx.font = `${Math.round(cell * 0.55)}px system-ui, sans-serif`;
+          ctx.fillStyle = PAL.text;
+          ctx.fillText('♞', cx, cy + 1);
+        } else if (isVisited) {
+          ctx.font = `600 ${Math.max(9, Math.round(cell * 0.28))}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = PAL.muted;
+          ctx.fillText(String(visited[idx]), cx, cy);
+        }
+      }
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = PAL.border;
+      ctx.strokeRect(1, 1, side - 2, side - 2);
+    },
+  });
+
+  return (
+    <div className="kt-boardbox" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="kt-canvas board-canvas"
+        role="grid"
+        aria-label={`Knight's Tour board — ${visited.filter((v) => v > 0).length} of ${size * size} squares visited`}
+      />
+    </div>
+  );
+}
+
 function KnightsTourGame({ onWin, onStepChange, resetKey, playMode, band, offset }) {
   /* Board comes from the mode. Free play keeps the classic full 8×8 from a
      free choice of start, which is what this game has always been. */
@@ -212,67 +309,37 @@ function KnightsTourGame({ onWin, onStepChange, resetKey, playMode, band, offset
     <div>
       {activeTab === 'game' && (
         <div className="kt-wrap">
-          <div className="status-bar">
-            <div className="pill">
-              <div className="plabel">Time</div>
-              <div className="pvalue time">{ktFmtTime(elapsed)}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Moves</div>
-              <div className="pvalue" style={stuck ? { color: C.rose } : {}}>{moves}/{KB.total}</div>
-            </div>
-            <div className="pill">
-              <div className="plabel">Left</div>
-              <div className="pvalue">{KB.total - moves}</div>
-            </div>
-          </div>
+          <CuiBar height={46} build={(W) => {
+            const pr = cuiRow(0, 0, W, 46, 3);
+            return [
+              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: ktFmtTime(elapsed), gold: true },
+              { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: `${moves}/${KB.total}`, color: stuck ? PAL.rose : undefined },
+              { id: 'p-left', kind: 'pill', r: pr[2], label: 'Left', value: KB.total - moves },
+            ];
+          }} />
 
-          <div className="kt-board" style={{ '--kt-size': KB.size }}>
-            {Array.from({ length: KN }, (_, idx) => {
-              const r = Math.floor(idx / KB.size), c = idx % KB.size;
-              const isLight    = (r + c) % 2 === 0;
-              const isCurrent  = idx === currentPos;
-              const isVisited  = visited[idx] > 0;
-              const isValid    = !done && !isCurrent && validMvs.includes(idx);
-              const canPlace   = currentPos === null && !isVisited;
+          <KtBoardCanvas
+            size={KB.size}
+            blocked={KB.blocked}
+            visited={visited}
+            currentPos={currentPos}
+            validMvs={validMvs}
+            done={done}
+            onCell={handleCellClick}
+          />
 
-              const isBlocked  = KB.blocked.has(idx);
-              let cls = 'kt-cell ' + (isLight ? 'kt-light' : 'kt-dark');
-              if (isBlocked)      cls += ' kt-blocked';
-              else if (isCurrent) cls += ' kt-current';
-              else if (isVisited) cls += ' kt-visited';
-              else if (isValid)   cls += ' kt-valid';
-
-              return (
-                <div
-                  key={idx}
-                  className={cls}
-                  style={(!isBlocked && (canPlace || isValid)) ? { cursor: 'pointer' } : {}}
-                  onClick={() => !isBlocked && (canPlace || isValid) && handleCellClick(idx)}
-                >
-                  {isBlocked ? null
-                   : isCurrent  ? <span className="kt-knight">♞</span>
-                   : isVisited ? <span className="kt-num">{visited[idx]}</span>
-                   : null}
-                </div>
-              );
-            })}
-          </div>
-
-          {stuck && <div className="kt-stuck-banner">No valid moves — try Undo or restart.</div>}
-
-          <div className="kt-actions">
-            <button
-              className="kt-undo-btn"
-              disabled={undoStack.length === 0 || done}
-              onClick={handleUndo}
-            >
-              ↩ Undo
-            </button>
-            {stuck && (
-              <button className="kt-new-btn" onClick={resetGame}>New Game</button>
-            )}
-          </div>
+          <CuiBar height={stuck ? 68 : 44} build={(W) => {
+            const out = [];
+            let y = 0;
+            if (stuck) {
+              out.push({ id: 'stuck', kind: 'label', r: [0, 0, W, 20], label: 'No valid moves — try Undo or restart.', color: PAL.rose, font: 12 });
+              y = 24;
+            }
+            const br = cuiRow(Math.floor(W * 0.1), y, Math.floor(W * 0.8), 40, stuck ? 2 : 1);
+            out.push({ id: 'undo', kind: 'button', r: br[0], label: '↩ Undo', disabled: undoStack.length === 0 || done, action: handleUndo });
+            if (stuck) out.push({ id: 'new', kind: 'button', r: br[1], label: 'New Game', primary: true, action: resetGame });
+            return out;
+          }} />
 
           {currentPos === null && (
             <div className="kt-hint">Tap any square to place the knight and begin.</div>

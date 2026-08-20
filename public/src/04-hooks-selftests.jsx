@@ -432,6 +432,45 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* A HELD CONTROL MUST STILL BE THERE. tapProps sets [data-pressed] on
+     pointerdown and acts on pointerup, so any rule that takes a pressed
+     element out of the flow breaks the press outright: it is not under the
+     cursor when the finger lifts, and the click lands on whatever slid into
+     its place. #173 did exactly that by ending this rule's selector list with
+     a comma above .sr-only, which merged the two and clipped every tappable
+     control to 1px for the duration of the press. Buttons vanished while held
+     and did nothing on release.
+
+     Probing a real pressed element is the only way to see it — the CSS parses,
+     the selectors are all spelled correctly, and nothing throws. */
+  checkStyled('press-feedback-visible', () => {
+    const probe = document.createElement('button');
+    probe.className = 'tappable';
+    probe.textContent = 'probe';
+    probe.style.position = 'fixed';
+    probe.style.left = '-9999px';
+    document.body.appendChild(probe);
+    try {
+      const before = probe.getBoundingClientRect();
+      probe.setAttribute('data-pressed', '1');
+      const cs = getComputedStyle(probe);
+      const after = probe.getBoundingClientRect();
+      if (cs.clip !== 'auto' && cs.clip !== '') {
+        throw new Error('a pressed .tappable is clipped (clip: ' + cs.clip + ') — it is being hidden, not highlighted');
+      }
+      // Allow the intended scale, but nothing that collapses the box.
+      if (after.width < before.width * 0.6 || after.height < before.height * 0.6) {
+        throw new Error('a pressed .tappable collapses from ' +
+          Math.round(before.width) + 'x' + Math.round(before.height) + ' to ' +
+          Math.round(after.width) + 'x' + Math.round(after.height) +
+          ' — pointerup will miss it and the tap will not register');
+      }
+      return true;
+    } finally {
+      probe.remove();
+    }
+  });
+
   // Phase 3 — every daily must opt into the one-viewport column, or it scrolls
   // (or clips) during play. This is the standing guarantee behind the audit.
   // #149 — extended past the FLAG: fitShell without a .fit-col root CLIPS

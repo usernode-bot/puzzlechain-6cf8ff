@@ -580,7 +580,29 @@ ${emitTouchActionRules()}
    the delayed click, and clear it on up/cancel/lostpointercapture so it can
    never stick. */
 ${emitTapHighlightRules()}
-.tappable:active, .tappable[data-pressed],
+/* NO BACKTICKS in this comment — it lives inside the css template literal.
+
+   #173 turned almost every tappable BOARD into a canvas and removed the
+   per-class selectors that used to follow this one — but it removed the
+   rule's BODY with them, leaving the .tappable:active/[data-pressed] selector
+   list ending in a comma directly above .sr-only. A trailing comma does not
+   end a selector list, so the two became ONE rule and every tappable control
+   in the app inherited the visually-hidden treatment: absolutely positioned,
+   clipped to 1px, gone from layout for exactly as long as it was held down.
+
+   That is not only a cosmetic flicker. An element that leaves the flow on
+   pointerdown is not under the cursor on pointerup, so the click lands on
+   whatever moved into its place and the press never completes — the button
+   vanishes while held and does nothing when released.
+
+   Only .tappable is left to style: every other entry in TAPPABLE_CLASSES is a
+   canvas now, and a canvas must NOT be scaled here — it draws its own pressed
+   state through cuiDrawControls. The press-feedback-visible self-test asserts
+   a held control still occupies space, so this cannot come back quietly. */
+.tappable:active, .tappable[data-pressed] {
+  filter: brightness(0.9);
+  transform: scale(0.96);
+}
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;

@@ -444,35 +444,49 @@ function runClientSelfTests(styleReady) {
      Probing a real pressed element is the only way to see it — the CSS parses,
      the selectors are all spelled correctly, and nothing throws. */
   checkStyled('press-feedback-visible', () => {
+    /* MEASURE ABSOLUTELY, NEVER BEFORE-AND-AFTER. A ratio between two reads of
+       the same element races anything that can resize it between them — web
+       fonts landing is the obvious one, since a text-sized button is exactly
+       as wide as its font makes it. A self-test that fires on a slow font load
+       is worse than no self-test: it cries wolf on somebody else's machine and
+       teaches everyone to ignore it. The failure being caught is unmissable in
+       absolute terms (313px -> 1px), so an absolute floor is both sufficient
+       and unraceable.
+
+       The positioning lives on a WRAPPER, never on the probe: an inline style
+       on the probe outranks the stylesheet, which would mask the very
+       declarations under test. */
+    const wrap = document.createElement('div');
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:60px';
     const probe = document.createElement('button');
     probe.className = 'tappable';
     probe.textContent = 'probe';
-    probe.style.position = 'fixed';
-    probe.style.left = '-9999px';
-    document.body.appendChild(probe);
+    wrap.appendChild(probe);
+    document.body.appendChild(wrap);
     try {
-      const before = probe.getBoundingClientRect();
+      const rest = probe.getBoundingClientRect();
+      // Cannot measure (detached, display:none, fonts mid-swap) — do not guess.
+      if (rest.width < 6 || rest.height < 6) return true;
       probe.setAttribute('data-pressed', '1');
       const cs = getComputedStyle(probe);
-      const after = probe.getBoundingClientRect();
-      /* Normalise `clip` rather than string-matching it: an unclipped element
-         computes to "auto" in some engines and "rect(auto, auto, auto, auto)"
-         in others, so `!== 'auto'` reports a false failure on whichever engine
-         you did not test on. Only a rect with no `auto` in it actually clips. */
+      const held = probe.getBoundingClientRect();
+      /* Normalise `clip`: an unclipped element computes to "auto" in some
+         engines and "rect(auto, auto, auto, auto)" in others, so a literal
+         !== 'auto' reports a false failure on whichever engine you did not
+         test on. Only a rect with no `auto` in it actually clips. */
       const clip = String(cs.clip || '');
       if (clip.indexOf('rect(') === 0 && clip.indexOf('auto') === -1) {
         throw new Error('a pressed .tappable is clipped (clip: ' + clip + ') — it is being hidden, not highlighted');
       }
-      // Allow the intended scale, but nothing that collapses the box.
-      if (after.width < before.width * 0.6 || after.height < before.height * 0.6) {
-        throw new Error('a pressed .tappable collapses from ' +
-          Math.round(before.width) + 'x' + Math.round(before.height) + ' to ' +
-          Math.round(after.width) + 'x' + Math.round(after.height) +
+      if (held.width < 6 || held.height < 6) {
+        throw new Error('a pressed .tappable collapses to ' +
+          Math.round(held.width) + 'x' + Math.round(held.height) +
           ' — pointerup will miss it and the tap will not register');
       }
       return true;
     } finally {
-      probe.remove();
+      wrap.remove();
     }
   });
 

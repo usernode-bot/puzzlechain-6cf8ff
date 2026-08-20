@@ -1277,6 +1277,52 @@ for real users.
 `data-snl-anim` so checks can assert on state; the banner is a **canvas label**,
 so `expectText` can never read it — assert on the attribute.
 
+### On a canvas board, the test attribute IS the assertion surface
+
+The #177 rebuild routed **bot / 2p** through `SnlMatch` too, and that quietly
+broke the one check asserting the two sides look different
+(`canvas.cnl-canvas[data-cnl-p2="diamond"]`): the diamond token is gone (the
+pawns are chess pieces now) and the attribute survives only on the online DOM
+board, which navigation cannot reach. Post-#173 every board is a canvas, so a
+check can read neither a piece nor its colour — the general rule that came out
+of it:
+
+- **A guarantee drawn on canvas is only testable through an attribute.** When
+  you change what a canvas renders, add the attribute in the SAME commit;
+  deleting the check instead silently retires the guarantee.
+- Derive it from the array the draw loop already walks, in the same order, so
+  the attribute cannot disagree with the pixels and no new state appears.
+  `SnlBoardCanvas` emits `data-snl-pieces` (seat piece ids) and
+  `data-snl-seat-colors` (seat colour ids) straight off `seats`; both local
+  modes are `"pawn,knight"`. `.snl-match` additionally carries
+  `data-snl-bot` ('1' when any seat is a bot) and `data-cnl-skin`.
+- **Prefer an attribute over a canvas twin's label text.** The `sr-only`
+  `CuiTwin` makes button labels readable, but a label is copy — free to change
+  case or gain an icon. Daily Cipher had two checks on the same key, one
+  expecting `ENTER` and one `Enter`, so *any* casing broke one of them; the
+  stable half is `.cw-board[data-cw-keys*="enter"]` (the ids of the keys
+  actually rendered). Leave the twin-text check as the label's own coverage.
+
+### Audio never starts before a gesture
+
+`cgAudio()` is the single choke point for every synthesized cue and the
+generative bed, and it now returns `null` until the player has actually
+touched something (`cgAudioReady()` checks `navigator.userActivation`, else
+arms a one-shot capture listener on pointerdown/touchstart/keydown). All seven
+call sites already null-checked the context, so a locked gate is a silent
+no-op rather than a branch each caller repeats.
+
+- A deep-linked match that wanted the bed while locked sets `snlMusic.wanted`;
+  `_cgArmAudio()` starts it on the first tap, so nothing is lost — it is late,
+  not missing.
+- This matters because the capture routes (`&snlstart=1`, `&snlanim=…`) mount a
+  live match with **no** gesture, and Chrome logs an autoplay warning per
+  blocked context. Warnings are not console errors today, so nothing was
+  failing — the gate keeps a whole class of noise out of the checks before the
+  runner's policy ever has to change.
+- `bgAudioContext()` (the asset-based manager) and Mancala's `_mncAudioCtx` are
+  deliberately untouched: both are already constructed from a real tap.
+
 ### Staging fixture
 
 `GET /api/daily?demo=snl-ranked` (idempotent, `IS_STAGING`, no-op in production)

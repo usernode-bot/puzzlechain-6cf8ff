@@ -710,24 +710,34 @@
       "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
     },
     {
-      "name": "Chutes & Ladders P2 pawn renders as a diamond token",
+      "name": "Snakes & Ladders bot mode gives P1 and P2 distinct pieces",
       "path": "/?game=chutes-ladders&mode=bot",
-      "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"
+      "expectSelector": "canvas.snl-canvas[data-snl-pieces=\"pawn,knight\"]"
+    },
+    {
+      "name": "Snakes & Ladders 2P mode gives P1 and P2 distinct pieces",
+      "path": "/?game=chutes-ladders&mode=2p",
+      "expectSelector": "canvas.snl-canvas[data-snl-pieces=\"pawn,knight\"]"
+    },
+    {
+      "name": "Snakes & Ladders bot mode seats a bot opponent",
+      "path": "/?game=chutes-ladders&mode=bot",
+      "expectSelector": ".snl-match[data-snl-bot=\"1\"][data-snl-seats=\"2\"]"
     },
     {
       "name": "Chutes & Ladders Jungle Vine skin deep-link renders",
       "path": "/?game=chutes-ladders&mode=bot&cnlskin=jungle",
-      "expectText": "Jungle Vine"
+      "expectSelector": ".snl-match[data-cnl-skin=\"jungle\"]"
     },
     {
       "name": "Chutes & Ladders Star Voyage skin deep-link renders",
       "path": "/?game=chutes-ladders&mode=bot&cnlskin=space",
-      "expectText": "Star Voyage"
+      "expectSelector": ".snl-match[data-cnl-skin=\"space\"]"
     },
     {
       "name": "Chutes & Ladders Treasure Trail skin deep-link renders",
       "path": "/?game=chutes-ladders&mode=bot&cnlskin=pirate",
-      "expectText": "Treasure Trail"
+      "expectSelector": ".snl-match[data-cnl-skin=\"pirate\"]"
     },
     {
       "name": "Moksha demo room seeds cleanly",
@@ -783,7 +793,7 @@
     {
       "name": "Daily Cipher Enter key is on screen",
       "path": "/?game=cryptowordle&practice=1",
-      "expectText": "ENTER"
+      "expectSelector": ".cw-board[data-cw-keys*=\"enter\"]"
     },
     {
       "name": "Klondike states the empty-column King rule",
@@ -1299,7 +1309,7 @@
     {
       "name": "Ranked sheet renders the RP tier bar and board",
       "path": "/?game=chutes-ladders&sheet=ranked&demo=snl-ranked",
-      "expectText": "RP Leaderboard"
+      "expectText": "Staging RP Anka"
     },
     {
       "name": "Ranked RP leaderboard readable without auth",

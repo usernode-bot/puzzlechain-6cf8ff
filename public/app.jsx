@@ -4017,8 +4017,53 @@ function canvasColorSelfTest() {
   return true;
 }
 
+/* ---- Gesture gate for the shared AudioContext ---------------------------
+   Every synthesized cue and the Snakes & Ladders music bed go through
+   cgAudio(), so this is the one place to enforce "no audio before the player
+   touches anything". It matters because a match is reachable by URL
+   (?snlstart=1, ?snlanim=…, the before/after screenshot routes): those mount a
+   running board with no gesture, the browser blocks the context, and every cue
+   logs an autoplay warning — 20 of them on the snake-animation route. Warnings
+   are not console errors today, so nothing was failing yet; the fix is cheap
+   and keeps the capture routes quiet.
+
+   Before the first gesture cgAudio() returns null and every cue is a silent
+   no-op (they all already `if (!ctx) return`). The listeners are passive,
+   capture-phase and one-shot, so this costs one flag flip per page. Once armed
+   the context is created lazily on the next cue exactly as before. */
+let _cgAudioArmed = false;
+let _cgAudioListening = false;
+function _cgArmAudio() {
+  _cgAudioArmed = true;
+  // Something may already be waiting on the bed (a match mounted by deep link
+  // before the first tap): resume/start it now that the browser will allow it.
+  try {
+    if (_cgAudioCtx && _cgAudioCtx.state === 'suspended') _cgAudioCtx.resume();
+  } catch {}
+  try { if (cgPrefs.music && snlMusic.wanted && !snlMusic.on) snlMusicStart(); } catch {}
+}
+function cgAudioReady() {
+  if (_cgAudioArmed) return true;
+  try {
+    if (navigator.userActivation && navigator.userActivation.hasBeenActive) {
+      _cgAudioArmed = true;
+      return true;
+    }
+  } catch {}
+  if (!_cgAudioListening) {
+    _cgAudioListening = true;
+    try {
+      ['pointerdown', 'touchstart', 'keydown'].forEach((ev) => {
+        window.addEventListener(ev, _cgArmAudio, { once: true, capture: true, passive: true });
+      });
+    } catch { _cgAudioArmed = true; }
+  }
+  return false;
+}
+
 let _cgAudioCtx = null;
 function cgAudio() {
+  if (!cgAudioReady()) return null;
   if (_cgAudioCtx) return _cgAudioCtx;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -4220,7 +4265,10 @@ function snlCue(name) { const f = SNL_CUES[name]; if (f) { try { f(); } catch {}
 const SNL_SCALE = [0, 2, 4, 7, 9];          // major pentatonic — no wrong notes
 const SNL_BASS  = [0, 0, 5, 7, 5, 0, 3, 7];
 const snlMusic = {
-  on: false, timer: null, next: 0, step: 0, intensity: 0, root: 220, gain: null,
+  // `wanted` = a match asked for the bed while audio was still gesture-locked.
+  // _cgArmAudio() reads it on the first tap so a deep-linked match starts its
+  // music then, instead of staying silent until the next mount.
+  on: false, wanted: false, timer: null, next: 0, step: 0, intensity: 0, root: 220, gain: null,
 };
 function snlMusicNoteAt(ctx, when, freq, dur, type, vol) {
   try {
@@ -4284,8 +4332,9 @@ function cgNoiseBurstAt(ctx, when, dur, freq, vol) {
 }
 function snlMusicStart() {
   if (!cgPrefs.music || snlMusic.on) return;
+  snlMusic.wanted = true;
   const ctx = cgAudio();
-  if (!ctx) return;
+  if (!ctx) return;  // gesture-locked — _cgArmAudio() retries on the first tap
   try {
     if (!snlMusic.gain) {
       snlMusic.gain = ctx.createGain();
@@ -4305,6 +4354,7 @@ function snlMusicStart() {
 function snlMusicStop() {
   if (snlMusic.timer) { clearInterval(snlMusic.timer); snlMusic.timer = null; }
   snlMusic.on = false;
+  snlMusic.wanted = false;
   const ctx = cgAudio();
   if (ctx && snlMusic.gain) {
     try {
@@ -9442,6 +9492,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
            `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
            the double-input bug it would read "LLEENN" and the check fails. */
         data-cw-typed={cur}
+        /* The keyboard is drawn on canvas, so "is the Enter key on screen?"
+           can only be asserted through the sr-only twin's TEXT — which is a
+           label ('Enter'), free to change case or gain an icon at any time.
+           This is the stable half: the ids of the keys actually rendered. */
+        data-cw-keys={controls.filter((c) => c.kind === 'button' && !c.noDraw)
+          .map((c) => c.id).join(',')}
       >
         <canvas
           ref={canvasRef}
@@ -18862,6 +18918,14 @@ function SnlBoardCanvas({ board, skin, seats, frameRef, animating, redrawKey, on
 
   const aria = 'Snakes and Ladders board (' + board.name + '): '
     + seats.map((s) => s.name + ' (' + snlPieceName(s.pieceId) + ') on square ' + (s.pos || 0)).join(', ');
+  // Test-only markers (#177 follow-up). The board is a canvas, so a check can
+  // read neither the pieces nor their colours — and the attribute the old DOM
+  // board carried (`data-cnl-p2="diamond"`) does not exist here, because the
+  // tokens are chess pieces now. These two derive from the SAME `seats` array
+  // the draw loop uses, in seat order, so "P1 and P2 are visually distinct"
+  // stays assertable by navigation alone. Derived values only — no new state.
+  const pieceAttr = seats.map((s) => s.pieceId).join(',');
+  const colorAttr = seats.map((s) => snlSeatColor(s.colorIdx).id).join(',');
   return (
     <div className="cnl-board-canvas-fill" ref={boxRef}>
       <canvas
@@ -18870,6 +18934,8 @@ function SnlBoardCanvas({ board, skin, seats, frameRef, animating, redrawKey, on
         role="img"
         data-snl-pawns="chess"
         data-snl-board={board.id}
+        data-snl-pieces={pieceAttr}
+        data-snl-seat-colors={colorAttr}
         aria-label={aria}
       />
     </div>
@@ -19359,7 +19425,8 @@ function SnlMatch({ config, onWin, onStepChange, resetKey, onExit, onResult, pra
 
   return (
     <div className="snl-match" data-snl-mode={match.mode} data-snl-board={board.id}
-      data-snl-seats={match.seats.length} data-snl-anim={animDemo || undefined}>
+      data-snl-seats={match.seats.length} data-snl-anim={animDemo || undefined}
+      data-cnl-skin={skin} data-snl-bot={match.seats.some((s) => s.kind === 'bot') ? '1' : '0'}>
       <CuiBar height={statusH} build={(W) => {
         const top = cuiRow(0, 0, W, 42, 3);
         const out = [

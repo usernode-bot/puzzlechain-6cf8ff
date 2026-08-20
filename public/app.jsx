@@ -156,6 +156,8 @@ const GA = {
 const TAPPABLE_CLASSES = [
   'tappable',
   'mf-canvas', 'board-canvas',
+  // Snakes & Ladders local-party lobby (DOM controls, not canvas).
+  'snl-board-card', 'snl-seat-btn', 'snl-piece-pick', 'snl-color-pick',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
@@ -3281,6 +3283,114 @@ ${emitTapHighlightRules()}
 .mok-dest { color: ${C.muted}; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin-left: 0.4rem; }
 .mok-blurb { color: ${C.muted}; font-size: 0.78rem; line-height: 1.4; }
 
+/* ---- Snakes & Ladders: local party lobby, ranked panel, standings ---- */
+.snl-lobby { display: flex; flex-direction: column; gap: 0.35rem; }
+.snl-lobby-back { margin: 0.35rem auto 0; display: block; }
+.snl-match { display: flex; flex-direction: column; min-height: 0; }
+.snl-warn { color: ${C.rose}; }
+
+.snl-board-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.4rem;
+}
+.snl-board-card {
+  display: flex; flex-direction: column; gap: 0.15rem; text-align: left;
+  padding: 0.5rem 0.6rem; border-radius: 10px; cursor: pointer;
+  background: var(--c-well); border: 1px solid ${C.border};
+  color: inherit; font-family: inherit; min-width: 0;
+}
+.snl-board-card.active { border-color: ${C.accent}; background: ${ca('accent', '1f')}; }
+.snl-board-card.locked { opacity: 0.6; }
+.snl-board-card[data-pressed] { transform: scale(0.97); }
+.snl-board-name { font-size: 0.85rem; font-weight: 700; }
+.snl-board-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.64rem;
+  color: ${C.muted}; letter-spacing: 0.02em;
+}
+.snl-lock-note {
+  margin-top: 0.5rem; padding: 0.45rem 0.6rem; border-radius: 8px;
+  background: ${ca('gold', '1f')}; color: ${C.text};
+  font-size: 0.76rem; line-height: 1.4;
+}
+
+.snl-seat-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.snl-seat-row {
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  padding: 0.35rem 0.45rem; border-radius: 10px;
+  background: var(--c-well); border: 1px solid ${C.border};
+}
+.snl-seat-dot { width: 0.85rem; height: 0.85rem; border-radius: 50%; flex: 0 0 auto; }
+.snl-seat-name {
+  flex: 1 1 5rem; min-width: 0; background: transparent; border: none;
+  color: inherit; font-family: inherit; font-size: 0.85rem; font-weight: 600;
+  padding: 0.15rem 0.2rem; border-bottom: 1px dashed ${C.border};
+}
+.snl-seat-name:focus { outline: none; border-bottom-color: ${C.accent}; }
+.snl-seat-btn {
+  flex: 0 0 auto; cursor: pointer; border-radius: 999px;
+  padding: 0.22rem 0.55rem; font-family: inherit; font-size: 0.72rem; font-weight: 600;
+  background: transparent; border: 1px solid ${C.border}; color: ${C.muted};
+}
+.snl-seat-btn.active { border-color: ${C.accent}; color: ${C.accent}; }
+.snl-seat-btn:disabled { opacity: 0.5; cursor: default; }
+.snl-seat-btn[data-pressed] { transform: scale(0.94); }
+.snl-seat-picker { flex: 1 1 100%; display: flex; flex-direction: column; gap: 0.3rem; }
+.snl-pick-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.snl-piece-pick {
+  cursor: pointer; border-radius: 8px; padding: 0.2rem 0.45rem;
+  font-family: inherit; font-size: 0.7rem; font-weight: 600;
+  background: transparent; border: 1px solid ${C.border}; color: ${C.muted};
+}
+.snl-piece-pick.active { border-color: ${C.accent}; color: ${C.accent}; }
+.snl-piece-pick[data-pressed] { transform: scale(0.94); }
+.snl-color-pick {
+  width: 1.35rem; height: 1.35rem; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; padding: 0;
+}
+.snl-color-pick.active { border-color: ${C.text}; }
+.snl-color-pick[data-pressed] { transform: scale(0.9); }
+
+.snl-ranked-panel { display: flex; flex-direction: column; gap: 0.5rem; }
+.snl-tier-block {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  padding: 0.6rem 0.7rem; border-radius: 12px;
+  background: var(--c-well); border: 1px solid ${C.border};
+}
+.snl-tier-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.snl-tier-badge {
+  border: 1px solid; border-radius: 999px; padding: 0.15rem 0.55rem;
+  font-size: 0.78rem; font-weight: 700;
+}
+.snl-tier-rp { font-size: 0.82rem; font-weight: 700; }
+.snl-tier-track {
+  height: 0.45rem; border-radius: 999px; overflow: hidden;
+  background: var(--c-well-strong);
+}
+.snl-tier-fill { height: 100%; background: ${C.accent}; border-radius: 999px; }
+.snl-tier-note { color: ${C.muted}; font-size: 0.74rem; }
+.snl-ranked-stats { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.snl-ranked-note { color: ${C.muted}; font-size: 0.76rem; line-height: 1.45; }
+
+/* Play-to-last-place: the win card lists the whole 1..N order. */
+.win-standings {
+  margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.22rem;
+  text-align: left;
+}
+.win-standings-head {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.09em;
+  text-transform: uppercase; color: ${C.muted}; margin-bottom: 0.15rem;
+}
+.win-standing-row {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.28rem 0.5rem; border-radius: 8px; background: var(--c-well);
+  font-size: 0.8rem;
+}
+.win-standing-row.first { background: ${ca('gold', '24')}; font-weight: 700; }
+.wsr-place { flex: 0 0 1.9rem; font-size: 0.78rem; }
+.wsr-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: 0 0 auto; }
+.wsr-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsr-rolls { flex: 0 0 auto; color: ${C.muted}; font-size: 0.7rem; }
+
 /* ---- Pre-launch Game Mode Modal ---- */
 .gm-modal-backdrop {
   position: fixed; inset: 0; z-index: 1000;
@@ -3702,17 +3812,25 @@ ${emitTapHighlightRules()}
 const CG_SOUND_KEY   = 'puzzlechain_cg_sound';
 const CG_HAPTICS_KEY = 'puzzlechain_cg_haptics';
 const CG_MOTION_KEY  = 'puzzlechain_cg_motion';
-const PREF_KEYS = { sound: CG_SOUND_KEY, haptics: CG_HAPTICS_KEY, motion: CG_MOTION_KEY };
+/* Music is a SEPARATE pref from Sound on purpose: the generative background
+   loop (snlMusic, below) is continuous, and plenty of players want the dice /
+   snake / ladder cues without a bed under them. Default ON, same '0' = off
+   convention as the others. */
+const CG_MUSIC_KEY   = 'pc_music';
+const PREF_KEYS = { sound: CG_SOUND_KEY, haptics: CG_HAPTICS_KEY, motion: CG_MOTION_KEY, music: CG_MUSIC_KEY };
 
 // Module-level prefs read by cgSound/cgHaptic without prop threading.
 const cgPrefs = {
   sound:   (() => { try { return localStorage.getItem(CG_SOUND_KEY) !== '0'; } catch { return true; } })(),
   haptics: (() => { try { return localStorage.getItem(CG_HAPTICS_KEY) !== '0'; } catch { return true; } })(),
   motion:  (() => { try { return localStorage.getItem(CG_MOTION_KEY) === '1'; } catch { return false; } })(),
+  music:   (() => { try { return localStorage.getItem(CG_MUSIC_KEY) !== '0'; } catch { return true; } })(),
 };
 function cgSetPref(key, val) {
   cgPrefs[key] = val;
   try { localStorage.setItem(PREF_KEYS[key] || CG_MOTION_KEY, val ? '1' : '0'); } catch {}
+  // Turning Music off must silence a bed that is already playing.
+  if (key === 'music' && !val && typeof snlMusicStop === 'function') snlMusicStop();
 }
 
 /* ============================================================
@@ -3899,8 +4017,53 @@ function canvasColorSelfTest() {
   return true;
 }
 
+/* ---- Gesture gate for the shared AudioContext ---------------------------
+   Every synthesized cue and the Snakes & Ladders music bed go through
+   cgAudio(), so this is the one place to enforce "no audio before the player
+   touches anything". It matters because a match is reachable by URL
+   (?snlstart=1, ?snlanim=…, the before/after screenshot routes): those mount a
+   running board with no gesture, the browser blocks the context, and every cue
+   logs an autoplay warning — 20 of them on the snake-animation route. Warnings
+   are not console errors today, so nothing was failing yet; the fix is cheap
+   and keeps the capture routes quiet.
+
+   Before the first gesture cgAudio() returns null and every cue is a silent
+   no-op (they all already `if (!ctx) return`). The listeners are passive,
+   capture-phase and one-shot, so this costs one flag flip per page. Once armed
+   the context is created lazily on the next cue exactly as before. */
+let _cgAudioArmed = false;
+let _cgAudioListening = false;
+function _cgArmAudio() {
+  _cgAudioArmed = true;
+  // Something may already be waiting on the bed (a match mounted by deep link
+  // before the first tap): resume/start it now that the browser will allow it.
+  try {
+    if (_cgAudioCtx && _cgAudioCtx.state === 'suspended') _cgAudioCtx.resume();
+  } catch {}
+  try { if (cgPrefs.music && snlMusic.wanted && !snlMusic.on) snlMusicStart(); } catch {}
+}
+function cgAudioReady() {
+  if (_cgAudioArmed) return true;
+  try {
+    if (navigator.userActivation && navigator.userActivation.hasBeenActive) {
+      _cgAudioArmed = true;
+      return true;
+    }
+  } catch {}
+  if (!_cgAudioListening) {
+    _cgAudioListening = true;
+    try {
+      ['pointerdown', 'touchstart', 'keydown'].forEach((ev) => {
+        window.addEventListener(ev, _cgArmAudio, { once: true, capture: true, passive: true });
+      });
+    } catch { _cgAudioArmed = true; }
+  }
+  return false;
+}
+
 let _cgAudioCtx = null;
 function cgAudio() {
+  if (!cgAudioReady()) return null;
   if (_cgAudioCtx) return _cgAudioCtx;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -3954,6 +4117,265 @@ function cgHaptic(ms) {
     if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     if (navigator.vibrate) navigator.vibrate(ms || 12);
   } catch {}
+}
+
+/* ============================================================
+   Snakes & Ladders audio — synthesized only, no asset files
+   ------------------------------------------------------------
+   The party overhaul asks for dice/snake/ladder/collision cues plus a music
+   bed, and the product constraint is "Web Audio sintetis saja, tanpa file" —
+   so none of this fetches or decodes anything. Two primitives on top of the
+   existing cgAudio() context:
+
+     cgNoiseBurst() — a short white-noise hit through a band-pass, which is the
+                      only way to get a dice rattle / hiss out of oscillators.
+     cgSoundSeq()   — a list of {f, d, t, g, at, slide} steps scheduled against
+                      one AudioContext clock, so a multi-note cue (a rising
+                      ladder arpeggio, a falling snake slide) stays in time even
+                      when the main thread is busy animating a pawn.
+
+   Everything is gated on cgPrefs.sound, matching cgSound(). The music bed is
+   gated on the separate cgPrefs.music.
+   ============================================================ */
+
+function cgNoiseBurst(opts) {
+  if (!cgPrefs.sound) return;
+  const ctx = cgAudio();
+  if (!ctx) return;
+  const o = opts || {};
+  const dur = o.d || 0.12;
+  const at = ctx.currentTime + (o.at || 0);
+  try {
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = o.type || 'bandpass';
+    bp.frequency.setValueAtTime(o.f || 1400, at);
+    if (o.f2) bp.frequency.exponentialRampToValueAtTime(Math.max(40, o.f2), at + dur);
+    bp.Q.value = o.q == null ? 1.2 : o.q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(o.g == null ? 0.16 : o.g, at);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+    src.start(at);
+    src.stop(at + dur + 0.02);
+  } catch {}
+}
+
+/* Schedule a sequence of tone steps. Each step:
+   { f, d, t, g, at, slide }  — slide is an optional target frequency the
+   oscillator glides to over the step's duration (the snake's descent). */
+function cgSoundSeq(steps) {
+  if (!cgPrefs.sound || !steps || !steps.length) return;
+  const ctx = cgAudio();
+  if (!ctx) return;
+  const base = ctx.currentTime;
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    if (s.noise) { cgNoiseBurst(s); continue; }
+    try {
+      const at = base + (s.at || 0);
+      const dur = s.d || 0.1;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = s.t || 'sine';
+      osc.frequency.setValueAtTime(s.f, at);
+      if (s.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, s.slide), at + dur);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(s.g == null ? 0.09 : s.g, at + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(at);
+      osc.stop(at + dur + 0.02);
+    } catch {}
+  }
+}
+
+/* The six named cues the match layer fires. Kept as functions rather than
+   CG_TONES entries because every one of them is multi-step. */
+const SNL_CUES = {
+  dice() {
+    cgNoiseBurst({ f: 2200, f2: 900, d: 0.09, g: 0.13, q: 0.8 });
+    cgNoiseBurst({ f: 1700, f2: 700, d: 0.08, g: 0.11, q: 0.8, at: 0.11 });
+    cgNoiseBurst({ f: 1300, f2: 520, d: 0.1, g: 0.1, q: 0.9, at: 0.22 });
+    cgSoundSeq([{ f: 520, d: 0.09, t: 'triangle', g: 0.07, at: 0.34 }]);
+  },
+  hop() { cgSoundSeq([{ f: 660, d: 0.045, t: 'square', g: 0.045 }]); },
+  ladder() {
+    cgSoundSeq([
+      { f: 392, d: 0.09, t: 'triangle', g: 0.08, at: 0 },
+      { f: 523, d: 0.09, t: 'triangle', g: 0.08, at: 0.07 },
+      { f: 659, d: 0.09, t: 'triangle', g: 0.08, at: 0.14 },
+      { f: 784, d: 0.14, t: 'triangle', g: 0.09, at: 0.21 },
+      { f: 1047, d: 0.2, t: 'sine', g: 0.07, at: 0.3 },
+    ]);
+  },
+  snake() {
+    cgSoundSeq([
+      { f: 700, slide: 150, d: 0.55, t: 'sawtooth', g: 0.07 },
+      { noise: true, f: 5200, f2: 1800, d: 0.5, g: 0.05, q: 0.6, at: 0.02 },
+      { f: 180, d: 0.2, t: 'sine', g: 0.08, at: 0.5 },
+    ]);
+  },
+  bump() {
+    cgSoundSeq([
+      { noise: true, f: 320, f2: 120, d: 0.16, g: 0.18, type: 'lowpass', q: 0.7 },
+      { f: 150, slide: 70, d: 0.22, t: 'square', g: 0.09, at: 0.01 },
+    ]);
+  },
+  finish() {
+    cgSoundSeq([
+      { f: 523, d: 0.12, t: 'triangle', g: 0.09, at: 0 },
+      { f: 659, d: 0.12, t: 'triangle', g: 0.09, at: 0.1 },
+      { f: 784, d: 0.12, t: 'triangle', g: 0.09, at: 0.2 },
+      { f: 1047, d: 0.3, t: 'triangle', g: 0.1, at: 0.3 },
+      { f: 1319, d: 0.34, t: 'sine', g: 0.07, at: 0.36 },
+    ]);
+  },
+  rankup() {
+    cgSoundSeq([
+      { f: 440, d: 0.14, t: 'sine', g: 0.08, at: 0 },
+      { f: 660, d: 0.14, t: 'sine', g: 0.08, at: 0.12 },
+      { f: 880, d: 0.18, t: 'sine', g: 0.09, at: 0.24 },
+      { f: 1320, d: 0.4, t: 'triangle', g: 0.08, at: 0.38 },
+    ]);
+  },
+  forfeit() {
+    cgSoundSeq([
+      { f: 300, d: 0.11, t: 'square', g: 0.06, at: 0 },
+      { f: 220, d: 0.16, t: 'square', g: 0.06, at: 0.1 },
+    ]);
+  },
+};
+function snlCue(name) { const f = SNL_CUES[name]; if (f) { try { f(); } catch {} } }
+
+/* ------------------------------------------------------------
+   Generative background music
+   ------------------------------------------------------------
+   A 100ms-lookahead scheduler (the standard Web Audio pattern — a setInterval
+   that queues notes ahead of the audio clock, so a busy rAF loop animating a
+   pawn can't make the music stutter). Tempo and layer density follow an
+   "intensity" the match sets: it rises as pawns approach square 100, so the
+   bed thickens on its own without any authored stems.
+   ------------------------------------------------------------ */
+const SNL_SCALE = [0, 2, 4, 7, 9];          // major pentatonic — no wrong notes
+const SNL_BASS  = [0, 0, 5, 7, 5, 0, 3, 7];
+const snlMusic = {
+  // `wanted` = a match asked for the bed while audio was still gesture-locked.
+  // _cgArmAudio() reads it on the first tap so a deep-linked match starts its
+  // music then, instead of staying silent until the next mount.
+  on: false, wanted: false, timer: null, next: 0, step: 0, intensity: 0, root: 220, gain: null,
+};
+function snlMusicNoteAt(ctx, when, freq, dur, type, vol) {
+  try {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, when);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    osc.connect(g);
+    g.connect(snlMusic.gain || ctx.destination);
+    osc.start(when);
+    osc.stop(when + dur + 0.02);
+  } catch {}
+}
+function snlMusicTick() {
+  const ctx = cgAudio();
+  if (!ctx || !snlMusic.on) return;
+  const bpm = 84 + Math.round(snlMusic.intensity * 28);   // 84 -> 112
+  const spb = 60 / bpm / 2;                                // eighth notes
+  while (snlMusic.next < ctx.currentTime + 0.2) {
+    const t = Math.max(snlMusic.next, ctx.currentTime + 0.02);
+    const st = snlMusic.step;
+    // Bass: every quarter.
+    if (st % 2 === 0) {
+      const semi = SNL_BASS[(st / 2) % SNL_BASS.length];
+      snlMusicNoteAt(ctx, t, snlMusic.root / 2 * Math.pow(2, semi / 12), spb * 1.6, 'triangle', 0.05);
+    }
+    // Melody: sparse at low intensity, busier as the race tightens.
+    const density = 0.28 + snlMusic.intensity * 0.42;
+    if (((st * 2654435761) % 97) / 97 < density) {
+      const deg = SNL_SCALE[(st * 3 + Math.floor(st / 8)) % SNL_SCALE.length];
+      const oct = st % 8 >= 4 ? 2 : 1;
+      snlMusicNoteAt(ctx, t, snlMusic.root * oct * Math.pow(2, deg / 12), spb * 1.2, 'sine', 0.035);
+    }
+    // Hat: only once the bed has thickened.
+    if (snlMusic.intensity > 0.45 && st % 2 === 1) {
+      cgNoiseBurstAt(ctx, t, 0.03, 6200, 0.018);
+    }
+    snlMusic.next = t + spb;
+    snlMusic.step = (st + 1) % 64;
+  }
+}
+function cgNoiseBurstAt(ctx, when, dur, freq, vol) {
+  try {
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < frames; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'highpass'; bp.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    src.connect(bp); bp.connect(g); g.connect(snlMusic.gain || ctx.destination);
+    src.start(when); src.stop(when + dur + 0.02);
+  } catch {}
+}
+function snlMusicStart() {
+  if (!cgPrefs.music || snlMusic.on) return;
+  snlMusic.wanted = true;
+  const ctx = cgAudio();
+  if (!ctx) return;  // gesture-locked — _cgArmAudio() retries on the first tap
+  try {
+    if (!snlMusic.gain) {
+      snlMusic.gain = ctx.createGain();
+      snlMusic.gain.gain.value = 0.0001;
+      snlMusic.gain.connect(ctx.destination);
+    }
+    snlMusic.gain.gain.cancelScheduledValues(ctx.currentTime);
+    snlMusic.gain.gain.setValueAtTime(Math.max(0.0001, snlMusic.gain.gain.value), ctx.currentTime);
+    snlMusic.gain.gain.exponentialRampToValueAtTime(0.34, ctx.currentTime + 1.2);
+  } catch { return; }
+  snlMusic.on = true;
+  snlMusic.next = ctx.currentTime + 0.1;
+  snlMusic.step = 0;
+  snlMusic.timer = setInterval(snlMusicTick, 100);
+  snlMusicTick();
+}
+function snlMusicStop() {
+  if (snlMusic.timer) { clearInterval(snlMusic.timer); snlMusic.timer = null; }
+  snlMusic.on = false;
+  snlMusic.wanted = false;
+  const ctx = cgAudio();
+  if (ctx && snlMusic.gain) {
+    try {
+      snlMusic.gain.gain.cancelScheduledValues(ctx.currentTime);
+      snlMusic.gain.gain.setValueAtTime(Math.max(0.0001, snlMusic.gain.gain.value), ctx.currentTime);
+      snlMusic.gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+    } catch {}
+  }
+}
+/* 0..1 — how close the leading pawn is to home. Drives tempo + density. */
+function snlMusicSetIntensity(v) {
+  snlMusic.intensity = Math.max(0, Math.min(1, v || 0));
+}
+/* One-shot chord over the bed, for a finish / rank-up moment. */
+function snlMusicSting() {
+  const ctx = cgAudio();
+  if (!ctx || !cgPrefs.music) return;
+  const t = ctx.currentTime + 0.01;
+  [0, 4, 7, 12].forEach((semi, i) => {
+    snlMusicNoteAt(ctx, t + i * 0.04, snlMusic.root * Math.pow(2, semi / 12), 0.9, 'sine', 0.05);
+  });
 }
 
 /* ============================================================
@@ -4198,6 +4620,7 @@ function CgSettings({ tick }) {
       <ThemeChoice />
       <h4 className="cg-settings-h4-spaced">Game feedback</h4>
       <div className="cg-setting-row"><span className="name">Sound</span><CgToggle on={cgPrefs.sound} onClick={() => flip('sound')} /></div>
+      <div className="cg-setting-row"><span className="name">Music</span><CgToggle on={cgPrefs.music} onClick={() => flip('music')} /></div>
       <div className="cg-setting-row"><span className="name">Haptics</span><CgToggle on={cgPrefs.haptics} onClick={() => flip('haptics')} /></div>
       <div className="cg-setting-row"><span className="name">Reduced motion</span><CgToggle on={cgPrefs.motion} onClick={() => flip('motion')} /></div>
     </div>
@@ -5556,6 +5979,155 @@ function runClientSelfTests(styleReady) {
   check('board-rules', () => {
     if (!window.boardRules) return true; // script not loaded (standalone) — skip
     return window.boardRules.selfTest() === true;
+  });
+
+  /* ---- Snakes & Ladders local party (rules are client-side, so these are
+     the only thing standing between an authoring slip and a stuck board) --- */
+
+  // Every board must survive snlValidateBoard, and the ladder ladder must be
+  // ordered: a harder board may not have fewer snakes than an easier one.
+  check('snl-boards', () => {
+    const errs = [];
+    SNL_BOARDS.forEach((b) => { errs.push.apply(errs, snlValidateBoard(b)); });
+    if (errs.length) throw new Error(errs.slice(0, 6).join('; '));
+    /* The difficulty ladder must actually be a ladder. Raw snake COUNT does not
+       say it (the classic Regular board carries 10 snakes, more than Hard's 9);
+       the snake:ladder RATIO does, so that is the ordering contract — a new
+       board inserted out of order fails here rather than shipping mislabelled. */
+    const ladder = snlLadderBoards();
+    const ratio = (b) => Object.keys(b.snakes).length / Math.max(1, Object.keys(b.ladders).length);
+    for (let i = 1; i < ladder.length; i++) {
+      if (ladder[i].tier <= ladder[i - 1].tier) {
+        throw new Error(ladder[i].id + ' tier ' + ladder[i].tier + ' does not follow ' + ladder[i - 1].id);
+      }
+      if (ratio(ladder[i]) <= ratio(ladder[i - 1])) {
+        throw new Error(ladder[i].id + ' is not harder than ' + ladder[i - 1].id +
+          ' (snake:ladder ' + ratio(ladder[i]).toFixed(2) + ' vs ' + ratio(ladder[i - 1]).toFixed(2) + ')');
+      }
+    }
+    if (!SNL_BOARD_MAP.legend || SNL_BOARD_MAP.legend.lockedBy !== 'superstar') {
+      throw new Error('the Legend board must be lockedBy superstar');
+    }
+    return true;
+  });
+
+  // Six grants a re-roll, capped at SNL_MAX_SIX_STREAK — the third six is
+  // forfeited and the turn passes.
+  check('snl-six-rule', () => {
+    let m = snlInitialMatch({ boardId: 'beginner', seats: [{ kind: 'human' }, { kind: 'human' }] });
+    let r = snlTakeTurn(m, 6);
+    if (r.match.turnSeat !== 1) throw new Error('first six did not keep the turn');
+    if (!r.events.some((e) => e.type === 'reroll')) throw new Error('first six emitted no reroll');
+    r = snlTakeTurn(r.match, 6);
+    if (r.match.turnSeat !== 1) throw new Error('second six did not keep the turn');
+    r = snlTakeTurn(r.match, 6);
+    if (!r.events.some((e) => e.type === 'forfeit-six')) throw new Error('third six was not forfeited');
+    if (r.match.turnSeat !== 2) throw new Error('third six did not pass the turn');
+    const before = snlTakeTurn(snlTakeTurn(snlInitialMatch({ boardId: 'beginner' }), 6).match, 6).match;
+    const posBefore = before.seats[0].pos;
+    if (snlTakeTurn(before, 6).match.seats[0].pos !== posBefore) {
+      throw new Error('the forfeited third six still moved the pawn');
+    }
+    // A non-six always passes the turn.
+    const nm = snlTakeTurn(snlInitialMatch({ boardId: 'beginner' }), 3);
+    if (nm.match.turnSeat !== 2) throw new Error('a non-six did not pass the turn');
+    return true;
+  });
+
+  // Landing on an occupied square sends the occupant back SNL_BUMP squares,
+  // and the jump under the LANDING square still applies to the mover.
+  check('snl-collision', () => {
+    const m = snlInitialMatch({ boardId: 'beginner', seats: [{ kind: 'human' }, { kind: 'human' }] });
+    m.seats[0].pos = 20; m.seats[1].pos = 24; m.turnSeat = 1;
+    const board = snlBoardById('beginner');
+    if (board.jumps[24] != null) throw new Error('test fixture square 24 is a jump on beginner');
+    const r = snlTakeTurn(m, 4);
+    const bump = r.events.find((e) => e.type === 'bump');
+    if (!bump) throw new Error('no bump event on an occupied landing');
+    if (bump.to !== 24 - SNL_BUMP) throw new Error('bump sent the victim to ' + bump.to + ', expected ' + (24 - SNL_BUMP));
+    if (r.match.seats[0].pos !== 24) throw new Error('mover did not keep the contested square');
+    // Two-way: it fires whichever pawn arrives.
+    const m2 = snlInitialMatch({ boardId: 'beginner', seats: [{ kind: 'human' }, { kind: 'human' }] });
+    m2.seats[0].pos = 24; m2.seats[1].pos = 20; m2.turnSeat = 2;
+    const r2 = snlTakeTurn(m2, 4);
+    if (!r2.events.some((e) => e.type === 'bump' && e.seat === 1)) {
+      throw new Error('collision is not two-way');
+    }
+    // Clamped at square 1 — a bump near the start line must not go negative.
+    const m3 = snlInitialMatch({ boardId: 'beginner', seats: [{ kind: 'human' }, { kind: 'human' }] });
+    m3.seats[0].pos = 5; m3.seats[1].pos = 4; m3.turnSeat = 2;
+    const r3 = snlTakeTurn(m3, 1);
+    const b3 = r3.events.find((e) => e.type === 'bump');
+    if (!b3 || b3.to !== 1) throw new Error('a bump near the start line did not clamp to square 1');
+    if (r3.match.seats[0].pos < 1) throw new Error('a bump pushed a pawn below square 1');
+    return true;
+  });
+
+  // Play-to-last-place: every seat ends with a distinct place 1..N.
+  check('snl-standings', () => {
+    for (const n of [2, 4, 6]) {
+      const seats = [];
+      for (let i = 0; i < n; i++) seats.push({ kind: 'bot' });
+      let m = snlInitialMatch({ boardId: 'regular', seats });
+      let guard = 0;
+      while (m.phase !== 'over' && guard++ < 8000) m = snlTakeTurn(m, snlRoll(m)).match;
+      if (m.phase !== 'over') throw new Error(n + ' seats: match never ended');
+      const places = m.seats.map((s) => s.place).sort((a, b) => a - b);
+      for (let i = 0; i < n; i++) {
+        if (places[i] !== i + 1) throw new Error(n + ' seats: places are ' + places.join(',') + ', expected 1..' + n);
+      }
+      const st = snlStandings(m);
+      if (st.length !== n || st[0].place !== 1) throw new Error(n + ' seats: standings are not 1..N ordered');
+    }
+    return true;
+  });
+
+  // RP is symmetric around the middle place, monotone in place, and the tier
+  // table is contiguous and ascending.
+  check('snl-rp-tiers', () => {
+    for (const players of [4, 5, 6]) {
+      let prev = Infinity;
+      for (let place = 1; place <= players; place++) {
+        const d = snlRankDelta(place, players);
+        if (d >= prev) throw new Error(players + 'p: RP is not monotone in place');
+        prev = d;
+      }
+      if (snlRankDelta(1, players) <= 0) throw new Error(players + 'p: winning must gain RP');
+      if (snlRankDelta(players, players) >= 0) throw new Error(players + 'p: last place must lose RP');
+    }
+    if (snlApplyRp(5, 6, 6) !== 0) throw new Error('RP floored below zero');
+    let last = -1;
+    for (const t of SNL_TIERS) {
+      if (!(t.min > last)) throw new Error('tier mins are not ascending at ' + t.id);
+      if (!t.icon || !t.color || !t.name) throw new Error('tier ' + t.id + ' is missing display fields');
+      last = t.min;
+      if (snlTierFor(t.min).id !== t.id) throw new Error('snlTierFor misses its own floor at ' + t.id);
+    }
+    if (SNL_TIERS[0].min !== 0) throw new Error('the lowest tier must start at 0 RP');
+    if (snlNextTier(SNL_TIERS[SNL_TIERS.length - 1].min)) throw new Error('the top tier must have no next');
+    return true;
+  });
+
+  // Legend stays locked until SNL_LEGEND_UNLOCK_WINS Super Star WINS — a loss,
+  // or a win on any other board, must not count.
+  check('snl-legend-lock', () => {
+    const legend = SNL_BOARD_MAP.legend;
+    let p = { superstarWins: 0 };
+    if (!snlBoardEarnedLocked(legend, p)) throw new Error('Legend is not locked at zero Super Star wins');
+    if (snlBoardEarnedLocked(SNL_BOARD_MAP.regular, p)) throw new Error('a normal board is locked');
+    for (let i = 0; i < SNL_LEGEND_UNLOCK_WINS; i++) p = snlApplyResult(p, { place: 2, boardId: 'superstar', players: 4, mode: 'party' });
+    if (!snlBoardEarnedLocked(legend, p)) throw new Error('Super Star LOSSES unlocked Legend');
+    for (let i = 0; i < SNL_LEGEND_UNLOCK_WINS; i++) p = snlApplyResult(p, { place: 1, boardId: 'expert', players: 4, mode: 'party' });
+    if (!snlBoardEarnedLocked(legend, p)) throw new Error('wins on another board unlocked Legend');
+    for (let i = 0; i < SNL_LEGEND_UNLOCK_WINS - 1; i++) p = snlApplyResult(p, { place: 1, boardId: 'superstar', players: 4, mode: 'party' });
+    if (!snlBoardEarnedLocked(legend, p)) throw new Error('Legend unlocked one win early');
+    p = snlApplyResult(p, { place: 1, boardId: 'superstar', players: 4, mode: 'party' });
+    if (snlBoardEarnedLocked(legend, p)) throw new Error('Legend did not unlock on the final Super Star win');
+    // Ranked results move RP through the same mirror.
+    const before = p.rp || 0;
+    p = snlApplyResult(p, { place: 1, boardId: 'regular', players: 4, mode: 'ranked' });
+    if ((p.rp || 0) <= before) throw new Error('a ranked win did not add RP to the local mirror');
+    return true;
   });
 
   if (fails.length) {
@@ -8920,6 +9492,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
            `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
            the double-input bug it would read "LLEENN" and the check fails. */
         data-cw-typed={cur}
+        /* The keyboard is drawn on canvas, so "is the Enter key on screen?"
+           can only be asserted through the sr-only twin's TEXT — which is a
+           label ('Enter'), free to change case or gain an icon at any time.
+           This is the stable half: the ids of the keys actually rendered. */
+        data-cw-keys={controls.filter((c) => c.kind === 'button' && !c.noDraw)
+          .map((c) => c.id).join(',')}
       >
         <canvas
           ref={canvasRef}
@@ -17495,246 +18073,1414 @@ function cnlCenterPct(n) {
   return { x: (col + 0.5) * 10, y: (visualRow + 0.5) * 10 };
 }
 
-// Local Chutes & Ladders board: hotseat 2-player, or vs Bot (P2 auto-rolls).
-// `initialState` (a saved bot snapshot) offers an in-stage Resume banner.
-function ChutesLaddersLocalGame({ onWin, onStepChange, resetKey, vsBot, initialState, onClearSave, variant, onGlossary }) {
-  // Board tables for the chosen style. `variant` is 'classic' | 'moksha'.
-  const vkey = cnlVariant(variant);
-  const V = CNL_VARIANTS[vkey];
-  const isMoksha = vkey === 'moksha';
-  // Cosmetic board skin — a local per-device preference, independent of the
-  // server-synced mechanical variant. Only applies on the Classic board.
+/* ============================================================
+   Snakes & Ladders — local party overhaul
+   ------------------------------------------------------------
+   Everything below this banner is the LOCAL (hot-seat) game: a pure rules
+   engine, seven difficulty boards, vector snake/ladder/chess-pawn art, a
+   2-6 seat lobby, a play-to-last-place turn loop, an animation layer, and
+   Ranked Match. The ONLINE path (ChutesLaddersOnlineGame + CnlBoardCanvas +
+   lib/board-rules.js's chutesLadders module) is deliberately untouched —
+   the server referees those rooms and its tables must keep matching
+   lib/board-rules.js byte-for-byte.
+   ============================================================ */
+
+/* ---- Engine constants ------------------------------------------------- */
+// Landing on an occupied square knocks the OCCUPANT back ten squares (never
+// below 1). The bumped pawn then re-resolves where it lands — a snake or
+// ladder there still applies, and it may in turn bump somebody else.
+const SNL_BUMP = 10;
+const SNL_COLLISION = { bump: SNL_BUMP, mode: 'occupant' };
+// Rolling a six earns another roll, but three sixes in a row forfeits the
+// third move entirely and passes the turn.
+const SNL_MAX_SIX_STREAK = 3;
+// Hard stop on bump -> jump -> bump chains. Two pawns can ping-pong through a
+// ladder/snake pair forever; the engine is pure, so a cap is the only guard.
+const SNL_CHAIN_CAP = 8;
+// Wins on the Super Star board needed before Legend unlocks.
+const SNL_LEGEND_UNLOCK_WINS = 3;
+const SNL_MAX_SEATS = 6;
+const SNL_MIN_SEATS = 2;
+// Ranked is hot-seat too, so "4 humans" means four people around one device.
+const SNL_RANKED_MIN_HUMANS = 4;
+
+/* ---- The seven boards -------------------------------------------------
+   Authoring rules (enforced by snlValidateBoard, asserted by the `snl-boards`
+   self-test, so a bad table fails the build rather than shipping a soft-lock):
+     - every square in 1..100; ladders go UP, snakes go DOWN, never to self
+     - no square is the start of two jumps
+     - no jump LANDS on the start of another jump (chained heads would make a
+       single roll teleport across the board and read as a bug)
+     - nothing starts on 100 (unreachable as a start), and no SNAKE starts on 1
+       (a pawn sent back before it began). A LADDER on 1 is allowed and is
+       what the classic table ships.
+   `regular` is the historical table and MUST stay byte-identical to
+   CNL_LADDERS / CNL_CHUTES above — the online rooms play it. */
+const SNL_BOARDS = [
+  {
+    id: 'beginner', name: 'Beginner', tier: 1, desc: 'Lots of ladders, short snakes.',
+    ladders: { 2: 23, 8: 34, 20: 38, 32: 51, 41: 62, 54: 66, 63: 81, 74: 92, 85: 95 },
+    snakes:  { 28: 12, 46: 25, 58: 37, 77: 57, 96: 79 },
+  },
+  {
+    id: 'easy', name: 'Easy', tier: 2, desc: 'Friendly climb with a few bites.',
+    ladders: { 5: 27, 11: 29, 19: 37, 26: 48, 43: 64, 55: 73, 68: 86, 79: 97 },
+    snakes:  { 24: 10, 39: 16, 52: 31, 67: 49, 84: 60, 94: 71 },
+  },
+  {
+    id: 'regular', name: 'Regular', tier: 3, desc: 'The classic board everyone knows.',
+    ladders: CNL_LADDERS, snakes: CNL_CHUTES,
+  },
+  {
+    id: 'hard', name: 'Hard', tier: 4, desc: 'Snakes outnumber ladders.',
+    ladders: { 3: 22, 15: 34, 25: 44, 42: 63, 57: 76, 71: 90 },
+    snakes:  { 18: 7, 31: 12, 40: 20, 53: 33, 66: 45, 78: 58, 87: 69, 96: 75, 99: 80 },
+  },
+  {
+    id: 'expert', name: 'Expert', tier: 5, desc: 'The nineties are a minefield.',
+    ladders: { 6: 26, 21: 41, 38: 59, 61: 80, 73: 92 },
+    snakes:  { 14: 2, 29: 9, 46: 24, 54: 35, 65: 44, 77: 56, 85: 63, 91: 70, 95: 74, 98: 79 },
+  },
+  {
+    id: 'superstar', name: 'Super Star', tier: 6, desc: 'Four ladders. Twelve snakes. Good luck.',
+    ladders: { 7: 28, 23: 45, 47: 68, 72: 93 },
+    snakes:  { 13: 3, 27: 8, 36: 15, 44: 21, 52: 30, 60: 39, 69: 48, 78: 57, 86: 64, 90: 71, 96: 75, 99: 81 },
+  },
+  {
+    id: 'legend', name: 'Legend', tier: 7, desc: 'Three ladders against fifteen snakes.',
+    lockedBy: 'superstar',
+    ladders: { 10: 31, 34: 55, 58: 79 },
+    snakes:  { 17: 4, 26: 6, 33: 11, 41: 19, 49: 27, 56: 35, 63: 42, 70: 50, 76: 59,
+               84: 66, 88: 72, 92: 77, 95: 80, 97: 83, 99: 86 },
+  },
+  {
+    /* The historical Indian board, kept alongside the difficulty ladder rather
+       than inside it: it is an authentic table, not one of ours to balance.
+       `special` also exempts it from the chained-head rule below — 98 slides to
+       78, which is itself a ladder foot, and that is how the original plays. */
+    id: 'moksha', name: 'Moksha Patam', tier: 0, special: true,
+    desc: 'The Indian original — ladders on virtues, snakes on vices.',
+    ladders: CNL_MOKSHA_LADDERS, snakes: CNL_MOKSHA_CHUTES,
+  },
+];
+const SNL_BOARD_MAP = {};
+SNL_BOARDS.forEach((b) => {
+  b.jumps = Object.assign({}, b.ladders, b.snakes);
+  SNL_BOARD_MAP[b.id] = b;
+});
+const SNL_DEFAULT_BOARD = 'regular';
+
+// The difficulty ladder shown in the lobby (Moksha Patam sits outside it).
+function snlLadderBoards() { return SNL_BOARDS.filter((b) => !b.special); }
+
+function snlBoardById(id) { return SNL_BOARD_MAP[id] || SNL_BOARD_MAP[SNL_DEFAULT_BOARD]; }
+
+// Returns [] when the table is sound, else a list of human-readable problems.
+function snlValidateBoard(board) {
+  const errs = [];
+  const starts = {};
+  const add = (map, kind) => {
+    Object.keys(map || {}).forEach((k) => {
+      const from = parseInt(k, 10);
+      const to = map[k];
+      const at = board.id + ' ' + kind + ' ' + from;
+      if (!(from >= 1 && from <= 100) || !(to >= 1 && to <= 100)) errs.push(at + ': out of range');
+      if (from === to) errs.push(at + ': maps to itself');
+      if (from === 100) errs.push(at + ': starts on 100');
+      if (kind === 'snake' && from === 1) errs.push(at + ': snake starts on 1');
+      if (kind === 'ladder' && to < from) errs.push(at + ': ladder goes down');
+      if (kind === 'snake' && to > from) errs.push(at + ': snake goes up');
+      if (starts[from]) errs.push(at + ': duplicate start');
+      starts[from] = kind;
+    });
+  };
+  add(board.ladders, 'ladder');
+  add(board.snakes, 'snake');
+  if (!board.special) {
+    Object.keys(board.jumps || {}).forEach((k) => {
+      const to = board.jumps[k];
+      if (starts[to]) errs.push(board.id + ' jump ' + k + ': lands on the start of another jump (' + to + ')');
+    });
+  }
+  return errs;
+}
+
+/* ---- Seats, pieces, colours -------------------------------------------
+   Pawn colours and chess silhouettes are INTRINSIC GAME ART, so they are
+   hardcoded rather than themed (same rule as the checkers browns and the
+   playing-card faces) — a light/dark flip must not repaint a player's piece. */
+const SNL_SEAT_COLORS = [
+  { id: 'red',    name: 'Red',    hex: '#e2453f', dark: '#9e2b26' },
+  { id: 'blue',   name: 'Blue',   hex: '#2f7ae5', dark: '#1a4a91' },
+  { id: 'amber',  name: 'Amber',  hex: '#f0a92a', dark: '#a86f0d' },
+  { id: 'green',  name: 'Green',  hex: '#37a860', dark: '#1d6b3b' },
+  { id: 'violet', name: 'Violet', hex: '#a05fd6', dark: '#63348c' },
+  { id: 'teal',   name: 'Teal',   hex: '#20b8bd', dark: '#0d7276' },
+];
+const SNL_PIECES = [
+  { id: 'pawn', name: 'Pawn' }, { id: 'knight', name: 'Knight' },
+  { id: 'bishop', name: 'Bishop' }, { id: 'rook', name: 'Rook' },
+  { id: 'queen', name: 'Queen' }, { id: 'king', name: 'King' },
+];
+function snlPieceName(id) { const p = SNL_PIECES.find((x) => x.id === id); return p ? p.name : 'Pawn'; }
+function snlSeatColor(i) { return SNL_SEAT_COLORS[((i % SNL_SEAT_COLORS.length) + SNL_SEAT_COLORS.length) % SNL_SEAT_COLORS.length]; }
+
+/* ---- Pure rules engine ------------------------------------------------- */
+function snlCloneMatch(m) {
+  return Object.assign({}, m, { seats: m.seats.map((s) => Object.assign({}, s)) });
+}
+
+function snlInitialMatch(cfg) {
+  cfg = cfg || {};
+  const board = snlBoardById(cfg.boardId);
+  const src = (cfg.seats && cfg.seats.length ? cfg.seats : [{ kind: 'human' }, { kind: 'bot' }])
+    .slice(0, SNL_MAX_SEATS);
+  const seats = src.map((s, i) => ({
+    id: i + 1,
+    kind: s.kind === 'bot' ? 'bot' : 'human',
+    name: s.name || (s.kind === 'bot' ? 'Bot ' + (i + 1) : 'Player ' + (i + 1)),
+    pieceId: (SNL_PIECES.find((p) => p.id === s.pieceId) || SNL_PIECES[i % SNL_PIECES.length]).id,
+    colorIdx: s.colorIdx == null ? i % SNL_SEAT_COLORS.length : s.colorIdx,
+    pos: 0, rolls: 0, place: 0, finishedAt: 0,
+  }));
+  return {
+    boardId: board.id, mode: cfg.mode === 'ranked' ? 'ranked' : 'party',
+    seats, turnSeat: seats.length ? seats[0].id : 0, die: 0, sixStreak: 0,
+    phase: 'playing', finished: 0, turnNo: 0,
+  };
+}
+
+function snlRoll(match, rng) {
+  const r = typeof rng === 'function' ? rng() : Math.random();
+  return 1 + Math.floor(Math.min(0.999999, Math.max(0, r)) * 6);
+}
+
+/* Resolve where `seatId` has just landed: apply the jump under it, then the
+   collision bump, then recurse for the bumped pawn. MUTATES `seats` (the
+   caller always hands it a clone) and returns the event list. */
+function snlResolveLanding(seats, board, seatId, square, depth) {
+  const events = [];
+  depth = depth || 0;
+  const seat = seats.find((s) => s.id === seatId);
+  if (!seat) return events;
+  let sq = Math.max(1, Math.min(100, square));
+  seat.pos = sq;
+  const jump = board.jumps[sq];
+  if (jump != null && jump !== sq) {
+    events.push({ type: jump > sq ? 'ladder' : 'snake', seat: seatId, from: sq, to: jump });
+    sq = jump;
+    seat.pos = sq;
+  }
+  if (sq > 0 && sq < 100 && depth < SNL_CHAIN_CAP) {
+    const victims = seats.filter((s) => s.id !== seatId && s.pos === sq && !s.finishedAt);
+    for (let i = 0; i < victims.length; i++) {
+      const v = victims[i];
+      const back = Math.max(1, sq - SNL_COLLISION.bump);
+      events.push({ type: 'bump', seat: v.id, by: seatId, from: sq, to: back });
+      const sub = snlResolveLanding(seats, board, v.id, back, depth + 1);
+      for (let j = 0; j < sub.length; j++) events.push(sub[j]);
+    }
+  }
+  return events;
+}
+
+function snlPassTurn(m, events) {
+  const active = m.seats.filter((s) => !s.finishedAt);
+  if (active.length <= 1) {
+    // Play-to-last-place: the last pawn still walking is awarded last place
+    // rather than being left mid-board, so standings are always 1..N.
+    if (active.length === 1) {
+      m.finished += 1;
+      active[0].place = m.finished;
+      active[0].finishedAt = m.finished;
+      events.push({ type: 'finish', seat: active[0].id, place: active[0].place, auto: true });
+    }
+    m.phase = 'over';
+    m.turnSeat = 0;
+    return;
+  }
+  const idx = m.seats.findIndex((s) => s.id === m.turnSeat);
+  for (let k = 1; k <= m.seats.length; k++) {
+    const cand = m.seats[(idx + k + m.seats.length) % m.seats.length];
+    if (!cand.finishedAt) { m.turnSeat = cand.id; break; }
+  }
+  m.turnNo += 1;
+  events.push({ type: 'turn', seat: m.turnSeat });
+}
+
+/* One complete turn action for the seat to move. Returns a NEW match plus the
+   ordered event list the animation layer replays. */
+function snlTakeTurn(match, die) {
+  const m = snlCloneMatch(match);
+  if (m.phase === 'over') return { match: m, events: [] };
+  const board = snlBoardById(m.boardId);
+  const seat = m.seats.find((s) => s.id === m.turnSeat);
+  if (!seat) return { match: m, events: [] };
+  const events = [{ type: 'roll', seat: seat.id, die }];
+  seat.rolls += 1;
+  m.die = die;
+  const isSix = die === 6;
+  const streak = isSix ? m.sixStreak + 1 : 0;
+
+  if (isSix && streak >= SNL_MAX_SIX_STREAK) {
+    events.push({ type: 'forfeit-six', seat: seat.id, streak });
+    m.sixStreak = 0;
+    snlPassTurn(m, events);
+    return { match: m, events };
+  }
+  m.sixStreak = streak;
+
+  const target = seat.pos + die;
+  if (target > 100) {
+    // Exact roll to finish: overshooting leaves the pawn where it stands.
+    events.push({ type: 'overshoot', seat: seat.id, need: 100 - seat.pos });
+  } else {
+    events.push({ type: 'move', seat: seat.id, from: seat.pos, to: target });
+    seat.pos = target;
+    const sub = snlResolveLanding(m.seats, board, seat.id, target, 0);
+    for (let j = 0; j < sub.length; j++) events.push(sub[j]);
+    if (seat.pos === 100) {
+      m.finished += 1;
+      seat.place = m.finished;
+      seat.finishedAt = m.finished;
+      events.push({ type: 'finish', seat: seat.id, place: seat.place });
+    }
+  }
+
+  if (isSix && !seat.finishedAt && m.phase !== 'over') {
+    events.push({ type: 'reroll', seat: seat.id, streak: m.sixStreak });
+  } else {
+    m.sixStreak = 0;
+    snlPassTurn(m, events);
+  }
+  return { match: m, events };
+}
+
+// Final (or live) ranking: finished seats by place, then the rest by progress.
+function snlStandings(match) {
+  return match.seats.slice().sort((a, b) => {
+    if (a.place && b.place) return a.place - b.place;
+    if (a.place) return -1;
+    if (b.place) return 1;
+    if (b.pos !== a.pos) return b.pos - a.pos;
+    return a.id - b.id;
+  }).map((s, i) => Object.assign({}, s, { rank: s.place || i + 1 }));
+}
+
+function snlMatchOver(match) { return match.phase === 'over'; }
+
+/* ---- Ranked Match: RP + tiers ------------------------------------------ */
+const SNL_TIERS = [
+  { id: 'bronze',   name: 'Bronze',   min: 0,    color: '#b1743a', icon: '🥉' },
+  { id: 'silver',   name: 'Silver',   min: 200,  color: '#9aa4b2', icon: '🥈' },
+  { id: 'gold',     name: 'Gold',     min: 500,  color: '#d8a32b', icon: '🥇' },
+  { id: 'platinum', name: 'Platinum', min: 900,  color: '#57c7c0', icon: '💠' },
+  { id: 'diamond',  name: 'Diamond',  min: 1400, color: '#5aa9ff', icon: '💎' },
+  { id: 'master',   name: 'Master',   min: 2000, color: '#a06bff', icon: '👑' },
+  { id: 'legend',   name: 'Legend',   min: 2800, color: '#ff6b6b', icon: '🐉' },
+];
+function snlTierFor(rp) {
+  let t = SNL_TIERS[0];
+  for (let i = 0; i < SNL_TIERS.length; i++) if ((rp || 0) >= SNL_TIERS[i].min) t = SNL_TIERS[i];
+  return t;
+}
+function snlNextTier(rp) {
+  for (let i = 0; i < SNL_TIERS.length; i++) if ((rp || 0) < SNL_TIERS[i].min) return SNL_TIERS[i];
+  return null;
+}
+/* Symmetric around the field: 1st gains the most, last loses the most, and
+   the +3 participation floor means a full lobby that finishes is never a pure
+   loss for everybody. Total RP is clamped at 0 (no negative ladder). */
+function snlRankDelta(place, players) {
+  if (!players || players < 2) return 0;
+  return Math.round(25 * (1 - (2 * (place - 1)) / (players - 1))) + 3;
+}
+function snlApplyRp(rp, place, players) {
+  return Math.max(0, (rp || 0) + snlRankDelta(place, players));
+}
+function snlRankedEligible(seats) {
+  const humans = seats.filter((s) => s.kind === 'human').length;
+  return seats.length >= SNL_RANKED_MIN_HUMANS && humans === seats.length;
+}
+
+/* ---- Progression (Legend unlock) --------------------------------------
+   Mirrored device-locally so the lobby can render before /api/snl/profile
+   answers, and so a signed-out player still keeps their unlock. */
+const SNL_PROGRESS_KEY = 'puzzlechain_snl_progress';
+function snlLoadLocalProgress() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SNL_PROGRESS_KEY) || '{}');
+    return {
+      superstarWins: raw.superstarWins || 0,
+      wins: raw.wins || 0, matches: raw.matches || 0,
+      rp: raw.rp || 0, rankedMatches: raw.rankedMatches || 0,
+    };
+  } catch { return { superstarWins: 0, wins: 0, matches: 0, rp: 0, rankedMatches: 0 }; }
+}
+function snlSaveLocalProgress(p) {
+  try { localStorage.setItem(SNL_PROGRESS_KEY, JSON.stringify(p)); } catch {}
+}
+// Fetch the server profile ONLY when a token exists. Without one, /api/snl/*
+// can only ever 401 (deny-by-default covers all of /api/), and the browser
+// logs that as a console error — which trips the no-console-errors baseline
+// for every signed-out visitor and every standalone/local page load. The
+// local mirror above is the intended answer in that case, so skipping the
+// call loses nothing: inside the platform shell a token is always injected.
+function snlFetchProfile() {
+  if (!USERNODE_TOKEN) return Promise.resolve(null);
+  return api('/api/snl/profile')
+    .then(({ ok, body }) => (ok && body && body.profile) || null)
+    .catch(() => null);
+}
+// The RULE, with no deep-link escape hatch in it. The self-test asserts this
+// one — a URL override baked into the predicate would make the test report a
+// failure on any page loaded with ?snlunlock=1, which is a console error and
+// therefore a failed proposal check.
+function snlLegendEarned(progress) {
+  return (progress && progress.superstarWins || 0) >= SNL_LEGEND_UNLOCK_WINS;
+}
+function snlLegendUnlocked(progress) {
+  // ?snlunlock=1 is a PURE UI-state deep link: it opens the Legend board for
+  // this page load so the unlocked lobby is screenshot- and check-reachable.
+  // It writes nothing, is deliberately NOT staging-gated (the "before" shot
+  // comes from production), and grants nothing — Legend is only a harder
+  // board, and the server never gated it either.
+  if (snlQ('snlunlock') === '1') return true;
+  return snlLegendEarned(progress);
+}
+function snlBoardLocked(board, progress) {
+  return board.lockedBy === 'superstar' && !snlLegendUnlocked(progress);
+}
+// Lock state as the RULE sees it, ignoring the deep link (self-tests only).
+function snlBoardEarnedLocked(board, progress) {
+  return board.lockedBy === 'superstar' && !snlLegendEarned(progress);
+}
+// Fold one finished match into the local progression mirror. The server row
+// is authoritative when signed in, but this keeps the Legend unlock and the
+// tier badge correct offline and instantly, before the POST lands.
+function snlApplyResult(progress, res) {
+  const p = Object.assign({}, progress);
+  p.matches = (p.matches || 0) + 1;
+  if (res.place === 1) {
+    p.wins = (p.wins || 0) + 1;
+    if (res.boardId === 'superstar') p.superstarWins = (p.superstarWins || 0) + 1;
+  }
+  if (res.mode === 'ranked') {
+    p.rankedMatches = (p.rankedMatches || 0) + 1;
+    p.rp = snlApplyRp(p.rp || 0, res.place, res.players);
+  }
+  return p;
+}
+
+/* ---- Ranked sheet section ---------------------------------------------
+   Registry-driven (`sheetExtras` on the chutes-ladders entry), so the ☰ sheet
+   and `?sheet=ranked` both reach it. Shows the viewer's RP + tier progress
+   from the local mirror (instant, works signed out) and the global RP board
+   from the public endpoint. */
+function SnlTierBar({ rp }) {
+  const tier = snlTierFor(rp);
+  const next = snlNextTier(rp);
+  const span = next ? Math.max(1, next.min - tier.min) : 1;
+  const pct = next ? Math.max(0, Math.min(100, Math.round(((rp - tier.min) / span) * 100))) : 100;
+  return (
+    <div className="snl-tier-block">
+      <div className="snl-tier-head">
+        <span className="snl-tier-badge" style={{ borderColor: tier.color, color: tier.color }}>
+          {tier.icon} {tier.name}
+        </span>
+        <span className="snl-tier-rp mono">{rp} RP</span>
+      </div>
+      <div className="snl-tier-track"><div className="snl-tier-fill" style={{ width: pct + '%' }} /></div>
+      <div className="snl-tier-note">
+        {next
+          ? `${next.min - rp} RP to ${next.icon} ${next.name}`
+          : 'Top tier reached — hold the line.'}
+      </div>
+    </div>
+  );
+}
+
+function SnlRankedPanel() {
+  const [progress, setProgress] = useState(() => snlLoadLocalProgress());
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let dead = false;
+    snlFetchProfile().then((pr) => {
+      if (dead || !pr) return;
+      setProgress((p) => ({
+        superstarWins: Math.max(p.superstarWins || 0, pr.superstarWins || 0),
+        wins: Math.max(p.wins || 0, pr.wins || 0),
+        matches: Math.max(p.matches || 0, pr.matches || 0),
+        rp: Math.max(p.rp || 0, pr.rp || 0),
+        rankedMatches: Math.max(p.rankedMatches || 0, pr.rankedMatches || 0),
+      }));
+    });
+    api('/api/snl/ranked/leaderboard').then(({ ok, body }) => {
+      if (dead) return;
+      if (ok && body) setData(body);
+      setLoading(false);
+    }).catch(() => { if (!dead) setLoading(false); });
+    return () => { dead = true; };
+  }, []);
+  const entries = (data && data.entries) || [];
+  const me = data && data.me;
+  const meInTop = me && entries.some((e) => e.rank === me.rank);
+  return (
+    <div className="snl-ranked-panel">
+      <h4>Ranked</h4>
+      <SnlTierBar rp={progress.rp || 0} />
+      <div className="snl-ranked-stats">
+        <span className="pill"><span className="plabel">Ranked</span><span className="pvalue mono">{progress.rankedMatches || 0}</span></span>
+        <span className="pill"><span className="plabel">Wins</span><span className="pvalue mono">{progress.wins || 0}</span></span>
+        <span className="pill"><span className="plabel">Super Star</span><span className="pvalue mono">{progress.superstarWins || 0}/{SNL_LEGEND_UNLOCK_WINS}</span></span>
+      </div>
+      <div className="snl-ranked-note">
+        Ranked Match is hot-seat and needs {SNL_RANKED_MIN_HUMANS}+ humans. Finishing
+        first pays the most RP; last place still pays a little for showing up.
+      </div>
+      <h4 style={{ marginTop: '0.9rem' }}>RP Leaderboard</h4>
+      {loading
+        ? <div className="cg-sheet-empty">Loading…</div>
+        : entries.length === 0
+          ? <div className="cg-sheet-empty">No ranked matches yet — play one!</div>
+          : (
+            <div className="snake-lb">
+              {entries.map((r) => (
+                <div key={r.rank} className={'snake-lb-row' + (r.isCurrentUser ? ' snake-lb-me' : '')}>
+                  <div className="snake-lb-rank">#{r.rank}</div>
+                  <div className="snake-lb-name">{r.username}{r.isCurrentUser ? ' (you)' : ''}</div>
+                  <div className="snake-lb-score">{snlTierFor(r.rp).icon} {r.rp} RP</div>
+                </div>
+              ))}
+              {me && !meInTop && (
+                <div className="snake-lb-row snake-lb-me">
+                  <div className="snake-lb-rank">#{me.rank}</div>
+                  <div className="snake-lb-name">{me.username} (you)</div>
+                  <div className="snake-lb-score">{snlTierFor(me.rp).icon} {me.rp} RP</div>
+                </div>
+              )}
+            </div>
+          )}
+    </div>
+  );
+}
+
+/* ---- Vector art: ladders, snakes, chess pieces -------------------------
+   All three draw in CSS pixels into whatever context they're handed, so the
+   static board layer and the standalone lobby previews share one renderer.
+   Colours come in as literals (intrinsic art) — never `C.x`, which is a
+   var() string guardCanvasCtx would reject. */
+const SNL_LADDER_STYLE = { wood: '#c98a3c', dark: '#8a5a22', light: '#e8b567' };
+const SNL_SNAKE_COLORS = [
+  { body: '#3f9e57', belly: '#b9e2a6', dark: '#245c33' },
+  { body: '#c2543f', belly: '#efc0a5', dark: '#7c2c1d' },
+  { body: '#6a63c8', belly: '#c3bff0', dark: '#3b3580' },
+  { body: '#c9a02b', belly: '#f2e0a0', dark: '#7d6111' },
+];
+
+function snlDrawLadder(ctx, ax, ay, bx, by, w, style) {
+  const st = style || SNL_LADDER_STYLE;
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.max(1, Math.hypot(dx, dy));
+  const ux = dx / len, uy = dy / len;
+  const px = -uy, py = ux;                     // unit perpendicular
+  const half = w / 2;
+  ctx.save();
+  ctx.lineCap = 'round';
+  // Rungs first so the rails paint over their ends.
+  const rungs = Math.max(2, Math.round(len / (w * 0.85)));
+  ctx.strokeStyle = st.dark;
+  ctx.lineWidth = Math.max(1.4, w * 0.16);
+  for (let i = 1; i < rungs; i++) {
+    const t = i / rungs;
+    const cx = ax + dx * t, cy = ay + dy * t;
+    ctx.beginPath();
+    ctx.moveTo(cx + px * half, cy + py * half);
+    ctx.lineTo(cx - px * half, cy - py * half);
+    ctx.stroke();
+  }
+  ctx.lineWidth = Math.max(2, w * 0.2);
+  for (const sgn of [1, -1]) {
+    ctx.strokeStyle = st.wood;
+    ctx.beginPath();
+    ctx.moveTo(ax + px * half * sgn, ay + py * half * sgn);
+    ctx.lineTo(bx + px * half * sgn, by + py * half * sgn);
+    ctx.stroke();
+    // A thin highlight down one edge of each rail reads as rounded wood.
+    ctx.strokeStyle = st.light;
+    ctx.lineWidth = Math.max(1, w * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(ax + px * half * sgn - px * w * 0.05, ay + py * half * sgn - py * w * 0.05);
+    ctx.lineTo(bx + px * half * sgn - px * w * 0.05, by + py * half * sgn - py * w * 0.05);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(2, w * 0.2);
+  }
+  ctx.restore();
+}
+
+/* The snake's spine is one cubic curve; the animation layer walks the SAME
+   curve so a sliding pawn tracks the drawn body instead of cutting across it. */
+function snlSnakeCurve(ax, ay, bx, by, seed) {
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.max(1, Math.hypot(dx, dy));
+  const px = -dy / len, py = dx / len;
+  const amp = Math.min(len * 0.28, 46) * (seed % 2 ? 1 : -1);
+  return [
+    { x: ax, y: ay },
+    { x: ax + dx * 0.3 + px * amp, y: ay + dy * 0.3 + py * amp },
+    { x: ax + dx * 0.7 - px * amp, y: ay + dy * 0.7 - py * amp },
+    { x: bx, y: by },
+  ];
+}
+function snlCurveAt(c, t) {
+  const mt = 1 - t;
+  const a = mt * mt * mt, b = 3 * mt * mt * t, d = 3 * mt * t * t, e = t * t * t;
+  return { x: a * c[0].x + b * c[1].x + d * c[2].x + e * c[3].x,
+           y: a * c[0].y + b * c[1].y + d * c[2].y + e * c[3].y };
+}
+
+function snlDrawSnake(ctx, ax, ay, bx, by, w, colors, seed) {
+  const col = colors || SNL_SNAKE_COLORS[0];
+  const curve = snlSnakeCurve(ax, ay, bx, by, seed || 0);
+  const steps = 44;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Body drawn as tapering segments: head-thick down to a fine tail.
+  let prev = snlCurveAt(curve, 0);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const p = snlCurveAt(curve, t);
+    const wide = w * (1 - 0.62 * t);
+    ctx.strokeStyle = col.dark;
+    ctx.lineWidth = wide;
+    ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.strokeStyle = col.body;
+    ctx.lineWidth = Math.max(0.8, wide * 0.78);
+    ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    if (i % 4 === 0) {
+      ctx.strokeStyle = col.belly;
+      ctx.lineWidth = Math.max(0.6, wide * 0.3);
+      ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+    prev = p;
+  }
+  // Head at the high square (where a pawn gets swallowed).
+  const nxt = snlCurveAt(curve, 0.06);
+  const hAng = Math.atan2(nxt.y - ay, nxt.x - ax);
+  const hr = w * 0.82;
+  ctx.translate(ax, ay);
+  ctx.rotate(hAng);
+  ctx.fillStyle = col.body;
+  ctx.strokeStyle = col.dark;
+  ctx.lineWidth = Math.max(1, w * 0.12);
+  ctx.beginPath();
+  ctx.ellipse(-hr * 0.15, 0, hr, hr * 0.78, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // Forked tongue, out the front of the head.
+  ctx.strokeStyle = '#e04a5a';
+  ctx.lineWidth = Math.max(1, w * 0.11);
+  ctx.beginPath();
+  ctx.moveTo(hr * 0.7, 0); ctx.lineTo(hr * 1.45, 0);
+  ctx.moveTo(hr * 1.45, 0); ctx.lineTo(hr * 1.8, -hr * 0.3);
+  ctx.moveTo(hr * 1.45, 0); ctx.lineTo(hr * 1.8, hr * 0.3);
+  ctx.stroke();
+  // Eyes.
+  for (const sgn of [-1, 1]) {
+    ctx.fillStyle = '#fdfdfd';
+    ctx.beginPath(); ctx.arc(hr * 0.15, sgn * hr * 0.4, hr * 0.28, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(hr * 0.22, sgn * hr * 0.4, hr * 0.13, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* Chess-piece silhouettes. `s` is the piece height in CSS px; (cx, cy) is the
+   CENTRE of its footprint, so the caller can place one per board square. */
+function snlDrawPiece(ctx, cx, cy, s, pieceId, color, dark) {
+  const u = s / 100;                       // the paths are authored on a 100 grid
+  ctx.save();
+  ctx.translate(cx, cy + s * 0.06);
+  ctx.scale(u, u);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = dark || '#00000055';
+  ctx.fillStyle = color;
+  const base = () => {
+    ctx.beginPath();
+    ctx.ellipse(0, 44, 32, 10, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-26, 40); ctx.lineTo(-17, 22); ctx.lineTo(17, 22); ctx.lineTo(26, 40);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  };
+  const ball = (y, r) => { ctx.beginPath(); ctx.arc(0, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); };
+  base();
+  if (pieceId === 'rook') {
+    ctx.beginPath();
+    ctx.moveTo(-16, 22); ctx.lineTo(-13, -18); ctx.lineTo(13, -18); ctx.lineTo(16, 22);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-22, -18); ctx.lineTo(-22, -38); ctx.lineTo(-12, -38); ctx.lineTo(-12, -29);
+    ctx.lineTo(-5, -29); ctx.lineTo(-5, -38); ctx.lineTo(5, -38); ctx.lineTo(5, -29);
+    ctx.lineTo(12, -29); ctx.lineTo(12, -38); ctx.lineTo(22, -38); ctx.lineTo(22, -18);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (pieceId === 'bishop') {
+    ctx.beginPath();
+    ctx.moveTo(-14, 22); ctx.quadraticCurveTo(-20, -6, 0, -30);
+    ctx.quadraticCurveTo(20, -6, 14, 22);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ball(-38, 9);
+    ctx.beginPath(); ctx.moveTo(4, -26); ctx.lineTo(12, -12); ctx.stroke();
+  } else if (pieceId === 'knight') {
+    ctx.beginPath();
+    ctx.moveTo(-18, 22); ctx.lineTo(-14, 0); ctx.quadraticCurveTo(-22, -14, -8, -28);
+    ctx.lineTo(-14, -40); ctx.lineTo(2, -34); ctx.quadraticCurveTo(24, -30, 22, -4);
+    ctx.lineTo(18, 22);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = dark || '#00000055';
+    ctx.beginPath(); ctx.arc(2, -24, 4, 0, Math.PI * 2); ctx.fill();
+  } else if (pieceId === 'queen' || pieceId === 'king') {
+    ctx.beginPath();
+    ctx.moveTo(-15, 22); ctx.quadraticCurveTo(-22, -4, -14, -20);
+    ctx.lineTo(14, -20); ctx.quadraticCurveTo(22, -4, 15, 22);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (pieceId === 'queen') {
+      ctx.beginPath();
+      ctx.moveTo(-24, -20); ctx.lineTo(-28, -48); ctx.lineTo(-12, -32);
+      ctx.lineTo(0, -52); ctx.lineTo(12, -32); ctx.lineTo(28, -48); ctx.lineTo(24, -20);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(-22, -20); ctx.quadraticCurveTo(-24, -40, 0, -38);
+      ctx.quadraticCurveTo(24, -40, 22, -20);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(0, -60); ctx.moveTo(-9, -52); ctx.lineTo(9, -52);
+      ctx.stroke();
+    }
+  } else {
+    // pawn
+    ctx.beginPath();
+    ctx.moveTo(-13, 22); ctx.quadraticCurveTo(-17, 0, -7, -10);
+    ctx.lineTo(7, -10); ctx.quadraticCurveTo(17, 0, 13, 22);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ball(-24, 14);
+  }
+  ctx.restore();
+}
+
+/* ---- Board canvas ------------------------------------------------------
+   The grid + ladders + snakes never change during a match, so they are drawn
+   ONCE into an offscreen layer keyed by [side, board, skin, theme]; each frame
+   is that layer blitted plus N pawns. That is what makes a 60fps pawn slide
+   affordable on a phone. */
+const SNL_LAYER_CACHE = new Map();
+function snlStaticLayer(side, board, skin, themeV) {
+  const dpr = canvasDpr();
+  const key = [Math.round(side), dpr, board.id, skin.id, themeV].join('|');
+  const hit = SNL_LAYER_CACHE.get(key);
+  if (hit) return hit;
+  const cvs = document.createElement('canvas');
+  cvs.width = Math.max(1, Math.floor(side * dpr));
+  cvs.height = cvs.width;
+  const ctx = guardCanvasCtx(cvs.getContext('2d'));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pad = 4;
+  const inner = side - pad * 2;
+  const cs = inner / 10;
+  const at = (n) => {
+    const p = cnlCenterPct(n);
+    return { x: pad + (p.x / 100) * inner, y: pad + (p.y / 100) * inner };
+  };
+  // Cells.
+  ctx.fillStyle = palOf('card', '#fff');
+  ctx.fillRect(0, 0, side, side);
+  for (let n = 1; n <= 100; n++) {
+    const { row, col } = cnlRowCol(n);
+    const vr = 9 - row;
+    const x = pad + col * cs, y = pad + vr * cs;
+    const shade = (row + col) % 2 === 0;
+    ctx.fillStyle = shade ? (skin.cellTint || palOf('bg', '#f4f1ea')) : palOf('card', '#fff');
+    ctx.fillRect(x, y, cs, cs);
+    ctx.strokeStyle = palOf('border', '#ddd');
+    ctx.lineWidth = 1;
+    ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(cs), Math.round(cs));
+    ctx.fillStyle = palOf('muted', '#999');
+    ctx.font = Math.max(8, Math.round(cs * 0.26)) + 'px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(String(n), x + cs * 0.1, y + cs * 0.08);
+  }
+  // Home flag on 100.
+  const home = at(100);
+  ctx.fillStyle = '#d8a32b';
+  ctx.beginPath(); ctx.arc(home.x, home.y, cs * 0.26, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#5a3f06';
+  ctx.font = Math.max(9, Math.round(cs * 0.3)) + 'px "Space Grotesk", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('★', home.x, home.y + 1);
+  // Ladders then snakes (snakes on top: they're the drama).
+  const lw = Math.max(6, cs * 0.42);
+  Object.keys(board.ladders).forEach((k) => {
+    const a = at(parseInt(k, 10)), b = at(board.ladders[k]);
+    snlDrawLadder(ctx, a.x, a.y, b.x, b.y, lw, skin.ladderWood || SNL_LADDER_STYLE);
+  });
+  const pal = (skin.snakeColors && skin.snakeColors.length) ? skin.snakeColors : SNL_SNAKE_COLORS;
+  Object.keys(board.snakes).forEach((k, i) => {
+    const from = parseInt(k, 10);
+    const a = at(from), b = at(board.snakes[k]);
+    snlDrawSnake(ctx, a.x, a.y, b.x, b.y, Math.max(5, cs * 0.34), pal[i % pal.length], from);
+  });
+  if (SNL_LAYER_CACHE.size > 6) SNL_LAYER_CACHE.delete(SNL_LAYER_CACHE.keys().next().value);
+  SNL_LAYER_CACHE.set(key, cvs);
+  return cvs;
+}
+
+/* frameRef.current is a plain map seatId -> { xp, yp, lift, shake } in board
+   percent coords, written by the animator every rAF tick. A seat with no
+   entry falls back to its logical square, which is what makes the board
+   correct on first paint and after a resume. */
+function SnlBoardCanvas({ board, skin, seats, frameRef, animating, redrawKey, onFrame }) {
+  const boxRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { boxW } = useFitBox(boxRef, { cols: 10, rows: 10 });
+  const side = Math.max(0, Math.floor(boxW));
+  const themeV = useThemeVersion();
+  const drawRef = useRef(null);
+  // One rAF for the whole game: the animator's per-frame tick runs here,
+  // immediately before the draw that consumes it, so there is never a second
+  // competing loop writing frameRef between paints.
+  const frameCbRef = useRef(null);
+  frameCbRef.current = onFrame;
+
+  drawRef.current = () => {
+    if (frameCbRef.current) frameCbRef.current();
+    const cvs = canvasRef.current;
+    if (!cvs || side < 80) return;
+    const dpr = canvasDpr();
+    const want = Math.floor(side * dpr);
+    // Both dimensions, deliberately: a fresh <canvas> is 300x150, so at a
+    // 300px board on a dpr-1 phone `width !== want` is already false and a
+    // width-only guard leaves the height at 150 — the board renders as its
+    // top four rows and nothing below.
+    if (cvs.width !== want || cvs.height !== want) {
+      cvs.width = want; cvs.height = want;
+      cvs.style.width = side + 'px'; cvs.style.height = side + 'px';
+    }
+    const ctx = guardCanvasCtx(cvs.getContext('2d'));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, side, side);
+    ctx.drawImage(snlStaticLayer(side, board, skin, themeV), 0, 0, side, side);
+    const pad = 4;
+    const inner = side - pad * 2;
+    const cs = inner / 10;
+    const frame = (frameRef && frameRef.current) || {};
+    seats.forEach((s, i) => {
+      const f = frame[s.id];
+      const p = f || cnlCenterPct(s.pos);
+      const col = snlSeatColor(s.colorIdx);
+      // A stable micro-offset per seat keeps six pawns on one square legible.
+      const ox = ((i % 3) - 1) * cs * 0.22;
+      const oy = (Math.floor(i / 3) - 0.5) * cs * 0.2;
+      const shake = f && f.shake ? (Math.random() - 0.5) * f.shake : 0;
+      const lift = f && f.lift ? f.lift * cs * 0.55 : 0;
+      // Off-board (square 0) sits at 104% by the shared board convention —
+      // outside this canvas, which is exactly `side` tall, so an unclamped
+      // start pawn is half-clipped by the bottom edge. The DOM board it was
+      // written for had an overflow-visible wrapper; a canvas has no such
+      // thing, so clamp the pawn back inside the last row instead.
+      const rawY = Math.min(p.yp != null ? p.yp : p.y, 97);
+      const x = pad + ((p.xp != null ? p.xp : p.x) / 100) * inner + ox + shake;
+      const y = pad + (rawY / 100) * inner + oy - lift;
+      if (lift > 0.5) {
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.beginPath();
+        ctx.ellipse(x, pad + (rawY / 100) * inner + oy + cs * 0.2,
+                    cs * 0.18, cs * 0.06, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      snlDrawPiece(ctx, x, y, cs * (s.finishedAt ? 0.62 : 0.78), s.pieceId, col.hex, col.dark);
+    });
+  };
+
+  const posKey = seats.map((s) => s.pos + ':' + s.place).join(',');
+  useEffect(() => { if (drawRef.current) drawRef.current(); },
+    [side, themeV, redrawKey, board.id, skin.id, seats.length, posKey]);
+
+  useEffect(() => {
+    if (!animating) return;
+    let raf = 0;
+    const loop = () => { if (drawRef.current) drawRef.current(); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [animating]);
+
+  const aria = 'Snakes and Ladders board (' + board.name + '): '
+    + seats.map((s) => s.name + ' (' + snlPieceName(s.pieceId) + ') on square ' + (s.pos || 0)).join(', ');
+  // Test-only markers (#177 follow-up). The board is a canvas, so a check can
+  // read neither the pieces nor their colours — and the attribute the old DOM
+  // board carried (`data-cnl-p2="diamond"`) does not exist here, because the
+  // tokens are chess pieces now. These two derive from the SAME `seats` array
+  // the draw loop uses, in seat order, so "P1 and P2 are visually distinct"
+  // stays assertable by navigation alone. Derived values only — no new state.
+  const pieceAttr = seats.map((s) => s.pieceId).join(',');
+  const colorAttr = seats.map((s) => snlSeatColor(s.colorIdx).id).join(',');
+  return (
+    <div className="cnl-board-canvas-fill" ref={boxRef}>
+      <canvas
+        ref={canvasRef}
+        className="cnl-canvas snl-canvas board-canvas"
+        role="img"
+        data-snl-pawns="chess"
+        data-snl-board={board.id}
+        data-snl-pieces={pieceAttr}
+        data-snl-seat-colors={colorAttr}
+        aria-label={aria}
+      />
+    </div>
+  );
+}
+
+/* ---- Deep-link params --------------------------------------------------
+   dapp.json checks and the before/after screenshots can only NAVIGATE, so
+   every state worth showing needs a URL that reaches it. */
+function snlQ(k) {
+  try { return new URLSearchParams(window.location.search).get(k); } catch { return null; }
+}
+
+/* ---- Lobby -------------------------------------------------------------
+   2-6 seats, each Human or Bot, with a piece and a colour; a board picker
+   with the Legend lock; and the Party / Ranked toggle. Plain DOM (the same
+   idiom as ChutesLaddersModeSelect) — only the in-match frame is canvas. */
+function SnlLobby({ progress, initialMode, onStart, onCancel }) {
+  const qBoard = snlQ('snlboard');
+  const qSeats = parseInt(snlQ('snlseats') || '0', 10);
+  const [boardId, setBoardId] = useState(
+    (qBoard && SNL_BOARD_MAP[qBoard]) ? qBoard : SNL_DEFAULT_BOARD);
+  const [mode, setMode] = useState(initialMode === 'ranked' ? 'ranked' : 'party');
+  const [seats, setSeats] = useState(() => {
+    const n = Math.max(SNL_MIN_SEATS, Math.min(SNL_MAX_SEATS, qSeats || (initialMode === 'ranked' ? 4 : 3)));
+    return Array.from({ length: n }, (_, i) => ({
+      kind: initialMode === 'ranked' ? 'human' : (i === 0 ? 'human' : 'bot'),
+      name: (initialMode === 'ranked' || i === 0) ? 'Player ' + (i + 1) : 'Bot ' + (i + 1),
+      pieceId: SNL_PIECES[i % SNL_PIECES.length].id,
+      colorIdx: i,
+    }));
+  });
+  const [expanded, setExpanded] = useState(-1);
+
+  const board = snlBoardById(boardId);
+  const locked = snlBoardLocked(board, progress);
+  const rankedOk = snlRankedEligible(seats);
+  const canStart = !locked && (mode !== 'ranked' || rankedOk);
+
+  const setSeat = (i, patch) => setSeats((prev) =>
+    prev.map((s, j) => (j === i ? Object.assign({}, s, patch) : s)));
+
+  const setCount = (n) => setSeats((prev) => {
+    const next = prev.slice(0, n);
+    while (next.length < n) {
+      const i = next.length;
+      next.push({
+        kind: mode === 'ranked' ? 'human' : 'bot',
+        name: (mode === 'ranked' ? 'Player ' : 'Bot ') + (i + 1),
+        pieceId: SNL_PIECES[i % SNL_PIECES.length].id, colorIdx: i,
+      });
+    }
+    return next;
+  });
+
+  const pickMode = (m) => {
+    setMode(m);
+    if (m === 'ranked') {
+      // Ranked is hot-seat with four real people; flip the bots to humans
+      // rather than silently refusing to start.
+      setSeats((prev) => {
+        const next = prev.map((s, i) => Object.assign({}, s, {
+          kind: 'human',
+          name: s.kind === 'bot' ? 'Player ' + (i + 1) : s.name,
+        }));
+        while (next.length < SNL_RANKED_MIN_HUMANS) {
+          const i = next.length;
+          next.push({ kind: 'human', name: 'Player ' + (i + 1),
+            pieceId: SNL_PIECES[i % SNL_PIECES.length].id, colorIdx: i });
+        }
+        return next;
+      });
+    }
+  };
+
+  const superWins = (progress && progress.superstarWins) || 0;
+
+  return (
+    <div className="snl-lobby mnc-mode-select">
+      <div className="cnl-variant-block">
+        <div className="cnl-variant-label">Match type</div>
+        <div className="mnc-mode-sub">
+          <button className={'mnc-difficulty-pill' + (mode === 'party' ? ' active' : '')}
+            onClick={() => pickMode('party')}>🎉 Party</button>
+          <button className={'mnc-difficulty-pill' + (mode === 'ranked' ? ' active' : '')}
+            onClick={() => pickMode('ranked')}>🏆 Ranked Match</button>
+        </div>
+        {mode === 'ranked' && (
+          <div className="cnl-variant-note">
+            Ranked is hot-seat: {SNL_RANKED_MIN_HUMANS}+ human players on this device, no bots.
+            Every finishing place moves your RP.
+            {!rankedOk && <strong className="snl-warn"> Add humans to start a ranked match.</strong>}
+          </div>
+        )}
+      </div>
+
+      <div className="cnl-variant-block">
+        <div className="cnl-variant-label">Board</div>
+        <div className="snl-board-grid">
+          {snlLadderBoards().map((b) => {
+            const lk = snlBoardLocked(b, progress);
+            return (
+              <button key={b.id}
+                className={'snl-board-card' + (boardId === b.id ? ' active' : '') + (lk ? ' locked' : '')}
+                {...tapProps(() => setBoardId(b.id))}>
+                <span className="snl-board-name">{lk ? '🔒 ' : ''}{b.name}</span>
+                <span className="snl-board-meta">
+                  {Object.keys(b.ladders).length} ladders · {Object.keys(b.snakes).length} snakes
+                </span>
+              </button>
+            );
+          })}
+          <button className={'snl-board-card' + (boardId === 'moksha' ? ' active' : '')}
+            {...tapProps(() => setBoardId('moksha'))}>
+            <span className="snl-board-name">Moksha Patam</span>
+            <span className="snl-board-meta">The Indian original</span>
+          </button>
+        </div>
+        <div className="cnl-variant-note">{board.desc}</div>
+        {locked && (
+          <div className="snl-lock-note">
+            🔒 Legend unlocks after {SNL_LEGEND_UNLOCK_WINS} Super Star wins —
+            you have {Math.min(superWins, SNL_LEGEND_UNLOCK_WINS)}/{SNL_LEGEND_UNLOCK_WINS}.
+          </div>
+        )}
+      </div>
+
+      <div className="cnl-variant-block">
+        <div className="cnl-variant-label">Players ({seats.length})</div>
+        <div className="mnc-mode-sub">
+          {[2, 3, 4, 5, 6].map((n) => (
+            <button key={n} className={'mnc-difficulty-pill' + (seats.length === n ? ' active' : '')}
+              onClick={() => setCount(n)}>{n}</button>
+          ))}
+        </div>
+        <div className="snl-seat-list">
+          {seats.map((s, i) => {
+            const col = snlSeatColor(s.colorIdx);
+            return (
+              <div className="snl-seat-row" key={i}>
+                <span className="snl-seat-dot" style={{ background: col.hex }} />
+                <input className="snl-seat-name" value={s.name} maxLength={14}
+                  aria-label={'Player ' + (i + 1) + ' name'}
+                  onChange={(e) => setSeat(i, { name: e.target.value })} />
+                <button className={'snl-seat-btn' + (s.kind === 'human' ? ' active' : '')}
+                  disabled={mode === 'ranked'}
+                  {...tapProps(() => setSeat(i, {
+                    kind: s.kind === 'human' ? 'bot' : 'human',
+                    name: s.kind === 'human' ? 'Bot ' + (i + 1) : 'Player ' + (i + 1),
+                  }), { disabled: mode === 'ranked' })}>{s.kind === 'human' ? '🧑 Human' : '🤖 Bot'}</button>
+                <button className="snl-seat-btn" {...tapProps(() => setExpanded(expanded === i ? -1 : i))}>
+                  {snlPieceName(s.pieceId)} ▾
+                </button>
+                {expanded === i && (
+                  <div className="snl-seat-picker">
+                    <div className="snl-pick-row">
+                      {SNL_PIECES.map((p) => (
+                        <button key={p.id}
+                          className={'snl-piece-pick' + (s.pieceId === p.id ? ' active' : '')}
+                          {...tapProps(() => setSeat(i, { pieceId: p.id }))}>{p.name}</button>
+                      ))}
+                    </div>
+                    <div className="snl-pick-row">
+                      {SNL_SEAT_COLORS.map((c, ci) => (
+                        <button key={c.id}
+                          className={'snl-color-pick' + (s.colorIdx === ci ? ' active' : '')}
+                          style={{ background: c.hex }} aria-label={c.name}
+                          {...tapProps(() => setSeat(i, { colorIdx: ci }))} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <button className="mnc-mode-start-btn" disabled={!canStart}
+        onClick={() => canStart && onStart({ boardId, mode, seats })}>
+        {locked ? 'Legend is locked' : (mode === 'ranked' ? 'Start Ranked Match' : 'Start Party')}
+      </button>
+      {onCancel && <button className="cnl-variant-link snl-lobby-back" onClick={() => onCancel()}>← Back to modes</button>}
+    </div>
+  );
+}
+
+/* ---- Animation timings ------------------------------------------------- */
+const SNL_ANIM = { dice: 620, hop: 130, ladderRung: 90, snake: 700, bump: 300, beat: 420 };
+// Reduced motion still plays the full event sequence (and its sounds) — it
+// just snaps between states instead of tweening, so nothing becomes
+// unreadable and no result is skipped.
+function snlDur(ms) { return cgPrefs.motion ? Math.min(ms, 30) : ms; }
+
+function snlPct(sq) { const p = cnlCenterPct(sq); return { xp: p.x, yp: p.y, lift: 0, shake: 0 }; }
+
+/* ---- The match --------------------------------------------------------- */
+function SnlMatch({ config, onWin, onStepChange, resetKey, onExit, onResult, practice }) {
+  const [match, setMatch] = useState(() => snlInitialMatch(config));
+  const [die, setDie] = useState(null);
+  const [rolling, setRolling] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [banner, setBanner] = useState('');
+  const [redrawKey, setRedrawKey] = useState(0);
   const [skin, setSkin] = useCnlSkin();
-  const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
+  const SK = CNL_SKINS[skin] || CNL_SKINS.plain;
+  const board = snlBoardById(match.boardId);
+  const over = match.phase === 'over';
+  const { secs, fmt } = useTimer(!over);
+  const secsRef = useRef(0); secsRef.current = secs;
+
+  const matchRef = useRef(match); matchRef.current = match;
+  const frameRef = useRef({});
+  const tweenRef = useRef(null);
+  const queueRef = useRef([]);
+  const timersRef = useRef([]);
+  const winSentRef = useRef(false);
+  const stepsRef = useRef(0);
+
   const cycleSkin = () => {
     const ids = Object.keys(CNL_SKINS);
     setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
   };
-  const [p1Pos, setP1Pos]   = useState(0);
-  const [p2Pos, setP2Pos]   = useState(0);
-  const [player, setPlayer] = useState(1);
-  const [die, setDie]       = useState(null);
-  const [rolls, setRolls]   = useState(0);
-  const [animating, setAnimating] = useState(false);
-  const [rolling, setRolling]     = useState(false);
-  const [done, setDone]     = useState(false);
-  const [winner, setWinner] = useState(null);
-  const [banner, setBanner] = useState('');
-  // Resume offer for a saved bot game; null once dismissed/applied.
-  const [resumeOffer, setResumeOffer] = useState(initialState || null);
 
-  const animatingRef = useRef(false);
-  const winTimerRef  = useRef(null);
-  const timersRef    = useRef([]);
+  const seatById = (id) => matchRef.current.seats.find((s) => s.id === id);
+  const nameOf = (id) => { const s = seatById(id); return s ? s.name : 'Player'; };
 
-  const { secs, fmt } = useTimer(!done);
-  const secsRef = useRef(0);
-  secsRef.current = secs;
-  const rollsRef = useRef(0);
-  rollsRef.current = rolls;
-
-  const pLabel = (who) => vsBot ? (who === 1 ? 'You' : 'Bot') : `Player ${who}`;
-
-  // Expose a save snapshot to the Game Menu while this is an active bot game.
-  useClassicSaveSource(vsBot && !done, () => ({
-    p1Pos, p2Pos, currentPlayer: player, rolls, secs: secsRef.current,
-  }));
-
-  const applyResume = () => {
-    const s = resumeOffer; if (!s) return;
-    setP1Pos(s.p1Pos || 0); setP2Pos(s.p2Pos || 0);
-    setPlayer(s.currentPlayer || 1); setRolls(s.rolls || 0);
-    rollsRef.current = s.rolls || 0;
-    setResumeOffer(null);
+  // Seed every pawn's drawn position once, so the first paint is correct and a
+  // resumed match renders its saved squares rather than the start line.
+  const seedFrame = (m) => {
+    const f = {};
+    m.seats.forEach((s) => { f[s.id] = snlPct(s.pos); });
+    frameRef.current = f;
   };
-  const dismissResume = () => { setResumeOffer(null); if (onClearSave) onClearSave(); };
+  const seedRef = useRef(false);
+  if (!seedRef.current) { seedFrame(match); seedRef.current = true; }
 
-  const clearTimers = () => {
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
-    if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
-  };
+  const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
+  const later = (fn, ms) => { const t = setTimeout(fn, ms); timersRef.current.push(t); return t; };
 
-  const resetGame = () => {
-    animatingRef.current = false;
+  useEffect(() => () => { clearTimers(); tweenRef.current = null; snlMusicStop(); }, []);
+
+  useEffect(() => {
+    if (!over && cgPrefs.music) snlMusicStart();
+    if (over) snlMusicStop();
+  }, [over]);
+
+  // Music intensity tracks the leader's progress up the board — the bed gets
+  // busier as somebody closes on 100.
+  useEffect(() => {
+    if (over) return;
+    const lead = match.seats.reduce((a, s) => Math.max(a, s.pos), 0);
+    snlMusicSetIntensity(lead / 100);
+  }, [match.seats.map((s) => s.pos).join(','), over]);
+
+  useEffect(() => {
     clearTimers();
-    setP1Pos(0); setP2Pos(0);
-    setPlayer(1); setDie(null); setRolls(0);
-    setAnimating(false); setRolling(false);
-    setDone(false); setWinner(null); setBanner('');
-  };
+    tweenRef.current = null;
+    queueRef.current = [];
+    winSentRef.current = false;
+    stepsRef.current = 0;
+    const m = snlInitialMatch(config);
+    seedFrame(m);
+    setMatch(m); setDie(null); setBusy(false); setRolling(false); setBanner('');
+    setRedrawKey((k) => k + 1);
+  }, [resetKey]);
 
-  useEffect(() => { resetGame(); }, [resetKey]);
-  useEffect(() => () => clearTimers(), []);
-
-  const p1Color = C.accent;
-  const p2Color = C.violet;
-  const p1Token = 'accent';
-  const p2Token = 'violet';
-  const activeColor = done ? C.muted : (player === 1 ? p1Color : p2Color);
-  const activeToken = done ? 'muted' : (player === 1 ? p1Token : p2Token);
-
-  const setPos = (who, val) => { who === 1 ? setP1Pos(val) : setP2Pos(val); };
-
-  const finishTurn = (who, landed) => {
-    const jump = V.jumps[landed];
-    // The win check must look at where the turn actually ENDS. A jump (e.g.
-    // the 80->100 ladder) moves the pawn past `landed`, so checking `landed`
-    // itself misses every jump-into-100 case and soft-locks the game.
-    const finalSquare = jump !== undefined ? jump : landed;
-    const settle = () => {
-      // Win check: must land exactly on 100 (no chute sits on 100).
-      if (finalSquare === 100) {
-        setDone(true);
-        setWinner(who);
-        if (onClearSave) onClearSave();
-        const label = `${pLabel(who)} win${vsBot && who === 1 ? '' : (vsBot ? 's' : 's')}! 🎉`;
-        setBanner(label);
-        const finalRolls = rollsRef.current;
-        const finalSecs = secsRef.current;
-        const score = Math.max(50, 300 - finalRolls * 5);
-        const share = `🪜 Snakes & Ladders — ${pLabel(who)} won in ${finalRolls} rolls!`;
-        winTimerRef.current = setTimeout(() => {
-          winTimerRef.current = null;
-          onWin(score, finalRolls, finalSecs, { winner: who, winnerLabel: label, share });
-        }, 1300);
-        return;
-      }
-      // Pass turn to the other player.
-      animatingRef.current = false;
-      setAnimating(false);
-      setPlayer(who === 1 ? 2 : 1);
-    };
-
-    if (jump !== undefined) {
-      // Brief pause so players see the landing, then climb/slide. On the
-      // Moksha board the banner names the virtue or vice you landed on, so the
-      // teaching content lands in the moment it applies.
-      const isLadder = V.ladders[landed] !== undefined;
-      const m = isMoksha ? CNL_MOKSHA_MEANINGS[landed] : null;
-      setBanner(m
-        ? `${m.name} (${m.sanskrit}) — ${isLadder ? 'climb up 🪜' : 'down you go 🐍'}`
-        : (isLadder ? 'Ladder up! 🪜' : 'Down the chute! 🛝'));
-      const t = setTimeout(() => {
-        setPos(who, jump);
-        const t2 = setTimeout(() => { setBanner(''); settle(); }, 320);
-        timersRef.current.push(t2);
-      }, 380);
-      timersRef.current.push(t);
-    } else {
-      settle();
+  /* -- the tween driver: one active tween, advanced from the canvas's rAF -- */
+  const onFrame = () => {
+    const tw = tweenRef.current;
+    if (!tw) return;
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const t = tw.dur <= 0 ? 1 : Math.min(1, (now - tw.t0) / tw.dur);
+    frameRef.current[tw.seatId] = tw.path(t);
+    if (t >= 1) {
+      tweenRef.current = null;
+      const done = tw.onDone;
+      if (done) done();
     }
   };
-
-  const roll = (clickedWho) => {
-    if (animatingRef.current || done || rolling) return;
-    // Buttons pass which player tapped; ignore a tap that isn't the active player.
-    if (clickedWho !== undefined && clickedWho !== player) return;
-    const who = player;
-    const value = Math.floor(Math.random() * 6) + 1;
-    const from = who === 1 ? p1Pos : p2Pos;
-    const newRolls = rolls + 1;
-
-    setRolling(true);
-    setDie(value);
-    setBanner('');
-    setRolls(newRolls);
-    rollsRef.current = newRolls;
-    onStepChange(newRolls);
-
-    const rollT = setTimeout(() => {
-      setRolling(false);
-
-      // Overshoot 100 => stay put, pass turn.
-      if (from + value > 100) {
-        setBanner('Overshoot — stay put');
-        const passT = setTimeout(() => {
-          setBanner('');
-          setPlayer(who === 1 ? 2 : 1);
-        }, 700);
-        timersRef.current.push(passT);
-        return;
-      }
-
-      // Hop square-by-square to the landing square.
-      animatingRef.current = true;
-      setAnimating(true);
-      const target = from + value;
-      let cur = from;
-      const hop = () => {
-        if (!animatingRef.current) return;
-        if (cur >= target) { finishTurn(who, target); return; }
-        cur++;
-        setPos(who, cur);
-        const t = setTimeout(hop, 130);
-        timersRef.current.push(t);
-      };
-      const t0 = setTimeout(hop, 130);
-      timersRef.current.push(t0);
-    }, 720);
-    timersRef.current.push(rollT);
+  const tween = (seatId, dur, path, onDone) => {
+    if (dur <= 0) { frameRef.current[seatId] = path(1); onDone(); return; }
+    tweenRef.current = {
+      seatId, dur, path, onDone,
+      t0: (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+    };
   };
 
-  // Bot auto-rolls for Player 2 in Versus-Bot mode.
-  useEffect(() => {
-    if (!vsBot || done || resumeOffer) return;
-    if (player !== 2 || animating || rolling) return;
-    const t = setTimeout(() => roll(2), 650);
-    return () => clearTimeout(t);
-  }, [vsBot, player, animating, rolling, done, resumeOffer]);
+  /* -- event playback -- */
+  const playEvent = (ev, next) => {
+    if (ev.type === 'roll') {
+      snlCue('dice'); cgHaptic(12);
+      setRolling(true); setDie(ev.die);
+      setBanner(nameOf(ev.seat) + ' rolled ' + ev.die + (ev.die === 6 ? ' — roll again!' : ''));
+      later(() => { setRolling(false); next(); }, snlDur(SNL_ANIM.dice));
+      return;
+    }
+    if (ev.type === 'move') {
+      const steps = ev.to - ev.from;
+      let cur = ev.from;
+      const hop = () => {
+        if (cur >= ev.to) { next(); return; }
+        const from = snlPct(cur), to = snlPct(cur + 1);
+        cur += 1;
+        snlCue('hop');
+        tween(ev.seat, snlDur(SNL_ANIM.hop), (t) => ({
+          xp: from.xp + (to.xp - from.xp) * t,
+          yp: from.yp + (to.yp - from.yp) * t,
+          lift: Math.sin(Math.PI * t) * 0.5, shake: 0,
+        }), hop);
+      };
+      if (steps <= 0) { next(); return; }
+      hop();
+      return;
+    }
+    if (ev.type === 'ladder') {
+      snlCue('ladder'); cgHaptic(18);
+      setBanner(nameOf(ev.seat) + ' climbs a ladder to ' + ev.to + '! 🪜');
+      const from = snlPct(ev.from), to = snlPct(ev.to);
+      const rungs = Math.max(3, Math.round(Math.abs(ev.to - ev.from) / 8));
+      tween(ev.seat, snlDur(SNL_ANIM.ladderRung * rungs), (t) => ({
+        xp: from.xp + (to.xp - from.xp) * t,
+        yp: from.yp + (to.yp - from.yp) * t,
+        // Stepping feel: a small saw-tooth lift, one bump per rung.
+        lift: 0.25 + 0.2 * Math.abs(Math.sin(Math.PI * t * rungs)), shake: 0,
+      }), next);
+      return;
+    }
+    if (ev.type === 'snake') {
+      snlCue('snake'); cgHaptic(26);
+      setBanner(nameOf(ev.seat) + ' is swallowed down to ' + ev.to + '! 🐍');
+      // Follow the SAME bezier the art draws, so the pawn slides along the
+      // body instead of cutting the corner.
+      const a = cnlCenterPct(ev.from), b = cnlCenterPct(ev.to);
+      const curve = snlSnakeCurve(a.x, a.y, b.x, b.y, ev.from);
+      tween(ev.seat, snlDur(SNL_ANIM.snake), (t) => {
+        const e = t * t * (3 - 2 * t);
+        const p = snlCurveAt(curve, e);
+        return { xp: p.x, yp: p.y, lift: 0, shake: 0 };
+      }, next);
+      return;
+    }
+    if (ev.type === 'bump') {
+      snlCue('bump'); cgHaptic(22);
+      setBanner(nameOf(ev.by) + ' knocks ' + nameOf(ev.seat) + ' back ' + SNL_BUMP + ' squares!');
+      const from = snlPct(ev.from), to = snlPct(ev.to);
+      tween(ev.seat, snlDur(SNL_ANIM.bump), (t) => ({
+        xp: from.xp + (to.xp - from.xp) * t,
+        yp: from.yp + (to.yp - from.yp) * t,
+        lift: Math.sin(Math.PI * t) * 0.35,
+        shake: (1 - t) * 3,
+      }), next);
+      return;
+    }
+    if (ev.type === 'overshoot') {
+      setBanner('Overshoot — needs exactly ' + ev.need + ' to finish');
+      later(next, snlDur(SNL_ANIM.beat));
+      return;
+    }
+    if (ev.type === 'forfeit-six') {
+      snlCue('forfeit');
+      setBanner('Three sixes in a row — ' + nameOf(ev.seat) + ' forfeits the move!');
+      later(next, snlDur(SNL_ANIM.beat + 260));
+      return;
+    }
+    if (ev.type === 'finish') {
+      snlCue('finish'); snlMusicSting(); cgHaptic(40);
+      setBanner(nameOf(ev.seat) + ' finishes in place #' + ev.place + '! 🎉');
+      later(next, snlDur(SNL_ANIM.beat + 200));
+      return;
+    }
+    if (ev.type === 'reroll') {
+      setBanner(nameOf(ev.seat) + ' rolls again (' + ev.streak + '/' + SNL_MAX_SIX_STREAK + ' sixes)');
+      later(next, snlDur(220));
+      return;
+    }
+    if (ev.type === 'turn') {
+      setBanner(nameOf(ev.seat) + "'s turn");
+      later(next, snlDur(180));
+      return;
+    }
+    next();
+  };
 
-  const bannerActive = !!banner;
-  const bannerColor = done ? C.muted : activeColor;
-  const bannerToken = done ? 'muted' : activeToken;
+  const pump = () => {
+    const q = queueRef.current;
+    if (!q.length) { setBusy(false); return; }
+    const ev = q.shift();
+    playEvent(ev, pump);
+  };
+
+  const doRoll = () => {
+    const m = matchRef.current;
+    if (busy || m.phase === 'over') return;
+    const value = snlRoll(m);
+    const res = snlTakeTurn(m, value);
+    stepsRef.current += 1;
+    if (onStepChange) onStepChange(stepsRef.current);
+    setMatch(res.match);
+    matchRef.current = res.match;
+    queueRef.current = res.events.slice();
+    setBusy(true);
+    pump();
+  };
+
+  /* ?snlanim=snake|ladder|bump|dice replays ONE scripted animation on the
+     opening board. The animation layer is otherwise reachable only by rolling,
+     which navigation-only screenshots and dapp.json checks cannot do — so
+     without this the whole slice is invisible to the gate. It plays events
+     against frameRef/banner only and never calls snlTakeTurn, so no match
+     state moves and nothing is recorded. */
+  const animDemoRef = useRef(false);
+  const animDemo = snlQ('snlanim');
+  useEffect(() => {
+    if (animDemoRef.current || !animDemo || over) return;
+    const seat = matchRef.current.seats[0];
+    if (!seat) return;
+    const ladderFrom = Object.keys(board.ladders)[0];
+    const snakeFrom = Object.keys(board.snakes)[0];
+    let evs = null;
+    if (animDemo === 'dice') {
+      evs = [{ type: 'roll', seat: seat.id, die: 6 }, { type: 'move', seat: seat.id, from: 1, to: 7 }];
+    } else if (animDemo === 'ladder' && ladderFrom) {
+      evs = [{ type: 'move', seat: seat.id, from: 1, to: Number(ladderFrom) },
+             { type: 'ladder', seat: seat.id, from: Number(ladderFrom), to: board.ladders[ladderFrom] }];
+    } else if (animDemo === 'snake' && snakeFrom) {
+      evs = [{ type: 'move', seat: seat.id, from: 1, to: Number(snakeFrom) },
+             { type: 'snake', seat: seat.id, from: Number(snakeFrom), to: board.snakes[snakeFrom] }];
+    } else if (animDemo === 'bump' && matchRef.current.seats[1]) {
+      const other = matchRef.current.seats[1];
+      evs = [{ type: 'move', seat: other.id, from: 1, to: 24 },
+             { type: 'bump', seat: other.id, by: seat.id, from: 24, to: Math.max(1, 24 - SNL_BUMP) }];
+    }
+    if (!evs) return;
+    animDemoRef.current = true;
+    queueRef.current = evs;
+    setBusy(true);
+    pump();
+  }, [animDemo, over]);
+
+  // Bots roll for themselves once the animation queue drains. The scripted
+  // ?snlanim demo holds them still so the recorded frame stays the one asked for.
+  useEffect(() => {
+    if (busy || over || animDemo) return;
+    const seat = match.seats.find((s) => s.id === match.turnSeat);
+    if (!seat || seat.kind !== 'bot') return;
+    const t = setTimeout(() => doRoll(), 620);
+    return () => clearTimeout(t);
+  }, [busy, over, match.turnSeat, match.turnNo]);
+
+  // Report the result once the last event has played out.
+  useEffect(() => {
+    if (!over || busy || winSentRef.current) return;
+    winSentRef.current = true;
+    const st = snlStandings(matchRef.current);
+    const you = matchRef.current.seats[0];
+    const place = you.place || st.length;
+    const won = place === 1;
+    const base = won
+      ? Math.max(60, 320 - you.rolls * 5)
+      : Math.max(15, 150 - (place - 1) * 30 - you.rolls * 2);
+    const label = won ? (you.name + ' wins! 🎉') : ('Finished #' + place + ' of ' + st.length);
+    const share = '🐍🪜 Snakes & Ladders (' + board.name + ') — '
+      + (won ? 'won' : '#' + place) + ' of ' + st.length + ' in ' + you.rolls + ' rolls!';
+    /* onResult owns progression + RP; it hands back the RP delta so the one
+       shell-owned win card can show it. `practice` short-circuits it entirely
+       (the inert replay path must never move a record). */
+    const res = (!practice && onResult)
+      ? onResult({ standings: st, place, players: st.length, board, match: matchRef.current })
+      : null;
+    onWin(base, stepsRef.current, secsRef.current, {
+      winner: won ? 1 : 0, winnerLabel: label, share,
+      standings: st.map((s) => ({
+        id: s.id, place: s.rank, name: s.name, bot: s.kind === 'bot',
+        color: snlSeatColor(s.colorIdx).hex, rolls: s.rolls, pos: s.pos,
+      })),
+      rankDelta: res && Number.isFinite(res.rankDelta) ? res.rankDelta : undefined,
+      rankTier: res && res.tierName ? res.tierName : undefined,
+    });
+  }, [over, busy]);
+
+  const cur = match.seats.find((s) => s.id === match.turnSeat) || null;
+  const curColor = cur ? snlSeatColor(cur.colorIdx).hex : PAL.muted;
+  const yourTurn = !!cur && cur.kind === 'human';
+  const seatRows = match.seats.length > 3 ? 2 : 1;
+  const statusH = 46 + (seatRows * 42) + 46;
 
   return (
-    <div>
-      {resumeOffer && (
-        <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />
-      )}
-      <CuiBar height={96} build={(W) => {
-        const pr = cuiRow(0, 0, W, 46, 5);
+    <div className="snl-match" data-snl-mode={match.mode} data-snl-board={board.id}
+      data-snl-seats={match.seats.length} data-snl-anim={animDemo || undefined}
+      data-cnl-skin={skin} data-snl-bot={match.seats.some((s) => s.kind === 'bot') ? '1' : '0'}>
+      <CuiBar height={statusH} build={(W) => {
+        const top = cuiRow(0, 0, W, 42, 3);
         const out = [
-          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
-          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: done ? pLabel(winner) : pLabel(player), color: palOf(activeColor, undefined) },
-          { id: 'p-1', kind: 'pill', r: pr[2], label: pLabel(1), value: p1Pos, color: palOf(p1Color, undefined) },
-          { id: 'p-2', kind: 'pill', r: pr[3], label: pLabel(2), value: p2Pos, color: palOf(p2Color, undefined) },
-          { id: 'p-rolls', kind: 'pill', r: pr[4], label: 'Rolls', value: rolls },
+          { id: 's-time', kind: 'pill', r: top[0], label: 'Time', value: fmt, gold: true },
+          { id: 's-turn', kind: 'pill', r: top[1], label: over ? 'Result' : 'Turn',
+            value: over ? 'Finished' : (cur ? cur.name : '—'), color: curColor },
+          { id: 's-board', kind: 'pill', r: top[2],
+            label: match.mode === 'ranked' ? 'Ranked' : 'Board', value: board.name },
         ];
-        if (isMoksha) {
-          out.push({ id: 'glossary', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: '📖 What do these mean?', font: 12, action: onGlossary });
-        } else {
-          // Cosmetic board skin (per-device, never sent to the server) — the
-          // same slot the Moksha board uses for its glossary button.
-          out.push({ id: 'skin', kind: 'button', r: [Math.floor(W * 0.2), 52, Math.floor(W * 0.6), 40], label: `${SK.icon} ${SK.label}`, font: 12, action: cycleSkin });
-        }
+        const perRow = Math.ceil(match.seats.length / seatRows);
+        match.seats.forEach((s, i) => {
+          const row = Math.floor(i / perRow);
+          const cols = cuiRow(0, 46 + row * 42, W, 38, Math.min(perRow, match.seats.length - row * perRow));
+          const r = cols[i - row * perRow];
+          if (!r) return;
+          out.push({
+            id: 'seat-' + s.id, kind: 'pill', r,
+            label: (s.kind === 'bot' ? '🤖 ' : '') + s.name,
+            value: s.place ? '#' + s.place : String(s.pos),
+            color: snlSeatColor(s.colorIdx).hex,
+          });
+        });
+        out.push({ id: 'skin', kind: 'button',
+          r: [Math.floor(W * 0.2), 46 + seatRows * 42, Math.floor(W * 0.6), 38],
+          label: SK.icon + ' ' + SK.label, font: 12, action: cycleSkin });
         return out;
       }} />
 
       <CuiBar height={30} build={(W) => ([{
         id: 'banner', kind: 'label', r: [0, 0, W, 28], font: 13, bold: true,
-        color: palOf(bannerActive ? bannerColor : activeColor, undefined),
-        label: done
-          ? `Game over — ${pLabel(winner)} win${vsBot && winner === 1 ? '' : 's'}! 🎉`
-          : (banner || `${pLabel(player)}'s turn`),
+        color: over ? PAL.gold : curColor,
+        label: banner || (over ? 'Match complete' : (cur ? cur.name + "'s turn" : '')),
       }])} />
 
       <div className="cnl-board-wrap">
-        <CnlBoardCanvas V={V} isMoksha={isMoksha} SK={SK} p1Pos={p1Pos} p2Pos={p2Pos} p1Color={p1Color} p2Color={p2Color} p2Glyph={vsBot ? '🤖' : '2'} />
+        <SnlBoardCanvas board={board} skin={SK} seats={match.seats} frameRef={frameRef}
+          animating={busy} redrawKey={redrawKey} onFrame={onFrame} />
       </div>
 
       <CuiBar height={54} build={(W) => {
-        const bw = Math.floor((W - 78) / 2) - 8;
+        const bw = Math.min(200, Math.floor(W * 0.44));
         return [
-          { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: die == null ? '·' : String(die), twinLabel: die == null ? 'Die not yet rolled' : `Die showing ${die}`, pips: die == null ? null : CNL_DIE_PIPS[die], font: 20, mono: true, disabled: true },
-          {
-            id: 'roll1', kind: 'button', r: [4, 7, bw, 40],
-            label: `${vsBot ? 'Your' : 'Player 1 -'} Roll`, solid: true, bg: palOf(p1Color, undefined), ink: '#fff',
-            disabled: done || animating || rolling || player !== 1 || !!resumeOffer, action: () => roll(1),
-          },
-          vsBot
-            ? { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: player === 2 && !done ? 'Bot rolling…' : 'Bot', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: true }
-            : { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: 'Player 2 - Roll', solid: true, bg: palOf(p2Color, undefined), ink: '#fff', disabled: done || animating || rolling || player !== 2, action: () => roll(2) },
+          { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48],
+            label: die == null ? '·' : String(die),
+            twinLabel: die == null ? 'Die not yet rolled' : 'Die showing ' + die,
+            pips: die == null ? null : CNL_DIE_PIPS[die], font: 20, mono: true, disabled: true },
+          { id: 'roll', kind: 'button', r: [4, 7, bw, 40],
+            label: over ? 'Match over' : (yourTurn ? 'Roll — ' + (cur ? cur.name : '') : 'Bot rolling…'),
+            solid: yourTurn && !over && !busy,
+            bg: yourTurn && !over ? curColor : undefined,
+            ink: yourTurn && !over ? '#fff' : undefined,
+            disabled: over || busy || rolling || !yourTurn, action: doRoll },
+          { id: 'exit', kind: 'button', r: [W - Math.floor(W * 0.3) - 4, 7, Math.floor(W * 0.3), 40],
+            label: over ? 'New match' : 'Lobby', font: 12, action: () => onExit && onExit() },
         ];
       }} />
     </div>
@@ -17758,10 +19504,15 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
   const [skin, setSkin] = useCnlSkin();
 
   const modes = [
+    { id: 'party',  icon: '🎉', name: 'Party Match',        desc: '2-6 seats, humans and bots, play to last place' },
+    { id: 'ranked', icon: '🏆', name: 'Ranked Match',       desc: 'Hot-seat, ' + SNL_RANKED_MIN_HUMANS + '+ humans, RP and tiers' },
     { id: '2p',     icon: '👥', name: '2 Players',         desc: 'Pass and play on this device' },
     { id: 'bot',    icon: '🤖', name: 'Versus Bot',        desc: 'The computer rolls for Player 2' },
     { id: 'online', icon: '🌐', name: 'Online Multiplayer', desc: 'Play a friend via room code' },
   ];
+  // Party/Ranked carry their own board picker in the lobby, so the two
+  // legacy board-style blocks below only apply to the other three modes.
+  const legacyBoardOpts = mode !== 'party' && mode !== 'ranked';
 
   const handleStart = async () => {
     if (!mode) return;
@@ -17816,6 +19567,7 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
           )}
         </div>
       )}
+      {legacyBoardOpts && (
       <div className="cnl-variant-block">
         <div className="cnl-variant-label">Board style</div>
         <div className="mnc-mode-sub">
@@ -17832,7 +19584,8 @@ function ChutesLaddersModeSelect({ game, onPick, onGlossary }) {
           </div>
         )}
       </div>
-      {variant !== 'moksha' && (
+      )}
+      {legacyBoardOpts && variant !== 'moksha' && (
         <div className="cnl-variant-block">
           <div className="cnl-variant-label">Board skin</div>
           <div className="mnc-mode-sub">
@@ -19294,9 +21047,12 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
       ? gameModeOpts.myPlayerNum
       : gameModeOpts && gameModeOpts.roomAction === 'join' ? 2 : 1
   );
-  const [resumeState, setResumeState] = useState(null);
-  const [resumeChecked, setResumeChecked] = useState(false);
-  const { loadState, clearState } = useClassicSave('chutes-ladders');
+  // Party / Ranked: the lobby produces a config, the match consumes it.
+  const [snlCfg, setSnlCfg] = useState(null);
+  const [progress, setProgress] = useState(() => snlLoadLocalProgress());
+  // ?practice=1 makes the whole run inert (shell rule) — no progression, no
+  // RP, no streak, no server write. Same guarantee the daily practice path gives.
+  const snlPractice = snlQ('practice') === '1';
 
   // Intercept onWin to track win streak in localStorage and submit to the server.
   // playerWon: meta.winner===1 for local/bot (player 1 = the human); score>0 for online.
@@ -19304,8 +21060,10 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
     const playerWon = meta && meta.winner !== undefined ? meta.winner === 1 : score > 0;
     const prevStreak = parseInt(localStorage.getItem(CNL_STREAK_KEY) || '0', 10);
     const newStreak = playerWon ? prevStreak + 1 : 0;
-    try { localStorage.setItem(CNL_STREAK_KEY, String(newStreak)); } catch (e) {}
-    submitClassicScore('chutes-ladders', newStreak, { mode: mode || 'bot' });
+    if (!snlPractice) {
+      try { localStorage.setItem(CNL_STREAK_KEY, String(newStreak)); } catch (e) {}
+      submitClassicScore('chutes-ladders', newStreak, { mode: mode || 'bot' });
+    }
     onWin(score, steps, secs, meta);
   };
 
@@ -19322,16 +21080,66 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
   // Report active mode upward for the top-bar pill + Save visibility.
   useEffect(() => { onModeChange && onModeChange(mode); }, [mode]);
 
-  // Check for a saved bot game when entering bot mode.
+  // Pull the server-side progression row so the Legend unlock and the RP tier
+  // follow the account, not the device. The local mirror is the fallback (and
+  // what a signed-out player sees), so a failed fetch is not an error.
   useEffect(() => {
     let cancelled = false;
-    if (mode === 'bot' && !resumeChecked) {
-      loadState().then(s => { if (!cancelled) { setResumeState(s); setResumeChecked(true); } });
-    } else if (mode !== 'bot') {
-      setResumeChecked(false); setResumeState(null);
-    }
+    snlFetchProfile().then((pr) => {
+      if (cancelled || !pr) return;
+      setProgress((prev) => Object.assign({}, prev, {
+        superstarWins: Math.max(prev.superstarWins || 0, pr.superstarWins || 0),
+        wins: Math.max(prev.wins || 0, pr.wins || 0),
+        matches: Math.max(prev.matches || 0, pr.matches || 0),
+        rp: Math.max(prev.rp || 0, pr.rp || 0),
+        rankedMatches: Math.max(prev.rankedMatches || 0, pr.rankedMatches || 0),
+      }));
+    });
     return () => { cancelled = true; };
-  }, [mode]);
+  }, []);
+
+  // ?snlstart=1 skips the lobby (screenshot / proposal-test deep link), and
+  // &snlseats=/&snlboard= shape what it starts. Reading them here rather than
+  // in the lobby keeps the lobby a pure component.
+  useEffect(() => {
+    if (mode !== 'party' && mode !== 'ranked') return;
+    if (snlCfg || !snlQ('snlstart')) return;
+    const bq = snlQ('snlboard');
+    const n = Math.max(SNL_MIN_SEATS, Math.min(SNL_MAX_SEATS,
+      parseInt(snlQ('snlseats') || '0', 10) || (mode === 'ranked' ? SNL_RANKED_MIN_HUMANS : 4)));
+    setSnlCfg({
+      boardId: (bq && SNL_BOARD_MAP[bq]) ? bq : SNL_DEFAULT_BOARD,
+      mode,
+      seats: Array.from({ length: n }, (_, i) => ({
+        kind: (mode === 'ranked' || i === 0) ? 'human' : 'bot',
+        name: (mode === 'ranked' || i === 0) ? 'Player ' + (i + 1) : 'Bot ' + (i + 1),
+        pieceId: SNL_PIECES[i % SNL_PIECES.length].id, colorIdx: i,
+      })),
+    });
+  }, [mode, snlCfg]);
+
+  // One finished match -> progression + (ranked) RP. Local mirror first so the
+  // Legend unlock is instant, then the server row for cross-device truth.
+  const handleSnlResult = (res) => {
+    if (snlPractice) return null;
+    const payload = {
+      boardId: res.board.id, mode: (snlCfg && snlCfg.mode) || 'party',
+      place: res.place, players: res.players,
+    };
+    const next = snlApplyResult(progress, payload);
+    setProgress(next);
+    snlSaveLocalProgress(next);
+    if (payload.mode === 'ranked') {
+      const before = snlTierFor(progress.rp || 0);
+      if (snlTierFor(next.rp).id !== before.id && next.rp > (progress.rp || 0)) snlCue('rankup');
+    }
+    api('/api/snl/result', { method: 'POST', body: JSON.stringify(payload) })
+      .then(({ ok, body }) => { if (ok && body && body.profile) setProgress((prev) => Object.assign({}, prev, body.profile)); })
+      .catch(() => {});
+    return payload.mode === 'ranked'
+      ? { rankDelta: snlRankDelta(res.place, res.players), tierName: snlTierFor(next.rp).name }
+      : null;
+  };
 
   const glossaryModal = glossary
     ? <MokshaGlossaryModal onClose={() => setGlossary(false)} />
@@ -19365,20 +21173,36 @@ function ChutesLaddersGame({ onWin, onStepChange, resetKey, gameMode, gameModeOp
       </React.Fragment>
     );
   }
-  if (mode === 'bot' && !resumeChecked) {
-    return <div style={{ textAlign: 'center', padding: '2rem', color: C.muted }}>Loading…</div>;
+  if ((mode === 'party' || mode === 'ranked') && !snlCfg) {
+    return (
+      <React.Fragment>
+        <SnlLobby progress={progress} initialMode={mode}
+          onStart={(cfg) => setSnlCfg(cfg)}
+          onCancel={() => { setMode(null); onModeChange && onModeChange(null); }} />
+        {glossaryModal}
+      </React.Fragment>
+    );
   }
+  // The two legacy local modes are the same engine with a fixed 2-seat table,
+  // so 2p / bot keep their deep links and their board-style choice.
+  const cfg = snlCfg || {
+    boardId: variant === 'moksha' ? 'moksha' : SNL_DEFAULT_BOARD,
+    mode: 'party',
+    seats: [
+      { kind: 'human', name: 'Player 1', pieceId: 'pawn', colorIdx: 0 },
+      { kind: mode === 'bot' ? 'bot' : 'human', name: mode === 'bot' ? 'Bot' : 'Player 2',
+        pieceId: 'knight', colorIdx: 1 },
+    ],
+  };
   return (
     <React.Fragment>
-      <ChutesLaddersLocalGame
+      <SnlMatch
+        config={cfg}
         onWin={handleWin}
         onStepChange={onStepChange}
         resetKey={resetKey}
-        vsBot={mode === 'bot'}
-        variant={variant}
-        onGlossary={() => setGlossary(true)}
-        initialState={mode === 'bot' ? resumeState : null}
-        onClearSave={mode === 'bot' ? clearState : null}
+        onResult={handleSnlResult}
+        onExit={() => { setSnlCfg(null); setMode(null); onModeChange && onModeChange(null); }}
       />
       {glossaryModal}
     </React.Fragment>
@@ -24020,16 +25844,18 @@ const GAMES = [
     icon: '🪜',
     category: 'classic',
     shell: 'classic',
-    desc: 'Race up the board — climb ladders, dodge slides. 2-player hotseat.',
+    desc: 'Party board race for 2-6 seats — climb ladders, dodge snakes, play to last place.',
     tag: 'Board',
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; slides drop you back.' },
-      { title: 'First to 100 wins', body: 'Play the bot, a hotseat friend, or online via room code. Win streaks climb the leaderboard.' },
+      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; snakes swallow you back down.' },
+      { title: 'Sixes roll again', body: 'A 6 earns another roll — but three sixes in a row forfeits the move, so pushing your luck costs you.' },
+      { title: 'Landing on a rival', body: 'Land on an occupied square and that pawn is knocked back ' + SNL_BUMP + ' squares — a snake or ladder there still applies.' },
+      { title: 'Play to last place', body: 'A party match keeps going after first place: everyone gets a finishing rank, 1 to N. Ranked Match needs ' + SNL_RANKED_MIN_HUMANS + '+ humans hot-seat and moves your RP.' },
     ],
     component: ChutesLaddersGame,
-    modes: ['bot', '2p', 'online'],
+    modes: ['party', 'ranked', 'bot', '2p', 'online'],
     supportsSave: true,
     menuModePicker: true,
     variantPicker: {
@@ -24045,6 +25871,9 @@ const GAMES = [
     },
     leaderboard: true,
     leaderboardOpts: { valueLabel: 'Best Streak' },
+    sheetExtras: () => ([
+      { id: 'ranked', label: 'Ranked', render: () => <SnlRankedPanel /> },
+    ]),
   },
   {
     id: '2048',
@@ -24774,6 +26603,29 @@ function badgeProgressHints(streak, solveCount) {
   return hints;
 }
 
+/* Shared 1..N placings table for the end-of-run cards. Play-to-last-place
+   (Snakes & Ladders party/ranked) is the only producer today: every seat gets
+   a place, so "who won" is not the whole result. Games that pass no standings
+   render nothing, so both cards can call this unconditionally. */
+function renderStandings(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const medal = (n) => (n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : '#' + n);
+  return (
+    <div className="win-standings">
+      <div className="win-standings-head">Final standings</div>
+      {rows.map((r, i) => (
+        <div className={'win-standing-row' + (r.place === 1 ? ' first' : '')}
+          key={r.id != null ? r.id : i}>
+          <span className="wsr-place mono">{medal(r.place)}</span>
+          <span className="wsr-dot" style={{ background: r.color || C.muted }} />
+          <span className="wsr-name">{r.name}{r.bot ? ' 🤖' : ''}</span>
+          <span className="wsr-rolls mono">{Number.isFinite(r.rolls) ? r.rolls + ' rolls' : ''}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=friends / ?screen=session deep links for testing.
@@ -25382,6 +27234,11 @@ function App() {
       return;
     }
     launchGame(g);
+    // A scripted screenshot-state deep link lands INSIDE a running match, so
+    // the first-open how-to would cover the very screen the link names (the
+    // capture browser is always a fresh profile, so it always fires). Same
+    // suppression as ?play=1 above.
+    if (params.get('snlstart') === '1' || params.get('snlanim')) setHowToGame(null);
   }, [loading]);
 
   // Merge a stored attempt's persisted progress JSON with its steps/elapsed so
@@ -25629,6 +27486,13 @@ function App() {
           isClassic: true,
           bestScore: meta && meta.bestScore,
           longestSnake: meta && meta.longestSnake,
+          // Play-to-last-place standings (Snakes & Ladders party/ranked) and
+          // the RP delta from a ranked finish. Whitelisted explicitly — this
+          // object is a field list, not a spread, so anything not named here
+          // is silently dropped.
+          standings: meta && meta.standings,
+          rankDelta: meta && meta.rankDelta,
+          rankTier: meta && meta.rankTier,
           gameId: currentGame.id,
         });
         // Remember the round's result for the Game Menu (kept for future
@@ -25948,6 +27812,12 @@ function App() {
      endpoint is called on either path, which is why this link is deliberately
      NOT staging-gated (the "before" screenshot comes from production). */
   const RESULT_DEMO = { score: 8432, steps: 214, timeSecs: 372, tile: 512 };
+  const RESULT_DEMO_STANDINGS = [
+    { id: 1, place: 1, name: 'Player 1', color: '#e0533d', rolls: 31 },
+    { id: 2, place: 2, name: 'Bot 2', bot: true, color: '#2f8f5b', rolls: 33 },
+    { id: 3, place: 3, name: 'Bot 3', bot: true, color: '#3a7bd5', rolls: 36 },
+    { id: 4, place: 4, name: 'Bot 4', bot: true, color: '#d8a32b', rolls: 38 },
+  ];
   const openResultDemo = (game) => {
     if (!game) return;
     setCurrentGame(game);
@@ -25983,6 +27853,10 @@ function App() {
       share: `Game Corner ${game.name} — ${RESULT_DEMO.score} pts`,
       isClassic: true,
       gameId: game.id,
+      // Play-to-last-place produces a table, not a winner — so the results
+      // card for this one game has a block nothing else has, and a
+      // navigation-only screenshot would never see it.
+      standings: game.id === 'chutes-ladders' ? RESULT_DEMO_STANDINGS : undefined,
     });
   };
 
@@ -26782,7 +28656,16 @@ function App() {
                   <span className="v mono">{winData.longestSnake} cells</span>
                 </div>
               )}
+              {Number.isFinite(winData.rankDelta) && (
+                <div className={'score-row' + (winData.rankDelta >= 0 ? ' bonus' : '')}>
+                  <span className="k">{winData.rankTier ? winData.rankTier + ' · RP' : 'Rank points'}</span>
+                  <span className="v mono">{winData.rankDelta >= 0 ? '+' : ''}{winData.rankDelta}</span>
+                </div>
+              )}
             </div>
+            {/* Play-to-last-place: every seat gets a placing, so the card
+                shows the full 1..N order rather than just the winner. */}
+            {renderStandings(winData.standings)}
             {!winData.isClassic && winData.justBadge && (
               <div className="badge-unlock">
                 <div className="bu-icon">{winData.justBadge.icon}</div>
@@ -26925,6 +28808,9 @@ function App() {
                 <span className="v mono">+{loseData.finalScore != null ? loseData.finalScore : 0}</span>
               </div>
             </div>
+            {/* Play-to-last-place tables also lose (a ranked seat can finish
+                last) — same block the win card renders. */}
+            {renderStandings(loseData.standings)}
             {loseData.guest && (
               <div className="guest-note" style={{ marginBottom: '0.8rem' }}>
                 🔑 Playing as a guest — sign in inside Usernode to lock in streaks

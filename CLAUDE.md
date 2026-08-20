@@ -1142,3 +1142,145 @@ Sudoku" just **Sudoku**. Prefer `expectSelector` for structure and reserve
 `expectText` for copy that is genuinely part of the product's voice — and note
 that `innerText` reflects `text-transform`, so a `.plabel` reading "Board" in the
 source matches "BOARD" at runtime.
+
+## Snakes & Ladders local party overhaul (`chutes-ladders`)
+
+The classic 2-player Snakes & Ladders grew a **local hot-seat party mode** and a
+**Ranked Match** beside it. Two constraints shaped it and still bound anything
+built on top: **local hot-seat only — the online path is untouched**, and
+**every sound is synthesized Web Audio, no asset files**.
+
+The two old modes (`2p`, `bot`) and the whole `classic_rooms`/`lib/board-rules.js`
+online path are **unchanged and must stay that way**. Party/Ranked are a
+*parallel* client-side stack (`SNL_*` in `public/app.jsx`); nothing in them
+touches the room endpoints, and `chutes-ladders` stays in `H2H_GAME_IDS` /
+`BOARD_RULE_GAME_IDS` only for the online path.
+
+### The rules engine is pure, module-scope, and the self-tests are the spec
+
+`snlTakeTurn(match, die)` → `{ match, events }` is the single mutator: it is
+pure (clones through `snlCloneMatch`), and everything the UI does — animation,
+sound, banner text, standings — is driven off the returned **event list**
+(`roll` / `reroll` / `forfeit-six` / `move` / `ladder` / `snake` / `bump` /
+`finish` / `turn`). Rendering reads events; it never re-derives rules. Keep it
+that way: the animation layer replays a queue, so a rule that only exists in the
+view cannot be animated, tested, or replayed.
+
+Because these rules are client-side, **the six `snl-*` client self-tests are the
+only thing between an authoring slip and a permanently stuck board.** They live
+in `runClientSelfTests` and assert behaviour, not snapshots:
+
+| test | contract |
+|---|---|
+| `snl-boards` | every board passes `snlValidateBoard`; the difficulty ladder really ascends; Legend is gated by Super Star |
+| `snl-six-rule` | 1st/2nd six re-roll, the **3rd six is forfeited** (turn passes, pawn does not move) |
+| `snl-collision` | landing on an occupant knocks it back `SNL_BUMP`, both directions, clamped at square 1 |
+| `snl-standings` | 2/4/6-seat matches play out to **places exactly 1..N** |
+| `snl-rp-tiers` | `snlRankDelta` is monotone in place, positive at 1st, negative at last; tier mins ascend; RP floors at 0 |
+| `snl-legend-lock` | only **wins on Super Star** count toward the unlock |
+
+Two authoring traps those tests exist to catch, both hit while writing them:
+
+- **Order the difficulty ladder by snake:ladder RATIO, not snake count.** The
+  classic Regular board carries 10 snakes — *more* than Hard's 9 — so a
+  count-based ordering check fails on the shipping boards. `snl-boards` asserts
+  ascending `tier` **and** ascending ratio.
+- **A collision assertion must read the `bump` event, not the victim's final
+  square.** The knock-back destination is itself resolved through
+  `snlResolveLanding`, so a snake/ladder there moves the pawn again — correctly.
+  Same reason the clamp case uses squares 5/4 on Beginner: squares 1–2 are
+  ladder feet, so a naive clamp test never reaches the clamp.
+
+### Board authoring
+
+`SNL_BOARDS` holds seven ladder boards (`beginner` → `legend`) plus `moksha`
+(`special: true`, exempt from the chained-head rule — the original Moksha Patam
+deliberately chains). `snlValidateBoard` runs at self-test time and rejects
+off-grid endpoints, a ladder that descends, a snake that climbs, a jump on
+square 1 or 100, and a square that is both a head and a tail. **Add a board and
+you must place it in ratio order**, or `snl-boards` fails the build.
+
+Constants are the balance knobs, and each has exactly one home:
+`SNL_BUMP` (10), `SNL_MAX_SIX_STREAK` (3), `SNL_CHAIN_CAP` (8),
+`SNL_LEGEND_UNLOCK_WINS` (3), `SNL_MIN_SEATS`/`SNL_MAX_SEATS` (2/6),
+`SNL_RANKED_MIN_HUMANS` (4), `SNL_TIERS` (Bronze→Legend), `SNL_ANIM` (timings).
+
+### Art is intrinsic — it does NOT follow the theme
+
+Snake bodies, ladder rails and rungs, the six chess pieces (`SNL_PIECES`), the
+six seat colours (`SNL_SEAT_COLORS`) and the seven tier colours are **hardcoded
+on purpose**, exactly like Mancala's wood and the playing-card faces. Only the
+surrounding chrome re-themes. The board canvas still reads `PAL`/`palOf` for
+chrome — never `C.x`, which `guardCanvasCtx` would reject.
+
+### Audio
+
+Synthesized only. `SNL_CUES` (dice rattle, hop, ladder arpeggio, snake slide,
+bump, forfeit, finish, rank-up) build on `cgNoiseBurst` / `cgSoundSeq`; the
+generative bed is `snlMusicStart` / `snlMusicStop` / `snlMusicSetIntensity` /
+`snlMusicSting`, scheduled against the AudioContext clock so it stays in time
+while the main thread animates. Cues follow the existing `cgPrefs.sound`; the
+bed follows the **new `cgPrefs.music`** pref (Settings → Music), and flipping
+that pref off calls `snlMusicStop` immediately. **Never add an audio asset
+file** — that was an explicit product constraint.
+
+Reduced motion (`cgPrefs.motion`) still plays the full event sequence and every
+sound; `snlDur()` just collapses the tweens, so no result is ever skipped.
+
+### Persistence and the trust boundary
+
+Two new PUBLIC tables (gameplay results, no sensitive data, no FKs):
+`snl_progress` (`matches`, `wins`, `superstar_wins` — the Legend unlock's only
+input) and `snl_ranked` (`rp`, `ranked_matches`, `ranked_wins`, `best_rp`, with
+`idx_snl_ranked_rp`).
+
+- `GET /api/snl/profile` — auth-gated; the account-level truth the local
+  localStorage mirror (`puzzlechain_snl_progress`) reconciles against.
+- `POST /api/snl/result` — auth-gated, and the **trust boundary**: it accepts
+  only `{ boardId, mode, place, players }` and derives the RP delta itself via
+  `snlRankDeltaSrv`, plus the Super Star win. The client never sends an RP
+  number. Keep it that way.
+- `GET /api/snl/ranked/leaderboard` — public read, in `PUBLIC_API_GET`,
+  `req.user`-null-guarded (anonymous ⇒ `me: null`).
+
+The local mirror exists so the unlock and the tier bar are instant and work
+signed out; the server row wins on merge (`Math.max` per field).
+
+### Deep links (screenshot- and check-reachable state)
+
+The lobby, the running match and the animation layer are all behind taps, which
+navigation-only screenshots and `dapp.json` checks cannot perform.
+
+| link | reaches |
+|---|---|
+| `?game=chutes-ladders&mode=party` / `&mode=ranked` | the lobby, mode pinned |
+| `&snlboard=<id>` / `&snlseats=<2..6>` | shape the lobby (and `?snlstart=1`) |
+| `&snlstart=1` | skip the lobby into a running match |
+| `&snlanim=snake\|ladder\|bump\|dice` | replay ONE scripted animation |
+| `&snlunlock=1` | open the Legend board for this page load |
+| `?sheet=ranked` | the ☰ Ranked / RP-leaderboard panel |
+| `?result=1` | the standings results card (`.win-standings`) |
+
+`?snlanim=` plays events against the frame/banner only — it never calls
+`snlTakeTurn`, so no match state moves and nothing is recorded — and it **holds
+the bots still** while it plays so the captured frame is deterministic.
+
+`?snlunlock=1` is a **pure UI-state** link: it writes nothing, grants nothing
+(Legend is only a harder board; the server never gated it), and is deliberately
+**not** staging-gated, so the "before" screenshot from production works too. It
+exists *instead of* a `demo=snl-legend` fixture on purpose — seeding the
+viewer's `snl_progress.superstar_wins` would fabricate the exact signal
+`snlLegendUnlocked` reads, making the lock untestable by the gate and different
+for real users.
+
+`.snl-match` carries `data-snl-mode` / `data-snl-board` / `data-snl-seats` /
+`data-snl-anim` so checks can assert on state; the banner is a **canvas label**,
+so `expectText` can never read it — assert on the attribute.
+
+### Staging fixture
+
+`GET /api/daily?demo=snl-ranked` (idempotent, `IS_STAGING`, no-op in production)
+seeds 8 obviously-fake ranked players spread Bronze→Legend so the RP board is
+demonstrable on a fresh staging DB. It seeds **nothing for the viewer** — an
+unplayed account correctly shows no pinned `me` row, and the Legend lock keeps
+its production-shaped state.

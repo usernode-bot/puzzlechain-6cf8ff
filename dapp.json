@@ -1230,6 +1230,86 @@
       "name": "Gomoku board is a canvas (confirm bar stays)",
       "path": "/?game=gomoku&mode=2p",
       "expectSelector": "canvas.gmk-canvas"
+    },
+    {
+      "name": "Snakes & Ladders mode select offers Party Match",
+      "path": "/?game=chutes-ladders",
+      "expectText": "Party Match"
+    },
+    {
+      "name": "Snakes & Ladders mode select offers Ranked Match",
+      "path": "/?game=chutes-ladders",
+      "expectText": "Ranked Match"
+    },
+    {
+      "name": "Party lobby renders the difficulty board picker",
+      "path": "/?game=chutes-ladders&mode=party",
+      "expectSelector": ".snl-lobby .snl-board-grid .snl-board-card"
+    },
+    {
+      "name": "Party lobby renders per-seat rows",
+      "path": "/?game=chutes-ladders&mode=party&snlseats=5",
+      "expectSelector": ".snl-lobby .snl-seat-list .snl-seat-row"
+    },
+    {
+      "name": "Legend board is locked until Super Star wins",
+      "path": "/?game=chutes-ladders&mode=party&snlboard=legend",
+      "expectSelector": ".snl-lobby .snl-lock-note"
+    },
+    {
+      "name": "Legend unlock deep link opens the Legend board",
+      "path": "/?game=chutes-ladders&mode=party&snlboard=legend&snlunlock=1",
+      "expectSelector": ".snl-lobby .snl-board-card.active:not(.locked)"
+    },
+    {
+      "name": "Ranked lobby explains the hot-seat minimum",
+      "path": "/?game=chutes-ladders&mode=ranked",
+      "expectText": "Ranked is hot-seat"
+    },
+    {
+      "name": "Party match deep-links into a running multi-seat board",
+      "path": "/?game=chutes-ladders&mode=party&snlstart=1&snlseats=4",
+      "expectSelector": ".snl-match[data-snl-seats=\"4\"]"
+    },
+    {
+      "name": "Party match renders chess-piece pawns on canvas",
+      "path": "/?game=chutes-ladders&mode=party&snlstart=1",
+      "expectSelector": ".snl-match canvas.snl-canvas[data-snl-pawns=\"chess\"]"
+    },
+    {
+      "name": "Harder boards are deep-linkable into a match",
+      "path": "/?game=chutes-ladders&mode=party&snlstart=1&snlboard=expert",
+      "expectSelector": ".snl-match[data-snl-board=\"expert\"]"
+    },
+    {
+      "name": "Snake slide animation is reachable by URL",
+      "path": "/?game=chutes-ladders&mode=party&snlstart=1&snlanim=snake",
+      "expectSelector": ".snl-match[data-snl-anim=\"snake\"]"
+    },
+    {
+      "name": "Ladder climb animation is reachable by URL",
+      "path": "/?game=chutes-ladders&mode=party&snlstart=1&snlanim=ladder",
+      "expectSelector": ".snl-match[data-snl-anim=\"ladder\"]"
+    },
+    {
+      "name": "Collision knock-back animation is reachable by URL",
+      "path": "/?game=chutes-ladders&mode=party&snlstart=1&snlanim=bump",
+      "expectSelector": ".snl-match[data-snl-anim=\"bump\"]"
+    },
+    {
+      "name": "Ranked sheet renders the RP tier bar and board",
+      "path": "/?game=chutes-ladders&sheet=ranked&demo=snl-ranked",
+      "expectText": "RP Leaderboard"
+    },
+    {
+      "name": "Ranked RP leaderboard readable without auth",
+      "path": "/api/snl/ranked/leaderboard",
+      "expectText": "entries"
+    },
+    {
+      "name": "Snakes & Ladders results card lists final standings",
+      "path": "/?game=chutes-ladders&result=1",
+      "expectSelector": ".win-standings"
     }
   ],
   "visibility": {

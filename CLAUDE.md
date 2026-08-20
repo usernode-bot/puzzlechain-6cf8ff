@@ -30,13 +30,156 @@ tables you've marked private), etc.
 
 Game Corner (renamed from PuzzleChain via dapp.json's `name` — the repo
 slug stays `puzzlechain-6cf8ff` and localStorage keys keep their
-`puzzlechain_`/`pc_` prefixes on purpose) is a **daily-puzzle hub** — a "chain" of bite-size puzzle
-games sharing one lobby. You play each game **once per day**, earn
-points for solving it (fast/efficient solves score higher), and build
-a **streak** that adds a bonus to every subsequent win. Solving pops a
-"Solved!" celebration, then the lobby card locks until the next day.
-Ships with **Mini Sudoku** (6×6) and **Word Hunt** (8×8 word search);
-more games slot into the same registry.
+`puzzlechain_`/`pc_` prefixes on purpose) is a **games hub** — a "chain"
+of bite-size games sharing one lobby, each offering up to **three ways
+to play** (#176):
+
+- **Daily** — one seeded deal a day, ranked, the same board for
+  everyone, one attempt. Solving pops a "Solved!" celebration and the
+  card locks until midnight UTC. Wins build a **streak** that multiplies
+  points.
+- **Story** — a ladder of difficulty bands you clear and tick off. Pays
+  once, on first clear.
+- **Arcade** — endless, a fresh board every run, three difficulty bands.
+  Pays only for landing higher: beating your own best, or crossing a
+  rank threshold for the first time.
+
+34 registry entries, 62 (game, mode) pairs. See "Play modes (#176)"
+below — the mode table is the single declaration of what exists.
+
+## Play modes (#176) — daily / story / arcade
+
+**A play mode is a property of a CARD, not of a registry entry.** That
+distinction is what keeps the whole feature cheap, and it is the first
+thing to understand before touching any of it.
+
+- **Registry ids never move.** `daily_attempts`, `classic_scores`, chat,
+  leaderboards, badges and every deep link key off them. The four games
+  that ship as two ids (Snake / Daily Snake, Bounce / Daily Bounce, Tile
+  Match / Daily Tile Match, Mine Finder / Mine Finder Classic) keep BOTH
+  and merge only on the home card. Nothing migrated.
+- **`PLAY_MODES_BY_ID` (`public/src/29-cards.jsx`) is the declaration.**
+  The home grid, the pre-game screen, the deep links and the self-tests
+  all read it. Omissions there are decisions, and the comment says why
+  for each one.
+- **`scripts/check-registry.js` enforces the client↔server agreement**
+  at build time (it runs as part of `npm run check`): the id sets match,
+  every id declaring `daily` is in the server's `GAME_IDS`, and every id
+  declaring `story` has a `STORY_BANDS` rung count. This pair used to be
+  hand-mirrored under a "keep these in sync" comment. It is not any more
+  — do not add a third copy of the same claim, extend the check.
+
+### Things that are easy to get wrong here
+
+- **Branch on the MODE, never on `game.daily`.** Seven classics (2048,
+  Knight's Tour, Block Fit, Diamond Rush, Marble Loop, Hash Rush,
+  Match-3) have a daily while keeping `daily: false` and their classic
+  shell. `handleWin`/`handleLose` reading the registry flag sent their
+  daily runs down the classic path, where they recorded nothing. Server
+  side those entries carry `dailyMode: true`, and `GAME_IDS` derives
+  from it.
+- **Only a daily resumes.** `savedProgress`/`onSaveProgress` are the
+  daily attempt row. A story run saving into it 409s, and READING from
+  it would hydrate a half-finished daily into a rung that is supposed to
+  be a fixed retryable deal. `resumable` in `renderGameBody` is the gate.
+- **A real-time game's "Game Over" is a WIN everywhere but story.**
+  Marble Loop, Bounce, Snake and Hash Rush report both endings through
+  `onWin` because the score is the result. In story that ticks the rung
+  you just failed, so they route through **`reportRunEnd`**, which sends
+  an uncleared story run to `onLose` and leaves every other mode alone.
+  A story rung must also END when its content is cleared — Bounce used
+  to rebuild the same wall forever, so the rung could only be ticked by
+  dying.
+- **The arcade seed belongs to the RUN, and the shell owns the run.**
+  `beginArcadeRun()` / `currentArcadeSeed()` in `05-core-lib.jsx`. A game
+  that rolled its own seed inside `modeSeed` left the finish with nothing
+  to store, so there was no board to replay — and games that call
+  `modeSeed` twice for one run would have got two unrelated boards.
+- **A story rung's board must be STABLE** (same seed every visit, so it
+  is a rung you can retry) and an arcade board must not be (fresh per
+  run). `modeSeed` is the one place that decides this.
+
+### Arcade settlement
+
+Arcade pays for leaderboard position, so a run is **anchored** before it
+is played: `POST /api/arcade/:gameId/start` stamps `started_at`, and the
+finish compares the claimed `timeSecs` against the server's own clock
+(`ARCADE_TIME_GRACE_SECS`, 30s, generous — it only has to catch a claim
+that could not have been played). A run that is unanchored, replayed
+against a finished row, or claims materially more time than passed is
+recorded **unverified**: it stays in the player's own history and it does
+NOT touch `arcade_bests`, the rank, or the point total. The rule is
+about the CLOCK, deliberately — a per-game score ceiling would be a
+second copy of every game's scoring formula, and the daily's replay
+harness already exists for the games that warrant that depth.
+
+`arcade_runs` is trimmed to 50 rows per (user, game); the history screen
+shows 25. Nothing else bounds that table — arcade is unlimited by design,
+so it has no equivalent of the daily's uniqueness constraint.
+
+### Replays are inert
+
+Replaying a past arcade run goes through `practiceMode`, so `handleWin`
+/`handleLose` stop before any endpoint. Without that, the cheapest way to
+top an arcade board would be to replay the friendliest seed you ever drew
+until you played it perfectly — the opposite of what a fresh-board mode
+is for. The practice ribbon is rendered **once, pinned, at the game-screen
+level** so it appears over all three shells; it used to live inside the
+daily shell, which is why replaying 2048 showed no marker at all.
+
+### Offline-generated content
+
+Two games cannot rate their own content at mount time and ship a corpus
+in `public/corpus/` instead:
+
+- **Klondike / Spider** (`scripts/rate-seeds.js`) ship rated SEEDS —
+  `[[seed, band], …]` — because the deal is cheap to re-derive and it was
+  RATING it that cost a search.
+- **Crate Push** (`scripts/gen-sokoban.js`) ships LEVELS, because Sokoban
+  generation is a search either way. 200 rooms across 8 bands, 3 pushes
+  up to ~35, each carrying its exact minimum solution length.
+
+`loadCorpus` handles both shapes and caches per game. **`startRun` and
+`startPractice` await it**; the pre-game screen only WARMS it. That is
+not belt-and-braces: `?game=cratepush&play=1` skips the pre-game screen,
+and when the warm-up was the only fetch it dealt from the hand-built
+fallback rooms every time — silently, because a graceful fallback is by
+design invisible.
+
+**How gen-sokoban works, and why it is worth reading before touching it.**
+A push and a pull are exact inverses, so breadth-first expanding the
+SOLVED position under pulls walks the forward push-graph backwards. Every
+position it reaches is solvable by construction, and its BFS depth IS the
+exact minimum solution length in pushes — one search per room instead of
+one per candidate. Two rules fall out, both learned the hard way:
+
+- **The search bound must fall BETWEEN whole levels.** Sampling states
+  within a level means their successors are not discovered there and turn
+  up later by a longer route: an earlier build shipped levels recorded at
+  35 pushes that a forward solver cracked in 16.
+- **Expanding a state and normalising its successors need SEPARATE reach
+  buffers.** Sharing one meant the first successor's scan destroyed the
+  map the move loop was still iterating against, silently allowing and
+  forbidding later moves. It was present in both directions at once, and
+  only the two disagreeing exposed it.
+
+`node scripts/gen-sokoban.js --verify` re-solves the shipped corpus
+FORWARD with an independent search and checks the recorded depths. Both
+bugs above were caught by it and nothing else. Run it after any retune.
+
+### Deep links
+
+`?pmode=daily|story|arcade` opens a card in a play mode; `?band=` picks
+the rung (story: 1-based) or difficulty (arcade: `easy|normal|hard`);
+`&play=1` mounts the board. Deliberately not `?mode=`, which already pins
+a classic's opponent. Checked BEFORE the pre-launch modal, or 2048 and
+Block Fit surface the opponent chooser instead.
+
+Without these the story ladder, the band pickers and every board behind
+them are reachable only by TAPPING a card button — which navigation-driven
+proposal checks and screenshots cannot do, so none of #176 would have been
+verifiable. `demo=modes` seeds a half-walked ladder plus arcade rivals and
+run history.
 
 ## App-specific conventions
 
@@ -44,7 +187,7 @@ This is a **single-page React 18 app** built by concatenation rather
 than by a module bundler. Read this before editing the frontend — the
 loading mechanism is unusual on purpose.
 
-- **The frontend is `public/src/*.jsx` — 32 files, concatenated.**
+- **The frontend is `public/src/*.jsx` — 31 files, concatenated.**
   `scripts/build.js` joins them in the order declared by
   `public/src/ORDER` and runs esbuild's JSX transform over the result,
   emitting `public/app.js`. `index.html` loads that as a plain script.

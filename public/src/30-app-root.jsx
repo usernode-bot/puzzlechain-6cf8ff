@@ -40,6 +40,10 @@ function App() {
   const [playMode, setPlayMode] = useState(null);
   const [arcadeBandId, setArcadeBandId] = useState('normal');
   const [storyBand, setStoryBand] = useState(0);
+  // Refs shadowing the two above, so startRun can read them without waiting a
+  // render when a deep link sets the mode and starts the run in one go.
+  const playModeRef = useRef(playMode);   playModeRef.current = playMode;
+  const arcadeBandRef = useRef(arcadeBandId); arcadeBandRef.current = arcadeBandId;
   // gameId -> { cleared, total } for the card state line and the story picker.
   const [storyProgress, setStoryProgress] = useState({});
   // The viewer's standing on the arcade band currently selected, so the
@@ -91,6 +95,13 @@ function App() {
      score shown but never recorded: no /start, no /finish, no /progress, no
      dailyRunLog entry, and handleWin/handleLose bail out early so streak,
      badges, bests and leaderboards cannot move. */
+  /* A replay re-runs one past board. It is deliberately INERT — practiceMode
+     is on, so handleWin/handleLose stop before any endpoint. Otherwise the
+     cheapest way to top an arcade board would be to replay the friendliest
+     seed you ever drew until you played it perfectly, which is the opposite of
+     what a fresh-board-every-run mode is for. */
+  const [arcadeReplaySeed, setArcadeReplaySeed] = useState(null);
+  const arcadeRunIdRef = useRef(null);
   const [practiceMode, setPracticeMode] = useState(() =>
     new URLSearchParams(window.location.search).get('practice') === '1'
   );
@@ -188,6 +199,13 @@ function App() {
     selectedUserId: navPrimitive(selectedUserId),
     reviewMode: !!reviewMode,
     practiceMode: !!practiceMode,
+    /* #176 — the play mode is part of "where am I". Two entries for the same
+       game in different modes are different places, and without this, going
+       back from an arcade run to the pre-game screen restored the screen but
+       not the mode it was showing. Primitives, per the barrier above. */
+    playMode: navPrimitive(playMode),
+    storyBand: Number.isFinite(storyBand) ? storyBand : 0,
+    arcadeBandId: navPrimitive(arcadeBandId),
     overlay: settingsOpen ? 'settings' : howToGame ? 'howto' : chatGame ? 'chat' : whatsNewOpen ? 'whatsnew' : null,
     overlayArg: navPrimitive(howToGame ? howToGame.id : chatGame ? (chatGame.id || chatGame) : null),
   };
@@ -227,6 +245,9 @@ function App() {
       setSelectedUserId(s.selectedUserId || null);
       setReviewMode(!!s.reviewMode);
       setPracticeMode(!!s.practiceMode);
+      setPlayMode(isPlayMode(s.playMode) ? s.playMode : null);
+      setStoryBand(Number.isFinite(s.storyBand) ? s.storyBand : 0);
+      setArcadeBandId(ARCADE_BAND_IDS.indexOf(s.arcadeBandId) !== -1 ? s.arcadeBandId : 'normal');
       if (s.screen === 'game' || s.screen === 'pregame' || s.screen === 'locked') {
         const g = GAMES.find(x => x.id === s.gameId);
         if (g) { setCurrentGame(g); setScreen(s.screen); }
@@ -460,10 +481,14 @@ function App() {
   /* Story opens on the first band you have not cleared, not on band 0 — the
      ladder is a progression, so re-entering it should carry on rather than
      restart. Falls back to 0 before progress has loaded. */
-  /* Corpus-backed games (the two solitaires) need their rated-seed table
-     before the board is dealt, and the pre-game screen is the natural place to
-     fetch it: story and arcade both pass through it, and the Play button is a
-     beat later. A miss is harmless — the game deals from a plain seed. */
+  /* Corpus-backed games need their table before the board is dealt. Visiting
+     the pre-game screen WARMS it — story, arcade and the daily all pass
+     through, and the Play button is a beat later — but a warm-up is not a
+     guarantee and this used to be the only fetch: `?game=cratepush&play=1`
+     skips the pre-game screen entirely and dealt from the hand-built fallback
+     rooms every time, silently, because the fallback is by design invisible.
+     startRun awaits the same (cached, deduped) promise, so the warm-up now
+     only decides whether that await costs anything. */
   useEffect(() => {
     if (screen === 'pregame' && currentGame && CORPUS_GAMES.has(currentGame.id)) {
       loadCorpus(currentGame.id);
@@ -510,6 +535,10 @@ function App() {
       setCurrentGame(game);
       setWinData(null);
       setLoseData(null);
+      // Opening a card is always a live run; only the history's Replay button
+      // arms a seed, and only for the run it launches.
+      setPracticeMode(false);
+      setArcadeReplaySeed(null);
       setScreen('pregame');
       if (game.howToPlay && game.howToPlay.length && !howtoSeen(game.id)) setHowToGame(game);
       return;
@@ -546,12 +575,59 @@ function App() {
 
   // Claim (or resume) the day's single attempt and mount the game. Extracted
   // from launchGame so the pre-game screen's Play button owns consume-on-start.
-  const startRun = async (game) => {
+  /* #176 — replay a past arcade run. The board is re-derived from the run's
+     seed, which is the whole reason a run is stored as a seed plus a move list
+     rather than as a board: history costs a few hundred bytes per run. */
+  const replayArcadeRun = (game, run) => {
+    if (!game || !run) return;
+    setPlayMode('arcade');
+    setArcadeBandId(run.band);
+    setArcadeReplaySeed(run.seed);
+    setPracticeMode(true);
+    setCurrentGame(game);
+    setStepCount(0);
+    setWinData(null);
+    setLoseData(null);
+    setPracticeResult(null);
+    beginArcadeRun(run.seed);
+    setScreen('game');
+  };
+
+  /* `over` lets a caller start a run in a mode/band it just chose, without
+     waiting a render for the state to land. Only the deep-link path needs it —
+     the Play button reads state that is already settled — but without it a
+     `?pmode=arcade&band=hard&play=1` link would claim the run under whatever
+     mode happened to be in state. */
+  const startRun = async (game, over) => {
+    const playMode = (over && over.mode) || playModeRef.current;
+    const arcadeBandId = (over && over.arcadeBand) || arcadeBandRef.current;
     allowProgressSave(game.id); // claiming/resuming a run lifts the finish guard
+    // Cached and request-deduped, so this is free after the first open.
+    if (CORPUS_GAMES.has(game.id)) await loadCorpus(game.id);
     /* #176 — only the DAILY consumes anything. Story and arcade have no
        once-a-day claim to make, so they mount straight away; the pre-game
        screen was there to pick a band, not to gate an attempt. */
     if (playMode === 'story' || playMode === 'arcade') {
+      /* Open the arcade run HERE, in the shell, so the seed that generates the
+         board is the same one the finish records — that is what makes a run
+         replayable at all. `arcadeReplaySeed` is set when the player picked a
+         past run out of their history; a fresh Play rolls a new one. */
+      if (playMode === 'arcade') {
+        const seed = beginArcadeRun(arcadeReplaySeed);
+        /* Claim the run server-side so the finish has a clock it did not get
+           from us. Fire-and-forget on purpose: the board must not wait on a
+           request. A run that never gets an id still plays and still lands in
+           the player's history — it just settles as unverified, which is the
+           right outcome for a run the server never saw begin. */
+        arcadeRunIdRef.current = null;
+        if (authOk) {
+          api(`/api/arcade/${game.id}/start`, {
+            method: 'POST',
+            body: JSON.stringify({ band: arcadeBandId, seed }),
+          }).then(({ ok, body }) => { if (ok && body) arcadeRunIdRef.current = body.runId; })
+            .catch(() => {});
+        }
+      }
       setCurrentGame(game);
       setStepCount(0);
       setWinData(null);
@@ -646,6 +722,35 @@ function App() {
     if (params.get('result') === '1') {
       openResultDemo(g);
       setHowToGame(null);
+      return;
+    }
+    /* #176 — ?pmode=daily|story|arcade opens a card in one of its play modes,
+       and ?band= preselects the rung (story: a 1-based number) or difficulty
+       (arcade: easy|normal|hard). Without these the story ladder, the arcade
+       band picker and every board behind them are reachable only by TAPPING a
+       card button — which navigation-driven proposal checks and screenshots
+       cannot do, so none of #176 would have been verifiable. Deliberately NOT
+       ?mode=, which already pins a classic's opponent (bot / 2p / online).
+
+       Checked BEFORE the pre-launch modal for the same reason ?result=1 is:
+       2048 and Block Fit carry preLaunchModal, so below that branch this link
+       would surface the opponent chooser instead of the mode it names. */
+    const pmode = params.get('pmode');
+    if (isPlayMode(pmode) && supportsMode(g.id, pmode)) {
+      const bandParam = params.get('band');
+      let band = null;
+      if (pmode === 'story' && bandParam) band = Math.max(0, (parseInt(bandParam, 10) || 1) - 1);
+      if (pmode === 'arcade' && ARCADE_BAND_IDS.indexOf(bandParam) !== -1) band = bandParam;
+      launchGame(g, pmode);
+      if (pmode === 'story' && band != null) setStoryBand(band);
+      if (pmode === 'arcade' && band != null) setArcadeBandId(band);
+      if (params.get('play') === '1') {
+        startRun(g, {
+          mode: pmode,
+          arcadeBand: pmode === 'arcade' ? (band || arcadeBandId) : undefined,
+        });
+        setHowToGame(null);
+      }
       return;
     }
     // Multi-mode classic games open the pre-launch modal unless a mode is
@@ -955,7 +1060,8 @@ function App() {
         method: 'POST',
         body: JSON.stringify({
           band, score, timeSecs, steps,
-          seed: (meta && meta.seed) || 0,
+          runId: arcadeRunIdRef.current || 0,
+          seed: currentArcadeSeed() || 0,
           moves: (meta && meta.moves) || undefined,
         }),
       }).catch(() => ({ ok: false, body: null }));
@@ -969,6 +1075,7 @@ function App() {
         arcadeBeatBest: ok && body ? body.beatBest : false,
         arcadeFirstRun: ok && body ? body.isFirstRun : false,
         arcadeAwarded: ok && body ? body.awarded : 0,
+        arcadeVerified: !!(ok && body && body.verified),
       });
       return;
     }
@@ -1185,7 +1292,8 @@ function App() {
           method: 'POST',
           body: JSON.stringify({
             band: arcadeBandId, score: lostScore, timeSecs, steps,
-            seed: (meta && meta.seed) || 0,
+            runId: arcadeRunIdRef.current || 0,
+            seed: currentArcadeSeed() || 0,
           }),
         }).catch(() => {});
       }
@@ -1304,8 +1412,11 @@ function App() {
      today's puzzle, not a random one) and a bumped resetKey, but with
      practiceMode on: handleWin/handleLose bail out before any endpoint, and no
      /start claim happens because we never call startRun. */
-  const startPractice = (game) => {
+  const startPractice = async (game) => {
     if (!game) return;
+    // Same rule as startRun: a corpus game must not deal from its fallback
+    // just because practice skipped the screen that warms the table.
+    if (CORPUS_GAMES.has(game.id)) await loadCorpus(game.id);
     setCurrentGame(game);
     setPracticeMode(true);
     setPracticeResult(null);
@@ -1568,10 +1679,6 @@ function App() {
                 >?</button>
               )}
             </div>
-            {/* PHASE 4 (#133) — an unmissable practice marker. */}
-            {practiceMode && (
-              <div className="practice-ribbon">🎲 Practice — not scored</div>
-            )}
             <GameComponent
               {...modeProps}
               onWin={handleWin}
@@ -2020,6 +2127,7 @@ function App() {
             arcadeBandId={arcadeBandId}
             onArcadeBand={setArcadeBandId}
             arcadeBest={arcadeBest}
+            onReplayRun={(run) => replayArcadeRun(currentGame, run)}
             onHowTo={() => setHowToGame(currentGame)}
             onChat={authOk ? () => setChatGame(currentGame) : undefined}
           />
@@ -2117,7 +2225,26 @@ function App() {
         </button>
       )}
 
-      {screen === 'game' && winData && !reviewMode && (
+      {/* PHASE 4 (#133) — an unmissable practice marker, and #176 made it
+          matter more: an arcade REPLAY is a practice run, and arcade replays
+          reach games on all three shells. It used to be rendered inside the
+          daily shell's game-wrap, so replaying 2048 or Block Fit showed no
+          marker at all — the one case where "this does not count" is least
+          obvious, because the board looks exactly like the scored one. Pinned
+          rather than in-flow so it needs no cooperation from a shell. */}
+      {screen === 'game' && practiceMode && !winData && !loseData && !practiceResult && (
+        <div className="practice-ribbon pinned">🎲 Practice — not scored</div>
+      )}
+
+      {screen === 'game' && winData && !reviewMode && (() => {
+      /* #176 — the card used to read `!isClassic` as "this is a daily", which
+         was true when there were only two kinds of run. A story rung and an
+         arcade run are neither: they showed a streak-badge progress panel that
+         cannot move, a guest sign-in pitch about "today's leaderboard", and an
+         offline-retry note for an endpoint they never called. The daily
+         furniture now asks for a daily. */
+      const isDailyResult = !winData.isClassic && !winData.modeLabel;
+      return (
         <div className="win-overlay" onPointerDown={dismissResultCard}>
           <div className="win-card">
             <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
@@ -2186,27 +2313,27 @@ function App() {
                 </div>
               )}
             </div>
-            {!winData.isClassic && winData.justBadge && (
+            {isDailyResult && winData.justBadge && (
               <div className="badge-unlock">
                 <div className="bu-icon">{winData.justBadge.icon}</div>
                 <div className="bu-title">Milestone reached!</div>
                 <div className="bu-name">{winData.justBadge.name} · {winData.justBadge.min}-day streak</div>
               </div>
             )}
-            {!winData.isClassic && !winData.justBadge && winData.activeBadge && (
+            {isDailyResult && !winData.justBadge && winData.activeBadge && (
               <div className="win-badge-row">
                 <span className="wbr-icon">{winData.activeBadge.icon}</span>
                 <span>{winData.activeBadge.name} badge active</span>
               </div>
             )}
-            {!winData.isClassic && winData.justAchievement && (
+            {isDailyResult && winData.justAchievement && (
               <div className="badge-unlock">
                 <div className="bu-icon">{winData.justAchievement.icon}</div>
                 <div className="bu-title">Badge unlocked!</div>
                 <div className="bu-name">{winData.justAchievement.name}</div>
               </div>
             )}
-            {!winData.isClassic && !winData.guest && (() => {
+            {isDailyResult && !winData.guest && (() => {
               // Next-milestone progress so every solve shows forward motion even
               // when nothing unlocked this run. Streak progress is based on the
               // streak this win landed in; solve progress on the lifetime count.
@@ -2228,7 +2355,7 @@ function App() {
                 collides with the daily lock the same word means everywhere else.
                 The run is already saved in pc_pending_runs_v1 and retries
                 automatically; the button is a fallback, not the only path. */}
-            {!winData.isClassic && (winData.syncError || syncFailDemo) && (
+            {isDailyResult && (winData.syncError || syncFailDemo) && (
               <div className="win-sync-note">
                 ✔ Saved on this device — we'll send your result automatically as
                 soon as you're back online. Your score and streak are safe.
@@ -2253,6 +2380,34 @@ function App() {
                 </div>
               </div>
             )}
+            {winData.modeLabel === 'Story' && winData.bandTotal > 0 && (
+              <div className="mode-result">
+                <div className="mode-result-title">📖 Story · band {winData.bandIndex + 1} of {winData.bandTotal}</div>
+                <div className="mode-result-note">
+                  {(storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
+                    ? 'Rung ticked off. Points are paid once, on first clear — replay it any time for practice.'
+                    : 'Cleared. The next rung is now open.'}
+                </div>
+              </div>
+            )}
+            {winData.modeLabel === 'Arcade' && (
+              <div className="mode-result">
+                <div className="mode-result-title">
+                  🎮 Arcade · {arcadeBand(winData.arcadeBand).label}
+                  {winData.arcadeRank ? ` · #${winData.arcadeRank}` : ''}
+                </div>
+                <div className="mode-result-note">
+                  {!winData.arcadeVerified
+                    ? 'This run was not anchored to a server clock, so it stays in your history but does not move your best or your rank.'
+                    : winData.arcadeFirstRun
+                      ? 'First run on this band — this is your baseline. Beat it and the difference pays.'
+                      : winData.arcadeBeatBest
+                        ? `New best on this band — up from ${winData.arcadePrevBest}.`
+                        : `Your best on this band is still ${winData.arcadePrevBest}.`}
+                  {winData.arcadeAwarded > 0 ? ` +${winData.arcadeAwarded} points.` : ''}
+                </div>
+              </div>
+            )}
             {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {/* DAILY board only. `/api/daily/:gameId/leaderboard` validates
                 :gameId against GAME_IDS and 400s on a classic id, and a 400 is
@@ -2271,16 +2426,23 @@ function App() {
               </button>
             )}
             {/* PHASE 4 (#133) — replay today's exact puzzle, scored but not
-                recorded. Daily games only: a classic already has Play Again. */}
-            {!winData.isClassic && currentGame && (
+                recorded. Daily games only: a classic already has Play Again,
+                and story/arcade are replayable from their pre-game screen. */}
+            {isDailyResult && currentGame && (
               <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
+              </button>
+            )}
+            {winData.modeLabel && currentGame && (
+              <button className="primary-btn review-btn" onClick={() => launchGame(currentGame, playMode)}>
+                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the ladder'}
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
-      )}
+      );
+      })()}
 
       {screen === 'game' && loseData && !reviewMode && (
         <div className="win-overlay" onPointerDown={dismissResultCard}>

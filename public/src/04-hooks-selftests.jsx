@@ -367,6 +367,23 @@ function runClientSelfTests(styleReady) {
   // one), and every day must deal a full round set. Repeats inside a week are
   // what made every day feel identical.
   check('cipher-rotation', () => {
+    /* Check the CAUSE before the symptom. The rotation guarantee is a partition
+       over the union of every theme, so one word appearing in two themes breaks
+       it — and the day-window failure below reports that as "X repeats on days
+       4 and 8", which reads like a bug in the block maths. It is not: adding a
+       Nature theme that shared 14 landform words with Geography produced
+       exactly that message. Name the real problem. */
+    const owner = new Map();
+    for (const t of CW_THEMES) {
+      for (const def of t.words) {
+        if (owner.has(def.word) && owner.get(def.word) !== t.name) {
+          throw new Error(`${def.word} is in two themes ("${owner.get(def.word)}" and ` +
+            `"${t.name}") — the rotation partitions the UNION of the themes, so a ` +
+            `word may only appear once across all of them`);
+        }
+        owner.set(def.word, t.name);
+      }
+    }
     for (let base = 0; base < 240; base++) {
       const seen = new Map();
       for (let d = base; d < base + CW_CYCLE_LEN; d++) {

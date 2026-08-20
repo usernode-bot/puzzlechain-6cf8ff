@@ -280,6 +280,14 @@ const isArcadeBand = (b) => ARCADE_BANDS.indexOf(b) !== -1;
 /* Rank thresholds pay ONCE each, ever, per (user, game, band). Paying for rank
    POSITION instead would let a player drift up as other scores decay, or
    oscillate across a boundary and collect repeatedly. */
+/* How far a claimed duration may exceed the server's own measurement of the
+   run before it is rejected. Generous on purpose: a backgrounded tab, a slow
+   finish request and a device clock are all allowed to cost a few seconds, and
+   the check only has to catch a claim that could not have been played, not
+   shave seconds off an honest one. Claiming LESS time than really elapsed is
+   always fine — putting a game down mid-run is normal. */
+const ARCADE_TIME_GRACE_SECS = 30;
+
 const ARCADE_RANK_THRESHOLDS = [
   { rank: 1,  key: 'top1',  points: 400 },
   { rank: 3,  key: 'top3',  points: 200 },
@@ -737,6 +745,21 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS arcade_runs_user_idx
       ON arcade_runs (user_id, game_id, created_at DESC)
   `);
+  /* A run is CLAIMED before it is played, so the server has its own clock
+     reading of how long it took. Without this the finish route could only take
+     the client's word for `timeSecs`, and arcade is the one mode that pays
+     directly for leaderboard position — see settleArcadeRun. Added as ALTERs
+     because the table shipped one commit earlier in this same branch. */
+  await pool.query(`ALTER TABLE arcade_runs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE arcade_runs ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE arcade_runs ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT false`);
+  /* Rows written before the anchor existed are real finished runs that simply
+     were never claimed. Backfilling finished_at keeps them in the player's own
+     history (which reads finished_at IS NOT NULL, so otherwise they would
+     silently disappear); `verified` stays false, which is the truth about them
+     and correctly keeps them out of the shared boards. Idempotent. */
+  await pool.query(
+    `UPDATE arcade_runs SET finished_at = created_at WHERE finished_at IS NULL AND started_at IS NULL`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS daily_attempts (
@@ -3086,6 +3109,68 @@ app.get('/api/daily', async (req, res) => {
       }
     }
 
+    /* Staging-only demo seed (#176): a story ladder half-walked and an arcade
+       board with rivals on it. Both are needed for the same reason — the two
+       new modes are otherwise invisible on a fresh staging DB: the ladder
+       renders every rung as unreachable-and-unstarted, and the arcade board is
+       an empty list with no rank to be outside of. Idempotent. */
+    if (IS_STAGING && req.query.demo === 'modes') {
+      // Half of Sudoku's 6-rung ladder cleared, so the pre-game screen shows
+      // ticks, an open rung and locked rungs all at once.
+      for (let b = 0; b < 3; b++) {
+        await pool.query(
+          `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+           VALUES ($1, 'sudoku', $2, $3, $4, $5, now())
+           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+          [req.user.id, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
+        );
+      }
+      // Rivals on the Normal arcade board for 2048, plus a modest viewer row
+      // that sits outside the top 3 — the case the pinned `me` row exists for.
+      const rivals = [
+        { name: 'Staging arcade Ada',  score: 21400 },
+        { name: 'Staging arcade Borg', score: 18800 },
+        { name: 'Staging arcade Cleo', score: 15200 },
+        { name: 'Staging arcade Dax',  score: 12600 },
+        { name: 'Staging arcade Evy',  score: 9400 },
+      ];
+      for (let i = 0; i < rivals.length; i++) {
+        await pool.query(
+          `INSERT INTO arcade_bests
+             (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
+           VALUES ($1, $2, '2048', 'normal', $3, 240, 300, 3, now())
+           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+          [`staging-arcade-${i + 1}`, rivals[i].name, rivals[i].score]
+        );
+      }
+      await pool.query(
+        `INSERT INTO arcade_bests
+           (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
+         VALUES ($1, $2, '2048', 'normal', 11200, 210, 268, 4, now())
+         ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+        [req.user.id, req.user.username || null]
+      );
+      // ...and a few settled runs of the viewer's own, so the run history on
+      // the arcade pre-game screen has something to share and replay.
+      const { rows: haveRuns } = await pool.query(
+        `SELECT 1 FROM arcade_runs WHERE user_id = $1 AND game_id = '2048' LIMIT 1`, [req.user.id]);
+      if (!haveRuns.length) {
+        const runs = [
+          { band: 'normal', seed: 1234567, score: 11200, t: 210, st: 268 },
+          { band: 'hard',   seed: 7654321, score: 6800,  t: 140, st: 190 },
+          { band: 'easy',   seed: 2468013, score: 9100,  t: 260, st: 310 },
+        ];
+        for (const r of runs) {
+          await pool.query(
+            `INSERT INTO arcade_runs
+               (user_id, username, game_id, band, seed, score, time_secs, steps, verified, started_at, finished_at)
+             VALUES ($1, $2, '2048', $3, $4, $5, $6, $7, true, now(), now())`,
+            [req.user.id, req.user.username || null, r.band, r.seed, r.score, r.t, r.st]
+          );
+        }
+      }
+    }
+
     // Staging-only demo seed (phase 7): ~10 chat messages across two game
     // rooms — today's featured game and Checkers — including one message
     // hidden by reports, so the chat sheet + moderation tombstone are
@@ -3993,6 +4078,30 @@ app.post('/api/story/:gameId/clear', async (req, res) => {
    rule, "play once in every band of every game" would be a free harvest now
    that all three bands are open from the start. Rank bonuses still fire, so a
    strong debut is not unrewarded. */
+/* POST /api/arcade/:gameId/start { band, seed } -> { runId }
+   Claims the run BEFORE it is played, which is the only thing that gives the
+   finish route a clock of its own. Cheap (one insert) and, unlike the daily's
+   consume-on-start, it consumes nothing — arcade is unlimited by design, so
+   this exists purely as an anchor. */
+app.post('/api/arcade/:gameId/start', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const band = String((req.body && req.body.band) || '');
+  if (!isArcadeBand(band)) return res.status(400).json({ error: 'Unknown band' });
+  const seed = Math.max(0, Math.min(4294967295, Number(req.body && req.body.seed) || 0));
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO arcade_runs (user_id, username, game_id, band, seed, score, started_at)
+       VALUES ($1, $2, $3, $4, $5, 0, now()) RETURNING id`,
+      [req.user.id, req.user.username || null, gameId, band, seed]
+    );
+    res.json({ runId: rows[0].id });
+  } catch (e) {
+    console.error('[arcade] start failed:', e.message);
+    res.status(500).json({ error: 'Could not start run' });
+  }
+});
+
 app.post('/api/arcade/:gameId/finish', async (req, res) => {
   const { gameId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
@@ -4004,8 +4113,38 @@ app.post('/api/arcade/:gameId/finish', async (req, res) => {
   const steps = Math.max(0, Math.min(1e6, Number(req.body && req.body.steps) || 0));
   const seed = Math.max(0, Math.min(4294967295, Number(req.body && req.body.seed) || 0));
   const moves = Array.isArray(req.body && req.body.moves) ? req.body.moves.slice(0, 800) : null;
+  const runId = Number(req.body && req.body.runId) || 0;
 
   try {
+    /* SETTLEMENT. Arcade pays for leaderboard position, so a score that the
+       server has no way to place in time is recorded but not banked: it goes
+       into the player's own history (which is theirs, and useful) and it does
+       NOT move a personal best, a rank or a point total (which are shared, and
+       what someone would bother to forge).
+
+       A run settles when it was claimed through /start by this user for this
+       game and band, is not already finished, and did not claim materially
+       more time than actually passed. Everything else is unverified — including
+       a finish that arrives with no runId at all, which is what an offline or
+       interrupted run looks like. The rule is deliberately about the CLOCK and
+       not about the score: a per-game score ceiling would be a second copy of
+       every game's scoring formula, and the daily's replay harness already
+       exists for the games that warrant that depth. */
+    let verified = false;
+    let claimedRun = null;
+    if (runId) {
+      const { rows } = await pool.query(
+        `SELECT id, started_at, finished_at FROM arcade_runs
+          WHERE id = $1 AND user_id = $2 AND game_id = $3 AND band = $4`,
+        [runId, req.user.id, gameId, band]
+      );
+      claimedRun = rows[0] || null;
+      if (claimedRun && !claimedRun.finished_at && claimedRun.started_at) {
+        const wall = (Date.now() - new Date(claimedRun.started_at).getTime()) / 1000;
+        verified = timeSecs <= wall + ARCADE_TIME_GRACE_SECS;
+      }
+    }
+
     const prev = await pool.query(
       `SELECT best_score, claimed_ranks FROM arcade_bests
         WHERE user_id = $1 AND game_id = $2 AND band = $3`,
@@ -4015,12 +4154,12 @@ app.post('/api/arcade/:gameId/finish', async (req, res) => {
     const prevBest = isFirstRun ? 0 : (prev.rows[0].best_score || 0);
     const claimed = new Set(isFirstRun ? [] : (prev.rows[0].claimed_ranks || []));
 
-    const beatBest = !isFirstRun && score > prevBest;
+    const beatBest = verified && !isFirstRun && score > prevBest;
     const pbAward = beatBest
       ? Math.round((score - prevBest) * (ARCADE_BAND_MULT[band] || 1))
       : 0;
 
-    await pool.query(
+    if (verified) await pool.query(
       `INSERT INTO arcade_bests
          (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 1, now())
@@ -4034,25 +4173,53 @@ app.post('/api/arcade/:gameId/finish', async (req, res) => {
       [req.user.id, req.user.username || null, gameId, band, score, timeSecs, steps]
     );
 
+    // Close the claimed row, or record an unanchored one so the history is
+    // still complete. Either way the run is the player's to see and replay.
+    if (claimedRun && !claimedRun.finished_at) {
+      await pool.query(
+        `UPDATE arcade_runs
+            SET score = $2, time_secs = $3, steps = $4, moves = $5,
+                verified = $6, finished_at = now()
+          WHERE id = $1`,
+        [claimedRun.id, score, timeSecs, steps, moves ? JSON.stringify(moves) : null, verified]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO arcade_runs
+           (user_id, username, game_id, band, seed, score, time_secs, steps, moves, verified, finished_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, now())`,
+        [req.user.id, req.user.username || null, gameId, band, seed, score, timeSecs, steps,
+         moves ? JSON.stringify(moves) : null]
+      );
+    }
+
+    /* Keep the per-game history bounded. Nothing else caps arcade_runs — the
+       daily's uniqueness constraint has no equivalent here because arcade is
+       unlimited by design — so a client stuck in a finish loop would grow the
+       table without limit. 50 is twice what the history screen shows, so the
+       trim is never visible to a player. */
     await pool.query(
-      `INSERT INTO arcade_runs (user_id, username, game_id, band, seed, score, time_secs, steps, moves)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [req.user.id, req.user.username || null, gameId, band, seed, score, timeSecs, steps,
-       moves ? JSON.stringify(moves) : null]
+      `DELETE FROM arcade_runs
+        WHERE user_id = $1 AND game_id = $2
+          AND id NOT IN (
+            SELECT id FROM arcade_runs
+             WHERE user_id = $1 AND game_id = $2
+             ORDER BY created_at DESC, id DESC LIMIT 50)`,
+      [req.user.id, gameId]
     );
 
     // Rank AFTER the write, so the row the player just set is the one ranked.
     const rankRes = await pool.query(
       `SELECT COUNT(*)::int AS ahead FROM arcade_bests
         WHERE game_id = $1 AND band = $2 AND best_score > $3`,
-      [gameId, band, Math.max(score, prevBest)]
+      [gameId, band, verified ? Math.max(score, prevBest) : prevBest]
     );
     const rank = (rankRes.rows[0] ? rankRes.rows[0].ahead : 0) + 1;
 
     let rankAward = 0;
     const newlyClaimed = [];
     for (const t of ARCADE_RANK_THRESHOLDS) {
-      if (rank <= t.rank && !claimed.has(t.key)) {
+      if (verified && rank <= t.rank && !claimed.has(t.key)) {
         rankAward += t.points;
         newlyClaimed.push(t.key);
       }
@@ -4077,8 +4244,8 @@ app.post('/api/arcade/:gameId/finish', async (req, res) => {
     }
 
     res.json({
-      ok: true, rank, band, score,
-      previousBest: prevBest, beatBest, isFirstRun,
+      ok: true, rank, band, score, verified,
+      previousBest: prevBest, beatBest, isFirstRun: verified && isFirstRun,
       awarded, pbAward, rankAward, newRanks: newlyClaimed,
     });
   } catch (e) {
@@ -4148,15 +4315,16 @@ app.get('/api/arcade/:gameId/runs', async (req, res) => {
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   try {
     const { rows } = await pool.query(
-      `SELECT id, band, seed, score, time_secs, steps, created_at
-         FROM arcade_runs WHERE user_id = $1 AND game_id = $2
+      `SELECT id, band, seed, score, time_secs, steps, verified, created_at
+         FROM arcade_runs
+        WHERE user_id = $1 AND game_id = $2 AND finished_at IS NOT NULL
         ORDER BY created_at DESC LIMIT 25`,
       [req.user.id, gameId]
     );
     res.json({
       runs: rows.map(r => ({
         id: r.id, band: r.band, seed: Number(r.seed), score: r.score,
-        timeSecs: r.time_secs, steps: r.steps, at: r.created_at,
+        timeSecs: r.time_secs, steps: r.steps, verified: r.verified, at: r.created_at,
       })),
     });
   } catch (e) {

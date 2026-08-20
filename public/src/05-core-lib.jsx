@@ -197,16 +197,40 @@ function reportRunEnd(opts, score, steps, secs, meta) {
   if (onWin) onWin(score, steps, secs, meta);
 }
 
+/* THE ARCADE SEED BELONGS TO THE RUN, NOT TO THE GENERATOR.
+
+   Rolling it inside modeSeed was enough to make a board, and not enough for
+   anything else: a game that generated its own seed and dropped it left the
+   finish with nothing to record, so the "history to share and replay" arcade
+   is supposed to have had no board to replay. Worse, several games call
+   modeSeed more than once for one run (Marble Loop derives its colour stream
+   from a second call) and would have got two unrelated boards.
+
+   So the SHELL opens a run and the generator reads it. A module-scope value is
+   the right shape here because exactly one run is live at a time — the same
+   reason `PAL` is module-scope — and it means the ~20 games that call
+   modeSeed(mode, id, band, offset) did not have to learn about seeds at all. */
+let _arcadeRunSeed = null;
+function beginArcadeRun(seed) {
+  _arcadeRunSeed = Number.isFinite(seed)
+    ? (seed >>> 0)
+    // Math.random is correct here and nowhere else in a generator: an arcade
+    // board is SUPPOSED to differ per player and per run.
+    : (Math.floor(Math.random() * 4294967295) >>> 0);
+  return _arcadeRunSeed;
+}
+function currentArcadeSeed() { return _arcadeRunSeed; }
+function endArcadeRun() { _arcadeRunSeed = null; }
+
 function modeSeed(playMode, gameId, band, offset) {
   if (playMode === 'story') {
     const s = (hashStr(gameId + ':story:' + band) >>> 0);
     return { rng: mulberry32(s), seed: s };
   }
   if (playMode === 'arcade') {
-    // Math.random is correct here and nowhere else in a generator: an arcade
-    // board is SUPPOSED to differ per player and per run. It is captured as a
-    // concrete seed immediately so the run stays reproducible.
-    const s = Math.floor(Math.random() * 4294967295) >>> 0;
+    // A run that somehow reaches here unopened still gets a board; it just
+    // cannot be replayed, which is strictly better than not starting.
+    const s = _arcadeRunSeed != null ? _arcadeRunSeed : beginArcadeRun();
     return { rng: mulberry32(s), seed: s };
   }
   return { rng: dailyRng(offset, gameId), seed: null };
@@ -266,6 +290,27 @@ function saveHistory(key, entry, max) {
 // The shell injects ?token=… on the initial iframe load; capture it once
 // and forward it on every API call via the x-usernode-token header.
 const USERNODE_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+
+/* Copy a line to the clipboard, degrading to a no-op where it is unavailable
+   (an insecure origin, or a browser that withholds it). Every caller shows its
+   own "copied" feedback, so a silent failure only costs the confirmation. */
+function copyText(text) {
+  try { return navigator.clipboard.writeText(text).catch(() => {}); }
+  catch { return Promise.resolve(); }
+}
+
+// Coarse relative time for history rows — "3d", "2h", "just now". Deliberately
+// coarse: a run list wants scannable ages, not timestamps.
+function cgAgo(when) {
+  const t = new Date(when).getTime();
+  if (!Number.isFinite(t)) return '';
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  if (s < 86400 * 30) return Math.floor(s / 86400) + 'd ago';
+  return new Date(t).toLocaleDateString();
+}
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -462,6 +507,19 @@ const STREAK_TIERS = [
    entry id in localStorage, like the how-to first-open state).
    ============================================================ */
 const CHANGELOG = [
+  {
+    id: 'w2026-08-17',
+    weekOf: 'Week of August 17, 2026',
+    items: [
+      'Most games now have three ways to play: today’s daily, a Story ladder you clear band by band, and endless Arcade with Easy / Normal / Hard.',
+      'Story pays the first time you clear a band — every game’s ladder is worth the same in total, however many rungs it has.',
+      'Arcade keeps a run history you can share or replay, and pays when you beat your own best or crack the top 10, top 3 or #1.',
+      'Seven classics gained a daily: 2048, Knight’s Tour, Block Fit, Diamond Rush, Marble Loop, Hash Rush and Match-3.',
+      'Crate Push now has 200 generated warehouses instead of 10 hand-built ones, each one showing the shortest solution it has.',
+      'Marble Loop builds a new track every run rather than reusing the same two.',
+      'Sudoku offers both the 9×9 grid and the 6×6 mini board from one card.',
+    ],
+  },
   {
     id: 'w2026-08-03',
     weekOf: 'Week of August 3, 2026',

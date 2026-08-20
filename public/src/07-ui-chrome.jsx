@@ -607,8 +607,64 @@ function ChatPanel({ game, user, onClose }) {
 }
 
 
+/* #176 — ARCADE RUN HISTORY. The request asked arcade to keep "a history to
+   share / replay", and this is it: the player's last runs on this game, with
+   the band and score they scored, a Share line, and a Replay that re-derives
+   that exact board from its stored seed.
+
+   Only the seed and the numbers are stored, never a board — every generator in
+   this app is seeded and deterministic, so a run is a few hundred bytes. That
+   is also why Replay can exist at all. */
+function ArcadeRuns({ gameId, authOk, onReplay }) {
+  const [runs, setRuns] = useState(null);
+  const [copied, setCopied] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    if (!authOk) { setRuns([]); return undefined; }
+    api(`/api/arcade/${gameId}/runs`)
+      .then(({ ok, body }) => { if (alive) setRuns(ok && body ? body.runs || [] : []); })
+      .catch(() => { if (alive) setRuns([]); });
+    return () => { alive = false; };
+  }, [gameId, authOk]);
+
+  if (!authOk) return null;
+  if (runs === null) return <div className="arun-empty">Loading your runs…</div>;
+  if (!runs.length) {
+    return <div className="arun-empty">No runs yet — your last 25 will show up here to share or replay.</div>;
+  }
+  const share = (r) => {
+    const line = `Game Corner ${gameId} — Arcade ${arcadeBand(r.band).label}: ${r.score} pts` +
+      (r.timeSecs ? ` in ${Math.floor(r.timeSecs / 60)}:${String(r.timeSecs % 60).padStart(2, '0')}` : '') +
+      ` 🎮 ${location.origin}/?game=${encodeURIComponent(gameId)}&mode=arcade`;
+    copyText(line);
+    setCopied(r.id);
+    setTimeout(() => setCopied(c => (c === r.id ? null : c)), 1600);
+  };
+  return (
+    <div className="arun-list">
+      <div className="pregame-bands-label">Your recent runs</div>
+      {runs.map(r => (
+        <div className="arun-row" key={r.id}>
+          <span className={'arun-band ' + r.band}>{arcadeBand(r.band).label}</span>
+          <span className="arun-score mono">{r.score}</span>
+          <span className="arun-when">{cgAgo(r.at)}</span>
+          <button className="arun-btn tappable" {...tapProps(() => share(r))}>
+            {copied === r.id ? '✓ Copied' : '↗ Share'}
+          </button>
+          <button className="arun-btn tappable" {...tapProps(() => onReplay && onReplay(r))}>↻ Replay</button>
+        </div>
+      ))}
+      <div className="pregame-band-note">
+        A replay is the same board again, for practice — it never moves a best or a rank.
+      </div>
+    </div>
+  );
+}
+
+
 function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
-                         playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest }) {
+                         playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest,
+                         onReplayRun }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const resuming = !!(attempt && !attempt.finishedAt);
   const m = game.manifest || {};
@@ -731,6 +787,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
             A fresh board every run. Beating your own best on this band scores;
             so does reaching the top 10, top 3 or #1 — once each.
           </div>
+          <ArcadeRuns gameId={game.id} authOk={authOk} onReplay={onReplayRun} />
         </div>
       )}
       {resuming && (

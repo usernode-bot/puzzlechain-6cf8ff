@@ -4257,6 +4257,15 @@ ${emitTapHighlightRules()}
   font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em;
   text-transform: uppercase;
 }
+/* Pinned so it renders identically over all three shells. pointer-events:none
+   because it floats over a live board — a marker must never eat a tap. */
+.practice-ribbon.pinned {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  z-index: 60; pointer-events: none;
+  background: ${C.card}; border: 1px solid ${C.violet};
+  box-shadow: var(--c-shadow-md);
+}
 .reset-line {
   text-align: center; font-size: 0.8rem; color: ${C.muted}; margin-top: 0.5rem;
 }
@@ -4932,4 +4941,36 @@ ${emitTapHighlightRules()}
 .err-fallback p {
   color: ${C.muted}; font-size: 0.9rem; line-height: 1.5; margin: 0 0 1.4rem;
 }
+
+/* #176 — arcade run history rows on the pre-game screen. */
+.arun-list { margin-top: .75rem; display: flex; flex-direction: column; gap: .35rem; }
+.arun-empty { margin-top: .75rem; font-size: .8rem; color: ${C.muted}; text-align: center; }
+.arun-row {
+  display: flex; align-items: center; gap: .45rem;
+  padding: .4rem .5rem; border-radius: 10px;
+  background: var(--c-well); font-size: .8rem;
+}
+.arun-band {
+  flex: 0 0 auto; padding: .1rem .4rem; border-radius: 6px;
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  background: ${ca('accent', '24')}; color: ${C.accent};
+}
+.arun-band.easy   { background: ${ca('emerald', '24')}; color: ${C.emerald}; }
+.arun-band.hard   { background: ${ca('rose', '24')};    color: ${C.rose}; }
+.arun-score { flex: 0 0 auto; font-weight: 700; color: ${C.text}; }
+.arun-when  { flex: 1 1 auto; color: ${C.muted}; font-size: .72rem; }
+.arun-btn {
+  flex: 0 0 auto; border: 1px solid ${C.border}; background: ${C.card};
+  color: ${C.text}; border-radius: 8px; padding: .25rem .45rem;
+  font: inherit; font-size: .72rem; cursor: pointer;
+}
+.arun-btn[data-pressed] { background: var(--c-well-strong); }
+
+/* #176 — story / arcade result block on the win card. */
+.mode-result {
+  margin: .5rem 0 .2rem; padding: .55rem .7rem; border-radius: 12px;
+  background: var(--c-well); text-align: left;
+}
+.mode-result-title { font-weight: 700; font-size: .86rem; color: ${C.text}; }
+.mode-result-note { margin-top: .2rem; font-size: .78rem; color: ${C.muted}; line-height: 1.35; }
 `;

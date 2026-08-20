@@ -1554,6 +1554,43 @@ async function migrate() {
        ON classic_scores(game_id, best_score DESC, updated_at ASC)`
   );
 
+  // ---- Snakes & Ladders local-party progression + ranked ladder ----------
+  // PUBLIC (gameplay results, no sensitive data — the "would a stranger seeing
+  // every row be a problem?" test says no: it is wins, matches and RP, the
+  // same class of data as classic_scores). No foreign keys (public-table rule).
+  //
+  // snl_progress backs the Legend unlock: `superstar_wins` is the ONLY column
+  // the gate reads, and it is incremented server-side from a reported finish,
+  // never trusted wholesale from the client.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS snl_progress (
+      user_id        TEXT PRIMARY KEY,
+      username       TEXT,
+      matches        INTEGER NOT NULL DEFAULT 0,
+      wins           INTEGER NOT NULL DEFAULT 0,
+      superstar_wins INTEGER NOT NULL DEFAULT 0,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // snl_ranked is the RP ladder. Separate from snl_progress so the public
+  // leaderboard read never has to touch the unlock row, and so a ranked reset
+  // is one TRUNCATE away from being expressible.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS snl_ranked (
+      user_id        TEXT PRIMARY KEY,
+      username       TEXT,
+      rp             INTEGER NOT NULL DEFAULT 0,
+      ranked_matches INTEGER NOT NULL DEFAULT 0,
+      ranked_wins    INTEGER NOT NULL DEFAULT 0,
+      best_rp        INTEGER NOT NULL DEFAULT 0,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_snl_ranked_rp
+       ON snl_ranked(rp DESC, updated_at ASC)`
+  );
+
 
   if (IS_STAGING) {
     // Social staging seeds: create demo users with follow relationships,
@@ -2438,6 +2475,7 @@ const PUBLIC_API_GET = [
   /^\/api\/daily\/leaderboard\/today$/,
   /^\/api\/classic\/[A-Za-z0-9_-]+\/leaderboard$/,
   /^\/api\/ladder\/[A-Za-z0-9_-]+$/,      // rating ladder (null-guards req.user)
+  /^\/api\/snl\/ranked\/leaderboard$/,     // Snakes & Ladders RP board (null-guards req.user)
 ];
 
 // Simple in-memory per-IP sliding window over the public GET surface — the
@@ -3783,6 +3821,42 @@ app.get('/api/daily', async (req, res) => {
            VALUES ($1, $2, $3, $4, $5, $6, 'finished', $7)
            ON CONFLICT (id) DO NOTHING`,
           [rid, gid, p1, n1, p2, n2, winner]
+        );
+      }
+    }
+
+    /* Staging-only demo seed: a populated Snakes & Ladders RP board. The match
+       itself is local hot-seat, so a fresh staging DB has zero ranked rows and
+       the Ranked sheet renders empty forever. Seeds 8 obviously-fake ranked
+       players spread across the Bronze..Legend tiers, and NOTHING for the
+       viewer — an unplayed account correctly shows no pinned "me" row, and the
+       Legend unlock (which reads snl_progress.superstar_wins) is left alone so
+       the lock state stays the production-shaped one. Idempotent; no-op in
+       production. */
+    if (IS_STAGING && req.query.demo === 'snl-ranked') {
+      const ranked = [
+        // [id, name, rp, matches, wins]
+        ['staging-demo-rp-1', 'Staging RP Anka',  2180, 41, 22],
+        ['staging-demo-rp-2', 'Staging RP Belu',  1735, 36, 17],
+        ['staging-demo-rp-3', 'Staging RP Cira',  1402, 30, 13],
+        ['staging-demo-rp-4', 'Staging RP Dovi',  1088, 27, 11],
+        ['staging-demo-rp-5', 'Staging RP Eshe',   820, 22,  8],
+        ['staging-demo-rp-6', 'Staging RP Faro',   517, 18,  6],
+        ['staging-demo-rp-7', 'Staging RP Gunn',   264, 12,  3],
+        ['staging-demo-rp-8', 'Staging RP Hodl',    96,  7,  1],
+      ];
+      for (const [uid, name, rp, matches, wins] of ranked) {
+        await pool.query(
+          `INSERT INTO snl_ranked (user_id, username, rp, ranked_matches, ranked_wins, best_rp)
+           VALUES ($1, $2, $3, $4, $5, $3)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [uid, name, rp, matches, wins]
+        );
+        await pool.query(
+          `INSERT INTO snl_progress (user_id, username, matches, wins, superstar_wins)
+           VALUES ($1, $2, $3, $4, 0)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [uid, name, matches, wins]
         );
       }
     }
@@ -5640,6 +5714,157 @@ app.get('/api/classic/:gameId/leaderboard', async (req, res) => {
   } catch (err) {
     console.error('[classic] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+/* ---- Snakes & Ladders: local-party progression + ranked ladder -----------
+   The match itself is entirely LOCAL hot-seat (no server referee — the online
+   room path is untouched), so these routes record an already-finished result.
+   That means the server cannot re-simulate it; what it CAN do is refuse to
+   take the client's numbers wholesale. It accepts only { boardId, mode, place,
+   players } and derives every stored value — the RP delta from the same
+   symmetric formula the client shows, and the Super Star win count (the only
+   input to the Legend unlock) from `place === 1 && boardId === 'superstar'`.
+   A tampered payload can still claim a win it didn't earn; it cannot invent an
+   arbitrary RP number or unlock total. */
+const SNL_BOARD_IDS = new Set([
+  'beginner', 'easy', 'regular', 'hard', 'expert', 'superstar', 'legend', 'moksha',
+]);
+const SNL_MAX_SEATS_SRV = 6;
+const SNL_RANKED_LB_LIMIT = 20;
+// Mirrors snlRankDelta in public/app.jsx — keep the two in sync (the client
+// shows the number, the server is what stores it).
+function snlRankDeltaSrv(place, players) {
+  if (!players || players < 2) return 0;
+  return Math.round(25 * (1 - (2 * (place - 1)) / (players - 1))) + 3;
+}
+function shapeSnlProfile(prog, rank) {
+  return {
+    matches: prog ? Number(prog.matches) : 0,
+    wins: prog ? Number(prog.wins) : 0,
+    superstarWins: prog ? Number(prog.superstar_wins) : 0,
+    rp: rank ? Number(rank.rp) : 0,
+    rankedMatches: rank ? Number(rank.ranked_matches) : 0,
+    rankedWins: rank ? Number(rank.ranked_wins) : 0,
+    bestRp: rank ? Number(rank.best_rp) : 0,
+  };
+}
+
+// Auth-gated: a progression row is per-account by definition.
+app.get('/api/snl/profile', async (req, res) => {
+  try {
+    const [{ rows: pr }, { rows: rk }] = await Promise.all([
+      pool.query(`SELECT * FROM snl_progress WHERE user_id = $1`, [req.user.id]),
+      pool.query(`SELECT * FROM snl_ranked WHERE user_id = $1`, [req.user.id]),
+    ]);
+    res.json({ profile: shapeSnlProfile(pr[0] || null, rk[0] || null) });
+  } catch (err) {
+    console.error('[snl] profile failed:', err.message);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+app.post('/api/snl/result', async (req, res) => {
+  const b = req.body || {};
+  const boardId = typeof b.boardId === 'string' ? b.boardId : null;
+  const mode = b.mode === 'ranked' ? 'ranked' : 'party';
+  const players = Number.isFinite(b.players) ? Math.round(b.players) : 0;
+  const place = Number.isFinite(b.place) ? Math.round(b.place) : 0;
+  if (!boardId || !SNL_BOARD_IDS.has(boardId)) return res.status(400).json({ error: 'Unknown board' });
+  if (players < 2 || players > SNL_MAX_SEATS_SRV) return res.status(400).json({ error: 'Bad player count' });
+  if (place < 1 || place > players) return res.status(400).json({ error: 'Bad place' });
+  const won = place === 1;
+  const superstarWin = won && boardId === 'superstar' ? 1 : 0;
+  try {
+    const { rows: pr } = await pool.query(
+      `INSERT INTO snl_progress (user_id, username, matches, wins, superstar_wins, updated_at)
+       VALUES ($1, $2, 1, $3, $4, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         username       = EXCLUDED.username,
+         matches        = snl_progress.matches + 1,
+         wins           = snl_progress.wins + EXCLUDED.wins,
+         superstar_wins = snl_progress.superstar_wins + EXCLUDED.superstar_wins,
+         updated_at     = now()
+       RETURNING *`,
+      [req.user.id, req.user.username || null, won ? 1 : 0, superstarWin]
+    );
+    let rk = null;
+    if (mode === 'ranked') {
+      const delta = snlRankDeltaSrv(place, players);
+      const { rows } = await pool.query(
+        `INSERT INTO snl_ranked (user_id, username, rp, ranked_matches, ranked_wins, best_rp, updated_at)
+         VALUES ($1, $2, GREATEST(0, $3), 1, $4, GREATEST(0, $3), now())
+         ON CONFLICT (user_id) DO UPDATE SET
+           username       = EXCLUDED.username,
+           rp             = GREATEST(0, snl_ranked.rp + $3),
+           ranked_matches = snl_ranked.ranked_matches + 1,
+           ranked_wins    = snl_ranked.ranked_wins + EXCLUDED.ranked_wins,
+           best_rp        = GREATEST(snl_ranked.best_rp, GREATEST(0, snl_ranked.rp + $3)),
+           updated_at     = now()
+         RETURNING *`,
+        [req.user.id, req.user.username || null, delta, won ? 1 : 0]
+      );
+      rk = rows[0] || null;
+    } else {
+      const { rows } = await pool.query(`SELECT * FROM snl_ranked WHERE user_id = $1`, [req.user.id]);
+      rk = rows[0] || null;
+    }
+    res.json({ profile: shapeSnlProfile(pr[0] || null, rk) });
+  } catch (err) {
+    console.error('[snl] result failed:', err.message);
+    res.status(500).json({ error: 'Failed to record result' });
+  }
+});
+
+// Public via PUBLIC_API_GET — null-guards req.user (anonymous ⇒ me: null,
+// isCurrentUser: false), same discipline as the other public boards.
+app.get('/api/snl/ranked/leaderboard', async (req, res) => {
+  try {
+    const { rows: top } = await pool.query(
+      `SELECT user_id, username, rp, ranked_matches, ranked_wins,
+              ROW_NUMBER() OVER (ORDER BY rp DESC, updated_at ASC) AS rank
+         FROM snl_ranked
+        WHERE ranked_matches > 0
+        ORDER BY rp DESC, updated_at ASC
+        LIMIT $1`,
+      [SNL_RANKED_LB_LIMIT]
+    );
+    const { rows: totalRows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM snl_ranked WHERE ranked_matches > 0`
+    );
+    let me = null;
+    if (req.user) {
+      const { rows: mine } = await pool.query(
+        `SELECT username, rp, ranked_matches, ranked_wins, updated_at
+           FROM snl_ranked WHERE user_id = $1 AND ranked_matches > 0`,
+        [req.user.id]
+      );
+      if (mine.length) {
+        const row = mine[0];
+        const { rows: rankRows } = await pool.query(
+          `SELECT COUNT(*) + 1 AS rank FROM snl_ranked
+            WHERE ranked_matches > 0
+              AND (rp > $1 OR (rp = $1 AND updated_at < $2))`,
+          [row.rp, row.updated_at]
+        );
+        me = {
+          rank: Number(rankRows[0].rank), username: row.username || 'you',
+          rp: Number(row.rp), rankedMatches: Number(row.ranked_matches),
+          rankedWins: Number(row.ranked_wins), isCurrentUser: true,
+        };
+      }
+    }
+    res.json({
+      entries: top.map((r) => ({
+        rank: Number(r.rank), username: r.username || 'player', rp: Number(r.rp),
+        rankedMatches: Number(r.ranked_matches), rankedWins: Number(r.ranked_wins),
+        isCurrentUser: !!(req.user && r.user_id === req.user.id),
+      })),
+      me, total: totalRows[0].n,
+    });
+  } catch (err) {
+    console.error('[snl] ranked leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load ranked leaderboard' });
   }
 });
 

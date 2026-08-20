@@ -121,7 +121,14 @@ function dailyRng(offset, gameId) {
    the corpus has not arrived, the game deals from an ordinary seed instead. A
    slow network costs you the difficulty guarantee, never the game.
    ============================================================ */
-const CORPUS_GAMES = new Set(['klondike', 'spider']);
+/* Two corpus SHAPES, because two different things are expensive.
+     `seeds`  — [[seed, band], ...]. The board is cheap to re-derive from the
+                seed; what cost a search was RATING it (Klondike, Spider).
+     `levels` — [[{g, p}, ...], ...] indexed by band. The content itself had to
+                be searched for and cannot be re-derived from a seed at all
+                (Crate Push: Sokoban generation is a search either way).
+   Both group by band and both are picked from with the same rng discipline. */
+const CORPUS_GAMES = new Set(['klondike', 'spider', 'cratepush']);
 const _corpusCache = {};
 const _corpusPending = {};
 
@@ -137,6 +144,10 @@ function loadCorpus(gameId) {
         const byBand = {};
         for (const [seed, band] of j.seeds) (byBand[band] = byBand[band] || []).push(seed);
         _corpusCache[gameId] = { ...j, byBand };
+      } else if (j && Array.isArray(j.levels)) {
+        const byBand = {};
+        j.levels.forEach((list, band) => { byBand[band] = list; });
+        _corpusCache[gameId] = { ...j, byBand };
       }
       return _corpusCache[gameId] || null;
     })
@@ -147,7 +158,7 @@ function loadCorpus(gameId) {
 /* Pick a rated seed for a band. `rng` chooses WITHIN the band, so a story rung
    is stable (its rng is derived from the band) while an arcade run is not.
    Returns null when the corpus is unavailable — callers fall back. */
-function corpusSeed(gameId, band, rng) {
+function corpusPick(gameId, band, rng) {
   const c = _corpusCache[gameId];
   if (!c || !c.byBand) return null;
   const nBands = c.bands || 1;
@@ -161,6 +172,29 @@ function corpusSeed(gameId, band, rng) {
     }
   }
   return null;
+}
+const corpusSeed = corpusPick;    // `seeds`-shaped corpora
+const corpusLevel = corpusPick;   // `levels`-shaped corpora
+const corpusBands = (gameId) => (_corpusCache[gameId] ? _corpusCache[gameId].bands || 0 : 0);
+
+/* WHEN "THE RUN ENDED" IS NOT "THE RUN SUCCEEDED".
+
+   The real-time games (Marble Loop, Bounce, Snake) have always reported BOTH
+   endings through onWin with a "Game Over" label, and that was right: the
+   score IS the result, so there is nothing to lose and a loss overlay would be
+   the wrong furniture. Story mode is the one place that reading breaks — a
+   rung is ticked off by onWin, so draining the track would tick the rung you
+   just failed. reportRunEnd routes an UNCLEARED STORY run to onLose (which
+   pays nothing and leaves the rung unticked) and leaves every other mode
+   exactly as it was, including arcade: reaching the end of an arcade run is
+   how an arcade run is supposed to end, and its score should still count. */
+function reportRunEnd(opts, score, steps, secs, meta) {
+  const { cleared, playMode, onWin, onLose } = opts;
+  if (!cleared && playMode === 'story' && onLose) {
+    onLose(steps, secs, { ...(meta || {}), score });
+    return;
+  }
+  if (onWin) onWin(score, steps, secs, meta);
 }
 
 function modeSeed(playMode, gameId, band, offset) {

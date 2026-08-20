@@ -12,18 +12,75 @@ const HR_BOOST_MULT = 2;
 const HR_BOOST_SECS = 5;
 const HR_LIVES = 3;
 
+/* #176 — three modes over one loop.
+
+   Hash Rush was pure endless score-attack driven by Math.random(), which is
+   fine for a classic and disqualifying for a daily: two players would dodge
+   different hazards and their scores would not be comparable. So the spawn
+   stream is now drawn from a seeded rng in every mode except free play, and
+   the modes differ only in how the shift is BOUNDED:
+
+     daily  — a fixed 90-second shift over the day's spawn stream. Everyone
+              dodges the same hazards in the same order. Running out of lives
+              ends it early with whatever you mined; the score is the result
+              either way, so both endings report a score (the same reading
+              Snake and Marble Loop use).
+     story  — five rungs, each a longer and faster shift than the last. The
+              rung is cleared by SURVIVING its duration, so losing your lives
+              leaves it unticked.
+     arcade — endless again, with the band setting the starting pressure. */
+const HR_DAILY_SECS = 90;
+const HR_STORY_BANDS = 5;
+const HR_STORY = [
+  { secs: 45,  speed: 150, blockRate: 0.26, spawnEvery: 0.95, lives: 3 },
+  { secs: 60,  speed: 170, blockRate: 0.30, spawnEvery: 0.88, lives: 3 },
+  { secs: 75,  speed: 195, blockRate: 0.34, spawnEvery: 0.80, lives: 3 },
+  { secs: 90,  speed: 220, blockRate: 0.38, spawnEvery: 0.72, lives: 2 },
+  { secs: 120, speed: 250, blockRate: 0.42, spawnEvery: 0.64, lives: 2 },
+];
+const HR_ARCADE = {
+  easy:   { speed: 130, blockRate: 0.24, spawnEvery: 1.00, lives: 4 },
+  normal: { speed: 150, blockRate: 0.30, spawnEvery: 0.85, lives: 3 },
+  hard:   { speed: 190, blockRate: 0.38, spawnEvery: 0.70, lives: 2 },
+};
+
+// One config for whichever mode the shell opened this in. `limit` of 0 means
+// endless — the run ends when the lives do.
+function hrModeConfig(playMode, band) {
+  if (playMode === 'story') {
+    const c = HR_STORY[Math.max(0, Math.min(HR_STORY.length - 1, band || 0))];
+    return { ...c, limit: c.secs, label: `Rung ${Math.max(0, band || 0) + 1}` };
+  }
+  if (playMode === 'arcade') {
+    const c = HR_ARCADE[band] || HR_ARCADE.normal;
+    return { ...c, limit: 0, label: 'Arcade' };
+  }
+  if (playMode === 'daily') {
+    return { speed: HR_START_SPEED, blockRate: 0.30, spawnEvery: 0.85,
+             lives: HR_LIVES, limit: HR_DAILY_SECS, label: "Today's shift" };
+  }
+  return { speed: HR_START_SPEED, blockRate: 0.30, spawnEvery: 0.85,
+           lives: HR_LIVES, limit: 0, label: 'Free play' };
+}
+
 /* `resultShown` (phase 1, #160) — true once App's shared results card owns this
    run's ending. Hash Rush is the ONE shell:'self' classic that draws its own
    end panel, and that panel is absolute-positioned over its canvas: leaving it
    up would hide the very board "View board" exists to reveal, and would repeat
    the score the shared card is already showing. Every other self-shell game
    (Snake, Block Fit, Diamond Rush) has no end panel and needs nothing. */
-function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, resultShown }) {
+function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig,
+                       resultShown, playMode, band, offset }) {
+  const cfg = useRef(null);
+  if (!cfg.current) cfg.current = hrModeConfig(playMode, band);
+  const MODE = cfg.current;
+  const MODE_LIMIT_INIT = MODE.limit || 0;
   const [phase, setPhase] = useState('idle'); // idle | playing | dead
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(HR_LIVES);
+  const [lives, setLives] = useState(MODE.lives);
   const [mult, setMult] = useState(1);
   const [boostLeft, setBoostLeft] = useState(0);
+  const [secsLeft, setSecsLeft] = useState(MODE_LIMIT_INIT);
   const [finalRank, setFinalRank] = useState(null);
 
   const wrapRef = useRef(null);
@@ -33,16 +90,23 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
   const stateRef = useRef(null);
   const submittedRef = useRef(false);
   const onWinRef = useRef(onWin); onWinRef.current = onWin;
+  const onLoseRef = useRef(onLose); onLoseRef.current = onLose;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
 
+  /* The spawn stream is seeded in every mode but free play. A fresh rng per
+     RUN (not per mount) is what makes "restart the rung" replay the same
+     hazards — a rung you cannot learn is not a rung. */
   const fresh = () => ({
-    lane: 1, objs: [], elapsed: 0, score: 0, lives: HR_LIVES, tokens: 0,
-    speed: HR_START_SPEED, boost: 0, spawnT: 0, spawnEvery: 0.85, dead: false,
+    lane: 1, objs: [], elapsed: 0, score: 0, lives: MODE.lives, tokens: 0,
+    speed: MODE.speed, boost: 0, spawnT: 0, spawnEvery: MODE.spawnEvery, dead: false,
+    rng: playMode ? modeSeed(playMode, 'hashrush', band, offset).rng : null,
+    cleared: false,
   });
 
   const reset = () => {
     stateRef.current = fresh();
-    setScore(0); setLives(HR_LIVES); setMult(1); setBoostLeft(0); setFinalRank(null);
+    setScore(0); setLives(MODE.lives); setMult(1); setBoostLeft(0); setFinalRank(null);
+    setSecsLeft(MODE.limit || 0);
     submittedRef.current = false;
   };
 
@@ -114,20 +178,30 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
     return () => window.removeEventListener('keydown', onKey);
   }, [phase]);
 
-  const endGame = () => {
+  const endGame = (cleared) => {
     const s = stateRef.current; if (!s) return;
     s.dead = true;
+    s.cleared = !!cleared;
     setPhase('dead');
-    cgSound('lose'); cgHaptic([20, 40, 20]);
+    cgSound(cleared ? 'clear' : 'lose'); cgHaptic(cleared ? 20 : [20, 40, 20]);
     const finalScore = Math.round(s.score);
     cgSaveHistory(HR_HISTORY_KEY, { score: finalScore, tokens: s.tokens, secs: Math.round(s.elapsed), ts: Date.now() });
     if (!submittedRef.current) {
       submittedRef.current = true;
-      submitClassicScore('hashrush', finalScore, { tokens: s.tokens, timeSecs: Math.round(s.elapsed) })
-        .then(r => { if (r && r.rank) setFinalRank(r.rank); });
-      onWinRef.current(finalScore, s.tokens, Math.round(s.elapsed), {
-        winnerLabel: 'Game Over', share: `⛏️ Hash Rush — ${finalScore} pts, ${s.tokens} hashes mined`,
-      });
+      // Only free play and arcade belong on the classic all-time board; a
+      // daily and a story rung settle on their own endpoints.
+      if (!playMode || playMode === 'arcade') {
+        submitClassicScore('hashrush', finalScore, { tokens: s.tokens, timeSecs: Math.round(s.elapsed) })
+          .then(r => { if (r && r.rank) setFinalRank(r.rank); });
+      }
+      reportRunEnd(
+        { cleared: !!cleared, playMode, onWin: onWinRef.current, onLose: onLoseRef.current },
+        finalScore, s.tokens, Math.round(s.elapsed),
+        {
+          winnerLabel: cleared ? 'Shift complete! ⛏️' : 'Game Over',
+          share: `⛏️ Hash Rush — ${finalScore} pts, ${s.tokens} hashes mined`,
+        }
+      );
     }
   };
 
@@ -158,22 +232,23 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
     sizeCanvas();
     window.addEventListener('resize', sizeCanvas);
 
-    const spawn = (s, W) => {
-      const lane = Math.floor(Math.random() * HR_LANES);
-      const roll = Math.random();
+    const spawn = (s) => {
+      const rnd = s.rng || Math.random;
+      const lane = Math.floor(rnd() * HR_LANES);
+      const roll = rnd();
       let type = 'token';
-      if (roll < 0.30) type = 'block';
-      else if (roll < 0.42) type = 'boost';
+      if (roll < MODE.blockRate) type = 'block';
+      else if (roll < MODE.blockRate + 0.12) type = 'boost';
       s.objs.push({ lane, y: -30, type });
     };
 
     const step = (s, dt, W, H) => {
       s.elapsed += dt;
-      s.speed = Math.min(HR_MAX_SPEED, HR_START_SPEED + Math.floor(s.elapsed / HR_RAMP_SECS) * HR_SPEED_STEP);
+      s.speed = Math.min(HR_MAX_SPEED, MODE.speed + Math.floor(s.elapsed / HR_RAMP_SECS) * HR_SPEED_STEP);
       if (s.boost > 0) { s.boost = Math.max(0, s.boost - dt); }
       s.spawnT += dt;
       const every = Math.max(0.45, s.spawnEvery - s.elapsed * 0.004);
-      if (s.spawnT >= every) { s.spawnT = 0; spawn(s, W); }
+      if (s.spawnT >= every) { s.spawnT = 0; spawn(s); }
 
       const minerY = H * 0.82;
       const laneW = W / HR_LANES;
@@ -203,6 +278,7 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
       setLives(s.lives);
       setMult(s.boost > 0 ? HR_BOOST_MULT : 1);
       setBoostLeft(s.boost > 0 ? Math.ceil(s.boost) : 0);
+      if (MODE.limit) setSecsLeft(Math.max(0, Math.ceil(MODE.limit - s.elapsed)));
       if (onStepRef.current) onStepRef.current(s.tokens);
     };
 
@@ -263,7 +339,11 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
       if (dt > 0.05) dt = 0.05;
       step(s, dt, W, H);
       draw(s, W, H);
-      if (s.dead) { endGame(); return; }
+      // A bounded shift (daily / story rung) that runs its clock out is
+      // CLEARED, which is a different ending from running out of lives — the
+      // distinction is the only thing that decides whether a story rung ticks.
+      if (!s.dead && MODE.limit && s.elapsed >= MODE.limit) { endGame(true); return; }
+      if (s.dead) { endGame(false); return; }
       rafRef.current = requestAnimationFrame(frame);
     };
     rafRef.current = requestAnimationFrame(frame);
@@ -297,7 +377,9 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
         <CgStatus items={[
           { l: 'Score', v: score },
           { l: 'Lives', v: '❤️'.repeat(lives) || '—' },
-          { l: 'Mult', v: '×' + mult },
+          MODE.limit
+            ? { l: 'Left', v: `${Math.floor(secsLeft / 60)}:${String(secsLeft % 60).padStart(2, '0')}` }
+            : { l: 'Mult', v: '×' + mult },
         ]} />
         <div className="hr-wrap" ref={wrapRef}>
           <canvas ref={canvasRef} className="hr-canvas" />
@@ -307,13 +389,19 @@ function HashRushGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig,
           {phase === 'idle' && (
             <div className="hr-overlay">
               <div className="hr-overlay-title">⛏️ Hash Rush</div>
-              <div className="hr-overlay-sub">Mine hashes, dodge invalid blocks.</div>
+              <div className="hr-overlay-sub">
+                {MODE.limit
+                  ? `${MODE.label} — survive ${MODE.limit}s. Mine hashes, dodge invalid blocks.`
+                  : 'Mine hashes, dodge invalid blocks.'}
+              </div>
               <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Start mining</button>
             </div>
           )}
           {phase === 'dead' && !resultShown && (
             <div className="hr-overlay">
-              <div className="hr-overlay-title">Game Over</div>
+              <div className="hr-overlay-title">
+                {stateRef.current && stateRef.current.cleared ? 'Shift complete' : 'Game Over'}
+              </div>
               <div className="hr-overlay-score">{score} pts</div>
               {finalRank && <div className="hr-overlay-sub">Global rank #{finalRank}</div>}
               <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Mine again</button>

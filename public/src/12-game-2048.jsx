@@ -56,20 +56,31 @@ function t2048_emptyCells(grid) {
    fair without pretending to a stronger guarantee. That is a deliberate
    product call — a fun thing for the day rather than a strict shared deal —
    and the pre-game copy says so rather than letting it read as a bug. */
-function t2048_addRandom(grid, rng) {
+/* #176 arcade bands — the FOUR-RATE, which is 2048's one honest difficulty
+   dial. The board is 4x4 in every mode (changing that would change the game,
+   not its difficulty), and the tile values, merge rules and win target are all
+   fixed by the game itself. What is left is how often a spawn is a 4 instead
+   of a 2: more 4s fill the board faster and break the chains you are trying to
+   build, which is exactly the pressure a "hard" band should add. 0.10 is the
+   standard rate, so Normal is the classic game unchanged. */
+const T2048_FOUR_RATE = { easy: 0.05, normal: 0.10, hard: 0.30 };
+const T2048_DEFAULT_FOUR = 0.10;
+
+function t2048_addRandom(grid, rng, fourRate) {
   const r0 = rng || Math.random;
   const empties = t2048_emptyCells(grid);
   if (!empties.length) return grid;
   const [r, c] = empties[Math.floor(r0() * empties.length)];
   const next = grid.map(row => [...row]);
-  next[r][c] = t2048_newTile(r0() < 0.9 ? 2 : 4, true, false);
+  const four = Number.isFinite(fourRate) ? fourRate : T2048_DEFAULT_FOUR;
+  next[r][c] = t2048_newTile(r0() < 1 - four ? 2 : 4, true, false);
   return next;
 }
 
-function t2048_initGrid(rng) {
+function t2048_initGrid(rng, fourRate) {
   let g = [[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]];
-  g = t2048_addRandom(g, rng);
-  g = t2048_addRandom(g, rng);
+  g = t2048_addRandom(g, rng, fourRate);
+  g = t2048_addRandom(g, rng, fourRate);
   return g;
 }
 
@@ -200,7 +211,11 @@ function t2048SaveBest(v) {
 /* ============================================================
    T2048Game component
    ============================================================ */
-function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode, offset }) {
+function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode, band, offset }) {
+  // Arcade picks a four-rate; every other mode plays the standard one.
+  const fourRate = playMode === 'arcade'
+    ? (T2048_FOUR_RATE[band] || T2048_DEFAULT_FOUR)
+    : T2048_DEFAULT_FOUR;
   /* One spawn stream for the run. Free play keeps Math.random (null), so the
      saved-board resume and the all-time leaderboard behave exactly as before. */
   const rngRef = useRef(undefined);
@@ -218,7 +233,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
   const seededRun = playMode === 'daily' || playMode === 'arcade';
   const _saved = (raceMode || seededRun) ? null : t2048LoadSavedBoard();
 
-  const [grid, setGrid]               = useState(() => _saved ? _saved.grid : t2048_initGrid(t2048Rng));
+  const [grid, setGrid]               = useState(() => _saved ? _saved.grid : t2048_initGrid(t2048Rng, fourRate));
   const [score, setScore]             = useState(() => _saved ? _saved.score || 0 : 0);
   const [moves, setMoves]             = useState(() => _saved ? _saved.moves || 0 : 0);
   const [elapsedSecs, setElapsedSecs] = useState(() => _saved ? _saved.elapsed || 0 : 0);
@@ -290,7 +305,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
   const handleNewGame = () => {
     t2048ClearBoard();
     try { localStorage.removeItem(T2048_UNDO_KEY); } catch {}
-    setGrid(t2048_initGrid(t2048Rng));
+    setGrid(t2048_initGrid(t2048Rng, fourRate));
     setScore(0);
     setMoves(0);
     setElapsedSecs(0);
@@ -310,7 +325,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
       ? [{ grid: t2048_stripAnim(grid), score, moves }, ...undoStack].slice(0, 10)
       : undoStack;
 
-    const withTile  = t2048_addRandom(movedGrid, t2048Rng);
+    const withTile  = t2048_addRandom(movedGrid, t2048Rng, fourRate);
     const newScore  = score + delta;
     const newMoves  = moves + 1;
 
@@ -609,7 +624,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
 
 // 2048 entry: solo board, or the online-race host when launched via the mode
 // modal in Online Race mode.
-function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOpts, onBack, playMode, offset }) {
+function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOpts, onBack, playMode, band, offset }) {
   if (gameMode === 'online' && gameModeOpts && gameModeOpts.roomId) {
     return (
       <ClassicRaceGame
@@ -623,5 +638,5 @@ function T2048Game({ onWin, onLose, onStepChange, resetKey, gameMode, gameModeOp
       />
     );
   }
-  return <T2048Solo onWin={onWin} onLose={onLose} onStepChange={onStepChange} resetKey={resetKey} playMode={playMode} offset={offset} />;
+  return <T2048Solo onWin={onWin} onLose={onLose} onStepChange={onStepChange} resetKey={resetKey} playMode={playMode} band={band} offset={offset} />;
 }

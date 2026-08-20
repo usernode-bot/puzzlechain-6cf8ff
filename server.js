@@ -141,25 +141,25 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   'chutes-ladders':  { name: 'Snakes & Ladders',  category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
-  '2048':            { name: '2048',              category: 'classic', tier: 'A',
+  '2048':            { name: '2048',              category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'swipe',    undo: 'none' } },
-  'knights-tour':    { name: "Knight's Tour",     category: 'classic', tier: 'A',
+  'knights-tour':    { name: "Knight's Tour",     category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   snake:             { name: 'Snake',             category: 'classic', tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
-  blockblast:        { name: 'Block Fit',         category: 'classic', tier: 'A',
+  blockblast:        { name: 'Block Fit',         category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'drag',     undo: 'none' } },
-  diamondrush:       { name: 'Diamond Rush',      category: 'classic', tier: 'A',
+  diamondrush:       { name: 'Diamond Rush',      category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   tilematching:      { name: 'Tile Match Puzzle', category: 'classic', tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
   bounce:            { name: 'Bounce',            category: 'classic', tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
-  zuma:              { name: 'Marble Loop',              category: 'classic', tier: 'B',
+  zuma:              { name: 'Marble Loop',              category: 'classic', dailyMode: true, tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
-  hashrush:          { name: 'Hash Rush',         category: 'classic', tier: 'A',
+  hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
-  match3:            { name: 'Match-3 Puzzle',    category: 'classic', tier: 'A',
+  match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
   // (snapshot + timing heuristics through settleDailySession); per-game replay
@@ -216,8 +216,18 @@ const GAME_REGISTRY = {
 // Daily-attempt routes validate :gameId against the daily-category games.
 // (Historically this set also carried mancala/idle/zuma by mistake; those are
 // not daily games and were never reachable as daily attempts.)
+/* Every id with a DAILY MODE — which is no longer the same thing as "lives on
+   the daily tab". #176 gave seven classics a daily alongside their free play
+   (2048, Knight's Tour, Block Fit, Diamond Rush, Marble Loop, Hash Rush,
+   Match-3): they stay category 'classic' because that is where they belong in
+   the lobby, and carry `dailyMode` to opt into the daily machinery — route
+   validation, server-issued seeds, per-game leaderboards, the Game-of-the-Day
+   pool and the staging fixtures all read THIS set, so opting in is one flag
+   rather than seven call sites. Keep it in step with PLAY_MODES_BY_ID in
+   public/src/29-cards.jsx, which is the client's copy of the same statement. */
 const GAME_IDS = new Set(
-  Object.keys(GAME_REGISTRY).filter(id => GAME_REGISTRY[id].category === 'daily')
+  Object.keys(GAME_REGISTRY).filter(id =>
+    GAME_REGISTRY[id].category === 'daily' || GAME_REGISTRY[id].dailyMode)
 );
 
 // Any game id known to the hub (used by DApp session validation).

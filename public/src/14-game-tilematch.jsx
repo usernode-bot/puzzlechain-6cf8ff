@@ -461,8 +461,12 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
     setSessionScore(ns);
     setCompletedLevels(prev => new Set([...prev, selectedLevel]));
     // Fire-and-forget: submit score
+    // An arcade run climbs faster than free play: the band already put you
+    // deep in the ladder, so +1 would barely move the difficulty.
+    const step = playMode === 'arcade' ? 8 : 1;
+    const nextLvl = selectedLevel < 1000 ? Math.min(1000, selectedLevel + step) : null;
+    if (playMode) { if (nextLvl) startLevel(nextLvl); return; }
     submitScore(selectedLevel, completedLevels.size + 1, ns);
-    const nextLvl = selectedLevel < 1000 ? selectedLevel + 1 : null;
     if (nextLvl) {
       startLevel(nextLvl);
     }
@@ -474,8 +478,9 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
     const totalS = totalSecsRef.current;
     const newTotalMoves = totalMoves + moves;
     const share = `Tile Match ⬢ L${completedLevels.size + 1} cleared | ${ns} pts 🀄✨`;
-    // Fire-and-forget: submit score
-    submitScore(selectedLevel, completedLevels.size + 1, ns);
+    // Free play alone feeds the all-time Tile Match board; a story rung and an
+    // arcade run settle on their own endpoints and must not appear on both.
+    if (!playMode) submitScore(selectedLevel, completedLevels.size + 1, ns);
     onWin(ns, newTotalMoves, totalS, { share });
   };
 
@@ -552,10 +557,20 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
   // ---- Level won screen ----
   if (phase === 'levelWon') {
     const isLast = selectedLevel >= 1000;
+    /* #176 — clearing the board means three different things here.
+
+       STORY: the rung IS this board, so clearing it finishes the run. Offering
+       "Next Level →" would walk the player straight out of the band they were
+       sent to clear, and because the rung is only ticked by the run ENDING,
+       they could climb five levels and still not have ticked it.
+       ARCADE: the run continues onto a fresh board one step harder — that is
+       what makes it a run rather than a single game.
+       FREE PLAY: unchanged, the original ladder-climbing session. */
+    const isStory = playMode === 'story';
     return (
       <div className="tm-level-won">
         <div className="trophy">🏆</div>
-        <h3>Level {selectedLevel} Cleared!</h3>
+        <h3>{isStory ? 'Band cleared!' : `Level ${selectedLevel} Cleared!`}</h3>
         <div className="sub">Board cleared — well played</div>
         <div className="tm-level-stats">
           <div className="tm-level-stat-row"><span className="k">Moves</span><span className="v">{moves}</span></div>
@@ -563,10 +578,14 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
           <div className="tm-level-stat-row"><span className="k">Session total</span><span className="v">{sessionScore + levelScore}</span></div>
         </div>
         <div className="tm-level-won-btns">
-          {!isLast && (
-            <button className="tm-next-btn" onClick={handleNextLevel}>Next Level →</button>
+          {!isLast && !isStory && (
+            <button className="tm-next-btn" onClick={handleNextLevel}>
+              {playMode === 'arcade' ? 'Next board →' : 'Next Level →'}
+            </button>
           )}
-          <button className="tm-end-btn" onClick={handleEndSession}>End Session</button>
+          <button className="tm-end-btn" onClick={handleEndSession}>
+            {isStory ? 'Finish' : 'End Session'}
+          </button>
         </div>
       </div>
     );

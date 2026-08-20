@@ -402,12 +402,18 @@ function runClientSelfTests(styleReady) {
   // is really on the tree. (Real-time dailies that render their own shell are
   // out of scope; every category:'daily' game here uses shell:'daily'.)
   check('registry-fitshell', () => {
-    /* #176 — the gate is now "declares a daily play mode", not category. Block
-       Fit and 2048 are classic entries that gained a daily, and a daily that
-       renders without .fit-col clips instead of fitting whatever its category
-       says. Entries that render their own shell are out of scope. */
-    const missing = GAMES.filter(g =>
-      supportsMode(g.id, 'daily') && g.shell !== 'self' && !g.fitShell).map(g => g.id);
+    /* #176 — the gate is the SHELL, not the category and not the play mode.
+       `fitShell` is read by exactly one renderer, the daily game-wrap, so it is
+       every shell:'daily' entry that must set it — that is the same set as
+       category:'daily' today, but says why rather than restating the coincidence.
+
+       It is NOT "declares a daily play mode". Seven classics gained a daily in
+       #176 and still render through ClassicShell, whose .cg-stage keeps
+       .cg-scroll deliberately (an overflow:hidden stage clips a tall setup
+       screen instead of fitting it) and whose boards honour the --cg-board
+       viewport cap instead. Demanding fitShell of them would demand a flag the
+       shell they use never reads. */
+    const missing = GAMES.filter(g => g.shell === 'daily' && !g.fitShell).map(g => g.id);
     if (missing.length) throw new Error('dailies missing fitShell: ' + missing.join(', '));
     const wrap = document.querySelector('.game-wrap.fit');
     if (wrap && !wrap.querySelector('.fit-col')) {

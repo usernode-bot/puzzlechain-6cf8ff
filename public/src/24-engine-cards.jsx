@@ -2163,9 +2163,20 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   );
 }
 
-/* ---- Crate Push (daily) --------------------------------------------------------
-   Push every crate onto a goal pad. One hand-built warehouse per day
-   (picked by the daily seed); moves are undoable and the room restartable. */
+/* ---- Crate Push (daily + story) ------------------------------------------------
+   Push every crate onto a goal pad. Moves are undoable and the room restartable.
+
+   #176 — WHERE THE ROOMS COME FROM. Ten hand-built rooms could not carry a
+   difficulty ladder, and Sokoban is the one game in the app whose content can
+   never be rated at mount time: deciding whether a room is solvable is a
+   PSPACE-complete search, not a deduction. So rooms are generated offline by
+   scripts/gen-sokoban.js and shipped as public/corpus/cratepush.json — 200
+   rooms across 8 bands, each one carrying the exact length of its shortest
+   solution in pushes (3 at the bottom of the ladder, ~35 at the top).
+
+   The ten hand-built rooms below stay as the FALLBACK. If the corpus has not
+   arrived, the day still has a warehouse — you lose the difficulty guarantee,
+   never the game, which is the same bargain Klondike and Spider strike. */
 
 const CP_LEVELS = [
   ['#######',
@@ -2244,11 +2255,47 @@ function cpParse(rows) {
   return { walls, goals, crates, player, w: Math.max(...rows.map((r) => r.length)), h: rows.length };
 }
 
-function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress }) {
+/* Which corpus band today's daily draws from. The ladder is 8 rungs and the
+   week is 7 days, so a straight weekday->band map would never show band 7 and
+   would make Monday permanently trivial. Instead the weekday picks a WINDOW of
+   the ladder and the daily seed picks inside it: gentle at the start of the
+   week, hardest at the weekend, with real variation on any given weekday. This
+   is the same shape TM_WEEK uses for Daily Tile Match. */
+const CP_WEEK = [
+  { from: 0, to: 3, label: 'Warm-up' },   // Sun
+  { from: 0, to: 3, label: 'Warm-up' },   // Mon
+  { from: 1, to: 4, label: 'Easy' },      // Tue
+  { from: 2, to: 5, label: 'Steady' },    // Wed
+  { from: 3, to: 6, label: 'Tricky' },    // Thu
+  { from: 4, to: 7, label: 'Hard' },      // Fri
+  { from: 5, to: 8, label: 'Weekend' },   // Sat
+];
+
+function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
-  const levelIdx = useRef(null);
-  if (levelIdx.current == null) levelIdx.current = Math.floor(dailyRng(offset, 'cratepush')() * CP_LEVELS.length);
-  const level = useRef(cpParse(CP_LEVELS[levelIdx.current])).current;
+  const picked = useRef(null);
+  if (picked.current == null) {
+    const { rng } = modeSeed(playMode, 'cratepush', band, offset);
+    /* Story plays exactly its rung. The daily draws from the weekday's window,
+       so today's room is the same for everyone but is not the same rung every
+       Tuesday. */
+    let want = 0;
+    if (playMode === 'story') want = Math.max(0, band || 0);
+    else {
+      const w = CP_WEEK[new Date(Date.now() + (offset || 0)).getUTCDay()];
+      want = w.from + Math.floor(rng() * (w.to - w.from));
+    }
+    const lv = corpusLevel('cratepush', want, rng);
+    if (lv && Array.isArray(lv.g)) {
+      picked.current = { rows: lv.g, pushes: lv.p, band: want, rated: true };
+    } else {
+      // Fallback: the hand-built rooms, still deterministic for the day.
+      const i = Math.floor(rng() * CP_LEVELS.length);
+      picked.current = { rows: CP_LEVELS[i], pushes: null, band: null, rated: false, idx: i };
+    }
+  }
+  const levelInfo = picked.current;
+  const level = useRef(cpParse(levelInfo.rows)).current;
 
   const resumed = savedProgress && savedProgress.dayNum === dayNum &&
     Array.isArray(savedProgress.player) && Array.isArray(savedProgress.crates)
@@ -2301,9 +2348,15 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     if (!won) saveNow([nx, ny], cr, m);
     if (won) {
       setDone(true);
-      const score = Math.max(1200 - m * 6 - secs * 2, 250);
+      /* A rated room knows its own par, so the ladder can pay for difficulty
+         instead of only for speed — clearing a 35-push warehouse should not
+         score like a 3-push one. Unrated fallback rooms keep the old curve. */
+      const base = levelInfo.rated ? 600 + levelInfo.pushes * 40 : 1200;
+      const score = Math.max(base - m * 6 - secs * 2, 250);
       onWin(score, m, secs, {
-        share: `Game Corner Crate Push — shifted today's warehouse in ${m} moves (${fmt}) 📦`,
+        share: levelInfo.rated
+          ? `Game Corner Crate Push — cleared a ${levelInfo.pushes}-push warehouse in ${m} moves (${fmt}) 📦`
+          : `Game Corner Crate Push — shifted today's warehouse in ${m} moves (${fmt}) 📦`,
       });
     }
   };
@@ -2358,7 +2411,10 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
       <div className="status-bar">
         <div className="pill"><div className="plabel">Time</div><div className="pvalue time">{fmt}</div></div>
         <div className="pill"><div className="plabel">Moves</div><div className="pvalue">{moves}</div></div>
-        <div className="pill"><div className="plabel">Room</div><div className="pvalue">#{levelIdx.current + 1}</div></div>
+        <div className="pill">
+          <div className="plabel">{levelInfo.rated ? 'Par' : 'Room'}</div>
+          <div className="pvalue">{levelInfo.rated ? `${levelInfo.pushes} pushes` : `#${levelInfo.idx + 1}`}</div>
+        </div>
       </div>
       <FitScale>
         <div className="cp-grid" style={{ gridTemplateColumns: `repeat(${level.w}, 34px)` }}>{cells}</div>
@@ -2375,7 +2431,10 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
         <button className="p6-btn" onClick={undo} disabled={!hist.length}>↶ Undo</button>
         <button className="p6-btn" onClick={restart}>⟲ Restart</button>
       </div>
-      <div className="p6-hint">Push every crate onto a green pad. You can push one crate at a time — never pull.</div>
+      <div className="p6-hint">
+        Push every crate onto a green pad. You can push one crate at a time — never pull.
+        {levelInfo.rated ? ` This room can be solved in ${levelInfo.pushes} pushes.` : ''}
+      </div>
     </div>
   );
 }

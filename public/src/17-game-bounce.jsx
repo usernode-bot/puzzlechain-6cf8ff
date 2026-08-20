@@ -145,7 +145,7 @@ function updatePowerup(pu, scale) {
   pu.vy += 0.1 * scale;
 }
 
-function BounceGame({ onWin, onStepChange, resetKey, playMode, band, offset }) {
+function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offset }) {
   /* #176 — story walks the pattern grammar in order (each rung is a specific
      wall you can learn and re-attempt), arcade rolls a pattern per level so
      the wall is different every run but never noise. Free play keeps the
@@ -222,6 +222,7 @@ function BounceGame({ onWin, onStepChange, resetKey, playMode, band, offset }) {
 
   // Latest-closure prop refs so listeners/loop mount once.
   const onWinRef = useRef(onWin);        onWinRef.current = onWin;
+  const onLoseRef = useRef(onLose);      onLoseRef.current = onLose;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
 
   const loopRunning = activeTab === 'game' && !done;
@@ -336,16 +337,35 @@ function BounceGame({ onWin, onStepChange, resetKey, playMode, band, offset }) {
     const finalScore = scoreRef.current;
     const lvl = levelRef.current;
     const secs = elapsedRef.current;
-    submitScore(finalScore, lvl, secs);
-    onWinRef.current && onWinRef.current(finalScore, brokenRef.current, secs, {
-      share: bounceShareText(finalScore, lvl, secs),
-    });
+    if (!playMode || playMode === 'arcade') submitScore(finalScore, lvl, secs);
+    /* `cleared` is false here by construction — endGame is the out-of-balls
+       path, and clearing the wall goes through nextLevel instead. */
+    reportRunEnd(
+      { cleared: false, playMode, onWin: onWinRef.current, onLose: onLoseRef.current },
+      finalScore, brokenRef.current, secs,
+      { share: bounceShareText(finalScore, lvl, secs) }
+    );
   };
 
   const nextLevel = () => {
     cgSound('blevel');
     scoreRef.current += BOUNCE_LEVEL_BONUS;
     setScore(scoreRef.current);
+    /* STORY ENDS AT ITS OWN WALL. A rung is one specific wall — clearing it is
+       the whole achievement — so story stops here instead of rolling into
+       level 2. Without this the run would rebuild the SAME fixed pattern
+       forever and the rung could only ever be ticked by dying, which is
+       exactly backwards. Free play and arcade keep climbing. */
+    if (playMode === 'story') {
+      doneRef.current = true;
+      setDone(true);
+      const secs = elapsedRef.current;
+      onWinRef.current && onWinRef.current(scoreRef.current, brokenRef.current, secs, {
+        winnerLabel: 'Wall cleared! 🎉',
+        share: bounceShareText(scoreRef.current, levelRef.current, secs),
+      });
+      return;
+    }
     const lvl = levelRef.current + 1;
     levelRef.current = lvl;
     setLevel(lvl);

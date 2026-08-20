@@ -293,9 +293,23 @@ const BB_COLORS = [C.accent, C.emerald, C.gold, C.violet, C.rose];
    every player's run genuinely identical, not merely similarly-supplied. (2048
    cannot promise that — see t2048_addRandom.) A null rng keeps free play on
    Math.random, so nothing about the classic mode changes. */
-function bbRandPiece(rng) {
+/* #176 arcade bands — the PIECE POOL. Block Fit's difficulty is entirely a
+   function of what it offers you: an 8x8 board with a steady diet of singles
+   and dominoes is nearly unloseable, and one that keeps handing you 4-and-5
+   cell pieces jams within a dozen placements. So a band is a slice of
+   BB_SHAPES ordered by size — Easy draws only from the small end, Hard only
+   from the large end, and Normal (and every other mode) uses the whole pool,
+   which is the classic game unchanged. */
+const BB_BAND_POOL = {
+  easy:   BB_SHAPES.filter(sh => sh.length <= 3),
+  normal: BB_SHAPES,
+  hard:   BB_SHAPES.filter(sh => sh.length >= 4),
+};
+
+function bbRandPiece(rng, band) {
   const r = rng || Math.random;
-  const cells = BB_SHAPES[Math.floor(r() * BB_SHAPES.length)];
+  const pool = (band && BB_BAND_POOL[band]) || BB_SHAPES;
+  const cells = pool[Math.floor(r() * pool.length)];
   return { cells, color: BB_COLORS[Math.floor(r() * BB_COLORS.length)] };
 }
 function bbCanPlace(grid, cells, or, oc) {
@@ -315,7 +329,9 @@ function bbCanPlaceAny(grid, tray) {
 // game-over it calls onEnd(score, placed, secs); the parent decides what to do
 // (solo submits the global score + shows the overlay; the race host posts to
 // the room). The board itself never touches scoring endpoints.
-function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, offset }) {
+function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, band, offset }) {
+  // Only arcade narrows the pool; the daily and free play use all of it.
+  const bbBand = playMode === 'arcade' ? band : null;
   const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
   /* One rng for the whole run so the offer sequence is reproducible: the daily
      seeds from today's server seed, arcade from a fresh per-run seed that is
@@ -328,7 +344,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, offset }) {
   }
   const bbRng = rngRef.current;
   const [grid, setGrid] = useState(() => new Array(64).fill(null));
-  const [tray, setTray] = useState(() => [bbRandPiece(bbRng), bbRandPiece(bbRng), bbRandPiece(bbRng)]);
+  const [tray, setTray] = useState(() => [bbRandPiece(bbRng, bbBand), bbRandPiece(bbRng, bbBand), bbRandPiece(bbRng, bbBand)]);
   const [score, setScore] = useState(0);
   const [drag, setDrag] = useState(null); // { idx, cells, color, x, y }
   const [done, setDone] = useState(false);
@@ -342,7 +358,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, offset }) {
 
   const init = () => {
     setGrid(new Array(64).fill(null));
-    setTray([bbRandPiece(bbRng), bbRandPiece(bbRng), bbRandPiece(bbRng)]);
+    setTray([bbRandPiece(bbRng, bbBand), bbRandPiece(bbRng, bbBand), bbRandPiece(bbRng, bbBand)]);
     setScore(0); setDone(false); setDrag(null);
     doneRef.current = false; placedRef.current = 0; linesRef.current = 0;
   };
@@ -388,7 +404,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, offset }) {
     // consume tray slot
     let nt = tray.slice();
     if (piece.idx != null) nt[piece.idx] = null;
-    if (nt.every(p => !p)) nt = [bbRandPiece(bbRng), bbRandPiece(bbRng), bbRandPiece(bbRng)];
+    if (nt.every(p => !p)) nt = [bbRandPiece(bbRng, bbBand), bbRandPiece(bbRng, bbBand), bbRandPiece(bbRng, bbBand)];
     setGrid(g);
     setTray(nt);
     // game-over check next frame
@@ -490,7 +506,7 @@ function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, offset }) {
 
 // Block Blast entry — solo (own board + leaderboard sheet) or the online-race
 // host. Both wrap the shared BlockBlastBoard in the standard ClassicShell.
-function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, gameMode, gameModeOpts, playMode, offset }) {
+function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, gameMode, gameModeOpts, playMode, band, offset }) {
   const [nkey, setNkey] = useState(0);
   const boardKey = `${resetKey || 0}:${nkey}`;
   const hist = cgLoadHistory(BB_KEY);
@@ -525,6 +541,7 @@ function BlockBlastGame({ onWin, onStepChange, resetKey, game, onBack, menuConfi
           onStepChange={onStepChange}
           resetKey={boardKey}
           playMode={playMode}
+          band={band}
           offset={offset}
           onEnd={(sc, placed, secs) => {
             /* Only free play feeds the all-time classic board. A daily run is

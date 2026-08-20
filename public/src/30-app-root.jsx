@@ -973,8 +973,15 @@ function App() {
       return;
     }
     try {
-      // Non-daily games skip the server, streak, and totalScore nav update.
-      if (currentGame && !currentGame.daily) {
+      /* #176 — the branch is the MODE, not the registry entry. Seven classics
+         gained a daily (2048, Knight's Tour, Block Fit, Diamond Rush, Marble
+         Loop, Hash Rush, Match-3) while keeping `daily: false` and their
+         classic shell, because that is still where they live in the lobby.
+         Reading the entry's flag here would send their daily win down the
+         classic path: no attempt row, no lock, no leaderboard, no streak — the
+         run would look like it worked and record nothing. */
+      // A free-play classic run skips the server, streak and totalScore.
+      if (currentGame && playMode !== 'daily') {
         const cashoutMultiplier = (meta && meta.cashoutMultiplier) || 1;
         setWinData({
           score,
@@ -1191,8 +1198,9 @@ function App() {
       return;
     }
     try {
-      // Non-daily games skip the server entirely.
-      if (currentGame && !currentGame.daily) {
+      // A free-play classic run skips the server entirely. Mode, not entry —
+      // see the matching note in handleWin.
+      if (currentGame && playMode !== 'daily') {
         setLoseData({
           steps,
           timeSecs,
@@ -1452,6 +1460,15 @@ function App() {
       band: playMode === 'arcade' ? arcadeBandId : playMode === 'story' ? storyBand : null,
       onBandCleared: playMode === 'story' ? handleBandCleared : undefined,
     };
+    /* ONLY A DAILY RESUMES. The progress row is the daily attempt row — it is
+       keyed by (user, game, UTC day) and exists only once /start has claimed
+       the day. A story or arcade run has no such row, so saving into it 409s
+       (a console error, which trips the no-console-errors check) and READING
+       from it is worse: a half-finished daily board would hydrate into a story
+       rung that is supposed to be a fixed, retryable deal. Neither mode wants
+       resume anyway — a story rung is stable by seed, so restarting it costs
+       nothing, and an arcade run is meant to be thrown away. */
+    const resumable = playMode === 'daily' && !practiceMode;
     switch (currentGame.shell) {
       case 'self':
         // Full-screen, gesture-first game that renders its own ClassicShell.
@@ -1566,8 +1583,8 @@ function App() {
               }}
               onMoveTile={logsOwnMoves && !practiceMode ? recordDailyMove : undefined}
               offset={offset}
-              savedProgress={practiceMode ? null : progressFor(attempts[currentGame.id])}
-              onSaveProgress={practiceMode ? null : handleSaveProgress}
+              savedProgress={resumable ? progressFor(attempts[currentGame.id]) : null}
+              onSaveProgress={resumable ? handleSaveProgress : null}
               resetKey={playAgainKey}
             />
           </div>
@@ -2241,7 +2258,7 @@ function App() {
                 :gameId against GAME_IDS and 400s on a classic id, and a 400 is
                 a console error the no-console-errors check fails on. Classics
                 reach their all-time board through ClassicShell's ☰ sheet. */}
-            {currentGame && currentGame.daily && <Leaderboard gameId={currentGame.id} solved={true} />}
+            {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             {winData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
@@ -2318,7 +2335,7 @@ function App() {
               </div>
             )}
             {/* Daily board only — see the note on the win card above. */}
-            {currentGame && currentGame.daily && <Leaderboard gameId={currentGame.id} solved={false} />}
+            {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
               <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>

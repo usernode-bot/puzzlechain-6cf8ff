@@ -33,16 +33,62 @@ const ZUMA_PATH_L3 = [
   {x:125,y:377},{x:148,y:380},
 ];
 
-/* #176 — the three authored levels stay as the free-play run, and a
-   PARAMETRIC ladder sits beside them for story and arcade. The bottleneck here
-   was always paths (the path IS the level, and there are two), so the ladder
-   varies the things that actually change difficulty on a fixed track — ball
-   count, chain speed and colour count — and alternates the two paths so
-   consecutive rungs do not look identical. */
-function zumaLevelForBand(band, bandCount) {
+/* #176 — PROCEDURAL TRACKS. The path IS the level here, and there were two of
+   them, hand-plotted waypoint by waypoint. Two tracks cannot carry a daily (it
+   would be the same board twice a week), a 5-rung ladder, or endless arcade
+   play, and hand-plotting more does not scale.
+
+   So a track is generated from a seed as an INWARD SPIRAL: start on a wide
+   ellipse and wind toward the middle, with the ellipse's aspect, tilt and a
+   low-frequency radial wobble all drawn from the seed. That shape is the right
+   one for this game for a structural reason — the frog sits at the centre, so
+   a spiral keeps every part of the track roughly within shooting range, where
+   an arbitrary squiggle would put stretches of it behind the frog's back or
+   past the canvas edge. The two authored paths are themselves spirals; this
+   generalises them rather than replacing them with something different.
+
+   The track STOPS short of the centre (ZUMA_SPIRAL_R1), leaving the skull an
+   arm's length from the frog: end it at the centre and the drain would sit
+   under the frog itself. */
+const ZUMA_SPIRAL_R0 = 168;   // outermost radius
+const ZUMA_SPIRAL_R1 = 46;    // where the track drains
+const ZUMA_CX = 150, ZUMA_CY = 196;
+const ZUMA_STEP = 0.22;       // radians per sampled waypoint
+
+function zumaGeneratePath(rng, loops) {
+  const tilt = rng() * Math.PI * 2;
+  const aspect = 0.72 + rng() * 0.30;        // ellipse squash
+  const wobbleAmp = 6 + rng() * 12;          // radial wobble depth
+  const wobbleFreq = 2 + Math.floor(rng() * 3);
+  const wobblePhase = rng() * Math.PI * 2;
+  const dir = rng() < 0.5 ? 1 : -1;          // clockwise or not
+  const total = loops * Math.PI * 2;
+  const pts = [];
+  for (let a = 0; a <= total; a += ZUMA_STEP) {
+    const t = a / total;
+    const r = ZUMA_SPIRAL_R0 + (ZUMA_SPIRAL_R1 - ZUMA_SPIRAL_R0) * t
+      + Math.sin(a * wobbleFreq + wobblePhase) * wobbleAmp * (1 - t);
+    const ang = tilt + dir * a;
+    const x = ZUMA_CX + Math.cos(ang) * r;
+    const y = ZUMA_CY + Math.sin(ang) * r * aspect;
+    // Keep the whole track on the canvas with a ball's clearance.
+    pts.push({
+      x: Math.max(ZUMA_BALL_R + 4, Math.min(ZUMA_W - ZUMA_BALL_R - 4, x)),
+      y: Math.max(ZUMA_BALL_R + 4, Math.min(ZUMA_H - ZUMA_BALL_R - 4, y)),
+    });
+  }
+  return pts;
+}
+
+/* A rung on the ladder. `rng` generates the track; the numbers that actually
+   set the pressure — ball count, chain speed, colour count — scale with the
+   band, and the spiral gains a loop as it climbs so a hard track is longer as
+   well as faster. */
+function zumaLevelForBand(band, bandCount, rng) {
   const t = bandCount > 1 ? band / (bandCount - 1) : 0;
+  const r = rng || mulberry32(0x5eed ^ (band * 2654435761));
   return {
-    path: band % 2 === 0 ? ZUMA_PATH_S : ZUMA_PATH_L3,
+    path: zumaGeneratePath(r, 2 + Math.round(t * 2)),
     ballCount: Math.round(20 + 22 * t),
     speed: Math.round(9 + 20 * t),
     colors: t < 0.34 ? 4 : t < 0.75 ? 5 : 6,
@@ -79,16 +125,21 @@ function zumaPointAtDist(pd, dist) {
   return { x: wps[lo].x + t*(wps[lo+1].x - wps[lo].x), y: wps[lo].y + t*(wps[lo+1].y - wps[lo].y) };
 }
 
-function zumaBuildChain(count, numColors) {
+/* `rng` is optional and defaults to Math.random — free play is supposed to
+   differ every time. A daily passes the day's rng so the chain, the shot
+   colours and the power-up drops are identical for everyone, which is the same
+   rule Daily Bounce follows for its brick drops. */
+function zumaBuildChain(count, numColors, rng) {
+  const r = rng || Math.random;
   const balls = [];
   for (let i = 0; i < count; i++) {
-    balls.push({ color: ZUMA_COLORS_ALL[Math.floor(Math.random() * numColors)], dist: -i * ZUMA_DIAM });
+    balls.push({ color: ZUMA_COLORS_ALL[Math.floor(r() * numColors)], dist: -i * ZUMA_DIAM });
   }
   return balls;
 }
 
-function zumaRandColor(numColors) {
-  return ZUMA_COLORS_ALL[Math.floor(Math.random() * numColors)];
+function zumaRandColor(numColors, rng) {
+  return ZUMA_COLORS_ALL[Math.floor((rng || Math.random)() * numColors)];
 }
 
 function zumaCheckMatches(chain, idx) {
@@ -112,21 +163,42 @@ function zumaCheckMatches(chain, idx) {
   return runLen + extra;
 }
 
-function ZumaGame({ onWin, onStepChange, resetKey, playMode, band }) {
+function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offset }) {
   const { useState, useEffect, useRef } = React;
-  /* One level, chosen by mode. Story plays exactly its band; arcade maps its
-     three difficulties onto the same ladder; free play keeps the original
-     three-level run untouched. */
+  /* One level, chosen by mode. Story plays exactly its band and gets a track
+     that is STABLE for that rung; the daily gives everyone the same mid-ladder
+     track for the day; arcade maps its three difficulties onto the same ladder
+     with a fresh track per run; free play keeps the original three-level run
+     on the two authored tracks, untouched. */
   const modeLevels = useRef(null);
-  if (!modeLevels.current) {
-    if (playMode === 'story') {
-      modeLevels.current = [zumaLevelForBand(Math.max(0, band || 0), ZUMA_STORY_BANDS)];
-    } else if (playMode === 'arcade') {
+  const modeRngRef = useRef(null);
+  if (!modeLevels.current && playMode && playMode !== 'free') {
+    const { rng } = modeSeed(playMode, 'zuma', band, offset);
+    modeRngRef.current = rng;
+    let rung;
+    if (playMode === 'story') rung = Math.max(0, band || 0);
+    else if (playMode === 'arcade') {
       const i = Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band));
-      modeLevels.current = [zumaLevelForBand(Math.round((i / 2) * (ZUMA_STORY_BANDS - 1)), ZUMA_STORY_BANDS)];
+      rung = Math.round((i / 2) * (ZUMA_STORY_BANDS - 1));
+    } else {
+      // Daily: a fixed mid-ladder rung, so the day is about the track and the
+      // chain rather than about which difficulty you happened to draw.
+      rung = Math.floor((ZUMA_STORY_BANDS - 1) / 2);
     }
+    modeLevels.current = [zumaLevelForBand(rung, ZUMA_STORY_BANDS, rng)];
   }
   const LEVELS = modeLevels.current || ZUMA_LEVELS;
+  /* The mode rng is consumed by generation AND by play (chain colours, shot
+     colours, power-up drops). Everything downstream of generation therefore
+     draws from a SECOND stream derived from the same seed, so that a run whose
+     colours diverge cannot shift the track — and so that Marble Loop's daily
+     really is byte-identical for two players, drops included. */
+  const playRng = useRef(null);
+  if (playMode && !playRng.current) {
+    const { seed } = modeSeed(playMode, 'zuma', band, offset);
+    playRng.current = mulberry32(((seed == null ? dailyRng(offset, 'zuma')() * 4294967295 : seed) ^ 0x9e3779b9) >>> 0);
+  }
+  const prand = () => (playRng.current ? playRng.current() : Math.random());
   const [activeTab, setActiveTab] = useState('game');
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
@@ -160,14 +232,15 @@ function ZumaGame({ onWin, onStepChange, resetKey, playMode, band }) {
   const wildColorLoadedRef = useRef(0);
   const chainClearLoadedRef = useRef(0);
   const onWinRef = useRef(onWin); onWinRef.current = onWin;
+  const onLoseRef = useRef(onLose); onLoseRef.current = onLose;
   const onStepRef = useRef(onStepChange); onStepRef.current = onStepChange;
 
   function initLevel(lvlNum) {
     const lvl = LEVELS[Math.min(lvlNum, LEVELS.length) - 1];
     pathDataRef.current = zumaComputePathData(lvl.path);
-    chainRef.current = zumaBuildChain(lvl.ballCount, lvl.colors);
-    curColorRef.current = zumaRandColor(lvl.colors);
-    nxtColorRef.current = zumaRandColor(lvl.colors);
+    chainRef.current = zumaBuildChain(lvl.ballCount, lvl.colors, playMode ? prand : null);
+    curColorRef.current = zumaRandColor(lvl.colors, playMode ? prand : null);
+    nxtColorRef.current = zumaRandColor(lvl.colors, playMode ? prand : null);
     shotRef.current = null;
   }
 
@@ -215,13 +288,19 @@ function ZumaGame({ onWin, onStepChange, resetKey, playMode, band }) {
     const bp = bpRef.current;
     const secs = elapsedRef.current;
     const lv = levelRef.current;
-    submitScore(s, lv);
-    onWinRef.current(s, bp, secs, {
-      winnerLabel: cleared ? 'Cleared! 🎉' : 'Game Over',
-      share: cleared
-        ? '🐸 Marble Loop — ' + s + ' pts, all 3 levels cleared!'
-        : '🐸 Marble Loop — ' + s + ' pts, level ' + lv,
-    });
+    // Free play and arcade post to the classic board; a story rung and a daily
+    // settle on their own endpoints and must not also appear there.
+    if (!playMode || playMode === 'arcade') submitScore(s, lv);
+    reportRunEnd(
+      { cleared, playMode, onWin: onWinRef.current, onLose: onLoseRef.current },
+      s, bp, secs,
+      {
+        winnerLabel: cleared ? 'Cleared! 🎉' : 'Game Over',
+        share: cleared
+          ? '🐸 Marble Loop — ' + s + ' pts, track cleared!'
+          : '🐸 Marble Loop — ' + s + ' pts, level ' + lv,
+      }
+    );
   }
 
   const loopRunning = activeTab === 'game' && !done;
@@ -452,7 +531,7 @@ function ZumaGame({ onWin, onStepChange, resetKey, playMode, band }) {
                   onStepRef.current && onStepRef.current(bpRef.current);
                 }
               }
-              if (Math.random() < POWERUP_SPAWN_RATE) {
+              if (prand() < POWERUP_SPAWN_RATE) {
                 const pt = zumaPointAtDist(pd, chain[i] ? chain[i].dist : chain[chain.length - 1] ? chain[chain.length - 1].dist : 0);
                 powerUpsRef.current.push(spawnPowerup(pt.x, pt.y, POWERUP_TYPES.zuma));
               }
@@ -500,7 +579,7 @@ function ZumaGame({ onWin, onStepChange, resetKey, playMode, band }) {
       color: shotColor,
     };
     curColorRef.current = nxtColorRef.current;
-    nxtColorRef.current = zumaRandColor(lv.colors);
+    nxtColorRef.current = zumaRandColor(lv.colors, playMode ? prand : null);
   };
 
   const loadLeaderboard = async () => {

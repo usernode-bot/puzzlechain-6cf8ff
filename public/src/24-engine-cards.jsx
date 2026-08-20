@@ -1831,8 +1831,24 @@ function ngBuildForBand(rng, bandIdx) {
      This is the one place a nonogram could ship needing a guess; measured over
      20 boards per band it does not fire at all, and the sparse top band was
      retuned from 0.40 to 0.44 density precisely because at 0.40 it fired a
-     quarter of the time. */
-  return fallback;
+     quarter of the time.
+
+     `fallback` is only assigned by attempts that got PAST the degenerate-shape
+     filters, so a seed whose every attempt is rejected there leaves it null —
+     and a null board is not a fallback, it is a crash at mount two lines later
+     (`built.current.rows`). A generator's last resort has to be a board. */
+  return fallback || ngBuildPlainBoard(rows, cols);
+}
+
+/* The unconditional last resort: a checkerboard-ish silhouette built without
+   any rng, so it is always well-formed and always passes the shape filters by
+   construction. It exists to be a board, not to be a good puzzle. */
+function ngBuildPlainBoard(rows, cols) {
+  const grid = Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => ((r + c) % 3 === 0 || r === c ? 1 : 0)));
+  const rowClues = grid.map(ngClues);
+  const colClues = grid[0].map((_, c) => ngClues(grid.map(row => row[c])));
+  return { grid, rowClues, colClues, rows, cols, passes: 0 };
 }
 
 function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
@@ -1857,7 +1873,16 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const rowClues = built.current.rowClues;
   const colClues = built.current.colClues;
 
-  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+  /* The saved grid has to MATCH THIS BOARD, not merely be an array. #176 made
+     the board size a band property (5x5 up to 15x15), so a snapshot from a
+     different band — or a staging fixture that hardcodes one size — hydrates a
+     grid the draw loop then indexes out of bounds: `grid[r][c]` on a missing
+     row throws at mount, and a mount-time throw is a blank screen, not a
+     graceful fallback. Dimensions are cheap to check; a wrong-sized snapshot
+     is simply not a resume. */
+  const ngFits = (g) => Array.isArray(g) && g.length === NG_ROWS &&
+    g.every((row) => Array.isArray(row) && row.length === NG_COLS);
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && ngFits(savedProgress.grid)
     ? savedProgress : null;
   // 0 = blank, 1 = filled, 2 = marked ✗
   const [grid, setGrid] = useState(() =>
@@ -3244,7 +3269,16 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
   // Resume tolerates the pre-rebuild progress shape: rows saved by the old
   // turn-based version carry no level/hold, so derive level from lines and
   // start with an empty hold rather than refusing to resume mid-day.
-  const resumed = savedProgress && savedProgress.dayNum === dayNum && Array.isArray(savedProgress.grid)
+  /* The saved grid has to MATCH THIS BOARD, not merely be an array. #176 made
+     the board size a band property (5x5 up to 15x15), so a snapshot from a
+     different band — or a staging fixture that hardcodes one size — hydrates a
+     grid the draw loop then indexes out of bounds: `grid[r][c]` on a missing
+     row throws at mount, and a mount-time throw is a blank screen, not a
+     graceful fallback. Dimensions are cheap to check; a wrong-sized snapshot
+     is simply not a resume. */
+  const ngFits = (g) => Array.isArray(g) && g.length === NG_ROWS &&
+    g.every((row) => Array.isArray(row) && row.length === NG_COLS);
+  const resumed = savedProgress && savedProgress.dayNum === dayNum && ngFits(savedProgress.grid)
     ? savedProgress : null;
   const resumedGrid = resumed
     // An old 14-row well is padded at the TOP to today's 16 rows, so the stack

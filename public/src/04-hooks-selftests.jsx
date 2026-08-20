@@ -455,8 +455,13 @@ function runClientSelfTests(styleReady) {
       probe.setAttribute('data-pressed', '1');
       const cs = getComputedStyle(probe);
       const after = probe.getBoundingClientRect();
-      if (cs.clip !== 'auto' && cs.clip !== '') {
-        throw new Error('a pressed .tappable is clipped (clip: ' + cs.clip + ') — it is being hidden, not highlighted');
+      /* Normalise `clip` rather than string-matching it: an unclipped element
+         computes to "auto" in some engines and "rect(auto, auto, auto, auto)"
+         in others, so `!== 'auto'` reports a false failure on whichever engine
+         you did not test on. Only a rect with no `auto` in it actually clips. */
+      const clip = String(cs.clip || '');
+      if (clip.indexOf('rect(') === 0 && clip.indexOf('auto') === -1) {
+        throw new Error('a pressed .tappable is clipped (clip: ' + clip + ') — it is being hidden, not highlighted');
       }
       // Allow the intended scale, but nothing that collapses the box.
       if (after.width < before.width * 0.6 || after.height < before.height * 0.6) {

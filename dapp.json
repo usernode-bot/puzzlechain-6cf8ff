@@ -710,9 +710,9 @@
       "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
     },
     {
-      "name": "Chutes & Ladders P2 pawn renders as a diamond token",
+      "name": "Snakes & Ladders bot match renders chess-piece pawns",
       "path": "/?game=chutes-ladders&mode=bot",
-      "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"
+      "expectSelector": "canvas.cnl-canvas[data-snl-pawns=\"chess\"]"
     },
     {
       "name": "Chutes & Ladders Jungle Vine skin deep-link renders",

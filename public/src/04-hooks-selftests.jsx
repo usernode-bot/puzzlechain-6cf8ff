@@ -432,6 +432,56 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* Snakes & Ladders V2 — the seven hand-authored tier boards must satisfy
+     the authoring constraints (see snakesladders-v2/00-layouts.jsx), or a
+     future retune ships a broken board: a chained jump the engine resolves
+     ambiguously, a snake pointing up, a Legend summit that can be skipped. */
+  check('cnlv2-layouts', () => {
+    const expected = {
+      beginner: [8, 3], amateur: [7, 5], regular: [6, 6], professional: [5, 8],
+      topplayer: [4, 10], superstar: [3, 12], legend: [2, 15],
+    };
+    if (CNLV2_LAYOUTS.length !== 7) throw new Error('expected 7 tiers, got ' + CNLV2_LAYOUTS.length);
+    for (const L of CNLV2_LAYOUTS) {
+      const exp = expected[L.id];
+      if (!exp) throw new Error('unknown tier id ' + L.id);
+      const lad = Object.keys(L.ladders).map(Number);
+      const snk = Object.keys(L.snakes).map(Number);
+      if (lad.length !== exp[0] || snk.length !== exp[1]) {
+        throw new Error(L.id + ' has ' + lad.length + ' ladders / ' + snk.length + ' snakes, expected ' + exp.join('/'));
+      }
+      const starts = lad.concat(snk);
+      if (new Set(starts).size !== starts.length) throw new Error(L.id + ' has duplicate jump starts');
+      const dests = [];
+      for (const s of lad) {
+        const e = L.ladders[s];
+        if (s < 2 || s > 99) throw new Error(L.id + ' ladder start ' + s + ' out of 2–99');
+        if (e <= s || e > 100) throw new Error(L.id + ' ladder ' + s + '→' + e + ' must climb, ending ≤100');
+        dests.push(e);
+      }
+      for (const s of snk) {
+        const e = L.snakes[s];
+        if (s < 2 || s > 99) throw new Error(L.id + ' snake head ' + s + ' out of 2–99');
+        if (e >= s || e < 2) throw new Error(L.id + ' snake ' + s + '→' + e + ' must slide down, ending ≥2');
+        dests.push(e);
+      }
+      // No square may be both a jump start and a jump destination: the engine
+      // applies exactly one jump per landing, so chains would be ambiguous.
+      const destSet = new Set(dests);
+      for (const s of starts) {
+        if (destSet.has(s)) throw new Error(L.id + ': square ' + s + ' is both a jump start and a destination');
+      }
+      if (L.id === 'legend') {
+        const high = snk.filter((s) => s >= 80 && s <= 99).length;
+        if (high < 10) throw new Error('legend has only ' + high + ' snake heads in 80–99, needs ≥10');
+        for (const s of lad) {
+          if (L.ladders[s] >= 80) throw new Error('legend ladder tops out at ' + L.ladders[s] + ' — must stay below 80');
+        }
+      }
+    }
+    return true;
+  });
+
   /* A HELD CONTROL MUST STILL BE THERE. tapProps sets [data-pressed] on
      pointerdown and acts on pointerup, so any rule that takes a pressed
      element out of the flow breaks the press outright: it is not under the

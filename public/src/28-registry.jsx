@@ -142,11 +142,27 @@ const GAMES = [
       { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; slides drop you back.' },
       { title: 'First to 100 wins', body: 'Play the bot, a hotseat friend, or online via room code. Win streaks climb the leaderboard.' },
     ],
-    component: ChutesLaddersGame,
+    // V2 hand-drawn rebuild (public/src/snakesladders-v2/): illustrated
+    // snakes/ladders, chess-piece pawns, 2–6 local seats, 7 difficulty tiers.
+    // The old ChutesLaddersGame stays in the repo untouched — rollback is
+    // pointing this line back at it.
+    component: SnLV2Game,
     modes: ['bot', '2p', 'online'],
     modeSelect: true,
     supportsSave: true,
     menuModePicker: true,
+    // 2–6 player hotseat (bot and online stay two-player).
+    localSeats: { min: 2, max: 6 },
+    // The 7-tier ladder, local play only. Legend is device-locally locked
+    // until a Super Star win; Moksha plays its fixed board and hides the row.
+    difficultyPicker: {
+      label: 'Difficulty',
+      default: 'beginner',
+      hideForVariants: ['moksha'],
+      options: CNLV2_LAYOUTS.map((l) => (l.id === 'legend'
+        ? { id: l.id, name: l.label, locked: () => !cnlv2LegendUnlocked(), lockNote: 'Win a Super Star game to unlock' }
+        : { id: l.id, name: l.label })),
+    },
     variantPicker: {
       label: 'Board style',
       default: 'classic',
@@ -438,6 +454,9 @@ const GAMES = [
     // deliberately unrated: only online head-to-head touches the ladder.
     modes: ['bot', '2p', 'online'],
     modeSelect: true,
+    // 2–4 local seats — declared here now that the shared picker's seat row
+    // is registry-driven (it used to be a hardcoded game.id === 'ludo' block).
+    localSeats: { min: 2, max: 4 },
   },
   {
     id: 'tilematchingdaily',

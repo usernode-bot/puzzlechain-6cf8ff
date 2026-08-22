@@ -720,6 +720,26 @@
       "expectText": "Treasure Trail"
     },
     {
+      "name": "Snakes & Ladders difficulty ladder renders",
+      "path": "/?game=chutes-ladders",
+      "expectText": "Super Star"
+    },
+    {
+      "name": "Snakes & Ladders Legend is locked by default",
+      "path": "/?game=chutes-ladders",
+      "expectSelector": ".cnlv2-diff-locked"
+    },
+    {
+      "name": "Snakes & Ladders Legend board deep-links into a running game",
+      "path": "/?game=chutes-ladders&mode=bot&cnldiff=legend",
+      "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
+    },
+    {
+      "name": "Snakes & Ladders six-player hotseat renders",
+      "path": "/?game=chutes-ladders&mode=2p&seats=6",
+      "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"
+    },
+    {
       "name": "Moksha demo room seeds cleanly",
       "path": "/?demo=moksha",
       "expectText": "Game Corner"

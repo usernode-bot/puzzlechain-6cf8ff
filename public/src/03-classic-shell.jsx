@@ -208,11 +208,21 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
   const [busy, setBusy] = useState(false);
   const vp = game.variantPicker;
   const [variant, setVariant] = useState(vp ? vp.default : null);
+  /* Registry-declared difficulty ladder (today: Snakes & Ladders V2's seven
+     tier boards). Local modes only — online boards are server-refereed. A
+     `locked` option renders with a padlock, shows its lockNote on tap, and
+     cannot be selected. */
+  const dp = game.difficultyPicker;
+  const [difficulty, setDifficulty] = useState(dp ? dp.default : null);
+  const [lockNote, setLockNote] = useState('');
+  const showDifficulty = dp && mode !== 'online'
+    && !(vp && (dp.hideForVariants || []).indexOf(variant) !== -1);
 
   const handlePlay = async () => {
     if (!mode) return;
     const variantOpts = vp ? { variant } : {};
-    if (mode !== 'online') { onPlay(mode, { botLevel, seats, ...variantOpts }); return; }
+    const diffOpts = showDifficulty ? { difficulty } : {};
+    if (mode !== 'online') { onPlay(mode, { botLevel, seats, ...diffOpts, ...variantOpts }); return; }
     /* Mancala's rooms live under their own table and their own routes, which
        is the second reason it had its own picker. `roomApiBase` is the whole
        accommodation: the flow, the copy and the error handling are shared. */
@@ -279,16 +289,41 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
           ))}
         </div>
       )}
-      {/* Local seat count — Ludo online has always offered 2–4 while local was
-          stuck at 2, purely because the rules module was called without its
-          seat argument. */}
-      {mode === '2p' && game.id === 'ludo' && (
-        <div className="mnc-mode-sub">
-          {[2, 3, 4].map(n => (
+      {/* Local seat count — registry-declared (`localSeats: { min, max }`).
+          Ludo declares 2–4 and keeps its old behavior; Snakes & Ladders V2
+          declares 2–6. This used to be a hardcoded game.id === 'ludo' block. */}
+      {mode === '2p' && game.localSeats && (
+        <div className="mnc-mode-sub cnlv2-diff-row">
+          {Array.from(
+            { length: game.localSeats.max - game.localSeats.min + 1 },
+            (_, i) => game.localSeats.min + i
+          ).map(n => (
             <button key={n}
               className={'mnc-difficulty-pill' + (seats === n ? ' active' : '')}
               onClick={() => setSeats(n)}>{n} players</button>
           ))}
+        </div>
+      )}
+      {showDifficulty && (
+        <div className="cnl-variant-block cnlv2-diff-block">
+          <div className="cnl-variant-label">{dp.label}</div>
+          <div className="mnc-mode-sub cnlv2-diff-row">
+            {dp.options.map(o => {
+              const locked = !!(o.locked && o.locked());
+              return (
+                <button key={o.id}
+                  className={'mnc-difficulty-pill' + (difficulty === o.id ? ' active' : '') + (locked ? ' cnlv2-diff-locked' : '')}
+                  onClick={() => {
+                    if (locked) { setLockNote(o.lockNote || 'Locked'); return; }
+                    setLockNote('');
+                    setDifficulty(o.id);
+                  }}>
+                  {locked ? '🔒 ' : ''}{o.name}
+                </button>
+              );
+            })}
+          </div>
+          {lockNote && <div className="cnl-variant-note cnlv2-lock-note">🔒 {lockNote}</div>}
         </div>
       )}
       {mode === 'online' && (

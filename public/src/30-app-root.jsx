@@ -2199,7 +2199,12 @@ function App() {
       )}
 
       {screen === 'locked' && currentGame && (
-        <div className={'game-wrap' + (lockedReviewable ? ' fit' : '')}>
+        // `.fit` only while the review BOARD is on show — it must match
+        // `fitActive` above. With the result card showing (lockedReview
+        // false) there is no .fit-col in this wrap, so `.game-wrap.fit`
+        // would clip the card AND fail the registry-fitshell self-test —
+        // exactly what the ?demo=solvedboard checks caught.
+        <div className={'game-wrap' + (lockedReviewable && lockedReview ? ' fit' : '')}>
           <div className="game-head">
             <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
             <div className="game-title">

@@ -46,7 +46,19 @@ function readOrder() {
     .split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#'));
 
   // Every .jsx in src must be listed, or a new file silently never ships.
-  const onDisk = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.jsx')).sort();
+  // ORDER entries may name files one subdirectory deep (e.g.
+  // snakesladders-v2/03-game.jsx), so the drift check recurses one level.
+  const onDisk = [];
+  for (const ent of fs.readdirSync(SRC_DIR, { withFileTypes: true })) {
+    if (ent.isDirectory()) {
+      for (const f of fs.readdirSync(path.join(SRC_DIR, ent.name))) {
+        if (f.endsWith('.jsx')) onDisk.push(ent.name + '/' + f);
+      }
+    } else if (ent.name.endsWith('.jsx')) {
+      onDisk.push(ent.name);
+    }
+  }
+  onDisk.sort();
   const listed = new Set(names);
   const missing = onDisk.filter(f => !listed.has(f));
   if (missing.length) {

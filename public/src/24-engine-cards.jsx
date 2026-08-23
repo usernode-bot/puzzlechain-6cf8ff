@@ -2063,7 +2063,9 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   });
 
   return (
-    <div className="ng-game">
+    // .fit-col: fitShell WITHOUT it clips instead of fitting — asserted by
+    // the registry-fitshell self-test the moment this board is mounted.
+    <div className="ng-game fit-col">
       <div className="ng-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
@@ -2538,7 +2540,8 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const minesLeft = minesLeftLive;
 
   return (
-    <div className="mf-game">
+    // .fit-col: same registry-fitshell contract as the Nonogram root above.
+    <div className="mf-game fit-col">
       <div className="mf-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}

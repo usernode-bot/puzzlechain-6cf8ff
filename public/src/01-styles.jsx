@@ -3158,6 +3158,15 @@ ${emitTapHighlightRules()}
   font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer;
   text-decoration: underline;
 }
+/* ---- Snakes & Ladders V2 — difficulty picker ---- */
+/* Seven pills need to wrap; .mnc-mode-sub alone stacks them full-width. */
+.cnlv2-diff-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.cnlv2-diff-row .mnc-difficulty-pill { flex: 1 1 28%; min-width: 28%; }
+.mnc-difficulty-pill.cnlv2-diff-locked {
+  opacity: 0.55; border-style: dashed; cursor: not-allowed;
+}
+.mnc-difficulty-pill.cnlv2-diff-locked:hover { border-color: ${C.border}; color: ${C.muted}; }
+.cnlv2-lock-note { color: ${C.gold}; }
 .mok-intro { color: ${C.muted}; font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.9rem; }
 .mok-section {
   font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.09em;

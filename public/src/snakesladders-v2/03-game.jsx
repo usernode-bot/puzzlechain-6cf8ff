@@ -43,6 +43,17 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   const animatingRef = useRef(false);
   const winTimerRef = useRef(null);
   const timersRef = useRef([]);
+  /* Live mirrors + the move lock. `positionsRef` lets a timer chain read the
+     CURRENT square at execution time instead of a stale render closure (a
+     stale `from` is exactly the teleport-then-hop ghost). `rollingRef` makes
+     the double-roll guard render-independent. `moveGenRef` is a generation
+     token: every roll captures (who, gen) at start, every timer in that
+     move's chain re-checks the gen, and reset/resume bumps it — so a stale
+     timer can never move a pawn or flip the turn after a new game starts. */
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+  const rollingRef = useRef(false);
+  const moveGenRef = useRef(0);
 
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
@@ -62,6 +73,7 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
 
   const applyResume = () => {
     const s = resumeOffer; if (!s) return;
+    moveGenRef.current += 1;
     const ps = Array.isArray(s.positions) ? s.positions.slice(0, nSeats) : [];
     while (ps.length < nSeats) ps.push(0);
     setPositions(ps);
@@ -79,7 +91,9 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   };
 
   const resetGame = () => {
+    moveGenRef.current += 1; // invalidate every in-flight move chain
     animatingRef.current = false;
+    rollingRef.current = false;
     clearTimers();
     setPositions(Array(nSeats).fill(0));
     setPlayer(1); setDie(null); setRolls(0);
@@ -95,14 +109,21 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   const seatColor = (who) => CNLV2_SEAT_COLORS[(who - 1) % CNLV2_SEAT_COLORS.length];
   const activeColor = done ? PAL.muted : seatColor(player);
 
+  // Immutable functional update — never mutates the previous array, and only
+  // ever touches the one locked seat's slot.
   const setPos = (who, val) => setPositions((ps) => ps.map((p, i) => (i === who - 1 ? val : p)));
 
-  const finishTurn = (who, landed) => {
+  /* `who` and `gen` were captured when the roll STARTED; every step below
+     belongs to that one move. The turn is advanced in `settle` and nowhere
+     else, so nothing (bot included) can act until this animation chain —
+     hops, jump banner, climb/slide glide — has fully finished. */
+  const finishTurn = (who, landed, gen) => {
     const jump = V.jumps[landed];
     // The win check must look at where the turn actually ENDS — a jump can
     // carry the pawn into 100 (see the old finishTurn's soft-lock note).
     const finalSquare = jump !== undefined ? jump : landed;
     const settle = () => {
+      if (gen !== moveGenRef.current) return;
       if (finalSquare === 100) {
         setDone(true);
         setWinner(who);
@@ -139,8 +160,12 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
         ? `${m.name} (${m.sanskrit}) — ${isLadder ? 'climb up 🪜' : 'down you go 🐍'}`
         : (isLadder ? 'Ladder up! 🪜' : (isLegend ? 'Dragon strike! 🐉' : 'Down the snake! 🐍')));
       const t = setTimeout(() => {
+        if (gen !== moveGenRef.current) return;
         setPos(who, jump);
-        const t2 = setTimeout(() => { setBanner(''); settle(); }, 320);
+        const t2 = setTimeout(() => {
+          if (gen !== moveGenRef.current) return;
+          setBanner(''); settle();
+        }, 320);
         timersRef.current.push(t2);
       }, 380);
       timersRef.current.push(t);
@@ -150,39 +175,50 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   };
 
   const roll = (clickedWho) => {
-    if (animatingRef.current || done || rolling) return;
+    if (animatingRef.current || rollingRef.current || done || rolling) return;
     if (clickedWho !== undefined && clickedWho !== player) return;
+    // Lock the mover NOW: `who` is the seat this entire move chain belongs
+    // to, `gen` invalidates the chain if a new game starts under it.
     const who = player;
+    const gen = moveGenRef.current;
     const value = Math.floor(Math.random() * 6) + 1;
-    const from = positions[who - 1];
-    const newRolls = rolls + 1;
 
+    rollingRef.current = true;
     setRolling(true);
     setDie(value);
     setBanner('');
-    setRolls(newRolls);
+    const newRolls = rollsRef.current + 1;
     rollsRef.current = newRolls;
+    setRolls(newRolls);
     onStepChange(newRolls);
 
     const rollT = setTimeout(() => {
+      if (gen !== moveGenRef.current) return;
+      rollingRef.current = false;
       setRolling(false);
+      // Read the start square at EXECUTION time from the live ref — a stale
+      // render closure here teleports the pawn back before hopping.
+      const from = positionsRef.current[who - 1];
       if (from + value > 100) {
         setBanner('Overshoot — stay put');
         const passT = setTimeout(() => {
+          if (gen !== moveGenRef.current) return;
           setBanner('');
           setPlayer(who >= nSeats ? 1 : who + 1);
         }, 700);
         timersRef.current.push(passT);
         return;
       }
+      // Hop square-by-square: post-check increment lands on from+1 .. target,
+      // exactly `value` steps — no pre-increment off-by-one.
       animatingRef.current = true;
       setAnimating(true);
       const target = from + value;
       let cur = from;
       const hop = () => {
-        if (!animatingRef.current) return;
-        if (cur >= target) { finishTurn(who, target); return; }
-        cur++;
+        if (gen !== moveGenRef.current || !animatingRef.current) return;
+        if (cur >= target) { finishTurn(who, target, gen); return; }
+        cur += 1;
         setPos(who, cur);
         const t = setTimeout(hop, 130);
         timersRef.current.push(t);
@@ -193,11 +229,17 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
     timersRef.current.push(rollT);
   };
 
-  // Bot auto-rolls for Player 2 in Versus-Bot mode.
+  // Bot auto-rolls for Player 2 in Versus-Bot mode. The effect only arms
+  // while nothing is moving (animating/rolling are deps), and the fire-time
+  // guard re-checks the refs so the bot can NEVER roll into a move that
+  // started after this timer was scheduled.
   useEffect(() => {
     if (!vsBot || done || resumeOffer) return;
     if (player !== 2 || animating || rolling) return;
-    const t = setTimeout(() => roll(2), 650);
+    const t = setTimeout(() => {
+      if (animatingRef.current || rollingRef.current) return;
+      roll(2);
+    }, 650);
     return () => clearTimeout(t);
   }, [vsBot, player, animating, rolling, done, resumeOffer]);
 

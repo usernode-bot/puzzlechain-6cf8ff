@@ -740,6 +740,21 @@
       "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"
     },
     {
+      "name": "Snakes & Ladders: rolling a 6 grants an extra roll (turn stays with P1)",
+      "path": "/?game=chutes-ladders&mode=2p&snldice=6&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-extra=\"1\"][data-snl-turn=\"1\"]"
+    },
+    {
+      "name": "Snakes & Ladders: a third consecutive 6 is forfeited and the turn passes",
+      "path": "/?game=chutes-ladders&mode=2p&snlsix=2&snldice=6&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-forfeit=\"1\"][data-snl-turn=\"2\"]"
+    },
+    {
+      "name": "Snakes & Ladders: scripted dice are inert without snlauto",
+      "path": "/?game=chutes-ladders&mode=2p&snldice=6,6,6",
+      "expectSelector": ".cnl-board-wrap[data-snl-forfeit=\"0\"][data-snl-busy=\"0\"]"
+    },
+    {
       "name": "Moksha demo room seeds cleanly",
       "path": "/?demo=moksha",
       "expectText": "Game Corner"

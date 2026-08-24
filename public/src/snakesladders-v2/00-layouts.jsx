@@ -88,15 +88,42 @@ function cnlv2LegendUnlocked() { return !!cnlv2Unlocks().legend; }
    ?cnldiff=<tierId> pins the difficulty — and for legend, bypasses the lock
    for the session (the URL wins over stored state; the lock itself is
    asserted separately on the bare picker). ?seats=2..6 pins the hotseat
-   seat count and is only honored with mode=2p. */
+   seat count and is only honored with mode=2p.
+
+   The dice rules (a 6 rolls again; three 6s forfeit the third roll) are only
+   reachable by ROLLING, which navigation-driven proposal checks and the
+   before/after screenshots cannot do — so three more params script them
+   deterministically. They are a pure client-side TEST FIXTURE: they write
+   nothing, touch no endpoint, and are therefore deliberately NOT
+   staging-gated (the "before" shot comes from production).
+
+   - ?snldice=6,6,6  forces the next rolls in order (values outside 1–6 are
+     dropped, at most 12 kept); once the queue empties the die is fair again.
+   - ?snlauto=1      fires exactly as many rolls as the queue holds, so the
+     whole sequence plays out on a plain page load.
+   - ?snlsix=0..2    pre-seeds seat 1's consecutive-6 counter, putting the
+     forfeit one roll away instead of three. */
+const CNLV2_NO_DEEP_LINKS = { difficulty: null, seats: null, dice: null, auto: false, sixSeed: 0 };
+
 function cnlv2DeepLinks() {
   try {
     const q = new URLSearchParams(window.location.search);
     const diff = q.get('cnldiff');
     const seats = parseInt(q.get('seats') || '', 10);
+    const dice = (q.get('snldice') || '')
+      .split(',')
+      .map((s) => parseInt(s, 10))
+      .filter((n) => n >= 1 && n <= 6)
+      .slice(0, 12);
+    const sixSeed = parseInt(q.get('snlsix') || '', 10);
     return {
       difficulty: diff && CNLV2_LAYOUTS.some((l) => l.id === diff) ? diff : null,
       seats: seats >= 2 && seats <= 6 ? seats : null,
+      dice: dice.length ? dice : null,
+      auto: q.get('snlauto') === '1',
+      // Clamped below the forfeit limit: seeding the limit itself would mean
+      // the forfeit had already happened without a roll being thrown.
+      sixSeed: sixSeed >= 1 && sixSeed <= 2 ? sixSeed : 0,
     };
-  } catch (e) { return { difficulty: null, seats: null }; }
+  } catch (e) { return CNLV2_NO_DEEP_LINKS; }
 }

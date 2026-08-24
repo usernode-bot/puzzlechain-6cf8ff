@@ -11,7 +11,25 @@
    CNL_MOKSHA_MEANINGS, MokshaGlossaryModal, CNL_DIE_PIPS, useCnlSkin/
    CNL_SKINS, CNL_STREAK_KEY, cnlVariant, cnlCenterPct. */
 
-function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficulty, variant, initialState, onClearSave, onGlossary }) {
+/* Dice rules (local play only — online rooms stay server-refereed by
+   lib/board-rules.js's chutesLadders, whose alternate-every-move rule is
+   deliberately untouched so no in-flight match changes rules mid-game):
+
+   Rule 1 — a 6 grants an EXTRA roll; the turn does not pass.
+   Rule 2 — three 6s in a row FORFEIT the third roll: the pawn does not move
+            at all, the streak resets and the turn passes immediately.
+   Rule 3 — both only take effect once the pawn has fully settled. The board
+            lerps each hop for SNLV2_GLIDE_MS and its rAF loop runs a frame or
+            two past that (02-board.jsx's `now - gp.t0 < 140`), so the roll
+            lock is released on a tail AFTER the last glide frame rather than
+            on the state change that started it. */
+const SNLV2_SIX = 6;
+const SNLV2_SIX_LIMIT = 3;        // third consecutive 6 is forfeited
+const SNLV2_GLIDE_MS = 130;       // mirrors the board's per-hop lerp
+const SNLV2_SETTLE_TAIL_MS = 60;  // > the rAF loop's 140ms tail minus a hop
+const SNLV2_FORFEIT_MS = 1000;    // how long the forfeit message holds the turn
+
+function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficulty, variant, initialState, onClearSave, onGlossary, script }) {
   const nSeats = vsBot ? 2 : Math.max(2, Math.min(6, seats || 2));
   const vkey = cnlVariant(variant);
   const isMoksha = vkey === 'moksha';
@@ -21,6 +39,9 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   const V = isMoksha
     ? CNL_VARIANTS.moksha
     : { ladders: layout.ladders, chutes: layout.snakes, jumps: Object.assign({}, layout.ladders, layout.snakes) };
+
+  // Scripted dice fixture (?snldice / ?snlauto / ?snlsix) — see cnlv2DeepLinks().
+  const SC = script || CNLV2_NO_DEEP_LINKS;
 
   const [skin, setSkin] = useCnlSkin();
   const SK = CNL_SKINS[isMoksha ? 'plain' : skin];
@@ -33,27 +54,47 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   const [player, setPlayer] = useState(1);
   const [die, setDie] = useState(null);
   const [rolls, setRolls] = useState(0);
-  const [animating, setAnimating] = useState(false);
-  const [rolling, setRolling] = useState(false);
+  /* ONE lock for the whole roll→settle sequence: spin, hop chain, snake/ladder
+     travel, overshoot pause and forfeit message alike. It replaces the old
+     `animating || rolling` pair, which left a ~700ms window where the roll
+     button was live during an overshoot (that branch cleared `rolling` and
+     never set `animating`) — harmless before, exploitable once a 6 can hand
+     the same seat another roll. */
+  const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [winner, setWinner] = useState(null);
   const [banner, setBanner] = useState('');
   const [resumeOffer, setResumeOffer] = useState(initialState || null);
+  // Consecutive 6s, one counter PER SEAT. Reset by a non-6 roll, by the
+  // forfeit itself, and again whenever the turn leaves the seat.
+  const [sixes, setSixes] = useState(() => {
+    const a = Array(nSeats).fill(0);
+    if (SC.sixSeed) a[0] = SC.sixSeed;
+    return a;
+  });
+  const [extraRoll, setExtraRoll] = useState(false);
+  // Sticky for the whole game: a forfeit is over in a second, but a
+  // navigation-driven check may not sample the DOM until after it has passed.
+  const [forfeited, setForfeited] = useState(false);
 
   const animatingRef = useRef(false);
   const winTimerRef = useRef(null);
   const timersRef = useRef([]);
   /* Live mirrors + the move lock. `positionsRef` lets a timer chain read the
      CURRENT square at execution time instead of a stale render closure (a
-     stale `from` is exactly the teleport-then-hop ghost). `rollingRef` makes
-     the double-roll guard render-independent. `moveGenRef` is a generation
-     token: every roll captures (who, gen) at start, every timer in that
-     move's chain re-checks the gen, and reset/resume bumps it — so a stale
-     timer can never move a pawn or flip the turn after a new game starts. */
+     stale `from` is exactly the teleport-then-hop ghost). `busyRef` makes the
+     double-roll guard render-independent. `moveGenRef` is a generation token:
+     every roll captures (who, gen) at start, every timer in that move's chain
+     re-checks the gen, and reset/resume bumps it — so a stale timer can never
+     move a pawn or flip the turn after a new game starts. `sixesRef` is read
+     synchronously inside the roll timer, which runs before the matching
+     render lands. */
   const positionsRef = useRef(positions);
   positionsRef.current = positions;
-  const rollingRef = useRef(false);
+  const busyRef = useRef(false);
   const moveGenRef = useRef(0);
+  const sixesRef = useRef(sixes);
+  const diceQueueRef = useRef(SC.dice ? SC.dice.slice() : []);
 
   const { secs, fmt } = useTimer(!done);
   const secsRef = useRef(0);
@@ -62,6 +103,7 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   rollsRef.current = rolls;
 
   const pLabel = (who) => vsBot ? (who === 1 ? 'You' : 'Bot') : `Player ${who}`;
+  const verb = (who, base) => `${base}${vsBot && who === 1 ? '' : 's'}`;
 
   // V2 bot snapshot for the Game Menu's Save button. The wrapper treats a
   // loaded snapshot without v:2 as no-save, so old-format saves never
@@ -80,6 +122,10 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
     setPlayer(s.currentPlayer || 1);
     setRolls(s.rolls || 0);
     rollsRef.current = s.rolls || 0;
+    // A saved game predates the dice rules and carries no streak; the seat
+    // resumes on a clean counter rather than inheriting seat 1's fixture.
+    setSixCount(0, 0);
+    setExtraRoll(false);
     setResumeOffer(null);
   };
   const dismissResume = () => { setResumeOffer(null); if (onClearSave) onClearSave(); };
@@ -90,15 +136,62 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
     if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
   };
 
+  /* `who` of 0 rewrites every seat — used by reset and resume. Writes the ref
+     first: `roll` reads the streak inside a timer, before React commits. */
+  const setSixCount = (who, val) => {
+    const next = who
+      ? sixesRef.current.map((n, i) => (i === who - 1 ? val : n))
+      : Array(nSeats).fill(val);
+    sixesRef.current = next;
+    setSixes(next);
+  };
+
+  const release = () => { busyRef.current = false; setBusy(false); };
+
+  const passTurn = (who) => {
+    setSixCount(who, 0);
+    setExtraRoll(false);
+    setPlayer(who >= nSeats ? 1 : who + 1);
+  };
+
+  /* The one exit from a completed move. `keepTurn` is Dice Rule 1: the seat
+     keeps the turn and gets another roll — but the lock is only lifted
+     SNLV2_SETTLE_TAIL_MS later, which is past the last glide frame of the hop
+     that just finished, so an extra roll can never start mid-glide. */
+  const endRoll = (who, gen, keepTurn) => {
+    animatingRef.current = false;
+    if (keepTurn) {
+      setExtraRoll(true);
+      setBanner(`Rolled a 6 — ${pLabel(who)} ${verb(who, 'roll')} again! 🎲`);
+    } else {
+      setBanner('');
+      passTurn(who);
+    }
+    const t = setTimeout(() => {
+      if (gen !== moveGenRef.current) return;
+      release();
+    }, SNLV2_SETTLE_TAIL_MS);
+    timersRef.current.push(t);
+  };
+
   const resetGame = () => {
     moveGenRef.current += 1; // invalidate every in-flight move chain
     animatingRef.current = false;
-    rollingRef.current = false;
+    busyRef.current = false;
     clearTimers();
     setPositions(Array(nSeats).fill(0));
     setPlayer(1); setDie(null); setRolls(0);
-    setAnimating(false); setRolling(false);
+    setBusy(false);
     setDone(false); setWinner(null); setBanner('');
+    setExtraRoll(false); setForfeited(false);
+    /* The scripted fixture is (re-)armed HERE, not at useState time: the
+       mount effect below runs resetGame after the initial state, so a queue
+       built in a useState initializer would be wiped before the first roll. */
+    const seeded = Array(nSeats).fill(0);
+    if (SC.sixSeed) seeded[0] = SC.sixSeed;
+    sixesRef.current = seeded;
+    setSixes(seeded);
+    diceQueueRef.current = SC.dice ? SC.dice.slice() : [];
   };
 
   // A seat-count / board change mid-mount must rebuild the positions array,
@@ -114,10 +207,10 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   const setPos = (who, val) => setPositions((ps) => ps.map((p, i) => (i === who - 1 ? val : p)));
 
   /* `who` and `gen` were captured when the roll STARTED; every step below
-     belongs to that one move. The turn is advanced in `settle` and nowhere
+     belongs to that one move. The turn is advanced in `endRoll` and nowhere
      else, so nothing (bot included) can act until this animation chain —
      hops, jump banner, climb/slide glide — has fully finished. */
-  const finishTurn = (who, landed, gen) => {
+  const finishTurn = (who, landed, gen, wasSix) => {
     const jump = V.jumps[landed];
     // The win check must look at where the turn actually ENDS — a jump can
     // carry the pawn into 100 (see the old finishTurn's soft-lock note).
@@ -128,7 +221,7 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
         setDone(true);
         setWinner(who);
         if (onClearSave) onClearSave();
-        let label = `${pLabel(who)} win${vsBot && who === 1 ? '' : 's'}! 🎉`;
+        let label = `${pLabel(who)} ${verb(who, 'win')}! 🎉`;
         // Legend unlocks on a Super Star win where YOUR pawn (seat 1)
         // reaches 100 first — bot or hotseat. Device-local, like every other
         // classic free-play state.
@@ -146,11 +239,11 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
           winTimerRef.current = null;
           onWin(score, finalRolls, finalSecs, { winner: who, winnerLabel: label, share });
         }, 1300);
+        // Deliberately no endRoll: the game is over, so a winning 6 grants
+        // no extra roll and the lock simply stays on.
         return;
       }
-      animatingRef.current = false;
-      setAnimating(false);
-      setPlayer(who >= nSeats ? 1 : who + 1);
+      endRoll(who, gen, wasSix);
     };
 
     if (jump !== undefined) {
@@ -162,6 +255,8 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
       const t = setTimeout(() => {
         if (gen !== moveGenRef.current) return;
         setPos(who, jump);
+        // 320ms is already past the jump glide's 140ms rAF tail; settle()
+        // then adds the shared release tail on top.
         const t2 = setTimeout(() => {
           if (gen !== moveGenRef.current) return;
           setBanner(''); settle();
@@ -175,16 +270,20 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   };
 
   const roll = (clickedWho) => {
-    if (animatingRef.current || rollingRef.current || done || rolling) return;
+    if (busyRef.current || done) return;
     if (clickedWho !== undefined && clickedWho !== player) return;
     // Lock the mover NOW: `who` is the seat this entire move chain belongs
     // to, `gen` invalidates the chain if a new game starts under it.
     const who = player;
     const gen = moveGenRef.current;
-    const value = Math.floor(Math.random() * 6) + 1;
+    // A scripted value wins until the queue drains; after that the die is
+    // fair again, so a fixture route stays playable by hand once it lands.
+    const forced = diceQueueRef.current.length ? diceQueueRef.current.shift() : null;
+    const value = forced != null ? forced : Math.floor(Math.random() * 6) + 1;
 
-    rollingRef.current = true;
-    setRolling(true);
+    busyRef.current = true;
+    setBusy(true);
+    setExtraRoll(false);
     setDie(value);
     setBanner('');
     const newRolls = rollsRef.current + 1;
@@ -194,8 +293,25 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
 
     const rollT = setTimeout(() => {
       if (gen !== moveGenRef.current) return;
-      rollingRef.current = false;
-      setRolling(false);
+
+      /* Dice Rule 2 is resolved BEFORE any movement: on the third consecutive
+         6 the pawn does not move at all. */
+      const isSix = value === SNLV2_SIX;
+      const streak = isSix ? (sixesRef.current[who - 1] || 0) + 1 : 0;
+      if (streak >= SNLV2_SIX_LIMIT) {
+        setSixCount(who, 0);
+        setForfeited(true);
+        setBanner(`Three 6s in a row — ${pLabel(who)} ${verb(who, 'forfeit')} this roll 🚫`);
+        const fT = setTimeout(() => {
+          if (gen !== moveGenRef.current) return;
+          passTurn(who);
+          release();
+        }, SNLV2_FORFEIT_MS);
+        timersRef.current.push(fT);
+        return;
+      }
+      setSixCount(who, streak);
+
       // Read the start square at EXECUTION time from the live ref — a stale
       // render closure here teleports the pawn back before hopping.
       const from = positionsRef.current[who - 1];
@@ -203,8 +319,7 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
         setBanner('Overshoot — stay put');
         const passT = setTimeout(() => {
           if (gen !== moveGenRef.current) return;
-          setBanner('');
-          setPlayer(who >= nSeats ? 1 : who + 1);
+          endRoll(who, gen, isSix);
         }, 700);
         timersRef.current.push(passT);
         return;
@@ -212,40 +327,59 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
       // Hop square-by-square: post-check increment lands on from+1 .. target,
       // exactly `value` steps — no pre-increment off-by-one.
       animatingRef.current = true;
-      setAnimating(true);
       const target = from + value;
       let cur = from;
       const hop = () => {
         if (gen !== moveGenRef.current || !animatingRef.current) return;
-        if (cur >= target) { finishTurn(who, target, gen); return; }
+        if (cur >= target) { finishTurn(who, target, gen, isSix); return; }
         cur += 1;
         setPos(who, cur);
-        const t = setTimeout(hop, 130);
+        const t = setTimeout(hop, SNLV2_GLIDE_MS);
         timersRef.current.push(t);
       };
-      const t0 = setTimeout(hop, 130);
+      const t0 = setTimeout(hop, SNLV2_GLIDE_MS);
       timersRef.current.push(t0);
     }, 720);
     timersRef.current.push(rollT);
   };
 
-  // Bot auto-rolls for Player 2 in Versus-Bot mode. The effect only arms
-  // while nothing is moving (animating/rolling are deps), and the fire-time
-  // guard re-checks the refs so the bot can NEVER roll into a move that
-  // started after this timer was scheduled.
+  /* Bot auto-rolls for Player 2 in Versus-Bot mode. `busy` is the only
+     movement dep now, which is also what re-arms it after the bot rolls a 6:
+     the seat does not change, but the lock releases. The fire-time guard
+     re-checks the ref so the bot can NEVER roll into a move that started
+     after this timer was scheduled. */
   useEffect(() => {
     if (!vsBot || done || resumeOffer) return;
-    if (player !== 2 || animating || rolling) return;
+    if (player !== 2 || busy) return;
     const t = setTimeout(() => {
-      if (animatingRef.current || rollingRef.current) return;
+      if (busyRef.current) return;
       roll(2);
     }, 650);
     return () => clearTimeout(t);
-  }, [vsBot, player, animating, rolling, done, resumeOffer]);
+  }, [vsBot, player, busy, done, resumeOffer]);
+
+  /* Scripted auto-roller (?snlauto=1). Proposal checks and the before/after
+     screenshots can only NAVIGATE — they cannot tap a canvas roll button — so
+     without this no route could ever reach an extra roll or a forfeit. It
+     fires exactly as many rolls as the forced-dice queue holds and then stops
+     on its own; it writes nothing and touches no endpoint. */
+  useEffect(() => {
+    if (!SC.auto || done || busy || resumeOffer) return;
+    if (!diceQueueRef.current.length) return;
+    if (vsBot && player === 2) return; // that seat belongs to the bot effect
+    const t = setTimeout(() => {
+      if (busyRef.current) return;
+      roll(player);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [SC.auto, player, busy, done, resumeOffer]);
 
   const bannerActive = !!banner;
   const twoRows = nSeats > 2;
   const tierLabel = isMoksha ? '' : (isLegend ? '🐉 Legend' : layout.label);
+  const streakNow = sixes[player - 1] || 0;
+  const idleBanner = `${pLabel(player)}'s turn`
+    + (streakNow ? ` · ${streakNow} six${streakNow > 1 ? 'es' : ''} in a row` : '');
 
   return (
     <div>
@@ -293,31 +427,45 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
         id: 'banner', kind: 'label', r: [0, 0, W, 28], font: 13, bold: true,
         color: bannerActive || done ? activeColor : activeColor,
         label: done
-          ? `Game over — ${pLabel(winner)} win${vsBot && winner === 1 ? '' : 's'}! 🎉`
-          : (banner || `${pLabel(player)}'s turn`),
+          ? `Game over — ${pLabel(winner)} ${verb(winner, 'win')}! 🎉`
+          : (banner || idleBanner),
       }])} />
 
-      <div className="cnl-board-wrap">
+      {/* The dice-rule state is mirrored onto the wrapper because the board,
+          the banner and the roll buttons are all CANVAS — a check can neither
+          read them nor click them. data-snl-forfeit is sticky for the run. */}
+      <div
+        className="cnl-board-wrap"
+        data-snl-turn={done ? 0 : player}
+        data-snl-sixes={streakNow}
+        data-snl-extra={extraRoll ? '1' : '0'}
+        data-snl-forfeit={forfeited ? '1' : '0'}
+        data-snl-busy={busy ? '1' : '0'}
+      >
         <SnLV2Board V={V} isMoksha={isMoksha} isLegend={isLegend} gildAll={gildAll} SK={SK} positions={positions} vsBot={vsBot} />
       </div>
 
       <CuiBar height={54} build={(W) => {
         const dieBtn = { id: 'die', kind: 'button', r: [Math.floor(W / 2) - 24, 3, 48, 48], label: die == null ? '·' : String(die), twinLabel: die == null ? 'Die not yet rolled' : `Die showing ${die}`, pips: die == null ? null : CNL_DIE_PIPS[die], font: 20, mono: true, disabled: true };
+        // `busy` spans the whole sequence — spin, hops, snake/ladder travel,
+        // overshoot and forfeit — so the extra roll a 6 grants only becomes
+        // clickable once the pawn has finished gliding.
         if (vsBot) {
           const bw = Math.floor((W - 78) / 2) - 8;
           return [
             dieBtn,
-            { id: 'roll1', kind: 'button', r: [4, 7, bw, 40], label: 'Your Roll', solid: true, bg: seatColor(1), ink: '#fff',
-              disabled: done || animating || rolling || player !== 1 || !!resumeOffer, action: () => roll(1) },
-            { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: player === 2 && !done ? 'Bot rolling…' : 'Bot', solid: true, bg: seatColor(2), ink: '#fff', disabled: true },
+            { id: 'roll1', kind: 'button', r: [4, 7, bw, 40], label: extraRoll && player === 1 ? 'Roll again 🎲' : 'Your Roll', solid: true, bg: seatColor(1), ink: '#fff',
+              disabled: done || busy || player !== 1 || !!resumeOffer, action: () => roll(1) },
+            { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: player === 2 && !done ? (extraRoll ? 'Bot rolls again…' : 'Bot rolling…') : 'Bot', solid: true, bg: seatColor(2), ink: '#fff', disabled: true },
           ];
         }
         if (nSeats === 2) {
           const bw = Math.floor((W - 78) / 2) - 8;
+          const lbl = (who) => `Player ${who} - Roll${extraRoll && player === who ? ' again' : ''}`;
           return [
             dieBtn,
-            { id: 'roll1', kind: 'button', r: [4, 7, bw, 40], label: 'Player 1 - Roll', solid: true, bg: seatColor(1), ink: '#fff', disabled: done || animating || rolling || player !== 1, action: () => roll(1) },
-            { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: 'Player 2 - Roll', solid: true, bg: seatColor(2), ink: '#fff', disabled: done || animating || rolling || player !== 2, action: () => roll(2) },
+            { id: 'roll1', kind: 'button', r: [4, 7, bw, 40], label: lbl(1), solid: true, bg: seatColor(1), ink: '#fff', disabled: done || busy || player !== 1, action: () => roll(1) },
+            { id: 'roll2', kind: 'button', r: [W - bw - 4, 7, bw, 40], label: lbl(2), solid: true, bg: seatColor(2), ink: '#fff', disabled: done || busy || player !== 2, action: () => roll(2) },
           ];
         }
         // 3–6 seats: one Roll button for the active human, in their color.
@@ -326,8 +474,8 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
         return [
           dieBtn,
           { id: 'roll', kind: 'button', r: [W - bw - 4, 7, bw, 40],
-            label: done ? 'Game over' : `Player ${active} - Roll`, solid: true, bg: seatColor(active), ink: '#fff',
-            disabled: done || animating || rolling, action: () => roll(active) },
+            label: done ? 'Game over' : `Player ${active} - Roll${extraRoll ? ' again' : ''}`, solid: true, bg: seatColor(active), ink: '#fff',
+            disabled: done || busy, action: () => roll(active) },
         ];
       }} />
     </div>
@@ -549,6 +697,7 @@ function SnLV2Game({ onWin, onStepChange, resetKey, gameMode, gameModeOpts, onMo
         onGlossary={() => setGlossary(true)}
         initialState={mode === 'bot' ? resumeState : null}
         onClearSave={mode === 'bot' ? clearState : null}
+        script={dl}
       />
       {glossaryModal}
     </React.Fragment>

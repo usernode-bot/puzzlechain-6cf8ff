@@ -456,7 +456,10 @@ function runClientSelfTests(styleReady) {
       for (const s of lad) {
         const e = L.ladders[s];
         if (s < 2 || s > 99) throw new Error(L.id + ' ladder start ' + s + ' out of 2–99');
-        if (e <= s || e > 100) throw new Error(L.id + ' ladder ' + s + '→' + e + ' must climb, ending ≤100');
+        // e < 100, not ≤: a collision knockback can land a pawn on a ladder
+        // bottom, and a ladder into 100 would win the game for a pawn that
+        // never rolled. Square 100 is reachable by an exact roll only.
+        if (e <= s || e >= 100) throw new Error(L.id + ' ladder ' + s + '→' + e + ' must climb, ending below 100');
         dests.push(e);
       }
       for (const s of snk) {

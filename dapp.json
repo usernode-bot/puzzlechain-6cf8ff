@@ -740,6 +740,31 @@
       "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"
     },
     {
+      "name": "Snakes & Ladders: rolling a 6 grants an extra roll (turn stays with P1)",
+      "path": "/?game=chutes-ladders&mode=2p&snldice=6&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-extra=\"1\"][data-snl-turn=\"1\"]"
+    },
+    {
+      "name": "Snakes & Ladders: a third consecutive 6 is forfeited and the turn passes",
+      "path": "/?game=chutes-ladders&mode=2p&snlsix=2&snldice=6&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-forfeit=\"1\"][data-snl-turn=\"2\"]"
+    },
+    {
+      "name": "Snakes & Ladders: scripted dice are inert without snlauto",
+      "path": "/?game=chutes-ladders&mode=2p&snldice=6,6,6",
+      "expectSelector": ".cnl-board-wrap[data-snl-forfeit=\"0\"][data-snl-busy=\"0\"]"
+    },
+    {
+      "name": "Snakes & Ladders: landing on an occupied square knocks the occupant back 10, onto a ladder",
+      "path": "/?game=chutes-ladders&mode=2p&snlpos=13,9&snlturn=2&snldice=4&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-knock=\"1\"][data-snl-pos=\"22,13\"]"
+    },
+    {
+      "name": "Snakes & Ladders: a knockback onto an occupied square does not re-trigger",
+      "path": "/?game=chutes-ladders&mode=2p&seats=3&snlpos=14,9,4&snlturn=2&snldice=5&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-knock=\"1\"][data-snl-pos=\"4,14,4\"]"
+    },
+    {
       "name": "Moksha demo room seeds cleanly",
       "path": "/?demo=moksha",
       "expectText": "Game Corner"

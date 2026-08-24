@@ -22,12 +22,23 @@
             lerps each hop for SNLV2_GLIDE_MS and its rAF loop runs a frame or
             two past that (02-board.jsx's `now - gp.t0 < 140`), so the roll
             lock is released on a tail AFTER the last glide frame rather than
-            on the state change that started it. */
+            on the state change that started it.
+   Rule 4 — a pawn that ENDS its move on an occupied square knocks the
+            occupant back SNLV2_KNOCKBACK squares (see `resolveCollision`).
+
+   Rules 1, 2 and 4 all extend the SAME `busy` lock: it is taken when the die
+   is thrown and released one tail after the last thing that moves — spin,
+   hops, snake/ladder travel, knockback shove, and the knocked pawn's own
+   snake/ladder. So the turn only passes, and an extra roll only becomes
+   available, once the whole chain has visually settled. */
 const SNLV2_SIX = 6;
 const SNLV2_SIX_LIMIT = 3;        // third consecutive 6 is forfeited
 const SNLV2_GLIDE_MS = 130;       // mirrors the board's per-hop lerp
 const SNLV2_SETTLE_TAIL_MS = 60;  // > the rAF loop's 140ms tail minus a hop
 const SNLV2_FORFEIT_MS = 1000;    // how long the forfeit message holds the turn
+const SNLV2_KNOCKBACK = 10;       // squares an occupant is shoved back
+const SNLV2_KNOCK_MS = 380;       // bump message before the shove (mirrors the jump banner)
+const SNLV2_KNOCK_TAIL_MS = 320;  // past the shove glide's rAF tail, as the jump uses
 
 function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficulty, variant, initialState, onClearSave, onGlossary, script }) {
   const nSeats = vsBot ? 2 : Math.max(2, Math.min(6, seats || 2));
@@ -50,8 +61,18 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
     setSkin(ids[(ids.indexOf(skin) + 1) % ids.length]);
   };
 
-  const [positions, setPositions] = useState(() => Array(nSeats).fill(0));
-  const [player, setPlayer] = useState(1);
+  /* Fixture seeding. ?snlpos / ?snlturn put the board one roll away from a
+     collision instead of six; with neither param these are the plain
+     all-at-zero, seat-1-to-move opening. */
+  const seedPositions = () => {
+    const a = Array(nSeats).fill(0);
+    if (SC.pos) SC.pos.slice(0, nSeats).forEach((v, i) => { a[i] = v; });
+    return a;
+  };
+  const seedPlayer = () => (SC.turn && SC.turn <= nSeats ? SC.turn : 1);
+
+  const [positions, setPositions] = useState(seedPositions);
+  const [player, setPlayer] = useState(seedPlayer);
   const [die, setDie] = useState(null);
   const [rolls, setRolls] = useState(0);
   /* ONE lock for the whole roll→settle sequence: spin, hop chain, snake/ladder
@@ -76,6 +97,9 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   // Sticky for the whole game: a forfeit is over in a second, but a
   // navigation-driven check may not sample the DOM until after it has passed.
   const [forfeited, setForfeited] = useState(false);
+  // Sticky for the same reason as `forfeited`: the bump message is gone in
+  // under a second, but the fact that one happened has to outlive it.
+  const [knocked, setKnocked] = useState(false);
 
   const animatingRef = useRef(false);
   const winTimerRef = useRef(null);
@@ -179,11 +203,11 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
     animatingRef.current = false;
     busyRef.current = false;
     clearTimers();
-    setPositions(Array(nSeats).fill(0));
-    setPlayer(1); setDie(null); setRolls(0);
+    setPositions(seedPositions());
+    setPlayer(seedPlayer()); setDie(null); setRolls(0);
     setBusy(false);
     setDone(false); setWinner(null); setBanner('');
-    setExtraRoll(false); setForfeited(false);
+    setExtraRoll(false); setForfeited(false); setKnocked(false);
     /* The scripted fixture is (re-)armed HERE, not at useState time: the
        mount effect below runs resetGame after the initial state, so a queue
        built in a useState initializer would be wiped before the first roll. */
@@ -205,6 +229,71 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
   // Immutable functional update — never mutates the previous array, and only
   // ever touches the one locked seat's slot.
   const setPos = (who, val) => setPositions((ps) => ps.map((p, i) => (i === who - 1 ? val : p)));
+
+  /* Collision penalty (Rule 4). A pawn that ends its move — AFTER any snake
+     or ladder has resolved — on a square another pawn occupies knocks that
+     pawn back SNLV2_KNOCKBACK squares, floored at the start square. Three
+     deliberate limits:
+
+     - The shove does NOT re-trigger a collision. Shoving a pawn onto a third
+       pawn and shoving that one in turn is a chain that can ping-pong between
+       two crowded squares; one hop, then stop.
+     - A snake or ladder under the shoved pawn DOES fire — that is the point
+       of the rule, the knockback is a real landing and not a teleport. It is
+       resolved here rather than by recursing into finishTurn, which would
+       drag the win check and the turn machinery in with it.
+     - No layout sends a jump to square 100 (`cnlv2-layouts` asserts it), so a
+       shoved pawn can never chain into a win it never rolled for.
+
+     Both steps are ordinary setPositions writes, so 02-board.jsx's rAF glide
+     animates them exactly like a rolled move: there is no second motion path
+     to keep in sync. */
+  const collisionHits = (who, square) => {
+    if (square <= 0) return [];
+    const hits = [];
+    positionsRef.current.forEach((p, i) => {
+      if (i === who - 1 || p !== square) return;
+      const back = Math.max(0, p - SNLV2_KNOCKBACK);
+      const jump = back > 0 ? V.jumps[back] : undefined;
+      hits.push({ seat: i + 1, back, jump: jump === undefined ? null : jump });
+    });
+    return hits;
+  };
+
+  /* Every hit seat is shoved in ONE write. Sequencing them would make the
+     pause scale with how crowded the square is, and they all travel the same
+     distance anyway — the glide runs them in parallel. */
+  const shove = (hits, key) => setPositions((ps) => ps.map((p, i) => {
+    const h = hits.find((x) => x.seat === i + 1);
+    return h ? h[key] : p;
+  }));
+
+  const resolveCollision = (who, hits, gen, wasSix) => {
+    setKnocked(true);
+    const names = hits.map((h) => pLabel(h.seat)).join(' & ');
+    setBanner(`💥 Bump! ${names} knocked back ${SNLV2_KNOCKBACK} squares.`);
+    const t = setTimeout(() => {
+      if (gen !== moveGenRef.current) return;
+      shove(hits, 'back');
+      const chain = hits.filter((h) => h.jump !== null);
+      const t2 = setTimeout(() => {
+        if (gen !== moveGenRef.current) return;
+        if (!chain.length) { setBanner(''); endRoll(who, gen, wasSix); return; }
+        const ladder = V.ladders[chain[0].back] !== undefined;
+        setBanner(chain.length > 1
+          ? 'Knocked onto a snake or ladder!'
+          : `${pLabel(chain[0].seat)} landed on a ${ladder ? 'ladder 🪜' : 'snake 🐍'}`);
+        shove(chain, 'jump');
+        const t3 = setTimeout(() => {
+          if (gen !== moveGenRef.current) return;
+          setBanner(''); endRoll(who, gen, wasSix);
+        }, SNLV2_KNOCK_TAIL_MS);
+        timersRef.current.push(t3);
+      }, SNLV2_KNOCK_TAIL_MS);
+      timersRef.current.push(t2);
+    }, SNLV2_KNOCK_MS);
+    timersRef.current.push(t);
+  };
 
   /* `who` and `gen` were captured when the roll STARTED; every step below
      belongs to that one move. The turn is advanced in `endRoll` and nowhere
@@ -243,6 +332,11 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
         // no extra roll and the lock simply stays on.
         return;
       }
+      /* The one place a move ends, so the one place a collision is tested —
+         and because settle() runs after the jump above, `finalSquare` is the
+         square the pawn actually came to rest on. */
+      const hits = collisionHits(who, finalSquare);
+      if (hits.length) { resolveCollision(who, hits, gen, wasSix); return; }
       endRoll(who, gen, wasSix);
     };
 
@@ -433,13 +527,17 @@ function SnLV2LocalGame({ onWin, onStepChange, resetKey, vsBot, seats, difficult
 
       {/* The dice-rule state is mirrored onto the wrapper because the board,
           the banner and the roll buttons are all CANVAS — a check can neither
-          read them nor click them. data-snl-forfeit is sticky for the run. */}
+          read them nor click them. data-snl-forfeit and data-snl-knock are sticky
+          for the run; data-snl-pos is the live square of every seat, which is
+          how a check reads a knockback and its chained snake or ladder. */}
       <div
         className="cnl-board-wrap"
         data-snl-turn={done ? 0 : player}
         data-snl-sixes={streakNow}
         data-snl-extra={extraRoll ? '1' : '0'}
         data-snl-forfeit={forfeited ? '1' : '0'}
+        data-snl-knock={knocked ? '1' : '0'}
+        data-snl-pos={positions.join(',')}
         data-snl-busy={busy ? '1' : '0'}
       >
         <SnLV2Board V={V} isMoksha={isMoksha} isLegend={isLegend} gildAll={gildAll} SK={SK} positions={positions} vsBot={vsBot} />

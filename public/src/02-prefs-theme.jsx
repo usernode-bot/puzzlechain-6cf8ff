@@ -124,6 +124,16 @@ function useThemeVersion() {
 // Resolve a palette token name (or pass a literal colour straight through).
 // Storing token NAMES and resolving at draw time is what lets a theme flip
 // recolour mid-game (the BOUNCE_ROW_COLORS precedent).
+/* One answer for "should this thing animate?": the app's own opt-in pref OR
+   the OS setting. Every new motion surface reads THIS, not matchMedia
+   directly, so a player who turned motion down in Settings is honoured even
+   on a device whose OS pref is unset. */
+function cgReducedMotion() {
+  if (cgPrefs.motion) return true;
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  catch (e) { return false; }
+}
+
 function palOf(nameOrLiteral, fallback) {
   if (!nameOrLiteral) return fallback || PAL.text;
   if (typeof nameOrLiteral !== 'string') return fallback || PAL.text;
@@ -230,6 +240,16 @@ const CG_TONES = {
   bpowerup:  { f: 720, d: 0.14, t: 'triangle', g: 0.08 },
   bdie:      { f: 190, d: 0.35, t: 'sawtooth', g: 0.10 },
   bgameover: { f: 140, d: 0.55, t: 'sawtooth', g: 0.11 },
+  /* Snakes & Ladders V2 board cues. `f2` (optional) ramps the pitch across the
+     tone's life, which is the whole difference between a beep and a hiss/slide:
+     a falling sawtooth reads as "dropped down a snake", a rising sine as
+     "climbed a ladder". Synthesised like every other cue here, so the feature
+     ships no audio asset. */
+  snlhiss:   { f: 620, f2: 170, d: 0.34, t: 'sawtooth', g: 0.07 },
+  snlchime:  { f: 880, f2: 1320, d: 0.26, t: 'sine',    g: 0.09 },
+  snlthwack: { f: 150, f2: 55,  d: 0.16, t: 'square',   g: 0.12 },
+  snlrattle: { f: 240, f2: 300, d: 0.05, t: 'square',   g: 0.05 },
+  snlfinish: { f: 660, f2: 990, d: 0.30, t: 'triangle', g: 0.09 },
 };
 function cgSound(name, pitch) {
   if (!cgPrefs.sound) return;
@@ -241,10 +261,15 @@ function cgSound(name, pitch) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = spec.t;
+    const now = ctx.currentTime;
     osc.frequency.value = spec.f * (pitch || 1);
+    // Optional pitch sweep across the tone (see the S&L cues above).
+    if (spec.f2) {
+      osc.frequency.exponentialRampToValueAtTime(
+        Math.max(20, spec.f2 * (pitch || 1)), now + spec.d);
+    }
     gain.gain.value = spec.g;
     osc.connect(gain).connect(ctx.destination);
-    const now = ctx.currentTime;
     gain.gain.setValueAtTime(spec.g, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + spec.d);
     osc.start(now);
@@ -379,6 +404,138 @@ function resumeBackgroundMusic() {
     startBackgroundMusic(_bgMusicUrl);
   }
 }
+
+/* ============================================================
+   Procedural loop music (cgStartLoopMusic / cgSetLoopMusicMood)
+   ============================================================
+   The manager above plays an ASSET. Snakes & Ladders has no soundtrack file
+   and an agent cannot author one, so its background music is synthesised from
+   the same AudioContext the SFX already use — no new bytes shipped, and it
+   re-themes for free when a mood changes.
+
+   Two things make this sound like music instead of a metronome of setTimeouts:
+
+   - A LOOKAHEAD SCHEDULER. A 25ms interval schedules every note that falls in
+     the next 150ms against ctx.currentTime, which is a sample-accurate clock.
+     One setTimeout per note would inherit the main thread's jitter, and the
+     result audibly stumbles whenever the board repaints.
+   - MOOD CHANGES LAND ON A BAR BOUNDARY. Flipping the tempo mid-bar is heard
+     as a mistake, not as tension. `pendingMood` holds the change until the
+     next downbeat, which is at most one bar away.
+
+   cgPrefs.sound is re-read PER NOTE, so muting during a match goes quiet
+   immediately without tearing the scheduler down. */
+const CG_LOOP_STEPS_PER_BAR = 8;
+const CG_LOOP_LOOKAHEAD = 0.15;
+const CG_LOOP_TICK_MS = 25;
+
+const CG_LOOP_MOODS = {
+  // Major pentatonic, slow, soft: the board is calm and nobody is close.
+  calm: {
+    bpm: 96,
+    lead: 'triangle', bass: 'sine',
+    gain: 0.6,
+    scale: [261.63, 293.66, 329.63, 392.0, 440.0],
+    pattern: [0, 2, 4, 2, 1, 3, 2, 0, 0, 2, 4, 3, 1, 2, 3, 4],
+    bassNote: 130.81,
+  },
+  /* Minor third plus a tritone, faster, with a sawtooth bass. Fires once any
+     pawn passes SNLV2_TENSE_SQUARE and stays for the rest of the match. */
+  tense: {
+    bpm: 132,
+    lead: 'sawtooth', bass: 'sawtooth',
+    gain: 0.75,
+    scale: [220.0, 261.63, 293.66, 311.13, 329.63],
+    pattern: [0, 3, 1, 3, 0, 4, 3, 1, 0, 3, 2, 3, 4, 3, 1, 0],
+    bassNote: 110.0,
+  },
+};
+
+/* Pure: which note this step of the loop plays. Split out so the
+   `cnlv2-music-loop` self-test can assert the pattern without an
+   AudioContext (a headless check has no speakers and no user gesture). */
+function cgLoopNoteAt(moodName, step) {
+  const m = CG_LOOP_MOODS[moodName] || CG_LOOP_MOODS.calm;
+  const i = ((step % m.pattern.length) + m.pattern.length) % m.pattern.length;
+  const beat = 60 / m.bpm / 2; // eighth notes
+  return {
+    lead: m.scale[m.pattern[i]],
+    bass: (step % CG_LOOP_STEPS_PER_BAR === 0) ? m.bassNote : null,
+    dur: beat,
+    gain: m.gain,
+  };
+}
+
+let _cgLoop = null;
+
+function _cgLoopVoice(ctx, freq, at, dur, type, level) {
+  try {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, at);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), at + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur * 0.95);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(at);
+    osc.stop(at + dur);
+  } catch (e) {}
+}
+
+function _cgLoopTick() {
+  const L = _cgLoop;
+  if (!L) return;
+  const ctx = cgAudio();
+  if (!ctx) return;
+  if (L.nextTime < ctx.currentTime) L.nextTime = ctx.currentTime + 0.05;
+  while (L.nextTime < ctx.currentTime + CG_LOOP_LOOKAHEAD) {
+    if (L.step % CG_LOOP_STEPS_PER_BAR === 0 && L.pendingMood) {
+      L.mood = L.pendingMood;
+      L.pendingMood = null;
+    }
+    const m = CG_LOOP_MOODS[L.mood] || CG_LOOP_MOODS.calm;
+    const note = cgLoopNoteAt(L.mood, L.step);
+    if (cgPrefs.sound) {
+      _cgLoopVoice(ctx, note.lead, L.nextTime, note.dur * 0.9, m.lead,
+        BG_MUSIC_GAIN * note.gain * 0.22);
+      if (note.bass) {
+        _cgLoopVoice(ctx, note.bass, L.nextTime, note.dur * 1.6, m.bass,
+          BG_MUSIC_GAIN * note.gain * 0.18);
+      }
+    }
+    L.nextTime += note.dur;
+    L.step += 1;
+  }
+}
+
+// Call from a user gesture the first time (the AudioContext stays suspended
+// otherwise, exactly like startBackgroundMusic).
+function cgStartLoopMusic(mood) {
+  const want = CG_LOOP_MOODS[mood] ? mood : 'calm';
+  if (_cgLoop) { cgSetLoopMusicMood(want); return; }
+  const ctx = cgAudio();
+  if (!ctx) return;
+  try { if (ctx.state === 'suspended') ctx.resume(); } catch (e) {}
+  _cgLoop = { mood: want, pendingMood: null, step: 0, nextTime: ctx.currentTime + 0.08, timer: 0 };
+  _cgLoop.timer = setInterval(_cgLoopTick, CG_LOOP_TICK_MS);
+  _cgLoopTick();
+}
+
+function cgSetLoopMusicMood(mood) {
+  if (!_cgLoop || !CG_LOOP_MOODS[mood]) return;
+  if (_cgLoop.mood === mood) { _cgLoop.pendingMood = null; return; }
+  _cgLoop.pendingMood = mood; // applied on the next bar line
+}
+
+function cgLoopMusicMood() { return _cgLoop ? (_cgLoop.pendingMood || _cgLoop.mood) : null; }
+
+function cgStopLoopMusic() {
+  if (!_cgLoop) return;
+  try { clearInterval(_cgLoop.timer); } catch (e) {}
+  _cgLoop = null;
+}
+
 
 // Discrete-gesture hook: tap / swipe / long-press / double-tap on an element.
 function useGestures(ref, handlers) {

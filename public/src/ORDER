@@ -28,6 +28,7 @@
 snakesladders-v2/00-layouts.jsx
 snakesladders-v2/01-art.jsx
 snakesladders-v2/02-board.jsx
+snakesladders-v2/04-rank.jsx
 snakesladders-v2/03-game.jsx
 28-registry.jsx
 29-cards.jsx

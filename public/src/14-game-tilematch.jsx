@@ -129,10 +129,19 @@ function tmSortBar(bar, tilesMap) {
    hit-test walks the same painter's order the frame was drawn in, so
    overlapping layers resolve exactly as they look. Tile art (the per-type
    colors and icons) is intrinsic and stays hardcoded. */
-function tmGeom(w, h, boardTiles, fitH) {
+/* The board's FOOTPRINT is a property of the deal, not of what is left on
+   it (#210). Extents are measured over every tile the deal contains —
+   removed and trayed ones included — so clearing a column never resizes
+   the step, re-centres the survivors, or shortens the canvas and yanks the
+   tray up underneath it. Painting and hit-testing still walk the LIVE
+   subset; only the geometry is anchored. */
+function tmExtent(tiles) {
   let maxC = 0, maxR = 0;
-  for (const t of boardTiles) { maxC = Math.max(maxC, t.col); maxR = Math.max(maxR, t.row); }
-  const unitsW = maxC + 1, unitsH = maxR + 1;
+  for (const t of tiles) { maxC = Math.max(maxC, t.col); maxR = Math.max(maxR, t.row); }
+  return { maxC, maxR };
+}
+function tmGeom(w, h, extent, fitH) {
+  const unitsW = extent.maxC + 1, unitsH = extent.maxR + 1;
   let step = Math.floor((w - 8) / unitsW);
   if (fitH) step = Math.min(step, Math.floor((h - 8) / unitsH));
   step = Math.max(20, Math.min(56, step));
@@ -141,6 +150,23 @@ function tmGeom(w, h, boardTiles, fitH) {
   const oy = fitH ? Math.max(2, Math.floor((h - bh) / 2)) : 2;
   return { step, tile: step - 2, ox, oy, bw, bh,
     at: (t) => [ox + t.col * step, oy + t.row * step] };
+}
+/* The 7-slot tile holder scales to the frame it is drawn in (#210). It used
+   to be a hardcoded 44px slot with a 6px gap — 344px of tray, wider than the
+   361px column a 390px phone gives it once the frame's own padding is out,
+   and negative `x0` (so the row hung off both edges) below that. The size is
+   derived here ONCE and shared by the draw block, the clear-mode hit
+   rectangles and the `data-tm-tray-*` attributes, because the previous two
+   independent copies of those constants were free to disagree. TRAY_H stays
+   the layout band so every offset below the tray is unchanged; a shorter
+   slot is centred inside it. */
+function tmTrayGeom(w, bandH) {
+  const gap = Math.max(3, Math.min(6, Math.round(w * 0.018)));
+  const slotW = Math.max(12, Math.min(44, Math.floor((w - 16 - gap * 6) / 7)));
+  const totalW = slotW * 7 + gap * 6;
+  const x0 = Math.floor((w - totalW) / 2);
+  const slotH = Math.min(bandH, Math.round(slotW * 1.14));
+  return { slotW, slotH, gap, x0, totalW, dy: Math.floor((bandH - slotH) / 2) };
 }
 // Paint order: layer ascending (same-layer tiles never overlap); the
 // hit-test walks it in reverse so the topmost tile wins, like the DOM
@@ -209,13 +235,17 @@ function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onT
   const H0 = Math.floor(boxH);
   const boardTiles = tiles.filter((t) => !t.removed && !t.inBar);
   const ordered = tmPaintOrder(boardTiles);
+  const extent = tmExtent(tiles);
 
   const GAP = 8, PILL_H = 46, DAY_H = dayLabel ? 18 : 0, TRAY_H = 50, BARL_H = 16, BOOST_H = 54;
   const HINT_H = hintBtn ? 36 : 0;
+  const tray = tmTrayGeom(W, TRAY_H);
   const chrome = PILL_H + GAP + (DAY_H ? DAY_H + GAP : 0) + GAP + TRAY_H + 4 + BARL_H + GAP + BOOST_H + (HINT_H ? GAP + HINT_H : 0);
   const boardAvail = fitH ? Math.max(80, H0 - chrome) : 1e9;
-  const geo = W > 60 && boardTiles.length
-    ? tmGeom(W, boardAvail, boardTiles, fitH) : null;
+  // Guarded on the DEAL, not the live subset: a board cleared to its last
+  // tile keeps the footprint it was dealt at instead of collapsing to 120.
+  const geo = W > 60 && tiles.length
+    ? tmGeom(W, boardAvail, extent, fitH) : null;
   const boardH = fitH ? Math.max(80, H0 - chrome) : (geo ? geo.bh + 4 : 120);
   const H = chrome + boardH;
   const boardY = PILL_H + GAP + (DAY_H ? DAY_H + GAP : 0);
@@ -242,15 +272,14 @@ function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onT
       font: 11, color: barFull ? PAL.rose : undefined,
     });
     // Tray slots become controls only in clear mode (tap removes that tile).
-    const slotW = 44, slotGap = 6;
-    const tx0 = Math.floor((W - slotW * 7 - slotGap * 6) / 2);
+    const { slotW, slotH, gap: slotGap, x0: tx0, dy: slotDy } = tray;
     if (clearSlotMode) {
       for (let i = 0; i < 7; i++) {
         const tid = bar[i];
         if (tid == null) continue;
         controls.push({
           id: 'slot' + i, kind: 'button', noDraw: true,
-          r: [tx0 + i * (slotW + slotGap), trayY, slotW, TRAY_H],
+          r: [tx0 + i * (slotW + slotGap), trayY + slotDy, slotW, slotH],
           label: 'Remove tray tile ' + (i + 1),
           action: () => onClearSlotTile(tid),
         });
@@ -295,8 +324,8 @@ function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onT
       cuiDrawControls(ctx, ctlRef.current, pressedId);
       // Tray slots.
       {
-        const slotW = 44, slotGap = 6;
-        const tx0 = Math.floor((W - slotW * 7 - slotGap * 6) / 2);
+        const { slotW, slotH, gap: slotGap, x0: tx0, dy: slotDy } = tray;
+        const slotY = trayY + slotDy;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         for (let i = 0; i < 7; i++) {
@@ -305,7 +334,7 @@ function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onT
           const t = tid != null ? tilesMap[tid] : null;
           const tt = t ? TM_TILE_TYPES[t.type % TM_TILE_TYPES.length] : null;
           const isClear = clearSlotMode && t != null;
-          klRR(ctx, x, trayY, slotW, TRAY_H, 8);
+          klRR(ctx, x, slotY, slotW, slotH, Math.min(8, Math.round(slotW * 0.2)));
           ctx.fillStyle = t ? PAL.card : PAL.surface;
           ctx.fill();
           ctx.lineWidth = isClear ? 2 : 1;
@@ -313,7 +342,7 @@ function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onT
           ctx.stroke();
           if (tt) {
             ctx.font = `${Math.round(slotW * 0.6)}px system-ui, sans-serif`;
-            ctx.fillText(tt.icon, x + slotW / 2, trayY + TRAY_H / 2 + 1);
+            ctx.fillText(tt.icon, x + slotW / 2, slotY + slotH / 2 + 1);
           }
         }
       }
@@ -334,7 +363,18 @@ function TmFrameCanvas({ pills, dayLabel, tiles, hintTileId, fitH, disabled, onT
   });
 
   return (
-    <div className={'tm-board-box cui-frame' + (fitH ? ' tm-board-fit' : '')} ref={boxRef}>
+    <div
+      className={'tm-board-box cui-frame' + (fitH ? ' tm-board-fit' : '')}
+      ref={boxRef}
+      /* Canvas frames expose no DOM to assert on, so the geometry that
+         issue #210 is about is published here: the deal's unit extents
+         (which must not change as tiles clear), whether the tray fits the
+         measured frame, its width, and the board region's height. */
+      data-tm-units={W > 60 ? `${extent.maxC + 1}x${extent.maxR + 1}` : undefined}
+      data-tm-tray-fits={W > 60 ? (tray.totalW <= W ? '1' : '0') : undefined}
+      data-tm-tray-w={W > 60 ? String(tray.totalW) : undefined}
+      data-tm-board-h={W > 60 ? String(boardH) : undefined}
+    >
       <canvas
         ref={canvasRef}
         className="tm-canvas board-canvas"
@@ -413,6 +453,44 @@ function TileMatchLeaderboard({ user }) {
 }
 
 
+/* Screenshot-state deep links (#210). Free play opens on a tier picker, so
+   the board itself was two taps deep and a navigation-driven check or
+   screenshot could never reach it; the mid-run state the issue is actually
+   about (tiles cleared, tray filling) was unreachable by any URL at all.
+   `?tmlevel=<1-1000>` mounts a level directly and `?tmcleared=<n>` takes n
+   tiles off it. Both are pure UI state — nothing is claimed, scored or
+   saved — so, like `?result=1`, neither is staging-gated and the "before"
+   screenshot can come from production. */
+function tmDeepLinkNum(key, lo, hi) {
+  try {
+    const raw = new URLSearchParams(window.location.search).get(key);
+    if (raw == null) return null;
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < lo || n > hi) return null;
+    return n;
+  } catch { return null; }
+}
+function tmDeepLinkLevel() { return tmDeepLinkNum('tmlevel', 1, 1000); }
+function tmDeepLinkCleared() { return tmDeepLinkNum('tmcleared', 0, 400); }
+/* Takes `n` tiles off a freshly dealt board, always the topmost tile that is
+   currently free, so one URL is one board every time. Determinism is the
+   point: the anchored-footprint self-test and the after-clearing screenshot
+   both compare against the fresh deal. */
+function tmClearSome(tiles, n) {
+  const out = tiles.map((t) => ({ ...t }));
+  const ordered = tmPaintOrder(out);
+  for (let k = 0; k < n; k++) {
+    let hit = null;
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const t = ordered[i];
+      if (!t.removed && !t.inBar && !tmIsLocked(t, out)) { hit = t; break; }
+    }
+    if (!hit) break;
+    hit.removed = true;
+  }
+  return out;
+}
+
 function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offset }) {
   /* #176 — this game already had the largest ladder in the app (1000 levels
      across 10 named tiers) and it FORGOT all of it: completions lived in
@@ -427,7 +505,10 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
   const arcadeLevel = playMode === 'arcade'
     ? [120, 480, 860][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))] || 480
     : null;
-  const forcedLevel = storyLevel != null ? storyLevel : arcadeLevel;
+  // A `?tmlevel=` deep link forces a level on the free-play path only; a
+  // play mode always wins, so a story rung stays the board its band names.
+  const forcedLevel = storyLevel != null ? storyLevel
+    : (arcadeLevel != null ? arcadeLevel : tmDeepLinkLevel());
   const [phase, setPhase] = useState(forcedLevel != null ? 'playing' : 'select');
   const [selectedLevel, setSelectedLevel] = useState(forcedLevel != null ? forcedLevel : 1);
   const [tierPage, setTierPage] = useState(null); // null = overview, 0-9 = tier index
@@ -497,11 +578,11 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
   useEffect(() => {
     if (forcedLevel != null && !bootedRef.current) {
       bootedRef.current = true;
-      startLevel(forcedLevel);
+      startLevel(forcedLevel, tmDeepLinkCleared());
     }
   }, [forcedLevel]);
 
-  const startLevel = (lvl) => {
+  const startLevel = (lvl, clearedN) => {
     const cfg = tmGetLevelConfig(lvl);
     /* Story keeps the level's fixed seed so a band is the SAME board every
        time you come back to it — a rung you can retry, not a reroll. Arcade
@@ -514,7 +595,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
     const ls = Math.min(50 + Math.floor((lvl - 1) / 10) * 2, 200);
     const limit = tmLevelTimeLimit(lvl, cfg);
     setSelectedLevel(lvl);
-    setTiles(newTiles);
+    setTiles(clearedN ? tmClearSome(newTiles, clearedN) : newTiles);
     setBar([]);
     setMoves(0);
     setDone(false);

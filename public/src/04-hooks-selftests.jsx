@@ -543,6 +543,115 @@ function runClientSelfTests(styleReady) {
     }
   });
 
+  /* #218 — Nonogram validation. These four are the whole reason the win
+     notification can be trusted: the banner, the Errors pill, the red clues and
+     the mistake counter are all rendered straight off ngValidate, so a wrong
+     line state is a wrong message rather than a crash. Cell values are the
+     component's: 0 blank, 1 filled, 2 marked empty. */
+  check('nonogram-line-state', () => {
+    const cases = [
+      [[0, 0, 0, 0, 0], [3], 'open'],       // untouched: still reachable
+      [[1, 1, 1, 0, 0], [3], 'done'],       // runs match the clue exactly
+      [[1, 0, 1, 0, 0], [3], 'open'],       // a blank is not a claim of empty
+      [[1, 2, 1, 0, 0], [3], 'error'],      // the mark rules out every run of 3
+      [[2, 2, 2, 2, 2], [], 'done'],        // an empty line's clue is 0
+      [[1, 1, 1, 1, 0], [3], 'error'],      // four filled can never read as 3
+      [[1, 0, 0, 1, 0], [1, 1], 'done'],
+    ];
+    for (const [cells, clue, want] of cases) {
+      const got = ngLineState(cells, clue);
+      if (got !== want) {
+        throw new Error('ngLineState([' + cells.join(',') + '], [' + clue.join(',') +
+          ']) = ' + got + ', expected ' + want);
+      }
+    }
+    return true;
+  });
+
+  check('nonogram-validate', () => {
+    /* Picture:  ##.     rows [2],[1],[2]
+                 .#.     cols [1],[3],[1]      */
+    const rowClues = [[2], [1], [2]], colClues = [[1], [3], [1]];
+    const solvedGrid = [[1, 1, 2], [2, 1, 2], [2, 1, 1]];
+    const a = ngValidate(solvedGrid, rowClues, colClues);
+    if (!a.solved || a.errorCount || !a.complete) {
+      throw new Error('the solution reads solved=' + a.solved + ' errors=' + a.errorCount);
+    }
+    if (a.filled !== 5 || a.targetFilled !== 5 || a.doneCount !== 6 || a.lines !== 6) {
+      throw new Error('solution counts wrong: filled=' + a.filled + '/' + a.targetFilled +
+        ' done=' + a.doneCount + '/' + a.lines);
+    }
+    // The ?ngfill=wrong shape: the right NUMBER of filled cells, in the wrong
+    // places, so `complete` must fire while `solved` must not.
+    const wrong = [[2, 1, 1], [2, 1, 2], [2, 1, 1]];
+    const b = ngValidate(wrong, rowClues, colClues);
+    if (b.solved || !b.complete || b.filled !== 5) {
+      throw new Error('full-but-wrong reads solved=' + b.solved + ' complete=' + b.complete);
+    }
+    if (b.errorCount !== 2) throw new Error('expected 2 dead lines, got ' + b.errorCount);
+    // A part-played board is neither.
+    const part = ngValidate([[1, 1, 0], [0, 0, 0], [0, 0, 0]], rowClues, colClues);
+    if (part.solved || part.complete || part.errorCount) {
+      throw new Error('a part-played board must be open');
+    }
+    return true;
+  });
+
+  /* #218 — the geometry used to hard-code 8, so every band above 8x8 drew its
+     trailing rows outside the canvas and could not be tapped at all, and 5x5
+     hit-tested phantom cells past the edge. Every corner of every band must
+     land back on itself, or the win is unreachable rather than unannounced. */
+  check('nonogram-board-bounds', () => {
+    for (const spec of NG_BANDS) {
+      const { rows, cols } = spec;
+      const geom = ngGeometry(390, 700, rows, cols, { rowChars: 5, colLines: 4 });
+      if (geom.boardX < 0 || geom.boardW > 390) {
+        throw new Error(rows + 'x' + cols + ' board is ' + geom.boardW + 'px wide in a 390px frame');
+      }
+      const corners = [[0, 0], [0, cols - 1], [rows - 1, 0], [rows - 1, cols - 1]];
+      for (const [r, c] of corners) {
+        const hit = ngCellAt(geom, rows, cols, {
+          x: geom.boardX + geom.gutterX + c * geom.cellStep + geom.cell / 2,
+          y: geom.boardY + geom.gutterY + r * geom.cellStep + geom.cell / 2,
+        });
+        if (!hit || hit.r !== r || hit.c !== c) {
+          throw new Error(rows + 'x' + cols + ' cell ' + r + ',' + c + ' hit-tests as ' +
+            (hit ? hit.r + ',' + hit.c : 'nothing'));
+        }
+      }
+      // And a tap just past the last cell must miss rather than index past the row.
+      const past = ngCellAt(geom, rows, cols, {
+        x: geom.boardX + geom.gutterX + cols * geom.cellStep + 4,
+        y: geom.boardY + geom.gutterY + rows * geom.cellStep + 4,
+      });
+      if (past) throw new Error(rows + 'x' + cols + ' hit-tests a cell past its own edge');
+    }
+    return true;
+  });
+
+  /* The Filled pill counts against the clue totals, so a board whose row and
+     column clues disagree would show a target nobody can reach. Generated
+     boards must agree on every band, fallback paths included. */
+  check('nonogram-target-filled', () => {
+    for (let band = 0; band < NG_BANDS.length; band++) {
+      const b = ngBuildForBand(mulberry32(9000 + band * 37), band);
+      const rowSum = b.rowClues.reduce((n, cl) => n + cl.reduce((a, v) => a + v, 0), 0);
+      const colSum = b.colClues.reduce((n, cl) => n + cl.reduce((a, v) => a + v, 0), 0);
+      const actual = b.grid.flat().filter(Boolean).length;
+      if (rowSum !== actual || colSum !== actual) {
+        throw new Error('band ' + band + ': clues total ' + rowSum + '/' + colSum +
+          ' against ' + actual + ' filled cells');
+      }
+      const solvedGrid = b.grid.map((row) => row.map((v) => (v ? 1 : 2)));
+      const v = ngValidate(solvedGrid, b.rowClues, b.colClues);
+      if (!v.solved || v.targetFilled !== actual) {
+        throw new Error('band ' + band + ' solution reads solved=' + v.solved +
+          ' target=' + v.targetFilled + '/' + actual);
+      }
+    }
+    return true;
+  });
+
   // Phase 3 — every daily must opt into the one-viewport column, or it scrolls
   // (or clips) during play. This is the standing guarantee behind the audit.
   // #149 — extended past the FLAG: fitShell without a .fit-col root CLIPS

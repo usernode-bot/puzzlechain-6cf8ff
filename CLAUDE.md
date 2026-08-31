@@ -143,6 +143,17 @@ through `useFitBox`, the draw loop and the pointer math together — miss one an
 the board draws at one size and is clicked at another. This bug class is silent:
 it neither throws nor fails a parser, and at the default band it looks correct.
 
+Nonogram was the last one holding a hard-coded `8` (#218), and it shows how far
+the damage goes: the fit maths, the board width and `cellAt` all assumed 8×8
+while the draw loop correctly walked `NG_ROWS`/`NG_COLS`, so story rungs 3 to 6
+drew their trailing rows outside the canvas and could not be tapped — the win
+was unreachable, not merely unannounced — and on 5×5 a tap past the edge threw
+on `g[6][c]`. Geometry and hit-testing are now one pair of pure functions,
+`ngGeometry`/`ngCellAt`, and `nonogram-board-bounds` round-trips every corner of
+every band through both. Put a new parameterised canvas board behind that same
+pair-of-pure-functions shape: it is the only version of this that a self-test
+can check.
+
 Related, and the reason the browser sweep exists: a merge that keeps the tail of
 a block and drops the head leaves an identifier referenced but undeclared. That
 is a `ReferenceError` at mount, which `npm run check` cannot see (it is valid
@@ -777,7 +788,8 @@ Shared card/tile engine + Lane A daily games"):
   1×7 words from in-file pools. Progress shapes: klondike/spider
   `{ dayNum, st }` (full serialized deal state), mahjongsol
   `{ dayNum, faces, removed, shuffles, pairs }`, nonogram
-  `{ dayNum, grid }`, minefinder `{ dayNum, revealed, flags }`,
+  `{ dayNum, grid, mistakes }` (the counter added by #218; a save without it
+  hydrates as 0), minefinder `{ dayNum, revealed, flags }`,
   anagrams `{ dayNum, solved }`, cratepush `{ dayNum, player, crates,
   moves }`, dropstack `{ dayNum, grid, pieceIdx, lines, points, level,
   hold }` (the last two added by the phase-9 rebuild; hydration still

@@ -1851,6 +1851,170 @@ function ngBuildPlainBoard(rows, cols) {
   return { grid, rowClues, colClues, rows, cols, passes: 0 };
 }
 
+/* ---- Nonogram validation (#218) --------------------------------------------
+   Every check below reads the CLUES, never the generated picture. That is
+   deliberate: ngBuildForBand's last-resort paths (`fallback`, and
+   ngBuildPlainBoard below it) can ship a board whose clues admit more than one
+   arrangement, so diffing the player's grid against `target` would call a
+   perfectly legal alternative solution a mistake. Sudoku takes exactly the
+   same stance (see sudokuConflicts: "no hidden correct answer comparison").
+
+   Cell values are the component's: 0 blank, 1 filled, 2 marked empty. */
+
+/* 'done'  the line's filled runs match its clue exactly.
+   'error' no arrangement of the clue is reachable from this line any more.
+   'open'  neither yet. */
+function ngLineState(cells, clue) {
+  const want = clue && clue.length ? clue : [0];
+  const got = ngClues(cells.map((v) => (v === 1 ? 1 : 0)));
+  if (got.length === want.length && got.every((v, k) => v === want[k])) return 'done';
+  const places = ngPlacements(want, cells.length);
+  /* ngPlacements BAILS past 20000 arrangements, and a truncated list would let
+     a still-reachable line be called an error. An unprovable error is not an
+     error, so an incomplete enumeration reads as 'open'. */
+  if (!places || !places.length || places.length > 20000) return 'open';
+  for (const p of places) {
+    let ok = true;
+    for (let i = 0; i < cells.length; i++) {
+      /* A filled cell must fall inside a run, and a mark is the player
+         asserting the cell is empty, so a run needing it is ruled out. */
+      if ((cells[i] === 1 && !p[i]) || (cells[i] === 2 && p[i])) { ok = false; break; }
+    }
+    if (ok) return 'open';
+  }
+  return 'error';
+}
+
+/* One pass over the board: the per-line states the clue tints read, the counts
+   the pills read, and the two completion facts the banner branches on.
+
+   `complete` means "the player has committed to a whole picture". It is true
+   when the filled count reaches the clue total OR when no blank cell is left,
+   because plenty of players never place a single mark, so "no blanks" alone
+   would never fire for them. */
+function ngValidate(grid, rowClues, colClues) {
+  const rows = grid.length, cols = rows ? grid[0].length : 0;
+  const rowStates = rowClues.map((cl, r) => ngLineState(grid[r], cl));
+  const colStates = colClues.map((cl, c) => ngLineState(grid.map((row) => row[c]), cl));
+  let filled = 0, blanks = 0;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (grid[r][c] === 1) filled++;
+    else if (grid[r][c] === 0) blanks++;
+  }
+  const targetFilled = rowClues.reduce((n, cl) => n + cl.reduce((a, b) => a + b, 0), 0);
+  const errorCount = rowStates.filter((s) => s === 'error').length +
+                     colStates.filter((s) => s === 'error').length;
+  const doneCount = rowStates.filter((s) => s === 'done').length +
+                    colStates.filter((s) => s === 'done').length;
+  const solved = rowStates.every((s) => s === 'done') && colStates.every((s) => s === 'done');
+  return {
+    rowStates, colStates, errorCount, doneCount, solved, filled, blanks, targetFilled,
+    lines: rows + cols,
+    complete: solved || (targetFilled > 0 && filled === targetFilled) || blanks === 0,
+  };
+}
+
+/* Board geometry, extracted so it is testable and so the board can never again
+   be DRAWN at one size and CLICKED at another.
+
+   #176 made the grid a band property (5x5 up to 15x15) while this game kept
+   three literal 8s: the cell fit was over a fixed 10 tracks, the board width
+   was `cellStep * 8`, and the hit test clamped to `r > 7 || c > 7`. So on
+   10x10 and up the trailing rows and columns were drawn outside the canvas and
+   could not be tapped at all, which made the win UNREACHABLE on story rungs 3
+   to 6; and on 5x5 a tap in the phantom area returned { r: 6, c: 6 } and threw
+   at the top of apply(), which is a blank screen. This is the bug class
+   CLAUDE.md names: a canvas board reads its dimensions from the run.
+
+   The gutters are sized from the ACTUAL clue content (the longest row clue
+   string, the tallest column clue stack) rather than a flat two cells, because
+   a 15-wide line's clue does not fit inside two of its own cells. */
+function ngGeometry(W, availH, rows, cols, m) {
+  const GAP = 8, PILL_H = 46, MODE_H = 48;
+  const chrome = PILL_H + MODE_H + GAP * 2;
+  const availW = Math.max(0, Math.floor(W)) - 8;
+  const availB = Math.max(0, Math.floor(availH) - chrome) - 8;
+  const rowChars = Math.max(1, (m && m.rowChars) || 1);
+  const colLines = Math.max(1, (m && m.colLines) || 1);
+  /* A 15x15 cell cannot be a 20px fingertip and still fit a phone column, so
+     the floor scales with the board: a big band shrinks rather than clips. */
+  const minCell = Math.max(rows, cols) > 8 ? 13 : 20;
+  const fontOf = (px) => Math.max(9, Math.round(px * 0.42));
+  let cell = minCell, gutterX = 0, gutterY = 0;
+  // Cell size and gutter size each depend on the other, so settle them.
+  for (let pass = 0; pass < 3; pass++) {
+    const byW = Math.floor((availW - gutterX - NG_GAP * (cols - 1)) / Math.max(1, cols));
+    const byH = Math.floor((availB - gutterY - NG_GAP * (rows - 1)) / Math.max(1, rows));
+    cell = Math.max(minCell, Math.min(42, Math.min(byW, byH)));
+    const f = fontOf(cell);
+    gutterX = Math.max(cell, Math.ceil(rowChars * f * 0.62) + 8);
+    gutterY = Math.max(cell, colLines * (f + 2) + 6);
+  }
+  const cellStep = cell + NG_GAP;
+  const boardW = gutterX + cellStep * cols - NG_GAP;
+  const boardH = gutterY + cellStep * rows - NG_GAP;
+  return {
+    GAP, PILL_H, MODE_H, chrome, cell, cellStep, clueFont: fontOf(cell),
+    gutterX, gutterY, boardW, boardH,
+    H: chrome + boardH,
+    boardX: Math.floor((Math.floor(W) - boardW) / 2),
+    boardY: PILL_H + GAP,
+    modesY: PILL_H + GAP + boardH + GAP,
+  };
+}
+
+/* The hit test, bounded by the board that was actually dealt. */
+function ngCellAt(geom, rows, cols, p) {
+  const c = Math.floor((p.x - geom.boardX - geom.gutterX) / geom.cellStep);
+  const r = Math.floor((p.y - geom.boardY - geom.gutterY) / geom.cellStep);
+  if (c < 0 || c >= cols || r < 0 || r >= rows) return null;
+  return { r, c };
+}
+
+function ngReducedMotion() {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+}
+
+/* ?ngfill=wrong|error|solved seeds a board state that proposal checks and the
+   before/after screenshots can NAVIGATE to. Every one of these states is
+   otherwise reachable only by tapping cells, and neither a check nor a
+   screenshot can tap. Honoured only where there is no attempt to write into
+   (see the call site), so it can never fabricate progress in a claimed daily.
+
+   'solved' the day's picture, completed.
+   'wrong'  fully decided, provably not a solution.
+   'error'  partial, with one line that can no longer match its clue. */
+function ngDeepLinkGrid(target, rowClues, colClues) {
+  let v = null;
+  try { v = new URLSearchParams(window.location.search).get('ngfill'); } catch {}
+  if (v !== 'wrong' && v !== 'error' && v !== 'solved') return null;
+  const rows = target.length, cols = target[0].length;
+  if (v === 'error') {
+    /* One solid row. Its clue sums to less than the width on any real board
+       (the generator caps a picture at 75% of the cells), so the row holds more
+       filled cells than the clue allows and can never match, while the blanks
+       everywhere else keep the grid incomplete. */
+    const g = Array.from({ length: rows }, () => new Array(cols).fill(0));
+    let r0 = rowClues.findIndex((cl) => cl.reduce((a, b) => a + b, 0) < cols);
+    if (r0 < 0) r0 = 0;
+    for (let c = 0; c < cols; c++) g[r0][c] = 1;
+    return g;
+  }
+  const g = target.map((row) => row.map((x) => (x ? 1 : 2)));
+  if (v === 'solved') return g;
+  /* 'wrong': swap one filled cell with one empty one. The filled COUNT stays
+     right (so the grid still reads as complete) while the two lines the swap
+     touched hold one cell too few and one too many, neither of which any
+     arrangement of their clues can absorb. */
+  let a = null, b = null;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (!a && g[r][c] === 1) a = [r, c];
+    if (!b && g[r][c] === 2) b = [r, c];
+  }
+  if (a && b) { g[a[0]][a[1]] = 2; g[b[0]][b[1]] = 1; }
+  return g;
+}
+
 function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   /* #176 — every board is now a symmetric silhouette that has been PROVEN
@@ -1885,9 +2049,27 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const resumed = savedProgress && savedProgress.dayNum === dayNum && ngFits(savedProgress.grid)
     ? savedProgress : null;
   // 0 = blank, 1 = filled, 2 = marked ✗
+  /* ?ngfill=wrong|error|solved. Honoured ONLY when there is no attempt to save
+     into: onSaveProgress is absent in practice, review and the signed-out
+     path, so a seeded board can never fabricate progress inside a claimed
+     daily. It exists because the states below are reachable only by tapping
+     cells, and neither a proposal check nor a screenshot can tap. */
+  const seeded = useRef(null);
+  if (seeded.current === null) {
+    seeded.current = onSaveProgress
+      ? false
+      : (ngDeepLinkGrid(built.current.grid, rowClues, colClues) || false);
+  }
   const [grid, setGrid] = useState(() =>
-    resumed ? resumed.grid.map((row) => row.slice()) : Array.from({ length: NG_ROWS }, () => new Array(NG_COLS).fill(0))
+    seeded.current ? seeded.current.map((row) => row.slice())
+      : resumed ? resumed.grid.map((row) => row.slice())
+        : Array.from({ length: NG_ROWS }, () => new Array(NG_COLS).fill(0))
   );
+  /* Completed-but-wrong pictures, counted across the whole run. Saves written
+     before #218 have no `mistakes` key, so the default is 0 rather than a
+     hydration failure. */
+  const [mistakes, setMistakes] = useState(() =>
+    resumed && Number.isFinite(resumed.mistakes) ? resumed.mistakes : 0);
   const [mode, setMode] = useState('fill'); // 'fill' | 'mark'
   const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
   const [done, setDone] = useState(false);
@@ -1895,54 +2077,77 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const { secs, fmt } = useTimer(!done, initialSecs);
 
   const stateRef = useRef({});
-  stateRef.current = { grid, steps, secs };
+  stateRef.current = { grid, steps, secs, mistakes };
   useAutosave(
     onSaveProgress,
-    () => ({ progress: { dayNum, grid: stateRef.current.grid }, steps: stateRef.current.steps, secs: stateRef.current.secs }),
+    () => ({
+      progress: { dayNum, grid: stateRef.current.grid, mistakes: stateRef.current.mistakes },
+      steps: stateRef.current.steps,
+      secs: stateRef.current.secs,
+    }),
     !done
   );
 
-  const solved = (g) => {
-    for (let r = 0; r < NG_ROWS; r++) {
-      const got = ngClues(g[r].map((v) => (v === 1 ? 1 : 0)));
-      if (got.length !== rowClues[r].length || got.some((v, k) => v !== rowClues[r][k])) return false;
-    }
-    for (let c = 0; c < NG_COLS; c++) {
-      const got = ngClues(g.map((row) => (row[c] === 1 ? 1 : 0)));
-      if (got.length !== colClues[c].length || got.some((v, k) => v !== colClues[c][k])) return false;
-    }
-    return true;
+  /* Re-render on a theme flip: the Errors pill bakes a resolved PAL colour
+     into its control object at render time, and useCanvasBoard's own theme
+     redraw would otherwise repaint a stale one. */
+  const themeV = useThemeVersion();
+
+  /* One validation pass per board state, memoised on grid IDENTITY (every edit
+     replaces the array), because ngLineState enumerates clue placements and the
+     draw loop, the pills and the banner all want the same answer. */
+  const vcache = useRef({ key: null, val: null });
+  if (vcache.current.key !== grid) {
+    vcache.current = { key: grid, val: ngValidate(grid, rowClues, colClues) };
+  }
+  const view = vcache.current.val;
+
+  /* A wrong picture is one mistake, not one per tap: counted on the TRANSITION
+     into "complete and not a solution", so nudging cells around inside a wrong
+     grid does not rack up a tally. */
+  const wrongRef = useRef(view.complete && !view.solved);
+  const mistakesRef = useRef(mistakes);
+  mistakesRef.current = mistakes;
+
+  const [flash, setFlash] = useState(null); // 'err' | 'ok' | null
+  const flashT = useRef(null);
+  const pulse = (kind) => {
+    if (ngReducedMotion()) return;
+    setFlash(kind);
+    clearTimeout(flashT.current);
+    flashT.current = setTimeout(() => setFlash(null), 600);
   };
+  useEffect(() => () => clearTimeout(flashT.current), []);
 
   // ---- Responsive canvas frame (controls wave) ----------------------------
-  // Clue gutters live inside the canvas, and now so do the pills and the
-  // Fill/Mark toggle — the whole frame scales as one unit. The gutters are
-  // sized in cells (2 wide for row clues, 2 tall for column clues), so the
-  // fit is over a 10×10 board and the clue text scales with it.
+  // Clue gutters live inside the canvas, and so do the pills and the Fill/Mark
+  // toggle — the whole frame scales as one unit. Geometry is a pure function of
+  // the board that was actually dealt (see ngGeometry), so a 5×5 rung and a
+  // 15×15 rung are both drawn and hit-tested at their own size.
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
   const W = Math.floor(boxW);
-  const GAP = 8, PILL_H = 46, MODE_H = 48;
-  const chrome = PILL_H + MODE_H + GAP * 2;
-  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome)) - 8;
-  const cell = Math.max(20, Math.min(42, Math.floor((availB - NG_GAP * 9) / 10)));
-  const cellStep = cell + NG_GAP;
-  const gutter = cellStep * 2;
-  const boardPx = gutter + cellStep * 8 - NG_GAP;
-  const H = chrome + boardPx;
-  const boardX = Math.floor((W - boardPx) / 2);
-  const boardY = PILL_H + GAP;
-  const modesY = boardY + boardPx + GAP;
+  const geom = ngGeometry(W, boxH, NG_ROWS, NG_COLS, {
+    rowChars: rowClues.reduce((n, cl) => Math.max(n, cl.join(' ').length), 1),
+    colLines: colClues.reduce((n, cl) => Math.max(n, cl.length), 1),
+  });
+  const { GAP, PILL_H, MODE_H, cell, cellStep, clueFont, gutterX, gutterY, H, boardX, boardY, modesY } = geom;
 
   const liveRef = useRef({});
-  liveRef.current = { grid, mode, done, steps, secs, cellStep, gutter, boardX, boardY };
+  liveRef.current = { grid, mode, done, steps, secs, geom };
 
-  const cellAt = (p) => {
-    const { cellStep: cs, gutter: gu, boardX: bx, boardY: by } = liveRef.current;
-    const c = Math.floor((p.x - bx - gu) / cs), r = Math.floor((p.y - by - gu) / cs);
-    if (c < 0 || c > 7 || r < 0 || r > 7) return null;
-    return { r, c };
+  const cellAt = (p) => ngCellAt(liveRef.current.geom, NG_ROWS, NG_COLS, p);
+
+  const finish = (ns, sc, nm) => {
+    setDone(true);
+    pulse('ok');
+    // Each completed-but-wrong picture costs 50, on the same floor as before.
+    const score = Math.max(1400 - ns * 4 - sc * 2 - nm * 50, 250);
+    onWin(score, ns, sc, {
+      share: `Game Corner Nonogram: today's ${NG_COLS}×${NG_ROWS} picture in ${fmt}`
+        + (nm ? `, ${nm} mistake${nm === 1 ? '' : 's'}` : ', no mistakes') + ' 🖼️',
+    });
   };
 
   // `paintMode` is applied rather than the live mode, so long-press can invert
@@ -1955,29 +2160,47 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     if (paintMode === 'fill') g[r][c] = v === 1 ? 0 : 1;
     else g[r][c] = v === 2 ? 0 : 2;
     const ns = cur.steps + 1;
+    const res = ngValidate(g, rowClues, colClues);
+    const won = res.solved;
+    const nowWrong = res.complete && !won;
+    let nm = mistakesRef.current;
+    if (nowWrong && !wrongRef.current) {
+      nm = nm + 1;
+      mistakesRef.current = nm;
+      setMistakes(nm);
+      pulse('err');
+    }
+    wrongRef.current = nowWrong;
     setGrid(g);
     setSteps(ns);
     onStepChange(ns);
-    const won = solved(g);
     // Skip the save on the winning move — the finish closes the attempt and a
     // racing progress write would 409 against the closed row.
-    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g }, ns, cur.secs);
-    if (won) {
-      setDone(true);
-      const score = Math.max(1400 - ns * 4 - cur.secs * 2, 250);
-      onWin(score, ns, cur.secs, {
-        share: `Game Corner Nonogram — solved today's ${NG_COLS}×${NG_ROWS} picture in ${fmt} 🖼️`,
-      });
-    }
+    if (!won && onSaveProgress) onSaveProgress({ dayNum, grid: g, mistakes: nm }, ns, cur.secs);
+    if (won) finish(ns, cur.secs, nm);
   };
 
-  const filled = grid.reduce((n, row) => n + row.filter((v) => v === 1).length, 0);
+  /* A board seeded solved by ?ngfill=solved has to report itself: the win is
+     detected inside apply(), and nothing was tapped. */
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (firedRef.current || !seeded.current || !view.solved || done) return;
+    firedRef.current = true;
+    finish(steps, secs, mistakes);
+  }, [view.solved]);
+
+  const filled = view.filled;
   const controls = [];
   if (W > 80) {
-    const pr = cuiRow(0, 0, W, PILL_H, 3);
+    const pr = cuiRow(0, 0, W, PILL_H, 4);
     controls.push({ id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true });
     controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
-    controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: filled });
+    controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: `${filled}/${view.targetFilled}` });
+    // PAL (not C) — a pill's colour is painted onto a canvas.
+    controls.push({
+      id: 'p-errors', kind: 'pill', r: pr[3], label: 'Errors', value: view.errorCount,
+      color: view.errorCount ? PAL.rose : undefined,
+    });
     const bw = Math.min(170, Math.floor((W - GAP) / 2));
     const bx = Math.floor((W - bw * 2 - GAP) / 2);
     controls.push({ id: 'mode-fill', kind: 'button', r: [bx, modesY, bw, MODE_H], label: '⬛ Fill', on: mode === 'fill', action: () => setMode('fill') });
@@ -1986,6 +2209,22 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const ctlRef = useRef([]);
   ctlRef.current = controls;
   const [pressedId, setPressedId] = useState(null);
+
+  /* Four tones, one line, always present. `info` is the running progress
+     report; `warn` fires the moment a line becomes impossible, which is what
+     turns "I filled it all in and nothing happened" into feedback you get
+     while there is still something to do about it. */
+  const tone = view.solved ? 'ok' : view.complete ? 'err' : view.errorCount ? 'warn' : 'info';
+  const nErr = view.errorCount;
+  const statusText = view.solved
+    ? 'Solved! Every row and column matches its clues.'
+    : view.complete
+      ? (nErr
+        ? `Not quite. The grid is full, and ${nErr} ${nErr === 1 ? 'line does' : 'lines do'} not match ${nErr === 1 ? 'its clue' : 'their clues'} (shown in red).`
+        : 'Not quite. The grid is full, but the picture does not match the clues.')
+      : nErr
+        ? `${nErr} ${nErr === 1 ? 'line can' : 'lines can'} no longer match ${nErr === 1 ? 'its clue' : 'their clues'}. Look for the red numbers.`
+        : `${filled} of ${view.targetFilled} cells filled. ${view.doneCount} of ${view.lines} lines done.`;
 
   usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
@@ -2000,38 +2239,44 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [cell, grid, done, W, fmt, steps, mode, pressedId],
+    deps: [cell, grid, done, W, fmt, steps, mode, pressedId, flash, nErr, view.doneCount, themeV],
     draw: (ctx) => {
       cuiDrawControls(ctx, ctlRef.current, pressedId);
       ctx.save();
       ctx.translate(boardX, boardY);
       const radius = Math.max(2, Math.round(cell * 0.14));
-      const clueFont = Math.max(9, Math.round(cell * 0.42));
+      const gridW = cellStep * NG_COLS, gridH = cellStep * NG_ROWS;
+      const xEnd = gutterX + gridW - NG_GAP, yEnd = gutterY + gridH - NG_GAP;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
+      /* Clue colour IS the validation surface: red for a line no arrangement
+         of its clue can still satisfy, faded for a line already done, plain
+         otherwise. PAL (not C) — canvas cannot resolve var() properties. */
+      const clueColor = (st) => (st === 'error' ? PAL.rose : st === 'done' ? PAL.dim : PAL.muted);
+
       // Column clues, bottom-aligned in the top gutter.
-      // PAL (not C) — canvas cannot resolve var() custom properties.
-      ctx.fillStyle = PAL.muted;
       ctx.font = `${clueFont}px 'JetBrains Mono', monospace`;
       colClues.forEach((cl, c) => {
-        const x = gutter + c * cellStep + cell / 2;
+        const x = gutterX + c * cellStep + cell / 2;
+        ctx.fillStyle = clueColor(view.colStates[c]);
         cl.forEach((v, k) => {
-          const y = gutter - 4 - (cl.length - 1 - k) * (clueFont + 2) - clueFont / 2;
+          const y = gutterY - 4 - (cl.length - 1 - k) * (clueFont + 2) - clueFont / 2;
           ctx.fillText(String(v), x, y);
         });
       });
       // Row clues, right-aligned in the left gutter.
       ctx.textAlign = 'right';
       rowClues.forEach((cl, r) => {
-        const y = gutter + r * cellStep + cell / 2;
-        ctx.fillText(cl.join(' '), gutter - 6, y);
+        const y = gutterY + r * cellStep + cell / 2;
+        ctx.fillStyle = clueColor(view.rowStates[r]);
+        ctx.fillText(cl.join(' '), gutterX - 6, y);
       });
       ctx.textAlign = 'center';
 
       for (let r = 0; r < NG_ROWS; r++) for (let c = 0; c < NG_COLS; c++) {
         const v = grid[r][c];
-        const x = gutter + c * cellStep, y = gutter + r * cellStep;
+        const x = gutterX + c * cellStep, y = gutterY + r * cellStep;
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
         else ctx.rect(x, y, cell, cell);
@@ -2046,17 +2291,47 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           ctx.fillText('✗', x + cell / 2, y + cell / 2 + 1);
         }
       }
-      // Major separators every 4 cells — replaces the old :nth-child CSS hack.
+
+      /* A faint rose wash across every impossible line. The tint says WHERE,
+         the red clue numbers say which rule was broken. */
+      if (nErr) {
+        ctx.save();
+        ctx.globalAlpha = 0.1;
+        ctx.fillStyle = PAL.rose;
+        view.rowStates.forEach((st, r) => {
+          if (st === 'error') ctx.fillRect(gutterX - NG_GAP, gutterY + r * cellStep - NG_GAP / 2, gridW, cellStep);
+        });
+        view.colStates.forEach((st, c) => {
+          if (st === 'error') ctx.fillRect(gutterX + c * cellStep - NG_GAP / 2, gutterY - NG_GAP, cellStep, gridH);
+        });
+        ctx.restore();
+      }
+
       ctx.strokeStyle = PAL.dim;
       ctx.lineWidth = 1.5;
-      /* Major separators every 5 cells, plus the far edge — the old list was
-         literally [0, 4, 8] for a fixed 8-wide board. */
-      const seps = [];
-      for (let k = 0; k <= Math.max(NG_ROWS, NG_COLS); k += 5) seps.push(k);
-      for (const k of seps) {
-        const off = gutter + k * cellStep - NG_GAP / 2;
-        ctx.beginPath(); ctx.moveTo(off, gutter - NG_GAP); ctx.lineTo(off, boardPx); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(gutter - NG_GAP, off); ctx.lineTo(boardPx, off); ctx.stroke();
+      /* Major separators every 5 cells plus the far edge, PER AXIS. The old
+         single list ran to max(rows, cols) and drew both axes to one length,
+         which on a non-square board put rules outside the grid. */
+      const axis = (n) => {
+        const out = [];
+        for (let k = 0; k <= n; k += 5) out.push(k);
+        if (out[out.length - 1] !== n) out.push(n);
+        return out;
+      };
+      for (const k of axis(NG_COLS)) {
+        const off = gutterX + k * cellStep - NG_GAP / 2;
+        ctx.beginPath(); ctx.moveTo(off, gutterY - NG_GAP); ctx.lineTo(off, yEnd); ctx.stroke();
+      }
+      for (const k of axis(NG_ROWS)) {
+        const off = gutterY + k * cellStep - NG_GAP / 2;
+        ctx.beginPath(); ctx.moveTo(gutterX - NG_GAP, off); ctx.lineTo(xEnd, off); ctx.stroke();
+      }
+
+      // One pulse of the board edge on a wrong picture or a win.
+      if (flash) {
+        ctx.strokeStyle = flash === 'err' ? PAL.rose : PAL.emerald;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(gutterX - NG_GAP - 1.5, gutterY - NG_GAP - 1.5, gridW + 3, gridH + 3);
       }
       ctx.restore();
     },
@@ -2066,17 +2341,26 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     // .fit-col: fitShell WITHOUT it clips instead of fitting — asserted by
     // the registry-fitshell self-test the moment this board is mounted.
     <div className="ng-game fit-col">
+      <div
+        className={'ng-status p6-banner ' + tone}
+        role="status"
+        aria-live="polite"
+        data-ng-tone={tone}
+      >
+        {statusText}
+      </div>
       <div className="ng-boardbox cui-frame" ref={boxRef}>
         <canvas
           ref={canvasRef}
           className="ng-canvas board-canvas"
           role="grid"
-          aria-label={`Nonogram, ${NG_COLS} by ${NG_ROWS} picture grid, ${filled} cells filled`}
+          aria-label={`Nonogram, ${NG_COLS} by ${NG_ROWS} picture grid, ${filled} of ${view.targetFilled} cells filled, ${nErr} lines not matching their clues`}
         />
       </div>
       <CuiTwin controls={controls} />
       <div className="p6-hint">
         Numbers are runs of filled cells, in order. Long-press uses the other tool.
+        {mistakes ? ` Mistakes so far: ${mistakes} (each costs 50 points).` : ''}
       </div>
     </div>
   );

@@ -291,6 +291,38 @@ function describeAppStylesheet() {
   } catch (e) { return 'introspection-failed(' + (e && e.message) + ')'; }
 }
 
+/* #182 — count the column tracks a grid-template-columns value declares, so a
+   static rule can be judged without mounting anything. Splits at the top level
+   only (parens shield minmax()/repeat() internals) and expands a numeric
+   repeat(); auto-fill / auto-fit are unbounded, so they count as "enough". */
+function countTracks(value) {
+  const v = String(value || '').trim();
+  if (!v || v === 'none') return 0;
+  const parts = [];
+  let depth = 0, cur = '';
+  for (const ch of v) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && /\s/.test(ch)) {
+      if (cur) { parts.push(cur); cur = ''; }
+    } else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  let n = 0;
+  for (const part of parts) {
+    const rep = /^repeat\(\s*([^,]+),([\s\S]*)\)$/.exec(part);
+    if (rep) {
+      const count = rep[1].trim();
+      if (/^(auto-fill|auto-fit)$/.test(count)) { n += 2; continue; }
+      const times = parseInt(count, 10);
+      n += (isNaN(times) ? 1 : times) * Math.max(1, countTracks(rep[2]));
+    } else if (/^\[/.test(part)) {
+      continue; // a line-name list is not a track
+    } else n += 1;
+  }
+  return n;
+}
+
 /* `styleReady` is passed false when scheduleSelfTests() exhausted its retry
    budget without ever seeing the app's stylesheet APPLY. In that state EVERY
    computed-style probe returns the UA default, so the touch-action sweep used
@@ -613,6 +645,50 @@ function runClientSelfTests(styleReady) {
       throw new Error('game cards are ragged: ' + Math.round(lo) + 'px ('
         + nameOf(cards[hs.indexOf(lo)]) + ') vs ' + Math.round(hi) + 'px ('
         + nameOf(cards[hs.indexOf(hi)]) + ') across ' + cards.length + ' cards');
+    }
+    return true;
+  });
+
+  /* #182 — the games grid must be at least two-up on a phone. Measured,
+     because the regression is arithmetic between two rules that never mention
+     each other: .lobby's padding sets the content width, .grid's track floor
+     sets how many fit, and a change to either can silently drop the wall back
+     to a 30-card single-column scroll. The width guard keeps this quiet on a
+     genuinely narrow frame (and while the grid is mid-mount at zero width),
+     where one column is the honest answer. */
+  checkStyled('grid-two-up', () => {
+    const el = document.querySelector('.grid');
+    if (!el) return true; // grid not mounted (in a game / on another screen)
+    const w = el.getBoundingClientRect().width;
+    if (w < 300) return true; // narrower than two 140px tiles + gap, or not laid out yet
+    const cols = getComputedStyle(el).gridTemplateColumns;
+    const tracks = (cols && cols !== 'none') ? cols.trim().split(/\s+/).length : 0;
+    if (tracks < 2) {
+      throw new Error('games grid is one column at ' + Math.round(w)
+        + 'px wide (grid-template-columns: ' + cols + ')');
+    }
+    return true;
+  });
+
+  /* The static half of grid-two-up: it fires even when the home screen isn't
+     mounted, and it names the rule rather than the symptom. Any rule whose
+     selector is exactly `.grid` — including inside a @media block — that pins
+     the wall to a single track is the #182 regression coming back. */
+  check('grid-no-single-column', () => {
+    const bad = [];
+    // Selector must be EXACTLY `.grid`: preceded by start-of-file, `}` or a
+    // media block's `{`, so `.fit-col .grid` or `.grid > .card` don't match.
+    const re = /(?:^|[{}])\s*\.grid\s*\{([^}]*)\}/g;
+    let m;
+    while ((m = re.exec(css))) {
+      const body = m[1];
+      const gm = /(^|[;\s])grid-template-columns\s*:([^;]+)/.exec(body);
+      if (!gm) continue;
+      const value = gm[2].trim();
+      if (countTracks(value) < 2) bad.push('grid-template-columns: ' + value);
+    }
+    if (bad.length) {
+      throw new Error('.grid pinned to a single column by: ' + bad.join(' | '));
     }
     return true;
   });

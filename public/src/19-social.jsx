@@ -148,7 +148,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
         <div style={{ marginBottom: '1.25rem' }}>
           <BadgeStrip
             badges={Array.isArray(profile.badges) ? profile.badges : []}
-            achievements={profile.achievements || { types: [], milestones: [] }}
+            achievements={profile.achievements || { types: [], milestones: [], stories: [] }}
             streak={isOwnProfile ? profile.stats.currentStreak : null}
             solveCount={isOwnProfile ? profile.stats.dailiesCompleted : null}
           />

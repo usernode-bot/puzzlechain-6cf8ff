@@ -1140,6 +1140,14 @@ function App() {
           isClassic: true,
           bestScore: meta && meta.bestScore,
           longestSnake: meta && meta.longestSnake,
+          /* Free-form result rows a game can add to the score breakdown
+             (Snakes & Ladders V2 reports its placement and, in a ranked
+             match, the rank points it moved). A game that reports none is
+             unchanged: the block renders nothing. */
+          extraRows: meta && meta.extraRows,
+          /* Final table for a multi-player local match: every seat with the
+             place it took and the square it stopped on. */
+          standings: meta && meta.standings,
           gameId: currentGame.id,
         });
         // Remember the round's result for the Game Menu (kept for future
@@ -2328,6 +2336,16 @@ function App() {
                   <span className="v mono">{winData.wordsSolved} / {winData.wordsTotal}</span>
                 </div>
               )}
+              {/* Free-form rows a game reports in its win meta (Snakes &
+                  Ladders V2 sends its placement, and in a ranked match the
+                  rank points it moved). A game that reports none renders
+                  nothing here, so every other game is unchanged. */}
+              {(winData.extraRows || []).map((r, i) => (
+                <div className="score-row" key={'xr' + i}>
+                  <span className="k">{r.k}</span>
+                  <span className="v mono">{r.v}</span>
+                </div>
+              ))}
               <div className="score-row">
                 <span className="k">Steps · Time</span>
                 <span className="v mono">{winData.steps} · {fmtTime(winData.timeSecs)}</span>
@@ -2368,6 +2386,21 @@ function App() {
                 </div>
               )}
             </div>
+            {/* Final table for a multi-seat local match. Seat 1 is the device's
+                own player, so its row is marked rather than left to be counted
+                out of the list. */}
+            {(winData.standings || []).length > 2 && (
+              <div className="win-standings" data-snl-standings={winData.standings.length}>
+                <div className="ws-title">Final standings</div>
+                {winData.standings.map((r) => (
+                  <div className={'ws-row' + (r.seat === 1 ? ' me' : '')} key={r.seat}>
+                    <span className="ws-place mono">{r.place}</span>
+                    <span className="ws-name">{r.label}{r.bot ? ' 🤖' : ''}</span>
+                    <span className="ws-sq mono">{r.square >= 100 ? '🏁 100' : r.square}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {isDailyResult && winData.justBadge && (
               <div className="badge-unlock">
                 <div className="bu-icon">{winData.justBadge.icon}</div>

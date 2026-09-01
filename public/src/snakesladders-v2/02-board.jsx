@@ -67,6 +67,23 @@ function cnlv2DrawBoardStatic(ctx, side, { V, isMoksha, isLegend, gildAll, skinI
   ctx.stroke();
 }
 
+/* ============================================================
+   VFX layer (particles + screen shake)
+   ============================================================
+   Both live INSIDE this component's existing rAF glide loop rather than in a
+   second canvas or a CSS animation. Two reasons: the loop already owns the
+   only per-frame paint in the game (no setState per frame — see the
+   PERFORMANCE CONTRACT below), and a CSS transform on the canvas element would
+   scale rasterised pixels and go soft, the same trap Daily Bounce's sizeCanvas
+   documents.
+
+   The loop's continue condition therefore widens from "a glide is running" to
+   "a glide OR a particle OR a shake is running". Miss that and particles paint
+   exactly one frame and freeze. */
+const SNLV2_FX_MAX = 90;      // hard cap; a stuck spawner cannot melt the frame
+const SNLV2_FX_LIFE = 520;    // ms
+const SNLV2_SHAKE_MS = 260;
+
 /* positions: array of squares, one per seat (0 = off-board). `layoutKey`
    names the static art (tier id / variant) for the cache.
 
@@ -78,8 +95,14 @@ function cnlv2DrawBoardStatic(ctx, side, { V, isMoksha, isLegend, gildAll, skinI
    setState to "animate", which did the worst of both worlds: React re-rendered
    every frame (the lag) while useCanvasBoard's deps never changed, so the
    interpolation frames never painted — pawns froze ~12% into each lerp and
-   only snapped forward on the next state change (the ghost). */
-function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot }) {
+   only snapped forward on the next state change (the ghost).
+
+   `fx` / `shake` / `slide` are one-shot signals carrying a monotonic `seq`:
+   the effect fires when the seq changes, so replaying the same kind twice in a
+   row still animates. `finishOrder` lists seat numbers in placement order and
+   is what dims a finished pawn and stamps its medal. */
+function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot,
+  finishOrder, fx, shake, slide, quiet }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const { boxW } = useFitBox(boxRef, { cols: 10, rows: 10 });
@@ -90,13 +113,23 @@ function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot }) {
   const layoutKey = [isMoksha ? 'moksha' : 'tier', isLegend ? 1 : 0, gildAll ? 1 : 0,
     Object.keys(V.jumps).join('.')].join('|');
   const posKey = positions.join(',');
+  const done = finishOrder || [];
+  const doneKey = done.join(',');
+  // The app-level motion pref, the OS pref and ?snlquiet=1 all silence the
+  // extra motion; the glide itself stays, because a pawn teleporting between
+  // squares is a correctness problem, not polish.
+  const calm = !!quiet || cgReducedMotion();
 
   // Static-layer cache; rebuilt only when an art input changes.
   const staticRef = useRef({ key: null, cv: null });
 
-  // Pawn glide state: each pawn's previous square, target square, and lerp
-  // start time. Lives in a ref — the glide never touches React state.
-  const glideRef = useRef(positions.map((p) => ({ from: p, to: p, t0: 0 })));
+  // Pawn glide state: each pawn's previous square, target square, lerp start
+  // time, and (per move) how long and with what easing. A snake slide is a
+  // longer, accelerating drop; everything else keeps the 130ms ease-out.
+  const glideRef = useRef(positions.map((p) => ({ from: p, to: p, t0: 0, ms: SNLV2_GLIDE_MS, ease: 'out' })));
+  const fxRef = useRef([]);
+  const shakeRef = useRef({ t0: 0, mag: 0 });
+  const rafRef = useRef(0);
 
   /* One painter shared by BOTH redraw paths (React-scheduled repaints on
      dep/theme/size changes, and the rAF glide loop below). Reassigned every
@@ -109,6 +142,19 @@ function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot }) {
     const inner = side - pad * 2;
     const cs = inner / 10;
     const pct = (p) => [pad + (p.x / 100) * inner, pad + (p.y / 100) * inner];
+    const now = performance.now();
+
+    /* Screen shake wraps the WHOLE frame. The canvas carries no pointer
+       handlers (every control is DOM), so nothing needs a hit-test
+       correction for the offset. */
+    const sh = shakeRef.current;
+    const sp = sh.mag ? (now - sh.t0) / SNLV2_SHAKE_MS : 2;
+    ctx.save();
+    if (sp < 1) {
+      const decay = 1 - sp;
+      ctx.translate(Math.sin(sp * Math.PI * 4) * sh.mag * decay,
+        Math.cos(sp * Math.PI * 5) * sh.mag * decay * 0.6);
+    }
 
     // Blit the cached static layer (rebuild if any art input moved).
     const key = [layoutKey, skinId, side, themeV].join('~');
@@ -119,7 +165,7 @@ function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot }) {
       cv.width = Math.max(1, Math.round(side * dpr));
       cv.height = Math.max(1, Math.round(side * dpr));
       const c2 = guardCanvasCtx(cv.getContext('2d'));
-      if (!c2) return;
+      if (!c2) { ctx.restore(); return; }
       c2.setTransform(dpr, 0, 0, dpr, 0, 0);
       cnlv2DrawBoardStatic(c2, side, { V, isMoksha, isLegend, gildAll, skinId });
       st = staticRef.current = { key, cv };
@@ -130,14 +176,14 @@ function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot }) {
     // settled pawn always sits EXACTLY on its square, never mid-lerp).
     const g = glideRef.current.length === seats
       ? glideRef.current
-      : positions.map((p) => ({ from: p, to: p, t0: 0 }));
-    const now = performance.now();
+      : positions.map((p) => ({ from: p, to: p, t0: 0, ms: SNLV2_GLIDE_MS, ease: 'out' }));
     const pos = g.map((gp) => {
-      const p = Math.min(1, (now - gp.t0) / 130);
-      const e = 1 - (1 - p) * (1 - p);
-      const [fx, fy] = pct(cnlCenterPct(gp.from));
+      const p = Math.min(1, (now - gp.t0) / (gp.ms || SNLV2_GLIDE_MS));
+      // A snake drop accelerates (ease-in); everything else settles (ease-out).
+      const e = gp.ease === 'in' ? p * p : 1 - (1 - p) * (1 - p);
+      const [fx0, fy0] = pct(cnlCenterPct(gp.from));
       const [tx, ty] = pct(cnlCenterPct(gp.to));
-      return [fx + (tx - fx) * e, fy + (ty - fy) * e];
+      return [fx0 + (tx - fx0) * e, fy0 + (ty - fy0) * e];
     });
     // Co-located pawns fan out in a small ring so all six stay visible
     // even at the 320px minimum board width.
@@ -155,31 +201,60 @@ function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot }) {
     }
     const ph = cs * 0.85; // chess pieces ~1.6x the old token radius
     for (let i = 0; i < seats; i++) {
+      const place = done.indexOf(i + 1);
+      ctx.save();
+      // A finished pawn stays on the board (it is the proof of the result) but
+      // steps back visually so the live race still reads at a glance.
+      if (place >= 0) ctx.globalAlpha = 0.5;
       cnlv2DrawPawn(ctx, pos[i][0], pos[i][1] - ph * 0.08, ph, i + 1);
+      ctx.restore();
+      if (place >= 0) cnlv2DrawPlaceChip(ctx, pos[i][0], pos[i][1] - ph * 0.72, cs, place + 1);
     }
+
+    // Particles last, over the pawns.
+    const parts = fxRef.current;
+    for (let i = 0; i < parts.length; i++) {
+      const pt = parts[i];
+      const age = (now - pt.t0) / SNLV2_FX_LIFE;
+      if (age >= 1) continue;
+      ctx.save();
+      ctx.globalAlpha = (1 - age) * pt.alpha;
+      ctx.fillStyle = palOf(pt.color, '#C9A227');
+      const px = pt.x + pt.vx * age * SNLV2_FX_LIFE;
+      const py = pt.y + pt.vy * age * SNLV2_FX_LIFE + 0.00045 * pt.g * Math.pow(age * SNLV2_FX_LIFE, 2);
+      if (pt.spark) {
+        // 4-point sparkle: two crossed slivers read brighter than a dot.
+        const r = pt.size * (1 - age * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(px - r, py); ctx.lineTo(px, py - r * 0.35);
+        ctx.lineTo(px + r, py); ctx.lineTo(px, py + r * 0.35);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(px, py - r); ctx.lineTo(px + r * 0.35, py);
+        ctx.lineTo(px, py + r); ctx.lineTo(px - r * 0.35, py);
+        ctx.closePath(); ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(px, py, Math.max(0.5, pt.size * (1 - age * 0.6)), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
     ctx.textBaseline = 'top';
   };
 
   const sideRef = useRef(side);
   sideRef.current = side;
 
-  /* Position changes update the glide targets, then a self-terminating rAF
-     loop paints the canvas directly at display rate until every lerp lands.
-     The loop's last pass paints with t = 1 (the `some` check runs AFTER the
-     paint), so the animation always ends with pawns pinned to their squares. */
-  useEffect(() => {
-    let g = glideRef.current;
-    if (g.length !== seats) {
-      glideRef.current = positions.map((p) => ({ from: p, to: p, t0: 0 }));
-      return;
-    }
-    let changed = false;
-    positions.forEach((pos, i) => {
-      if (g[i].to !== pos) { g[i] = { from: g[i].to, to: pos, t0: performance.now() }; changed = true; }
-    });
-    if (!changed) return;
-    let raf = 0;
+  /* The single animation driver. Every source of motion (glide, particles,
+     shake) calls kick(); the loop terminates itself once all three are idle,
+     so an idle board costs zero frames. */
+  const kickRef = useRef(null);
+  kickRef.current = () => {
+    if (rafRef.current) return;
     const step = () => {
+      rafRef.current = 0;
       const canvas = canvasRef.current;
       const paint = paintRef.current;
       if (!canvas || !paint) return;
@@ -191,24 +266,92 @@ function SnLV2Board({ V, isMoksha, isLegend, gildAll, SK, positions, vsBot }) {
       ctx.clearRect(0, 0, s, s);
       paint(ctx);
       const now = performance.now();
-      if (glideRef.current.some((gp) => now - gp.t0 < 140)) raf = requestAnimationFrame(step);
+      const gliding = glideRef.current.some((gp) => now - gp.t0 < (gp.ms || SNLV2_GLIDE_MS) + 10);
+      // Retiring dead particles here (not in the painter) keeps the painter
+      // pure — useCanvasBoard calls it too, on React's schedule.
+      fxRef.current = fxRef.current.filter((pt) => now - pt.t0 < SNLV2_FX_LIFE);
+      const shaking = shakeRef.current.mag && (now - shakeRef.current.t0) < SNLV2_SHAKE_MS;
+      if (gliding || fxRef.current.length || shaking) rafRef.current = requestAnimationFrame(step);
     };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
+    rafRef.current = requestAnimationFrame(step);
+  };
+
+  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
+
+  /* Position changes update the glide targets, then the shared loop paints the
+     canvas directly at display rate until every lerp lands. The loop's last
+     pass paints with t = 1 (the liveness check runs AFTER the paint), so the
+     animation always ends with pawns pinned to their squares. */
+  useEffect(() => {
+    const g = glideRef.current;
+    if (g.length !== seats) {
+      glideRef.current = positions.map((p) => ({ from: p, to: p, t0: 0, ms: SNLV2_GLIDE_MS, ease: 'out' }));
+      return;
+    }
+    let changed = false;
+    positions.forEach((pos, i) => {
+      if (g[i].to === pos) return;
+      const useSlide = slide && slide.seat === i + 1 && !calm;
+      g[i] = {
+        from: g[i].to,
+        to: pos,
+        t0: performance.now(),
+        ms: useSlide ? slide.ms : SNLV2_GLIDE_MS,
+        ease: useSlide ? slide.ease : 'out',
+      };
+      changed = true;
+    });
+    if (!changed) return;
+    if (kickRef.current) kickRef.current();
   }, [posKey, seats]);
+
+  // Particle burst. `fx.seq` is the trigger, so two ladders in a row both fire.
+  useEffect(() => {
+    if (!fx || !fx.kind || calm) return;
+    const s = sideRef.current;
+    if (s < 80) return;
+    const pad = 4, inner = s - pad * 2, cs = inner / 10;
+    const c = cnlCenterPct(fx.square || 1);
+    const cx = pad + (c.x / 100) * inner, cy = pad + (c.y / 100) * inner;
+    const spec = fx.kind === 'ladder'
+      ? { n: 18, spark: true, colors: ['gold', 'emerald'], speed: 0.075, g: -0.02, size: cs * 0.13, alpha: 1 }
+      : { n: 14, spark: false, colors: ['muted', 'border'], speed: 0.045, g: 0.06, size: cs * 0.1, alpha: 0.8 };
+    const add = [];
+    for (let i = 0; i < spec.n; i++) {
+      const ang = (i / spec.n) * Math.PI * 2 + Math.random() * 0.5;
+      const sp = spec.speed * (0.5 + Math.random());
+      add.push({
+        x: cx, y: cy,
+        vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - (spec.spark ? 0.02 : 0),
+        g: spec.g, t0: performance.now(), alpha: spec.alpha,
+        color: spec.colors[i % spec.colors.length],
+        size: spec.size * (0.6 + Math.random() * 0.7), spark: spec.spark,
+      });
+    }
+    fxRef.current = fxRef.current.concat(add).slice(-SNLV2_FX_MAX);
+    if (kickRef.current) kickRef.current();
+  }, [fx && fx.seq]);
+
+  useEffect(() => {
+    if (!shake || !shake.mag || calm) return;
+    shakeRef.current = { t0: performance.now(), mag: shake.mag };
+    if (kickRef.current) kickRef.current();
+  }, [shake && shake.seq]);
 
   // React-scheduled repaints: mount, resize, theme flip, board/skin change,
   // and a safety repaint on any position change (idempotent with the loop).
   useCanvasBoard(canvasRef, {
     width: side,
     height: side,
-    deps: [posKey, layoutKey, skinId, side, seats],
+    deps: [posKey, layoutKey, skinId, side, seats, doneKey],
     draw: (ctx) => { const f = paintRef.current; if (f) f(ctx); },
   });
 
   const seatDesc = positions.map((p, i) => {
     const piece = (i + 1) % 2 === 1 ? 'knight' : 'rook';
     const extra = (i === 1 ? ', diamond emblem' : '') + (vsBot && i === 1 ? ', bot' : '');
+    const place = done.indexOf(i + 1);
+    if (place >= 0) return `seat ${i + 1} (${piece}${extra}) finished in place ${place + 1}`;
     return `seat ${i + 1} (${piece}${extra}) on square ${p || 0}`;
   }).join(', ');
 

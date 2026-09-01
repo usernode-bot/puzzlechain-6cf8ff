@@ -182,6 +182,12 @@ const CLASSIC_MODE_META = {
    screen has to speak for every game. */
 const classicModeMeta = (game, m) => {
   const base = CLASSIC_MODE_META[m];
+  /* A registry entry may restate one of its own modes when the shared copy
+     reads wrong for it. Snakes & Ladders V2's "2p" is not two players at a
+     table any more, it is a 2 to 6 seat roster, so "Local Match" says what it
+     is where "Pass and Play" no longer does. */
+  const over = (game.modeMeta || {})[m];
+  if (over) return { icon: over.icon || base.icon, name: over.name || base.name, desc: over.desc || base.desc };
   if (m !== 'online' || !(game.modes || []).includes('bot')) return base;
   return { icon: base.icon, name: 'Online', desc: 'Play a friend via room code — take turns on one board' };
 };
@@ -194,14 +200,29 @@ const classicModeMeta = (game, m) => {
 // same Board-style sub-section for every entry point — first launch, the
 // opponent screen, and "New Game" from the ☰ menu.
 function ClassicModePicker({ game, onPlay, onGlossary }) {
-  const [mode, setMode] = useState(null);
+  /* Optional registry-declared deep-link preset (`game.pickerPreset`), read
+     once. Sub-sections like the roster block only exist once a mode is chosen,
+     and a navigation-driven check or screenshot cannot choose one, so a game
+     may declare a link that preselects the mode along with its options. */
+  const [preset] = useState(() => (game.pickerPreset ? game.pickerPreset() : null) || {});
+  const [mode, setMode] = useState(preset.mode || null);
   /* #176 — bot strength and local seat count. Both are per-mode options that
      only make sense once a mode is chosen, so they render under the picker
      rather than beside it. `medium` is the default rather than `hard`: the
      bots were all previously single-strength AND at full depth, which is the
      thing players were actually complaining about. */
   const [botLevel, setBotLevel] = useState('medium');
-  const [seats, setSeats] = useState(2);
+  const [seats, setSeats] = useState(preset.seats || 2);
+  /* Per-seat Human/Bot assignment (`game.localRoster`). Stored long — six
+     entries regardless of the current seat count — so dropping to 3 seats and
+     back to 5 returns the assignments the player made rather than resetting
+     them. */
+  const [roster, setRoster] = useState(() => {
+    const base = ['human', 'bot', 'bot', 'bot', 'bot', 'bot'];
+    (preset.roster || []).forEach((r, i) => { if (i < 6) base[i] = r; });
+    return base;
+  });
+  const [ranked, setRanked] = useState(!!preset.ranked);
   const [onlineAction, setOnlineAction] = useState(null);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
@@ -218,11 +239,35 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
   const showDifficulty = dp && mode !== 'online'
     && !(vp && (dp.hideForVariants || []).indexOf(variant) !== -1);
 
+  /* The roster the picker will actually hand over: the stored assignments cut
+     to the chosen seat count, with the guarantee that seat 1 is a human. A
+     hot-seat table of nothing but bots is a screensaver. */
+  const showRoster = mode === '2p' && !!game.localRoster;
+  const seatRoles = [];
+  for (let i = 0; i < seats; i++) seatRoles.push(roster[i] === 'bot' ? 'bot' : 'human');
+  if (!seatRoles.some((r) => r === 'human')) seatRoles[0] = 'human';
+  const humanSeats = seatRoles.filter((r) => r === 'human').length;
+  const rk = game.rankedLocal;
+  // The gate is HUMAN seats, not seats: six players where five are bots is a
+  // practice game, and a ladder that counted it would be worth nothing.
+  const rankedEligible = !!rk && showRoster && humanSeats >= rk.minHumans;
+  const rankedOn = ranked && rankedEligible;
+  const setSeatRole = (i, role) => {
+    const next = roster.slice();
+    while (next.length < 6) next.push('bot');
+    next[i] = role;
+    // Refuse the change that empties the table of humans rather than silently
+    // rewriting some other seat behind the player's back.
+    if (!next.slice(0, seats).some((r) => r === 'human')) return;
+    setRoster(next);
+  };
+
   const handlePlay = async () => {
     if (!mode) return;
     const variantOpts = vp ? { variant } : {};
     const diffOpts = showDifficulty ? { difficulty } : {};
-    if (mode !== 'online') { onPlay(mode, { botLevel, seats, ...diffOpts, ...variantOpts }); return; }
+    const rosterOpts = showRoster ? { roster: seatRoles, ranked: rankedOn } : {};
+    if (mode !== 'online') { onPlay(mode, { botLevel, seats, ...rosterOpts, ...diffOpts, ...variantOpts }); return; }
     /* Mancala's rooms live under their own table and their own routes, which
        is the second reason it had its own picker. `roomApiBase` is the whole
        accommodation: the flow, the copy and the error handling are shared. */
@@ -302,6 +347,37 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
               className={'mnc-difficulty-pill' + (seats === n ? ' active' : '')}
               onClick={() => setSeats(n)}>{n} players</button>
           ))}
+        </div>
+      )}
+      {/* Who is in each seat. One row per seat, two pills per row, so the
+          whole table reads at a glance instead of hiding behind a count. */}
+      {showRoster && (
+        <div className="cnl-variant-block cnlv2-roster-block">
+          <div className="cnl-variant-label">{game.localRoster.label || 'Seats'}</div>
+          {seatRoles.map((role, i) => (
+            <div className="cnlv2-roster-row" key={i}>
+              <span className="cnlv2-roster-seat">P{i + 1}</span>
+              <button className={'mnc-difficulty-pill' + (role === 'human' ? ' active' : '')}
+                onClick={() => setSeatRole(i, 'human')}>👤 Human</button>
+              <button className={'mnc-difficulty-pill' + (role === 'bot' ? ' active' : '')}
+                onClick={() => setSeatRole(i, 'bot')}>🤖 Bot</button>
+            </div>
+          ))}
+          {rk && (
+            <div className="cnlv2-ranked-row">
+              <button
+                className={'mnc-difficulty-pill cnlv2-ranked-toggle' + (rankedOn ? ' active' : '') + (rankedEligible ? '' : ' cnlv2-diff-locked')}
+                aria-pressed={rankedOn ? 'true' : 'false'}
+                onClick={() => { if (rankedEligible) setRanked(!ranked); }}>
+                {rankedOn ? '🏆 Ranked Match: on' : '🏆 Ranked Match'}
+              </button>
+              <span className="cnl-variant-note cnlv2-ranked-note">
+                {rankedEligible
+                  ? (rk.note || 'Your placement moves your rank.')
+                  : (rk.lockNote || 'Needs ' + rk.minHumans + '+ human players')}
+              </span>
+            </div>
+          )}
         </div>
       )}
       {showDifficulty && (

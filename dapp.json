@@ -1365,6 +1365,21 @@
       "name": "Arcade deep link mounts a board",
       "path": "/?game=wordsprint&pmode=arcade&band=hard&play=1",
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
+    },
+    {
+      "name": "Band banner shows the next band",
+      "path": "/?advance=1",
+      "expectSelector": ".adv-banner-band"
+    },
+    {
+      "name": "Auto-advance offers Start now and Back to the ladder",
+      "path": "/?advance=1",
+      "expectSelector": ".adv-actions .tappable"
+    },
+    {
+      "name": "End of ladder shows a completion card",
+      "path": "/?advance=complete",
+      "expectText": "Ladder complete"
     }
   ],
   "visibility": {

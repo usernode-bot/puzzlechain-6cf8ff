@@ -2724,6 +2724,96 @@ ${emitTapHighlightRules()}
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
+/* ---- #185 — between-bands auto-advance overlay ----
+   z-index 55 sits it above the win overlay (50): cancelling swaps one for the
+   other, so both exist for a frame. Colours come from tokens and ca() only —
+   an alpha byte concatenated onto a var() token is not a colour at all (see
+   the token-alpha-concat self-test). */
+.adv-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--c-scrim);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 55;
+  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+.adv-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 18px;
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 20px 50px var(--c-shadow-lg);
+  animation: advPop 0.24s ease-out;
+}
+.adv-tally-label {
+  color: ${C.muted};
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.adv-tally-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: ${C.gold};
+  line-height: 1.1;
+  margin: 0.3rem 0 0.35rem;
+  animation: advPop 0.34s ease-out;
+}
+.adv-note { color: ${C.muted}; font-size: 0.82rem; line-height: 1.45; }
+.adv-next {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid ${C.border};
+}
+.adv-banner {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.45rem;
+  background: ${ca('accent','1f')};
+  border: 1px solid ${ca('accent','44')};
+  border-radius: 12px;
+  padding: 0.6rem 0.9rem;
+}
+.adv-banner-band { font-size: 1.3rem; font-weight: 700; color: ${C.accent}; }
+.adv-banner-of { font-size: 0.85rem; color: ${C.muted}; }
+.adv-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+.adv-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: ${C.text};
+  min-width: 1.3rem;
+  display: inline-block;
+  animation: advCount 0.85s ease-out;
+}
+.adv-crown { font-size: 2.6rem; }
+.adv-done-title { font-size: 1.4rem; font-weight: 700; margin: 0.4rem 0 0.55rem; }
+.adv-actions { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.35rem; }
+.adv-actions .primary-btn { margin: 0; }
+@keyframes advPop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes advCount {
+  from { transform: scale(1.5); opacity: 0.35; }
+  to { transform: scale(1); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cg-sheet { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
@@ -2738,6 +2828,9 @@ ${emitTapHighlightRules()}
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed] { transform: none !important; }
+  /* #185 — the between-bands overlay still counts down; it just stops
+     bouncing while it does. */
+  .adv-card, .adv-tally-num, .adv-count { animation: none !important; }
 }
 
 /* ---- Knight's Tour ---- */

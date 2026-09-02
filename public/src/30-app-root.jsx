@@ -141,6 +141,14 @@ function App() {
   const dismissWhatsNew = () => setWnDismissed(true);
   // Incremented to trigger MinesweeperGame reset on Play Again
   const [playAgainKey, setPlayAgainKey] = useState(0);
+  /* #185 — auto-advance between Ladder bands. One object drives the whole
+     overlay: { gameId, phase, fromBand, toBand, total, awarded, firstClear,
+     secs, win }, where phase is 'tally' | 'count' | 'complete' and `win` is
+     the result card to fall back to if the player cancels. null = no overlay.
+     Every timer that drives it lives in the ref so ANY exit path can clear all
+     of them at once (see clearAdvanceTimers). */
+  const [advance, setAdvance] = useState(null);
+  const advanceTimers = useRef([]);
   // Classic Games — Game Menu state. `classicGameMode` is the active mode of
   // the current classic game ('bot' | '2p' | 'online' | null); `classicLastResult`
   // is the most recent finished classic result so the menu's Post to Feed works
@@ -287,7 +295,21 @@ function App() {
      covers dailies that opted in and shell:'self' games bypass it entirely, so
      locking the document is what makes "nothing scrolls during play" true for
      all 33 games. Released the moment a result screen appears (that scrolls). */
-  useScrollLock(screen === 'game' && !!currentGame && !winData && !loseData && !practiceResult);
+  useScrollLock((screen === 'game' && !!currentGame && !winData && !loseData && !practiceResult) || !!advance);
+
+  /* #185 — Escape leaves the countdown (falling back to the ordinary result
+     card), and any unmount clears every pending timer so nothing can start a
+     band on a screen the player has left. */
+  useEffect(() => {
+    if (!advance) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') dismissAdvance(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+  useEffect(() => () => {
+    advanceTimers.current.forEach(t => clearTimeout(t));
+    advanceTimers.current = [];
+  }, []);
 
   // Per-run daily move log (phase 2). Every daily game feeds move events with
   // client timestamps into this ref — the Daily Tile Match via its native
@@ -732,8 +754,12 @@ function App() {
     if (loading || deepLinkedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const gid = params.get('game');
-    if (!gid) return;
-    const g = GAMES.find(x => x.id === gid);
+    /* ?advance= is the one link that does not need a ?game=: it previews
+       shell-owned chrome, not a particular game, so a bare /?advance=1 picks a
+       representative ladder game rather than dropping the visitor on home. */
+    const advParam = params.get('advance');
+    if (!gid && !advParam) return;
+    const g = GAMES.find(x => x.id === (gid || 'sudoku'));
     if (!g) return;
     deepLinkedRef.current = true;
     // ?mode= / ?mmode= both pin a classic game's mode (#144: land straight in a
@@ -754,6 +780,15 @@ function App() {
        mode itself. */
     if (params.get('result') === '1') {
       openResultDemo(g);
+      setHowToGame(null);
+      return;
+    }
+    /* #185 — ?advance=1|count|complete opens the between-bands overlay. Same
+       reasoning as ?result=1 above, and checked in the same place: it must
+       come before the pre-launch / mode-select branches or a game carrying a
+       chooser would surface that instead. */
+    if (advParam) {
+      openAdvanceDemo(g, advParam);
       setHowToGame(null);
       return;
     }
@@ -1053,7 +1088,113 @@ function App() {
     if (ok && body) {
       setStoryProgress(prev => ({ ...prev, [gameId]: { cleared: body.cleared, total: body.total } }));
       if (body.awarded) setTotalScore(t => t + body.awarded);
+      /* Returned, not swallowed: the auto-advance tally needs this exact
+         response ({ awarded, firstClear, cleared, total }) and re-deriving it
+         client-side would be a second copy of the server's award rule. */
+      return body;
     }
+    return null;
+  };
+
+  /* ============================================================
+     #185 — auto-advance between Ladder bands
+     ------------------------------------------------------------
+     Clearing a band used to drop the ordinary result card, and the only way on
+     was Back to the ladder, then the pre-game screen, then Play. A band's board
+     is a pure function of (gameId, band) (see modeSeed), so nothing has to be
+     fetched to start the next one: the shell moves the band and remounts.
+     Two things make that work, both easy to get wrong:
+       - A story game caches its board in its own useRef at mount, so moving
+         `storyBand` alone repaints nothing. The three <GameComponent> call
+         sites carry a story-scoped React `key`; changing the key IS the
+         remount. Note the `.game-body` wrapper stays unconditional either
+         way (see #158) — the key changes, the element does not.
+       - Every timer goes through advTimer so any exit (Start now, Back to the
+         ladder, Escape, backdrop, unmount) can clear all of them. A stray
+         timer would start a band the player had just walked away from.
+     ============================================================ */
+  const ADV_TALLY_MS = 1100;
+  const ADV_COUNT_SECS = 3;
+  const clearAdvanceTimers = () => {
+    advanceTimers.current.forEach(t => clearTimeout(t));
+    advanceTimers.current = [];
+  };
+  const advTimer = (fn, ms) => { advanceTimers.current.push(setTimeout(fn, ms)); };
+  // Leave the overlay for a destination the caller supplies (Start now, Back
+  // to the ladder). No result card: the player chose where to go.
+  const cancelAdvance = () => { clearAdvanceTimers(); setAdvance(null); };
+  /* Escape / backdrop means "out of the countdown", not "out of the result" —
+     so fall back to the ordinary win card, where the score breakdown, the
+     share CTA and the ladder button all still live. */
+  const dismissAdvance = () => {
+    clearAdvanceTimers();
+    if (advance && advance.win) setWinData(advance.win);
+    setAdvance(null);
+  };
+  const startAdvanceBand = (band) => {
+    clearAdvanceTimers();
+    setAdvance(null);
+    setWinData(null); setLoseData(null); setPracticeResult(null);
+    setStepCount(0);
+    if (typeof band === 'number') setStoryBand(band);
+    // playAgainKey is part of the board key, so bumping it re-deals even when
+    // the band is unchanged — which is what "Try this band again" needs.
+    setPlayAgainKey(k => k + 1);
+    cgSound('click', 1.3);
+  };
+  const backToLadder = () => {
+    clearAdvanceTimers();
+    setAdvance(null);
+    if (currentGame) launchGame(currentGame, 'story');
+  };
+  const runAdvanceSequence = (info) => {
+    clearAdvanceTimers();
+    setAdvance({ ...info, phase: 'tally', secs: ADV_COUNT_SECS });
+    cgSound('blevel'); cgHaptic(20);
+    advTimer(() => setAdvance(a => (a ? { ...a, phase: 'count' } : a)), ADV_TALLY_MS);
+    for (let i = 1; i < ADV_COUNT_SECS; i++) {
+      advTimer(() => {
+        cgSound('click', 1 + i * 0.15);
+        setAdvance(a => (a ? { ...a, secs: ADV_COUNT_SECS - i } : a));
+      }, ADV_TALLY_MS + i * 1000);
+    }
+    advTimer(() => startAdvanceBand(info.toBand), ADV_TALLY_MS + ADV_COUNT_SECS * 1000);
+  };
+  /* Deep-linked preview of the overlay, for screenshots and proposal checks:
+     ?advance=1 freezes it on the countdown, ?advance=count runs the real
+     sequence, ?advance=complete shows the end-of-ladder card. Inert — practice
+     mode, no claim, no clear, no win payload — so it needs no seed data, is
+     deliberately NOT staging-gated, and the "before" shot can come from
+     production. */
+  const openAdvanceDemo = (game, kind) => {
+    if (!game) return;
+    clearAdvanceTimers();
+    setCurrentGame(game);
+    setPlayMode('story');
+    setPracticeMode(true);
+    setReviewMode(false);
+    setLockedReview(false);
+    setWinData(null); setLoseData(null); setPracticeResult(null);
+    setPreLaunchGame(null); setClassicGameMode(null); setClassicGameModeOpts(null);
+    setStepCount(0);
+    setScreen('game');
+    const total = ((storyProgress[game.id] || {}).total) || 6;
+    if (kind === 'complete') {
+      setStoryBand(total - 1);
+      setAdvance({
+        gameId: game.id, phase: 'complete', fromBand: total - 1, toBand: null,
+        total, awarded: 571, firstClear: true, secs: 0, win: null,
+      });
+      return;
+    }
+    const from = Math.min(2, Math.max(0, total - 2));
+    setStoryBand(from);
+    const info = {
+      gameId: game.id, fromBand: from, toBand: from + 1, total,
+      awarded: 286, firstClear: true, win: null,
+    };
+    if (kind === 'count') { runAdvanceSequence(info); return; }
+    setAdvance({ ...info, phase: 'count', secs: ADV_COUNT_SECS });
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
@@ -1081,13 +1222,30 @@ function App() {
        the shell decides what that means in the mode it was opened in. */
     if (playMode === 'story') {
       const bandIdx = typeof storyBand === 'number' ? storyBand : 0;
-      await handleBandCleared(bandIdx, { score, steps, timeSecs });
-      const total = (storyProgress[currentGame.id] || {}).total || 0;
-      setWinData({
+      const res = await handleBandCleared(bandIdx, { score, steps, timeSecs });
+      const total = (res && res.total) || (storyProgress[currentGame.id] || {}).total || 0;
+      const winPayload = {
         score, bonus: 0, finalScore: score, steps, timeSecs,
         multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
         modeLabel: 'Story', bandIndex: bandIdx, bandTotal: total,
-      });
+      };
+      /* #185 — the ladder carries you on. Two cases keep the old card: a
+         guest has no ladder at all (GET /api/story is auth-gated, so there is
+         no total to walk), and a practice replay records nothing, so there is
+         nothing to advance. */
+      if (!total || practiceMode || !authOk) { setWinData(winPayload); return; }
+      const info = {
+        gameId: currentGame.id, fromBand: bandIdx, toBand: bandIdx + 1, total,
+        awarded: (res && res.awarded) || 0, firstClear: !!(res && res.firstClear),
+        win: winPayload,
+      };
+      if (bandIdx + 1 >= total) {
+        clearAdvanceTimers();
+        cgSound('win'); cgHaptic(30);
+        setAdvance({ ...info, phase: 'complete', toBand: null, secs: 0 });
+        return;
+      }
+      runAdvanceSequence(info);
       return;
     }
     if (playMode === 'arcade') {
@@ -1615,6 +1773,13 @@ function App() {
       band: playMode === 'arcade' ? arcadeBandId : playMode === 'story' ? storyBand : null,
       onBandCleared: playMode === 'story' ? handleBandCleared : undefined,
     };
+    /* #185 — a story game caches its board in a useRef at mount, so moving the
+       band is only visible if the component REMOUNTS. This key is that remount,
+       and it is scoped to story on purpose: every other mode keeps its identity
+       across a re-render exactly as before. playAgainKey rides along so "Try
+       this band again" re-deals the same band. */
+    const bodyKey = playMode === 'story'
+      ? `story-${currentGame.id}-${storyBand}-${playAgainKey}` : undefined;
     /* ONLY A DAILY RESUMES. The progress row is the daily attempt row — it is
        keyed by (user, game, UTC day) and exists only once /start has claimed
        the day. A story or arcade run has no such row, so saving into it 409s
@@ -1629,6 +1794,7 @@ function App() {
         // Full-screen, gesture-first game that renders its own ClassicShell.
         return (
           <GameComponent
+            key={bodyKey}
             {...modeProps}
             game={currentGame}
             onBack={() => backToLobby('classic')}
@@ -1677,6 +1843,7 @@ function App() {
                 max-width), so board + status + legend fit at 390x844. */}
             <div className="cg-stage cg-scroll">
               <GameComponent
+                key={bodyKey}
                 {...modeProps}
                 onWin={handleWin}
                 onLose={handleLose}
@@ -1729,6 +1896,7 @@ function App() {
               )}
             </div>
             <GameComponent
+              key={bodyKey}
               {...modeProps}
               onWin={handleWin}
               onLose={handleLose}
@@ -2295,8 +2463,75 @@ function App() {
           marker at all — the one case where "this does not count" is least
           obvious, because the board looks exactly like the scored one. Pinned
           rather than in-flow so it needs no cooperation from a shell. */}
-      {screen === 'game' && practiceMode && !winData && !loseData && !practiceResult && (
+      {screen === 'game' && practiceMode && !winData && !loseData && !practiceResult && !advance && (
         <div className="practice-ribbon pinned">🎲 Practice — not scored</div>
+      )}
+
+      {/* #185 — between-bands overlay. A sibling of .game-body, like the
+          practice ribbon above, so it sits over all three shells and the
+          wrapper itself stays untouched. The gameId guard is the same one the
+          practice card uses: a result must belong to the mounted game. */}
+      {screen === 'game' && advance && currentGame && advance.gameId === currentGame.id && (
+        <div
+          className="adv-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={advance.phase === 'complete' ? 'Ladder complete' : 'Next band'}
+          onPointerDown={(e) => { if (e.target === e.currentTarget) dismissAdvance(); }}
+        >
+          {advance.phase === 'complete' ? (
+            <div className="adv-card">
+              <div className="adv-crown">🏆</div>
+              <div className="adv-done-title">Ladder complete</div>
+              <div className="adv-note">
+                You cleared all {advance.total} bands in {currentGame.name}.
+                Replay any band for practice, or try Arcade for a fresh board every run.
+              </div>
+              <div className="adv-actions">
+                <button className="primary-btn tappable" {...tapProps(() => backToLadder())}>
+                  📖 Back to the ladder
+                </button>
+                <button className="primary-btn review-btn tappable" {...tapProps(() => { cancelAdvance(); backToLobby(); })}>
+                  Back to Lobby
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="adv-card">
+              <div className="adv-tally">
+                <div className="adv-tally-label">Band {advance.fromBand + 1} cleared</div>
+                <div className="adv-tally-num" aria-live="polite">
+                  {advance.awarded > 0 ? '+' + advance.awarded : '+0'}
+                </div>
+                <div className="adv-note">
+                  {advance.awarded > 0
+                    ? 'points added to your total'
+                    : 'Replays do not pay. Points land on the first clear.'}
+                </div>
+              </div>
+              {advance.phase === 'count' && (
+                <div className="adv-next">
+                  <div className="adv-banner">
+                    <span className="adv-banner-band">Band {advance.toBand + 1}</span>
+                    <span className="adv-banner-of">of {advance.total}</span>
+                  </div>
+                  <div className="adv-count-row">
+                    <span className="adv-note">Starting in</span>
+                    <span className="adv-count" key={advance.secs}>{advance.secs}</span>
+                  </div>
+                </div>
+              )}
+              <div className="adv-actions">
+                <button className="primary-btn tappable" {...tapProps(() => startAdvanceBand(advance.toBand))}>
+                  ▶ Start now
+                </button>
+                <button className="primary-btn review-btn tappable" {...tapProps(() => backToLadder())}>
+                  📖 Back to the ladder
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {screen === 'game' && winData && !reviewMode && (() => {
@@ -2597,7 +2832,15 @@ function App() {
                 👁 View board
               </button>
             )}
-            {!loseData.isClassic && currentGame && (
+            {/* #185 — a story band is a fixed, retryable deal, so the useful
+                move after a loss is another go at THIS band, not the ladder
+                screen. Remounts through the same key the auto-advance uses. */}
+            {loseData.modeLabel === 'Story' && currentGame && (
+              <button className="primary-btn review-btn" onClick={() => startAdvanceBand(storyBand)}>
+                🔁 Try this band again
+              </button>
+            )}
+            {!loseData.isClassic && currentGame && playMode !== 'story' && (
               <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>

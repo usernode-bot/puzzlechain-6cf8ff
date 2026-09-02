@@ -797,7 +797,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         )}
         {isStory && bandTotal > 0 && (
           <div className="pregame-stat">
-            <div className="l">Cleared</div>
+            <div className="l">Levels cleared</div>
             <div className="v mono">{bandCleared}/{bandTotal}</div>
           </div>
         )}
@@ -820,18 +820,18 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         </div>
       )}
       {isStory && bandTotal > 0 && (
-        <div className="pregame-bands" role="group" aria-label="Choose a band">
-          <div className="pregame-bands-label">Band</div>
+        <div className="pregame-bands" role="group" aria-label="Choose a level">
+          <div className="pregame-bands-label">Level</div>
           <div className="pregame-band-row">
             {Array.from({ length: bandTotal }, (_, i) => {
               const done = i < bandCleared;
-              const locked = i > bandCleared;   // the ladder is walked in order
+              const locked = i > bandCleared;   // levels are walked in order
               return (
                 <button
                   key={i}
                   className={'pregame-band tappable' + (i === storyBand ? ' on' : '') + (done ? ' done' : '') + (locked ? ' locked' : '')}
                   disabled={locked}
-                  aria-label={`Band ${i + 1}${done ? ', cleared' : ''}`}
+                  aria-label={`Level ${i + 1}${done ? ', cleared' : ''}`}
                   {...tapProps(() => { if (!locked) onStoryBand && onStoryBand(i); })}
                 >{done ? '✓' : i + 1}</button>
               );
@@ -839,8 +839,8 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
           </div>
           <div className="pregame-band-note">
             {bandCleared >= bandTotal
-              ? 'Ladder complete — replay any band for practice. Points are paid once, on first clear.'
-              : 'Clearing a band for the first time pays. Replays are for practice.'}
+              ? 'All levels cleared. Replay any level for practice. Points are paid once, on first clear.'
+              : 'Clearing a level for the first time pays. Replays are for practice.'}
           </div>
         </div>
       )}

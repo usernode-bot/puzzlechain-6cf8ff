@@ -104,8 +104,8 @@ function OnlineRoomSetup({ gameId, onReady }) {
       )}
       <div className="brg-intro">
         {multiSeat
-          ? <>🌐 Online Ludo — 2, 3, or 4 players via room code. 2-player wins count on the <strong>Ladder</strong>.</>
-          : <>🌐 Online head-to-head — play a friend via room code. Wins count on the <strong>Ladder</strong>.</>}
+          ? <>🌐 Online Ludo — 2, 3, or 4 players via room code. 2-player wins count on the <strong>Rating Ladder</strong>.</>
+          : <>🌐 Online head-to-head — play a friend via room code. Wins count on the <strong>Rating Ladder</strong>.</>}
       </div>
       <div className="mnc-online-actions">
         <div className="mnc-mode-sub">
@@ -847,7 +847,7 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
     const other = myPlayerNum === 1 ? 2 : 1;
     const msg = isWaitingRoom
       ? 'Close this room? Nobody has joined yet, so nothing is rated.'
-      : 'End this game? Your opponent wins and it counts on the Ladder.';
+      : 'End this game? Your opponent wins and it counts on the Rating Ladder.';
     if (window.unNative && window.unNative.alert) {
       const r = await window.unNative.alert({
         title: isWaitingRoom ? 'Close room' : 'End game',

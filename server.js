@@ -238,24 +238,39 @@ const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
 
 /* ============================================================
-   Play modes (#176) — story ladders and arcade bands
+   Play modes (#176) — story levels and arcade bands
    ============================================================
    Mirrors PLAY_MODES_BY_ID in public/src/29-cards.jsx. The client owns the
-   card copy; the server owns what a mode is worth and whether a rung has
+   card copy; the server owns what a mode is worth and whether a level has
    already been claimed, because both are cheatable from the client.
 
-   STORY_BANDS is the rung count per game. Bands, not levels: Tile Match
-   generates 1000 levels and Mahjong has 6 layouts, so paying per level would
-   make one game worth a hundred times another for the same "finished the
-   story" achievement. Every ladder is normalised to 4–8 rungs here, and
-   storyBandAward below spends the SAME total budget on every game however
-   many rungs it has — later bands simply weigh more than earlier ones. */
+   STORY_BANDS is the story LEVEL count per game. (The identifier and the
+   `game_progress.band` column keep their original names on purpose — the
+   #184 rename is display-only, and `band` is part of a live primary key.)
+   A story level is a difficulty step, not one of a game's own levels: Tile
+   Match generates 1000 of those and Mahjong has 6 layouts, so paying per
+   level-of-content would make one game worth a hundred times another for the
+   same "finished the story" achievement.
+
+   Every game's story is capped to STORY_LEVEL_MIN..STORY_LEVEL_MAX levels
+   (#184), and storyBandAward below spends the SAME total budget on every game
+   however many levels it has: later levels simply weigh more than earlier
+   ones. scripts/check-registry.js enforces the bound AND that each client
+   difficulty table is the same length as its entry here, because a server
+   bump without the matching client bump silently replays the old hardest
+   board at the top of the ladder. */
+const STORY_LEVEL_MIN = 6;
+const STORY_LEVEL_MAX = 10;
+// What a NEWLY added story starts at. Start at the floor and earn the extra
+// levels with content: the four games above the floor are there because they
+// have a ladder of real, distinguishable difficulty to spend them on.
+const STORY_LEVEL_DEFAULT = 6;
 const STORY_BANDS = {
-  sudoku: 6, sudokumini: 5, wordhunt: 6, cryptowordle: 6,
-  klondike: 5, spider: 3, mahjongsol: 6, anagrams: 5,
+  sudoku: 6, sudokumini: 6, wordhunt: 6, cryptowordle: 6,
+  klondike: 6, spider: 6, mahjongsol: 6, anagrams: 6,
   nonogram: 6, cratepush: 8, minefinder: 6,
-  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 5,
-  hashrush: 5, match3: 5, 'knights-tour': 6,
+  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 6,
+  hashrush: 6, match3: 6, 'knights-tour': 6,
 };
 const storyBandCount = (gameId) => STORY_BANDS[gameId] || 0;
 
@@ -3146,15 +3161,28 @@ app.get('/api/daily', async (req, res) => {
        renders every rung as unreachable-and-unstarted, and the arcade board is
        an empty list with no rank to be outside of. Idempotent. */
     if (IS_STAGING && req.query.demo === 'modes') {
-      // Half of Sudoku's 6-rung ladder cleared, so the pre-game screen shows
-      // ticks, an open rung and locked rungs all at once.
-      for (let b = 0; b < 3; b++) {
-        await pool.query(
-          `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
-           VALUES ($1, 'sudoku', $2, $3, $4, $5, now())
-           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
-          [req.user.id, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
-        );
+      /* Three shapes of the same screen, because the level picker reads
+         differently in each and only one of them was reachable before (#184):
+           sudoku — half walked: ticks, one open level, locked levels.
+           zuma   — every level cleared, which is the only way to see the
+                    "All levels cleared" note and an all-ticked picker.
+           spider — 3 of 6, the count the header renders as "3/6". Spider's
+                    story went from 3 levels to 6, so it is also the game where
+                    a stale client table would show as a short picker. */
+      const walked = [
+        { gameId: 'sudoku', cleared: 3 },
+        { gameId: 'zuma',   cleared: 6 },
+        { gameId: 'spider', cleared: 3 },
+      ];
+      for (const w of walked) {
+        for (let b = 0; b < w.cleared; b++) {
+          await pool.query(
+            `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+            [req.user.id, w.gameId, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
+          );
+        }
       }
       // Rivals on the Normal arcade board for 2048, plus a modest viewer row
       // that sits outside the top 3 — the case the pinned `me` row exists for.

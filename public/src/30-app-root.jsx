@@ -758,19 +758,24 @@ function App() {
       return;
     }
     /* #176 — ?pmode=daily|story|arcade opens a card in one of its play modes,
-       and ?band= preselects the rung (story: a 1-based number) or difficulty
-       (arcade: easy|normal|hard). Without these the story ladder, the arcade
-       band picker and every board behind them are reachable only by TAPPING a
-       card button — which navigation-driven proposal checks and screenshots
-       cannot do, so none of #176 would have been verifiable. Deliberately NOT
-       ?mode=, which already pins a classic's opponent (bot / 2p / online).
+       and ?level= preselects the story level (a 1-based number) or the arcade
+       difficulty (easy|normal|hard). Without these the story levels, the
+       arcade band picker and every board behind them are reachable only by
+       TAPPING a card button — which navigation-driven proposal checks and
+       screenshots cannot do, so none of #176 would have been verifiable.
+       Deliberately NOT ?mode=, which already pins a classic's opponent
+       (bot / 2p / online).
+
+       ?band= is the original spelling and still works (#184 renamed the copy,
+       not the URL contract) — every merged deep link and dapp.json test keeps
+       resolving. ?level= wins when both are present.
 
        Checked BEFORE the pre-launch modal for the same reason ?result=1 is:
        2048 and Block Fit carry preLaunchModal, so below that branch this link
        would surface the opponent chooser instead of the mode it names. */
     const pmode = params.get('pmode');
     if (isPlayMode(pmode) && supportsMode(g.id, pmode)) {
-      const bandParam = params.get('band');
+      const bandParam = params.get('level') || params.get('band');
       let band = null;
       if (pmode === 'story' && bandParam) band = Math.max(0, (parseInt(bandParam, 10) || 1) - 1);
       if (pmode === 'arcade' && ARCADE_BAND_IDS.indexOf(bandParam) !== -1) band = bandParam;
@@ -2470,11 +2475,11 @@ function App() {
             )}
             {winData.modeLabel === 'Story' && winData.bandTotal > 0 && (
               <div className="mode-result">
-                <div className="mode-result-title">📖 Story · band {winData.bandIndex + 1} of {winData.bandTotal}</div>
+                <div className="mode-result-title">📖 Story · level {winData.bandIndex + 1} of {winData.bandTotal}</div>
                 <div className="mode-result-note">
                   {(storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
-                    ? 'Rung ticked off. Points are paid once, on first clear — replay it any time for practice.'
-                    : 'Cleared. The next rung is now open.'}
+                    ? 'Level ticked off. Points are paid once, on first clear, so replay it any time for practice.'
+                    : 'Cleared. The next level is now open.'}
                 </div>
               </div>
             )}
@@ -2523,7 +2528,7 @@ function App() {
             )}
             {winData.modeLabel && currentGame && (
               <button className="primary-btn review-btn" onClick={() => launchGame(currentGame, playMode)}>
-                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the ladder'}
+                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the levels'}
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>

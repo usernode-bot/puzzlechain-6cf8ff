@@ -233,6 +233,12 @@ const GAME_IDS = new Set(
 // Any game id known to the hub (used by DApp session validation).
 const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
+/* Most games a single player may pin to the top of the home grid (#232). The
+   client mirrors this as PIN_LIMIT in public/src/29-cards.jsx purely to grey
+   out the control once it is reached; THIS value is the authoritative one —
+   the insert below refuses the 9th pin regardless of what the client sends. */
+const PIN_LIMIT = 8;
+
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
 const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
@@ -1224,6 +1230,22 @@ async function migrate() {
   `);
   await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS save_hash TEXT`);
   await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS anchor_tx_hash TEXT`);
+
+  /* game_pins is PUBLIC — which games a player pinned to the top of their home
+     grid (#232). It is a display preference over ids that are already public
+     (every game id is a deep-link key), so a stranger reading every row learns
+     nothing they could not read off the lobby. game_id holds the CARD's anchor
+     registry id; the client resolves it back to a card through CARD_BY_GAME_ID,
+     which is what lets the four merged cards keep both of their ids. */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_pins (
+      user_id   TEXT NOT NULL,
+      username  TEXT,
+      game_id   TEXT NOT NULL,
+      pinned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
 
   // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
   // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
@@ -2309,6 +2331,59 @@ app.delete('/api/social/unfollow/:userId', async (req, res) => {
   }
 });
 
+// ---- Pinned games API (#232) --------------------------------------------
+// Auth-gated like every other /api route: the pin belongs to req.user, never
+// to an id the client names. Both routes answer with the player's FULL pin
+// list so the client replaces its optimistic array with the server's truth
+// rather than trying to reproduce the cap's arithmetic locally.
+
+async function readPins(userId) {
+  const { rows } = await pool.query(
+    `SELECT game_id FROM game_pins WHERE user_id = $1 ORDER BY pinned_at ASC, game_id ASC`,
+    [userId]
+  );
+  return rows.map(r => r.game_id);
+}
+
+// POST /api/pins/:gameId — pin a game to the top of the home grid.
+app.post('/api/pins/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    // The cap is enforced INSIDE the insert: a count-then-insert pair would let
+    // two taps in flight at once both see 7 and both land.
+    const { rowCount } = await pool.query(
+      `INSERT INTO game_pins (user_id, username, game_id)
+       SELECT $1, $2, $3
+        WHERE (SELECT count(*) FROM game_pins WHERE user_id = $1) < $4
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [req.user.id, req.user.username || null, gameId, PIN_LIMIT]
+    );
+    const pins = await readPins(req.user.id);
+    if (!rowCount && !pins.includes(gameId)) {
+      return res.status(409).json({ error: 'Pin limit reached', limit: PIN_LIMIT, pins });
+    }
+    res.json({ pins, limit: PIN_LIMIT });
+  } catch (err) {
+    console.error('[pins] POST failed:', err.message);
+    res.status(500).json({ error: 'Failed to pin game' });
+  }
+});
+
+// DELETE /api/pins/:gameId — unpin. Idempotent: unpinning something that was
+// never pinned is a success with an unchanged list.
+app.delete('/api/pins/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  try {
+    await pool.query(`DELETE FROM game_pins WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]);
+    res.json({ pins: await readPins(req.user.id), limit: PIN_LIMIT });
+  } catch (err) {
+    console.error('[pins] DELETE failed:', err.message);
+    res.status(500).json({ error: 'Failed to unpin game' });
+  }
+});
+
 // ---- Posts API (sharing) -----------------------------------------------
 
 
@@ -2438,6 +2513,44 @@ app.get('/api/daily', async (req, res) => {
         [req.user.id, req.user.username || 'staging-demo-user',
          JSON.stringify({ dayNum: Math.floor(Date.now() / 86400000), grid: ngSolved })]
       );
+    }
+
+    /* Staging-only demo seed (#232): pins three games for the current viewer
+       so the Pinned section, its filter behaviour and the pin's "on" state are
+       all reachable by navigation alone. game_pins is a NEW table, so staging
+       starts with zero rows and none of that would otherwise render.
+
+       The three ids are deliberately mixed — a daily (sudoku), a classic
+       (mancala) and one half of a merged card (snakedaily) — and pinned in an
+       order that is NOT their registry order, so a screenshot shows the
+       section sorting by registry position rather than by recency. Nothing the
+       app's own logic reads is fabricated here: a pin only ever moves a card
+       up the grid. Idempotent; strict no-op in production. */
+    if (IS_STAGING && (req.query.demo === 'pins' || req.query.demo === 'pinsfull')) {
+      const demoPins = req.query.demo === 'pinsfull'
+        ? ['snakedaily', 'mancala', 'sudoku', 'nonogram', 'checkers',
+           'dropstack', '2048', 'wordhunt']
+        : ['snakedaily', 'mancala', 'sudoku'];
+      for (let i = 0; i < demoPins.length; i++) {
+        await pool.query(
+          `INSERT INTO game_pins (user_id, username, game_id, pinned_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoPins[i],
+           String(demoPins.length - i)]
+        );
+      }
+    }
+
+    /* Staging-only counterpart to demo=pins (#232): clears the viewer's pins so
+       the zero-pin home — the shape a real player sees before they pin anything —
+       is reachable DETERMINISTICALLY. A pin is durable by design, and the whole
+       proposal-check suite runs as one viewer against one staging DB, so a plain
+       `/` assertion on the empty state would pass or fail purely on whether a
+       demo=pins route ran earlier in the file. This makes that order irrelevant.
+       Deletes only rows belonging to the caller; strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'pinsempty') {
+      await pool.query(`DELETE FROM game_pins WHERE user_id = $1`, [req.user.id]);
     }
 
     // Staging-only demo seed: gives the current viewer a 10-day consecutive
@@ -3377,6 +3490,17 @@ app.get('/api/daily', async (req, res) => {
       solveCount = (scRows[0] && scRows[0].n) || 0;
     } catch { solveCount = 0; }
 
+    // Pinned games (#232) — the card anchor ids this player pinned, oldest
+    // first. Non-fatal: a lobby without its Pinned section is still a lobby.
+    let pins = [];
+    try {
+      const { rows: pinRows } = await pool.query(
+        `SELECT game_id FROM game_pins WHERE user_id = $1 ORDER BY pinned_at ASC, game_id ASC`,
+        [req.user.id]
+      );
+      pins = pinRows.map(r => r.game_id);
+    } catch (e) { console.warn('[daily] pins query failed (non-fatal):', e.message); }
+
     res.json({
       // Surface the signed-in account so the UI can confirm login +
       // that persistent data is active. Always present here (route is
@@ -3404,6 +3528,9 @@ app.get('/api/daily', async (req, res) => {
       featured,
       // All-time personal bests per daily game ({ gameId: { score, timeSecs } }).
       bests,
+      // Games pinned to the top of the home grid (#232), oldest pin first.
+      pins,
+      pinLimit: PIN_LIMIT,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);

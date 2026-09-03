@@ -1365,6 +1365,26 @@
       "name": "Arcade deep link mounts a board",
       "path": "/?game=wordsprint&pmode=arcade&band=hard&play=1",
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
+    },
+    {
+      "name": "Pin button renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-pin"
+    },
+    {
+      "name": "Pinned section renders pinned games",
+      "path": "/?demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Pinned section survives the Daily filter",
+      "path": "/?tab=daily&demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Home with nothing pinned explains how to pin",
+      "path": "/?demo=pinsempty",
+      "expectText": "on any card to pin it to the top"
     }
   ],
   "visibility": {

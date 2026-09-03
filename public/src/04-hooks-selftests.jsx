@@ -351,6 +351,50 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #232 — the Pinned section is a PARTITION of the list the filter already
+     produced, and the two halves are rendered as two separate grids. Three
+     things have to hold or a card either vanishes or renders twice: a stored
+     id must resolve to exactly one card (the four merged cards answer to two
+     ids each), the partition must be lossless, and the pinned half must keep
+     registry order rather than the order the ids arrived in. */
+  check('pin-card-partition', () => {
+    // A NON-anchor id of a merged card still resolves, and to one card only.
+    const merged = CARD_BY_GAME_ID['tilematching'];
+    if (!merged) throw new Error('merged id tilematching resolves to no card');
+    if (CARD_BY_GAME_ID['tilematchingdaily'] !== merged) {
+      throw new Error('the two halves of the Tile Match card resolve differently');
+    }
+    if (cardPinId(merged) !== 'tilematchingdaily') {
+      throw new Error('merged card anchor id is ' + cardPinId(merged));
+    }
+    // Every card must have an anchor id to store, or it cannot be pinned.
+    for (const c of GAME_CARDS) {
+      if (!cardPinId(c)) throw new Error('card ' + c.key + ' has no pin id');
+      if (CARD_BY_GAME_ID[cardPinId(c)] !== c) {
+        throw new Error('card ' + c.key + ' does not round-trip through its pin id');
+      }
+    }
+    // Partition, given ids deliberately out of registry order.
+    const stored = ['minesweeper', 'sudoku', 'tilematching'];
+    const keys = new Set();
+    for (const id of stored) { const c = CARD_BY_GAME_ID[id]; if (c) keys.add(c.key); }
+    if (keys.size !== 3) throw new Error('3 stored ids resolved to ' + keys.size + ' cards');
+    const ordered = GAME_CARDS;
+    const pinned = ordered.filter(c => keys.has(c.key));
+    const rest = ordered.filter(c => !keys.has(c.key));
+    if (pinned.length + rest.length !== ordered.length) {
+      throw new Error('partition lost or duplicated cards');
+    }
+    if (pinned.some(c => rest.indexOf(c) !== -1)) throw new Error('a card is in both halves');
+    if (pinned.length !== 3) throw new Error('pinned half has ' + pinned.length + ' cards');
+    // Registry order, not the order `stored` listed them in.
+    const idx = pinned.map(c => ordered.indexOf(c));
+    for (let i = 1; i < idx.length; i++) {
+      if (idx[i] <= idx[i - 1]) throw new Error('pinned half is not in registry order');
+    }
+    return true;
+  });
+
   // Phase 5 (#143) — 2048 vertical swipes were inverted. A lone tile at the
   // bottom row swiped 'up' must reach row 0, and vice versa.
   check('t2048-up', () => {

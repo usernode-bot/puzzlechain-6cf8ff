@@ -644,6 +644,11 @@
       "expectText": "PLAYED"
     },
     {
+      "name": "Home grid lists multiple game cards",
+      "path": "/?demo=homegrid",
+      "expectSelector": ".grid > .card + .card"
+    },
+    {
       "name": "Home filter chips render",
       "path": "/?tab=classic",
       "expectSelector": ".home-filter-chips"
@@ -1385,6 +1390,21 @@
       "name": "Arcade deep link mounts a board",
       "path": "/?game=wordsprint&pmode=arcade&band=hard&play=1",
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
+    },
+    {
+      "name": "Story ladder badge renders on the badge screen",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.active[data-badge=\"story-sudoku\"]"
+    },
+    {
+      "name": "Badge collection lists the Story ladders group",
+      "path": "/?screen=account&demo=storybadges",
+      "expectText": "Story ladders"
+    },
+    {
+      "name": "Unfinished ladder renders as a locked story badge",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.locked[data-badge=\"story-cratepush\"]"
     }
   ],
   "visibility": {

@@ -267,9 +267,10 @@ function LadderScreen() {
 // ({ types, milestones }). Consumed by the profile BadgeStrip.
 function badgeChips(badges, achievements) {
   const earnedDays = new Set(badges || []);
-  const ach = achievements || { types: [], milestones: [] };
+  const ach = achievements || { types: [], milestones: [], stories: [] };
   const earnedTypes = new Set(ach.types || []);
   const earnedMilestones = new Set(ach.milestones || []);
+  const earnedStories = new Set(ach.stories || []);
 
   const chips = [];
   for (const b of STREAK_BADGES) {
@@ -281,12 +282,25 @@ function badgeChips(badges, achievements) {
   for (const b of SOLVE_MILESTONE_BADGES) {
     chips.push({ key: `m${b.count}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedMilestones.has(b.count) });
   }
+  // Story-ladder completions — one chip per game that HAS a story ladder, so
+  // the collection shows what is left to finish, not only what is done. The
+  // list is derived from PLAY_MODES_BY_ID rather than hand-written, so a game
+  // that gains or loses a story ladder needs no edit here; the order follows
+  // GAMES so it matches the lobby grid.
+  for (const g of (typeof GAMES !== 'undefined' ? GAMES : [])) {
+    if (typeof supportsMode !== 'function' || !supportsMode(g.id, 'story')) continue;
+    const chip = storyBadgeChip(g.id);
+    if (!chip) continue;
+    chips.push({ ...chip, group: 'story', earned: earnedStories.has(g.id) });
+  }
   return chips;
 }
 
 function BadgeStrip({ badges, achievements, streak, solveCount }) {
-  const chips = badgeChips(badges, achievements);
-  const earnedCount = chips.filter(c => c.earned).length;
+  const allChips = badgeChips(badges, achievements);
+  const chips = allChips.filter(c => c.group !== 'story');
+  const storyChips = allChips.filter(c => c.group === 'story');
+  const earnedCount = allChips.filter(c => c.earned).length;
   // Next-milestone progress pills (formerly on the home Badges panel) —
   // rendered only when the caller supplies the live streak/solve counts,
   // i.e. on the viewer's own profile.
@@ -298,7 +312,7 @@ function BadgeStrip({ badges, achievements, streak, solveCount }) {
     <div className="badge-strip-wrap">
       <div className="badge-strip-head">
         <span>Badges</span>
-        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
+        <span className="badge-strip-count mono">{earnedCount} / {allChips.length}</span>
       </div>
       {hints.length > 0 && (
         <div className="badge-progress">
@@ -310,17 +324,32 @@ function BadgeStrip({ badges, achievements, streak, solveCount }) {
         </div>
       )}
       <div className="badge-strip">
-        {chips.map(c => (
-          <div
-            key={c.key}
-            className={`badge-chip${c.earned ? ' active' : ' locked'}`}
-            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
-          >
-            <span className="badge-chip-icon">{c.icon}</span>
-            <span className="badge-chip-name">{c.name}</span>
-          </div>
-        ))}
+        {chips.map(c => <BadgeChip key={c.key} chip={c} />)}
       </div>
+      {storyChips.length > 0 && (
+        <>
+          <div className="badge-strip-sub">Story ladders</div>
+          <div className="badge-strip">
+            {storyChips.map(c => <BadgeChip key={c.key} chip={c} />)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* One badge tile. `data-badge` carries the chip key so a navigation-only
+   proposal check can assert on a specific badge's earned/locked state, which
+   the class alone cannot express. */
+function BadgeChip({ chip }) {
+  return (
+    <div
+      className={`badge-chip${chip.earned ? ' active' : ' locked'}`}
+      data-badge={chip.key}
+      title={`${chip.name}${chip.earned ? '' : ' (locked)'} — ${chip.sub}`}
+    >
+      <span className="badge-chip-icon">{chip.icon}</span>
+      <span className="badge-chip-name">{chip.name}</span>
     </div>
   );
 }
@@ -839,7 +868,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
           </div>
           <div className="pregame-band-note">
             {bandCleared >= bandTotal
-              ? 'All levels cleared. Replay any level for practice. Points are paid once, on first clear.'
+              ? 'All levels cleared: badge earned. Replay any level for practice; points are paid once, on first clear.'
               : 'Clearing a level for the first time pays. Replays are for practice.'}
           </div>
         </div>

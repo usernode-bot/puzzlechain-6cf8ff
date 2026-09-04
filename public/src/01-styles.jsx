@@ -324,9 +324,24 @@ body {
   grid-auto-rows: 1fr;
 }
 
-@media (max-width: 380px) {
+/* #182 — phones get TWO cards per row, not one.
+
+   The old rule here was a single-column override below 380px, but the
+   one-column phone grid was never really that rule's doing: .lobby drops to
+   0.75rem side padding at 560px, so the content box is (viewport - 24px), and
+   auto-fill needs 200 + 16 + 200 = 416px for a second track. 320/390/430px
+   phones all fall short, so EVERY phone got one column and a ~9,800px scroll
+   through 30 cards. Removing the override alone fixes nothing — the track
+   floor has to come down too, which is what this rule does.
+
+   minmax(0, 1fr) rather than a bare 1fr: 1fr is minmax(auto, 1fr), whose auto
+   floor is the card's min-content width, and a long unbroken game name would
+   push the track wider than half the row and overflow. grid-auto-rows: 1fr
+   above still applies, so the uniform-tile-height guarantee is untouched. */
+@media (max-width: 560px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
   }
 }
 
@@ -1232,6 +1247,29 @@ ${emitTapHighlightRules()}
 
 @media (max-width: 480px) {
   .lobby-tab { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+
+  /* #182 — compact card metrics for the two-up phone grid. At 390px each
+     track is ~178px, so the card's desktop padding/type scale eats most of
+     the tile. Everything the card shows is KEPT and scaled down: two of the
+     merged cards name their variants only in .card-desc (and dapp.json
+     asserts those strings), so hiding it would remove real content, not just
+     decoration. .card-mode-btn's min-height stays 44px — only its horizontal
+     padding gives way. */
+  .grid > .card { padding: 0.75rem; border-radius: 12px; }
+  .grid > .card .card-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .grid > .card .card-name { font-size: 0.95rem; }
+  .grid > .card .card-desc {
+    font-size: 0.75rem;
+    min-height: 2.6em;
+    margin-bottom: 0.5rem;
+  }
+  .grid > .card .card-daily-badge {
+    top: 0.45rem;
+    right: 0.45rem;
+    font-size: 0.5rem;
+    padding: 0.18rem 0.35rem;
+  }
+  .grid > .card .card-mode-btn { padding: 0.45rem 0.2rem; }
 }
 
 /* ---- Minesweeper ---- */

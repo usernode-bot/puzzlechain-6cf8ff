@@ -3205,6 +3205,50 @@ ${emitTapHighlightRules()}
 }
 .mnc-difficulty-pill.cnlv2-diff-locked:hover { border-color: ${C.border}; color: ${C.muted}; }
 .cnlv2-lock-note { color: ${C.gold}; }
+/* ---- Snakes & Ladders V2 — Local Match roster + Ranked toggle ---- */
+/* One row per seat, so a six-seat table reads top to bottom instead of
+   wrapping into an unreadable pill soup. The seat label is a fixed column so
+   the Human/Bot pills line up down the whole list. */
+.cnlv2-roster-block { margin-top: 0.6rem; }
+.cnlv2-roster-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+.cnlv2-roster-row .mnc-difficulty-pill { flex: 1 1 0; min-width: 0; }
+.cnlv2-roster-seat {
+  flex: 0 0 2.1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+  font-weight: 700; color: ${C.muted};
+}
+.cnlv2-ranked-row {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid ${C.border};
+}
+.mnc-difficulty-pill.cnlv2-ranked-toggle { align-self: flex-start; }
+.mnc-difficulty-pill.cnlv2-ranked-toggle.active {
+  border-color: ${C.gold}; color: ${C.gold}; background: ${ca('gold', '1f')};
+}
+.cnlv2-ranked-note { color: ${C.muted}; font-size: 0.75rem; }
+/* Final standings table on the win card (multi-seat local matches). */
+.win-standings {
+  margin-top: 0.7rem; padding: 0.55rem 0.6rem;
+  border: 1px solid ${C.border}; border-radius: 10px; background: ${C.card};
+}
+.win-standings .ws-title {
+  font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: ${C.muted}; margin-bottom: 0.35rem;
+}
+.win-standings .ws-row {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.22rem 0.3rem; border-radius: 7px; font-size: 0.82rem;
+}
+.win-standings .ws-row.me { background: ${ca('accent', '1f')}; color: ${C.text}; }
+.win-standings .ws-place { flex: 0 0 1.2rem; color: ${C.gold}; font-weight: 700; }
+.win-standings .ws-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.win-standings .ws-sq { flex: 0 0 auto; color: ${C.muted}; }
+
+.cnlv2-rank-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.1rem 0.45rem; border-radius: 999px;
+  border: 1px solid ${C.gold}; color: ${C.gold}; background: ${ca('gold', '1a')};
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700;
+}
 .mok-intro { color: ${C.muted}; font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.9rem; }
 .mok-section {
   font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.09em;

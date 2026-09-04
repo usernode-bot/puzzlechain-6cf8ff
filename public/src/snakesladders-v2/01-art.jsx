@@ -335,3 +335,31 @@ function cnlv2DrawPawn(ctx, x, y, h, seat) {
   ctx.fillText(String(seat), 0, 0.45 * u);
   ctx.restore();
 }
+
+/* Medal chip stamped over a pawn that has already finished. Placement is the
+   whole point of the multi-finisher match, so it has to be legible on the
+   board itself, not only in the standings strip. Gold / silver / bronze for
+   the podium, then a plain numbered disc. */
+function cnlv2DrawPlaceChip(ctx, x, y, cs, place) {
+  const r = Math.max(6, cs * 0.26);
+  // Medal metals are intrinsic art (like the pawns themselves), so they stay
+  // hardcoded; only the also-ran disc follows the theme.
+  const fill = place === 1 ? '#D4AF37' : place === 2 ? '#B9BCC4'
+    : place === 3 ? '#B87333' : palOf('card', '#FFFFFF');
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.16);
+  ctx.strokeStyle = place <= 3 ? '#3A2E12' : palOf('border', '#DDD');
+  ctx.stroke();
+  ctx.fillStyle = place <= 3 ? '#231A05' : palOf('text', '#1A1A1A');
+  ctx.font = `700 ${Math.round(r * 1.15)}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(place), x, y + r * 0.05);
+  ctx.restore();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+}

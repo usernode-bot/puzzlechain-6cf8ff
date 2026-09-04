@@ -3589,8 +3589,42 @@ ${emitTapHighlightRules()}
   color: ${C.muted}; cursor: pointer; touch-action: manipulation;
 }
 .home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+/* The pin control (#232). It sits in the card's top-right corner, which the
+   daily badge already used, so the badge's right offset below clears it
+   unconditionally rather than only on cards that render a pin, so a daily and
+   a classic card line their badges up the same way. 44px square is the touch
+   minimum; the glyph inside it is small, so the padding does the work. */
+.card-pin {
+  position: absolute; top: 0.15rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 0.95rem; line-height: 1; opacity: 0.32;
+  filter: grayscale(1);
+  transition: opacity .12s ease, transform .12s ease, filter .12s ease;
+}
+.card-pin:hover { opacity: 0.6; }
+.card-pin.on { opacity: 1; filter: none; transform: rotate(-20deg); }
+.card-pin[data-pressed] { transform: scale(0.86); }
+.card-pin.on[data-pressed] { transform: rotate(-20deg) scale(0.86); }
+.card-pin[disabled] { opacity: 0.18; cursor: default; }
+
+/* The Pinned section's heading and the two lines that explain it. */
+.home-pinned-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.home-pin-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600;
+  color: ${C.muted}; letter-spacing: 0.05em;
+}
+.home-pin-tip { color: ${C.muted}; font-size: 0.78rem; margin: 0 0 0.9rem; }
+.home-pin-full {
+  color: ${C.rose}; font-size: 0.78rem; margin: 0 0 0.6rem; font-weight: 600;
+}
+.home-pin-empty {
+  color: ${C.muted}; font-size: 0.82rem; margin: 0 0 1.2rem;
+  padding: 0.7rem 0.9rem; border: 1px dashed ${C.border}; border-radius: 10px;
+}
+
 .card-daily-badge {
-  position: absolute; top: 0.65rem; right: 0.65rem; z-index: 1;
+  position: absolute; top: 0.65rem; right: 2.7rem; z-index: 1;
   font-family: 'JetBrains Mono', monospace; font-size: 0.56rem; font-weight: 600;
   letter-spacing: 0.07em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;

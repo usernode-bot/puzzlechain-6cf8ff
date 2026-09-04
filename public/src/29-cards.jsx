@@ -248,13 +248,25 @@ const cardDailyId = (card) => {
   return d ? d.gameId : null;
 };
 
+/* The registry id a pin (#232) is stored under: the card's ANCHOR id. Cards
+   are a client-side composition and can be recomposed; registry ids never
+   move, so the durable thing to write to the database is one of the ids the
+   card speaks for. Reads come back through CARD_BY_GAME_ID, which already maps
+   either half of a merged pair onto the one card. */
+const cardPinId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
+
+/* Mirrors PIN_LIMIT in server.js. Used ONLY to grey out the control once the
+   player is at the cap — the server refuses the 9th pin either way, so the two
+   drifting costs a stale tooltip rather than a wrong outcome. */
+const PIN_LIMIT = 8;
+
 /* ============================================================
    The card
    ============================================================
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay }) {
+function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -283,6 +295,16 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay }) {
 
   return (
     <div className="card paired" style={{ '--accent': card.tagColor }} role="group" aria-label={card.name}>
+      {onTogglePin && (
+        <button
+          className={'card-pin tappable' + (pinned ? ' on' : '')}
+          aria-pressed={pinned ? 'true' : 'false'}
+          aria-label={pinned ? `Unpin ${card.name}` : `Pin ${card.name} to top`}
+          title={pinned ? 'Unpin' : pinDisabled ? `Pin limit reached (${PIN_LIMIT})` : 'Pin to top'}
+          disabled={!pinned && pinDisabled}
+          {...tapProps(() => { onTogglePin(cardPinId(card), !pinned); }, { disabled: !pinned && pinDisabled })}
+        >📌</button>
+      )}
       {dailyId && (
         <span className={'card-daily-badge' + (finished ? ' done' : inProgress ? ' resume' : ' fresh')}>
           {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}

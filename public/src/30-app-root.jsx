@@ -46,6 +46,14 @@ function App() {
   const arcadeBandRef = useRef(arcadeBandId); arcadeBandRef.current = arcadeBandId;
   // gameId -> { cleared, total } for the card state line and the story picker.
   const [storyProgress, setStoryProgress] = useState({});
+  /* Pinned games (#232): the CARD ANCHOR ids this player pinned, in the order
+     the server holds them. The array is the server's, replaced wholesale on
+     every toggle — the client never recomputes the cap. Deliberately NOT a
+     navState field: a pin changes what the home grid looks like, not which
+     screen you are on, so it must not push a history entry. */
+  const [pins, setPins] = useState([]);
+  // Transient "you are at the cap" line, cleared on the next successful pin.
+  const [pinNotice, setPinNotice] = useState('');
   // The viewer's standing on the arcade band currently selected, so the
   // pre-game screen can show what there is to beat before the run starts.
   const [arcadeBest, setArcadeBest] = useState(null);
@@ -382,6 +390,7 @@ function App() {
       // (they do: games launch from the lobby, which renders after loading).
       SERVER_DAILY_SEEDS = body.seeds || {};
       setBests(body.bests || {});
+      setPins(Array.isArray(body.pins) ? body.pins : []);
       /* #176 — story progress is loaded alongside the daily state rather than
          folded into it: it is not day-scoped, so it does not belong on a route
          whose whole contract is "today". Failure is silent because the home
@@ -414,6 +423,7 @@ function App() {
       setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [] });
+      setPins([]);
       // Signed-out (or backend hiccup): the public read surface still supplies
       // server time, the reset countdown, and today's board seeds, so the
       // signed-out lobby stays anchored to server time.
@@ -431,6 +441,27 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  /* Pin / unpin one card (#232). Optimistic so the grid reorders on the tap
+     rather than a round trip later, then RECONCILED against the array the
+     server returns — the cap lives there, so the server's answer is the only
+     one that can be trusted about what actually landed. A failure reverts. */
+  const togglePin = async (gameId, wantPinned) => {
+    if (!gameId || !authOk || loading) return;
+    const before = pins;
+    setPinNotice('');
+    cgHaptic(8);
+    setPins(wantPinned
+      ? (before.includes(gameId) ? before : before.concat([gameId]))
+      : before.filter(id => id !== gameId));
+    const r = await api('/api/pins/' + encodeURIComponent(gameId),
+      { method: wantPinned ? 'POST' : 'DELETE' });
+    if (r.ok && r.body && Array.isArray(r.body.pins)) { setPins(r.body.pins); return; }
+    setPins(Array.isArray(r.body && r.body.pins) ? r.body.pins : before);
+    if (r.status === 409) {
+      setPinNotice(`You can pin up to ${PIN_LIMIT} games. Unpin one to make room.`);
+    }
+  };
 
   // Home in-progress row (phase 7): the viewer's active online matches.
   // Refetched on every return to the lobby so a just-made move updates the
@@ -2108,8 +2139,50 @@ function App() {
                   if (!mode) { setClassicGameMode(null); setClassicGameModeOpts(null); }
                   launchGame(g, mode);
                 };
+                /* Pinned (#232) partitions the list the filter ALREADY produced,
+                   so pinning can never change what a chip shows — a pinned card
+                   that fails the active filter is simply absent from both
+                   sections, exactly as it was before it was pinned. Order
+                   inside the pinned section is registry order, not pin
+                   recency: the point is "the games I play a lot are easy to
+                   find", and a section that reshuffles itself as you use it is
+                   the opposite of easy to find. */
+                const pinnedSet = new Set();
+                for (const id of pins) {
+                  const c = CARD_BY_GAME_ID[id];
+                  if (c) pinnedSet.add(c.key);
+                }
+                const pinnedCards = ordered.filter(c => pinnedSet.has(c.key));
+                const restCards = ordered.filter(c => !pinnedSet.has(c.key));
+                const atPinCap = pins.length >= PIN_LIMIT;
+                const cardProps = (c) => ({
+                  key: c.key,
+                  card: c,
+                  attempts: attempts,
+                  bests: bests,
+                  storyProgress: storyProgress,
+                  loading: loading,
+                  onPlay: playCardMode,
+                  pinned: pinnedSet.has(c.key),
+                  // Signed-out visitors have nowhere to store a pin, so they
+                  // get no control rather than one that fails on tap.
+                  onTogglePin: authOk ? togglePin : null,
+                  pinDisabled: atPinCap,
+                });
                 return (
                   <React.Fragment>
+                    {pinnedCards.length > 0 && (
+                      <React.Fragment>
+                        <div className="home-section-title home-pinned-title">
+                          📌 Pinned
+                          <span className="home-pin-count">{pins.length}/{PIN_LIMIT}</span>
+                        </div>
+                        <div className="grid home-pinned-grid">
+                          {pinnedCards.map(c => <GameCard {...cardProps(c)} />)}
+                        </div>
+                      </React.Fragment>
+                    )}
+                    {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
                     <div className="home-section-title">All Games</div>
                     <div className="home-daily-note">
                       🕛 New daily puzzles at midnight UTC — resets in{' '}
@@ -2130,18 +2203,13 @@ function App() {
                         >{f.label}</button>
                       ))}
                     </div>
+                    {authOk && pins.length === 0 && (
+                      <div className="home-pin-empty">
+                        Nothing pinned yet. Tap 📌 on any card to pin it to the top.
+                      </div>
+                    )}
                     <div className="grid">
-                      {ordered.map(c => (
-                        <GameCard
-                          key={c.key}
-                          card={c}
-                          attempts={attempts}
-                          bests={bests}
-                          storyProgress={storyProgress}
-                          loading={loading}
-                          onPlay={playCardMode}
-                        />
-                      ))}
+                      {restCards.map(c => <GameCard {...cardProps(c)} />)}
                     </div>
                   </React.Fragment>
                 );

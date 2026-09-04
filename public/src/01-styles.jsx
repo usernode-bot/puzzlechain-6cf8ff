@@ -151,6 +151,16 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Sub-heading inside the badge collection — separates the story-ladder chips
+   (one per game with a story mode) from the streak/achievement chips above. */
+.badge-strip-sub {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${C.muted};
+}
 /* Badge accordion trigger — base styles, mobile activation via @media (max-width: 560px) */
 .badge-strip-trigger {
   display: flex; align-items: center; justify-content: space-between;

@@ -55,7 +55,7 @@ function App() {
   // even after a streak resets, so the lobby can show a collected-badges strip.
   const [badges, setBadges] = useState([]);
   // Non-streak achievement badges earned: { types: [...], milestones: [...] }.
-  const [achievements, setAchievements] = useState({ types: [], milestones: [] });
+  const [achievements, setAchievements] = useState({ types: [], milestones: [], stories: [] });
   // Lifetime won-solve count (server-computed), used to drive the
   // "X/Y solves → Solver" next-milestone progress hint.
   const [solveCount, setSolveCount] = useState(0);
@@ -178,7 +178,9 @@ function App() {
   // consumed once the load settles.
   const pendingSelfProfile = useRef((() => {
     const s = new URLSearchParams(window.location.search).get('screen');
-    return s === 'account' || s === 'profile';
+    // 'badges' is the literal deep link to the badge collection; there is no
+    // separate badge screen, the collection lives in the profile's BadgeStrip.
+    return s === 'account' || s === 'profile' || s === 'badges';
   })());
 
   useEffect(() => {
@@ -376,8 +378,12 @@ function App() {
       setSolveCount(Number.isFinite(body.solveCount) ? body.solveCount : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
-        ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
-        : { types: [], milestones: [] });
+        ? {
+            types: body.achievements.types,
+            milestones: body.achievements.milestones || [],
+            stories: body.achievements.stories || [],
+          }
+        : { types: [], milestones: [], stories: [] });
       // Server-issued daily seeds — must land before any daily game mounts
       // (they do: games launch from the lobby, which renders after loading).
       SERVER_DAILY_SEEDS = body.seeds || {};
@@ -413,7 +419,7 @@ function App() {
       setStreak(0);
       setSolveCount(0);
       setBadges([]);
-      setAchievements({ types: [], milestones: [] });
+      setAchievements({ types: [], milestones: [], stories: [] });
       // Signed-out (or backend hiccup): the public read surface still supplies
       // server time, the reset countdown, and today's board seeds, so the
       // signed-out lobby stays anchored to server time.
@@ -1053,7 +1059,14 @@ function App() {
     if (ok && body) {
       setStoryProgress(prev => ({ ...prev, [gameId]: { cleared: body.cleared, total: body.total } }));
       if (body.awarded) setTotalScore(t => t + body.awarded);
+      if (body.newAchievements && body.newAchievements.length) {
+        setAchievements(prev => mergeAchievements(prev, body.newAchievements));
+      }
     }
+    /* Returned, not stashed in state here: handleWin's setWinData runs AFTER
+       this await, so anything this function set on the win overlay would be
+       clobbered by that call. The caller threads it in instead. */
+    return ok && body ? body : null;
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
@@ -1081,12 +1094,18 @@ function App() {
        the shell decides what that means in the mode it was opened in. */
     if (playMode === 'story') {
       const bandIdx = typeof storyBand === 'number' ? storyBand : 0;
-      await handleBandCleared(bandIdx, { score, steps, timeSecs });
-      const total = (storyProgress[currentGame.id] || {}).total || 0;
+      const clearBody = await handleBandCleared(bandIdx, { score, steps, timeSecs });
+      const total = (clearBody && clearBody.total) || (storyProgress[currentGame.id] || {}).total || 0;
+      // Issue #183 — the ladder-completion badge. Only a FRESH award pops the
+      // celebration; finishing the last band again just shows the usual card.
+      const storyAch = (clearBody && clearBody.newAchievements || [])
+        .find(a => a && a.type === 'story_complete');
       setWinData({
         score, bonus: 0, finalScore: score, steps, timeSecs,
         multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
         modeLabel: 'Story', bandIndex: bandIdx, bandTotal: total,
+        ladderComplete: !!(clearBody && clearBody.ladderComplete),
+        storyBadge: storyAch ? achievementBadgeFor(storyAch) : null,
       });
       return;
     }
@@ -2468,13 +2487,29 @@ function App() {
                 </div>
               </div>
             )}
+            {/* Issue #183 — the Story ladder's completion badge. Deliberately a
+                SEPARATE block from the three daily badge celebrations above:
+                those are gated on isDailyResult and must stay that way, since
+                a story run never touches the daily attempt row, streak or
+                daily badges. */}
+            {winData.modeLabel === 'Story' && winData.storyBadge && (
+              <div className="badge-unlock">
+                <div className="bu-icon">{winData.storyBadge.icon}</div>
+                <div>
+                  <div className="bu-title">Ladder complete!</div>
+                  <div className="bu-name">{winData.storyBadge.name} · {winData.storyBadge.desc}</div>
+                </div>
+              </div>
+            )}
             {winData.modeLabel === 'Story' && winData.bandTotal > 0 && (
               <div className="mode-result">
                 <div className="mode-result-title">📖 Story · band {winData.bandIndex + 1} of {winData.bandTotal}</div>
                 <div className="mode-result-note">
-                  {(storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
-                    ? 'Rung ticked off. Points are paid once, on first clear — replay it any time for practice.'
-                    : 'Cleared. The next rung is now open.'}
+                  {winData.ladderComplete
+                    ? 'Every band cleared. The completion badge is on your profile; replay any band for practice.'
+                    : (storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
+                      ? 'Rung ticked off. Points are paid once, on first clear — replay it any time for practice.'
+                      : 'Cleared. The next rung is now open.'}
                 </div>
               </div>
             )}

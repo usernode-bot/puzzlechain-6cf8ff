@@ -644,6 +644,11 @@
       "expectText": "PLAYED"
     },
     {
+      "name": "Home grid lists multiple game cards",
+      "path": "/?demo=homegrid",
+      "expectSelector": ".grid > .card + .card"
+    },
+    {
       "name": "Home filter chips render",
       "path": "/?tab=classic",
       "expectSelector": ".home-filter-chips"

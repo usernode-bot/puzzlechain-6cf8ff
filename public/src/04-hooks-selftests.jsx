@@ -239,6 +239,112 @@ function navPrimitive(v) {
   return null; // objects/functions/symbols can never reach the serializer
 }
 
+/* ============================================================
+   #186 — back navigation: the nested-step stack and the parent map.
+
+   Two problems this solves, both structural:
+
+   1. Every in-app back control was hardwired to the lobby, so back from a
+      board went home rather than to the screen you came from.
+   2. Screens NESTED INSIDE a game (a ClassicShell sheet, an opponent picker,
+      an online room setup, a level select) were invisible to the history
+      reducer, so back from one of them unmounted the whole game.
+
+   `useNavStep` is how a nested screen announces itself. Each active
+   registration is one back step: it contributes its id to navState.sub (so the
+   history entry records the depth), and its handler is what unwinds it. The
+   stack is module scope on purpose — it has to be readable by the App's
+   popstate handler, which is not inside any of these components.
+   ============================================================ */
+const NAV_STEPS = [];
+let _navStepSeq = 0;
+const _navStepSubs = new Set();
+
+function navStepsSignature() { return NAV_STEPS.map((s) => s.id).join('|'); }
+function navStepsCount() { return NAV_STEPS.length; }
+function navStepsSubscribe(fn) { _navStepSubs.add(fn); return () => { _navStepSubs.delete(fn); }; }
+function _navStepsNotify() { _navStepSubs.forEach((fn) => { try { fn(); } catch (_) {} }); }
+
+/* Unwind the stack down to `n` entries, deepest-last-registered first.
+
+   Handlers are read by INDEX from a snapshot rather than by repeatedly taking
+   the tail, because each handler unwinds by calling setState — the entry does
+   not leave NAV_STEPS until React has re-run that component's effect cleanup,
+   which is not synchronous with this loop. Snapshotting makes "pop two levels"
+   deterministic instead of racing the reconciler. */
+function navStepsUnwindTo(n) {
+  const target = Math.max(0, n | 0);
+  const snapshot = NAV_STEPS.slice();
+  let unwound = 0;
+  for (let i = snapshot.length - 1; i >= target; i--) {
+    try { snapshot[i].onBack(); unwound++; } catch (_) {}
+  }
+  return unwound;
+}
+
+/* Register one nested back step.
+     active — whether this screen is currently showing
+     onBack — how to leave it (one level, not all the way out)
+     id     — a short stable token; it lands in navState.sub and in the
+              data-nav-sub attribute the navigation proposal checks assert on.
+
+   Registration order is effect order, which in React runs children before
+   parents. That is the ordering we want: a sheet opened OVER a picker belongs
+   at the top of the stack, and ClassicShell (the parent) registers after the
+   game body (the child), so its step is popped first. */
+function useNavStep(active, onBack, id) {
+  const cbRef = useRef(onBack);
+  cbRef.current = onBack;
+  const keyRef = useRef(0);
+  if (!keyRef.current) keyRef.current = ++_navStepSeq;
+  const stepId = String(id || 'step');
+  useEffect(() => {
+    if (!active) return undefined;
+    const entry = {
+      key: keyRef.current,
+      id: stepId,
+      onBack: () => { if (cbRef.current) cbRef.current(); },
+    };
+    NAV_STEPS.push(entry);
+    _navStepsNotify();
+    return () => {
+      const i = NAV_STEPS.indexOf(entry);
+      if (i !== -1) NAV_STEPS.splice(i, 1);
+      _navStepsNotify();
+    };
+  }, [!!active, stepId]);
+}
+
+/* Where does back go from here, when there is no history entry to pop?
+
+   Pure over the nav state so it is self-testable (`nav-parent-map`), and it
+   prefers the entry's own recorded `from` over the static map: the same game
+   screen has a different parent depending on how it was opened (through the
+   opponent picker, through the pre-game screen, or straight off a home card).
+   Returns null at the root — the one place back must NOT be intercepted, so
+   the platform shell handles the press instead. */
+const NAV_HOME = { screen: 'lobby', lobbyTab: 'home' };
+function parentOf(s) {
+  if (!s || typeof s !== 'object') return null;
+  const scr = s.screen || 'lobby';
+  const gameId = s.gameId || null;
+  if (scr === 'lobby') {
+    if (s.lobbyTab && s.lobbyTab !== 'home') return { screen: 'lobby', lobbyTab: 'home' };
+    return null;
+  }
+  if (scr === 'game') {
+    if (!gameId) return NAV_HOME;
+    if (s.from === 'opponent') return { screen: 'opponent', gameId };
+    if (s.from === 'lobby') return NAV_HOME;
+    return { screen: 'pregame', gameId, playMode: s.playMode || null };
+  }
+  if (scr === 'locked') return gameId ? { screen: 'pregame', gameId } : NAV_HOME;
+  if (scr === 'pregame' || scr === 'opponent') return NAV_HOME;
+  if (scr === 'profile') return s.from === 'friends' ? { screen: 'friends' } : NAV_HOME;
+  if (scr === 'friends' || scr === 'session') return NAV_HOME;
+  return NAV_HOME;
+}
+
 /* PHASE 2 (#163) — one reusable off-screen probe for touch-action computed
    values. Created once per sweep; `read(cls)` swaps the class and re-reads, and
    getComputedStyle flushes style recalc so the value is always current. */

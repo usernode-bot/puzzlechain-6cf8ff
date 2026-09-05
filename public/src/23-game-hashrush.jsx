@@ -30,13 +30,14 @@ const HR_LIVES = 3;
               leaves it unticked.
      arcade — endless again, with the band setting the starting pressure. */
 const HR_DAILY_SECS = 90;
-const HR_STORY_BANDS = 5;
+const HR_STORY_BANDS = 6;
 const HR_STORY = [
   { secs: 45,  speed: 150, blockRate: 0.26, spawnEvery: 0.95, lives: 3 },
   { secs: 60,  speed: 170, blockRate: 0.30, spawnEvery: 0.88, lives: 3 },
   { secs: 75,  speed: 195, blockRate: 0.34, spawnEvery: 0.80, lives: 3 },
   { secs: 90,  speed: 220, blockRate: 0.38, spawnEvery: 0.72, lives: 2 },
   { secs: 120, speed: 250, blockRate: 0.42, spawnEvery: 0.64, lives: 2 },
+  { secs: 150, speed: 285, blockRate: 0.46, spawnEvery: 0.56, lives: 2 },
 ];
 const HR_ARCADE = {
   easy:   { speed: 130, blockRate: 0.24, spawnEvery: 1.00, lives: 4 },
@@ -49,7 +50,7 @@ const HR_ARCADE = {
 function hrModeConfig(playMode, band) {
   if (playMode === 'story') {
     const c = HR_STORY[Math.max(0, Math.min(HR_STORY.length - 1, band || 0))];
-    return { ...c, limit: c.secs, label: `Rung ${Math.max(0, band || 0) + 1}` };
+    return { ...c, limit: c.secs, label: `Level ${Math.max(0, band || 0) + 1}` };
   }
   if (playMode === 'arcade') {
     const c = HR_ARCADE[band] || HR_ARCADE.normal;

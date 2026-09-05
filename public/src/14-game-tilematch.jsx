@@ -875,7 +875,7 @@ function TileMatchingGame({ onWin, onLose, onStepChange, resetKey, playMode, ban
     return (
       <div className="tm-level-won">
         <div className="trophy">🏆</div>
-        <h3>{isStory ? 'Band cleared!' : `Level ${selectedLevel} Cleared!`}</h3>
+        <h3>{isStory ? 'Story level cleared!' : `Level ${selectedLevel} Cleared!`}</h3>
         <div className="sub">Board cleared — well played</div>
         <div className="tm-level-stats">
           <div className="tm-level-stat-row"><span className="k">Moves</span><span className="v">{moves}</span></div>

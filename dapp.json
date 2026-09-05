@@ -644,6 +644,11 @@
       "expectText": "PLAYED"
     },
     {
+      "name": "Home grid lists multiple game cards",
+      "path": "/?demo=homegrid",
+      "expectSelector": ".grid > .card + .card"
+    },
+    {
       "name": "Home filter chips render",
       "path": "/?tab=classic",
       "expectSelector": ".home-filter-chips"
@@ -763,6 +768,66 @@
       "name": "Snakes & Ladders: a knockback onto an occupied square does not re-trigger",
       "path": "/?game=chutes-ladders&mode=2p&seats=3&snlpos=14,9,4&snlturn=2&snldice=5&snlauto=1",
       "expectSelector": ".cnl-board-wrap[data-snl-knock=\"1\"][data-snl-pos=\"4,14,4\"]"
+    },
+    {
+      "name": "Snakes & Ladders Local Match roster lobby renders",
+      "path": "/?game=chutes-ladders&snlroster=h,h,h,h&snlranked=1",
+      "expectSelector": ".cnlv2-roster-block"
+    },
+    {
+      "name": "Snakes & Ladders Ranked Match is locked below four humans",
+      "path": "/?game=chutes-ladders&snlroster=h,b,b",
+      "expectSelector": ".cnlv2-ranked-toggle.cnlv2-diff-locked"
+    },
+    {
+      "name": "Snakes & Ladders Ranked Match arms with four humans",
+      "path": "/?game=chutes-ladders&mode=2p&snlroster=h,h,h,h&snlranked=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-ranked=\"1\"][data-snl-roster=\"hhhh\"]"
+    },
+    {
+      "name": "Snakes & Ladders rank badge renders the linked tier",
+      "path": "/?game=chutes-ladders&mode=2p&snlroster=hhhh&snlranked=1&snlrank=gold",
+      "expectSelector": ".cnl-board-wrap[data-snl-rank=\"rank-gold\"]"
+    },
+    {
+      "name": "Snakes & Ladders: the first finisher takes a place while the rest play on",
+      "path": "/?game=chutes-ladders&mode=2p&snlroster=hhh&snlpos=99,50,20&snldice=1&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-finished=\"1\"][data-snl-over=\"0\"]"
+    },
+    {
+      "name": "Snakes & Ladders: the match ends once one racer is left",
+      "path": "/?game=chutes-ladders&mode=2p&snlroster=hhh&snlpos=99,99,20&snldice=1,1&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-over=\"1\"][data-snl-finished=\"1,2,3\"]"
+    },
+    {
+      "name": "Snakes & Ladders final standings render on the result card",
+      "path": "/?game=chutes-ladders&mode=2p&snlroster=hhh&snlpos=99,99,20&snldice=1,1&snlauto=1",
+      "expectSelector": ".win-standings[data-snl-standings=\"3\"]"
+    },
+    {
+      "name": "Snakes & Ladders climbing a ladder fires the ladder effect",
+      "path": "/?game=chutes-ladders&mode=2p&cnldiff=beginner&snlpos=2&snldice=1&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-fx=\"ladder\"][data-snl-pos=\"22,0\"]"
+    },
+    {
+      "name": "Snakes & Ladders sliding down a snake fires the snake effect",
+      "path": "/?game=chutes-ladders&mode=2p&cnldiff=beginner&snlpos=38&snldice=1&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-fx=\"snake\"][data-snl-pos=\"18,0\"]"
+    },
+    {
+      "name": "Snakes & Ladders a knockback fires the impact effect",
+      "path": "/?game=chutes-ladders&mode=2p&snlpos=24,20&snlturn=2&snldice=4&snlauto=1",
+      "expectSelector": ".cnl-board-wrap[data-snl-fx=\"knock\"][data-snl-pos=\"14,24\"]"
+    },
+    {
+      "name": "Snakes & Ladders music turns tense past square 80",
+      "path": "/?game=chutes-ladders&mode=2p&snlpos=85,10",
+      "expectSelector": ".cnl-board-wrap[data-snl-mood=\"tense\"]"
+    },
+    {
+      "name": "Snakes & Ladders music stays calm early in the race",
+      "path": "/?game=chutes-ladders&mode=2p&snlpos=10,10",
+      "expectSelector": ".cnl-board-wrap[data-snl-mood=\"calm\"]"
     },
     {
       "name": "Moksha demo room seeds cleanly",
@@ -1277,12 +1342,12 @@
       "expectSelector": "canvas.gmk-canvas"
     },
     {
-      "name": "Story ladder pre-game screen",
+      "name": "Story level picker pre-game screen",
       "path": "/?game=sudoku&pmode=story&demo=modes",
       "expectSelector": ".pregame-band"
     },
     {
-      "name": "Story band deep link mounts its board",
+      "name": "Story level deep link mounts its board",
       "path": "/?game=cratepush&pmode=story&band=8&play=1",
       "expectSelector": ".cp-game"
     },
@@ -1290,6 +1355,26 @@
       "name": "Arcade pre-game offers three bands",
       "path": "/?game=2048&pmode=arcade&demo=modes",
       "expectSelector": ".pregame-band.wide"
+    },
+    {
+      "name": "Story picker calls each step a level",
+      "path": "/?game=sudoku&pmode=story&demo=modes",
+      "expectText": "Clearing a level for the first time pays"
+    },
+    {
+      "name": "Story picker reports every level cleared",
+      "path": "/?game=zuma&pmode=story&demo=modes",
+      "expectText": "All levels cleared"
+    },
+    {
+      "name": "Spider story runs to six levels",
+      "path": "/?game=spider&pmode=story&demo=modes",
+      "expectText": "3/6"
+    },
+    {
+      "name": "Story level deep link accepts ?level=",
+      "path": "/?game=cratepush&pmode=story&level=8&play=1",
+      "expectSelector": ".cp-game"
     },
     {
       "name": "Arcade run history is shareable and replayable",
@@ -1325,6 +1410,21 @@
       "name": "Tile Match tile holder fits the frame mid-run",
       "path": "/?game=tilematching&pmode=story&band=1&play=1&tmcleared=12",
       "expectSelector": ".tm-board-box[data-tm-tray-fits=\"1\"]"
+    },
+    {
+      "name": "Story ladder badge renders on the badge screen",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.active[data-badge=\"story-sudoku\"]"
+    },
+    {
+      "name": "Badge collection lists the Story ladders group",
+      "path": "/?screen=account&demo=storybadges",
+      "expectText": "Story ladders"
+    },
+    {
+      "name": "Unfinished ladder renders as a locked story badge",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.locked[data-badge=\"story-cratepush\"]"
     }
   ],
   "visibility": {

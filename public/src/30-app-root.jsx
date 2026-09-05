@@ -55,7 +55,7 @@ function App() {
   // even after a streak resets, so the lobby can show a collected-badges strip.
   const [badges, setBadges] = useState([]);
   // Non-streak achievement badges earned: { types: [...], milestones: [...] }.
-  const [achievements, setAchievements] = useState({ types: [], milestones: [] });
+  const [achievements, setAchievements] = useState({ types: [], milestones: [], stories: [] });
   // Lifetime won-solve count (server-computed), used to drive the
   // "X/Y solves → Solver" next-milestone progress hint.
   const [solveCount, setSolveCount] = useState(0);
@@ -178,7 +178,9 @@ function App() {
   // consumed once the load settles.
   const pendingSelfProfile = useRef((() => {
     const s = new URLSearchParams(window.location.search).get('screen');
-    return s === 'account' || s === 'profile';
+    // 'badges' is the literal deep link to the badge collection; there is no
+    // separate badge screen, the collection lives in the profile's BadgeStrip.
+    return s === 'account' || s === 'profile' || s === 'badges';
   })());
 
   useEffect(() => {
@@ -376,8 +378,12 @@ function App() {
       setSolveCount(Number.isFinite(body.solveCount) ? body.solveCount : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
-        ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
-        : { types: [], milestones: [] });
+        ? {
+            types: body.achievements.types,
+            milestones: body.achievements.milestones || [],
+            stories: body.achievements.stories || [],
+          }
+        : { types: [], milestones: [], stories: [] });
       // Server-issued daily seeds — must land before any daily game mounts
       // (they do: games launch from the lobby, which renders after loading).
       SERVER_DAILY_SEEDS = body.seeds || {};
@@ -413,7 +419,7 @@ function App() {
       setStreak(0);
       setSolveCount(0);
       setBadges([]);
-      setAchievements({ types: [], milestones: [] });
+      setAchievements({ types: [], milestones: [], stories: [] });
       // Signed-out (or backend hiccup): the public read surface still supplies
       // server time, the reset countdown, and today's board seeds, so the
       // signed-out lobby stays anchored to server time.
@@ -758,19 +764,24 @@ function App() {
       return;
     }
     /* #176 — ?pmode=daily|story|arcade opens a card in one of its play modes,
-       and ?band= preselects the rung (story: a 1-based number) or difficulty
-       (arcade: easy|normal|hard). Without these the story ladder, the arcade
-       band picker and every board behind them are reachable only by TAPPING a
-       card button — which navigation-driven proposal checks and screenshots
-       cannot do, so none of #176 would have been verifiable. Deliberately NOT
-       ?mode=, which already pins a classic's opponent (bot / 2p / online).
+       and ?level= preselects the story level (a 1-based number) or the arcade
+       difficulty (easy|normal|hard). Without these the story levels, the
+       arcade band picker and every board behind them are reachable only by
+       TAPPING a card button — which navigation-driven proposal checks and
+       screenshots cannot do, so none of #176 would have been verifiable.
+       Deliberately NOT ?mode=, which already pins a classic's opponent
+       (bot / 2p / online).
+
+       ?band= is the original spelling and still works (#184 renamed the copy,
+       not the URL contract) — every merged deep link and dapp.json test keeps
+       resolving. ?level= wins when both are present.
 
        Checked BEFORE the pre-launch modal for the same reason ?result=1 is:
        2048 and Block Fit carry preLaunchModal, so below that branch this link
        would surface the opponent chooser instead of the mode it names. */
     const pmode = params.get('pmode');
     if (isPlayMode(pmode) && supportsMode(g.id, pmode)) {
-      const bandParam = params.get('band');
+      const bandParam = params.get('level') || params.get('band');
       let band = null;
       if (pmode === 'story' && bandParam) band = Math.max(0, (parseInt(bandParam, 10) || 1) - 1);
       if (pmode === 'arcade' && ARCADE_BAND_IDS.indexOf(bandParam) !== -1) band = bandParam;
@@ -1053,7 +1064,14 @@ function App() {
     if (ok && body) {
       setStoryProgress(prev => ({ ...prev, [gameId]: { cleared: body.cleared, total: body.total } }));
       if (body.awarded) setTotalScore(t => t + body.awarded);
+      if (body.newAchievements && body.newAchievements.length) {
+        setAchievements(prev => mergeAchievements(prev, body.newAchievements));
+      }
     }
+    /* Returned, not stashed in state here: handleWin's setWinData runs AFTER
+       this await, so anything this function set on the win overlay would be
+       clobbered by that call. The caller threads it in instead. */
+    return ok && body ? body : null;
   };
 
   const handleWin = async (score, steps, timeSecs, meta) => {
@@ -1081,12 +1099,18 @@ function App() {
        the shell decides what that means in the mode it was opened in. */
     if (playMode === 'story') {
       const bandIdx = typeof storyBand === 'number' ? storyBand : 0;
-      await handleBandCleared(bandIdx, { score, steps, timeSecs });
-      const total = (storyProgress[currentGame.id] || {}).total || 0;
+      const clearBody = await handleBandCleared(bandIdx, { score, steps, timeSecs });
+      const total = (clearBody && clearBody.total) || (storyProgress[currentGame.id] || {}).total || 0;
+      // Issue #183 — the ladder-completion badge. Only a FRESH award pops the
+      // celebration; finishing the last band again just shows the usual card.
+      const storyAch = (clearBody && clearBody.newAchievements || [])
+        .find(a => a && a.type === 'story_complete');
       setWinData({
         score, bonus: 0, finalScore: score, steps, timeSecs,
         multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
         modeLabel: 'Story', bandIndex: bandIdx, bandTotal: total,
+        ladderComplete: !!(clearBody && clearBody.ladderComplete),
+        storyBadge: storyAch ? achievementBadgeFor(storyAch) : null,
       });
       return;
     }
@@ -1140,6 +1164,14 @@ function App() {
           isClassic: true,
           bestScore: meta && meta.bestScore,
           longestSnake: meta && meta.longestSnake,
+          /* Free-form result rows a game can add to the score breakdown
+             (Snakes & Ladders V2 reports its placement and, in a ranked
+             match, the rank points it moved). A game that reports none is
+             unchanged: the block renders nothing. */
+          extraRows: meta && meta.extraRows,
+          /* Final table for a multi-player local match: every seat with the
+             place it took and the square it stopped on. */
+          standings: meta && meta.standings,
           gameId: currentGame.id,
         });
         // Remember the round's result for the Game Menu (kept for future
@@ -2328,6 +2360,16 @@ function App() {
                   <span className="v mono">{winData.wordsSolved} / {winData.wordsTotal}</span>
                 </div>
               )}
+              {/* Free-form rows a game reports in its win meta (Snakes &
+                  Ladders V2 sends its placement, and in a ranked match the
+                  rank points it moved). A game that reports none renders
+                  nothing here, so every other game is unchanged. */}
+              {(winData.extraRows || []).map((r, i) => (
+                <div className="score-row" key={'xr' + i}>
+                  <span className="k">{r.k}</span>
+                  <span className="v mono">{r.v}</span>
+                </div>
+              ))}
               <div className="score-row">
                 <span className="k">Steps · Time</span>
                 <span className="v mono">{winData.steps} · {fmtTime(winData.timeSecs)}</span>
@@ -2368,6 +2410,21 @@ function App() {
                 </div>
               )}
             </div>
+            {/* Final table for a multi-seat local match. Seat 1 is the device's
+                own player, so its row is marked rather than left to be counted
+                out of the list. */}
+            {(winData.standings || []).length > 2 && (
+              <div className="win-standings" data-snl-standings={winData.standings.length}>
+                <div className="ws-title">Final standings</div>
+                {winData.standings.map((r) => (
+                  <div className={'ws-row' + (r.seat === 1 ? ' me' : '')} key={r.seat}>
+                    <span className="ws-place mono">{r.place}</span>
+                    <span className="ws-name">{r.label}{r.bot ? ' 🤖' : ''}</span>
+                    <span className="ws-sq mono">{r.square >= 100 ? '🏁 100' : r.square}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {isDailyResult && winData.justBadge && (
               <div className="badge-unlock">
                 <div className="bu-icon">{winData.justBadge.icon}</div>
@@ -2435,13 +2492,29 @@ function App() {
                 </div>
               </div>
             )}
+            {/* Issue #183 — the Story ladder's completion badge. Deliberately a
+                SEPARATE block from the three daily badge celebrations above:
+                those are gated on isDailyResult and must stay that way, since
+                a story run never touches the daily attempt row, streak or
+                daily badges. */}
+            {winData.modeLabel === 'Story' && winData.storyBadge && (
+              <div className="badge-unlock">
+                <div className="bu-icon">{winData.storyBadge.icon}</div>
+                <div>
+                  <div className="bu-title">Ladder complete!</div>
+                  <div className="bu-name">{winData.storyBadge.name} · {winData.storyBadge.desc}</div>
+                </div>
+              </div>
+            )}
             {winData.modeLabel === 'Story' && winData.bandTotal > 0 && (
               <div className="mode-result">
-                <div className="mode-result-title">📖 Story · band {winData.bandIndex + 1} of {winData.bandTotal}</div>
+                <div className="mode-result-title">📖 Story · level {winData.bandIndex + 1} of {winData.bandTotal}</div>
                 <div className="mode-result-note">
-                  {(storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
-                    ? 'Rung ticked off. Points are paid once, on first clear — replay it any time for practice.'
-                    : 'Cleared. The next rung is now open.'}
+                  {winData.ladderComplete
+                    ? 'Every level cleared. The completion badge is on your profile; replay any level for practice.'
+                    : (storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
+                      ? 'Level ticked off. Points are paid once, on first clear — replay it any time for practice.'
+                      : 'Cleared. The next level is now open.'}
                 </div>
               </div>
             )}
@@ -2490,7 +2563,7 @@ function App() {
             )}
             {winData.modeLabel && currentGame && (
               <button className="primary-btn review-btn" onClick={() => launchGame(currentGame, playMode)}>
-                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the ladder'}
+                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the levels'}
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>

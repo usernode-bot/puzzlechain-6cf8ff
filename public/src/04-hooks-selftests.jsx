@@ -291,6 +291,38 @@ function describeAppStylesheet() {
   } catch (e) { return 'introspection-failed(' + (e && e.message) + ')'; }
 }
 
+/* #182 — count the column tracks a grid-template-columns value declares, so a
+   static rule can be judged without mounting anything. Splits at the top level
+   only (parens shield minmax()/repeat() internals) and expands a numeric
+   repeat(); auto-fill / auto-fit are unbounded, so they count as "enough". */
+function countTracks(value) {
+  const v = String(value || '').trim();
+  if (!v || v === 'none') return 0;
+  const parts = [];
+  let depth = 0, cur = '';
+  for (const ch of v) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && /\s/.test(ch)) {
+      if (cur) { parts.push(cur); cur = ''; }
+    } else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  let n = 0;
+  for (const part of parts) {
+    const rep = /^repeat\(\s*([^,]+),([\s\S]*)\)$/.exec(part);
+    if (rep) {
+      const count = rep[1].trim();
+      if (/^(auto-fill|auto-fit)$/.test(count)) { n += 2; continue; }
+      const times = parseInt(count, 10);
+      n += (isNaN(times) ? 1 : times) * Math.max(1, countTracks(rep[2]));
+    } else if (/^\[/.test(part)) {
+      continue; // a line-name list is not a track
+    } else n += 1;
+  }
+  return n;
+}
+
 /* `styleReady` is passed false when scheduleSelfTests() exhausted its retry
    budget without ever seeing the app's stylesheet APPLY. In that state EVERY
    computed-style probe returns the UA default, so the touch-action sweep used
@@ -485,6 +517,111 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* Local Match flow — the pure helpers behind the roster, the placement
+     ladder and the mood switch. None of them is reachable by a navigation
+     check (a hot-seat match takes dozens of taps to finish), so the rules
+     they encode are asserted here instead of in dapp.json. */
+  check('cnlv2-match-flow', () => {
+    // A roster is always 2-6 seats and always holds at least one human: a
+    // table of six bots has nobody to hand the phone to.
+    const r1 = cnlv2NormalizeRoster(['bot', 'bot', 'bot'], 3);
+    if (r1.length !== 3 || r1[0] !== 'human') throw new Error('all-bot roster must gain a human seat');
+    if (cnlv2NormalizeRoster(null, 5).length !== 5) throw new Error('seat count fallback broken');
+    if (cnlv2NormalizeRoster(['human'], 2).length !== 2) throw new Error('a 1-seat roster must pad to 2');
+    if (cnlv2NormalizeRoster(new Array(9).fill('human'), 6).length !== 6) throw new Error('roster must cap at 6 seats');
+    const mixed = cnlv2NormalizeRoster(['human', 'bot', 'human'], 3);
+    if (mixed.join(',') !== 'human,bot,human') throw new Error('a legal roster must pass through unchanged');
+
+    // Winning still scores exactly what it scored before placements existed.
+    if (SNLV2_PLACE_FACTOR[1] !== 1) throw new Error('first place must not be scaled');
+    if (cnlv2PlacementScore(300, 1) !== 300) throw new Error('first place must score the full base');
+    let prev = Infinity;
+    for (let place = 1; place <= 6; place++) {
+      const v = cnlv2PlacementScore(300, place);
+      if (v > prev) throw new Error('place ' + place + ' scored more than place ' + (place - 1));
+      if (v < 10) throw new Error('placement score floor breached at place ' + place);
+      prev = v;
+    }
+    if (cnlv2PlacementScore(12, 6) !== 10) throw new Error('the floor must hold for a low base');
+    if (cnlv2PlaceLabel(1) !== '1st' || cnlv2PlaceLabel(2) !== '2nd' ||
+        cnlv2PlaceLabel(3) !== '3rd' || cnlv2PlaceLabel(4) !== '4th') {
+      throw new Error('placement labels wrong');
+    }
+
+    // The music turns tense once ANY pawn is past the tense square, and the
+    // check is over the whole table, not just the seat that moved.
+    if (cnlv2MoodFor([1, 2, 3]) !== 'calm') throw new Error('an early board must stay calm');
+    if (cnlv2MoodFor([4, SNLV2_TENSE_SQUARE]) !== 'tense') throw new Error('the tense square itself must trip the mood');
+    if (cnlv2MoodFor([0, 0, 96]) !== 'tense') throw new Error('any seat past 80 must trip the mood');
+    if (cnlv2MoodFor(null) !== 'calm') throw new Error('an absent board must not throw');
+    return true;
+  });
+
+  /* Ranked ladder — RP movement has to be symmetric and zero-sum-shaped, or
+     a six-player table would inflate or deflate every device that plays one.
+     cnlv2ApplyRank is the sole writer of localStorage, so this asserts the
+     pure math only and never touches the stored ladder. */
+  check('cnlv2-rank-tiers', () => {
+    if (SNLV2_RANK_TIERS[0].at !== 0) throw new Error('the first tier must start at 0 RP');
+    for (let i = 1; i < SNLV2_RANK_TIERS.length; i++) {
+      if (SNLV2_RANK_TIERS[i].at <= SNLV2_RANK_TIERS[i - 1].at) throw new Error('tier thresholds must ascend');
+    }
+    if (cnlv2Tier(-50).id !== SNLV2_RANK_TIERS[0].id) throw new Error('RP below the floor must read as the first tier');
+    if (cnlv2Tier(99999).id !== SNLV2_RANK_TIERS[SNLV2_RANK_TIERS.length - 1].id) throw new Error('a huge RP must read as the top tier');
+    if (!cnlv2TierById('rank-gold') || cnlv2TierById('rank-gold').name !== 'Gold') throw new Error('tier lookup by id broken');
+    if (!cnlv2TierById('Legend')) throw new Error('tier lookup must also accept a tier name');
+    if (cnlv2TierById('nope')) throw new Error('an unknown tier id must resolve to null');
+
+    for (let n = 2; n <= 6; n++) {
+      const first = cnlv2RpDelta(1, n);
+      const last = cnlv2RpDelta(n, n);
+      if (first !== SNLV2_RP_BASE) throw new Error('first place must always pay +' + SNLV2_RP_BASE + ' (n=' + n + ')');
+      if (last !== -SNLV2_RP_BASE) throw new Error('last place must always cost -' + SNLV2_RP_BASE + ' (n=' + n + ')');
+      let prevD = Infinity;
+      for (let place = 1; place <= n; place++) {
+        const d = cnlv2RpDelta(place, n);
+        if (d >= prevD) throw new Error('RP must fall as placement worsens (n=' + n + ')');
+        prevD = d;
+      }
+      // Symmetric about the middle of the table: placing kth from the top
+      // gains exactly what placing kth from the bottom loses.
+      for (let place = 1; place <= n; place++) {
+        if (cnlv2RpDelta(place, n) !== -cnlv2RpDelta(n + 1 - place, n)) {
+          throw new Error('RP is not symmetric (n=' + n + ', place=' + place + ')');
+        }
+      }
+    }
+    if (SNLV2_RANKED_MIN_HUMANS < 4) throw new Error('ranked must need at least 4 human seats');
+    return true;
+  });
+
+  /* Background music — the scheduler runs on a Web Audio clock a check can
+     neither hear nor wait for, so the note generator is asserted as the pure
+     function it is. A null note is a legal rest; a null LEAD is a silent bar. */
+  check('cnlv2-music-loop', () => {
+    const moods = Object.keys(CG_LOOP_MOODS);
+    if (moods.indexOf('calm') < 0 || moods.indexOf('tense') < 0) throw new Error('both moods must exist');
+    if (CG_LOOP_MOODS.tense.bpm <= CG_LOOP_MOODS.calm.bpm) throw new Error('tense must be faster than calm');
+    for (const m of moods) {
+      let heard = 0;
+      for (let step = 0; step < CG_LOOP_STEPS_PER_BAR * 2; step++) {
+        const note = cgLoopNoteAt(m, step);
+        if (!note) continue;
+        if (!(note.lead > 0)) throw new Error(m + ' step ' + step + ' has no lead pitch');
+        if (!(note.dur > 0)) throw new Error(m + ' step ' + step + ' has no duration');
+        if (!(note.gain > 0)) throw new Error(m + ' step ' + step + ' is silent');
+        heard++;
+      }
+      if (heard < CG_LOOP_STEPS_PER_BAR) throw new Error(m + ' loop is mostly rests');
+      // Pure: the same step must always yield the same note, or a mood that
+      // survives a bar line would drift out of phase with itself.
+      const a = cgLoopNoteAt(m, 3);
+      const b = cgLoopNoteAt(m, 3 + CG_LOOP_STEPS_PER_BAR * 2);
+      if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(m + ' loop is not bar-periodic');
+    }
+    return true;
+  });
+
   /* A HELD CONTROL MUST STILL BE THERE. tapProps sets [data-pressed] on
      pointerdown and acts on pointerup, so any rule that takes a pressed
      element out of the flow breaks the press outright: it is not under the
@@ -613,6 +750,50 @@ function runClientSelfTests(styleReady) {
       throw new Error('game cards are ragged: ' + Math.round(lo) + 'px ('
         + nameOf(cards[hs.indexOf(lo)]) + ') vs ' + Math.round(hi) + 'px ('
         + nameOf(cards[hs.indexOf(hi)]) + ') across ' + cards.length + ' cards');
+    }
+    return true;
+  });
+
+  /* #182 — the games grid must be at least two-up on a phone. Measured,
+     because the regression is arithmetic between two rules that never mention
+     each other: .lobby's padding sets the content width, .grid's track floor
+     sets how many fit, and a change to either can silently drop the wall back
+     to a 30-card single-column scroll. The width guard keeps this quiet on a
+     genuinely narrow frame (and while the grid is mid-mount at zero width),
+     where one column is the honest answer. */
+  checkStyled('grid-two-up', () => {
+    const el = document.querySelector('.grid');
+    if (!el) return true; // grid not mounted (in a game / on another screen)
+    const w = el.getBoundingClientRect().width;
+    if (w < 300) return true; // narrower than two 140px tiles + gap, or not laid out yet
+    const cols = getComputedStyle(el).gridTemplateColumns;
+    const tracks = (cols && cols !== 'none') ? cols.trim().split(/\s+/).length : 0;
+    if (tracks < 2) {
+      throw new Error('games grid is one column at ' + Math.round(w)
+        + 'px wide (grid-template-columns: ' + cols + ')');
+    }
+    return true;
+  });
+
+  /* The static half of grid-two-up: it fires even when the home screen isn't
+     mounted, and it names the rule rather than the symptom. Any rule whose
+     selector is exactly `.grid` — including inside a @media block — that pins
+     the wall to a single track is the #182 regression coming back. */
+  check('grid-no-single-column', () => {
+    const bad = [];
+    // Selector must be EXACTLY `.grid`: preceded by start-of-file, `}` or a
+    // media block's `{`, so `.fit-col .grid` or `.grid > .card` don't match.
+    const re = /(?:^|[{}])\s*\.grid\s*\{([^}]*)\}/g;
+    let m;
+    while ((m = re.exec(css))) {
+      const body = m[1];
+      const gm = /(^|[;\s])grid-template-columns\s*:([^;]+)/.exec(body);
+      if (!gm) continue;
+      const value = gm[2].trim();
+      if (countTracks(value) < 2) bad.push('grid-template-columns: ' + value);
+    }
+    if (bad.length) {
+      throw new Error('.grid pinned to a single column by: ' + bad.join(' | '));
     }
     return true;
   });
@@ -1040,15 +1221,41 @@ function cuiDrawButton(ctx, c, pressed) {
   ctx.font = '600 ' + fs + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
   ctx.fillStyle = c.ink || (c.solid ? '#fff' : PAL.text);
   if (c.pips) {
-    // Die face: 3x3 pip grid (row-major booleans) instead of the label text.
+    /* Die face: 3x3 pip grid (row-major booleans) instead of the label text.
+       `c.spin` = { p, blur } turns the same grid into a throw: the face
+       tumbles (a rotation about the button's centre, so it reads as a die
+       turning over rather than a number swapping) and two ghost copies are
+       stamped either side of it for motion blur. Both decay to nothing at
+       p = 1, so a settled die is byte-identical to the static draw and a
+       caller that passes no `spin` sees no change at all. */
     const pr = Math.max(2, Math.min(w, h) * 0.075);
-    for (let i = 0; i < 9; i++) {
-      if (!c.pips[i]) continue;
-      const px = x + w * (0.28 + 0.22 * (i % 3));
-      const py = y + h * (0.28 + 0.22 * Math.floor(i / 3));
-      ctx.beginPath();
-      ctx.arc(px, py, pr, 0, Math.PI * 2);
-      ctx.fill();
+    const face = () => {
+      for (let i = 0; i < 9; i++) {
+        if (!c.pips[i]) continue;
+        const px = x + w * (0.28 + 0.22 * (i % 3));
+        const py = y + h * (0.28 + 0.22 * Math.floor(i / 3));
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+    const sp = c.spin;
+    if (sp && sp.blur > 0.05) {
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate((1 - sp.p) * Math.PI * 0.55);
+      ctx.translate(-cx, -cy);
+      ctx.save();
+      ctx.globalAlpha *= 0.3;
+      ctx.translate(-sp.blur, 0); face();
+      ctx.translate(sp.blur * 2, 0); face();
+      ctx.restore();
+      face();
+      ctx.restore();
+    } else {
+      face();
     }
   } else {
     ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, c.sub ? y + h / 2 - fs * 0.42 : y + h / 2 + 0.5, w - 10);

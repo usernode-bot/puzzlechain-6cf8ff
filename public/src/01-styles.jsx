@@ -2790,6 +2790,7 @@ ${emitTapHighlightRules()}
     animation: none !important;
     transition: none !important;
   }
+  .ng-status.err, .ng-status.ok { animation: none !important; }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed] { transform: none !important; }
 }
@@ -3327,6 +3328,21 @@ ${emitTapHighlightRules()}
   background: rgb(var(--c-gold-rgb) / 12%); border: 1px solid rgb(var(--c-gold-rgb) / 40%); color: ${C.gold};
   border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
 }
+/* #218 — banner tones. The base rule is brass (a notice); these three carry a
+   verdict, so they borrow the palette's own semantic hues. The info tone is the
+   neutral running-progress state, deliberately quieter than the base. */
+.p6-banner.info {
+  background: var(--c-well); border-color: ${C.border}; color: ${C.muted};
+}
+.p6-banner.warn {
+  background: rgb(var(--c-gold-rgb) / 14%); border-color: rgb(var(--c-gold-rgb) / 45%); color: ${C.gold};
+}
+.p6-banner.err {
+  background: rgb(var(--c-rose-rgb) / 14%); border-color: rgb(var(--c-rose-rgb) / 45%); color: ${C.rose};
+}
+.p6-banner.ok {
+  background: rgb(var(--c-emerald-rgb) / 14%); border-color: rgb(var(--c-emerald-rgb) / 45%); color: ${C.emerald};
+}
 
 /* #170 — the Klondike board is a canvas now (cards are drawn, not DOM), so
    the column can afford to be wide: cards grow with it, capped in klLayout.
@@ -3343,6 +3359,18 @@ ${emitTapHighlightRules()}
 /* Nonogram — canvas board (slice 5). The clue gutters are drawn inside the
    canvas so grid + clues scale together off one useFitBox measurement. */
 .ng-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
+/* The status line is always rendered (its text changes, never its presence), so
+   it reserves its own height and the board below it never shifts as the verdict
+   changes. Two lines' worth: the longest tone wraps on a phone. */
+.ng-status {
+  min-height: 2.9em; display: flex; align-items: center; justify-content: center;
+  line-height: 1.35; margin: 0;
+}
+.ng-status.err, .ng-status.ok { animation: ngStatusPop 260ms ease-out; }
+@keyframes ngStatusPop {
+  0% { transform: scale(0.97); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
 .ng-boardbox {
   flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
 }

@@ -2832,6 +2832,36 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    /* Staging-only demo seed (#218): a claimed, unfinished NONOGRAM row whose
+       grid is FULLY DECIDED and provably wrong, so the "filled but does not
+       match" verdict, the red clue numbers and the mistake counter are all
+       reachable by navigation alone (a proposal check cannot tap 64 cells).
+
+       Even rows all filled, odd rows all marked empty. That can never be the
+       day's answer whatever the seed: ngBuildForBand rejects any picture with
+       an empty row, so a row of zero filled cells cannot match its clue. No
+       blank cells remain, so the grid reads as complete. Today's daily is band
+       1 (8x8), which is the size the client's ngFits check requires.
+       Idempotent; today only; strict no-op in prod. */
+    if (IS_STAGING && req.query.demo === 'ngmistake') {
+      const ngDay = Math.floor(Date.now() / 86400000);
+      const ngGrid = Array.from({ length: 8 }, (_, r) => new Array(8).fill(r % 2 === 0 ? 1 : 2));
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'nonogram', (now() AT TIME ZONE 'utc')::date, 64, 180, $3::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL, score = NULL, time_secs = NULL,
+               steps = EXCLUDED.steps, elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          JSON.stringify({ dayNum: ngDay, grid: ngGrid, mistakes: 2 }),
+        ]
+      );
+    }
+
     // Staging-only demo seed (slice 6): a claimed, unfinished DROP STACK run
     // deep enough to show levels, the next-three queue and Hold without playing
     // five minutes. `lines: 24` puts the player on level 3, so gravity is

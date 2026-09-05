@@ -1392,6 +1392,36 @@
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
     },
     {
+      "name": "Nonogram flags a grid that is full but wrong",
+      "path": "/?game=nonogram&practice=1&ngfill=wrong",
+      "expectSelector": ".ng-status[data-ng-tone=\"err\"]"
+    },
+    {
+      "name": "Nonogram warns when a line can no longer match",
+      "path": "/?game=nonogram&practice=1&ngfill=error",
+      "expectSelector": ".ng-status[data-ng-tone=\"warn\"]"
+    },
+    {
+      "name": "Nonogram announces the solve",
+      "path": "/?game=nonogram&practice=1&ngfill=solved",
+      "expectSelector": ".win-overlay .win-card"
+    },
+    {
+      "name": "Nonogram resumes its mistake count",
+      "path": "/?demo=ngmistake&game=nonogram&play=1",
+      "expectText": "Mistakes so far: 2"
+    },
+    {
+      "name": "Nonogram top story band fits its board",
+      "path": "/?game=nonogram&pmode=story&band=6&play=1",
+      "expectSelector": ".ng-status[data-ng-tone=\"info\"]"
+    },
+    {
+      "name": "Nonogram error tone reads in dark mode",
+      "path": "/?game=nonogram&practice=1&ngfill=wrong&theme=dark",
+      "expectSelector": ".ng-status.err"
+    },
+    {
       "name": "Tile Match free-play board is URL-reachable",
       "path": "/?game=tilematching&play=1&tmlevel=900",
       "expectSelector": "canvas.tm-canvas"

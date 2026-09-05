@@ -1392,6 +1392,26 @@
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
     },
     {
+      "name": "Tile Match free-play board is URL-reachable",
+      "path": "/?game=tilematching&play=1&tmlevel=900",
+      "expectSelector": "canvas.tm-canvas"
+    },
+    {
+      "name": "Tile Match board footprint on a fresh story board",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1",
+      "expectSelector": ".tm-board-box[data-tm-units=\"5x3\"]"
+    },
+    {
+      "name": "Tile Match board footprint holds after tiles clear",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1&tmcleared=12",
+      "expectSelector": ".tm-board-box[data-tm-units=\"5x3\"]"
+    },
+    {
+      "name": "Tile Match tile holder fits the frame mid-run",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1&tmcleared=12",
+      "expectSelector": ".tm-board-box[data-tm-tray-fits=\"1\"]"
+    },
+    {
       "name": "Story ladder badge renders on the badge screen",
       "path": "/?screen=badges&demo=storybadges",
       "expectSelector": ".badge-chip.active[data-badge=\"story-sudoku\"]"

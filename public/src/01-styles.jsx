@@ -2177,7 +2177,13 @@ ${emitTapHighlightRules()}
   font-size: 0.9rem;
 }
 /* ---- Tile Match ---- */
-.tm-wrap { max-width: 400px; margin: 0 auto; }
+/* width:100% is load-bearing, not decorative (#210, same class of bug as
+   #149): .cg-stage is align-items:center, so with only an auto margin this
+   wrap took its FIT-CONTENT width, which is the canvas's own CSS width, which
+   useCanvasBoard writes back from the measured box. That loop settles at the
+   UA's default 300px canvas on every device, which is what made the free-play
+   tile holder hang off the frame. A definite width breaks the loop. */
+.tm-wrap { width: 100%; max-width: 400px; margin: 0 auto; }
 .tm-wrap.fit-col { max-width: 520px; }
 /* The canvas board box (both variants): the daily's carries tm-board-fit so
    it is the fit column's flexible region; classic takes natural height and

@@ -963,6 +963,102 @@ function runClientSelfTests(styleReady) {
     return window.boardRules.selfTest() === true;
   });
 
+  /* #210 — the Tile Match board's FOOTPRINT belongs to the deal, not to what
+     is still on it. `tmGeom` used to measure the live subset, so clearing a
+     column shrank the canvas and dragged the tile holder up underneath it.
+     Functional, so it fails whether or not the game is mounted. */
+  check('tilematch-board-anchor', () => {
+    if (typeof tmExtent !== 'function' || typeof tmGeom !== 'function') return true;
+    const tiles = [];
+    let id = 0;
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) {
+      tiles.push({ id: id++, col: c, row: r, layer: 0, type: (r * 6 + c) % 3, removed: false, inBar: false });
+    }
+    const fresh = tmExtent(tiles);
+    if (fresh.maxC !== 5 || fresh.maxR !== 3) {
+      throw new Error('tmExtent read ' + fresh.maxC + 'x' + fresh.maxR + ' of a 6x4 deal');
+    }
+    const before = tmGeom(360, 400, fresh, false);
+    // Clear the entire right column and bottom row — the worst case for a
+    // live-subset measurement, and the exact shape players reported.
+    const played = tiles.map((t) => ({ ...t,
+      removed: t.col === 5 || t.row === 3,
+      inBar: t.col === 4 && t.row === 0 }));
+    const after = tmExtent(played);
+    if (after.maxC !== fresh.maxC || after.maxR !== fresh.maxR) {
+      throw new Error('extents moved after clearing: ' + fresh.maxC + 'x' + fresh.maxR
+        + ' -> ' + after.maxC + 'x' + after.maxR);
+    }
+    const geo = tmGeom(360, 400, after, false);
+    if (geo.bw !== before.bw || geo.bh !== before.bh || geo.ox !== before.ox || geo.step !== before.step) {
+      throw new Error('board geometry moved after clearing: ' + JSON.stringify(before)
+        .slice(0, 80) + ' -> step ' + geo.step + ' ox ' + geo.ox + ' ' + geo.bw + 'x' + geo.bh);
+    }
+    // And the deep-link clearer must not move it either.
+    if (typeof tmClearSome === 'function') {
+      const cut = tmExtent(tmClearSome(tiles, 9));
+      if (cut.maxC !== fresh.maxC || cut.maxR !== fresh.maxR) {
+        throw new Error('tmClearSome moved the extents to ' + cut.maxC + 'x' + cut.maxR);
+      }
+    }
+    return true;
+  });
+
+  /* #210 — the 7-slot tile holder must fit the frame it is drawn in at every
+     width the fleet actually sees. It was a hardcoded 44px slot with a 6px
+     gap (344px), so on a phone it hung off both edges and its left origin
+     went negative. Swept, because one device width proves nothing. */
+  check('tilematch-tray-fits', () => {
+    if (typeof tmTrayGeom !== 'function') return true;
+    const bad = [];
+    for (let w = 240; w <= 560; w += 4) {
+      const t = tmTrayGeom(w, 50);
+      if (t.totalW > w - 8 || t.x0 < 4 || t.slotW < 12 || t.slotH < 8) {
+        bad.push(w + 'px -> ' + t.totalW + 'px tray at x' + t.x0);
+      }
+    }
+    if (bad.length) throw new Error('tile holder does not fit: ' + bad.slice(0, 4).join(', '));
+    // The mounted frame publishes the same answer for its measured width.
+    const box = document.querySelector('.tm-board-box[data-tm-tray-fits]');
+    if (box && box.getAttribute('data-tm-tray-fits') === '0') {
+      throw new Error('mounted tile holder is ' + box.getAttribute('data-tm-tray-w')
+        + 'px in a ' + Math.round(box.getBoundingClientRect().width) + 'px frame');
+    }
+    return true;
+  });
+
+  /* #210, the CSS half, measured. `.tm-wrap` sits in `.cg-stage`, which is
+     `align-items: center`, so without a definite width it took its
+     fit-content width — the canvas's own CSS width, which useCanvasBoard
+     writes back from the measured box. That loop settles at the UA's default
+     300px canvas on every device, whatever the screen. */
+  checkStyled('tilematch-canvas-fills', () => {
+    const wrap = document.querySelector('.tm-wrap');
+    const parent = wrap && wrap.parentElement;
+    if (!parent) return true; // Tile Match not mounted
+    const pcs = getComputedStyle(parent);
+    const avail = parent.clientWidth
+      - (parseFloat(pcs.paddingLeft) || 0) - (parseFloat(pcs.paddingRight) || 0);
+    if (avail < 40) return true; // laid out off-screen / mid-mount
+    const cap = parseFloat(getComputedStyle(wrap).maxWidth);
+    const want = Number.isFinite(cap) ? Math.min(avail, cap) : avail;
+    const got = wrap.getBoundingClientRect().width;
+    if (got < want - 4) {
+      throw new Error('.tm-wrap is ' + Math.round(got) + 'px inside '
+        + Math.round(avail) + 'px (expected ~' + Math.round(want) + 'px)');
+    }
+    const box = wrap.querySelector('.tm-board-box');
+    const canvas = box && box.querySelector('canvas.tm-canvas');
+    if (!canvas) return true;
+    const bw = box.getBoundingClientRect().width;
+    const cw = canvas.getBoundingClientRect().width;
+    if (bw >= 40 && cw < bw - 4) {
+      throw new Error('the Tile Match canvas is ' + Math.round(cw) + 'px in a '
+        + Math.round(bw) + 'px frame');
+    }
+    return true;
+  });
+
   if (fails.length) {
     console.error('[self-test] client self-tests FAILED:\n  ' + fails.join('\n  '));
     return false;

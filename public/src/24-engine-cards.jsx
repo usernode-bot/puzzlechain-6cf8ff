@@ -279,7 +279,7 @@ function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSa
      ordinary seeded deal — you lose the guarantee, not the game. */
   const kdBand = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
-      ? [0, 2, 4][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      ? [0, 2, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
       : null;
   const kdSeeded = useRef(null);
   if (kdSeeded.current === null && kdBand !== null) {
@@ -830,12 +830,18 @@ function spHitAt(ly, st, x, y) {
 
 function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
-  /* Spider's traditional ladder is SUIT COUNT (1 → 2 → 4), and its three story
-     bands are exactly that — a real progression before any rating enters.
-     Within a band, a rated seed picks a deal of known effort. */
+  /* Spider's traditional progression is SUIT COUNT (1 → 2 → 4), but this
+     build deals one suit at every level (see spDeal), so the difficulty comes
+     entirely from the RATED SEED: public/corpus/spider.json cuts 400 solved
+     deals into six effort bands and each level draws from its own.
+
+     Arcade's three buttons therefore index [0, 2, 5] — the bottom, middle and
+     TOP of those six. The raw findIndex 0/1/2 that used to be here was right
+     while the corpus had exactly three bands; after #184 raised it to six it
+     would have quietly made arcade Hard the third-easiest deal of six. */
   const spBand = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
-      ? Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))
+      ? [0, 2, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
       : null;
   const spSeeded = useRef(null);
   if (spSeeded.current === null && spBand !== null) {
@@ -2595,15 +2601,17 @@ function anPoolFor(len) {
   return _anPoolCache[len];
 }
 
-/* Word length mix per band — the ladder is length plus count, which is what
-   actually makes an anagram harder. Band 0 is five short words; the top band
-   is seven, weighted long. */
+/* Word length mix per story level — the progression is length plus count,
+   which is what actually makes an anagram harder. Level 1 is five short
+   words; the top level is all sevens. anPoolFor only curates lengths 5, 6 and
+   7 (4 falls back to the raw list), so the ladder stays inside that range. */
 const AN_BANDS = [
   [4, 4, 5, 5, 5],
   [5, 5, 5, 6, 6],
   [5, 5, 6, 6, 7],
   [5, 6, 6, 7, 7],
   [6, 6, 7, 7, 7],
+  [6, 7, 7, 7, 7],
 ];
 
 function anPickWords(rng, bandIdx) {
@@ -2636,7 +2644,7 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const dayNum = useRef(utcDayNum(offset)).current;
   const anBand = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
-      ? [0, 2, 4][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      ? [0, 2, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
       : 2;
   const deal = useRef(null);
   if (!deal.current) {

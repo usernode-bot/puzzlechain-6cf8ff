@@ -901,8 +901,8 @@ ${emitTapHighlightRules()}
 .pregame-deal {
   font-size: 0.82rem; color: ${C.text}
 
-/* #176 — the band pickers. Story's is a numbered ladder walked in order
-   (cleared behind you, one open rung ahead, the rest locked); arcade's is
+/* #176 — the band pickers. Story's is a numbered level list walked in order
+   (cleared behind you, one open level ahead, the rest locked); arcade's is
    three wide buttons with no lock at all, because all three difficulties are
    open from the first run and the recommendation steers instead of gating. */
 .pregame-bands { margin-top: 0.9rem; text-align: left; }

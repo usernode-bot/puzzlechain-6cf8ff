@@ -1342,12 +1342,12 @@
       "expectSelector": "canvas.gmk-canvas"
     },
     {
-      "name": "Story ladder pre-game screen",
+      "name": "Story level picker pre-game screen",
       "path": "/?game=sudoku&pmode=story&demo=modes",
       "expectSelector": ".pregame-band"
     },
     {
-      "name": "Story band deep link mounts its board",
+      "name": "Story level deep link mounts its board",
       "path": "/?game=cratepush&pmode=story&band=8&play=1",
       "expectSelector": ".cp-game"
     },
@@ -1355,6 +1355,26 @@
       "name": "Arcade pre-game offers three bands",
       "path": "/?game=2048&pmode=arcade&demo=modes",
       "expectSelector": ".pregame-band.wide"
+    },
+    {
+      "name": "Story picker calls each step a level",
+      "path": "/?game=sudoku&pmode=story&demo=modes",
+      "expectText": "Clearing a level for the first time pays"
+    },
+    {
+      "name": "Story picker reports every level cleared",
+      "path": "/?game=zuma&pmode=story&demo=modes",
+      "expectText": "All levels cleared"
+    },
+    {
+      "name": "Spider story runs to six levels",
+      "path": "/?game=spider&pmode=story&demo=modes",
+      "expectText": "3/6"
+    },
+    {
+      "name": "Story level deep link accepts ?level=",
+      "path": "/?game=cratepush&pmode=story&level=8&play=1",
+      "expectSelector": ".cp-game"
     },
     {
       "name": "Arcade run history is shareable and replayable",

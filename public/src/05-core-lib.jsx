@@ -497,8 +497,8 @@ const CHANGELOG = [
     id: 'w2026-08-17',
     weekOf: 'Week of August 17, 2026',
     items: [
-      'Most games now have three ways to play: today’s daily, a Story ladder you clear band by band, and endless Arcade with Easy / Normal / Hard.',
-      'Story pays the first time you clear a band — every game’s ladder is worth the same in total, however many rungs it has.',
+      'Most games now have three ways to play: today’s daily, a Story mode you clear level by level, and endless Arcade with Easy / Normal / Hard.',
+      'Story pays the first time you clear a level. Every game’s story is worth the same in total, however many levels it has.',
       'Arcade keeps a run history you can share or replay, and pays when you beat your own best or crack the top 10, top 3 or #1.',
       'Seven classics gained a daily: 2048, Knight’s Tour, Block Fit, Diamond Rush, Marble Loop, Hash Rush and Match-3.',
       'Crate Push now has 200 generated warehouses instead of 10 hand-built ones, each one showing the shortest solution it has.',

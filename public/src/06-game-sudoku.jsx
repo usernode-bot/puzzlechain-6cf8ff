@@ -516,10 +516,10 @@ function sdkDigUnique(solution, size, holes, rng) {
    Re-measure before retuning these numbers rather than eyeballing them; hole
    count alone predicts felt difficulty better than silhouette does, but only
    inside the range that was actually sampled. */
-// Rung counts, mirroring STORY_BANDS in server.js — the server owns what a
-// band is WORTH, the client owns what it looks like, and they must agree on
-// how many there are.
-const SDK_BAND_COUNT = { sudoku: 6, sudokumini: 5 };
+// Story LEVEL counts, mirroring STORY_BANDS in server.js — the server owns
+// what a level is WORTH, the client owns what it looks like, and they must
+// agree on how many there are (scripts/check-registry.js asserts it).
+const SDK_BAND_COUNT = { sudoku: 6, sudokumini: 6 };
 // Arcade's three bands map onto the same ladder, so Easy/Normal/Hard are the
 // bottom, middle and top of the story range rather than a second scale.
 const ARCADE_BAND_ORDER = ['easy', 'normal', 'hard'];

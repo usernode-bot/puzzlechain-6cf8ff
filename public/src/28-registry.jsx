@@ -134,13 +134,14 @@ const GAMES = [
     icon: '🪜',
     category: 'classic',
     shell: 'classic',
-    desc: 'Race up the board — climb ladders, dodge slides. 2-player hotseat.',
+    desc: 'Race 2 to 6 players up the board. Climb ladders, dodge snakes, play for a podium place.',
     tag: 'Board',
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead; slides drop you back.' },
-      { title: 'First to 100 wins', body: 'Play the bot, a hotseat friend, or online via room code. Win streaks climb the leaderboard.' },
+      { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead, snakes drop you back, and landing on an occupied square knocks that pawn back 10 squares.' },
+      { title: 'The race runs to the end', body: 'Reaching 100 takes an exact roll and wins you a place, not the match. Play carries on for 2nd, 3rd and the rest until one player is left.' },
+      { title: 'Local Match', body: 'Seat 2 to 6 players and set each one to Human or Bot. With 4 or more humans you can switch on Ranked Match and climb from Bronze to Legend.' },
     ],
     // V2 hand-drawn rebuild (public/src/snakesladders-v2/): illustrated
     // snakes/ladders, chess-piece pawns, 2–6 local seats, 7 difficulty tiers.
@@ -153,6 +154,27 @@ const GAMES = [
     menuModePicker: true,
     // 2–6 player hotseat (bot and online stay two-player).
     localSeats: { min: 2, max: 6 },
+    // Per-seat Human/Bot assignment, and the device-local ranked ladder that
+    // rides on top of it. `minHumans` is the gate the picker enforces; the
+    // engine re-checks it, because a deep link can set a roster too.
+    localRoster: { label: 'Who is playing' },
+    /* The roster and Ranked controls only exist once Local Match is chosen,
+       and neither a proposal check nor a screenshot can tap a mode chip. So
+       ?snlroster= (optionally with ?snlranked=1) also preselects the mode it
+       configures, which makes the lobby a URL. */
+    pickerPreset: () => {
+      const dl = cnlv2DeepLinks();
+      if (!dl.roster) return null;
+      return { mode: '2p', seats: dl.roster.length, roster: dl.roster, ranked: dl.ranked };
+    },
+    rankedLocal: {
+      minHumans: SNLV2_RANKED_MIN_HUMANS,
+      note: 'Your finishing place moves your rank, Bronze up to Legend.',
+      lockNote: 'Needs 4+ human players',
+    },
+    modeMeta: {
+      '2p': { icon: '👥', name: 'Local Match', desc: 'Seat 2 to 6 players on one device, each one a human or a bot' },
+    },
     // The 7-tier ladder, local play only. Legend is device-locally locked
     // until a Super Star win; Moksha plays its fixed board and hides the row.
     difficultyPicker: {

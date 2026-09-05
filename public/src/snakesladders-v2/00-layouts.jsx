@@ -115,10 +115,37 @@ function cnlv2LegendUnlocked() { return !!cnlv2Unlocks().legend; }
      ignored); anything unlisted starts at 0 as usual.
    - ?snlturn=1..6   starts the round on that seat rather than seat 1.
 
+   The Local Match roster, the Ranked toggle and the ranked ladder are all
+   behind taps too, so they get the same treatment:
+
+   - ?snlroster=h,b,b  seats the match directly ("h" human, "b" bot; the
+     compact form "hbb" also parses). Ignored unless it holds at least one
+     human, because a table of six bots has nobody to hand the phone to.
+   - ?snlranked=1      arms Ranked Match. Still subject to the 4-human rule,
+     so it only takes effect on a roster that qualifies.
+   - ?snlrank=gold     DISPLAY-ONLY: shows the badge at that tier without
+     writing localStorage, exactly as ?cnldiff=legend shows the Legend board
+     without granting the unlock. A screenshot fixture must never mutate the
+     device's ladder.
+   - ?snlquiet=1       forces reduced motion and silence for this load, so
+     the particle layer and the music scheduler cannot make a screenshot
+     nondeterministic.
+
    Same fixture rules: client-side only, no writes, no endpoint. */
 const CNLV2_NO_DEEP_LINKS = {
   difficulty: null, seats: null, dice: null, auto: false, sixSeed: 0, pos: null, turn: 0,
+  roster: null, ranked: false, rank: null, quiet: false,
 };
+
+/* "h,b,b" and "hbb" both mean [human, bot, bot]. Returns null unless the
+   result is a legal 2-6 seat table containing a human. */
+function cnlv2ParseRoster(raw) {
+  const txt = String(raw || '').toLowerCase().replace(/[^hb]/g, '');
+  const seats = txt.split('').map((c) => (c === 'b' ? 'bot' : 'human')).slice(0, 6);
+  if (seats.length < 2) return null;
+  if (!seats.some((s) => s === 'human')) return null;
+  return seats;
+}
 
 function cnlv2DeepLinks() {
   try {
@@ -137,6 +164,7 @@ function cnlv2DeepLinks() {
       .filter((n) => n >= 0 && n <= 99)
       .slice(0, 6);
     const turn = parseInt(q.get('snlturn') || '', 10);
+    const rankId = q.get('snlrank');
     return {
       difficulty: diff && CNLV2_LAYOUTS.some((l) => l.id === diff) ? diff : null,
       seats: seats >= 2 && seats <= 6 ? seats : null,
@@ -149,6 +177,11 @@ function cnlv2DeepLinks() {
       // finished game the shell never announced.
       pos: pos.length ? pos : null,
       turn: turn >= 1 && turn <= 6 ? turn : 0,
+      roster: cnlv2ParseRoster(q.get('snlroster')),
+      ranked: q.get('snlranked') === '1',
+      // Display only. cnlv2ApplyRank is the sole writer of the stored ladder.
+      rank: rankId && cnlv2TierById(rankId) ? cnlv2TierById(rankId).id : null,
+      quiet: q.get('snlquiet') === '1',
     };
   } catch (e) { return CNLV2_NO_DEEP_LINKS; }
 }

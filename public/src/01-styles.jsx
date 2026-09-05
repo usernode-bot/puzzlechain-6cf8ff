@@ -151,6 +151,16 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Sub-heading inside the badge collection — separates the story-ladder chips
+   (one per game with a story mode) from the streak/achievement chips above. */
+.badge-strip-sub {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${C.muted};
+}
 /* Badge accordion trigger — base styles, mobile activation via @media (max-width: 560px) */
 .badge-strip-trigger {
   display: flex; align-items: center; justify-content: space-between;
@@ -324,9 +334,24 @@ body {
   grid-auto-rows: 1fr;
 }
 
-@media (max-width: 380px) {
+/* #182 — phones get TWO cards per row, not one.
+
+   The old rule here was a single-column override below 380px, but the
+   one-column phone grid was never really that rule's doing: .lobby drops to
+   0.75rem side padding at 560px, so the content box is (viewport - 24px), and
+   auto-fill needs 200 + 16 + 200 = 416px for a second track. 320/390/430px
+   phones all fall short, so EVERY phone got one column and a ~9,800px scroll
+   through 30 cards. Removing the override alone fixes nothing — the track
+   floor has to come down too, which is what this rule does.
+
+   minmax(0, 1fr) rather than a bare 1fr: 1fr is minmax(auto, 1fr), whose auto
+   floor is the card's min-content width, and a long unbroken game name would
+   push the track wider than half the row and overflow. grid-auto-rows: 1fr
+   above still applies, so the uniform-tile-height guarantee is untouched. */
+@media (max-width: 560px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
   }
 }
 
@@ -876,8 +901,8 @@ ${emitTapHighlightRules()}
 .pregame-deal {
   font-size: 0.82rem; color: ${C.text}
 
-/* #176 — the band pickers. Story's is a numbered ladder walked in order
-   (cleared behind you, one open rung ahead, the rest locked); arcade's is
+/* #176 — the band pickers. Story's is a numbered level list walked in order
+   (cleared behind you, one open level ahead, the rest locked); arcade's is
    three wide buttons with no lock at all, because all three difficulties are
    open from the first run and the recommendation steers instead of gating. */
 .pregame-bands { margin-top: 0.9rem; text-align: left; }
@@ -1232,6 +1257,29 @@ ${emitTapHighlightRules()}
 
 @media (max-width: 480px) {
   .lobby-tab { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+
+  /* #182 — compact card metrics for the two-up phone grid. At 390px each
+     track is ~178px, so the card's desktop padding/type scale eats most of
+     the tile. Everything the card shows is KEPT and scaled down: two of the
+     merged cards name their variants only in .card-desc (and dapp.json
+     asserts those strings), so hiding it would remove real content, not just
+     decoration. .card-mode-btn's min-height stays 44px — only its horizontal
+     padding gives way. */
+  .grid > .card { padding: 0.75rem; border-radius: 12px; }
+  .grid > .card .card-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .grid > .card .card-name { font-size: 0.95rem; }
+  .grid > .card .card-desc {
+    font-size: 0.75rem;
+    min-height: 2.6em;
+    margin-bottom: 0.5rem;
+  }
+  .grid > .card .card-daily-badge {
+    top: 0.45rem;
+    right: 0.45rem;
+    font-size: 0.5rem;
+    padding: 0.18rem 0.35rem;
+  }
+  .grid > .card .card-mode-btn { padding: 0.45rem 0.2rem; }
 }
 
 /* ---- Minesweeper ---- */
@@ -2129,7 +2177,13 @@ ${emitTapHighlightRules()}
   font-size: 0.9rem;
 }
 /* ---- Tile Match ---- */
-.tm-wrap { max-width: 400px; margin: 0 auto; }
+/* width:100% is load-bearing, not decorative (#210, same class of bug as
+   #149): .cg-stage is align-items:center, so with only an auto margin this
+   wrap took its FIT-CONTENT width, which is the canvas's own CSS width, which
+   useCanvasBoard writes back from the measured box. That loop settles at the
+   UA's default 300px canvas on every device, which is what made the free-play
+   tile holder hang off the frame. A definite width breaks the loop. */
+.tm-wrap { width: 100%; max-width: 400px; margin: 0 auto; }
 .tm-wrap.fit-col { max-width: 520px; }
 /* The canvas board box (both variants): the daily's carries tm-board-fit so
    it is the fit column's flexible region; classic takes natural height and
@@ -3168,6 +3222,50 @@ ${emitTapHighlightRules()}
 }
 .mnc-difficulty-pill.cnlv2-diff-locked:hover { border-color: ${C.border}; color: ${C.muted}; }
 .cnlv2-lock-note { color: ${C.gold}; }
+/* ---- Snakes & Ladders V2 — Local Match roster + Ranked toggle ---- */
+/* One row per seat, so a six-seat table reads top to bottom instead of
+   wrapping into an unreadable pill soup. The seat label is a fixed column so
+   the Human/Bot pills line up down the whole list. */
+.cnlv2-roster-block { margin-top: 0.6rem; }
+.cnlv2-roster-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+.cnlv2-roster-row .mnc-difficulty-pill { flex: 1 1 0; min-width: 0; }
+.cnlv2-roster-seat {
+  flex: 0 0 2.1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+  font-weight: 700; color: ${C.muted};
+}
+.cnlv2-ranked-row {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid ${C.border};
+}
+.mnc-difficulty-pill.cnlv2-ranked-toggle { align-self: flex-start; }
+.mnc-difficulty-pill.cnlv2-ranked-toggle.active {
+  border-color: ${C.gold}; color: ${C.gold}; background: ${ca('gold', '1f')};
+}
+.cnlv2-ranked-note { color: ${C.muted}; font-size: 0.75rem; }
+/* Final standings table on the win card (multi-seat local matches). */
+.win-standings {
+  margin-top: 0.7rem; padding: 0.55rem 0.6rem;
+  border: 1px solid ${C.border}; border-radius: 10px; background: ${C.card};
+}
+.win-standings .ws-title {
+  font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: ${C.muted}; margin-bottom: 0.35rem;
+}
+.win-standings .ws-row {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.22rem 0.3rem; border-radius: 7px; font-size: 0.82rem;
+}
+.win-standings .ws-row.me { background: ${ca('accent', '1f')}; color: ${C.text}; }
+.win-standings .ws-place { flex: 0 0 1.2rem; color: ${C.gold}; font-weight: 700; }
+.win-standings .ws-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.win-standings .ws-sq { flex: 0 0 auto; color: ${C.muted}; }
+
+.cnlv2-rank-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.1rem 0.45rem; border-radius: 999px;
+  border: 1px solid ${C.gold}; color: ${C.gold}; background: ${ca('gold', '1a')};
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700;
+}
 .mok-intro { color: ${C.muted}; font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.9rem; }
 .mok-section {
   font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.09em;

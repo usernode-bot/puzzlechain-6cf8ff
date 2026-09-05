@@ -238,24 +238,39 @@ const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
 
 /* ============================================================
-   Play modes (#176) — story ladders and arcade bands
+   Play modes (#176) — story levels and arcade bands
    ============================================================
    Mirrors PLAY_MODES_BY_ID in public/src/29-cards.jsx. The client owns the
-   card copy; the server owns what a mode is worth and whether a rung has
+   card copy; the server owns what a mode is worth and whether a level has
    already been claimed, because both are cheatable from the client.
 
-   STORY_BANDS is the rung count per game. Bands, not levels: Tile Match
-   generates 1000 levels and Mahjong has 6 layouts, so paying per level would
-   make one game worth a hundred times another for the same "finished the
-   story" achievement. Every ladder is normalised to 4–8 rungs here, and
-   storyBandAward below spends the SAME total budget on every game however
-   many rungs it has — later bands simply weigh more than earlier ones. */
+   STORY_BANDS is the story LEVEL count per game. (The identifier and the
+   `game_progress.band` column keep their original names on purpose — the
+   #184 rename is display-only, and `band` is part of a live primary key.)
+   A story level is a difficulty step, not one of a game's own levels: Tile
+   Match generates 1000 of those and Mahjong has 6 layouts, so paying per
+   level-of-content would make one game worth a hundred times another for the
+   same "finished the story" achievement.
+
+   Every game's story is capped to STORY_LEVEL_MIN..STORY_LEVEL_MAX levels
+   (#184), and storyBandAward below spends the SAME total budget on every game
+   however many levels it has: later levels simply weigh more than earlier
+   ones. scripts/check-registry.js enforces the bound AND that each client
+   difficulty table is the same length as its entry here, because a server
+   bump without the matching client bump silently replays the old hardest
+   board at the top of the ladder. */
+const STORY_LEVEL_MIN = 6;
+const STORY_LEVEL_MAX = 10;
+// What a NEWLY added story starts at. Start at the floor and earn the extra
+// levels with content: the four games above the floor are there because they
+// have a ladder of real, distinguishable difficulty to spend them on.
+const STORY_LEVEL_DEFAULT = 6;
 const STORY_BANDS = {
-  sudoku: 6, sudokumini: 5, wordhunt: 6, cryptowordle: 6,
-  klondike: 5, spider: 3, mahjongsol: 6, anagrams: 5,
+  sudoku: 6, sudokumini: 6, wordhunt: 6, cryptowordle: 6,
+  klondike: 6, spider: 6, mahjongsol: 6, anagrams: 6,
   nonogram: 6, cratepush: 8, minefinder: 6,
-  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 5,
-  hashrush: 5, match3: 5, 'knights-tour': 6,
+  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 6,
+  hashrush: 6, match3: 6, 'knights-tour': 6,
 };
 const storyBandCount = (gameId) => STORY_BANDS[gameId] || 0;
 
@@ -568,6 +583,10 @@ const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
 //   daily_sweep    — finished ALL daily games within one UTC day.
 //   podium         — held rank #1 on a game's daily leaderboard at finish time.
 //   solve_milestone — lifetime finished+won solves crossed 10/50/100.
+//   story_complete  — cleared every band of one game's Story ladder. One
+//                    badge per (user, game); the game id lives in
+//                    metadata.gameId so a single `type` covers all ladders,
+//                    exactly as solve_milestone parameterises by count.
 const SPEED_DEMON_MAX_SECS = 60;
 // Per-game "no wasted moves" thresholds (the single balance knob for the
 // Flawless badge — tune here). Only the move-counted daily games qualify;
@@ -589,23 +608,28 @@ async function earnedAchievementBadges(userId) {
       `SELECT type, metadata
          FROM user_achievements
         WHERE user_id = $1
-          AND type IN ('first_solve','speed_demon','flawless','daily_sweep','podium','solve_milestone')`,
+          AND type IN ('first_solve','speed_demon','flawless','daily_sweep','podium','solve_milestone','story_complete')`,
       [userId]
     );
     const types = new Set();
     const milestones = new Set();
+    const stories = new Set();
     for (const r of rows) {
       types.add(r.type);
       if (r.type === 'solve_milestone' && r.metadata && Number.isFinite(+r.metadata.count)) {
         milestones.add(+r.metadata.count);
       }
+      if (r.type === 'story_complete' && r.metadata && typeof r.metadata.gameId === 'string') {
+        stories.add(r.metadata.gameId);
+      }
     }
     return {
       types: Array.from(types),
       milestones: Array.from(milestones).sort((a, b) => a - b),
+      stories: Array.from(stories).sort(),
     };
   } catch {
-    return { types: [], milestones: [] };
+    return { types: [], milestones: [], stories: [] };
   }
 }
 
@@ -1079,6 +1103,31 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_user_achievements_created
     ON user_achievements(created_at DESC)
   `);
+
+  /* Backfill story_complete badges for ladders finished before the badge
+     existed. Idempotent by the same NOT EXISTS guard the live award uses, so
+     it is a cheap no-op on every boot after the first. A ladder counts as
+     complete when the user holds every band 0..n-1 of that game. */
+  try {
+    for (const [gameId, bands] of Object.entries(STORY_BANDS)) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+         SELECT gp.user_id, 'story_complete', $1, $3::jsonb
+           FROM game_progress gp
+          WHERE gp.game_id = $1 AND gp.band >= 0 AND gp.band < $2::int
+          GROUP BY gp.user_id
+         HAVING COUNT(DISTINCT gp.band) = $2::int
+            AND NOT EXISTS (
+              SELECT 1 FROM user_achievements ua
+               WHERE ua.user_id = gp.user_id AND ua.type = 'story_complete'
+                 AND ua.metadata->>'gameId' = $1
+            )`,
+        [gameId, bands, JSON.stringify({ gameId, bands })]
+      );
+    }
+  } catch (e) {
+    console.warn('[migrate] story_complete backfill skipped:', e.message);
+  }
 
   // tilematch_scores is PUBLIC: personal-best scores for the Tile Match Puzzle
   // (1000-level mode). One row per user, upserted with GREATEST.
@@ -2502,6 +2551,54 @@ app.get('/api/daily', async (req, res) => {
           [req.user.id, a.type, a.type === 'solve_milestone' ? a.meta.count : null, JSON.stringify(a.meta)]
         );
       }
+      // One story_complete per ladder, so the Story ladders group in the badge
+      // strip also reads fully earned. Without this, broadening the strip by 18
+      // chips would quietly break this fixture's "everything unlocked" promise.
+      for (const [sGameId, sBands] of Object.entries(STORY_BANDS)) {
+        await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+           SELECT $1, 'story_complete', $2, $3::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements
+               WHERE user_id = $1 AND type = 'story_complete'
+                 AND metadata->>'gameId' = $2
+            )`,
+          [req.user.id, sGameId, JSON.stringify({ gameId: sGameId, bands: sBands })]
+        );
+      }
+    }
+
+    // Staging-only demo seed for the Story-ladder completion badge: one ladder
+    // finished (Sudoku, all 6 bands + its badge), one part-walked (Mine Finder,
+    // 5 of 6 — still locked), and one untouched (Crate Push), so the badge
+    // strip shows an earned story chip next to locked ones. Idempotent, no-op
+    // in prod.
+    if (IS_STAGING && req.query.demo === 'storybadges') {
+      const storySeed = [
+        { gameId: 'sudoku',     upTo: storyBandCount('sudoku') },
+        { gameId: 'minefinder', upTo: Math.max(0, storyBandCount('minefinder') - 1) },
+      ];
+      for (const sg of storySeed) {
+        for (let b = 0; b < sg.upTo; b++) {
+          await pool.query(
+            `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+            [req.user.id, sg.gameId, b, 600 + b * 80, 320 - b * 15, 55 + b * 7]
+          );
+        }
+      }
+      // The badge itself, on the same guarded insert the live award uses.
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+         SELECT $1, 'story_complete', 'sudoku', $2::jsonb
+          WHERE NOT EXISTS (
+            SELECT 1 FROM user_achievements
+             WHERE user_id = $1 AND type = 'story_complete'
+               AND metadata->>'gameId' = 'sudoku'
+          )`,
+        [req.user.id, JSON.stringify({ gameId: 'sudoku', bands: storyBandCount('sudoku') })]
+      );
     }
 
     // Staging-only demo seed: populate today's per-game leaderboards with a
@@ -3176,15 +3273,28 @@ app.get('/api/daily', async (req, res) => {
        renders every rung as unreachable-and-unstarted, and the arcade board is
        an empty list with no rank to be outside of. Idempotent. */
     if (IS_STAGING && req.query.demo === 'modes') {
-      // Half of Sudoku's 6-rung ladder cleared, so the pre-game screen shows
-      // ticks, an open rung and locked rungs all at once.
-      for (let b = 0; b < 3; b++) {
-        await pool.query(
-          `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
-           VALUES ($1, 'sudoku', $2, $3, $4, $5, now())
-           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
-          [req.user.id, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
-        );
+      /* Three shapes of the same screen, because the level picker reads
+         differently in each and only one of them was reachable before (#184):
+           sudoku — half walked: ticks, one open level, locked levels.
+           zuma   — every level cleared, which is the only way to see the
+                    "All levels cleared" note and an all-ticked picker.
+           spider — 3 of 6, the count the header renders as "3/6". Spider's
+                    story went from 3 levels to 6, so it is also the game where
+                    a stale client table would show as a short picker. */
+      const walked = [
+        { gameId: 'sudoku', cleared: 3 },
+        { gameId: 'zuma',   cleared: 6 },
+        { gameId: 'spider', cleared: 3 },
+      ];
+      for (const w of walked) {
+        for (let b = 0; b < w.cleared; b++) {
+          await pool.query(
+            `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+            [req.user.id, w.gameId, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
+          );
+        }
       }
       // Rivals on the Normal arcade board for 2048, plus a modest viewer row
       // that sits outside the top 3 — the case the pinned `me` row exists for.
@@ -4118,7 +4228,39 @@ app.post('/api/story/:gameId/clear', async (req, res) => {
     let cleared = 0;
     while (cleared < total && have.has(cleared)) cleared += 1;
 
-    res.json({ ok: true, band, total, cleared, awarded: firstClear ? award : 0, firstClear });
+    /* story_complete badge — awarded the moment the ladder reads as fully
+       cleared. Evaluated on EVERY clear, not only a first clear: the last rung
+       a player fills may well be one they are replaying out of order, and the
+       badge is about the ladder's state, not this one row. The guarded insert
+       is the idempotency (one row per user per gameId, forever), so re-running
+       this is free. Best-effort: a badge failure must never cost the player
+       the band they just cleared. */
+    const newAchievements = [];
+    const ladderComplete = cleared >= total;
+    if (ladderComplete) {
+      try {
+        const ach = await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+           SELECT $1, 'story_complete', $2, $3::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements
+               WHERE user_id = $1 AND type = 'story_complete'
+                 AND metadata->>'gameId' = $2
+            )
+           RETURNING type`,
+          [req.user.id, gameId, JSON.stringify({ gameId, bands: total })]
+        );
+        if (ach.rows.length) newAchievements.push({ type: 'story_complete', gameId, bands: total });
+      } catch (e) {
+        console.warn('[story] badge award failed:', e.message);
+      }
+    }
+
+    res.json({
+      ok: true, band, total, cleared,
+      awarded: firstClear ? award : 0, firstClear,
+      ladderComplete, newAchievements,
+    });
   } catch (e) {
     console.error('[story] clear failed:', e.message);
     res.status(500).json({ error: 'Could not record band' });

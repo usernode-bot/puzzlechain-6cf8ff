@@ -291,6 +291,38 @@ function describeAppStylesheet() {
   } catch (e) { return 'introspection-failed(' + (e && e.message) + ')'; }
 }
 
+/* #182 — count the column tracks a grid-template-columns value declares, so a
+   static rule can be judged without mounting anything. Splits at the top level
+   only (parens shield minmax()/repeat() internals) and expands a numeric
+   repeat(); auto-fill / auto-fit are unbounded, so they count as "enough". */
+function countTracks(value) {
+  const v = String(value || '').trim();
+  if (!v || v === 'none') return 0;
+  const parts = [];
+  let depth = 0, cur = '';
+  for (const ch of v) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && /\s/.test(ch)) {
+      if (cur) { parts.push(cur); cur = ''; }
+    } else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  let n = 0;
+  for (const part of parts) {
+    const rep = /^repeat\(\s*([^,]+),([\s\S]*)\)$/.exec(part);
+    if (rep) {
+      const count = rep[1].trim();
+      if (/^(auto-fill|auto-fit)$/.test(count)) { n += 2; continue; }
+      const times = parseInt(count, 10);
+      n += (isNaN(times) ? 1 : times) * Math.max(1, countTracks(rep[2]));
+    } else if (/^\[/.test(part)) {
+      continue; // a line-name list is not a track
+    } else n += 1;
+  }
+  return n;
+}
+
 /* `styleReady` is passed false when scheduleSelfTests() exhausted its retry
    budget without ever seeing the app's stylesheet APPLY. In that state EVERY
    computed-style probe returns the UA default, so the touch-action sweep used
@@ -481,6 +513,111 @@ function runClientSelfTests(styleReady) {
           if (L.ladders[s] >= 80) throw new Error('legend ladder tops out at ' + L.ladders[s] + ' — must stay below 80');
         }
       }
+    }
+    return true;
+  });
+
+  /* Local Match flow — the pure helpers behind the roster, the placement
+     ladder and the mood switch. None of them is reachable by a navigation
+     check (a hot-seat match takes dozens of taps to finish), so the rules
+     they encode are asserted here instead of in dapp.json. */
+  check('cnlv2-match-flow', () => {
+    // A roster is always 2-6 seats and always holds at least one human: a
+    // table of six bots has nobody to hand the phone to.
+    const r1 = cnlv2NormalizeRoster(['bot', 'bot', 'bot'], 3);
+    if (r1.length !== 3 || r1[0] !== 'human') throw new Error('all-bot roster must gain a human seat');
+    if (cnlv2NormalizeRoster(null, 5).length !== 5) throw new Error('seat count fallback broken');
+    if (cnlv2NormalizeRoster(['human'], 2).length !== 2) throw new Error('a 1-seat roster must pad to 2');
+    if (cnlv2NormalizeRoster(new Array(9).fill('human'), 6).length !== 6) throw new Error('roster must cap at 6 seats');
+    const mixed = cnlv2NormalizeRoster(['human', 'bot', 'human'], 3);
+    if (mixed.join(',') !== 'human,bot,human') throw new Error('a legal roster must pass through unchanged');
+
+    // Winning still scores exactly what it scored before placements existed.
+    if (SNLV2_PLACE_FACTOR[1] !== 1) throw new Error('first place must not be scaled');
+    if (cnlv2PlacementScore(300, 1) !== 300) throw new Error('first place must score the full base');
+    let prev = Infinity;
+    for (let place = 1; place <= 6; place++) {
+      const v = cnlv2PlacementScore(300, place);
+      if (v > prev) throw new Error('place ' + place + ' scored more than place ' + (place - 1));
+      if (v < 10) throw new Error('placement score floor breached at place ' + place);
+      prev = v;
+    }
+    if (cnlv2PlacementScore(12, 6) !== 10) throw new Error('the floor must hold for a low base');
+    if (cnlv2PlaceLabel(1) !== '1st' || cnlv2PlaceLabel(2) !== '2nd' ||
+        cnlv2PlaceLabel(3) !== '3rd' || cnlv2PlaceLabel(4) !== '4th') {
+      throw new Error('placement labels wrong');
+    }
+
+    // The music turns tense once ANY pawn is past the tense square, and the
+    // check is over the whole table, not just the seat that moved.
+    if (cnlv2MoodFor([1, 2, 3]) !== 'calm') throw new Error('an early board must stay calm');
+    if (cnlv2MoodFor([4, SNLV2_TENSE_SQUARE]) !== 'tense') throw new Error('the tense square itself must trip the mood');
+    if (cnlv2MoodFor([0, 0, 96]) !== 'tense') throw new Error('any seat past 80 must trip the mood');
+    if (cnlv2MoodFor(null) !== 'calm') throw new Error('an absent board must not throw');
+    return true;
+  });
+
+  /* Ranked ladder — RP movement has to be symmetric and zero-sum-shaped, or
+     a six-player table would inflate or deflate every device that plays one.
+     cnlv2ApplyRank is the sole writer of localStorage, so this asserts the
+     pure math only and never touches the stored ladder. */
+  check('cnlv2-rank-tiers', () => {
+    if (SNLV2_RANK_TIERS[0].at !== 0) throw new Error('the first tier must start at 0 RP');
+    for (let i = 1; i < SNLV2_RANK_TIERS.length; i++) {
+      if (SNLV2_RANK_TIERS[i].at <= SNLV2_RANK_TIERS[i - 1].at) throw new Error('tier thresholds must ascend');
+    }
+    if (cnlv2Tier(-50).id !== SNLV2_RANK_TIERS[0].id) throw new Error('RP below the floor must read as the first tier');
+    if (cnlv2Tier(99999).id !== SNLV2_RANK_TIERS[SNLV2_RANK_TIERS.length - 1].id) throw new Error('a huge RP must read as the top tier');
+    if (!cnlv2TierById('rank-gold') || cnlv2TierById('rank-gold').name !== 'Gold') throw new Error('tier lookup by id broken');
+    if (!cnlv2TierById('Legend')) throw new Error('tier lookup must also accept a tier name');
+    if (cnlv2TierById('nope')) throw new Error('an unknown tier id must resolve to null');
+
+    for (let n = 2; n <= 6; n++) {
+      const first = cnlv2RpDelta(1, n);
+      const last = cnlv2RpDelta(n, n);
+      if (first !== SNLV2_RP_BASE) throw new Error('first place must always pay +' + SNLV2_RP_BASE + ' (n=' + n + ')');
+      if (last !== -SNLV2_RP_BASE) throw new Error('last place must always cost -' + SNLV2_RP_BASE + ' (n=' + n + ')');
+      let prevD = Infinity;
+      for (let place = 1; place <= n; place++) {
+        const d = cnlv2RpDelta(place, n);
+        if (d >= prevD) throw new Error('RP must fall as placement worsens (n=' + n + ')');
+        prevD = d;
+      }
+      // Symmetric about the middle of the table: placing kth from the top
+      // gains exactly what placing kth from the bottom loses.
+      for (let place = 1; place <= n; place++) {
+        if (cnlv2RpDelta(place, n) !== -cnlv2RpDelta(n + 1 - place, n)) {
+          throw new Error('RP is not symmetric (n=' + n + ', place=' + place + ')');
+        }
+      }
+    }
+    if (SNLV2_RANKED_MIN_HUMANS < 4) throw new Error('ranked must need at least 4 human seats');
+    return true;
+  });
+
+  /* Background music — the scheduler runs on a Web Audio clock a check can
+     neither hear nor wait for, so the note generator is asserted as the pure
+     function it is. A null note is a legal rest; a null LEAD is a silent bar. */
+  check('cnlv2-music-loop', () => {
+    const moods = Object.keys(CG_LOOP_MOODS);
+    if (moods.indexOf('calm') < 0 || moods.indexOf('tense') < 0) throw new Error('both moods must exist');
+    if (CG_LOOP_MOODS.tense.bpm <= CG_LOOP_MOODS.calm.bpm) throw new Error('tense must be faster than calm');
+    for (const m of moods) {
+      let heard = 0;
+      for (let step = 0; step < CG_LOOP_STEPS_PER_BAR * 2; step++) {
+        const note = cgLoopNoteAt(m, step);
+        if (!note) continue;
+        if (!(note.lead > 0)) throw new Error(m + ' step ' + step + ' has no lead pitch');
+        if (!(note.dur > 0)) throw new Error(m + ' step ' + step + ' has no duration');
+        if (!(note.gain > 0)) throw new Error(m + ' step ' + step + ' is silent');
+        heard++;
+      }
+      if (heard < CG_LOOP_STEPS_PER_BAR) throw new Error(m + ' loop is mostly rests');
+      // Pure: the same step must always yield the same note, or a mood that
+      // survives a bar line would drift out of phase with itself.
+      const a = cgLoopNoteAt(m, 3);
+      const b = cgLoopNoteAt(m, 3 + CG_LOOP_STEPS_PER_BAR * 2);
+      if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(m + ' loop is not bar-periodic');
     }
     return true;
   });
@@ -726,6 +863,50 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #182 — the games grid must be at least two-up on a phone. Measured,
+     because the regression is arithmetic between two rules that never mention
+     each other: .lobby's padding sets the content width, .grid's track floor
+     sets how many fit, and a change to either can silently drop the wall back
+     to a 30-card single-column scroll. The width guard keeps this quiet on a
+     genuinely narrow frame (and while the grid is mid-mount at zero width),
+     where one column is the honest answer. */
+  checkStyled('grid-two-up', () => {
+    const el = document.querySelector('.grid');
+    if (!el) return true; // grid not mounted (in a game / on another screen)
+    const w = el.getBoundingClientRect().width;
+    if (w < 300) return true; // narrower than two 140px tiles + gap, or not laid out yet
+    const cols = getComputedStyle(el).gridTemplateColumns;
+    const tracks = (cols && cols !== 'none') ? cols.trim().split(/\s+/).length : 0;
+    if (tracks < 2) {
+      throw new Error('games grid is one column at ' + Math.round(w)
+        + 'px wide (grid-template-columns: ' + cols + ')');
+    }
+    return true;
+  });
+
+  /* The static half of grid-two-up: it fires even when the home screen isn't
+     mounted, and it names the rule rather than the symptom. Any rule whose
+     selector is exactly `.grid` — including inside a @media block — that pins
+     the wall to a single track is the #182 regression coming back. */
+  check('grid-no-single-column', () => {
+    const bad = [];
+    // Selector must be EXACTLY `.grid`: preceded by start-of-file, `}` or a
+    // media block's `{`, so `.fit-col .grid` or `.grid > .card` don't match.
+    const re = /(?:^|[{}])\s*\.grid\s*\{([^}]*)\}/g;
+    let m;
+    while ((m = re.exec(css))) {
+      const body = m[1];
+      const gm = /(^|[;\s])grid-template-columns\s*:([^;]+)/.exec(body);
+      if (!gm) continue;
+      const value = gm[2].trim();
+      if (countTracks(value) < 2) bad.push('grid-template-columns: ' + value);
+    }
+    if (bad.length) {
+      throw new Error('.grid pinned to a single column by: ' + bad.join(' | '));
+    }
+    return true;
+  });
+
   /* #149, statically — fires even for a game that isn't mounted. A board rule
      that sets an auto SIDE margin without a definite width is the bug class;
      inside .fit-col that always collapses the board. */
@@ -891,6 +1072,102 @@ function runClientSelfTests(styleReady) {
     return window.boardRules.selfTest() === true;
   });
 
+  /* #210 — the Tile Match board's FOOTPRINT belongs to the deal, not to what
+     is still on it. `tmGeom` used to measure the live subset, so clearing a
+     column shrank the canvas and dragged the tile holder up underneath it.
+     Functional, so it fails whether or not the game is mounted. */
+  check('tilematch-board-anchor', () => {
+    if (typeof tmExtent !== 'function' || typeof tmGeom !== 'function') return true;
+    const tiles = [];
+    let id = 0;
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) {
+      tiles.push({ id: id++, col: c, row: r, layer: 0, type: (r * 6 + c) % 3, removed: false, inBar: false });
+    }
+    const fresh = tmExtent(tiles);
+    if (fresh.maxC !== 5 || fresh.maxR !== 3) {
+      throw new Error('tmExtent read ' + fresh.maxC + 'x' + fresh.maxR + ' of a 6x4 deal');
+    }
+    const before = tmGeom(360, 400, fresh, false);
+    // Clear the entire right column and bottom row — the worst case for a
+    // live-subset measurement, and the exact shape players reported.
+    const played = tiles.map((t) => ({ ...t,
+      removed: t.col === 5 || t.row === 3,
+      inBar: t.col === 4 && t.row === 0 }));
+    const after = tmExtent(played);
+    if (after.maxC !== fresh.maxC || after.maxR !== fresh.maxR) {
+      throw new Error('extents moved after clearing: ' + fresh.maxC + 'x' + fresh.maxR
+        + ' -> ' + after.maxC + 'x' + after.maxR);
+    }
+    const geo = tmGeom(360, 400, after, false);
+    if (geo.bw !== before.bw || geo.bh !== before.bh || geo.ox !== before.ox || geo.step !== before.step) {
+      throw new Error('board geometry moved after clearing: ' + JSON.stringify(before)
+        .slice(0, 80) + ' -> step ' + geo.step + ' ox ' + geo.ox + ' ' + geo.bw + 'x' + geo.bh);
+    }
+    // And the deep-link clearer must not move it either.
+    if (typeof tmClearSome === 'function') {
+      const cut = tmExtent(tmClearSome(tiles, 9));
+      if (cut.maxC !== fresh.maxC || cut.maxR !== fresh.maxR) {
+        throw new Error('tmClearSome moved the extents to ' + cut.maxC + 'x' + cut.maxR);
+      }
+    }
+    return true;
+  });
+
+  /* #210 — the 7-slot tile holder must fit the frame it is drawn in at every
+     width the fleet actually sees. It was a hardcoded 44px slot with a 6px
+     gap (344px), so on a phone it hung off both edges and its left origin
+     went negative. Swept, because one device width proves nothing. */
+  check('tilematch-tray-fits', () => {
+    if (typeof tmTrayGeom !== 'function') return true;
+    const bad = [];
+    for (let w = 240; w <= 560; w += 4) {
+      const t = tmTrayGeom(w, 50);
+      if (t.totalW > w - 8 || t.x0 < 4 || t.slotW < 12 || t.slotH < 8) {
+        bad.push(w + 'px -> ' + t.totalW + 'px tray at x' + t.x0);
+      }
+    }
+    if (bad.length) throw new Error('tile holder does not fit: ' + bad.slice(0, 4).join(', '));
+    // The mounted frame publishes the same answer for its measured width.
+    const box = document.querySelector('.tm-board-box[data-tm-tray-fits]');
+    if (box && box.getAttribute('data-tm-tray-fits') === '0') {
+      throw new Error('mounted tile holder is ' + box.getAttribute('data-tm-tray-w')
+        + 'px in a ' + Math.round(box.getBoundingClientRect().width) + 'px frame');
+    }
+    return true;
+  });
+
+  /* #210, the CSS half, measured. `.tm-wrap` sits in `.cg-stage`, which is
+     `align-items: center`, so without a definite width it took its
+     fit-content width — the canvas's own CSS width, which useCanvasBoard
+     writes back from the measured box. That loop settles at the UA's default
+     300px canvas on every device, whatever the screen. */
+  checkStyled('tilematch-canvas-fills', () => {
+    const wrap = document.querySelector('.tm-wrap');
+    const parent = wrap && wrap.parentElement;
+    if (!parent) return true; // Tile Match not mounted
+    const pcs = getComputedStyle(parent);
+    const avail = parent.clientWidth
+      - (parseFloat(pcs.paddingLeft) || 0) - (parseFloat(pcs.paddingRight) || 0);
+    if (avail < 40) return true; // laid out off-screen / mid-mount
+    const cap = parseFloat(getComputedStyle(wrap).maxWidth);
+    const want = Number.isFinite(cap) ? Math.min(avail, cap) : avail;
+    const got = wrap.getBoundingClientRect().width;
+    if (got < want - 4) {
+      throw new Error('.tm-wrap is ' + Math.round(got) + 'px inside '
+        + Math.round(avail) + 'px (expected ~' + Math.round(want) + 'px)');
+    }
+    const box = wrap.querySelector('.tm-board-box');
+    const canvas = box && box.querySelector('canvas.tm-canvas');
+    if (!canvas) return true;
+    const bw = box.getBoundingClientRect().width;
+    const cw = canvas.getBoundingClientRect().width;
+    if (bw >= 40 && cw < bw - 4) {
+      throw new Error('the Tile Match canvas is ' + Math.round(cw) + 'px in a '
+        + Math.round(bw) + 'px frame');
+    }
+    return true;
+  });
+
   if (fails.length) {
     console.error('[self-test] client self-tests FAILED:\n  ' + fails.join('\n  '));
     return false;
@@ -1053,15 +1330,41 @@ function cuiDrawButton(ctx, c, pressed) {
   ctx.font = '600 ' + fs + 'px ' + (c.mono ? CUI_MONO : CUI_FONT);
   ctx.fillStyle = c.ink || (c.solid ? '#fff' : PAL.text);
   if (c.pips) {
-    // Die face: 3x3 pip grid (row-major booleans) instead of the label text.
+    /* Die face: 3x3 pip grid (row-major booleans) instead of the label text.
+       `c.spin` = { p, blur } turns the same grid into a throw: the face
+       tumbles (a rotation about the button's centre, so it reads as a die
+       turning over rather than a number swapping) and two ghost copies are
+       stamped either side of it for motion blur. Both decay to nothing at
+       p = 1, so a settled die is byte-identical to the static draw and a
+       caller that passes no `spin` sees no change at all. */
     const pr = Math.max(2, Math.min(w, h) * 0.075);
-    for (let i = 0; i < 9; i++) {
-      if (!c.pips[i]) continue;
-      const px = x + w * (0.28 + 0.22 * (i % 3));
-      const py = y + h * (0.28 + 0.22 * Math.floor(i / 3));
-      ctx.beginPath();
-      ctx.arc(px, py, pr, 0, Math.PI * 2);
-      ctx.fill();
+    const face = () => {
+      for (let i = 0; i < 9; i++) {
+        if (!c.pips[i]) continue;
+        const px = x + w * (0.28 + 0.22 * (i % 3));
+        const py = y + h * (0.28 + 0.22 * Math.floor(i / 3));
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+    const sp = c.spin;
+    if (sp && sp.blur > 0.05) {
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate((1 - sp.p) * Math.PI * 0.55);
+      ctx.translate(-cx, -cy);
+      ctx.save();
+      ctx.globalAlpha *= 0.3;
+      ctx.translate(-sp.blur, 0); face();
+      ctx.translate(sp.blur * 2, 0); face();
+      ctx.restore();
+      face();
+      ctx.restore();
+    } else {
+      face();
     }
   } else {
     ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, c.sub ? y + h / 2 - fs * 0.42 : y + h / 2 + 0.5, w - 10);

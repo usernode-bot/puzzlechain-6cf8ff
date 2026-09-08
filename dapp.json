@@ -1392,6 +1392,26 @@
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
     },
     {
+      "name": "Pin button renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-pin"
+    },
+    {
+      "name": "Pinned section renders pinned games",
+      "path": "/?demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Pinned section survives the Daily filter",
+      "path": "/?tab=daily&demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Home with nothing pinned explains how to pin",
+      "path": "/?demo=pinsempty",
+      "expectText": "on any card to pin it to the top"
+    },
+    {
       "name": "Nonogram flags a grid that is full but wrong",
       "path": "/?game=nonogram&practice=1&ngfill=wrong",
       "expectSelector": ".ng-status[data-ng-tone=\"err\"]"

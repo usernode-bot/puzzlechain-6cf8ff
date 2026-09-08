@@ -1232,7 +1232,7 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
     const other = myPlayerNum === 1 ? 2 : 1;
     const msg = isWaitingRoom
       ? 'Close this room? Nobody has joined yet, so nothing is rated.'
-      : 'End this game? Your opponent wins and it counts on the Ladder.';
+      : 'End this game? Your opponent wins and it counts on the Rating Ladder.';
     if (window.unNative && window.unNative.alert) {
       const r = await window.unNative.alert({
         title: isWaitingRoom ? 'Close room' : 'End game',

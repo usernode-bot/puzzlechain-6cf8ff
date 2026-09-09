@@ -260,6 +260,48 @@ body {
 .account-chip.on { cursor: pointer; font-family: inherit; color: ${C.text}; transition: border-color 0.12s ease; }
 .account-chip.on:hover { border-color: ${C.accent}; }
 
+/* #236 — the page wrapper shared by the profile and friends screens.
+   These sit directly under .app, which is a COLUMN flex container, so they
+   are flex items — and an auto horizontal margin opts a flex item out of
+   align-items: stretch. That is the same trap the .fit-col boards hit: with
+   no definite width the box falls back to fit-content, and fit-content is
+   clamped UP to min-content. The profile's min-content is ~460px (an
+   unbreakable username plus a recent-games row that cannot shrink), so the
+   whole page scrolled sideways on every phone — 70px at 390, 140px at 320.
+   width: 100% restores a definite width; max-width still centres it on
+   desktop. min-width: 0 keeps the item shrinkable if the container ever
+   becomes a ROW flex, where the automatic minimum size would apply instead. */
+.social-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+}
+/* A username is user-supplied and can be one long unbreakable token, which is
+   what made min-content exceed the viewport in the first place. Let it wrap
+   rather than push the page wide, and let its column shrink. */
+.profile-id { min-width: 0; }
+/* Recent-games row. The date and the score are fixed-width monospace and do
+   not shrink, so on a narrow card they left the game name almost nothing —
+   "Daily Cipher" truncating to "Dail…". Below 460px the meta pair drops to
+   its own line instead of competing with the name for the same one. */
+.prr {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.2rem; font-size: 0.88rem;
+}
+.prr-icon { font-size: 1.1rem; flex: 0 0 auto; }
+.prr-name { flex: 1 1 auto; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prr-meta { display: flex; align-items: center; gap: 0.6rem; flex: 0 0 auto; }
+.prr-date { color: ${C.muted}; font-size: 0.78rem; }
+.prr-score { font-size: 0.82rem; white-space: nowrap; }
+@media (max-width: 460px) {
+  .prr { flex-wrap: wrap; row-gap: 0.15rem; }
+  /* The name takes the rest of the first line beside the icon; the meta pair
+     wraps below and lines up under the name, not the icon. */
+  .prr-meta { width: 100%; padding-left: 1.7rem; justify-content: flex-start; }
+}
+.profile-id h2 { overflow-wrap: anywhere; }
 /* Profile "Connections" section — Friends entry, shown on mobile only. */
 .account-connection-row {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -301,6 +343,18 @@ body {
   .badge-strip-body.open { max-height: 600px; opacity: 1; } /* 600px > any realistic badge grid height */
   .badge-chevron { display: inline-block; }
   .badge-strip-trigger { cursor: pointer; pointer-events: auto; }
+}
+
+/* The top bar's own contribution to horizontal scroll, and the last 9px of
+   #236. The brand and the stats/settings/account cluster are both flex items
+   with an automatic minimum size, so neither shrinks: below ~330px their
+   combined min-content simply exceeds the viewport and the WHOLE app scrolls
+   sideways, profile included. Nothing is dropped here — the gaps and the
+   bar's own padding are just tightened enough to fit a 320px screen. */
+@media (max-width: 380px) {
+  .nav { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .nav-right { gap: 0.5rem; }
+  .nav-stats { gap: 0.7rem; }
 }
 
 /* ---- Lobby ---- */

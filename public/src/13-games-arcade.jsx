@@ -391,7 +391,14 @@ function BbGridCanvas({ grid, preview }) {
         const x = c * (cs + gapPx), y = r * (cs + gapPx);
         const pv = preview && preview[i];
         klRR(ctx, x, y, cs, cs, 4);
-        ctx.fillStyle = grid[i] || PAL.bg;
+        /* #208 — BB_COLORS are C.* tokens ('var(--c-accent)'), which a canvas
+           CANNOT resolve: the assignment is silently ignored and fillStyle
+           keeps whatever it held, i.e. the PAL.bg of the previous empty cell.
+           Every placed block therefore painted itself the background colour —
+           the board read as empty however many pieces you had dropped. The
+           tray canvas a few lines below already resolved through palOf; the
+           well did not. */
+        ctx.fillStyle = grid[i] ? palOf(grid[i], PAL.accent) : PAL.bg;
         ctx.fill();
         if (pv) {
           klRR(ctx, x, y, cs, cs, 4);

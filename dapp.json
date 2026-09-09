@@ -301,6 +301,11 @@
       "expectSelector": ".pregame-howto-btn"
     },
     {
+      "name": "How to play and Game chat are buttons, not footnote links",
+      "path": "/?game=sudoku",
+      "expectSelector": ".pregame-actions .pregame-howto-btn"
+    },
+    {
       "name": "Snakes & Ladders mode select offers Versus Bot",
       "path": "/?game=chutes-ladders",
       "expectText": "Versus Bot"

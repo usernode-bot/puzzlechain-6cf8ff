@@ -769,8 +769,10 @@ function OpponentScreen({ game, onPlay, onHowTo, onChat }) {
         </div>
       )}
 
-      <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
-      {onChat && <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>}
+      <div className="pregame-actions">
+        <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+        {onChat && <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>}
+      </div>
     </div>
   );
 }
@@ -916,10 +918,17 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
           to put your run on the leaderboard and start a streak.
         </div>
       )}
-      <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
-      {onChat && (
-        <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>
-      )}
+      {/* #240 — these two were trailing text links under the Play button, the
+          quietest thing on the screen. They are the game's instructions and
+          its room; a first-time player needs the first one before they press
+          Play at all. Now a pair of real buttons on their own row, each a
+          44px tap target. */}
+      <div className="pregame-actions">
+        <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+        {onChat && (
+          <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>
+        )}
+      </div>
     </div>
   );
 }

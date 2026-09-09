@@ -948,11 +948,26 @@ ${emitTapHighlightRules()}
 .pregame-play { width: 100%; }
 .pregame-play:disabled { opacity: 0.5; cursor: default; }
 .pregame-signedout { font-size: 0.78rem; color: ${C.muted}; margin-top: 0.6rem; }
-.pregame-howto-btn {
-  margin-top: 0.8rem; background: none; border: none; color: ${C.accent};
-  font-family: inherit; font-size: 0.85rem; cursor: pointer; padding: 0.3rem;
+/* #240 — "How to play" and the game's chat room were trailing text links
+   under the Play button: no border, no background, 0.3rem of padding and a
+   ~28px tap target, sitting in the position a page gives its footnotes. One of
+   them is the game's instructions, which a first-time player needs BEFORE
+   pressing Play, and the other is the only social surface a game has.
+   They are a pair of real buttons on their own row now, each filling half the
+   width with a 44px target — visible without competing with Play, which keeps
+   the filled accent treatment to itself. */
+.pregame-actions {
+  display: flex; gap: 0.5rem; margin-top: 0.8rem;
 }
-.pregame-howto-btn:hover { text-decoration: underline; }
+.pregame-howto-btn {
+  flex: 1 1 0; min-width: 0; min-height: 44px;
+  display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+  background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px;
+  color: ${C.text}; font-family: inherit; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; padding: 0.3rem 0.5rem;
+  transition: border-color 0.12s, color 0.12s;
+}
+.pregame-howto-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
 
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
@@ -980,14 +995,23 @@ ${emitTapHighlightRules()}
 .howto-step-body { font-size: 0.82rem; color: ${C.muted}; line-height: 1.45; }
 
 /* "?" help button in the in-game headers */
+/* #240 — the daily header's "?" and chat buttons were 1.9rem muted circles,
+   while the SAME two controls in the classic shell's topbar are 2.4rem and
+   full-contrast (.cg-btn). Two shells disagreeing about how important the
+   instructions are is not a design decision, and the daily side lost: at
+   30px these sat under the 44px tap target the rest of the app aims for and
+   read as disabled. Sized and coloured to match .cg-btn. */
 .help-btn {
   margin-left: auto; background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 50%; width: 1.9rem; height: 1.9rem; color: ${C.muted};
-  font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  border-radius: 50%; width: 2.4rem; height: 2.4rem; color: ${C.text};
+  font-family: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: border-color 0.12s, color 0.12s;
 }
 .help-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
+/* Only the first of the pair pushes off the title; the second sits beside it
+   rather than opening a second gap. */
+.help-btn + .help-btn { margin-left: 0; }
 
 /* ---- Locked lobby card ---- */
 .card.locked { cursor: default; }

@@ -33,7 +33,7 @@
     {
       "name": "Locked card after daily attempt",
       "path": "/?demo=locked",
-      "expectText": "resets in"
+      "expectSelector": ".card-daily-badge.done"
     },
     {
       "name": "Word Search card in lobby",
@@ -224,6 +224,11 @@
       "name": "Today's Top Scores board renders in daily lobby",
       "path": "/?demo=leaderboard",
       "expectText": "Today's Top Scores"
+    },
+    {
+      "name": "Home leads with the games grid",
+      "path": "/",
+      "expectSelector": ".lobby .grid .card .card-mode-btn"
     },
     {
       "name": "Today's Top Scores lists a seeded solver",
@@ -656,7 +661,7 @@
     {
       "name": "Home daily reset countdown renders",
       "path": "/",
-      "expectText": "New daily puzzles at midnight UTC"
+      "expectSelector": ".gotd-hero .gotd-meta"
     },
     {
       "name": "Nonogram canvas board renders in-game",

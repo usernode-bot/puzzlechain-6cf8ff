@@ -1836,7 +1836,13 @@ function App() {
   // Server-anchored reset clock for the merged grid's daily note (slice 2) —
   // the same hook LockedScreen and the pre-game screen use, so every countdown
   // in the app ticks off one clock.
-  const homeResetCountdown = useCountdown(nextResetUtc, offset, onReset);
+  /* The home page's midnight trigger. #234 removed the note that RENDERED this
+     string — the Game-of-the-Day hero directly above it runs the same clock —
+     but the call stays, because it is also what fires onReset at 00:00 UTC.
+     The hero has its own useCountdown, so on most days either would do; when
+     there is no featured game the hero falls back to a plain formatted string
+     with no expiry hook at all, and this is the only thing left watching. */
+  useCountdown(nextResetUtc, offset, onReset);
 
   /* PHASE 1 (#158/#160/#162) — one `resultData` for every kind of ending, so
      the frozen board, the minibar, the backdrop dismiss and "View board" all
@@ -2061,13 +2067,6 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
-              {/* Today's Top Scores (GotD-only board) sits directly below the
-                  hero so the featured game's results read as one section. */}
-              {authOk && !loading && (
-                <TodayChampions
-                  onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-                />
-              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}
@@ -2208,10 +2207,6 @@ function App() {
                     )}
                     {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
                     <div className="home-section-title">All Games</div>
-                    <div className="home-daily-note">
-                      🕛 New daily puzzles at midnight UTC — resets in{' '}
-                      <span className="mono">{homeResetCountdown}</span>
-                    </div>
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },
@@ -2229,12 +2224,21 @@ function App() {
                     </div>
                     {authOk && pins.length === 0 && (
                       <div className="home-pin-empty">
-                        Nothing pinned yet. Tap 📌 on any card to pin it to the top.
+                        Tap 📌 on any card to pin it to the top.
                       </div>
                     )}
                     <div className="grid">
                       {restCards.map(c => <GameCard {...cardProps(c)} />)}
                     </div>
+                    {/* #234 — Today's Top Scores reads AFTER the games now.
+                        It is a result of playing, not a way in, and at 135px
+                        directly under the hero it was one of the four blocks
+                        keeping every game card off the first screen. */}
+                    {authOk && !loading && (
+                      <TodayChampions
+                        onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+                      />
+                    )}
                   </React.Fragment>
                 );
               })()}

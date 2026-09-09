@@ -913,6 +913,50 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #199 — the same round-trip for Mine Finder, whose bands run 7x7 to 13x13.
+     Its geometry and hit test were hardcoded to 9 while the draw loop walked
+     the real dimensions, so only the two 9x9 bands worked: 7x7 mapped a tap
+     through `r * 9 + c` and revealed the wrong cell, and 11x11 / 13x13 could
+     not be tapped past column 8 at all. Every corner of every band has to
+     survive geometry -> pixels -> hit test, or the board is unplayable in a
+     way no parser and no console error can see. */
+  check('minefinder-board-bounds', () => {
+    for (const spec of MF_BANDS) {
+      const { cols, rows } = spec;
+      const geo = mfGeometry(390, 700, cols, rows);
+      if (geo.boardX < 0 || geo.boardW > 390) {
+        throw new Error(cols + 'x' + rows + ' board is ' + geo.boardW + 'px wide in a 390px frame');
+      }
+      const corners = [[0, 0], [0, cols - 1], [rows - 1, 0], [rows - 1, cols - 1]];
+      for (const [r, c] of corners) {
+        const hit = mfCellAt({
+          x: geo.boardX + c * geo.cellStep + geo.cell / 2,
+          y: geo.boardY + r * geo.cellStep + geo.cell / 2,
+        }, geo, cols, rows);
+        if (hit !== r * cols + c) {
+          throw new Error(cols + 'x' + rows + ' cell ' + r + ',' + c +
+            ' hit-tests as index ' + hit + ', expected ' + (r * cols + c));
+        }
+      }
+      // A tap past the last column must MISS, not wrap onto the next row.
+      const past = mfCellAt({
+        x: geo.boardX + cols * geo.cellStep + 4,
+        y: geo.boardY + geo.cell / 2,
+      }, geo, cols, rows);
+      if (past !== -1) throw new Error(cols + 'x' + rows + ' hit-tests ' + past + ' past its own edge');
+      // Every cell the draw loop paints must be reachable by a tap.
+      for (let i = 0; i < cols * rows; i++) {
+        const r = Math.floor(i / cols), c = i % cols;
+        const hit = mfCellAt({
+          x: geo.boardX + c * geo.cellStep + geo.cell / 2,
+          y: geo.boardY + r * geo.cellStep + geo.cell / 2,
+        }, geo, cols, rows);
+        if (hit !== i) throw new Error(cols + 'x' + rows + ' cell ' + i + ' is unreachable (got ' + hit + ')');
+      }
+    }
+    return true;
+  });
+
   /* The Filled pill counts against the clue totals, so a board whose row and
      column clues disagree would show a target nobody can reach. Generated
      boards must agree on every band, fallback paths included. */

@@ -1442,6 +1442,16 @@
       "expectSelector": ".win-overlay .win-card"
     },
     {
+      "name": "Mine Finder's first story band deals a 7 by 7 field",
+      "path": "/?game=minefinder&pmode=story&band=1&play=1",
+      "expectSelector": "canvas[aria-label^='Mine Finder, 7 by 7 field']"
+    },
+    {
+      "name": "Mine Finder's largest story band deals a 13 by 13 field",
+      "path": "/?game=minefinder&pmode=story&band=6&play=1",
+      "expectSelector": "canvas[aria-label^='Mine Finder, 13 by 13 field']"
+    },
+    {
       "name": "Nonogram resumes its mistake count",
       "path": "/?demo=ngmistake&game=nonogram&play=1",
       "expectText": "Mistakes so far: 2"

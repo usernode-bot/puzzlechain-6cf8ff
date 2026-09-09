@@ -2526,6 +2526,57 @@ const MF_BANDS = [
   { cols: 13, rows: 13, mines: 38 },
 ];
 
+/* #199 — Mine Finder's geometry and its hit test, as ONE pair of pure
+   functions. This is the shape CLAUDE.md prescribes after Nonogram (#218),
+   and Mine Finder had the identical defect: the draw loop already walked
+   MF_COLS/MF_ROWS correctly, while the cell size, the board box, the centring
+   and the hit test were all hardcoded to 9.
+
+   Only the two 9x9 bands were ever right. On 7x7 (story band 1, arcade Easy) a
+   tap was mapped through `r * 9 + c`, so it revealed a DIFFERENT cell than the
+   one under the finger. On 11x11 and 13x13 the hit test rejected every column
+   and row past 8 outright, so most of the board could not be tapped at all,
+   and the board drew wider than the box that was measured for it. That is the
+   "cells do not reveal on tap" report: silent, and invisible at the default
+   band.
+
+   Both functions are pure and take the board's real dimensions, so a band that
+   changes size cannot desynchronise the two halves again. Asserted by
+   `minefinder-board-bounds`. */
+function mfGeometry(boxW, boxH, cols, rows) {
+  const W = Math.max(0, Math.floor(boxW));
+  const GAP = 8, PILL_H = 46, MODE_H = 48;
+  const chrome = PILL_H + MODE_H + GAP * 2;
+  const availW = Math.max(0, W - 8);
+  const availH = Math.max(0, Math.floor(boxH) - chrome - 8);
+  /* A 13x13 cell cannot be a 24px fingertip and still fit a phone column, so
+     the floor scales with the board: a big band shrinks rather than clips. */
+  const minCell = Math.max(cols, rows) > 9 ? 18 : 24;
+  const byW = Math.floor((availW - MF_GAP * (cols - 1)) / Math.max(1, cols));
+  const byH = Math.floor((availH - MF_GAP * (rows - 1)) / Math.max(1, rows));
+  const cell = Math.max(minCell, Math.min(46, Math.min(byW, byH)));
+  const cellStep = cell + MF_GAP;
+  const boardW = cellStep * cols - MF_GAP;
+  const boardH = cellStep * rows - MF_GAP;
+  const boardX = Math.floor((W - boardW) / 2);
+  const boardY = PILL_H + GAP;
+  return {
+    W, H: chrome + boardH, GAP, PILL_H, MODE_H, chrome,
+    cell, cellStep, boardW, boardH, boardX, boardY,
+    modeY: boardY + boardH + GAP,
+  };
+}
+
+/* The hit test, reading the same numbers the draw loop does. A tap in the gap
+   after a cell still belongs to that cell — fingers are wider than 3px — but a
+   tap outside the board is -1 rather than an index past the end of the row. */
+function mfCellAt(p, geo, cols, rows) {
+  const c = Math.floor((p.x - geo.boardX) / geo.cellStep);
+  const r = Math.floor((p.y - geo.boardY) / geo.cellStep);
+  if (c < 0 || c >= cols || r < 0 || r >= rows) return -1;
+  return r * cols + c;
+}
+
 /* Build a no-guess board for a band. Retries until the deduction solver clears
    it; falls back to the last board tried rather than hanging, because a
    slightly-unfair board is better than a frozen mount — and with these
@@ -2620,29 +2671,17 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
-  const W = Math.floor(boxW);
-  const GAP = 8, PILL_H = 46, MODE_H = 48;
-  const chrome = PILL_H + MODE_H + GAP * 2;
-  const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome)) - 8;
-  const cell = Math.max(24, Math.min(46, Math.floor((availB - MF_GAP * 8) / 9)));
-  const cellStep = cell + MF_GAP;
-  const boardPx = cellStep * 9 - MF_GAP;
-  const H = chrome + boardPx;
-  const boardX = Math.floor((W - boardPx) / 2);
-  const boardY = PILL_H + GAP;
-  const modeY = boardY + boardPx + GAP;
+  // Geometry comes from the board this run actually dealt, never from a
+  // constant — see mfGeometry. The hit test below reads the same object.
+  const geo = mfGeometry(boxW, boxH, MF_COLS, MF_ROWS);
+  const { W, H, PILL_H, MODE_H, cell, cellStep, boardX, boardY, modeY } = geo;
 
   // Mutable snapshot the pointer handlers read — usePointerCell binds its
   // listeners once, so it must not close over stale render state.
   const liveRef = useRef({});
-  liveRef.current = { revealed, flags, flagMode, done, steps, secs, cellStep, boardX, boardY };
+  liveRef.current = { revealed, flags, flagMode, done, steps, secs, geo };
 
-  const idxAt = (p) => {
-    const { cellStep: cs, boardX: bx, boardY: by } = liveRef.current;
-    const c = Math.floor((p.x - bx) / cs), r = Math.floor((p.y - by) / cs);
-    if (c < 0 || c > 8 || r < 0 || r > 8) return -1;
-    return r * 9 + c;
-  };
+  const idxAt = (p) => mfCellAt(p, liveRef.current.geo, MF_COLS, MF_ROWS);
 
   // ---- Actions -------------------------------------------------------------
   // Every action funnels its outcome through here so the loss/win/save paths

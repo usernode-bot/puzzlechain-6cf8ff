@@ -3477,9 +3477,14 @@ ${emitTapHighlightRules()}
   box-shadow: 0 1px 2px var(--c-shadow-sm);
 }
 .wn-strip-body {
-  flex: 1; text-align: left; background: none; border: none; cursor: pointer;
+  flex: 1; min-width: 0; text-align: left; background: none; border: none; cursor: pointer;
   color: ${C.text}; font-family: inherit; font-size: 13px; line-height: 1.45;
   padding: 9px 4px 9px 12px;
+  /* #234 — one line. This strip wrapped to three on a phone, spending ~95px
+     of the first screen on a changelog entry before a single game card. The
+     headline plus "See all >" is the whole job; the panel behind it holds the
+     detail. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .wn-strip-body strong { font-family: 'Fraunces', Georgia, serif; }
 .wn-more { color: ${C.accent}; font-weight: 600; white-space: nowrap; }
@@ -3626,7 +3631,7 @@ ${emitTapHighlightRules()}
 .home-daily-note {
   color: ${C.muted}; font-size: 0.82rem; margin: 0.5rem 0 0.6rem;
 }
-.home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
 .home-chip {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
   padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
@@ -3662,9 +3667,11 @@ ${emitTapHighlightRules()}
 .home-pin-full {
   color: ${C.rose}; font-size: 0.78rem; margin: 0 0 0.6rem; font-weight: 600;
 }
+/* #234 — the pin hint teaches a real feature, so it stays; it just stops
+   being a boxed 58px banner between the filter chips and the first game. One
+   muted line, in the same register as the chips it follows. */
 .home-pin-empty {
-  color: ${C.muted}; font-size: 0.82rem; margin: 0 0 1.2rem;
-  padding: 0.7rem 0.9rem; border: 1px dashed ${C.border}; border-radius: 10px;
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
 }
 
 .card-daily-badge {

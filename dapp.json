@@ -226,6 +226,11 @@
       "expectText": "Today's Top Scores"
     },
     {
+      "name": "Home leads with the games grid",
+      "path": "/",
+      "expectSelector": ".lobby .grid .card .card-mode-btn"
+    },
+    {
       "name": "Today's Top Scores lists a seeded solver",
       "path": "/?demo=leaderboard",
       "expectText": "Staging demo Ada"

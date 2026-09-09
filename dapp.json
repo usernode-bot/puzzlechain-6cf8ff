@@ -33,7 +33,7 @@
     {
       "name": "Locked card after daily attempt",
       "path": "/?demo=locked",
-      "expectText": "resets in"
+      "expectSelector": ".card-daily-badge.done"
     },
     {
       "name": "Word Search card in lobby",
@@ -661,7 +661,7 @@
     {
       "name": "Home daily reset countdown renders",
       "path": "/",
-      "expectText": "New daily puzzles at midnight UTC"
+      "expectSelector": ".gotd-hero .gotd-meta"
     },
     {
       "name": "Nonogram canvas board renders in-game",

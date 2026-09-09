@@ -56,9 +56,9 @@
       "expectText": "Streak"
     },
     {
-      "name": "New masthead tagline renders",
+      "name": "Masthead tagline renders",
       "path": "/",
-      "expectText": "no pay-to-win"
+      "expectText": "Classic games, fresh every day."
     },
     {
       "name": "Leaderboard seed boots cleanly",

@@ -190,28 +190,89 @@ function tapWasHandled(el) {
   return true;
 }
 
+/* #238 — a tap fires on RELEASE-IN-PLACE, so the gesture that started it has
+   to be measured. Firing on any pointerup is what made a scroll that began on
+   a card's "Daily" button launch the game when the finger came off.
+
+   `pointercancel` is NOT the guard people expect it to be: the browser only
+   sends it once it has taken the gesture over for panning, and a short flick
+   inside a scroller — or a drag that never scrolls anything because the list
+   is already at its end — releases with no cancel at all. So the distance
+   travelled is measured here instead, module scope for the same reason the
+   de-dupe guard above is: a re-render between down and up (a timer tick, a
+   poll landing) would reset a per-render closure mid-gesture.
+
+   Beyond the slop the press styling is dropped and the release is swallowed —
+   including the compatibility `click`, which the browser still delivers when
+   it never took the gesture over. Mouse is untouched: it has no scroll
+   gesture, and a press-drag-release on a button is a click by every platform's
+   rules. Asserted by `tap-slop-cancels-scroll`. */
+let _tapDownEl = null;
+let _tapDownX = 0;
+let _tapDownY = 0;
+let _tapMoved = false;
+const TAP_SLOP_PX = 10;
+
+function tapPointerXY(e) {
+  return [typeof e.clientX === 'number' ? e.clientX : 0,
+          typeof e.clientY === 'number' ? e.clientY : 0];
+}
+function tapNoteDown(e) {
+  const [x, y] = tapPointerXY(e);
+  _tapDownEl = e.currentTarget || null;
+  _tapDownX = x;
+  _tapDownY = y;
+  _tapMoved = false;
+}
+/* True once this gesture has travelled far enough to be a scroll rather than a
+   tap. Unknown gestures (no matching pointerdown recorded — a handler upstream
+   stopped propagation, say) are treated as taps, keeping the old behaviour
+   rather than silently dropping an action. */
+function tapDragged(e) {
+  if (!_tapDownEl || _tapDownEl !== e.currentTarget) return false;
+  if (_tapMoved) return true;
+  const [x, y] = tapPointerXY(e);
+  if (Math.abs(x - _tapDownX) > TAP_SLOP_PX || Math.abs(y - _tapDownY) > TAP_SLOP_PX) {
+    _tapMoved = true;
+    return true;
+  }
+  return false;
+}
+
 function tapProps(onTap, { disabled = false } = {}) {
   if (disabled) return {};
+  const unpress = (e) => {
+    if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+  };
   return {
     onPointerDown: (e) => {
+      tapNoteDown(e);
       if (e.currentTarget.setAttribute) e.currentTarget.setAttribute('data-pressed', '1');
     },
+    onPointerMove: (e) => {
+      // Drop the press styling the moment it stops being a press, so the
+      // button doesn't sit lit for the length of a scroll.
+      if (tapDragged(e)) unpress(e);
+    },
     onPointerUp: (e) => {
-      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+      const dragged = tapDragged(e);
+      unpress(e);
       // Touch/pen act on release-in-place; mouse falls through to onClick so
       // text selection and drag handlers elsewhere keep working.
       if (e.pointerType === 'touch' || e.pointerType === 'pen') {
         // Mark BEFORE running the action: onTap re-renders, and the compat
-        // click is dispatched against whatever props exist by then.
+        // click is dispatched against whatever props exist by then. A dragged
+        // release marks too — that swallows the compat click without acting.
         tapMarkHandled(e.currentTarget);
-        onTap && onTap(e);
+        if (!dragged) onTap && onTap(e);
       }
     },
     onPointerCancel: (e) => {
-      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+      if (_tapDownEl === e.currentTarget) _tapMoved = true;
+      unpress(e);
     },
     onPointerLeave: (e) => {
-      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+      unpress(e);
     },
     onClick: (e) => {
       if (tapWasHandled(e.currentTarget)) return;
@@ -380,6 +441,48 @@ function runClientSelfTests(styleReady) {
     // A genuine MOUSE click on the same element afterwards must still work.
     tapProps(onTap).onClick({ currentTarget: el });
     if (fired !== 2) throw new Error('mouse click was swallowed (' + fired + ' total, expected 2)');
+    return true;
+  });
+
+  /* #238 — a scroll that STARTS on a button must not press it on release.
+     The action fires on pointerup, so without a distance check the release
+     that ends a scroll is indistinguishable from a tap. Checks all three
+     halves: the drag is swallowed, the compat click the browser still sends
+     after it is swallowed too, and a release inside the slop still fires. */
+  check('tap-slop-cancels-scroll', () => {
+    const mkEl = () => ({ _attrs: {}, setAttribute(k, v) { this._attrs[k] = v; }, removeAttribute(k) { delete this._attrs[k]; } });
+    const el = mkEl();
+    let fired = 0;
+    const onTap = () => { fired++; };
+
+    // A scroll: down, drag well past the slop, release on the same button.
+    const p = tapProps(onTap);
+    p.onPointerDown({ currentTarget: el, pointerType: 'touch', clientX: 100, clientY: 300 });
+    p.onPointerMove({ currentTarget: el, pointerType: 'touch', clientX: 100, clientY: 220 });
+    if (el._attrs['data-pressed']) throw new Error('press styling survived a scroll');
+    p.onPointerUp({ currentTarget: el, pointerType: 'touch', clientX: 100, clientY: 180 });
+    if (fired !== 0) throw new Error('a scroll that started on the button fired it');
+    // The browser still delivers a compatibility click when it never took the
+    // gesture over for panning; that must not act either.
+    tapProps(onTap).onClick({ currentTarget: el });
+    if (fired !== 0) throw new Error('the compat click after a scroll fired the button');
+
+    // A real tap wanders a pixel or two and must still count.
+    const el2 = mkEl();
+    const q = tapProps(onTap);
+    q.onPointerDown({ currentTarget: el2, pointerType: 'touch', clientX: 40, clientY: 40 });
+    q.onPointerMove({ currentTarget: el2, pointerType: 'touch', clientX: 42, clientY: 43 });
+    q.onPointerUp({ currentTarget: el2, pointerType: 'touch', clientX: 43, clientY: 44 });
+    if (fired !== 1) throw new Error('a tap with normal finger wobble did not fire (' + fired + ')');
+
+    // A MOUSE press-drag-release on a button is a click by every platform's
+    // rules, and the slop must not have quietly changed that.
+    const el3 = mkEl();
+    const r = tapProps(onTap);
+    r.onPointerDown({ currentTarget: el3, pointerType: 'mouse', clientX: 10, clientY: 10 });
+    r.onPointerUp({ currentTarget: el3, pointerType: 'mouse', clientX: 10, clientY: 90 });
+    r.onClick({ currentTarget: el3 });
+    if (fired !== 2) throw new Error('mouse click after a drag was swallowed (' + fired + ')');
     return true;
   });
 

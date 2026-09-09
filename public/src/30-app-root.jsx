@@ -2031,7 +2031,13 @@ function App() {
                   <span>No. {utcDayNum(offset) - 20000} · {new Date(Date.now() + offset).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
                 </div>
                 <h1>Game Corner</h1>
-                <p>Classic games, free to play — no ads, no pay-to-win. Fresh puzzles every day at midnight UTC.</p>
+                {/* #237 — one line, and a short one. This used to run to two
+                    sentences that sold the app to someone already inside it
+                    ("free to play — no ads, no pay-to-win") and then restated
+                    the reset time, which the hero's own "Next puzzle in"
+                    countdown says a few hundred pixels further down. A
+                    masthead names the paper; it does not argue for it. */}
+                <p>Classic games, fresh every day.</p>
                 <div className="masthead-rule" />
               </div>
               {commitNotice && (

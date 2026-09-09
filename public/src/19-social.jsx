@@ -32,7 +32,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
 
   if (loading) {
     return (
-      <div style={{ maxWidth: '620px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+      <div className="social-page">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <p style={{ color: C.muted, marginTop: '1rem' }}>Loading profile...</p>
       </div>
@@ -41,7 +41,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
 
   if (!profile) {
     return (
-      <div style={{ maxWidth: '620px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+      <div className="social-page">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <p style={{ color: C.rose, marginTop: '1rem' }}>Profile not found</p>
       </div>
@@ -52,7 +52,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
   const recentGames = Array.isArray(profile.recentGames) ? profile.recentGames : [];
 
   return (
-    <div style={{ maxWidth: '620px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+    <div className="social-page">
       <button className="back-btn" onClick={onBack}>← Back</button>
 
       <div style={{
@@ -62,8 +62,8 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
         padding: '1.5rem',
         marginTop: '1.5rem'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem', gap: '0.75rem' }}>
+          <div className="profile-id">
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{profile.user.username}</h2>
             <p style={{ color: C.muted, fontSize: '0.85rem', margin: '0.25rem 0 0', fontFamily: "'JetBrains Mono', monospace" }}>
               {new Date(profile.user.createdAt).toLocaleDateString()}
@@ -124,19 +124,16 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
                 return (
                   <div
                     key={`${r.gameId}-${r.date}-${i}`}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.6rem',
-                      padding: '0.5rem 0.2rem', fontSize: '0.88rem',
-                      borderBottom: i < recentGames.length - 1 ? `1px solid ${C.border}` : 'none',
-                    }}
+                    className="prr"
+                    style={{ borderBottom: i < recentGames.length - 1 ? `1px solid ${C.border}` : 'none' }}
                   >
-                    <span style={{ fontSize: '1.1rem' }}>{g ? g.icon : '🎮'}</span>
-                    <span style={{ flex: 1, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {g ? g.name : r.gameId}
-                    </span>
-                    <span style={{ color: C.muted, fontSize: '0.78rem', fontFamily: "'JetBrains Mono', monospace" }}>{r.date}</span>
-                    <span style={{ color: r.score > 0 ? C.gold : C.muted, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                      {r.score > 0 ? `+${r.score} pts · ${lbFmtTime(r.timeSecs)}` : 'Played'}
+                    <span className="prr-icon">{g ? g.icon : '🎮'}</span>
+                    <span className="prr-name">{g ? g.name : r.gameId}</span>
+                    <span className="prr-meta mono">
+                      <span className="prr-date">{r.date}</span>
+                      <span className="prr-score" style={{ color: r.score > 0 ? C.gold : C.muted }}>
+                        {r.score > 0 ? `+${r.score} pts · ${lbFmtTime(r.timeSecs)}` : 'Played'}
+                      </span>
                     </span>
                   </div>
                 );
@@ -237,7 +234,7 @@ function FriendsListScreen({ onSelectUser, onBack }) {
 
   if (loading) {
     return (
-      <div style={{ maxWidth: '620px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+      <div className="social-page">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <p style={{ color: C.muted, marginTop: '1rem' }}>Loading friends...</p>
       </div>
@@ -245,7 +242,7 @@ function FriendsListScreen({ onSelectUser, onBack }) {
   }
 
   return (
-    <div style={{ maxWidth: '620px', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+    <div className="social-page">
       <button className="back-btn" onClick={onBack}>← Back</button>
 
       <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '1.5rem 0 1rem' }}>Friends</h2>

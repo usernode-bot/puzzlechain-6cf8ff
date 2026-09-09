@@ -33,7 +33,7 @@
     {
       "name": "Locked card after daily attempt",
       "path": "/?demo=locked",
-      "expectText": "resets in"
+      "expectSelector": ".card-daily-badge.done"
     },
     {
       "name": "Word Search card in lobby",
@@ -56,9 +56,9 @@
       "expectText": "Streak"
     },
     {
-      "name": "New masthead tagline renders",
+      "name": "Masthead tagline renders",
       "path": "/",
-      "expectText": "no pay-to-win"
+      "expectText": "Classic games, fresh every day."
     },
     {
       "name": "Leaderboard seed boots cleanly",
@@ -226,6 +226,11 @@
       "expectText": "Today's Top Scores"
     },
     {
+      "name": "Home leads with the games grid",
+      "path": "/",
+      "expectSelector": ".lobby .grid .card .card-mode-btn"
+    },
+    {
       "name": "Today's Top Scores lists a seeded solver",
       "path": "/?demo=leaderboard",
       "expectText": "Staging demo Ada"
@@ -299,6 +304,16 @@
       "name": "How-to-Play stays behind its button on the pre-game screen",
       "path": "/?game=tilematchingdaily",
       "expectSelector": ".pregame-howto-btn"
+    },
+    {
+      "name": "How to play and Game chat are buttons, not footnote links",
+      "path": "/?game=tilematchingdaily",
+      "expectSelector": ".pregame-actions .pregame-howto-btn"
+    },
+    {
+      "name": "The same pair are buttons on the opponent screen",
+      "path": "/?game=checkers",
+      "expectSelector": ".pregame-actions .pregame-howto-btn"
     },
     {
       "name": "Snakes & Ladders mode select offers Versus Bot",
@@ -644,6 +659,11 @@
       "expectText": "PLAYED"
     },
     {
+      "name": "Home grid lists multiple game cards",
+      "path": "/?demo=homegrid",
+      "expectSelector": ".grid > .card + .card"
+    },
+    {
       "name": "Home filter chips render",
       "path": "/?tab=classic",
       "expectSelector": ".home-filter-chips"
@@ -651,7 +671,7 @@
     {
       "name": "Home daily reset countdown renders",
       "path": "/",
-      "expectText": "New daily puzzles at midnight UTC"
+      "expectSelector": ".gotd-hero .gotd-meta"
     },
     {
       "name": "Nonogram canvas board renders in-game",
@@ -1337,12 +1357,12 @@
       "expectSelector": "canvas.gmk-canvas"
     },
     {
-      "name": "Story ladder pre-game screen",
+      "name": "Story level picker pre-game screen",
       "path": "/?game=sudoku&pmode=story&demo=modes",
       "expectSelector": ".pregame-band"
     },
     {
-      "name": "Story band deep link mounts its board",
+      "name": "Story level deep link mounts its board",
       "path": "/?game=cratepush&pmode=story&band=8&play=1",
       "expectSelector": ".cp-game"
     },
@@ -1350,6 +1370,26 @@
       "name": "Arcade pre-game offers three bands",
       "path": "/?game=2048&pmode=arcade&demo=modes",
       "expectSelector": ".pregame-band.wide"
+    },
+    {
+      "name": "Story picker calls each step a level",
+      "path": "/?game=sudoku&pmode=story&demo=modes",
+      "expectText": "Clearing a level for the first time pays"
+    },
+    {
+      "name": "Story picker reports every level cleared",
+      "path": "/?game=zuma&pmode=story&demo=modes",
+      "expectText": "All levels cleared"
+    },
+    {
+      "name": "Spider story runs to six levels",
+      "path": "/?game=spider&pmode=story&demo=modes",
+      "expectText": "3/6"
+    },
+    {
+      "name": "Story level deep link accepts ?level=",
+      "path": "/?game=cratepush&pmode=story&level=8&play=1",
+      "expectSelector": ".cp-game"
     },
     {
       "name": "Arcade run history is shareable and replayable",
@@ -1365,6 +1405,101 @@
       "name": "Arcade deep link mounts a board",
       "path": "/?game=wordsprint&pmode=arcade&band=hard&play=1",
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
+    },
+    {
+      "name": "Pin button renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-pin"
+    },
+    {
+      "name": "Pinned section renders pinned games",
+      "path": "/?demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Pinned section survives the Daily filter",
+      "path": "/?tab=daily&demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Home with nothing pinned explains how to pin",
+      "path": "/?demo=pinsempty",
+      "expectText": "on any card to pin it to the top"
+    },
+    {
+      "name": "Nonogram flags a grid that is full but wrong",
+      "path": "/?game=nonogram&practice=1&ngfill=wrong",
+      "expectSelector": ".ng-status[data-ng-tone=\"err\"]"
+    },
+    {
+      "name": "Nonogram warns when a line can no longer match",
+      "path": "/?game=nonogram&practice=1&ngfill=error",
+      "expectSelector": ".ng-status[data-ng-tone=\"warn\"]"
+    },
+    {
+      "name": "Nonogram announces the solve",
+      "path": "/?game=nonogram&practice=1&ngfill=solved",
+      "expectSelector": ".win-overlay .win-card"
+    },
+    {
+      "name": "Mine Finder's first story band deals a 7 by 7 field",
+      "path": "/?game=minefinder&pmode=story&band=1&play=1",
+      "expectSelector": "canvas[aria-label^='Mine Finder, 7 by 7 field']"
+    },
+    {
+      "name": "Mine Finder's largest story band deals a 13 by 13 field",
+      "path": "/?game=minefinder&pmode=story&band=6&play=1",
+      "expectSelector": "canvas[aria-label^='Mine Finder, 13 by 13 field']"
+    },
+    {
+      "name": "Nonogram resumes its mistake count",
+      "path": "/?demo=ngmistake&game=nonogram&play=1",
+      "expectText": "Mistakes so far: 2"
+    },
+    {
+      "name": "Nonogram top story band fits its board",
+      "path": "/?game=nonogram&pmode=story&band=6&play=1",
+      "expectSelector": ".ng-status[data-ng-tone=\"info\"]"
+    },
+    {
+      "name": "Nonogram error tone reads in dark mode",
+      "path": "/?game=nonogram&practice=1&ngfill=wrong&theme=dark",
+      "expectSelector": ".ng-status.err"
+    },
+    {
+      "name": "Tile Match free-play board is URL-reachable",
+      "path": "/?game=tilematching&play=1&tmlevel=900",
+      "expectSelector": "canvas.tm-canvas"
+    },
+    {
+      "name": "Tile Match board footprint on a fresh story board",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1",
+      "expectSelector": ".tm-board-box[data-tm-units=\"5x3\"]"
+    },
+    {
+      "name": "Tile Match board footprint holds after tiles clear",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1&tmcleared=12",
+      "expectSelector": ".tm-board-box[data-tm-units=\"5x3\"]"
+    },
+    {
+      "name": "Tile Match tile holder fits the frame mid-run",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1&tmcleared=12",
+      "expectSelector": ".tm-board-box[data-tm-tray-fits=\"1\"]"
+    },
+    {
+      "name": "Story ladder badge renders on the badge screen",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.active[data-badge=\"story-sudoku\"]"
+    },
+    {
+      "name": "Badge collection lists the Story ladders group",
+      "path": "/?screen=account&demo=storybadges",
+      "expectText": "Story ladders"
+    },
+    {
+      "name": "Unfinished ladder renders as a locked story badge",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.locked[data-badge=\"story-cratepush\"]"
     }
   ],
   "visibility": {
@@ -1372,6 +1507,7 @@
     "view": "public"
   },
   "admins": [
-    "evan"
+    "evan",
+    "snait"
   ]
 }

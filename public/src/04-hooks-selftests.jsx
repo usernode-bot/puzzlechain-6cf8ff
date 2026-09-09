@@ -190,28 +190,89 @@ function tapWasHandled(el) {
   return true;
 }
 
+/* #238 — a tap fires on RELEASE-IN-PLACE, so the gesture that started it has
+   to be measured. Firing on any pointerup is what made a scroll that began on
+   a card's "Daily" button launch the game when the finger came off.
+
+   `pointercancel` is NOT the guard people expect it to be: the browser only
+   sends it once it has taken the gesture over for panning, and a short flick
+   inside a scroller — or a drag that never scrolls anything because the list
+   is already at its end — releases with no cancel at all. So the distance
+   travelled is measured here instead, module scope for the same reason the
+   de-dupe guard above is: a re-render between down and up (a timer tick, a
+   poll landing) would reset a per-render closure mid-gesture.
+
+   Beyond the slop the press styling is dropped and the release is swallowed —
+   including the compatibility `click`, which the browser still delivers when
+   it never took the gesture over. Mouse is untouched: it has no scroll
+   gesture, and a press-drag-release on a button is a click by every platform's
+   rules. Asserted by `tap-slop-cancels-scroll`. */
+let _tapDownEl = null;
+let _tapDownX = 0;
+let _tapDownY = 0;
+let _tapMoved = false;
+const TAP_SLOP_PX = 10;
+
+function tapPointerXY(e) {
+  return [typeof e.clientX === 'number' ? e.clientX : 0,
+          typeof e.clientY === 'number' ? e.clientY : 0];
+}
+function tapNoteDown(e) {
+  const [x, y] = tapPointerXY(e);
+  _tapDownEl = e.currentTarget || null;
+  _tapDownX = x;
+  _tapDownY = y;
+  _tapMoved = false;
+}
+/* True once this gesture has travelled far enough to be a scroll rather than a
+   tap. Unknown gestures (no matching pointerdown recorded — a handler upstream
+   stopped propagation, say) are treated as taps, keeping the old behaviour
+   rather than silently dropping an action. */
+function tapDragged(e) {
+  if (!_tapDownEl || _tapDownEl !== e.currentTarget) return false;
+  if (_tapMoved) return true;
+  const [x, y] = tapPointerXY(e);
+  if (Math.abs(x - _tapDownX) > TAP_SLOP_PX || Math.abs(y - _tapDownY) > TAP_SLOP_PX) {
+    _tapMoved = true;
+    return true;
+  }
+  return false;
+}
+
 function tapProps(onTap, { disabled = false } = {}) {
   if (disabled) return {};
+  const unpress = (e) => {
+    if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+  };
   return {
     onPointerDown: (e) => {
+      tapNoteDown(e);
       if (e.currentTarget.setAttribute) e.currentTarget.setAttribute('data-pressed', '1');
     },
+    onPointerMove: (e) => {
+      // Drop the press styling the moment it stops being a press, so the
+      // button doesn't sit lit for the length of a scroll.
+      if (tapDragged(e)) unpress(e);
+    },
     onPointerUp: (e) => {
-      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+      const dragged = tapDragged(e);
+      unpress(e);
       // Touch/pen act on release-in-place; mouse falls through to onClick so
       // text selection and drag handlers elsewhere keep working.
       if (e.pointerType === 'touch' || e.pointerType === 'pen') {
         // Mark BEFORE running the action: onTap re-renders, and the compat
-        // click is dispatched against whatever props exist by then.
+        // click is dispatched against whatever props exist by then. A dragged
+        // release marks too — that swallows the compat click without acting.
         tapMarkHandled(e.currentTarget);
-        onTap && onTap(e);
+        if (!dragged) onTap && onTap(e);
       }
     },
     onPointerCancel: (e) => {
-      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+      if (_tapDownEl === e.currentTarget) _tapMoved = true;
+      unpress(e);
     },
     onPointerLeave: (e) => {
-      if (e.currentTarget.removeAttribute) e.currentTarget.removeAttribute('data-pressed');
+      unpress(e);
     },
     onClick: (e) => {
       if (tapWasHandled(e.currentTarget)) return;
@@ -397,6 +458,38 @@ function describeAppStylesheet() {
   } catch (e) { return 'introspection-failed(' + (e && e.message) + ')'; }
 }
 
+/* #182 — count the column tracks a grid-template-columns value declares, so a
+   static rule can be judged without mounting anything. Splits at the top level
+   only (parens shield minmax()/repeat() internals) and expands a numeric
+   repeat(); auto-fill / auto-fit are unbounded, so they count as "enough". */
+function countTracks(value) {
+  const v = String(value || '').trim();
+  if (!v || v === 'none') return 0;
+  const parts = [];
+  let depth = 0, cur = '';
+  for (const ch of v) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && /\s/.test(ch)) {
+      if (cur) { parts.push(cur); cur = ''; }
+    } else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  let n = 0;
+  for (const part of parts) {
+    const rep = /^repeat\(\s*([^,]+),([\s\S]*)\)$/.exec(part);
+    if (rep) {
+      const count = rep[1].trim();
+      if (/^(auto-fill|auto-fit)$/.test(count)) { n += 2; continue; }
+      const times = parseInt(count, 10);
+      n += (isNaN(times) ? 1 : times) * Math.max(1, countTracks(rep[2]));
+    } else if (/^\[/.test(part)) {
+      continue; // a line-name list is not a track
+    } else n += 1;
+  }
+  return n;
+}
+
 /* `styleReady` is passed false when scheduleSelfTests() exhausted its retry
    budget without ever seeing the app's stylesheet APPLY. In that state EVERY
    computed-style probe returns the UA default, so the touch-action sweep used
@@ -454,6 +547,92 @@ function runClientSelfTests(styleReady) {
     // A genuine MOUSE click on the same element afterwards must still work.
     tapProps(onTap).onClick({ currentTarget: el });
     if (fired !== 2) throw new Error('mouse click was swallowed (' + fired + ' total, expected 2)');
+    return true;
+  });
+
+  /* #238 — a scroll that STARTS on a button must not press it on release.
+     The action fires on pointerup, so without a distance check the release
+     that ends a scroll is indistinguishable from a tap. Checks all three
+     halves: the drag is swallowed, the compat click the browser still sends
+     after it is swallowed too, and a release inside the slop still fires. */
+  check('tap-slop-cancels-scroll', () => {
+    const mkEl = () => ({ _attrs: {}, setAttribute(k, v) { this._attrs[k] = v; }, removeAttribute(k) { delete this._attrs[k]; } });
+    const el = mkEl();
+    let fired = 0;
+    const onTap = () => { fired++; };
+
+    // A scroll: down, drag well past the slop, release on the same button.
+    const p = tapProps(onTap);
+    p.onPointerDown({ currentTarget: el, pointerType: 'touch', clientX: 100, clientY: 300 });
+    p.onPointerMove({ currentTarget: el, pointerType: 'touch', clientX: 100, clientY: 220 });
+    if (el._attrs['data-pressed']) throw new Error('press styling survived a scroll');
+    p.onPointerUp({ currentTarget: el, pointerType: 'touch', clientX: 100, clientY: 180 });
+    if (fired !== 0) throw new Error('a scroll that started on the button fired it');
+    // The browser still delivers a compatibility click when it never took the
+    // gesture over for panning; that must not act either.
+    tapProps(onTap).onClick({ currentTarget: el });
+    if (fired !== 0) throw new Error('the compat click after a scroll fired the button');
+
+    // A real tap wanders a pixel or two and must still count.
+    const el2 = mkEl();
+    const q = tapProps(onTap);
+    q.onPointerDown({ currentTarget: el2, pointerType: 'touch', clientX: 40, clientY: 40 });
+    q.onPointerMove({ currentTarget: el2, pointerType: 'touch', clientX: 42, clientY: 43 });
+    q.onPointerUp({ currentTarget: el2, pointerType: 'touch', clientX: 43, clientY: 44 });
+    if (fired !== 1) throw new Error('a tap with normal finger wobble did not fire (' + fired + ')');
+
+    // A MOUSE press-drag-release on a button is a click by every platform's
+    // rules, and the slop must not have quietly changed that.
+    const el3 = mkEl();
+    const r = tapProps(onTap);
+    r.onPointerDown({ currentTarget: el3, pointerType: 'mouse', clientX: 10, clientY: 10 });
+    r.onPointerUp({ currentTarget: el3, pointerType: 'mouse', clientX: 10, clientY: 90 });
+    r.onClick({ currentTarget: el3 });
+    if (fired !== 2) throw new Error('mouse click after a drag was swallowed (' + fired + ')');
+    return true;
+  });
+
+  /* #232 — the Pinned section is a PARTITION of the list the filter already
+     produced, and the two halves are rendered as two separate grids. Three
+     things have to hold or a card either vanishes or renders twice: a stored
+     id must resolve to exactly one card (the four merged cards answer to two
+     ids each), the partition must be lossless, and the pinned half must keep
+     registry order rather than the order the ids arrived in. */
+  check('pin-card-partition', () => {
+    // A NON-anchor id of a merged card still resolves, and to one card only.
+    const merged = CARD_BY_GAME_ID['tilematching'];
+    if (!merged) throw new Error('merged id tilematching resolves to no card');
+    if (CARD_BY_GAME_ID['tilematchingdaily'] !== merged) {
+      throw new Error('the two halves of the Tile Match card resolve differently');
+    }
+    if (cardPinId(merged) !== 'tilematchingdaily') {
+      throw new Error('merged card anchor id is ' + cardPinId(merged));
+    }
+    // Every card must have an anchor id to store, or it cannot be pinned.
+    for (const c of GAME_CARDS) {
+      if (!cardPinId(c)) throw new Error('card ' + c.key + ' has no pin id');
+      if (CARD_BY_GAME_ID[cardPinId(c)] !== c) {
+        throw new Error('card ' + c.key + ' does not round-trip through its pin id');
+      }
+    }
+    // Partition, given ids deliberately out of registry order.
+    const stored = ['minesweeper', 'sudoku', 'tilematching'];
+    const keys = new Set();
+    for (const id of stored) { const c = CARD_BY_GAME_ID[id]; if (c) keys.add(c.key); }
+    if (keys.size !== 3) throw new Error('3 stored ids resolved to ' + keys.size + ' cards');
+    const ordered = GAME_CARDS;
+    const pinned = ordered.filter(c => keys.has(c.key));
+    const rest = ordered.filter(c => !keys.has(c.key));
+    if (pinned.length + rest.length !== ordered.length) {
+      throw new Error('partition lost or duplicated cards');
+    }
+    if (pinned.some(c => rest.indexOf(c) !== -1)) throw new Error('a card is in both halves');
+    if (pinned.length !== 3) throw new Error('pinned half has ' + pinned.length + ' cards');
+    // Registry order, not the order `stored` listed them in.
+    const idx = pinned.map(c => ordered.indexOf(c));
+    for (let i = 1; i < idx.length; i++) {
+      if (idx[i] <= idx[i - 1]) throw new Error('pinned half is not in registry order');
+    }
     return true;
   });
 
@@ -754,6 +933,159 @@ function runClientSelfTests(styleReady) {
     }
   });
 
+  /* #218 — Nonogram validation. These four are the whole reason the win
+     notification can be trusted: the banner, the Errors pill, the red clues and
+     the mistake counter are all rendered straight off ngValidate, so a wrong
+     line state is a wrong message rather than a crash. Cell values are the
+     component's: 0 blank, 1 filled, 2 marked empty. */
+  check('nonogram-line-state', () => {
+    const cases = [
+      [[0, 0, 0, 0, 0], [3], 'open'],       // untouched: still reachable
+      [[1, 1, 1, 0, 0], [3], 'done'],       // runs match the clue exactly
+      [[1, 0, 1, 0, 0], [3], 'open'],       // a blank is not a claim of empty
+      [[1, 2, 1, 0, 0], [3], 'error'],      // the mark rules out every run of 3
+      [[2, 2, 2, 2, 2], [], 'done'],        // an empty line's clue is 0
+      [[1, 1, 1, 1, 0], [3], 'error'],      // four filled can never read as 3
+      [[1, 0, 0, 1, 0], [1, 1], 'done'],
+    ];
+    for (const [cells, clue, want] of cases) {
+      const got = ngLineState(cells, clue);
+      if (got !== want) {
+        throw new Error('ngLineState([' + cells.join(',') + '], [' + clue.join(',') +
+          ']) = ' + got + ', expected ' + want);
+      }
+    }
+    return true;
+  });
+
+  check('nonogram-validate', () => {
+    /* Picture:  ##.     rows [2],[1],[2]
+                 .#.     cols [1],[3],[1]      */
+    const rowClues = [[2], [1], [2]], colClues = [[1], [3], [1]];
+    const solvedGrid = [[1, 1, 2], [2, 1, 2], [2, 1, 1]];
+    const a = ngValidate(solvedGrid, rowClues, colClues);
+    if (!a.solved || a.errorCount || !a.complete) {
+      throw new Error('the solution reads solved=' + a.solved + ' errors=' + a.errorCount);
+    }
+    if (a.filled !== 5 || a.targetFilled !== 5 || a.doneCount !== 6 || a.lines !== 6) {
+      throw new Error('solution counts wrong: filled=' + a.filled + '/' + a.targetFilled +
+        ' done=' + a.doneCount + '/' + a.lines);
+    }
+    // The ?ngfill=wrong shape: the right NUMBER of filled cells, in the wrong
+    // places, so `complete` must fire while `solved` must not.
+    const wrong = [[2, 1, 1], [2, 1, 2], [2, 1, 1]];
+    const b = ngValidate(wrong, rowClues, colClues);
+    if (b.solved || !b.complete || b.filled !== 5) {
+      throw new Error('full-but-wrong reads solved=' + b.solved + ' complete=' + b.complete);
+    }
+    if (b.errorCount !== 2) throw new Error('expected 2 dead lines, got ' + b.errorCount);
+    // A part-played board is neither.
+    const part = ngValidate([[1, 1, 0], [0, 0, 0], [0, 0, 0]], rowClues, colClues);
+    if (part.solved || part.complete || part.errorCount) {
+      throw new Error('a part-played board must be open');
+    }
+    return true;
+  });
+
+  /* #218 — the geometry used to hard-code 8, so every band above 8x8 drew its
+     trailing rows outside the canvas and could not be tapped at all, and 5x5
+     hit-tested phantom cells past the edge. Every corner of every band must
+     land back on itself, or the win is unreachable rather than unannounced. */
+  check('nonogram-board-bounds', () => {
+    for (const spec of NG_BANDS) {
+      const { rows, cols } = spec;
+      const geom = ngGeometry(390, 700, rows, cols, { rowChars: 5, colLines: 4 });
+      if (geom.boardX < 0 || geom.boardW > 390) {
+        throw new Error(rows + 'x' + cols + ' board is ' + geom.boardW + 'px wide in a 390px frame');
+      }
+      const corners = [[0, 0], [0, cols - 1], [rows - 1, 0], [rows - 1, cols - 1]];
+      for (const [r, c] of corners) {
+        const hit = ngCellAt(geom, rows, cols, {
+          x: geom.boardX + geom.gutterX + c * geom.cellStep + geom.cell / 2,
+          y: geom.boardY + geom.gutterY + r * geom.cellStep + geom.cell / 2,
+        });
+        if (!hit || hit.r !== r || hit.c !== c) {
+          throw new Error(rows + 'x' + cols + ' cell ' + r + ',' + c + ' hit-tests as ' +
+            (hit ? hit.r + ',' + hit.c : 'nothing'));
+        }
+      }
+      // And a tap just past the last cell must miss rather than index past the row.
+      const past = ngCellAt(geom, rows, cols, {
+        x: geom.boardX + geom.gutterX + cols * geom.cellStep + 4,
+        y: geom.boardY + geom.gutterY + rows * geom.cellStep + 4,
+      });
+      if (past) throw new Error(rows + 'x' + cols + ' hit-tests a cell past its own edge');
+    }
+    return true;
+  });
+
+  /* #199 — the same round-trip for Mine Finder, whose bands run 7x7 to 13x13.
+     Its geometry and hit test were hardcoded to 9 while the draw loop walked
+     the real dimensions, so only the two 9x9 bands worked: 7x7 mapped a tap
+     through `r * 9 + c` and revealed the wrong cell, and 11x11 / 13x13 could
+     not be tapped past column 8 at all. Every corner of every band has to
+     survive geometry -> pixels -> hit test, or the board is unplayable in a
+     way no parser and no console error can see. */
+  check('minefinder-board-bounds', () => {
+    for (const spec of MF_BANDS) {
+      const { cols, rows } = spec;
+      const geo = mfGeometry(390, 700, cols, rows);
+      if (geo.boardX < 0 || geo.boardW > 390) {
+        throw new Error(cols + 'x' + rows + ' board is ' + geo.boardW + 'px wide in a 390px frame');
+      }
+      const corners = [[0, 0], [0, cols - 1], [rows - 1, 0], [rows - 1, cols - 1]];
+      for (const [r, c] of corners) {
+        const hit = mfCellAt({
+          x: geo.boardX + c * geo.cellStep + geo.cell / 2,
+          y: geo.boardY + r * geo.cellStep + geo.cell / 2,
+        }, geo, cols, rows);
+        if (hit !== r * cols + c) {
+          throw new Error(cols + 'x' + rows + ' cell ' + r + ',' + c +
+            ' hit-tests as index ' + hit + ', expected ' + (r * cols + c));
+        }
+      }
+      // A tap past the last column must MISS, not wrap onto the next row.
+      const past = mfCellAt({
+        x: geo.boardX + cols * geo.cellStep + 4,
+        y: geo.boardY + geo.cell / 2,
+      }, geo, cols, rows);
+      if (past !== -1) throw new Error(cols + 'x' + rows + ' hit-tests ' + past + ' past its own edge');
+      // Every cell the draw loop paints must be reachable by a tap.
+      for (let i = 0; i < cols * rows; i++) {
+        const r = Math.floor(i / cols), c = i % cols;
+        const hit = mfCellAt({
+          x: geo.boardX + c * geo.cellStep + geo.cell / 2,
+          y: geo.boardY + r * geo.cellStep + geo.cell / 2,
+        }, geo, cols, rows);
+        if (hit !== i) throw new Error(cols + 'x' + rows + ' cell ' + i + ' is unreachable (got ' + hit + ')');
+      }
+    }
+    return true;
+  });
+
+  /* The Filled pill counts against the clue totals, so a board whose row and
+     column clues disagree would show a target nobody can reach. Generated
+     boards must agree on every band, fallback paths included. */
+  check('nonogram-target-filled', () => {
+    for (let band = 0; band < NG_BANDS.length; band++) {
+      const b = ngBuildForBand(mulberry32(9000 + band * 37), band);
+      const rowSum = b.rowClues.reduce((n, cl) => n + cl.reduce((a, v) => a + v, 0), 0);
+      const colSum = b.colClues.reduce((n, cl) => n + cl.reduce((a, v) => a + v, 0), 0);
+      const actual = b.grid.flat().filter(Boolean).length;
+      if (rowSum !== actual || colSum !== actual) {
+        throw new Error('band ' + band + ': clues total ' + rowSum + '/' + colSum +
+          ' against ' + actual + ' filled cells');
+      }
+      const solvedGrid = b.grid.map((row) => row.map((v) => (v ? 1 : 2)));
+      const v = ngValidate(solvedGrid, b.rowClues, b.colClues);
+      if (!v.solved || v.targetFilled !== actual) {
+        throw new Error('band ' + band + ' solution reads solved=' + v.solved +
+          ' target=' + v.targetFilled + '/' + actual);
+      }
+    }
+    return true;
+  });
+
   // Phase 3 — every daily must opt into the one-viewport column, or it scrolls
   // (or clips) during play. This is the standing guarantee behind the audit.
   // #149 — extended past the FLAG: fitShell without a .fit-col root CLIPS
@@ -824,6 +1156,50 @@ function runClientSelfTests(styleReady) {
       throw new Error('game cards are ragged: ' + Math.round(lo) + 'px ('
         + nameOf(cards[hs.indexOf(lo)]) + ') vs ' + Math.round(hi) + 'px ('
         + nameOf(cards[hs.indexOf(hi)]) + ') across ' + cards.length + ' cards');
+    }
+    return true;
+  });
+
+  /* #182 — the games grid must be at least two-up on a phone. Measured,
+     because the regression is arithmetic between two rules that never mention
+     each other: .lobby's padding sets the content width, .grid's track floor
+     sets how many fit, and a change to either can silently drop the wall back
+     to a 30-card single-column scroll. The width guard keeps this quiet on a
+     genuinely narrow frame (and while the grid is mid-mount at zero width),
+     where one column is the honest answer. */
+  checkStyled('grid-two-up', () => {
+    const el = document.querySelector('.grid');
+    if (!el) return true; // grid not mounted (in a game / on another screen)
+    const w = el.getBoundingClientRect().width;
+    if (w < 300) return true; // narrower than two 140px tiles + gap, or not laid out yet
+    const cols = getComputedStyle(el).gridTemplateColumns;
+    const tracks = (cols && cols !== 'none') ? cols.trim().split(/\s+/).length : 0;
+    if (tracks < 2) {
+      throw new Error('games grid is one column at ' + Math.round(w)
+        + 'px wide (grid-template-columns: ' + cols + ')');
+    }
+    return true;
+  });
+
+  /* The static half of grid-two-up: it fires even when the home screen isn't
+     mounted, and it names the rule rather than the symptom. Any rule whose
+     selector is exactly `.grid` — including inside a @media block — that pins
+     the wall to a single track is the #182 regression coming back. */
+  check('grid-no-single-column', () => {
+    const bad = [];
+    // Selector must be EXACTLY `.grid`: preceded by start-of-file, `}` or a
+    // media block's `{`, so `.fit-col .grid` or `.grid > .card` don't match.
+    const re = /(?:^|[{}])\s*\.grid\s*\{([^}]*)\}/g;
+    let m;
+    while ((m = re.exec(css))) {
+      const body = m[1];
+      const gm = /(^|[;\s])grid-template-columns\s*:([^;]+)/.exec(body);
+      if (!gm) continue;
+      const value = gm[2].trim();
+      if (countTracks(value) < 2) bad.push('grid-template-columns: ' + value);
+    }
+    if (bad.length) {
+      throw new Error('.grid pinned to a single column by: ' + bad.join(' | '));
     }
     return true;
   });
@@ -991,6 +1367,102 @@ function runClientSelfTests(styleReady) {
   check('board-rules', () => {
     if (!window.boardRules) return true; // script not loaded (standalone) — skip
     return window.boardRules.selfTest() === true;
+  });
+
+  /* #210 — the Tile Match board's FOOTPRINT belongs to the deal, not to what
+     is still on it. `tmGeom` used to measure the live subset, so clearing a
+     column shrank the canvas and dragged the tile holder up underneath it.
+     Functional, so it fails whether or not the game is mounted. */
+  check('tilematch-board-anchor', () => {
+    if (typeof tmExtent !== 'function' || typeof tmGeom !== 'function') return true;
+    const tiles = [];
+    let id = 0;
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) {
+      tiles.push({ id: id++, col: c, row: r, layer: 0, type: (r * 6 + c) % 3, removed: false, inBar: false });
+    }
+    const fresh = tmExtent(tiles);
+    if (fresh.maxC !== 5 || fresh.maxR !== 3) {
+      throw new Error('tmExtent read ' + fresh.maxC + 'x' + fresh.maxR + ' of a 6x4 deal');
+    }
+    const before = tmGeom(360, 400, fresh, false);
+    // Clear the entire right column and bottom row — the worst case for a
+    // live-subset measurement, and the exact shape players reported.
+    const played = tiles.map((t) => ({ ...t,
+      removed: t.col === 5 || t.row === 3,
+      inBar: t.col === 4 && t.row === 0 }));
+    const after = tmExtent(played);
+    if (after.maxC !== fresh.maxC || after.maxR !== fresh.maxR) {
+      throw new Error('extents moved after clearing: ' + fresh.maxC + 'x' + fresh.maxR
+        + ' -> ' + after.maxC + 'x' + after.maxR);
+    }
+    const geo = tmGeom(360, 400, after, false);
+    if (geo.bw !== before.bw || geo.bh !== before.bh || geo.ox !== before.ox || geo.step !== before.step) {
+      throw new Error('board geometry moved after clearing: ' + JSON.stringify(before)
+        .slice(0, 80) + ' -> step ' + geo.step + ' ox ' + geo.ox + ' ' + geo.bw + 'x' + geo.bh);
+    }
+    // And the deep-link clearer must not move it either.
+    if (typeof tmClearSome === 'function') {
+      const cut = tmExtent(tmClearSome(tiles, 9));
+      if (cut.maxC !== fresh.maxC || cut.maxR !== fresh.maxR) {
+        throw new Error('tmClearSome moved the extents to ' + cut.maxC + 'x' + cut.maxR);
+      }
+    }
+    return true;
+  });
+
+  /* #210 — the 7-slot tile holder must fit the frame it is drawn in at every
+     width the fleet actually sees. It was a hardcoded 44px slot with a 6px
+     gap (344px), so on a phone it hung off both edges and its left origin
+     went negative. Swept, because one device width proves nothing. */
+  check('tilematch-tray-fits', () => {
+    if (typeof tmTrayGeom !== 'function') return true;
+    const bad = [];
+    for (let w = 240; w <= 560; w += 4) {
+      const t = tmTrayGeom(w, 50);
+      if (t.totalW > w - 8 || t.x0 < 4 || t.slotW < 12 || t.slotH < 8) {
+        bad.push(w + 'px -> ' + t.totalW + 'px tray at x' + t.x0);
+      }
+    }
+    if (bad.length) throw new Error('tile holder does not fit: ' + bad.slice(0, 4).join(', '));
+    // The mounted frame publishes the same answer for its measured width.
+    const box = document.querySelector('.tm-board-box[data-tm-tray-fits]');
+    if (box && box.getAttribute('data-tm-tray-fits') === '0') {
+      throw new Error('mounted tile holder is ' + box.getAttribute('data-tm-tray-w')
+        + 'px in a ' + Math.round(box.getBoundingClientRect().width) + 'px frame');
+    }
+    return true;
+  });
+
+  /* #210, the CSS half, measured. `.tm-wrap` sits in `.cg-stage`, which is
+     `align-items: center`, so without a definite width it took its
+     fit-content width — the canvas's own CSS width, which useCanvasBoard
+     writes back from the measured box. That loop settles at the UA's default
+     300px canvas on every device, whatever the screen. */
+  checkStyled('tilematch-canvas-fills', () => {
+    const wrap = document.querySelector('.tm-wrap');
+    const parent = wrap && wrap.parentElement;
+    if (!parent) return true; // Tile Match not mounted
+    const pcs = getComputedStyle(parent);
+    const avail = parent.clientWidth
+      - (parseFloat(pcs.paddingLeft) || 0) - (parseFloat(pcs.paddingRight) || 0);
+    if (avail < 40) return true; // laid out off-screen / mid-mount
+    const cap = parseFloat(getComputedStyle(wrap).maxWidth);
+    const want = Number.isFinite(cap) ? Math.min(avail, cap) : avail;
+    const got = wrap.getBoundingClientRect().width;
+    if (got < want - 4) {
+      throw new Error('.tm-wrap is ' + Math.round(got) + 'px inside '
+        + Math.round(avail) + 'px (expected ~' + Math.round(want) + 'px)');
+    }
+    const box = wrap.querySelector('.tm-board-box');
+    const canvas = box && box.querySelector('canvas.tm-canvas');
+    if (!canvas) return true;
+    const bw = box.getBoundingClientRect().width;
+    const cw = canvas.getBoundingClientRect().width;
+    if (bw >= 40 && cw < bw - 4) {
+      throw new Error('the Tile Match canvas is ' + Math.round(cw) + 'px in a '
+        + Math.round(bw) + 'px frame');
+    }
+    return true;
   });
 
   if (fails.length) {

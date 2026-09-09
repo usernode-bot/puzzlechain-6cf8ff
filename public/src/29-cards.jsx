@@ -22,12 +22,15 @@
    buttons (`regular` and `daily`). The shape is now an ordered list, so a card
    can carry one, two or three of them.
 
-   STORY RUNGS ARE DIFFICULTY BANDS, NOT LEVELS. Ladder lengths differ wildly
-   by game — Tile Match generates 1000 levels, Mahjong has 6 layouts, Marble
-   Loop has 3 paths — so paying per level would make one game worth a hundred
-   times another for the same "finished the story" achievement. Banding
-   normalises every game to 4–8 rungs, and bands are what a difficulty rating
-   produces anyway, so the ladder falls out of work the rating already does.
+   A STORY LEVEL IS A DIFFICULTY STEP, NOT ONE OF A GAME'S OWN LEVELS. Games
+   differ wildly in how much content they have — Tile Match generates 1000
+   levels, Mahjong has 6 layouts, Marble Loop has 3 paths — so paying per
+   level-of-content would make one game worth a hundred times another for the
+   same "finished the story" achievement. Every game is normalised to
+   STORY_LEVEL_MIN..STORY_LEVEL_MAX steps (6 to 10, #184), and a difficulty
+   step is what a rating produces anyway, so the ladder falls out of work the
+   rating already does. The internal identifiers still say `band` — the #184
+   rename is display-only, and `game_progress.band` is a live primary key.
 
    ARCADE BANDS ARE ALWAYS THREE, ALWAYS OPEN. Easy / Normal / Hard for every
    game, available from the start — no story gate. See ARCADE_BANDS below.
@@ -38,7 +41,7 @@
 // honestly say "everyone plays this exact deal").
 const PLAY_MODES = {
   daily:  { label: 'Daily',  order: 0, blurb: 'Everyone plays this exact deal today. One attempt.' },
-  story:  { label: 'Story',  order: 1, blurb: 'Clear a band to tick it off. Each one is harder than the last.' },
+  story:  { label: 'Story',  order: 1, blurb: 'Clear a level to tick it off. Each one is harder than the last.' },
   arcade: { label: 'Arcade', order: 2, blurb: 'A fresh board every run. Beat your best to score.' },
 };
 const PLAY_MODE_IDS = Object.keys(PLAY_MODES).sort((a, b) => PLAY_MODES[a].order - PLAY_MODES[b].order);
@@ -151,7 +154,7 @@ const MERGED_CARDS = [
     desc: 'Daily Tile Match Puzzle or free play — clear layered boards three of a kind.',
     modes: [
       { mode: 'daily',  gameId: 'tilematchingdaily', caption: 'One try' },
-      { mode: 'story',  gameId: 'tilematching',      caption: '10 bands' },
+      { mode: 'story',  gameId: 'tilematching',      caption: '10 levels' },
       { mode: 'arcade', gameId: 'tilematching',      caption: 'Endless chain' },
     ],
   },
@@ -248,13 +251,25 @@ const cardDailyId = (card) => {
   return d ? d.gameId : null;
 };
 
+/* The registry id a pin (#232) is stored under: the card's ANCHOR id. Cards
+   are a client-side composition and can be recomposed; registry ids never
+   move, so the durable thing to write to the database is one of the ids the
+   card speaks for. Reads come back through CARD_BY_GAME_ID, which already maps
+   either half of a merged pair onto the one card. */
+const cardPinId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
+
+/* Mirrors PIN_LIMIT in server.js. Used ONLY to grey out the control once the
+   player is at the cap — the server refuses the 9th pin either way, so the two
+   drifting costs a stale tooltip rather than a wrong outcome. */
+const PIN_LIMIT = 8;
+
 /* ============================================================
    The card
    ============================================================
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay }) {
+function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -283,6 +298,16 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay }) {
 
   return (
     <div className="card paired" style={{ '--accent': card.tagColor }} role="group" aria-label={card.name}>
+      {onTogglePin && (
+        <button
+          className={'card-pin tappable' + (pinned ? ' on' : '')}
+          aria-pressed={pinned ? 'true' : 'false'}
+          aria-label={pinned ? `Unpin ${card.name}` : `Pin ${card.name} to top`}
+          title={pinned ? 'Unpin' : pinDisabled ? `Pin limit reached (${PIN_LIMIT})` : 'Pin to top'}
+          disabled={!pinned && pinDisabled}
+          {...tapProps(() => { onTogglePin(cardPinId(card), !pinned); }, { disabled: !pinned && pinDisabled })}
+        >📌</button>
+      )}
       {dailyId && (
         <span className={'card-daily-badge' + (finished ? ' done' : inProgress ? ' resume' : ' fresh')}>
           {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}
@@ -302,7 +327,7 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay }) {
           const label = m.label || PLAY_MODES[m.mode].label;
           const caption = m.caption
             || (isDaily ? (finished ? 'Played' : inProgress ? 'Resume' : 'One try') : null)
-            || (m.mode === 'story' ? 'Ladder' : m.mode === 'arcade' ? 'Endless' : null);
+            || (m.mode === 'story' ? 'Levels' : m.mode === 'arcade' ? 'Endless' : null);
           return (
             <button
               key={m.mode || 'play'}

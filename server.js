@@ -233,29 +233,50 @@ const GAME_IDS = new Set(
 // Any game id known to the hub (used by DApp session validation).
 const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
+/* Most games a single player may pin to the top of the home grid (#232). The
+   client mirrors this as PIN_LIMIT in public/src/29-cards.jsx purely to grey
+   out the control once it is reached; THIS value is the authoritative one —
+   the insert below refuses the 9th pin regardless of what the client sends. */
+const PIN_LIMIT = 8;
+
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
 const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
 
 /* ============================================================
-   Play modes (#176) — story ladders and arcade bands
+   Play modes (#176) — story levels and arcade bands
    ============================================================
    Mirrors PLAY_MODES_BY_ID in public/src/29-cards.jsx. The client owns the
-   card copy; the server owns what a mode is worth and whether a rung has
+   card copy; the server owns what a mode is worth and whether a level has
    already been claimed, because both are cheatable from the client.
 
-   STORY_BANDS is the rung count per game. Bands, not levels: Tile Match
-   generates 1000 levels and Mahjong has 6 layouts, so paying per level would
-   make one game worth a hundred times another for the same "finished the
-   story" achievement. Every ladder is normalised to 4–8 rungs here, and
-   storyBandAward below spends the SAME total budget on every game however
-   many rungs it has — later bands simply weigh more than earlier ones. */
+   STORY_BANDS is the story LEVEL count per game. (The identifier and the
+   `game_progress.band` column keep their original names on purpose — the
+   #184 rename is display-only, and `band` is part of a live primary key.)
+   A story level is a difficulty step, not one of a game's own levels: Tile
+   Match generates 1000 of those and Mahjong has 6 layouts, so paying per
+   level-of-content would make one game worth a hundred times another for the
+   same "finished the story" achievement.
+
+   Every game's story is capped to STORY_LEVEL_MIN..STORY_LEVEL_MAX levels
+   (#184), and storyBandAward below spends the SAME total budget on every game
+   however many levels it has: later levels simply weigh more than earlier
+   ones. scripts/check-registry.js enforces the bound AND that each client
+   difficulty table is the same length as its entry here, because a server
+   bump without the matching client bump silently replays the old hardest
+   board at the top of the ladder. */
+const STORY_LEVEL_MIN = 6;
+const STORY_LEVEL_MAX = 10;
+// What a NEWLY added story starts at. Start at the floor and earn the extra
+// levels with content: the four games above the floor are there because they
+// have a ladder of real, distinguishable difficulty to spend them on.
+const STORY_LEVEL_DEFAULT = 6;
 const STORY_BANDS = {
-  sudoku: 6, sudokumini: 5, wordhunt: 6, cryptowordle: 6,
-  klondike: 5, spider: 3, mahjongsol: 6, anagrams: 5,
+  sudoku: 6, sudokumini: 6, wordhunt: 6, cryptowordle: 6,
+  klondike: 6, spider: 6, mahjongsol: 6, anagrams: 6,
   nonogram: 6, cratepush: 8, minefinder: 6,
-  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 5,
-  hashrush: 5, match3: 5, 'knights-tour': 6,
+  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 6,
+  hashrush: 6, match3: 6, 'knights-tour': 6,
 };
 const storyBandCount = (gameId) => STORY_BANDS[gameId] || 0;
 
@@ -568,6 +589,10 @@ const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
 //   daily_sweep    — finished ALL daily games within one UTC day.
 //   podium         — held rank #1 on a game's daily leaderboard at finish time.
 //   solve_milestone — lifetime finished+won solves crossed 10/50/100.
+//   story_complete  — cleared every band of one game's Story ladder. One
+//                    badge per (user, game); the game id lives in
+//                    metadata.gameId so a single `type` covers all ladders,
+//                    exactly as solve_milestone parameterises by count.
 const SPEED_DEMON_MAX_SECS = 60;
 // Per-game "no wasted moves" thresholds (the single balance knob for the
 // Flawless badge — tune here). Only the move-counted daily games qualify;
@@ -589,23 +614,28 @@ async function earnedAchievementBadges(userId) {
       `SELECT type, metadata
          FROM user_achievements
         WHERE user_id = $1
-          AND type IN ('first_solve','speed_demon','flawless','daily_sweep','podium','solve_milestone')`,
+          AND type IN ('first_solve','speed_demon','flawless','daily_sweep','podium','solve_milestone','story_complete')`,
       [userId]
     );
     const types = new Set();
     const milestones = new Set();
+    const stories = new Set();
     for (const r of rows) {
       types.add(r.type);
       if (r.type === 'solve_milestone' && r.metadata && Number.isFinite(+r.metadata.count)) {
         milestones.add(+r.metadata.count);
       }
+      if (r.type === 'story_complete' && r.metadata && typeof r.metadata.gameId === 'string') {
+        stories.add(r.metadata.gameId);
+      }
     }
     return {
       types: Array.from(types),
       milestones: Array.from(milestones).sort((a, b) => a - b),
+      stories: Array.from(stories).sort(),
     };
   } catch {
-    return { types: [], milestones: [] };
+    return { types: [], milestones: [], stories: [] };
   }
 }
 
@@ -1080,6 +1110,31 @@ async function migrate() {
     ON user_achievements(created_at DESC)
   `);
 
+  /* Backfill story_complete badges for ladders finished before the badge
+     existed. Idempotent by the same NOT EXISTS guard the live award uses, so
+     it is a cheap no-op on every boot after the first. A ladder counts as
+     complete when the user holds every band 0..n-1 of that game. */
+  try {
+    for (const [gameId, bands] of Object.entries(STORY_BANDS)) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+         SELECT gp.user_id, 'story_complete', $1, $3::jsonb
+           FROM game_progress gp
+          WHERE gp.game_id = $1 AND gp.band >= 0 AND gp.band < $2::int
+          GROUP BY gp.user_id
+         HAVING COUNT(DISTINCT gp.band) = $2::int
+            AND NOT EXISTS (
+              SELECT 1 FROM user_achievements ua
+               WHERE ua.user_id = gp.user_id AND ua.type = 'story_complete'
+                 AND ua.metadata->>'gameId' = $1
+            )`,
+        [gameId, bands, JSON.stringify({ gameId, bands })]
+      );
+    }
+  } catch (e) {
+    console.warn('[migrate] story_complete backfill skipped:', e.message);
+  }
+
   // tilematch_scores is PUBLIC: personal-best scores for the Tile Match Puzzle
   // (1000-level mode). One row per user, upserted with GREATEST.
   await pool.query(`
@@ -1224,6 +1279,22 @@ async function migrate() {
   `);
   await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS save_hash TEXT`);
   await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS anchor_tx_hash TEXT`);
+
+  /* game_pins is PUBLIC — which games a player pinned to the top of their home
+     grid (#232). It is a display preference over ids that are already public
+     (every game id is a deep-link key), so a stranger reading every row learns
+     nothing they could not read off the lobby. game_id holds the CARD's anchor
+     registry id; the client resolves it back to a card through CARD_BY_GAME_ID,
+     which is what lets the four merged cards keep both of their ids. */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_pins (
+      user_id   TEXT NOT NULL,
+      username  TEXT,
+      game_id   TEXT NOT NULL,
+      pinned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
 
   // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
   // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
@@ -2309,6 +2380,59 @@ app.delete('/api/social/unfollow/:userId', async (req, res) => {
   }
 });
 
+// ---- Pinned games API (#232) --------------------------------------------
+// Auth-gated like every other /api route: the pin belongs to req.user, never
+// to an id the client names. Both routes answer with the player's FULL pin
+// list so the client replaces its optimistic array with the server's truth
+// rather than trying to reproduce the cap's arithmetic locally.
+
+async function readPins(userId) {
+  const { rows } = await pool.query(
+    `SELECT game_id FROM game_pins WHERE user_id = $1 ORDER BY pinned_at ASC, game_id ASC`,
+    [userId]
+  );
+  return rows.map(r => r.game_id);
+}
+
+// POST /api/pins/:gameId — pin a game to the top of the home grid.
+app.post('/api/pins/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    // The cap is enforced INSIDE the insert: a count-then-insert pair would let
+    // two taps in flight at once both see 7 and both land.
+    const { rowCount } = await pool.query(
+      `INSERT INTO game_pins (user_id, username, game_id)
+       SELECT $1, $2, $3
+        WHERE (SELECT count(*) FROM game_pins WHERE user_id = $1) < $4
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [req.user.id, req.user.username || null, gameId, PIN_LIMIT]
+    );
+    const pins = await readPins(req.user.id);
+    if (!rowCount && !pins.includes(gameId)) {
+      return res.status(409).json({ error: 'Pin limit reached', limit: PIN_LIMIT, pins });
+    }
+    res.json({ pins, limit: PIN_LIMIT });
+  } catch (err) {
+    console.error('[pins] POST failed:', err.message);
+    res.status(500).json({ error: 'Failed to pin game' });
+  }
+});
+
+// DELETE /api/pins/:gameId — unpin. Idempotent: unpinning something that was
+// never pinned is a success with an unchanged list.
+app.delete('/api/pins/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  try {
+    await pool.query(`DELETE FROM game_pins WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]);
+    res.json({ pins: await readPins(req.user.id), limit: PIN_LIMIT });
+  } catch (err) {
+    console.error('[pins] DELETE failed:', err.message);
+    res.status(500).json({ error: 'Failed to unpin game' });
+  }
+});
+
 // ---- Posts API (sharing) -----------------------------------------------
 
 
@@ -2440,6 +2564,44 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    /* Staging-only demo seed (#232): pins three games for the current viewer
+       so the Pinned section, its filter behaviour and the pin's "on" state are
+       all reachable by navigation alone. game_pins is a NEW table, so staging
+       starts with zero rows and none of that would otherwise render.
+
+       The three ids are deliberately mixed — a daily (sudoku), a classic
+       (mancala) and one half of a merged card (snakedaily) — and pinned in an
+       order that is NOT their registry order, so a screenshot shows the
+       section sorting by registry position rather than by recency. Nothing the
+       app's own logic reads is fabricated here: a pin only ever moves a card
+       up the grid. Idempotent; strict no-op in production. */
+    if (IS_STAGING && (req.query.demo === 'pins' || req.query.demo === 'pinsfull')) {
+      const demoPins = req.query.demo === 'pinsfull'
+        ? ['snakedaily', 'mancala', 'sudoku', 'nonogram', 'checkers',
+           'dropstack', '2048', 'wordhunt']
+        : ['snakedaily', 'mancala', 'sudoku'];
+      for (let i = 0; i < demoPins.length; i++) {
+        await pool.query(
+          `INSERT INTO game_pins (user_id, username, game_id, pinned_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoPins[i],
+           String(demoPins.length - i)]
+        );
+      }
+    }
+
+    /* Staging-only counterpart to demo=pins (#232): clears the viewer's pins so
+       the zero-pin home — the shape a real player sees before they pin anything —
+       is reachable DETERMINISTICALLY. A pin is durable by design, and the whole
+       proposal-check suite runs as one viewer against one staging DB, so a plain
+       `/` assertion on the empty state would pass or fail purely on whether a
+       demo=pins route ran earlier in the file. This makes that order irrelevant.
+       Deletes only rows belonging to the caller; strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'pinsempty') {
+      await pool.query(`DELETE FROM game_pins WHERE user_id = $1`, [req.user.id]);
+    }
+
     // Staging-only demo seed: gives the current viewer a 10-day consecutive
     // streak (finished sudoku attempts for the last 10 UTC days BEFORE today)
     // so the multiplier tier UI is demonstrable — nav badge, lobby next-tier
@@ -2502,6 +2664,54 @@ app.get('/api/daily', async (req, res) => {
           [req.user.id, a.type, a.type === 'solve_milestone' ? a.meta.count : null, JSON.stringify(a.meta)]
         );
       }
+      // One story_complete per ladder, so the Story ladders group in the badge
+      // strip also reads fully earned. Without this, broadening the strip by 18
+      // chips would quietly break this fixture's "everything unlocked" promise.
+      for (const [sGameId, sBands] of Object.entries(STORY_BANDS)) {
+        await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+           SELECT $1, 'story_complete', $2, $3::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements
+               WHERE user_id = $1 AND type = 'story_complete'
+                 AND metadata->>'gameId' = $2
+            )`,
+          [req.user.id, sGameId, JSON.stringify({ gameId: sGameId, bands: sBands })]
+        );
+      }
+    }
+
+    // Staging-only demo seed for the Story-ladder completion badge: one ladder
+    // finished (Sudoku, all 6 bands + its badge), one part-walked (Mine Finder,
+    // 5 of 6 — still locked), and one untouched (Crate Push), so the badge
+    // strip shows an earned story chip next to locked ones. Idempotent, no-op
+    // in prod.
+    if (IS_STAGING && req.query.demo === 'storybadges') {
+      const storySeed = [
+        { gameId: 'sudoku',     upTo: storyBandCount('sudoku') },
+        { gameId: 'minefinder', upTo: Math.max(0, storyBandCount('minefinder') - 1) },
+      ];
+      for (const sg of storySeed) {
+        for (let b = 0; b < sg.upTo; b++) {
+          await pool.query(
+            `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+            [req.user.id, sg.gameId, b, 600 + b * 80, 320 - b * 15, 55 + b * 7]
+          );
+        }
+      }
+      // The badge itself, on the same guarded insert the live award uses.
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+         SELECT $1, 'story_complete', 'sudoku', $2::jsonb
+          WHERE NOT EXISTS (
+            SELECT 1 FROM user_achievements
+             WHERE user_id = $1 AND type = 'story_complete'
+               AND metadata->>'gameId' = 'sudoku'
+          )`,
+        [req.user.id, JSON.stringify({ gameId: 'sudoku', bands: storyBandCount('sudoku') })]
+      );
     }
 
     // Staging-only demo seed: populate today's per-game leaderboards with a
@@ -2732,6 +2942,36 @@ app.get('/api/daily', async (req, res) => {
                steps = EXCLUDED.steps, elapsed_secs = EXCLUDED.elapsed_secs,
                progress = EXCLUDED.progress`,
         [req.user.id, req.user.username || 'staging-demo-user', JSON.stringify({ reviewDemo: true })]
+      );
+    }
+
+    /* Staging-only demo seed (#218): a claimed, unfinished NONOGRAM row whose
+       grid is FULLY DECIDED and provably wrong, so the "filled but does not
+       match" verdict, the red clue numbers and the mistake counter are all
+       reachable by navigation alone (a proposal check cannot tap 64 cells).
+
+       Even rows all filled, odd rows all marked empty. That can never be the
+       day's answer whatever the seed: ngBuildForBand rejects any picture with
+       an empty row, so a row of zero filled cells cannot match its clue. No
+       blank cells remain, so the grid reads as complete. Today's daily is band
+       1 (8x8), which is the size the client's ngFits check requires.
+       Idempotent; today only; strict no-op in prod. */
+    if (IS_STAGING && req.query.demo === 'ngmistake') {
+      const ngDay = Math.floor(Date.now() / 86400000);
+      const ngGrid = Array.from({ length: 8 }, (_, r) => new Array(8).fill(r % 2 === 0 ? 1 : 2));
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'nonogram', (now() AT TIME ZONE 'utc')::date, 64, 180, $3::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL, score = NULL, time_secs = NULL,
+               steps = EXCLUDED.steps, elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          JSON.stringify({ dayNum: ngDay, grid: ngGrid, mistakes: 2 }),
+        ]
       );
     }
 
@@ -3146,15 +3386,28 @@ app.get('/api/daily', async (req, res) => {
        renders every rung as unreachable-and-unstarted, and the arcade board is
        an empty list with no rank to be outside of. Idempotent. */
     if (IS_STAGING && req.query.demo === 'modes') {
-      // Half of Sudoku's 6-rung ladder cleared, so the pre-game screen shows
-      // ticks, an open rung and locked rungs all at once.
-      for (let b = 0; b < 3; b++) {
-        await pool.query(
-          `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
-           VALUES ($1, 'sudoku', $2, $3, $4, $5, now())
-           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
-          [req.user.id, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
-        );
+      /* Three shapes of the same screen, because the level picker reads
+         differently in each and only one of them was reachable before (#184):
+           sudoku — half walked: ticks, one open level, locked levels.
+           zuma   — every level cleared, which is the only way to see the
+                    "All levels cleared" note and an all-ticked picker.
+           spider — 3 of 6, the count the header renders as "3/6". Spider's
+                    story went from 3 levels to 6, so it is also the game where
+                    a stale client table would show as a short picker. */
+      const walked = [
+        { gameId: 'sudoku', cleared: 3 },
+        { gameId: 'zuma',   cleared: 6 },
+        { gameId: 'spider', cleared: 3 },
+      ];
+      for (const w of walked) {
+        for (let b = 0; b < w.cleared; b++) {
+          await pool.query(
+            `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+            [req.user.id, w.gameId, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
+          );
+        }
       }
       // Rivals on the Normal arcade board for 2048, plus a modest viewer row
       // that sits outside the top 3 — the case the pinned `me` row exists for.
@@ -3377,6 +3630,17 @@ app.get('/api/daily', async (req, res) => {
       solveCount = (scRows[0] && scRows[0].n) || 0;
     } catch { solveCount = 0; }
 
+    // Pinned games (#232) — the card anchor ids this player pinned, oldest
+    // first. Non-fatal: a lobby without its Pinned section is still a lobby.
+    let pins = [];
+    try {
+      const { rows: pinRows } = await pool.query(
+        `SELECT game_id FROM game_pins WHERE user_id = $1 ORDER BY pinned_at ASC, game_id ASC`,
+        [req.user.id]
+      );
+      pins = pinRows.map(r => r.game_id);
+    } catch (e) { console.warn('[daily] pins query failed (non-fatal):', e.message); }
+
     res.json({
       // Surface the signed-in account so the UI can confirm login +
       // that persistent data is active. Always present here (route is
@@ -3404,6 +3668,9 @@ app.get('/api/daily', async (req, res) => {
       featured,
       // All-time personal bests per daily game ({ gameId: { score, timeSecs } }).
       bests,
+      // Games pinned to the top of the home grid (#232), oldest pin first.
+      pins,
+      pinLimit: PIN_LIMIT,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);
@@ -4088,7 +4355,39 @@ app.post('/api/story/:gameId/clear', async (req, res) => {
     let cleared = 0;
     while (cleared < total && have.has(cleared)) cleared += 1;
 
-    res.json({ ok: true, band, total, cleared, awarded: firstClear ? award : 0, firstClear });
+    /* story_complete badge — awarded the moment the ladder reads as fully
+       cleared. Evaluated on EVERY clear, not only a first clear: the last rung
+       a player fills may well be one they are replaying out of order, and the
+       badge is about the ladder's state, not this one row. The guarded insert
+       is the idempotency (one row per user per gameId, forever), so re-running
+       this is free. Best-effort: a badge failure must never cost the player
+       the band they just cleared. */
+    const newAchievements = [];
+    const ladderComplete = cleared >= total;
+    if (ladderComplete) {
+      try {
+        const ach = await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+           SELECT $1, 'story_complete', $2, $3::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements
+               WHERE user_id = $1 AND type = 'story_complete'
+                 AND metadata->>'gameId' = $2
+            )
+           RETURNING type`,
+          [req.user.id, gameId, JSON.stringify({ gameId, bands: total })]
+        );
+        if (ach.rows.length) newAchievements.push({ type: 'story_complete', gameId, bands: total });
+      } catch (e) {
+        console.warn('[story] badge award failed:', e.message);
+      }
+    }
+
+    res.json({
+      ok: true, band, total, cleared,
+      awarded: firstClear ? award : 0, firstClear,
+      ladderComplete, newAchievements,
+    });
   } catch (e) {
     console.error('[story] clear failed:', e.message);
     res.status(500).json({ error: 'Could not record band' });

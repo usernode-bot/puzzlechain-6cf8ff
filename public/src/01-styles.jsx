@@ -953,6 +953,22 @@ ${emitTapHighlightRules()}
   font-family: inherit; font-size: 0.85rem; cursor: pointer; padding: 0.3rem;
 }
 .pregame-howto-btn:hover { text-decoration: underline; }
+/* #239 — "one page wherever possible, and not require scrolling".
+   The pre-game screen is the first thing a tap on a game card lands on, and
+   at 390x667 (an iPhone SE / 8, and any phone in a shorter window) it stood
+   716px tall: the Play button and the How-to-play / Game chat links sat below
+   the fold, so the screen whose entire job is a Play button opened without one
+   in sight. Nothing is removed or hidden — the card's own breathing room is
+   spent instead, and only on viewports too short to afford it. Keyed on
+   max-HEIGHT, so a roomy phone is untouched. */
+@media (max-height: 730px) {
+  .pregame-card { margin: 0.75rem auto; padding: 1.25rem 1.25rem; }
+  .pregame-icon { font-size: 2.1rem; margin-bottom: 0.25rem; }
+  .pregame-card .sub { margin-bottom: 0.7rem; }
+  .pregame-chips { margin-bottom: 0.7rem; }
+  .pregame-stats { margin-bottom: 0.7rem; }
+  .pregame-howto-btn { margin-top: 0.5rem; }
+}
 
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {

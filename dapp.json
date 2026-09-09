@@ -1482,6 +1482,7 @@
     "view": "public"
   },
   "admins": [
-    "evan"
+    "evan",
+    "snait"
   ]
 }

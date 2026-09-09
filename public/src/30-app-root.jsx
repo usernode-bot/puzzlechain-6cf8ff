@@ -237,6 +237,36 @@ function App() {
   };
   const navKey = JSON.stringify(navState);
 
+  /* #239 — "start at the top of the page in any case".
+     Nothing reset the scroll position on navigation, and the home grid is
+     ~4500px tall on a phone. The browser clamps scrollY to the new document's
+     height, which HID the bug on a tall screen against a short target: tap a
+     game from the bottom of the grid on a 844px phone and the pre-game screen
+     happens to be exactly 844px, so you land at 0 by accident. Anywhere the
+     target is taller you land mid-page — tapping the account chip from the
+     bottom of the grid opened the profile at scrollY 844 of 1688, below its
+     own header, and on a 420px-tall viewport a game's header sat 195px above
+     the top of the screen.
+
+     This is deliberately keyed off the PAGE, not off navKey: navKey also
+     changes when an overlay opens, and scrolling the page out from under a
+     modal you just opened is its own bug. Overlay and overlayArg are the two
+     fields left out.
+
+     A POP is left alone. The early return below already covers it (navLock),
+     and it is the right behaviour: back should put you where you were, not at
+     the top of a screen you have already read. */
+  const navPageKey = JSON.stringify({ ...navState, overlay: null, overlayArg: null });
+  const navPageReady = useRef(false);
+  useEffect(() => {
+    if (navLock.current) return;          // a pop — the push effect clears the flag
+    if (!navPageReady.current) {          // first mount: already at the top
+      navPageReady.current = true;
+      return;
+    }
+    try { window.scrollTo(0, 0); } catch {}
+  }, [navPageKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (navLock.current) { navLock.current = false; return; }
     try {
@@ -1836,7 +1866,13 @@ function App() {
   // Server-anchored reset clock for the merged grid's daily note (slice 2) —
   // the same hook LockedScreen and the pre-game screen use, so every countdown
   // in the app ticks off one clock.
-  const homeResetCountdown = useCountdown(nextResetUtc, offset, onReset);
+  /* The home page's midnight trigger. #234 removed the note that RENDERED this
+     string — the Game-of-the-Day hero directly above it runs the same clock —
+     but the call stays, because it is also what fires onReset at 00:00 UTC.
+     The hero has its own useCountdown, so on most days either would do; when
+     there is no featured game the hero falls back to a plain formatted string
+     with no expiry hook at all, and this is the only thing left watching. */
+  useCountdown(nextResetUtc, offset, onReset);
 
   /* PHASE 1 (#158/#160/#162) — one `resultData` for every kind of ending, so
      the frozen board, the minibar, the backdrop dismiss and "View board" all
@@ -2061,13 +2097,6 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
-              {/* Today's Top Scores (GotD-only board) sits directly below the
-                  hero so the featured game's results read as one section. */}
-              {authOk && !loading && (
-                <TodayChampions
-                  onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-                />
-              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}
@@ -2208,10 +2237,6 @@ function App() {
                     )}
                     {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
                     <div className="home-section-title">All Games</div>
-                    <div className="home-daily-note">
-                      🕛 New daily puzzles at midnight UTC — resets in{' '}
-                      <span className="mono">{homeResetCountdown}</span>
-                    </div>
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },
@@ -2229,12 +2254,21 @@ function App() {
                     </div>
                     {authOk && pins.length === 0 && (
                       <div className="home-pin-empty">
-                        Nothing pinned yet. Tap 📌 on any card to pin it to the top.
+                        Tap 📌 on any card to pin it to the top.
                       </div>
                     )}
                     <div className="grid">
                       {restCards.map(c => <GameCard {...cardProps(c)} />)}
                     </div>
+                    {/* #234 — Today's Top Scores reads AFTER the games now.
+                        It is a result of playing, not a way in, and at 135px
+                        directly under the hero it was one of the four blocks
+                        keeping every game card off the first screen. */}
+                    {authOk && !loading && (
+                      <TodayChampions
+                        onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+                      />
+                    )}
                   </React.Fragment>
                 );
               })()}

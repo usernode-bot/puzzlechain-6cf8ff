@@ -306,6 +306,16 @@
       "expectSelector": ".pregame-howto-btn"
     },
     {
+      "name": "How to play and Game chat are buttons, not footnote links",
+      "path": "/?game=tilematchingdaily",
+      "expectSelector": ".pregame-actions .pregame-howto-btn"
+    },
+    {
+      "name": "The same pair are buttons on the opponent screen",
+      "path": "/?game=checkers",
+      "expectSelector": ".pregame-actions .pregame-howto-btn"
+    },
+    {
       "name": "Snakes & Ladders mode select offers Versus Bot",
       "path": "/?game=chutes-ladders",
       "expectText": "Versus Bot"

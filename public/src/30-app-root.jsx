@@ -46,6 +46,14 @@ function App() {
   const arcadeBandRef = useRef(arcadeBandId); arcadeBandRef.current = arcadeBandId;
   // gameId -> { cleared, total } for the card state line and the story picker.
   const [storyProgress, setStoryProgress] = useState({});
+  /* Pinned games (#232): the CARD ANCHOR ids this player pinned, in the order
+     the server holds them. The array is the server's, replaced wholesale on
+     every toggle — the client never recomputes the cap. Deliberately NOT a
+     navState field: a pin changes what the home grid looks like, not which
+     screen you are on, so it must not push a history entry. */
+  const [pins, setPins] = useState([]);
+  // Transient "you are at the cap" line, cleared on the next successful pin.
+  const [pinNotice, setPinNotice] = useState('');
   // The viewer's standing on the arcade band currently selected, so the
   // pre-game screen can show what there is to beat before the run starts.
   const [arcadeBest, setArcadeBest] = useState(null);
@@ -55,7 +63,7 @@ function App() {
   // even after a streak resets, so the lobby can show a collected-badges strip.
   const [badges, setBadges] = useState([]);
   // Non-streak achievement badges earned: { types: [...], milestones: [...] }.
-  const [achievements, setAchievements] = useState({ types: [], milestones: [] });
+  const [achievements, setAchievements] = useState({ types: [], milestones: [], stories: [] });
   // Lifetime won-solve count (server-computed), used to drive the
   // "X/Y solves → Solver" next-milestone progress hint.
   const [solveCount, setSolveCount] = useState(0);
@@ -186,7 +194,9 @@ function App() {
   // consumed once the load settles.
   const pendingSelfProfile = useRef((() => {
     const s = new URLSearchParams(window.location.search).get('screen');
-    return s === 'account' || s === 'profile';
+    // 'badges' is the literal deep link to the badge collection; there is no
+    // separate badge screen, the collection lives in the profile's BadgeStrip.
+    return s === 'account' || s === 'profile' || s === 'badges';
   })());
 
   useEffect(() => {
@@ -234,6 +244,36 @@ function App() {
     overlayArg: navPrimitive(howToGame ? howToGame.id : chatGame ? (chatGame.id || chatGame) : null),
   };
   const navKey = JSON.stringify(navState);
+
+  /* #239 — "start at the top of the page in any case".
+     Nothing reset the scroll position on navigation, and the home grid is
+     ~4500px tall on a phone. The browser clamps scrollY to the new document's
+     height, which HID the bug on a tall screen against a short target: tap a
+     game from the bottom of the grid on a 844px phone and the pre-game screen
+     happens to be exactly 844px, so you land at 0 by accident. Anywhere the
+     target is taller you land mid-page — tapping the account chip from the
+     bottom of the grid opened the profile at scrollY 844 of 1688, below its
+     own header, and on a 420px-tall viewport a game's header sat 195px above
+     the top of the screen.
+
+     This is deliberately keyed off the PAGE, not off navKey: navKey also
+     changes when an overlay opens, and scrolling the page out from under a
+     modal you just opened is its own bug. Overlay and overlayArg are the two
+     fields left out.
+
+     A POP is left alone. The early return below already covers it (navLock),
+     and it is the right behaviour: back should put you where you were, not at
+     the top of a screen you have already read. */
+  const navPageKey = JSON.stringify({ ...navState, overlay: null, overlayArg: null });
+  const navPageReady = useRef(false);
+  useEffect(() => {
+    if (navLock.current) return;          // a pop — the push effect clears the flag
+    if (!navPageReady.current) {          // first mount: already at the top
+      navPageReady.current = true;
+      return;
+    }
+    try { window.scrollTo(0, 0); } catch {}
+  }, [navPageKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (navLock.current) { navLock.current = false; return; }
@@ -398,12 +438,17 @@ function App() {
       setSolveCount(Number.isFinite(body.solveCount) ? body.solveCount : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
-        ? { types: body.achievements.types, milestones: body.achievements.milestones || [] }
-        : { types: [], milestones: [] });
+        ? {
+            types: body.achievements.types,
+            milestones: body.achievements.milestones || [],
+            stories: body.achievements.stories || [],
+          }
+        : { types: [], milestones: [], stories: [] });
       // Server-issued daily seeds — must land before any daily game mounts
       // (they do: games launch from the lobby, which renders after loading).
       SERVER_DAILY_SEEDS = body.seeds || {};
       setBests(body.bests || {});
+      setPins(Array.isArray(body.pins) ? body.pins : []);
       /* #176 — story progress is loaded alongside the daily state rather than
          folded into it: it is not day-scoped, so it does not belong on a route
          whose whole contract is "today". Failure is silent because the home
@@ -435,7 +480,8 @@ function App() {
       setStreak(0);
       setSolveCount(0);
       setBadges([]);
-      setAchievements({ types: [], milestones: [] });
+      setAchievements({ types: [], milestones: [], stories: [] });
+      setPins([]);
       // Signed-out (or backend hiccup): the public read surface still supplies
       // server time, the reset countdown, and today's board seeds, so the
       // signed-out lobby stays anchored to server time.
@@ -453,6 +499,27 @@ function App() {
   };
 
   useEffect(() => { loadDaily(); }, []);
+
+  /* Pin / unpin one card (#232). Optimistic so the grid reorders on the tap
+     rather than a round trip later, then RECONCILED against the array the
+     server returns — the cap lives there, so the server's answer is the only
+     one that can be trusted about what actually landed. A failure reverts. */
+  const togglePin = async (gameId, wantPinned) => {
+    if (!gameId || !authOk || loading) return;
+    const before = pins;
+    setPinNotice('');
+    cgHaptic(8);
+    setPins(wantPinned
+      ? (before.includes(gameId) ? before : before.concat([gameId]))
+      : before.filter(id => id !== gameId));
+    const r = await api('/api/pins/' + encodeURIComponent(gameId),
+      { method: wantPinned ? 'POST' : 'DELETE' });
+    if (r.ok && r.body && Array.isArray(r.body.pins)) { setPins(r.body.pins); return; }
+    setPins(Array.isArray(r.body && r.body.pins) ? r.body.pins : before);
+    if (r.status === 409) {
+      setPinNotice(`You can pin up to ${PIN_LIMIT} games. Unpin one to make room.`);
+    }
+  };
 
   // Home in-progress row (phase 7): the viewer's active online matches.
   // Refetched on every return to the lobby so a just-made move updates the
@@ -793,19 +860,24 @@ function App() {
       return;
     }
     /* #176 — ?pmode=daily|story|arcade opens a card in one of its play modes,
-       and ?band= preselects the rung (story: a 1-based number) or difficulty
-       (arcade: easy|normal|hard). Without these the story ladder, the arcade
-       band picker and every board behind them are reachable only by TAPPING a
-       card button — which navigation-driven proposal checks and screenshots
-       cannot do, so none of #176 would have been verifiable. Deliberately NOT
-       ?mode=, which already pins a classic's opponent (bot / 2p / online).
+       and ?level= preselects the story level (a 1-based number) or the arcade
+       difficulty (easy|normal|hard). Without these the story levels, the
+       arcade band picker and every board behind them are reachable only by
+       TAPPING a card button — which navigation-driven proposal checks and
+       screenshots cannot do, so none of #176 would have been verifiable.
+       Deliberately NOT ?mode=, which already pins a classic's opponent
+       (bot / 2p / online).
+
+       ?band= is the original spelling and still works (#184 renamed the copy,
+       not the URL contract) — every merged deep link and dapp.json test keeps
+       resolving. ?level= wins when both are present.
 
        Checked BEFORE the pre-launch modal for the same reason ?result=1 is:
        2048 and Block Fit carry preLaunchModal, so below that branch this link
        would surface the opponent chooser instead of the mode it names. */
     const pmode = params.get('pmode');
     if (isPlayMode(pmode) && supportsMode(g.id, pmode)) {
-      const bandParam = params.get('band');
+      const bandParam = params.get('level') || params.get('band');
       let band = null;
       if (pmode === 'story' && bandParam) band = Math.max(0, (parseInt(bandParam, 10) || 1) - 1);
       if (pmode === 'arcade' && ARCADE_BAND_IDS.indexOf(bandParam) !== -1) band = bandParam;
@@ -1088,12 +1160,18 @@ function App() {
     if (ok && body) {
       setStoryProgress(prev => ({ ...prev, [gameId]: { cleared: body.cleared, total: body.total } }));
       if (body.awarded) setTotalScore(t => t + body.awarded);
-      /* Returned, not swallowed: the auto-advance tally needs this exact
-         response ({ awarded, firstClear, cleared, total }) and re-deriving it
-         client-side would be a second copy of the server's award rule. */
-      return body;
+      if (body.newAchievements && body.newAchievements.length) {
+        setAchievements(prev => mergeAchievements(prev, body.newAchievements));
+      }
     }
-    return null;
+    /* Returned, not stashed in state here: handleWin's setWinData runs AFTER
+       this await, so anything this function set on the win overlay would be
+       clobbered by that call. The caller threads it in instead — the
+       auto-advance tally also needs this exact response ({ awarded,
+       firstClear, cleared, total, ladderComplete, newAchievements }) and
+       re-deriving it client-side would be a second copy of the server's
+       award rule. */
+    return ok && body ? body : null;
   };
 
   /* ============================================================
@@ -1224,10 +1302,17 @@ function App() {
       const bandIdx = typeof storyBand === 'number' ? storyBand : 0;
       const res = await handleBandCleared(bandIdx, { score, steps, timeSecs });
       const total = (res && res.total) || (storyProgress[currentGame.id] || {}).total || 0;
+      // Issue #183 — the ladder-completion badge. Only a FRESH award pops the
+      // celebration; finishing the last band again just shows the usual card.
+      const storyAch = (res && res.newAchievements || [])
+        .find(a => a && a.type === 'story_complete');
+      const storyBadge = storyAch ? achievementBadgeFor(storyAch) : null;
       const winPayload = {
         score, bonus: 0, finalScore: score, steps, timeSecs,
         multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
         modeLabel: 'Story', bandIndex: bandIdx, bandTotal: total,
+        ladderComplete: !!(res && res.ladderComplete),
+        storyBadge,
       };
       /* #185 — the ladder carries you on. Two cases keep the old card: a
          guest has no ladder at all (GET /api/story is auth-gated, so there is
@@ -1237,7 +1322,7 @@ function App() {
       const info = {
         gameId: currentGame.id, fromBand: bandIdx, toBand: bandIdx + 1, total,
         awarded: (res && res.awarded) || 0, firstClear: !!(res && res.firstClear),
-        win: winPayload,
+        storyBadge, win: winPayload,
       };
       if (bandIdx + 1 >= total) {
         clearAdvanceTimers();
@@ -1949,7 +2034,13 @@ function App() {
   // Server-anchored reset clock for the merged grid's daily note (slice 2) —
   // the same hook LockedScreen and the pre-game screen use, so every countdown
   // in the app ticks off one clock.
-  const homeResetCountdown = useCountdown(nextResetUtc, offset, onReset);
+  /* The home page's midnight trigger. #234 removed the note that RENDERED this
+     string — the Game-of-the-Day hero directly above it runs the same clock —
+     but the call stays, because it is also what fires onReset at 00:00 UTC.
+     The hero has its own useCountdown, so on most days either would do; when
+     there is no featured game the hero falls back to a plain formatted string
+     with no expiry hook at all, and this is the only thing left watching. */
+  useCountdown(nextResetUtc, offset, onReset);
 
   /* PHASE 1 (#158/#160/#162) — one `resultData` for every kind of ending, so
      the frozen board, the minibar, the backdrop dismiss and "View board" all
@@ -2144,7 +2235,13 @@ function App() {
                   <span>No. {utcDayNum(offset) - 20000} · {new Date(Date.now() + offset).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
                 </div>
                 <h1>Game Corner</h1>
-                <p>Classic games, free to play — no ads, no pay-to-win. Fresh puzzles every day at midnight UTC.</p>
+                {/* #237 — one line, and a short one. This used to run to two
+                    sentences that sold the app to someone already inside it
+                    ("free to play — no ads, no pay-to-win") and then restated
+                    the reset time, which the hero's own "Next puzzle in"
+                    countdown says a few hundred pixels further down. A
+                    masthead names the paper; it does not argue for it. */}
+                <p>Classic games, fresh every day.</p>
                 <div className="masthead-rule" />
               </div>
               {commitNotice && (
@@ -2174,13 +2271,6 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
-              {/* Today's Top Scores (GotD-only board) sits directly below the
-                  hero so the featured game's results read as one section. */}
-              {authOk && !loading && (
-                <TodayChampions
-                  onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-                />
-              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}
@@ -2276,13 +2366,51 @@ function App() {
                   if (!mode) { setClassicGameMode(null); setClassicGameModeOpts(null); }
                   launchGame(g, mode);
                 };
+                /* Pinned (#232) partitions the list the filter ALREADY produced,
+                   so pinning can never change what a chip shows — a pinned card
+                   that fails the active filter is simply absent from both
+                   sections, exactly as it was before it was pinned. Order
+                   inside the pinned section is registry order, not pin
+                   recency: the point is "the games I play a lot are easy to
+                   find", and a section that reshuffles itself as you use it is
+                   the opposite of easy to find. */
+                const pinnedSet = new Set();
+                for (const id of pins) {
+                  const c = CARD_BY_GAME_ID[id];
+                  if (c) pinnedSet.add(c.key);
+                }
+                const pinnedCards = ordered.filter(c => pinnedSet.has(c.key));
+                const restCards = ordered.filter(c => !pinnedSet.has(c.key));
+                const atPinCap = pins.length >= PIN_LIMIT;
+                const cardProps = (c) => ({
+                  key: c.key,
+                  card: c,
+                  attempts: attempts,
+                  bests: bests,
+                  storyProgress: storyProgress,
+                  loading: loading,
+                  onPlay: playCardMode,
+                  pinned: pinnedSet.has(c.key),
+                  // Signed-out visitors have nowhere to store a pin, so they
+                  // get no control rather than one that fails on tap.
+                  onTogglePin: authOk ? togglePin : null,
+                  pinDisabled: atPinCap,
+                });
                 return (
                   <React.Fragment>
+                    {pinnedCards.length > 0 && (
+                      <React.Fragment>
+                        <div className="home-section-title home-pinned-title">
+                          📌 Pinned
+                          <span className="home-pin-count">{pins.length}/{PIN_LIMIT}</span>
+                        </div>
+                        <div className="grid home-pinned-grid">
+                          {pinnedCards.map(c => <GameCard {...cardProps(c)} />)}
+                        </div>
+                      </React.Fragment>
+                    )}
+                    {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
                     <div className="home-section-title">All Games</div>
-                    <div className="home-daily-note">
-                      🕛 New daily puzzles at midnight UTC — resets in{' '}
-                      <span className="mono">{homeResetCountdown}</span>
-                    </div>
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },
@@ -2298,19 +2426,23 @@ function App() {
                         >{f.label}</button>
                       ))}
                     </div>
+                    {authOk && pins.length === 0 && (
+                      <div className="home-pin-empty">
+                        Tap 📌 on any card to pin it to the top.
+                      </div>
+                    )}
                     <div className="grid">
-                      {ordered.map(c => (
-                        <GameCard
-                          key={c.key}
-                          card={c}
-                          attempts={attempts}
-                          bests={bests}
-                          storyProgress={storyProgress}
-                          loading={loading}
-                          onPlay={playCardMode}
-                        />
-                      ))}
+                      {restCards.map(c => <GameCard {...cardProps(c)} />)}
                     </div>
+                    {/* #234 — Today's Top Scores reads AFTER the games now.
+                        It is a result of playing, not a way in, and at 135px
+                        directly under the hero it was one of the four blocks
+                        keeping every game card off the first screen. */}
+                    {authOk && !loading && (
+                      <TodayChampions
+                        onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+                      />
+                    )}
                   </React.Fragment>
                 );
               })()}
@@ -2487,6 +2619,18 @@ function App() {
                 You cleared all {advance.total} bands in {currentGame.name}.
                 Replay any band for practice, or try Arcade for a fresh board every run.
               </div>
+              {/* Issue #183 — the ladder-completion badge. The auto-advance
+                  overlay is what actually shows on a final-band clear now, so
+                  the celebration has to render here too or it never appears. */}
+              {advance.storyBadge && (
+                <div className="badge-unlock">
+                  <div className="bu-icon">{advance.storyBadge.icon}</div>
+                  <div>
+                    <div className="bu-title">Badge unlocked!</div>
+                    <div className="bu-name">{advance.storyBadge.name} · {advance.storyBadge.desc}</div>
+                  </div>
+                </div>
+              )}
               <div className="adv-actions">
                 <button className="primary-btn tappable" {...tapProps(() => backToLadder())}>
                   📖 Back to the ladder
@@ -2703,13 +2847,29 @@ function App() {
                 </div>
               </div>
             )}
+            {/* Issue #183 — the Story ladder's completion badge. Deliberately a
+                SEPARATE block from the three daily badge celebrations above:
+                those are gated on isDailyResult and must stay that way, since
+                a story run never touches the daily attempt row, streak or
+                daily badges. */}
+            {winData.modeLabel === 'Story' && winData.storyBadge && (
+              <div className="badge-unlock">
+                <div className="bu-icon">{winData.storyBadge.icon}</div>
+                <div>
+                  <div className="bu-title">Ladder complete!</div>
+                  <div className="bu-name">{winData.storyBadge.name} · {winData.storyBadge.desc}</div>
+                </div>
+              </div>
+            )}
             {winData.modeLabel === 'Story' && winData.bandTotal > 0 && (
               <div className="mode-result">
-                <div className="mode-result-title">📖 Story · band {winData.bandIndex + 1} of {winData.bandTotal}</div>
+                <div className="mode-result-title">📖 Story · level {winData.bandIndex + 1} of {winData.bandTotal}</div>
                 <div className="mode-result-note">
-                  {(storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
-                    ? 'Rung ticked off. Points are paid once, on first clear — replay it any time for practice.'
-                    : 'Cleared. The next rung is now open.'}
+                  {winData.ladderComplete
+                    ? 'Every level cleared. The completion badge is on your profile; replay any level for practice.'
+                    : (storyProgress[currentGame && currentGame.id] || {}).cleared > winData.bandIndex
+                      ? 'Level ticked off. Points are paid once, on first clear — replay it any time for practice.'
+                      : 'Cleared. The next level is now open.'}
                 </div>
               </div>
             )}
@@ -2758,7 +2918,7 @@ function App() {
             )}
             {winData.modeLabel && currentGame && (
               <button className="primary-btn review-btn" onClick={() => launchGame(currentGame, playMode)}>
-                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the ladder'}
+                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the levels'}
               </button>
             )}
             <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>

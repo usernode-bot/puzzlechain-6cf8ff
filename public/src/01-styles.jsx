@@ -151,6 +151,16 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Sub-heading inside the badge collection — separates the story-ladder chips
+   (one per game with a story mode) from the streak/achievement chips above. */
+.badge-strip-sub {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${C.muted};
+}
 /* Badge accordion trigger — base styles, mobile activation via @media (max-width: 560px) */
 .badge-strip-trigger {
   display: flex; align-items: center; justify-content: space-between;
@@ -250,6 +260,48 @@ body {
 .account-chip.on { cursor: pointer; font-family: inherit; color: ${C.text}; transition: border-color 0.12s ease; }
 .account-chip.on:hover { border-color: ${C.accent}; }
 
+/* #236 — the page wrapper shared by the profile and friends screens.
+   These sit directly under .app, which is a COLUMN flex container, so they
+   are flex items — and an auto horizontal margin opts a flex item out of
+   align-items: stretch. That is the same trap the .fit-col boards hit: with
+   no definite width the box falls back to fit-content, and fit-content is
+   clamped UP to min-content. The profile's min-content is ~460px (an
+   unbreakable username plus a recent-games row that cannot shrink), so the
+   whole page scrolled sideways on every phone — 70px at 390, 140px at 320.
+   width: 100% restores a definite width; max-width still centres it on
+   desktop. min-width: 0 keeps the item shrinkable if the container ever
+   becomes a ROW flex, where the automatic minimum size would apply instead. */
+.social-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+}
+/* A username is user-supplied and can be one long unbreakable token, which is
+   what made min-content exceed the viewport in the first place. Let it wrap
+   rather than push the page wide, and let its column shrink. */
+.profile-id { min-width: 0; }
+/* Recent-games row. The date and the score are fixed-width monospace and do
+   not shrink, so on a narrow card they left the game name almost nothing —
+   "Daily Cipher" truncating to "Dail…". Below 460px the meta pair drops to
+   its own line instead of competing with the name for the same one. */
+.prr {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.2rem; font-size: 0.88rem;
+}
+.prr-icon { font-size: 1.1rem; flex: 0 0 auto; }
+.prr-name { flex: 1 1 auto; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prr-meta { display: flex; align-items: center; gap: 0.6rem; flex: 0 0 auto; }
+.prr-date { color: ${C.muted}; font-size: 0.78rem; }
+.prr-score { font-size: 0.82rem; white-space: nowrap; }
+@media (max-width: 460px) {
+  .prr { flex-wrap: wrap; row-gap: 0.15rem; }
+  /* The name takes the rest of the first line beside the icon; the meta pair
+     wraps below and lines up under the name, not the icon. */
+  .prr-meta { width: 100%; padding-left: 1.7rem; justify-content: flex-start; }
+}
+.profile-id h2 { overflow-wrap: anywhere; }
 /* Profile "Connections" section — Friends entry, shown on mobile only. */
 .account-connection-row {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -293,6 +345,18 @@ body {
   .badge-strip-trigger { cursor: pointer; pointer-events: auto; }
 }
 
+/* The top bar's own contribution to horizontal scroll, and the last 9px of
+   #236. The brand and the stats/settings/account cluster are both flex items
+   with an automatic minimum size, so neither shrinks: below ~330px their
+   combined min-content simply exceeds the viewport and the WHOLE app scrolls
+   sideways, profile included. Nothing is dropped here — the gaps and the
+   bar's own padding are just tightened enough to fit a 320px screen. */
+@media (max-width: 380px) {
+  .nav { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .nav-right { gap: 0.5rem; }
+  .nav-stats { gap: 0.7rem; }
+}
+
 /* ---- Lobby ---- */
 .lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem 1.25rem; width: 100%; }
 .lobby-head { margin-bottom: 1.5rem; }
@@ -324,9 +388,24 @@ body {
   grid-auto-rows: 1fr;
 }
 
-@media (max-width: 380px) {
+/* #182 — phones get TWO cards per row, not one.
+
+   The old rule here was a single-column override below 380px, but the
+   one-column phone grid was never really that rule's doing: .lobby drops to
+   0.75rem side padding at 560px, so the content box is (viewport - 24px), and
+   auto-fill needs 200 + 16 + 200 = 416px for a second track. 320/390/430px
+   phones all fall short, so EVERY phone got one column and a ~9,800px scroll
+   through 30 cards. Removing the override alone fixes nothing — the track
+   floor has to come down too, which is what this rule does.
+
+   minmax(0, 1fr) rather than a bare 1fr: 1fr is minmax(auto, 1fr), whose auto
+   floor is the card's min-content width, and a long unbroken game name would
+   push the track wider than half the row and overflow. grid-auto-rows: 1fr
+   above still applies, so the uniform-tile-height guarantee is untouched. */
+@media (max-width: 560px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
   }
 }
 
@@ -876,8 +955,8 @@ ${emitTapHighlightRules()}
 .pregame-deal {
   font-size: 0.82rem; color: ${C.text}
 
-/* #176 — the band pickers. Story's is a numbered ladder walked in order
-   (cleared behind you, one open rung ahead, the rest locked); arcade's is
+/* #176 — the band pickers. Story's is a numbered level list walked in order
+   (cleared behind you, one open level ahead, the rest locked); arcade's is
    three wide buttons with no lock at all, because all three difficulties are
    open from the first run and the recommendation steers instead of gating. */
 .pregame-bands { margin-top: 0.9rem; text-align: left; }
@@ -923,11 +1002,42 @@ ${emitTapHighlightRules()}
 .pregame-play { width: 100%; }
 .pregame-play:disabled { opacity: 0.5; cursor: default; }
 .pregame-signedout { font-size: 0.78rem; color: ${C.muted}; margin-top: 0.6rem; }
-.pregame-howto-btn {
-  margin-top: 0.8rem; background: none; border: none; color: ${C.accent};
-  font-family: inherit; font-size: 0.85rem; cursor: pointer; padding: 0.3rem;
+/* #240 — "How to play" and the game's chat room were trailing text links
+   under the Play button: no border, no background, 0.3rem of padding and a
+   ~28px tap target, sitting in the position a page gives its footnotes. One of
+   them is the game's instructions, which a first-time player needs BEFORE
+   pressing Play, and the other is the only social surface a game has.
+   They are a pair of real buttons on their own row now, each filling half the
+   width with a 44px target — visible without competing with Play, which keeps
+   the filled accent treatment to itself. */
+.pregame-actions {
+  display: flex; gap: 0.5rem; margin-top: 0.8rem;
 }
-.pregame-howto-btn:hover { text-decoration: underline; }
+.pregame-howto-btn {
+  flex: 1 1 0; min-width: 0; min-height: 44px;
+  display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+  background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px;
+  color: ${C.text}; font-family: inherit; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; padding: 0.3rem 0.5rem;
+  transition: border-color 0.12s, color 0.12s;
+}
+.pregame-howto-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
+/* #239 — "one page wherever possible, and not require scrolling".
+   The pre-game screen is the first thing a tap on a game card lands on, and
+   at 390x667 (an iPhone SE / 8, and any phone in a shorter window) it stood
+   716px tall: the Play button and the How-to-play / Game chat links sat below
+   the fold, so the screen whose entire job is a Play button opened without one
+   in sight. Nothing is removed or hidden — the card's own breathing room is
+   spent instead, and only on viewports too short to afford it. Keyed on
+   max-HEIGHT, so a roomy phone is untouched. */
+@media (max-height: 730px) {
+  .pregame-card { margin: 0.75rem auto; padding: 1.25rem 1.25rem; }
+  .pregame-icon { font-size: 2.1rem; margin-bottom: 0.25rem; }
+  .pregame-card .sub { margin-bottom: 0.7rem; }
+  .pregame-chips { margin-bottom: 0.7rem; }
+  .pregame-stats { margin-bottom: 0.7rem; }
+  .pregame-actions { margin-top: 0.5rem; }
+}
 
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
@@ -955,14 +1065,23 @@ ${emitTapHighlightRules()}
 .howto-step-body { font-size: 0.82rem; color: ${C.muted}; line-height: 1.45; }
 
 /* "?" help button in the in-game headers */
+/* #240 — the daily header's "?" and chat buttons were 1.9rem muted circles,
+   while the SAME two controls in the classic shell's topbar are 2.4rem and
+   full-contrast (.cg-btn). Two shells disagreeing about how important the
+   instructions are is not a design decision, and the daily side lost: at
+   30px these sat under the 44px tap target the rest of the app aims for and
+   read as disabled. Sized and coloured to match .cg-btn. */
 .help-btn {
   margin-left: auto; background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 50%; width: 1.9rem; height: 1.9rem; color: ${C.muted};
-  font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  border-radius: 50%; width: 2.4rem; height: 2.4rem; color: ${C.text};
+  font-family: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: border-color 0.12s, color 0.12s;
 }
 .help-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
+/* Only the first of the pair pushes off the title; the second sits beside it
+   rather than opening a second gap. */
+.help-btn + .help-btn { margin-left: 0; }
 
 /* ---- Locked lobby card ---- */
 .card.locked { cursor: default; }
@@ -1232,6 +1351,29 @@ ${emitTapHighlightRules()}
 
 @media (max-width: 480px) {
   .lobby-tab { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+
+  /* #182 — compact card metrics for the two-up phone grid. At 390px each
+     track is ~178px, so the card's desktop padding/type scale eats most of
+     the tile. Everything the card shows is KEPT and scaled down: two of the
+     merged cards name their variants only in .card-desc (and dapp.json
+     asserts those strings), so hiding it would remove real content, not just
+     decoration. .card-mode-btn's min-height stays 44px — only its horizontal
+     padding gives way. */
+  .grid > .card { padding: 0.75rem; border-radius: 12px; }
+  .grid > .card .card-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .grid > .card .card-name { font-size: 0.95rem; }
+  .grid > .card .card-desc {
+    font-size: 0.75rem;
+    min-height: 2.6em;
+    margin-bottom: 0.5rem;
+  }
+  .grid > .card .card-daily-badge {
+    top: 0.45rem;
+    right: 0.45rem;
+    font-size: 0.5rem;
+    padding: 0.18rem 0.35rem;
+  }
+  .grid > .card .card-mode-btn { padding: 0.45rem 0.2rem; }
 }
 
 /* ---- Minesweeper ---- */
@@ -2129,7 +2271,13 @@ ${emitTapHighlightRules()}
   font-size: 0.9rem;
 }
 /* ---- Tile Match ---- */
-.tm-wrap { max-width: 400px; margin: 0 auto; }
+/* width:100% is load-bearing, not decorative (#210, same class of bug as
+   #149): .cg-stage is align-items:center, so with only an auto margin this
+   wrap took its FIT-CONTENT width, which is the canvas's own CSS width, which
+   useCanvasBoard writes back from the measured box. That loop settles at the
+   UA's default 300px canvas on every device, which is what made the free-play
+   tile holder hang off the frame. A definite width breaks the loop. */
+.tm-wrap { width: 100%; max-width: 400px; margin: 0 auto; }
 .tm-wrap.fit-col { max-width: 520px; }
 /* The canvas board box (both variants): the daily's carries tm-board-fit so
    it is the fit column's flexible region; classic takes natural height and
@@ -2826,6 +2974,7 @@ ${emitTapHighlightRules()}
     animation: none !important;
     transition: none !important;
   }
+  .ng-status.err, .ng-status.ok { animation: none !important; }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed] { transform: none !important; }
   /* #185 — the between-bands overlay still counts down; it just stops
@@ -3366,6 +3515,21 @@ ${emitTapHighlightRules()}
   background: rgb(var(--c-gold-rgb) / 12%); border: 1px solid rgb(var(--c-gold-rgb) / 40%); color: ${C.gold};
   border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
 }
+/* #218 — banner tones. The base rule is brass (a notice); these three carry a
+   verdict, so they borrow the palette's own semantic hues. The info tone is the
+   neutral running-progress state, deliberately quieter than the base. */
+.p6-banner.info {
+  background: var(--c-well); border-color: ${C.border}; color: ${C.muted};
+}
+.p6-banner.warn {
+  background: rgb(var(--c-gold-rgb) / 14%); border-color: rgb(var(--c-gold-rgb) / 45%); color: ${C.gold};
+}
+.p6-banner.err {
+  background: rgb(var(--c-rose-rgb) / 14%); border-color: rgb(var(--c-rose-rgb) / 45%); color: ${C.rose};
+}
+.p6-banner.ok {
+  background: rgb(var(--c-emerald-rgb) / 14%); border-color: rgb(var(--c-emerald-rgb) / 45%); color: ${C.emerald};
+}
 
 /* #170 — the Klondike board is a canvas now (cards are drawn, not DOM), so
    the column can afford to be wide: cards grow with it, capped in klLayout.
@@ -3382,6 +3546,18 @@ ${emitTapHighlightRules()}
 /* Nonogram — canvas board (slice 5). The clue gutters are drawn inside the
    canvas so grid + clues scale together off one useFitBox measurement. */
 .ng-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
+/* The status line is always rendered (its text changes, never its presence), so
+   it reserves its own height and the board below it never shifts as the verdict
+   changes. Two lines' worth: the longest tone wraps on a phone. */
+.ng-status {
+  min-height: 2.9em; display: flex; align-items: center; justify-content: center;
+  line-height: 1.35; margin: 0;
+}
+.ng-status.err, .ng-status.ok { animation: ngStatusPop 260ms ease-out; }
+@keyframes ngStatusPop {
+  0% { transform: scale(0.97); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
 .ng-boardbox {
   flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
 }
@@ -3488,9 +3664,14 @@ ${emitTapHighlightRules()}
   box-shadow: 0 1px 2px var(--c-shadow-sm);
 }
 .wn-strip-body {
-  flex: 1; text-align: left; background: none; border: none; cursor: pointer;
+  flex: 1; min-width: 0; text-align: left; background: none; border: none; cursor: pointer;
   color: ${C.text}; font-family: inherit; font-size: 13px; line-height: 1.45;
   padding: 9px 4px 9px 12px;
+  /* #234 — one line. This strip wrapped to three on a phone, spending ~95px
+     of the first screen on a changelog entry before a single game card. The
+     headline plus "See all >" is the whole job; the panel behind it holds the
+     detail. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .wn-strip-body strong { font-family: 'Fraunces', Georgia, serif; }
 .wn-more { color: ${C.accent}; font-weight: 600; white-space: nowrap; }
@@ -3637,15 +3818,51 @@ ${emitTapHighlightRules()}
 .home-daily-note {
   color: ${C.muted}; font-size: 0.82rem; margin: 0.5rem 0 0.6rem;
 }
-.home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
 .home-chip {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
   padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
   color: ${C.muted}; cursor: pointer; touch-action: manipulation;
 }
 .home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+/* The pin control (#232). It sits in the card's top-right corner, which the
+   daily badge already used, so the badge's right offset below clears it
+   unconditionally rather than only on cards that render a pin, so a daily and
+   a classic card line their badges up the same way. 44px square is the touch
+   minimum; the glyph inside it is small, so the padding does the work. */
+.card-pin {
+  position: absolute; top: 0.15rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 0.95rem; line-height: 1; opacity: 0.32;
+  filter: grayscale(1);
+  transition: opacity .12s ease, transform .12s ease, filter .12s ease;
+}
+.card-pin:hover { opacity: 0.6; }
+.card-pin.on { opacity: 1; filter: none; transform: rotate(-20deg); }
+.card-pin[data-pressed] { transform: scale(0.86); }
+.card-pin.on[data-pressed] { transform: rotate(-20deg) scale(0.86); }
+.card-pin[disabled] { opacity: 0.18; cursor: default; }
+
+/* The Pinned section's heading and the two lines that explain it. */
+.home-pinned-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.home-pin-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600;
+  color: ${C.muted}; letter-spacing: 0.05em;
+}
+.home-pin-tip { color: ${C.muted}; font-size: 0.78rem; margin: 0 0 0.9rem; }
+.home-pin-full {
+  color: ${C.rose}; font-size: 0.78rem; margin: 0 0 0.6rem; font-weight: 600;
+}
+/* #234 — the pin hint teaches a real feature, so it stays; it just stops
+   being a boxed 58px banner between the filter chips and the first game. One
+   muted line, in the same register as the chips it follows. */
+.home-pin-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
+
 .card-daily-badge {
-  position: absolute; top: 0.65rem; right: 0.65rem; z-index: 1;
+  position: absolute; top: 0.65rem; right: 2.7rem; z-index: 1;
   font-family: 'JetBrains Mono', monospace; font-size: 0.56rem; font-weight: 600;
   letter-spacing: 0.07em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;

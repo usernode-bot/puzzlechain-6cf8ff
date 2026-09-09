@@ -497,8 +497,8 @@ const CHANGELOG = [
     id: 'w2026-08-17',
     weekOf: 'Week of August 17, 2026',
     items: [
-      'Most games now have three ways to play: today’s daily, a Story ladder you clear band by band, and endless Arcade with Easy / Normal / Hard.',
-      'Story pays the first time you clear a band — every game’s ladder is worth the same in total, however many rungs it has.',
+      'Most games now have three ways to play: today’s daily, a Story mode you clear level by level, and endless Arcade with Easy / Normal / Hard.',
+      'Story pays the first time you clear a level. Every game’s story is worth the same in total, however many levels it has.',
       'Arcade keeps a run history you can share or replay, and pays when you beat your own best or crack the top 10, top 3 or #1.',
       'Seven classics gained a daily: 2048, Knight’s Tour, Block Fit, Diamond Rush, Marble Loop, Hash Rush and Match-3.',
       'Crate Push now has 200 generated warehouses instead of 10 hand-built ones, each one showing the shortest solution it has.',
@@ -697,6 +697,23 @@ const SOLVE_MILESTONE_BADGES = [
   { count: 100, name: 'Centenarian', icon: '💯', desc: 'Solved 100 daily puzzles' },
 ];
 
+// One badge per Story ladder (server type `story_complete`, parameterised by
+// metadata.gameId — the same trick solve_milestone plays with metadata.count).
+// The chip's identity IS the game, so name and icon come from the registry
+// rather than a second hand-maintained table that would drift from it.
+// Read at render time only, so GAMES loading later in ORDER is fine.
+function storyBadgeChip(gameId) {
+  if (!gameId) return null;
+  const g = (typeof GAMES !== 'undefined' ? GAMES : []).find(x => x.id === gameId);
+  if (!g) return null;
+  return {
+    key: 'story-' + gameId,
+    icon: g.icon,
+    name: g.name + ' Story',
+    sub: 'Cleared every band of the ' + g.name + ' story ladder',
+  };
+}
+
 // Resolve a freshly-awarded achievement (from finish's newAchievements) to its
 // badge definition for the "just unlocked" overlay pop.
 function achievementBadgeFor(ach) {
@@ -715,6 +732,13 @@ function achievementBadgeFor(ach) {
     const b = STREAK_BADGES.find(x => x.min === days);
     return b ? { ...b, desc: `${b.min}-day streak` } : null;
   }
+  // Story-ladder completion: one type, many games. Resolve through the registry
+  // so the celebration names the ladder the player just finished.
+  if (ach.type === 'story_complete') {
+    const gid = ach.gameId || (ach.metadata && ach.metadata.gameId);
+    const chip = storyBadgeChip(gid);
+    return chip ? { name: chip.name, icon: chip.icon, desc: chip.sub } : null;
+  }
   return ACHIEVEMENT_BADGES.find(b => b.type === ach.type) || null;
 }
 
@@ -722,14 +746,23 @@ function achievementBadgeFor(ach) {
 function mergeAchievements(prev, newAch) {
   const types = new Set((prev && prev.types) || []);
   const milestones = new Set((prev && prev.milestones) || []);
+  const stories = new Set((prev && prev.stories) || []);
   for (const a of newAch || []) {
     if (!a || !a.type) continue;
     types.add(a.type);
     if (a.type === 'solve_milestone' && a.metadata && Number.isFinite(+a.metadata.count)) {
       milestones.add(+a.metadata.count);
     }
+    if (a.type === 'story_complete') {
+      const gid = a.gameId || (a.metadata && a.metadata.gameId);
+      if (gid) stories.add(gid);
+    }
   }
-  return { types: Array.from(types), milestones: Array.from(milestones).sort((a, b) => a - b) };
+  return {
+    types: Array.from(types),
+    milestones: Array.from(milestones).sort((a, b) => a - b),
+    stories: Array.from(stories).sort(),
+  };
 }
 
 // Live countdown to `nextResetUtc`, driven by server time (Date.now()+offset)

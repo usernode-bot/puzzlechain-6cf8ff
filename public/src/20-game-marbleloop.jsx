@@ -8,7 +8,7 @@ const ZUMA_SHOT_SPEED = 300;
 const FROG_X = 150, FROG_Y = 218;
 const ZUMA_COLORS_ALL = ['#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
 
-const ZUMA_STORY_BANDS = 5;
+const ZUMA_STORY_BANDS = 6;
 const ZUMA_PATH_S = [
   {x:28,y:32},{x:75,y:25},{x:135,y:22},{x:195,y:25},{x:250,y:34},
   {x:276,y:58},{x:278,y:100},{x:268,y:138},{x:245,y:162},
@@ -777,9 +777,15 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
      Daily and arcade come nearly free on top: the board generator was already
      seeded, so a daily is "today's goal plus today's board" and arcade is the
      same with a fresh seed and a goal that keeps rising. */
-  const M3_BAND_SIZE = 10;
+  /* The story levels are spread PROPORTIONALLY across the 50 campaign
+     puzzles rather than in fixed steps of ten, so the top level is always the
+     last puzzle whatever M3_STORY_BANDS is. A fixed stride silently stopped
+     short of 50 the moment the level count changed (#184). */
+  const M3_STORY_BANDS = 6;
+  const M3_CAMPAIGN_PUZZLES = 50;
   const bandPuzzle = playMode === 'story'
-    ? Math.min(50, (Math.max(0, band || 0) + 1) * M3_BAND_SIZE)
+    ? Math.max(1, Math.min(M3_CAMPAIGN_PUZZLES, Math.round(
+        ((Math.max(0, Math.min(M3_STORY_BANDS - 1, band || 0)) + 1) / M3_STORY_BANDS) * M3_CAMPAIGN_PUZZLES)))
     : null;
   const dailyPuzzle = playMode === 'daily'
     ? 1 + (utcDayNum(offset) % 50)

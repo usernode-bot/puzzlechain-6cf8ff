@@ -41,43 +41,34 @@ function signIntegrationPayload(payload) {
 }
 
 
-// Server-authoritative daily hint cap. Hints are FREE (the MATCH currency is
-// retired) but still capped and counted server-side so the count survives
-// reloads and a client can't reveal more clues than the day's puzzle carries.
-// Mirrors the frontend source's cwDailyRounds: the day's round count R is the FIRST draw
-// off dailyRng(offset, 'cryptowordle'), before any word is picked, so we can
-// reproduce R without porting the whole CW_WORDS list — only the round-count
-// draw needs to match byte-for-byte. Every CW_WORDS entry ships exactly
-// CW_HINTS_PER_WORD hints today, so the day's total available clues is simply
-// R * CW_HINTS_PER_WORD.
-const CW_MIN_ROWS = 4, CW_MAX_ROWS = 7;
-const CW_HINTS_PER_WORD = 2;
-function cwMulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function cwHashStr(s) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+/* Server-authoritative daily hint cap. Hints are FREE (the MATCH currency is
+   retired) but still capped and counted server-side so the count survives
+   reloads and a client can't reveal more clues than the day's puzzle carries.
+
+   #193 — this used to REDERIVE the day's round count from a seeded draw,
+   mirroring a frontend that drew R off dailyRng before picking any word. The
+   frontend stopped doing that: the count is a fixed CW_ROUNDS_PER_DAY now
+   ("Count is now fixed" in 09-game-cipher.jsx), and the 4-to-7 range the draw
+   still used is the GUESS-ROW range, not a round count. So the cap was a
+   uniform draw from {8, 10, 12, 14} against a day that always carries
+   5 * hints-per-word — and on the quarter of days the draw landed on 4, the
+   last clues of the day were refused with "No more clues" while the puzzle
+   still had them. That is the "2-hint ceiling" as a player meets it.
+
+   It is a straight multiplication now, with nothing to drift: the round count
+   is fixed, and CW_HINTS_PER_WORD is the MAXIMUM a word can offer (two written
+   clues plus the derived ones cwDerivedHints adds). The real per-word limit is
+   enforced client-side against the clues that word actually has; this is only
+   the day's abuse ceiling, so erring high is correct — every clue it counts is
+   one the client already holds locally. */
+const CW_ROUNDS_PER_DAY = 5;
+const CW_HINTS_PER_WORD = 4;
 function cwUtcDayNum() {
   const d = new Date();
   return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
 }
 function cwServerMaxHints() {
-  const dayNum = cwUtcDayNum();
-  const rng = cwMulberry32((dayNum + cwHashStr('cryptowordle')) >>> 0);
-  const rounds = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
-  return rounds * CW_HINTS_PER_WORD;
+  return CW_ROUNDS_PER_DAY * CW_HINTS_PER_WORD;
 }
 
 // Single shared connection pool to this app's Postgres DB.

@@ -1834,6 +1834,25 @@ function App() {
               )}
             </div>
             <GameComponent
+              /* #198 — the REPLAY controls on a daily's result card ("Play
+                 again for fun", "Another practice run") go through
+                 startPractice, which bumps playAgainKey and clears the
+                 overlay. But nothing consumed that: `resetKey` is passed
+                 below and NO daily reads it (only three classics do), and
+                 without a key React reuses this component in place, because
+                 the element type and position never change. So the card
+                 vanished and the finished run stayed exactly as it was — a
+                 dead board with its clock at zero, which is the reported
+                 "Play Again fails to launch".
+
+                 Keying on playAgainKey makes the replay an actual remount, so
+                 every daily restarts from its own initial state without any of
+                 the 23 game components needing to know about it. The key
+                 changes ONLY at the four deliberate start-fresh moments
+                 (startPractice, playAgain, a classic mode change, and
+                 ClassicShell's New Game), so a normal run is never remounted
+                 mid-play. */
+              key={playAgainKey}
               {...modeProps}
               onWin={handleWin}
               onLose={handleLose}

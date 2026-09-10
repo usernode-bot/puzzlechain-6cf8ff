@@ -2735,7 +2735,7 @@ function App() {
             {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             {winData.isClassic && (
-              <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
+              <button className="primary-btn play-again-btn" onClick={playAgain}>
                 Play Again
               </button>
             )}
@@ -2757,7 +2757,10 @@ function App() {
                 {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the levels'}
               </button>
             )}
-            <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            {/* One primary action per card. Where Play Again exists it is the
+                primary, so leaving steps down to the quiet style; a daily has
+                no Play Again, so Back to Lobby stays the primary there. */}
+            <button className={'primary-btn' + (winData.isClassic ? ' review-btn' : '')} onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
       );
@@ -2819,7 +2822,7 @@ function App() {
             {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
-              <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
+              <button className="primary-btn play-again-btn" onClick={playAgain}>
                 Play Again
               </button>
             )}
@@ -2833,7 +2836,9 @@ function App() {
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>
             )}
-            <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            {/* Same rule as the win card: one primary action, and where there
+                is a Play Again it is not the one that leaves. */}
+            <button className={'primary-btn' + (loseData.isClassic ? ' review-btn' : '')} onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
       )}

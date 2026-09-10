@@ -1442,6 +1442,16 @@
       "expectSelector": ".cg-shell canvas.ck-canvas"
     },
     {
+      "name": "Play Again is the primary action on a classic result",
+      "path": "/?game=checkers&result=1",
+      "expectSelector": ".win-card .play-again-btn"
+    },
+    {
+      "name": "Reversi result card carries the same Play Again",
+      "path": "/?game=reversi&result=1",
+      "expectSelector": ".win-card .play-again-btn"
+    },
+    {
       "name": "Gomoku board is a canvas (confirm bar stays)",
       "path": "/?game=gomoku&mode=2p",
       "expectSelector": "canvas.gmk-canvas"

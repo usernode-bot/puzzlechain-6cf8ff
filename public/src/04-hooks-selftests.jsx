@@ -678,6 +678,46 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #197 — the Word Search board's states must stay READABLE in BOTH
+     palettes. This is a self-test rather than a code review because the
+     failure is silent and one-sided: every colour on that board used to be a
+     literal tuned against dark, and the light theme quietly inherited a 2.21:1
+     selection that nobody would notice unless they switched themes. Bold
+     letters at roughly half the cell are large text, so 3:1 is the bar; the
+     values here clear it with room, and this fails the build if a retheme
+     takes one back under. */
+  check('wordsearch-contrast', () => {
+    const lum = (rgb) => {
+      const f = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+    };
+    const hex = (h) => {
+      const v = String(h).replace('#', '');
+      return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+    };
+    const ratio = (a, b) => {
+      const la = lum(a), lb = lum(b);
+      return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    };
+    const over = (fg, alpha, bg) => fg.map((v, i) => Math.round(v * alpha + bg[i] * (1 - alpha)));
+    const MIN = 3; // large-text AA; the letters are 600 weight at ~half the cell
+    for (const theme of ['light', 'dark']) {
+      const P = PALETTES[theme];
+      const card = hex(P.card), text = hex(P.text), white = [255, 255, 255];
+      const cases = [
+        ['plain', text, card],
+        ['found', text, over(hex(P.emerald), 0.34, card)],
+        ['hinted', text, over(hex(P.gold), 0.20, card)],
+        ['selected', white, hex(P.accent)],
+      ];
+      for (const [name, ink, bg] of cases) {
+        const r = ratio(ink, bg);
+        if (r < MIN) throw new Error(theme + ' ' + name + ' is ' + r.toFixed(2) + ':1, under ' + MIN);
+      }
+    }
+    return true;
+  });
+
   /* #205 — the knight's move overlay is drawn from ktMovePath, and the hit
      test accepts whatever ktValidMoves returns. If those two ever disagree
      the board draws a path to a square you cannot tap, or leaves a tappable

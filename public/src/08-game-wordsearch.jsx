@@ -430,16 +430,39 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
           const isFound = foundCells.has(i);
           const isHinted = !isFound && hintedStarts.has(i);
           const isSel = selSet.has(i);
-          ctx.fillStyle = isFound ? 'rgba(45,159,102,0.20)' : isHinted ? 'rgba(201,162,39,0.20)' : PAL.card;
+          /* #197 — every colour on this board was a hardcoded rgba tuned
+             against the dark palette, so the light theme inherited washes that
+             were never checked. Measured on the light palette before changing
+             anything: a SELECTED cell was white letters on rgba(58,110,205,.55)
+             over white card — a 2.21:1 ratio, which fails even the 3:1 bar for
+             large text. While you drag a selection is exactly when you need to
+             read the letters.
+
+             The selection is solid PAL.accent now (6.25:1 light, 4.47:1 dark
+             against white letters), and the found/hinted washes come from PAL
+             through globalAlpha rather than from frozen literals, so both
+             themes get a tint that belongs to them. globalAlpha, not ca():
+             ca() emits a var(--c-…) string, which is invalid on a canvas. */
+          ctx.fillStyle = PAL.card;
           ctx.fillRect(x, y, wsCell, wsCell);
-          if (isSel) { ctx.fillStyle = 'rgba(58,110,205,0.55)'; ctx.fillRect(x, y, wsCell, wsCell); }
+          if (isFound || isHinted) {
+            ctx.save();
+            ctx.globalAlpha = isFound ? 0.34 : 0.20;
+            ctx.fillStyle = isFound ? PAL.emerald : PAL.gold;
+            ctx.fillRect(x, y, wsCell, wsCell);
+            ctx.restore();
+          }
+          if (isSel) { ctx.fillStyle = PAL.accent; ctx.fillRect(x, y, wsCell, wsCell); }
           if (isHinted) {
             ctx.lineWidth = 2;
             ctx.strokeStyle = PAL.gold;
             ctx.strokeRect(x + 1, y + 1, wsCell - 2, wsCell - 2);
           }
           ctx.font = `600 ${Math.round(wsCell * 0.5)}px 'JetBrains Mono', monospace`;
-          ctx.fillStyle = isSel ? '#fff' : isFound ? PAL.emerald : PAL.text;
+          /* A found letter was emerald ON an emerald wash: 3.27:1 in light,
+             under the 4.5 AA bar. The tint already says "found" — the letter
+             does not have to repeat it, and in ink it reads at 9.15:1. */
+          ctx.fillStyle = isSel ? '#fff' : PAL.text;
           ctx.fillText(String(letters[r][c]).toUpperCase(), x + wsCell / 2, y + wsCell / 2 + 1);
         }
       }

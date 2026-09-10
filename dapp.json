@@ -1041,6 +1041,16 @@
       "expectSelector": ".cw-board[data-cw-typed=\"LE\"]"
     },
     {
+      "name": "Daily Cipher scores a guess so its feedback colours render",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=1",
+      "expectSelector": ".cw-board[data-cw-rows=\"1\"]"
+    },
+    {
+      "name": "Daily Cipher scores two guesses in a row",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=2",
+      "expectSelector": ".cw-board[data-cw-rows=\"2\"]"
+    },
+    {
       "name": "Word Search grid is the larger 10x10 board",
       "path": "/?game=wordhunt&practice=1",
       "expectSelector": ".wordsearch"

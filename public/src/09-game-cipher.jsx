@@ -459,6 +459,33 @@ function cwTypeScript() {
   } catch (e) { return ''; }
 }
 
+/* #194's companion fixture: `?cwsubmit=N&practice=1` plays N deterministic
+   WRONG guesses so a route can reach a board that has feedback on it at all.
+   `?cwtype=` deliberately never submits, and it cannot be made to: the guess
+   it types is a fixed string, so on a day whose first word is a different
+   length it would not be submittable anyway.
+
+   This submits a filler of the ACTIVE word's own length instead, so it works
+   on every day's board rather than on the days a hard-coded word happens to
+   fit. Without it the before/after screenshots of a feedback-colour change
+   are two pictures of an empty grid.
+
+   PRACTICE ONLY, and that is the whole safety argument: a real guess spends
+   one of the day's attempts, and practiceMode is the app's existing inert
+   path (App short-circuits handleWin/handleLose and suppresses saves before
+   any endpoint). Off the practice route this returns 0 and nothing happens. */
+function cwSubmitScript() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('practice') !== '1') return 0;
+    const n = parseInt(p.get('cwsubmit') || '0', 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(3, n)) : 0;
+  } catch (e) { return 0; }
+}
+// The filler letter. Q is the rarest letter in the corpus, so a filler row is
+// almost always all-wrong — which is the state this fixture exists to show.
+const CW_FILLER_CH = 'Q';
+
 function cwSimulateTouchTapAt(el, clientX, clientY) {
   const opts = {
     bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1,
@@ -729,6 +756,25 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, []);
 
+  /* `?cwsubmit=N` (practice only) — see cwSubmitScript. It goes through the
+     same `submit` the Enter key calls, via the ref, so the guess is scored,
+     rendered and keyboard-tinted by exactly the code a player exercises. One
+     pass per round-state change, guarded by a ref so a re-render cannot
+     replay a guess that has already been spent. */
+  const cwFillRef = useRef(0);
+  useEffect(() => {
+    const want = cwSubmitScript();
+    if (!want || cwFillRef.current >= want) return;
+    if (!active || done) return;
+    cwFillRef.current += 1;
+    const t = setTimeout(() => {
+      const len = active.def.word.length;
+      setCur(CW_FILLER_CH.repeat(len));
+      setTimeout(() => apiRef.current.submit(), 40);
+    }, 120);
+    return () => clearTimeout(t);
+  }, [activeIdx, roundGuesses]);
+
   const wordLen = active ? active.def.word.length : 5;
   const maxGuesses = active ? active.maxG : 6;
   const boardWidth = Math.min(wordLen * 52, 440);
@@ -837,11 +883,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
       // Keyboard: 3 rows, wide Enter/⌫ flanking the bottom row.
       const kbW = Math.min(W, 480);
       const kbX0 = Math.floor((W - kbW) / 2);
+      // The key must say the same thing as the tile it came from, so a spent
+      // letter is red here too — a red tile over a grey key is two answers.
       const keyBg = (ch) => keyState[ch] === 'green' ? PAL.emerald
         : keyState[ch] === 'yellow' ? PAL.gold
-        : keyState[ch] === 'gray' ? PAL.dim : PAL.border;
-      const keyInk = (ch) => keyState[ch] === 'gray' ? PAL.muted
-        : keyState[ch] ? '#fff' : PAL.text;
+        : keyState[ch] === 'gray' ? PAL.rose : PAL.border;
+      const keyInk = (ch) => keyState[ch] ? '#fff' : PAL.text;
       CW_KEYS.forEach((row, ri) => {
         const y = kbdY + ri * (KEY_H + KGAP);
         const units = row.length + (ri === 2 ? 3.2 : 0); // two 1.6-wide keys
@@ -884,8 +931,11 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
         const stepX = 26;
         let x = Math.floor(W / 2 - ((n - 1) * stepX) / 2);
         roundState.forEach((r, i) => {
+          /* #194's check mark. The track already carried the cross for a
+             missed word; a solved one was a filled dot, which said "this one
+             is over" but not "you got it". It costs no layout to say both. */
           ctx.fillStyle = r.solved ? PAL.emerald : r.missed ? PAL.rose : i === activeIdx ? PAL.accent : PAL.dim;
-          ctx.fillText(r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○', x, trackY + TRACK_H / 2);
+          ctx.fillText(r.solved ? '✓' : r.missed ? '✗' : i === activeIdx ? '▶' : '○', x, trackY + TRACK_H / 2);
           x += stepX;
         });
       }
@@ -923,7 +973,13 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
             if (state === 'filled') border = PAL.muted;
             else if (state === 'green') { bg = PAL.emerald; border = PAL.emerald; ink = '#fff'; }
             else if (state === 'yellow') { bg = PAL.gold; border = PAL.gold; ink = '#fff'; }
-            else if (state === 'gray') { bg = PAL.dim; border = PAL.dim; }
+            /* #194 — an absent letter is RED, not grey. Grey read as "empty"
+               rather than as "wrong": PAL.dim is also the unfilled tile's
+               border, so a spent guess and a blank row were nearly the same
+               object at a glance. A present-but-misplaced letter deliberately
+               stays gold — the issue asks for red only for the wrong ones, and
+               three states need three colours. */
+            else if (state === 'gray') { bg = PAL.rose; border = PAL.rose; ink = '#fff'; }
             klRR(ctx, x + 1, y + 1, tile - 2, tile - 2, 8);
             ctx.fillStyle = bg;
             ctx.fill();
@@ -952,6 +1008,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
            `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
            the double-input bug it would read "LLEENN" and the check fails. */
         data-cw-typed={cur}
+        /* How many guesses the ACTIVE round has scored. The feedback colours
+           live on the canvas, where no check can read a pixel, so this is the
+           assertable half: a row exists to be coloured (#194). */
+        data-cw-rows={active ? active.guesses.length : 0}
       >
         <canvas
           ref={canvasRef}

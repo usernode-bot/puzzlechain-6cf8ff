@@ -26,6 +26,11 @@
       "expectText": "Game Corner"
     },
     {
+      "name": "Nav wordmark sits on one line in the compact header",
+      "path": "/",
+      "expectSelector": ".nav .nav-brand .brandword"
+    },
+    {
       "name": "Daily filter splits out what is completed today",
       "path": "/?tab=daily&demo=locked",
       "expectText": "Completed today"

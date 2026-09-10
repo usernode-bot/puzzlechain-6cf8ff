@@ -1994,7 +1994,7 @@ function App() {
   return (
     <div className={'app' + (fitActive ? ' app-fit' : '')}>
       <nav className="nav">
-        <div className="nav-brand"><span className="logo">⬢</span> Game Corner</div>
+        <div className="nav-brand"><span className="logo">⬢</span><span className="brandword">Game Corner</span></div>
         <div className="nav-right">
           <div className="nav-stats">
             <div className="nav-stat">

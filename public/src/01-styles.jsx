@@ -34,10 +34,18 @@ body {
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 
 /* ---- Nav bar ---- */
+/* #223 — the bar was 78px tall at 390px wide, and it is sticky, so it cost
+   that on EVERY screen, above every board. Two thirds of it was one thing:
+   "Game Corner" plus the score/streak/gear/avatar cluster came to 374px of
+   min-content inside a 350px content box, so the wordmark WRAPPED to two
+   lines and set the bar's height from the brand rather than from the stats.
+   Nothing is dropped here — the wordmark is held on one line, the type is
+   stepped down, and the padding and gaps are tightened until the stats are
+   the tallest thing in the bar again. Measured back to 50px. */
 .nav {
   background: ${C.surface};
   border-bottom: 1px solid ${C.border};
-  padding: 0.9rem 1.25rem;
+  padding: 0.45rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -47,25 +55,34 @@ body {
 }
 .nav-brand {
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.02rem;
+  line-height: 1.2;
+  /* Load-bearing: without it the wordmark wraps and the bar grows 24px.
+     It raises the brand's min-content width, which is why the narrow
+     media queries below tighten the cluster to match (see #236). */
+  white-space: nowrap;
   letter-spacing: -0.01em;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 .nav-brand .logo { color: ${C.accent}; }
-.nav-stats { display: flex; gap: 1.5rem; }
+.nav-stats { display: flex; gap: 1rem; }
 .nav-stat { text-align: right; }
 .nav-stat .label {
-  font-size: 0.62rem;
+  font-size: 0.56rem;
+  line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: ${C.muted};
 }
+/* The stacked label + value is the bar's height floor now, so both carry an
+   explicit line-height: the default leading was adding 8px of nothing. */
 .nav-stat .value {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 0.92rem;
+  line-height: 1.25;
 }
 .nav-stat .value.score { color: ${C.gold}; }
 .nav-stat .value.streak { color: ${C.emerald}; }
@@ -225,20 +242,20 @@ body {
 }
 
 /* ---- Account indicator ---- */
-.nav-right { display: flex; align-items: center; gap: 1.25rem; }
+.nav-right { display: flex; align-items: center; gap: 0.75rem; }
 .account-chip {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   background: ${C.card};
   border: 1px solid ${C.border};
   border-radius: 999px;
-  padding: 0.35rem 0.7rem 0.35rem 0.45rem;
+  padding: 0.25rem 0.6rem 0.25rem 0.3rem;
   cursor: default;
 }
 .account-chip .avatar {
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.35rem;
+  height: 1.35rem;
   border-radius: 50%;
   background: ${C.accent};
   color: white;
@@ -345,9 +362,9 @@ body {
 
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
-  .account-chip { padding: 0.35rem; }
-  .nav-right { gap: 0.8rem; }
-  .nav-stats { gap: 1rem; }
+  .account-chip { padding: 0.25rem; }
+  .nav-right { gap: 0.6rem; }
+  .nav-stats { gap: 0.8rem; }
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
@@ -370,9 +387,16 @@ body {
    sideways, profile included. Nothing is dropped here — the gaps and the
    bar's own padding are just tightened enough to fit a 320px screen. */
 @media (max-width: 380px) {
-  .nav { padding-left: 0.75rem; padding-right: 0.75rem; }
-  .nav-right { gap: 0.5rem; }
-  .nav-stats { gap: 0.7rem; }
+  .nav { padding-left: 0.6rem; padding-right: 0.6rem; }
+  .nav-right { gap: 0.4rem; }
+  .nav-stats { gap: 0.55rem; }
+  /* The wordmark is nowrap now, so it can no longer absorb the squeeze by
+     wrapping. On the smallest screens it TRUNCATES instead — never
+     display:none, because a clipped node still reports its full text to
+     innerText, so the checks that assert on "Game Corner" from a game
+     screen keep passing, and #236's horizontal scroll still cannot happen. */
+  .nav-brand { min-width: 0; }
+  .nav-brand .brandword { overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* ---- Lobby ---- */

@@ -471,6 +471,46 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #214 — a Match 3 deal must contain a MULTIPLE OF THREE of every type (a
+     match is three of a kind, so anything else strands tiles), and the puzzle's
+     own target must be reachable from the deal it is given. The old deal put
+     `layers` of each of five types on the board: five of the fifty puzzles are
+     `layers: 2`, which is two of each type and therefore no possible match at
+     all, and the score ceiling everywhere else fell far below the authored
+     target. Both halves are checked here across the real target/layer range. */
+  check('match3-deal-is-winnable', () => {
+    for (let layers = 1; layers <= 6; layers++) {
+      for (const target of [800, 1200, 2000, 3200, 4800, 6000, 7200]) {
+        const cfg = m3NormalizeConfig({ targetScore: target, layers });
+        if (cfg.perType % 3 !== 0) {
+          throw new Error('layers ' + layers + ' deals ' + cfg.perType +
+            ' of each type — not a multiple of 3, so tiles strand');
+        }
+        if (cfg.perType < 3) {
+          throw new Error('layers ' + layers + ' deals ' + cfg.perType +
+            ' of each type — no match of three can exist');
+        }
+        const ceiling = cfg.pointsPerMatch * cfg.totalTriples;
+        if (ceiling < target) {
+          throw new Error('layers ' + layers + ' target ' + target +
+            ' is unreachable: ceiling is ' + ceiling);
+        }
+      }
+    }
+    // The deal itself must honour the counts it promised.
+    const cfg = m3NormalizeConfig({ targetScore: 800, layers: 2 });
+    const tiles = m3DealBoard(cfg, 90);
+    const counts = {};
+    for (const t of tiles) counts[t.type] = (counts[t.type] || 0) + 1;
+    const kinds = Object.keys(counts);
+    if (kinds.length !== 5) throw new Error('deal has ' + kinds.length + ' types, expected 5');
+    for (const k of kinds) {
+      if (counts[k] % 3 !== 0) throw new Error('type ' + k + ' dealt ' + counts[k] + ' times');
+    }
+    if (tiles.length !== cfg.perType * 5) throw new Error('deal size ' + tiles.length);
+    return true;
+  });
+
   /* #238 — a scroll that STARTS on a button must not press it on release.
      The action fires on pointerup, so without a distance check the release
      that ends a scroll is indistinguishable from a tap. Checks all three

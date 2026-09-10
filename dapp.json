@@ -1322,6 +1322,11 @@
       "expectSelector": "canvas.kt-canvas"
     },
     {
+      "name": "Knight's Tour story board starts with the knight placed",
+      "path": "/?game=knights-tour&pmode=story&band=1&play=1",
+      "expectSelector": "canvas.kt-canvas[aria-label*=\"1 of 25\"]"
+    },
+    {
       "name": "Crate Push room is a canvas",
       "path": "/?game=cratepush&practice=1",
       "expectSelector": "canvas.cp-canvas"

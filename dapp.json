@@ -1202,6 +1202,16 @@
       "expectText": "Erase"
     },
     {
+      "name": "Sudoku offers an Undo beside Erase",
+      "path": "/?game=sudoku&practice=1&sdk=9",
+      "expectText": "Undo"
+    },
+    {
+      "name": "Sudoku Mini offers an Undo too",
+      "path": "/?game=sudokumini&practice=1",
+      "expectText": "Undo"
+    },
+    {
       "name": "Sudoku arcade HUD names the difficulty that was chosen",
       "path": "/?game=sudoku&pmode=arcade&band=hard&play=1",
       "expectText": "Difficulty: Hard"

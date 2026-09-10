@@ -602,6 +602,21 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   const effBand = playMode === 'story' ? (band || 0)
     : playMode === 'arcade' ? Math.round((arcadeIdx / 2) * (bandCount - 1))
     : 0;
+  /* #189 — the run's difficulty, named, for the gameplay HUD. Arcade prints
+     the band the player PICKED rather than the grader's word for the board it
+     maps onto: arcade Normal digs to what sdkBandLabel calls "Tricky", and
+     printing that over a run they started by pressing "Normal" reads as a
+     different setting than the one they chose. It reads the band off
+     arcadeIdx, not off `band`, so an unrecognised id names the board that was
+     actually dealt instead of naming nothing. Story has no picker, so it shows
+     the rung AND what the grader calls it — that is the first caller
+     sdkBandLabel has ever had. Daily and free play have no band, so both
+     correctly show nothing at all. */
+  const bandName = playMode === 'arcade'
+    ? `Difficulty: ${(ARCADE_BANDS[arcadeIdx] || ARCADE_BANDS[0]).label}`
+    : playMode === 'story'
+      ? `Level ${effBand + 1}: ${sdkBandLabel(difficulty === 'mini' ? 6 : 9, effBand, bandCount)}`
+      : null;
   const seedRef = useRef(null);
   const boardsRef = useRef({});
   const getBoard = (diff) => {
@@ -661,6 +676,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     <SudokuBoard
       key={difficulty}
       difficulty={difficulty}
+      bandName={bandName}
       board={getBoard(difficulty)}
       dayNum={dayNum}
       savedProgress={savedProgress}
@@ -671,7 +687,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   );
 }
 
-function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProgress, onSaveProgress }) {
+function SudokuBoard({ difficulty, bandName, board, dayNum, onWin, onStepChange, savedProgress, onSaveProgress }) {
   const { puzzle, solution } = board;
   const size = puzzle.length;
   const mult = SUDOKU_MULT[difficulty] || 1;
@@ -801,14 +817,20 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
   const W = Math.floor(boxW);
   const GAP = 8, PILL_H = 46, HINT_H = 36, KEY_H = 44, ERASE_H = 38;
-  const chrome = PILL_H + HINT_H + KEY_H + ERASE_H + GAP * 4;
+  /* #189 — the difficulty line is its own track under the pills, and it costs
+     nothing in the two modes that have no difficulty to name: BAND_H is 0
+     there, so the daily's board is the same size it has always been. The
+     spacing is baked into the track rather than added as a fifth GAP, so the
+     board's y only has one term to keep in step with `chrome`. */
+  const BAND_H = bandName ? 20 : 0;
+  const chrome = PILL_H + BAND_H + HINT_H + KEY_H + ERASE_H + GAP * 4;
   const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
   const sdkCell = Math.max(24, Math.min(size === 9 ? 44 : 56, Math.floor((availB - (size - 1)) / size)));
   const sdkStep = sdkCell + 1;
   const sdkSide = sdkStep * size - 1;
   const H = chrome + sdkSide;
   const boardX = Math.floor((W - sdkSide) / 2);
-  const boardY = PILL_H + GAP;
+  const boardY = PILL_H + BAND_H + GAP;
   const hintY = boardY + sdkSide + GAP;
   const keysY = hintY + HINT_H + GAP;
   const eraseY = keysY + KEY_H + GAP;
@@ -821,6 +843,14 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
     controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
     controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: `${filled}/${size * size}` });
     controls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: size === 9 ? '9×9 ×2' : '6×6' });
+    if (bandName) {
+      /* Gold and bold, not the label default: PAL.muted under a row of pills
+         reads as a caption on the pills rather than as the run's own setting,
+         and #189 asks for the difficulty to be HIGHLIGHTED. `gold` resolves at
+         DRAW time, so a theme flip recolours it — an explicit colour here
+         would be captured at render and go stale. */
+      controls.push({ id: 'p-band', kind: 'label', r: [0, PILL_H, W, BAND_H], label: bandName, font: 12, bold: true, gold: true });
+    }
     if (!done) {
       const exhausted = hints.exhausted || noEmpty;
       controls.push({
@@ -860,7 +890,7 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [grid, selected, errors, hintedCells, done, sdkCell, W, fmt, steps, pressedId, hints.hintsLeft, hints.msg, hints.buying],
+    deps: [grid, selected, errors, hintedCells, done, sdkCell, W, fmt, steps, pressedId, bandName, hints.hintsLeft, hints.msg, hints.buying],
     draw: (ctx) => {
       cuiDrawControls(ctx, ctlRef.current, pressedId);
       ctx.save();

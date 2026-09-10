@@ -765,6 +765,58 @@ function M3BoardCanvas({ tiles, bar, done, onTile }) {
   );
 }
 
+/* ---- Match 3 deal + scoring (#214) -------------------------------------
+   Three things were wrong at once and each on its own made the game
+   unfinishable.
+
+   THE BOARD. The deal was `layers * 5` tiles typed `i % 5`, i.e. exactly
+   `layers` copies of each of the five types — and a match needs THREE of a
+   type. Twenty-four of the fifty puzzles are `layers: 2`, so they put TWO of
+   each type on the board and contained no possible match whatsoever: every tap
+   grew the tray and the only reachable ending was filling it to seven and
+   losing. Where matches did exist the ceiling was 300 x 5 x floor(layers / 3),
+   which is 1500 for every layers-3-to-5 board, against authored targets of
+   1200 to 7200. (It also made each of the five board columns a single colour,
+   because the column index and the type were both `i % 5`.)
+
+   Deal in TRIPLES instead, shuffled with the puzzle's own server seed so a
+   given puzzle is the same board for everyone, and size the award so the
+   authored target is reachable by clearing about three quarters of the board.
+   `layers` stays the size knob and `target` stays the difficulty knob. */
+const M3_TYPES = 5;
+const M3_BASE_POINTS = 300;
+/* Clearing ~75% of the dealt triples must reach the target, so a puzzle is
+   winnable without demanding a perfect board clear. */
+const M3_CLEAR_FRACTION = 0.75;
+
+function m3NormalizeConfig(body) {
+  const target = Number(body && (body.targetScore != null ? body.targetScore : body.target)) || 0;
+  const layers = Math.max(1, Number(body && body.layers) || 2);
+  // Tiles per type, always a multiple of three: 2 layers -> 3, 5 layers -> 9.
+  const perType = 3 * Math.max(1, Math.round(layers / 2));
+  const totalTriples = M3_TYPES * (perType / 3);
+  const pointsPerMatch = Math.max(
+    M3_BASE_POINTS,
+    Math.ceil(target / Math.max(1, totalTriples * M3_CLEAR_FRACTION))
+  );
+  return Object.assign({}, body, { target, layers, perType, totalTriples, pointsPerMatch });
+}
+
+function m3MatchPoints(cfg) {
+  return (cfg && cfg.pointsPerMatch) || M3_BASE_POINTS;
+}
+
+function m3DealBoard(cfg, seed) {
+  const rng = mulberry32((Number(seed) || 1) >>> 0);
+  const deck = [];
+  for (let t = 0; t < M3_TYPES; t++) {
+    for (let k = 0; k < cfg.perType; k++) deck.push(t);
+  }
+  return ceShuffle(deck, rng).map((type, i) => ({
+    id: i + 1, type, pos: i, locked: false, inBar: false, removed: false,
+  }));
+}
+
 function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, resetKey, playMode, band }) {
   /* #176 — the campaign CONVERGES onto the shared progression at the layer
      that matters: rewards. Its fifty authored puzzles group into five story
@@ -888,7 +940,14 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
        third reason Match 3 could never actually be played. */
     const { ok, body } = await api(`/api/match3/start/${puzzleId}`, { method: 'POST' });
     if (ok && body) {
-      setPuzzleConfig(body);
+      /* #214 — the server sends `targetScore`; the win check read
+         `puzzleConfig.target`, which is undefined, and `score >= undefined` is
+         false for every score there has ever been. That alone made the win
+         state unreachable on all 50 puzzles. Normalise ONCE here, accepting
+         either name, so the comparison and the status bar cannot drift apart
+         again. */
+      const cfg = m3NormalizeConfig(body);
+      setPuzzleConfig(cfg);
       setBoardSeed(body.boardSeed);
       setSelectedPuzzle(puzzleId);
 
@@ -898,21 +957,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
         setScore(body.savedSession.score || 0);
         setMoves(body.savedSession.moves || 0);
       } else {
-        // Generate fresh board (simple: 5 random tiles per layer)
-        const config = body;
-        const newTiles = [];
-        let id = 1;
-        for (let i = 0; i < config.layers * 5; i++) {
-          newTiles.push({
-            id: id++,
-            type: i % 5,
-            pos: i,
-            locked: false,
-            inBar: false,
-            removed: false,
-          });
-        }
-        setTiles(newTiles);
+        setTiles(m3DealBoard(cfg, body.boardSeed || puzzleId));
         setBar([]);
         setScore(0);
         setMoves(0);
@@ -949,7 +994,7 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
           const toRemove = new Set([newBar[i], newBar[i + 1], newBar[i + 2]]);
           setTiles(tiles.map(t => toRemove.has(t.id) ? { ...t, removed: true } : t));
           setBar(newBar.filter(id => !toRemove.has(id)));
-          const newScore = score + 300;
+          const newScore = score + m3MatchPoints(puzzleConfig);
           setScore(newScore);
           setMoves(newMoves);
           onStepChange && onStepChange(newMoves);
@@ -1087,12 +1132,46 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
       { className: 'm3-wrap fit-col', style: { alignItems: 'center', gap: '0.75rem' } },
       React.createElement(CgStatus, {
         items: [
-          { l: 'Score', v: `${score} / ${puzzleConfig.targetScore}` },
+          { l: 'Score', v: `${score} / ${puzzleConfig.target}` },
           { l: 'Moves', v: `${moves} / ${puzzleConfig.moveLimit}` },
           { l: 'Time', v: `${secs}s` },
         ],
       }),
       React.createElement(M3BoardCanvas, { tiles, bar, done, onTile: selectTile })
+    );
+  }
+
+  /* #214 — `setPhase('won')` / `setPhase('lost')` had NO render branch, so a
+     finished puzzle fell through to the bare "Loading..." string below with no
+     control on it at all. The shell's own win overlay appears over the top;
+     dismiss it and you were left staring at "Loading..." with no way back —
+     the reported "Play Again freezes". A finished puzzle now says so and
+     offers the two things you can actually do next. */
+  if (phase === 'won' || phase === 'lost') {
+    const won = phase === 'won';
+    const nextId = Math.min(M3_CAMPAIGN_PUZZLES, selectedPuzzle + 1);
+    return React.createElement(
+      'div',
+      { className: 'm3-result' },
+      React.createElement('div', { className: 'm3-result-icon' }, won ? '🏆' : '💥'),
+      React.createElement('div', { className: 'm3-result-title' },
+        won ? 'Puzzle cleared!' : 'Tray full — run over'),
+      React.createElement('div', { className: 'm3-result-sub' },
+        `Puzzle ${selectedPuzzle} · ${score} points · ${moves} moves`),
+      React.createElement(
+        'div',
+        { className: 'm3-result-actions' },
+        React.createElement('button', Object.assign(
+          { className: 'primary-btn m3-result-btn' },
+          tapProps(() => startPuzzle(won ? nextId : selectedPuzzle))
+        ), won && nextId !== selectedPuzzle ? `Next puzzle ${nextId}` : 'Play again'),
+        /* A mode that named its own puzzle (daily, story, arcade) has no
+           campaign screen behind it, so that button would strand the player. */
+        !forcedPuzzle && React.createElement('button', Object.assign(
+          { className: 'm3-result-btn m3-result-btn-quiet' },
+          tapProps(() => { setDone(false); setPhase('campaign'); })
+        ), '← All puzzles')
+      )
     );
   }
 

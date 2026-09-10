@@ -417,6 +417,31 @@ function cwScoreGuess(guess, answer) {
   return res;
 }
 
+/* #193 — the third and fourth clue, DERIVED rather than written.
+
+   The "2-hint ceiling" the report hit is not a number anyone chose: every one
+   of the 271 corpus entries ships exactly two hand-written hints, and the Hint
+   button reads `activeHints.length`, so two is simply all a word has. Raising a
+   cap would change nothing — there is no third clue to reveal.
+
+   Hand-writing a third for 271 words would be 271 lines of invented copy that
+   nobody can review against the puzzle. These are derived from the answer
+   instead, so every word gains them for free and they cannot contradict it.
+   They also escalate correctly: the two written clues are semantic ("what is
+   this thing"), and when those have not been enough the next help a stuck
+   player wants is structural.
+
+   The last letter is withheld from short words on purpose. Giving first AND
+   last of a 4-letter word leaves two, which is not a clue any more; at five
+   letters or more it still leaves real work. */
+function cwDerivedHints(word) {
+  const w = String(word || '').toUpperCase();
+  if (w.length < 3) return [];
+  const out = [`It starts with "${w[0]}".`];
+  if (w.length >= 5) out.push(`It ends with "${w[w.length - 1]}".`);
+  return out;
+}
+
 // Multi-word daily puzzle: each UTC day is a deterministic stack of independent
 // words, identical for every player. Count is now fixed (CW_ROUNDS_PER_DAY) and
 // the words come from the themed rotation above — see the #138 note there.
@@ -594,7 +619,11 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
 
   // Per-round clue reveal: wrong guesses in THIS round + hints applied to it,
   // capped at the round's available clues. Cost ramp is global across rounds.
-  const activeHints = active ? (active.def.hints || []) : [];
+  /* Written clues first, derived ones after — the order IS the escalation, and
+     revealedExtra walks it from the front. */
+  const activeHints = active
+    ? [...(active.def.hints || []), ...cwDerivedHints(active.def.word)]
+    : [];
   const activeWrong = active ? active.guesses.filter(g => g.word !== active.def.word).length : 0;
   const activeHintsApplied = active ? (hintsByRound[activeIdx] || 0) : 0;
   const revealedExtra = active ? Math.min(activeWrong + activeHintsApplied, activeHints.length) : 0;
@@ -806,7 +835,13 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const tightScale = tightH > 0 && tightH < FIT_REF_H ? tightH / FIT_REF_H : 1;
   const GAP = tightScale < 1 ? 6 : 8;
   const PILL_H = tightScale < 1 ? Math.max(38, Math.round(46 * tightScale)) : 46;
-  const THEME_H = 20, TRACK_H = 24, CLUE_H = 34, XCLUE_H = 28, HINTB_H = 36;
+  const THEME_H = 20, TRACK_H = 24, CLUE_H = 34, HINTB_H = 36;
+  /* #193 doubled how many extra clues can be on screen at once, and each one
+     costs XCLUE_H of chrome the board does not get. So it scales like #191's
+     other constants rather than staying fixed: four clues on a short phone
+     would otherwise take 112px off the board, which is exactly the clipping
+     #191 fixed, arriving by a different route. */
+  const XCLUE_H = tightScale < 1 ? Math.max(18, Math.round(28 * tightScale)) : 28;
   const KEY_H = tightScale < 1 ? Math.max(30, Math.round(46 * tightScale)) : 46;
   const KGAP = 4;
   const kbdH = KEY_H * 3 + KGAP * 2;

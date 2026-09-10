@@ -678,6 +678,38 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #193 — the derived clues must help without answering. They are generated
+     from the word rather than written, so nothing but this stops a short word
+     from having its whole answer spelled out one clue at a time. */
+  check('cipher-derived-hints', () => {
+    const seen = new Set();
+    for (const theme of CW_THEMES) {
+      for (const entry of theme.words) {
+        const w = entry.word;
+        const derived = cwDerivedHints(w);
+        if (derived.length < 1) throw new Error(w + ': no derived clue at all');
+        if (derived.length > 2) throw new Error(w + ': ' + derived.length + ' derived clues, expected at most 2');
+        // Never more than half the word given away by structure alone.
+        const revealed = derived.length;
+        if (revealed >= w.length - 1) throw new Error(w + ' (len ' + w.length + '): ' + revealed + ' letters revealed leaves nothing to solve');
+        if (w.length < 5 && derived.length !== 1) throw new Error(w + ': a short word must keep its last letter');
+        for (const h of derived) {
+          if (h.indexOf(w) !== -1) throw new Error(w + ': a clue spells the answer');
+        }
+        if (derived[0].indexOf('"' + w[0] + '"') === -1) throw new Error(w + ': first-letter clue names the wrong letter');
+        if (derived[1] && derived[1].indexOf('"' + w[w.length - 1] + '"') === -1) throw new Error(w + ': last-letter clue names the wrong letter');
+        seen.add(w);
+      }
+    }
+    if (seen.size < 200) throw new Error('only checked ' + seen.size + ' words — the corpus should be far larger');
+    // And the written clues still lead: the escalation is semantic, then structural.
+    const sample = CW_THEMES[0].words[0];
+    const all = [...(sample.hints || []), ...cwDerivedHints(sample.word)];
+    if (all.length <= (sample.hints || []).length) throw new Error('derived clues did not extend the list');
+    if (all[0] !== sample.hints[0]) throw new Error('a written clue must come first');
+    return true;
+  });
+
   /* #205 — the knight's move overlay is drawn from ktMovePath, and the hit
      test accepts whatever ktValidMoves returns. If those two ever disagree
      the board draws a path to a square you cannot tap, or leaves a tappable

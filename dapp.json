@@ -1046,6 +1046,16 @@
       "expectText": "Today's theme"
     },
     {
+      "name": "Daily Cipher offers more than two clues per word",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectText": "4 left"
+    },
+    {
+      "name": "Daily Cipher reveals a third clue past the old ceiling",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=3",
+      "expectText": "Hint 3:"
+    },
+    {
       "name": "Daily Cipher: one tap = one letter",
       "path": "/?game=cryptowordle&practice=1&cwtype=LEN",
       "expectSelector": ".cw-board[data-cw-typed=\"LEN\"]"

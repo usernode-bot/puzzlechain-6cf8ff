@@ -3484,6 +3484,42 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     saveNow(level.player, level.crates, 0);
   };
 
+  /* #225 — the D-pad walks while you HOLD it.
+
+     The four arrows were plain `action` controls, and cuiWrapHandlers fires an
+     action on pointer-UP: every step cost a full press-and-release, and holding
+     an arrow did nothing at all, so crossing a room meant one deliberate tap
+     per square. That is the "slow arrows" in the report — the keyboard handler
+     itself measures ~0.1ms per press, so the delay was never the canvas.
+
+     `holdDown`/`holdUp` is the mechanism the controls layer already has for
+     exactly this (Bounce's paddle uses it): it engages on finger-DOWN and
+     releases if the finger slides off. The cadence copies a keyboard — one
+     step immediately, a pause so a single tap stays a single step, then a
+     steady repeat. `move` reads stateRef, so every repeat sees the live board
+     rather than the closure it was scheduled in. */
+  const CP_HOLD_DELAY_MS = 320;
+  const CP_HOLD_REPEAT_MS = 120;
+  const holdRef = useRef({ t: null, iv: null });
+  const stopHold = () => {
+    const h = holdRef.current;
+    if (h.t) { clearTimeout(h.t); h.t = null; }
+    if (h.iv) { clearInterval(h.iv); h.iv = null; }
+  };
+  const startHold = (dx, dy) => {
+    stopHold();
+    move(dx, dy); // on PRESS, not on release
+    holdRef.current.t = setTimeout(() => {
+      holdRef.current.t = null;
+      holdRef.current.iv = setInterval(() => move(dx, dy), CP_HOLD_REPEAT_MS);
+    }, CP_HOLD_DELAY_MS);
+  };
+  useEffect(() => stopHold, []);
+
+  /* The dep array matters: without it this effect re-ran on EVERY render, so
+     the window listener was torn down and re-added once per move (measured: 17
+     add/remove pairs across 8 moves). `move` reads stateRef.current, so the
+     handler never needs rebinding to see fresh state. */
   useEffect(() => {
     const onKey = (e) => {
       const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
@@ -3491,7 +3527,7 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, []);
 
   /* The whole frame is ONE canvas (controls wave): pills, the room, the
      D-pad and Undo/Restart draw together (arrow keys still work); only the
@@ -3527,10 +3563,19 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
       : { id: 'p-room', kind: 'pill', r: pr[2], label: 'Room', value: '#' + (levelInfo.idx + 1) });
     const kw = 52, kg = 6;
     const px0 = Math.floor((W - kw * 3 - kg * 2) / 2);
-    controls.push({ id: 'up', kind: 'button', r: [px0 + kw + kg, padY, kw, KEY_H], label: '▲', font: 16, action: () => move(0, -1) });
-    controls.push({ id: 'left', kind: 'button', r: [px0, padY + KEY_H + 6, kw, KEY_H], label: '◀', font: 16, action: () => move(-1, 0) });
-    controls.push({ id: 'down', kind: 'button', r: [px0 + kw + kg, padY + KEY_H + 6, kw, KEY_H], label: '▼', font: 16, action: () => move(0, 1) });
-    controls.push({ id: 'right', kind: 'button', r: [px0 + (kw + kg) * 2, padY + KEY_H + 6, kw, KEY_H], label: '▶', font: 16, action: () => move(1, 0) });
+    /* holdDown/holdUp, not action — see #225 above. The twin still carries a
+       plain onClick through `action`, so the keyboard-and-screen-reader path
+       keeps working: a twin click is one step, which is what it should be. */
+    const arrow = (id, label, r, dx, dy) => ({
+      id, kind: 'button', r, label, font: 16,
+      holdDown: () => startHold(dx, dy),
+      holdUp: stopHold,
+      action: () => move(dx, dy),
+    });
+    controls.push(arrow('up', '▲', [px0 + kw + kg, padY, kw, KEY_H], 0, -1));
+    controls.push(arrow('left', '◀', [px0, padY + KEY_H + 6, kw, KEY_H], -1, 0));
+    controls.push(arrow('down', '▼', [px0 + kw + kg, padY + KEY_H + 6, kw, KEY_H], 0, 1));
+    controls.push(arrow('right', '▶', [px0 + (kw + kg) * 2, padY + KEY_H + 6, kw, KEY_H], 1, 0));
     const ar = cuiRow(Math.floor(W * 0.1), actY, Math.floor(W * 0.8), ACT_H, 2);
     controls.push({ id: 'undo', kind: 'button', r: ar[0], label: '↶ Undo', disabled: !hist.length, action: undo });
     controls.push({ id: 'restart', kind: 'button', r: ar[1], label: '⟲ Restart', action: restart });

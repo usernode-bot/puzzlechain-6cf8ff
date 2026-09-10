@@ -302,6 +302,18 @@ body {
   .prr-meta { width: 100%; padding-left: 1.7rem; justify-content: flex-start; }
 }
 .profile-id h2 { overflow-wrap: anywhere; }
+/* #214 — Match 3's end-of-puzzle screen. The game set a 'won'/'lost' phase
+   that nothing rendered, so a finished puzzle showed "Loading..." forever. */
+.m3-result {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.5rem; padding: 2rem 1.25rem; text-align: center;
+}
+.m3-result-icon { font-size: 2.6rem; line-height: 1; }
+.m3-result-title { font-size: 1.25rem; font-weight: 700; color: ${C.text}; }
+.m3-result-sub { font-size: 0.88rem; color: ${C.muted}; }
+.m3-result-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; justify-content: center; }
+.m3-result-btn { min-height: 44px; padding: 0 1.2rem; border-radius: 12px; font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.m3-result-btn-quiet { background: ${C.surface}; border: 1px solid ${C.border}; color: ${C.text}; }
 /* Profile "Connections" section — Friends entry, shown on mobile only. */
 .account-connection-row {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;

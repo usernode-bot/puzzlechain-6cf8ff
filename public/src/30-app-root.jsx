@@ -863,6 +863,26 @@ function App() {
     // through this one branch now — Mancala and Snakes & Ladders used to fall
     // through to their own in-game pickers, which is exactly the split the
     // opponent screen exists to close.
+    /* #201 — ?room=<code> (plus ?seat=1|2) enters a live online match the way
+       tapping a your-turn card on Home does. That tap was the ONLY way in, so
+       no proposal check and no before/after screenshot could ever see the
+       in-match chrome — which is exactly the surface this change moves. Pure
+       navigation: it pre-seats the room id and lets the normal polling decide
+       whether the room is real, so a bad code lands on "Room not found"
+       rather than on a broken screen.
+
+       Checked BEFORE the opponent-screen branch, for the same reason ?result=1
+       and ?pmode= are: a game with modeSelect would otherwise surface the
+       chooser instead of the room this link names. */
+    const roomParam = params.get('room');
+    if (roomParam) {
+      setClassicGameMode('online');
+      setClassicGameModeOpts({ roomId: roomParam, myPlayerNum: params.get('seat') === '2' ? 2 : 1 });
+      setPreLaunchGame(null);
+      launchGame(g);
+      setHowToGame(null);
+      return;
+    }
     if (g.modeSelect && !mmode) { openOpponentScreen(g); return; }
     if (g.modeSelect && mmode) { setClassicGameMode(mmode); }
     // ?play=1 skips the pre-game screen and claims/mounts immediately — used

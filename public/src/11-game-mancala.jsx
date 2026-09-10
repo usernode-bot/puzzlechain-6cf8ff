@@ -1253,6 +1253,22 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
     });
     setEnding(false);
   };
+  /* #145 gave a live match the same concede affordance the five board games
+     have; without it the only exit is the 48h turn timer.
+
+     #201 moved WHERE it is offered. It sat eleven pixels under the board,
+     directly beneath the row of pits a player taps to move — and there is no
+     "safe" side to put it on, because whichever row is yours is the one you
+     tap. It is published into the ☰ sheet's "This match" group now, off the
+     board entirely and two deliberate taps away, on top of the confirm dialog
+     that already guarded it. Passing null while the room is not active
+     withdraws it. The waiting-room "Close this room" button below stays where
+     it is: there is no board on that screen to mis-tap. */
+  useCgShellAction(room && room.status === 'active' ? {
+    id: 'endgame', danger: true, disabled: ending,
+    label: ending ? 'Ending…' : '🏳️ End game',
+    onSelect: () => endGame(false),
+  } : null);
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
   const secsRef = useRef(0);
   secsRef.current = secs;
@@ -1356,13 +1372,6 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
         labelR={myPlayerNum === 1 ? 'You' : oppName}
         onPit={handleClick}
       />
-      {/* #145 — same concede affordance the five board games have; without it
-          the only exit from a live match is the 48h turn timer. */}
-      {status === 'active' && (
-        <button className="brd-endgame" onClick={() => endGame(false)} disabled={ending}>
-          {ending ? 'Ending…' : '🏳️ End game'}
-        </button>
-      )}
     </div>
   );
 }

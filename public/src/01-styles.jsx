@@ -2731,6 +2731,11 @@ ${emitTapHighlightRules()}
   margin-top: 0.5rem;
 }
 .cg-sheet-action:hover { border-color: ${C.accent}; }
+/* #201 — the concede action. Destructive, so it reads as destructive, but it
+   is a sheet row like the others rather than the loudest thing on the board. */
+.cg-sheet-action.danger { color: ${C.rose}; border-color: ${ca('rose', '55')}; }
+.cg-sheet-action.danger:hover { border-color: ${C.rose}; }
+.cg-sheet-action[disabled] { opacity: 0.55; cursor: default; }
 
 /* Game Menu (Menu tab) */
 .cg-menu-section { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -3268,6 +3273,8 @@ ${emitTapHighlightRules()}
   font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
 }
 .brd-myroom button.ghost { background: transparent; color: ${C.muted}; border: 1px solid ${C.border}; }
+/* #201 left this on the waiting-room "Close this room" button only — the live
+   match's concede moved into the ☰ sheet, where it is not under the board. */
 .brd-endgame {
   min-height: 44px; padding: 0 1rem; margin: 0.7rem auto 0; display: block;
   background: transparent; border: 1px solid ${C.rose}; border-radius: 12px;

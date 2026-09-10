@@ -1066,6 +1066,11 @@
       "expectSelector": ".cw-board[data-cw-rows=\"2\"]"
     },
     {
+      "name": "Word Search board renders in the light theme",
+      "path": "/?game=wordhunt&practice=1&theme=light",
+      "expectSelector": "canvas.ws-canvas"
+    },
+    {
       "name": "Word Search grid is the larger 10x10 board",
       "path": "/?game=wordhunt&practice=1",
       "expectSelector": ".wordsearch"

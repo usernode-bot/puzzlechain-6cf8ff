@@ -444,6 +444,33 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #208 — a touch DROP must yield coordinates. `e.touches` is a TouchList on
+     every TouchEvent and a TouchList is an object, so testing it for existence
+     rather than length made `touchend` — whose `touches` is empty by
+     definition — read `undefined.clientX` and throw. That throw happened
+     inside Block Fit's window listener before the piece was committed, so the
+     block was never placed and its drag ghost never cleared. Mouse was fine,
+     which is why it read as a mobile-only rendering bug. */
+  check('pointer-xy-reads-touchend', () => {
+    const touch = { clientX: 120, clientY: 240 };
+    // touchend: the lifted finger is in changedTouches, touches is EMPTY.
+    const end = pointerXY({ touches: [], changedTouches: [touch] });
+    if (end.x !== 120 || end.y !== 240) {
+      throw new Error('touchend read as ' + JSON.stringify(end) + ', expected 120,240');
+    }
+    // touchmove: the finger is still down, so touches wins.
+    const move = pointerXY({ touches: [touch], changedTouches: [{ clientX: 9, clientY: 9 }] });
+    if (move.x !== 120 || move.y !== 240) {
+      throw new Error('touchmove read as ' + JSON.stringify(move) + ', expected 120,240');
+    }
+    // mouse/pointer: neither list, so the event itself carries the point.
+    const mouse = pointerXY({ clientX: 7, clientY: 8 });
+    if (mouse.x !== 7 || mouse.y !== 8) {
+      throw new Error('mouse read as ' + JSON.stringify(mouse) + ', expected 7,8');
+    }
+    return true;
+  });
+
   /* #214 — a Match 3 deal must contain a MULTIPLE OF THREE of every type (a
      match is three of a kind, so anything else strands tiles), and the puzzle's
      own target must be reachable from the deal it is given. The old deal put

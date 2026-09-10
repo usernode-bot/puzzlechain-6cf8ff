@@ -154,9 +154,23 @@ let _canvasGuardWarned = 0;
    stale-colour leak can never happen again, and the first few occurrences log
    a console error (which trips the platform's no-console-errors check).
    Deliberately NOT env-gated: identical code path in staging and production. */
+/* #208 — the guard has to return the SAME proxy every time, so it is cached
+   against the context rather than flagged on it.
+
+   It used to mark the RAW context `__unGuarded` once it had wrapped it, and
+   bail out returning that raw context on every later call. But
+   `canvas.getContext('2d')` hands back the SAME object each time, and
+   `useCanvasBoard` re-guards on EVERY frame — so only the very first frame of
+   every canvas in the app was ever guarded, and every frame after it drew
+   through an unwrapped context. The protection this comment block promises
+   ("the bug class can never silently return") had been inert since frame one,
+   which is exactly how Block Fit shipped a board that painted every placed
+   piece in the background colour without ever tripping the check. */
+const _ctxGuards = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
 function guardCanvasCtx(ctx) {
   if (!ctx || typeof Proxy === 'undefined') return ctx;
-  if (ctx.__unGuarded) return ctx;
+  const cached = _ctxGuards && _ctxGuards.get(ctx);
+  if (cached) return cached;
   try {
     const p = new Proxy(ctx, {
       get(t, k) {
@@ -178,7 +192,7 @@ function guardCanvasCtx(ctx) {
         return true;
       },
     });
-    try { Object.defineProperty(ctx, '__unGuarded', { value: true, enumerable: false }); } catch {}
+    if (_ctxGuards) _ctxGuards.set(ctx, p);
     return p;
   } catch { return ctx; }
 }
@@ -602,8 +616,27 @@ function useGestures(ref, handlers) {
   }, [ref]);
 }
 
-// Drag tracking for Block Blast pieces / Diamond Rush swaps.
+/* Drag tracking for Block Blast pieces / Diamond Rush swaps.
+
+   #208 — the branch has to test LENGTH, not existence. `e.touches` on a
+   TouchEvent is always a TouchList, and a TouchList is an object, so the old
+   `e.touches ? …` was true even when it was EMPTY — which is exactly what
+   `touchend` carries: the finger that just lifted is in `changedTouches`, and
+   `touches` holds the fingers still down, i.e. none.
+
+   So every touch DROP read `e.touches[0]` as undefined and threw
+   `Cannot read properties of undefined (reading 'clientX')`. In Block Fit that
+   throw happened inside the window `touchend` listener, before `commitDrop`
+   ran: the piece was never placed and the cell stayed empty, which is the
+   "dropped blocks fail to render, leaving empty slots" report. Because the
+   throw also skipped `setDrag(null)`, the dragged piece's ghost stayed stuck
+   on screen afterwards.
+
+   Only touch was affected — a mouse drop has neither list and falls through to
+   the event itself, which is why this was reported against mobile. */
 function pointerXY(e) {
-  const p = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+  const p = (e.touches && e.touches.length) ? e.touches[0]
+    : (e.changedTouches && e.changedTouches.length) ? e.changedTouches[0]
+    : e;
   return { x: p.clientX, y: p.clientY };
 }

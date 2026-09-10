@@ -2142,6 +2142,13 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const liveRef = useRef({});
   liveRef.current = { grid, mode, done, steps, secs, geom };
+  /* The step counter, advanced SYNCHRONOUSLY. pointermove is not a discrete
+     event, so React batches a stroke's paints into one render — reading
+     `steps` from liveRef for each of them would count a five-cell sweep as one
+     step, making a drag cheaper than five taps on a scored board (#222). It is
+     re-synced from state on every render, so the two can never drift. */
+  const stepsRef = useRef(0);
+  stepsRef.current = steps;
 
   const cellAt = (p) => ngCellAt(liveRef.current.geom, NG_ROWS, NG_COLS, p);
 
@@ -2158,14 +2165,15 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   // `paintMode` is applied rather than the live mode, so long-press can invert
   // the action exactly the way Mine Finder does.
-  const apply = (r, c, paintMode) => {
+  /* One place decides what a changed grid MEANS — validation, the mistake
+     counter, the step, the save and the win — so a tap and a drag stroke can
+     never diverge on any of it (#222). `apply` toggles one cell and hands the
+     result here; a stroke paints into its own copy and hands it here too. */
+  const commitGrid = (g) => {
     const cur = liveRef.current;
     if (cur.done) return;
-    const g = cur.grid.map((row) => row.slice());
-    const v = g[r][c];
-    if (paintMode === 'fill') g[r][c] = v === 1 ? 0 : 1;
-    else g[r][c] = v === 2 ? 0 : 2;
-    const ns = cur.steps + 1;
+    const ns = stepsRef.current + 1;
+    stepsRef.current = ns;
     const res = ngValidate(g, rowClues, colClues);
     const won = res.solved;
     const nowWrong = res.complete && !won;
@@ -2186,8 +2194,18 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     if (won) finish(ns, cur.secs, nm);
   };
 
+  const apply = (r, c, paintMode) => {
+    const cur = liveRef.current;
+    if (cur.done) return;
+    const g = cur.grid.map((row) => row.slice());
+    const v = g[r][c];
+    if (paintMode === 'fill') g[r][c] = v === 1 ? 0 : 1;
+    else g[r][c] = v === 2 ? 0 : 2;
+    commitGrid(g);
+  };
+
   /* A board seeded solved by ?ngfill=solved has to report itself: the win is
-     detected inside apply(), and nothing was tapped. */
+     detected inside commitGrid(), and nothing was tapped. */
   const firedRef = useRef(false);
   useEffect(() => {
     if (firedRef.current || !seeded.current || !view.solved || done) return;
@@ -2232,14 +2250,67 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
         ? `${nErr} ${nErr === 1 ? 'line can' : 'lines can'} no longer match ${nErr === 1 ? 'its clue' : 'their clues'}. Look for the red numbers.`
         : `${filled} of ${view.targetFilled} cells filled. ${view.doneCount} of ${view.lines} lines done.`;
 
+  /* #222 — drag to paint a run of cells.
+
+     A nonogram is played in RUNS: you read "7" and want seven cells, not seven
+     taps. The board only had onTap, so a 15x15 band cost 225 separate taps.
+
+     The stroke decides its value from the FIRST cell and then SETS every cell
+     it crosses, rather than toggling each one. Toggling per cell is what makes
+     a drag destroy its own work — cross a cell twice on the way back and you
+     undo it. This is also why the stroke carries its own grid copy: pointermove
+     is not a discrete event, so React batches it, and two paints in one batch
+     would both read the same pre-batch state and the second would clobber the
+     first. `seen` keeps a wobble over one cell from costing a step per frame.
+
+     Painting waits for `d.moved` (the 10px tolerance) on purpose. Below it the
+     gesture is still a tap, and usePointerCell will fire onTap on release —
+     painting early would apply the same cell twice. */
+  const strokeRef = useRef(null);
+  const beginStroke = (p) => {
+    strokeRef.current = null;
+    const t = cellAt(p);
+    if (!t) return;
+    const cur = liveRef.current;
+    if (cur.done) return;
+    const v = cur.grid[t.r][t.c];
+    const want = cur.mode === 'fill' ? (v === 1 ? 0 : 1) : (v === 2 ? 0 : 2);
+    strokeRef.current = { want, origin: t, started: false, seen: new Set(), grid: cur.grid.map((row) => row.slice()) };
+  };
+  const strokePaint = (st, r, c) => {
+    const k = r + ',' + c;
+    if (st.seen.has(k)) return;
+    st.seen.add(k);
+    if (st.grid[r][c] === st.want) return;
+    st.grid[r][c] = st.want;
+    commitGrid(st.grid.map((row) => row.slice()));
+  };
+  const strokeTo = (p, d) => {
+    const st = strokeRef.current;
+    if (!st || !d || !d.moved) return;
+    /* The cell the finger went DOWN on belongs to the run. It cannot be
+       painted on pointerdown — below the 10px tolerance the gesture is still a
+       tap, and onTap would then apply it a second time — so it is painted here,
+       the moment the gesture commits to being a drag. Without this a run drawn
+       left-to-right silently starts one cell late. */
+    if (!st.started) { st.started = true; strokePaint(st, st.origin.r, st.origin.c); }
+    const t = cellAt(p);
+    if (t) strokePaint(st, t.r, t.c);
+  };
+  const endStroke = () => { strokeRef.current = null; };
+
   usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
-    onTap: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
+    onDown: (p) => beginStroke(p),
+    onDrag: (p, d) => strokeTo(p, d),
+    onUp: () => endStroke(),
+    onTap: (p) => { endStroke(); const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
     // Long-press = the opposite tool, same idiom as Mine Finder.
     onLongPress: (p) => {
+      endStroke();
       const t = cellAt(p);
       if (t) apply(t.r, t.c, liveRef.current.mode === 'fill' ? 'mark' : 'fill');
     },
-    onContext: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, 'mark'); },
+    onContext: (p) => { endStroke(); const t = cellAt(p); if (t) apply(t.r, t.c, 'mark'); },
   }));
 
   useCanvasBoard(canvasRef, {

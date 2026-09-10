@@ -1202,6 +1202,16 @@
       "expectText": "Erase"
     },
     {
+      "name": "Sudoku arcade HUD names the difficulty that was chosen",
+      "path": "/?game=sudoku&pmode=arcade&band=hard&play=1",
+      "expectText": "Difficulty: Hard"
+    },
+    {
+      "name": "Sudoku story HUD names the level and what it demands",
+      "path": "/?game=sudoku&pmode=story&band=4&play=1",
+      "expectText": "Level 4: Tricky"
+    },
+    {
       "name": "Sudoku 6x6 Mini board is deep-linkable",
       "path": "/?game=sudoku&practice=1&sdk=6",
       "expectSelector": ".sudoku canvas.sdk-canvas"

@@ -75,6 +75,11 @@ const GAMES = [
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
     fitShell: true,
+    /* #195 — no "View board" step. The result card already reveals the answer
+       and the score, so the frozen board behind it repeats what you just read.
+       Every other game keeps it; this is a property of the game, not a
+       shell-wide change (see boardReviewable). */
+    reviewBoard: false,
     howToPlay: [
       { title: 'Guess the word', body: 'Type a guess and submit. Green = right letter, right spot; gold = right letter, wrong spot.' },
       { title: 'Work the stack', body: "Today's puzzle is a stack of crypto words — solve one to unlock the next. Clues unlock as you go, and free hints are capped per day." },

@@ -879,25 +879,21 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         <div className="pregame-bands" role="group" aria-label="Choose a difficulty">
           <div className="pregame-bands-label">Difficulty</div>
           <div className="pregame-band-row wide">
-            {ARCADE_BANDS.map(b => {
-              /* All three are open from the first run. The recommendation is
-                 STEERING, not gating: a player who picks Hard on a game they
-                 have never touched gets a hard board and concludes the game is
-                 broken, so the band matching their ladder progress is marked
-                 rather than the others being locked. */
-              const rec = bandTotal > 0 &&
-                b.id === (bandCleared === 0 ? 'easy' : bandCleared >= bandTotal ? 'hard' : 'normal');
-              return (
-                <button
-                  key={b.id}
-                  className={'pregame-band wide tappable' + (b.id === arcadeBandId ? ' on' : '')}
-                  aria-label={`${b.label}${rec ? ', recommended' : ''}`}
-                  {...tapProps(() => onArcadeBand && onArcadeBand(b.id))}
-                >
-                  {b.label}{rec && <span className="rec">recommended</span>}
-                </button>
-              );
-            })}
+            {/* #195 — the per-band "recommended" tag is gone. It was steering
+                rather than gating (all three bands are open from the first
+                run), but it repeated what the band names already say: Easy is
+                the easy one. The note under the row still explains what arcade
+                scoring rewards, which is the part a player cannot infer. */}
+            {ARCADE_BANDS.map(b => (
+              <button
+                key={b.id}
+                className={'pregame-band wide tappable' + (b.id === arcadeBandId ? ' on' : '')}
+                aria-label={b.label}
+                {...tapProps(() => onArcadeBand && onArcadeBand(b.id))}
+              >
+                {b.label}
+              </button>
+            ))}
           </div>
           <div className="pregame-band-note">
             A fresh board every run. Beating your own best on this band scores;

@@ -1946,7 +1946,15 @@ function App() {
      render below unmount the body and put the results card over a blank page.
      Snake, Block Fit, Diamond Rush and Hash Rush now keep their final board
      frozen behind the card like every other game. */
+  /* #195 — `reviewBoard: false` in the registry opts a game out of the review
+     step. Reviewing a frozen board is worth a tap when the board IS the result
+     (a solved nonogram, a final 2048 grid); for Daily Cipher the result card
+     already reveals the answer and the score, so the board behind it repeats
+     what you just read and the overlay is one more thing to dismiss. It is a
+     declarative flag rather than an id check here, because "does my board say
+     anything after the run" is a property of a game, not of the shell. */
   const boardReviewable = screen === 'game' && !!currentGame && !!resultData
+    && currentGame.reviewBoard !== false
     && (!resultData.gameId || resultData.gameId === currentGame.id);
 
   /* #162 — dismissing a results card reveals the board behind it. One handler

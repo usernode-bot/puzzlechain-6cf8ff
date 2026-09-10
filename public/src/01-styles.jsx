@@ -1028,8 +1028,20 @@ ${emitTapHighlightRules()}
   color: ${C.muted}; margin-bottom: 0.2rem;
 }
 .pregame-stat .v { font-weight: 700; font-size: 1rem; }
+/* This rule used to be missing its semicolon AND its closing brace, and the
+   declarations that belong to it had been stranded ~70 lines further down
+   behind a stray brace-semicolon. Everything in between — the whole band-picker family,
+   the resume note, the Play button — was swallowed into one invalid rule and
+   silently discarded by the CSS parser. Verified before fixing: NONE of
+   .pregame-deal, .pregame-band, .pregame-band.on, .pregame-band-row,
+   .pregame-bands-label, .pregame-band-note, .pregame-resume-note or
+   .pregame-play appeared in document.styleSheets. */
 .pregame-deal {
-  font-size: 0.82rem; color: ${C.text}
+  font-size: 0.82rem; color: ${C.text};
+  background: ${ca('accent', '14')};
+  border: 1px solid ${ca('accent', '44')}; border-radius: 10px;
+  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
+}
 
 /* #176 — the band pickers. Story's is a numbered level list walked in order
    (cleared behind you, one open level ahead, the rest locked); arcade's is
@@ -1066,11 +1078,35 @@ ${emitTapHighlightRules()}
   font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
   color: ${C.muted}; margin-top: 0.1rem;
 }
+/* #188 — the leaderboards panel. A centred sheet rather than a bottom sheet:
+   it is a thing you read, not a menu you act from, and the tab row plus three
+   or four rows of names sits badly hugging the bottom edge on a phone. */
+.gb-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: var(--c-scrim);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.gb-sheet {
+  width: 100%; max-width: 420px; max-height: 82dvh; overflow-y: auto;
+  background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 18px; padding: 0.9rem 1rem 1rem;
+  box-shadow: 0 20px 50px var(--c-shadow-lg);
+}
+.gb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; font-weight: 700; margin-bottom: 0.7rem;
+}
+.gb-close {
+  min-width: 32px; min-height: 32px; flex: 0 0 auto;
+  background: transparent; border: 1px solid ${C.border}; border-radius: 8px;
+  color: ${C.muted}; font-family: inherit; cursor: pointer;
+}
+.gb-close:hover { color: ${C.text}; border-color: ${C.accent}; }
+.gb-bands { margin-bottom: 0.6rem; }
+
 .pregame-band-note {
   margin-top: 0.45rem; font-size: 0.72rem; line-height: 1.4; color: ${C.muted};
-}; background: ${ca('accent','14')};
-  border: 1px solid ${ca('accent','44')}; border-radius: 10px;
-  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
 }
 .pregame-resume-note {
   font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.8rem;

@@ -778,9 +778,124 @@ function OpponentScreen({ game, onPlay, onHowTo, onChat }) {
 }
 
 
+/* #188 — one place to see where you stand in a game, with the three rankings
+   the report asks for.
+
+   Two of the three already existed and simply had nowhere to be seen from: the
+   daily board only ever appeared on the result card (so you had to finish
+   today's puzzle to read it), and the per-band arcade boards were only reachable
+   from an arcade run. All-time is the one that had no endpoint at all.
+
+   "Level" is the arcade band ladder rather than the story rungs, deliberately.
+   Story pays once on first clear, so a story ranking would be a list of who has
+   finished, in the order they happened to arrive — not a standing. Arcade keeps
+   a best per band, which is what a ladder means. */
+const GB_TABS = [
+  { id: 'daily', label: 'Daily' },
+  { id: 'level', label: 'Level' },
+  { id: 'alltime', label: 'All-time' },
+];
+
+function GbRows({ rows, me, cols, empty }) {
+  const meVisible = me && rows.some((e) => e.isCurrentUser);
+  if (!rows.length) return <div className="lboard-empty">{empty}</div>;
+  const row = (e, pinned) => (
+    <div key={(pinned ? 'me-' : '') + e.rank} className={'lrow' + (e.isCurrentUser ? ' me' : '') + (pinned ? ' pinned' : '')}>
+      <span className="lrank mono">#{e.rank}</span>
+      <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+      <span className="ltime mono">{cols.a(e)}</span>
+      <span className="lsteps mono">{cols.b(e)}</span>
+    </div>
+  );
+  return (
+    <div className="lboard-rows">
+      {rows.map((e) => row(e, false))}
+      {me && !meVisible && row(me, true)}
+    </div>
+  );
+}
+
+function GameBoards({ game, onClose }) {
+  const [tab, setTab] = useState('daily');
+  const [band, setBand] = useState('normal');
+  const [scope, setScope] = useState(lbInitialScope);
+  const [state, setState] = useState({ loading: true });
+
+  // Each tab is a different endpoint of the same shape, so one fetch serves all
+  // three; band only participates on the arcade ladder.
+  const url = tab === 'daily' ? `/api/daily/${game.id}/leaderboard`
+    : tab === 'level' ? `/api/arcade/${game.id}/leaderboard?band=${encodeURIComponent(band)}`
+    : `/api/alltime/${game.id}/leaderboard`;
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true });
+    (async () => {
+      const q = scope === 'friends' ? (url.indexOf('?') === -1 ? '?scope=friends' : '&scope=friends') : '';
+      const { ok, body } = await api(url + q);
+      if (!alive) return;
+      setState(ok && body ? { loading: false, ...body } : { loading: false, entries: [], me: null, total: 0, error: true });
+    })();
+    return () => { alive = false; };
+  }, [url, scope]);
+
+  const rows = state.entries || [];
+  const cols = tab === 'alltime'
+    ? { a: (e) => `${e.points} pts`, b: (e) => `${e.plays}d` }
+    : tab === 'level'
+      ? { a: (e) => `${e.bestScore != null ? e.bestScore : e.score || 0} pts`, b: (e) => (e.runs != null ? `${e.runs}r` : '—') }
+      : { a: (e) => lbFmtTime(e.timeSecs), b: (e) => (e.steps != null ? `${e.steps} st` : '—') };
+  const empty = scope === 'friends' ? LB_FRIENDS_EMPTY
+    : tab === 'daily' ? "Nobody has solved today's puzzle yet."
+      : tab === 'level' ? 'No runs on this band yet.'
+        : 'No finished games yet — play one and you are on the board.';
+
+  return (
+    <div className="gb-sheet-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="gb-sheet" role="dialog" aria-label={`${game.name} leaderboards`}>
+        <div className="gb-head">
+          <span>{game.icon} {game.name} — leaderboards</span>
+          <button className="gb-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="cg-sheet-tabs">
+          {GB_TABS.map((t) => (
+            <button key={t.id} className={'cg-sheet-tab' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>{t.label}</button>
+          ))}
+        </div>
+        {tab === 'level' && (
+          <div className="pregame-band-row wide gb-bands">
+            {ARCADE_BANDS.map((b) => (
+              <button key={b.id} className={'pregame-band wide tappable' + (b.id === band ? ' on' : '')}
+                {...tapProps(() => setBand(b.id))}>{b.label}</button>
+            ))}
+          </div>
+        )}
+        <LbScopeTabs scope={scope} onChange={setScope} />
+        {state.loading
+          ? <div className="lboard-empty">Loading…</div>
+          : <GbRows rows={rows} me={state.me} cols={cols} empty={empty} />}
+        <div className="lboard-note">
+          {tab === 'alltime'
+            ? 'Total points across every daily you have finished. Ties go to fewer days played.'
+            : tab === 'level'
+              ? 'Your best arcade run on each difficulty band.'
+              : "Today's solvers, fastest first."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
                          playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest,
                          onReplayRun }) {
+  /* `?boards=1` opens the panel at mount. The boards are behind a tap, and a
+     screen behind a tap is invisible to proposal checks and to the before/after
+     screenshots alike — the same reason ?sheet= exists for the classic shell. */
+  const [boardsOpen, setBoardsOpen] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('boards') === '1'; }
+    catch (e) { return false; }
+  });
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const resuming = !!(attempt && !attempt.finishedAt);
   const m = game.manifest || {};
@@ -928,7 +1043,13 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         {onChat && (
           <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>
         )}
+        {/* #188 — the boards were only readable AFTER a run: today's from the
+            result card, the arcade ladder from inside an arcade run. Here they
+            are before you play, which is when "where do I stand" is a reason
+            to press Play. */}
+        <button className="pregame-howto-btn" onClick={() => setBoardsOpen(true)}>🏆 Leaderboards</button>
       </div>
+      {boardsOpen && <GameBoards game={game} onClose={() => setBoardsOpen(false)} />}
     </div>
   );
 }

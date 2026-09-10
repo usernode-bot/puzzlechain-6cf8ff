@@ -1231,6 +1231,16 @@
       "expectSelector": "html[data-theme=\"dark\"] .card.paired .card-mode-btn.daily"
     },
     {
+      "name": "Sudoku has a leaderboards panel with all three boards",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectSelector": ".gb-sheet .cg-sheet-tab"
+    },
+    {
+      "name": "Sudoku leaderboards offer an all-time ranking",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectText": "All-time"
+    },
+    {
       "name": "Sudoku 9x9 board is deep-linkable and fills its column",
       "path": "/?game=sudoku&practice=1&sdk=9",
       "expectSelector": ".sudoku.s9 canvas.sdk-canvas"

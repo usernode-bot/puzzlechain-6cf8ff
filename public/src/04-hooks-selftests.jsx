@@ -685,7 +685,7 @@ function runClientSelfTests(styleReady) {
   check('cnlv2-layouts', () => {
     const expected = {
       beginner: [8, 3], amateur: [7, 5], regular: [6, 6], professional: [5, 8],
-      topplayer: [4, 10], superstar: [3, 12], legend: [2, 15],
+      topplayer: [4, 10], superstar: [3, 12], legend: [2, 14],
     };
     if (CNLV2_LAYOUTS.length !== 7) throw new Error('expected 7 tiers, got ' + CNLV2_LAYOUTS.length);
     for (const L of CNLV2_LAYOUTS) {
@@ -721,12 +721,33 @@ function runClientSelfTests(styleReady) {
         if (destSet.has(s)) throw new Error(L.id + ': square ' + s + ' is both a jump start and a destination');
       }
       if (L.id === 'legend') {
-        const high = snk.filter((s) => s >= 80 && s <= 99).length;
-        if (high < 10) throw new Error('legend has only ' + high + ' snake heads in 80–99, needs ≥10');
         for (const s of lad) {
           if (L.ladders[s] >= 80) throw new Error('legend ladder tops out at ' + L.ladders[s] + ' — must stay below 80');
         }
       }
+    }
+    /* #203 — the part no count-based rule could catch. Legend satisfied every
+       constraint above and still took 1812 expected rolls to finish, because
+       95/97/98/99 were all snake heads and only two squares in the whole
+       board could reach 100 by an exact roll. A tier is now MEASURED: it must
+       finish in a human number of rolls, and each tier must be harder than the
+       one before it, or the ladder the picker presents is a fiction.
+
+       The cap is deliberately loose. It is not a balance target — it is the
+       line between "a long game" and "not a game", and a retune that wants
+       Legend at 400 rolls should be free to do it without editing a test. */
+    const CNLV2_MAX_EXPECTED_ROLLS = 600;
+    let prev = 0;
+    for (const L of CNLV2_LAYOUTS) {
+      const e = cnlv2ExpectedRolls(L);
+      if (!isFinite(e) || e <= 0) throw new Error(L.id + ' has no finite expected roll count — square 100 may be unreachable');
+      if (e > CNLV2_MAX_EXPECTED_ROLLS) {
+        throw new Error(L.id + ' needs ' + Math.round(e) + ' expected rolls to finish, cap is ' + CNLV2_MAX_EXPECTED_ROLLS);
+      }
+      if (e <= prev) {
+        throw new Error(L.id + ' (' + Math.round(e) + ' rolls) is not harder than the tier before it (' + Math.round(prev) + ')');
+      }
+      prev = e;
     }
     return true;
   });

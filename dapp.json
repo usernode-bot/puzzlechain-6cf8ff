@@ -755,6 +755,11 @@
       "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
     },
     {
+      "name": "Legend board names its tier on the gameplay HUD",
+      "path": "/?game=chutes-ladders&mode=bot&cnldiff=legend",
+      "expectText": "Legend"
+    },
+    {
       "name": "Snakes & Ladders six-player hotseat renders",
       "path": "/?game=chutes-ladders&mode=2p&seats=6",
       "expectSelector": "canvas.cnl-canvas[data-cnl-p2=\"diamond\"]"

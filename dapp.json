@@ -26,6 +26,16 @@
       "expectText": "Game Corner"
     },
     {
+      "name": "Daily filter splits out what is completed today",
+      "path": "/?tab=daily&demo=locked",
+      "expectText": "Completed today"
+    },
+    {
+      "name": "Daily filter's completed section holds a card",
+      "path": "/?tab=daily&demo=locked",
+      "expectSelector": ".grid.home-split-done .card"
+    },
+    {
       "name": "Lobby renders",
       "path": "/",
       "expectText": "Game Corner"

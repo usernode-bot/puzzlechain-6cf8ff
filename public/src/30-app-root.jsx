@@ -2302,9 +2302,53 @@ function App() {
                         Tap 📌 on any card to pin it to the top.
                       </div>
                     )}
-                    <div className="grid">
-                      {restCards.map(c => <GameCard {...cardProps(c)} />)}
-                    </div>
+                    {(() => {
+                      /* #226 — under the Daily chip, split the grid into what
+                         is still open today and what is already done. The card
+                         already knows: cardDailyId + attempts[id].finishedAt is
+                         the same pair its own "Daily ✓" badge reads, so this
+                         needs no extra fetch and cannot disagree with the badge.
+
+                         The split only appears once something IS finished, and
+                         only after the attempts have loaded. A signed-out
+                         visitor, and everyone at 00:01 UTC, would otherwise get
+                         a "Not completed (23)" heading over the whole grid and
+                         an empty section under it — a breakdown that breaks
+                         nothing down. */
+                      const dailyDone = (c) => {
+                        const id = cardDailyId(c);
+                        const a = id ? attempts[id] : null;
+                        return !!(a && a.finishedAt);
+                      };
+                      const done = homeFilter === 'daily' && !loading
+                        ? restCards.filter(dailyDone) : [];
+                      if (done.length === 0) {
+                        return (
+                          <div className="grid">
+                            {restCards.map(c => <GameCard {...cardProps(c)} />)}
+                          </div>
+                        );
+                      }
+                      const todo = restCards.filter(c => !dailyDone(c));
+                      return (
+                        <React.Fragment>
+                          <div className="home-section-title home-split-title">
+                            Still to play
+                            <span className="home-pin-count">{todo.length}</span>
+                          </div>
+                          {todo.length === 0
+                            ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
+                            : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                          <div className="home-section-title home-split-title">
+                            Completed today
+                            <span className="home-pin-count">{done.length}</span>
+                          </div>
+                          <div className="grid home-split-done">
+                            {done.map(c => <GameCard {...cardProps(c)} />)}
+                          </div>
+                        </React.Fragment>
+                      );
+                    })()}
                     {/* #234 — Today's Top Scores reads AFTER the games now.
                         It is a result of playing, not a way in, and at 135px
                         directly under the hero it was one of the four blocks

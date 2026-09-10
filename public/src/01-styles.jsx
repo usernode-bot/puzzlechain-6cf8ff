@@ -3809,6 +3809,15 @@ ${emitTapHighlightRules()}
   color: ${C.muted}; letter-spacing: 0.05em;
 }
 .home-pin-tip { color: ${C.muted}; font-size: 0.78rem; margin: 0 0 0.9rem; }
+/* #226 — the Daily chip's completed / still-to-play split. Same column-rule
+   heading as every other home section, so the grid reads as one page with two
+   headings rather than two grids. The finished cards are dimmed a little, not
+   collapsed: they still carry today's score and the tap that reviews the
+   board, so hiding them would lose the thing you'd go looking for. */
+.home-split-title { display: flex; align-items: baseline; gap: 0.5rem; margin-top: 1.4rem; }
+.home-split-empty { color: ${C.muted}; font-size: 0.82rem; margin: 0.6rem 0 0.2rem; }
+.grid.home-split-done .card { opacity: 0.72; }
+.grid.home-split-done .card:hover, .grid.home-split-done .card:focus-within { opacity: 1; }
 .home-pin-full {
   color: ${C.rose}; font-size: 0.78rem; margin: 0 0 0.6rem; font-weight: 600;
 }

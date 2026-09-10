@@ -31,6 +31,16 @@
       "expectSelector": ".nav .nav-brand .brandword"
     },
     {
+      "name": "Daily filter splits out what is completed today",
+      "path": "/?tab=daily&demo=locked",
+      "expectText": "Completed today"
+    },
+    {
+      "name": "Daily filter's completed section holds a card",
+      "path": "/?tab=daily&demo=locked",
+      "expectSelector": ".grid.home-split-done .card"
+    },
+    {
       "name": "Lobby renders",
       "path": "/",
       "expectText": "Game Corner"
@@ -1046,6 +1056,16 @@
       "expectSelector": ".cw-board[data-cw-typed=\"LE\"]"
     },
     {
+      "name": "Daily Cipher scores a guess so its feedback colours render",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=1",
+      "expectSelector": ".cw-board[data-cw-rows=\"1\"]"
+    },
+    {
+      "name": "Daily Cipher scores two guesses in a row",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=2",
+      "expectSelector": ".cw-board[data-cw-rows=\"2\"]"
+    },
+    {
       "name": "Word Search grid is the larger 10x10 board",
       "path": "/?game=wordhunt&practice=1",
       "expectSelector": ".wordsearch"
@@ -1207,6 +1227,16 @@
       "expectText": "Erase"
     },
     {
+      "name": "Sudoku offers an Undo beside Erase",
+      "path": "/?game=sudoku&practice=1&sdk=9",
+      "expectText": "Undo"
+    },
+    {
+      "name": "Sudoku Mini offers an Undo too",
+      "path": "/?game=sudokumini&practice=1",
+      "expectText": "Undo"
+    },
+    {
       "name": "Sudoku arcade HUD names the difficulty that was chosen",
       "path": "/?game=sudoku&pmode=arcade&band=hard&play=1",
       "expectText": "Difficulty: Hard"
@@ -1325,6 +1355,11 @@
       "name": "Knight's Tour board is a canvas",
       "path": "/?game=knights-tour",
       "expectSelector": "canvas.kt-canvas"
+    },
+    {
+      "name": "Knight's Tour story board starts with the knight placed",
+      "path": "/?game=knights-tour&pmode=story&band=1&play=1",
+      "expectSelector": "canvas.kt-canvas[aria-label*=\"1 of 25\"]"
     },
     {
       "name": "Crate Push room is a canvas",

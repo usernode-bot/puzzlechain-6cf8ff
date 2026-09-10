@@ -678,6 +678,45 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #205 — the knight's move overlay is drawn from ktMovePath, and the hit
+     test accepts whatever ktValidMoves returns. If those two ever disagree
+     the board draws a path to a square you cannot tap, or leaves a tappable
+     square with no path — the silent, only-visible-in-a-browser class of bug
+     that ngGeometry/ngCellAt exists to prevent on Nonogram. */
+  check('knight-move-paths', () => {
+    for (const size of [5, 6, 7, 8]) {
+      const n = size * size;
+      const visited = new Array(n).fill(0);
+      for (let from = 0; from < n; from++) {
+        const moves = ktValidMoves(from, visited, size, null);
+        if (moves.length === 0) throw new Error('no moves from ' + from + ' on ' + size);
+        for (const to of moves) {
+          const path = ktMovePath(from, to, size);
+          if (!path) throw new Error(size + ': no path for the legal move ' + from + '->' + to);
+          const [a, elbow, b] = path;
+          if (a[0] * size + a[1] !== from) throw new Error('path does not start at the knight');
+          if (b[0] * size + b[1] !== to) throw new Error('path does not end on the move');
+          for (const [r, c] of path) {
+            if (r < 0 || r >= size || c < 0 || c >= size) throw new Error(size + ': path leaves the board at ' + r + ',' + c);
+          }
+          // The elbow is on the LONG leg: it shares a file with the start and
+          // a rank with the end, or the other way round — never a diagonal.
+          const straight1 = a[0] === elbow[0] || a[1] === elbow[1];
+          const straight2 = b[0] === elbow[0] || b[1] === elbow[1];
+          if (!straight1 || !straight2) throw new Error(size + ': elbow is not a right angle for ' + from + '->' + to);
+          const leg1 = Math.abs(elbow[0] - a[0]) + Math.abs(elbow[1] - a[1]);
+          const leg2 = Math.abs(b[0] - elbow[0]) + Math.abs(b[1] - elbow[1]);
+          if (leg1 !== 2 || leg2 !== 1) throw new Error(size + ': legs are ' + leg1 + '/' + leg2 + ', expected 2 then 1');
+        }
+      }
+    }
+    // And nothing that is not a knight move gets a path.
+    if (ktMovePath(0, 1, 8)) throw new Error('a one-square step is not a knight move');
+    if (ktMovePath(0, 9, 8)) throw new Error('a diagonal is not a knight move');
+    if (ktMovePath(null, 5, 8)) throw new Error('no knight, no path');
+    return true;
+  });
+
   /* Snakes & Ladders V2 — the seven hand-authored tier boards must satisfy
      the authoring constraints (see snakesladders-v2/00-layouts.jsx), or a
      future retune ships a broken board: a chained jump the engine resolves

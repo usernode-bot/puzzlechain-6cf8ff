@@ -741,7 +741,28 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const canvasRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
   const W = Math.floor(boxW);
-  const GAP = 8, PILL_H = 46, THEME_H = 20, TRACK_H = 24, CLUE_H = 34, XCLUE_H = 28, HINTB_H = 36, KEY_H = 46, KGAP = 4;
+  /* #191 — the chrome has to give way before the board clips.
+     Every one of these was a fixed pixel height, so on a short viewport the
+     chrome alone (a 146px keyboard, the pills, the theme line, the track and
+     the clue) plus the board's own 20px-per-tile floor came to 524px whatever
+     the space actually was. `.cw-board` is `overflow: hidden`, so the excess
+     was simply cut off — 43px lost at 360x640, 115px at 360x568, and the
+     bottom keyboard row with it. The board stopped shrinking and started
+     disappearing instead.
+
+     The keyboard is by far the biggest block, so it is the one that scales;
+     the pill row follows it down a little. Below the reference height they
+     shrink in proportion, floored at a still-tappable size, which buys the
+     board enough room to fit rather than clip. `.fit-col` fits or it clips —
+     there is no scrollbar to fall back on. */
+  const FIT_REF_H = 700;
+  const tightH = Math.max(0, Math.floor(boxH));
+  const tightScale = tightH > 0 && tightH < FIT_REF_H ? tightH / FIT_REF_H : 1;
+  const GAP = tightScale < 1 ? 6 : 8;
+  const PILL_H = tightScale < 1 ? Math.max(38, Math.round(46 * tightScale)) : 46;
+  const THEME_H = 20, TRACK_H = 24, CLUE_H = 34, XCLUE_H = 28, HINTB_H = 36;
+  const KEY_H = tightScale < 1 ? Math.max(30, Math.round(46 * tightScale)) : 46;
+  const KGAP = 4;
   const kbdH = KEY_H * 3 + KGAP * 2;
   const activeXtra = active ? revealedExtra : 0;
   const hasHintBar = !!(active && activeHints.length > 0 && !done);
@@ -749,8 +770,13 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + kbdH + GAP : 0)
     + (allResolved ? 34 : 0);
   const gapPx = 5;
-  const availB = Math.max(90, Math.floor(boxH) - chrome);
-  const tile = active ? Math.max(20, Math.min(56, Math.floor(Math.min(
+  /* No floor on the available height: flooring it at 90 meant a board that
+     could not fit simply drew past the bottom of its own frame. The tile floor
+     scales the same way, so a short screen gets a smaller board instead of a
+     clipped one. */
+  const minTile = tightScale < 1 ? 14 : 20;
+  const availB = Math.max(0, Math.floor(boxH) - chrome);
+  const tile = active ? Math.max(minTile, Math.min(56, Math.floor(Math.min(
     (Math.min(W, boardWidth) - gapPx * (wordLen - 1)) / wordLen,
     (availB - gapPx * (maxGuesses - 1)) / maxGuesses
   )))) : 0;

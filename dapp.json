@@ -1076,6 +1076,11 @@
       "expectSelector": ".cw-board[data-cw-rows=\"2\"]"
     },
     {
+      "name": "Word Search board renders in the light theme",
+      "path": "/?game=wordhunt&practice=1&theme=light",
+      "expectSelector": "canvas.ws-canvas"
+    },
+    {
       "name": "Word Search grid is the larger 10x10 board",
       "path": "/?game=wordhunt&practice=1",
       "expectSelector": ".wordsearch"
@@ -1382,6 +1387,21 @@
       "expectSelector": ".cw-board canvas.cw-canvas"
     },
     {
+      "name": "Diamond Rush names its target on the HUD",
+      "path": "/?game=diamondrush",
+      "expectText": "Target"
+    },
+    {
+      "name": "Diamond Rush shows how far there is to go",
+      "path": "/?game=diamondrush",
+      "expectText": "more points in"
+    },
+    {
+      "name": "Diamond Rush story rung carries its own target",
+      "path": "/?game=diamondrush&pmode=story&band=3&play=1",
+      "expectText": "1200"
+    },
+    {
       "name": "Diamond Rush gem board is a canvas",
       "path": "/?game=diamondrush",
       "expectSelector": ".dr-grid canvas.dr-canvas"
@@ -1430,6 +1450,16 @@
       "name": "Room deep link enters a live online match",
       "path": "/?demo=yourturn&game=checkers&room=DEMOYT&seat=2",
       "expectSelector": ".cg-shell canvas.ck-canvas"
+    },
+    {
+      "name": "Play Again is the primary action on a classic result",
+      "path": "/?game=checkers&result=1",
+      "expectSelector": ".win-card .play-again-btn"
+    },
+    {
+      "name": "Reversi result card carries the same Play Again",
+      "path": "/?game=reversi&result=1",
+      "expectSelector": ".win-card .play-again-btn"
     },
     {
       "name": "Gomoku board is a canvas (confirm bar stays)",

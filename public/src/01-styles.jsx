@@ -756,10 +756,7 @@ ${emitTapHighlightRules()}
 .game-body.frozen .cg-topbar,
 .game-body.frozen .cg-topbar *,
 .game-body.frozen .result-minibar { pointer-events: auto; }
-.review-btn {
-  margin-bottom: 0.6rem; background: ${C.surface};
-  border: 1px solid ${C.border}; color: ${C.text};
-}
+
 .result-minibar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
@@ -916,6 +913,43 @@ ${emitTapHighlightRules()}
   transition: background 0.12s ease;
 }
 .primary-btn:hover { background: var(--c-accent-hover); }
+
+/* Result-card button hierarchy. These MUST sit after .primary-btn.
+
+   #216 — .review-btn was declared ~150 lines earlier, at the same specificity,
+   so .primary-btn's accent background won and every secondary button on the
+   result card rendered as a primary one. It had never applied. That is also
+   why Play Again carried an inline copy of these exact declarations twice:
+   inline was the only way to beat the cascade, and it left the card with one
+   dark button among a column of purple ones — the button the report says is
+   hard to see. Moving the rule down fixes the whole column at once. */
+.review-btn {
+  margin-bottom: 0.6rem; background: ${C.surface};
+  border: 1px solid ${C.border}; color: ${C.text};
+}
+.review-btn:hover { border-color: ${C.accent}; background: ${C.well}; }
+
+/* Play Again is the PRIMARY action on a result card: you have just finished a
+   game, and the loudest thing on the screen should not be leaving. The ring is
+   an OUTLINE and the glow a FILTER, deliberately — box-shadow is not ours to
+   use here, because the hosted native kit puts its own shadow on every button
+   and wins, so a box-shadow glow would silently do nothing. Outline costs no
+   layout either: it draws outside the border box, so nothing on the card
+   moves. */
+.play-again-btn {
+  margin-bottom: 0.6rem;
+  background: ${C.accent};
+  color: white;
+  border: 1px solid ${ca('accent', '99')};
+  outline: 2px solid ${ca('accent', '7a')};
+  outline-offset: 2px;
+  filter: drop-shadow(0 0 6px ${ca('accent', '66')});
+}
+.play-again-btn:hover {
+  background: var(--c-accent-hover);
+  outline-color: ${ca('accent', 'b3')};
+  filter: drop-shadow(0 0 9px ${ca('accent', '8c')});
+}
 
 /* ---- Locked screen ---- */
 .locked-card {

@@ -275,8 +275,17 @@ function snakeDeepLinkDifficulty() {
 }
 
 /* ---- Snake — Wrapper (mode selector + gameplay) ---- */
-function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
-  const [difficulty, setDifficulty] = useState(snakeDeepLinkDifficulty);
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, playMode, band }) {
+  /* #207 — Snake's only play mode is ARCADE, and the arcade band picker on the
+     pre-game screen already asks Easy / Normal / Hard. Landing on Snake's own
+     "Choose Difficulty" screen straight afterwards asked the same question a
+     second time, in different words, having thrown the first answer away.
+     The two vocabularies are identical (ARCADE_BAND_IDS is exactly
+     ['easy','normal','hard']), so the band IS the difficulty: take it and skip
+     the chooser. Free play, which arrives with no band, still gets it. */
+  const bandDifficulty = playMode === 'arcade' && ARCADE_BAND_IDS.indexOf(band) !== -1
+    ? band : null;
+  const [difficulty, setDifficulty] = useState(bandDifficulty || snakeDeepLinkDifficulty);
   const diffRef = useRef(difficulty);
   diffRef.current = difficulty;
   // This effect sends the player back to the chooser on a New Game. It must NOT
@@ -288,6 +297,10 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) 
 
   useEffect(() => {
     if (!diffMounted.current) { diffMounted.current = true; return; }
+    /* A New Game returns to the chooser — unless the band already answered
+       the question, in which case "New Game" means another run at that band,
+       not a fresh interrogation. */
+    if (bandDifficulty) { setDifficulty(bandDifficulty); return; }
     if (diffRef.current !== null) {
       setDifficulty(null);
     }

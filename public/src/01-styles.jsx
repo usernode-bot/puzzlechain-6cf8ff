@@ -302,6 +302,12 @@ body {
   .prr-meta { width: 100%; padding-left: 1.7rem; justify-content: flex-start; }
 }
 .profile-id h2 { overflow-wrap: anywhere; }
+.bounce-start-btn {
+  pointer-events: auto;
+  min-height: 44px; padding: 0 1.4rem; margin-top: 0.35rem;
+  font-size: 0.95rem; font-weight: 700;
+}
+.bounce-start-hint { font-size: 0.75rem; color: ${C.muted}; }
 /* Profile "Connections" section — Friends entry, shown on mobile only. */
 .account-connection-row {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -2147,7 +2153,9 @@ ${emitTapHighlightRules()}
   justify-content: center;
   gap: 0.5rem;
   z-index: 5;
-  cursor: pointer;
+  /* #211 — the backdrop is INERT so a finger reaches the canvas underneath,
+     which is what aims the paddle and launches. Only the button takes input. */
+  pointer-events: none;
   color: ${C.text};
   font-size: 0.9rem;
   text-align: center;

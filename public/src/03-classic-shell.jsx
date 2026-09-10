@@ -288,8 +288,22 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
       const { ok, status, body } = await api(`${roomBase}/rooms/${code}/join`, { method: 'POST' });
       setBusy(false);
       if (ok) onPlay('online', { roomAction: 'join', roomId: code, myPlayerNum: (body && body.yourPlayerNum) || 2 });
+      /* #200 — a 409 that names YOUR OWN seat is a rejoin, not an error.
+
+         #145 taught the server to answer "that is your own room" with the room
+         and your seat number, precisely so this could offer a way back in. The
+         client never used it: every 409 rendered "Room is full or you created
+         it" — which is, word for word, the dead end #145's own comment says it
+         was fixing. So the server half shipped and the client half did not, and
+         a player who left their own match could not get back into it in ANY of
+         the seven online games. */
+      else if (status === 409 && body && (body.ownRoom || body.yourPlayerNum)) {
+        onPlay('online', { roomAction: 'join', roomId: code, myPlayerNum: body.yourPlayerNum || 1 });
+      }
       else if (status === 404) setError('Room not found. Check the code.');
-      else if (status === 409) setError('Room is full or you created it.');
+      // "or you created it" is gone: your own room is a rejoin now, so a 409
+      // that reaches here really is somebody else's full or finished room.
+      else if (status === 409) setError('That room is full or already finished.');
       else setError('Could not join. Try again.');
     }
   };

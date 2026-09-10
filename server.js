@@ -4792,6 +4792,36 @@ app.post('/api/mancala/rooms', async (req, res) => {
 app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
   const { roomId } = req.params;
   try {
+    /* #200 — RECOGNISE A PLAYER WHO IS ALREADY IN THIS ROOM, before trying to
+       seat them as a newcomer.
+
+       The insert-only version below could only match a room that was still
+       `waiting` with an empty seat 2, so a player who dropped out of an ACTIVE
+       match and typed their own code again fell through to the error branch and
+       was told "Room is already full or finished" — by their own room. There
+       was no way back into a game in progress at all.
+
+       This mirrors what /api/classic/:gameId/rooms/:roomId/join has done since
+       #145; mancala keeps its own table and its own routes (see roomApiBase),
+       and this is one the accommodation had not caught up on. Deliberately not
+       gated on status: rejoining a finished room shows you the final board,
+       which is a better answer than an error. */
+    const existing = await pool.query('SELECT * FROM mancala_rooms WHERE id = $1', [roomId]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    const cur = existing.rows[0];
+    const mySeat = cur.player1_id === req.user.id ? 1 : cur.player2_id === req.user.id ? 2 : 0;
+    if (mySeat === 1) {
+      // Same shape the classic route returns, so the shared picker can offer
+      // Rejoin rather than rendering a dead end.
+      return res.status(409).json({
+        error: 'That\'s your own room — rejoin it instead of joining',
+        ownRoom: true,
+        yourPlayerNum: 1,
+        room: shapeRoom(cur),
+      });
+    }
+    if (mySeat === 2) return res.json({ ...shapeRoom(cur), yourPlayerNum: 2 });
+
     const { rows } = await pool.query(
       `UPDATE mancala_rooms
          SET player2_id = $1, player2_name = $2, status = 'active', last_move_at = now()
@@ -4800,14 +4830,8 @@ app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
        RETURNING *`,
       [req.user.id, req.user.username || null, roomId]
     );
-    if (rows.length === 0) {
-      const existing = await pool.query('SELECT id, status, player2_id, player1_id FROM mancala_rooms WHERE id = $1', [roomId]);
-      if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
-      const r = existing.rows[0];
-      if (r.player1_id === req.user.id) return res.status(409).json({ error: 'You created this room — share the code with a friend' });
-      return res.status(409).json({ error: 'Room is already full or finished' });
-    }
-    res.json(shapeRoom(rows[0]));
+    if (rows.length === 0) return res.status(409).json({ error: 'Room is already full or finished', full: true });
+    res.json({ ...shapeRoom(rows[0]), yourPlayerNum: 2 });
   } catch (err) {
     console.error('[mancala] join room failed:', err.message);
     res.status(500).json({ error: 'Failed to join room' });

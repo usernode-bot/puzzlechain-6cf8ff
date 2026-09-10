@@ -1377,6 +1377,21 @@
       "expectSelector": ".cw-board canvas.cw-canvas"
     },
     {
+      "name": "Diamond Rush names its target on the HUD",
+      "path": "/?game=diamondrush",
+      "expectText": "Target"
+    },
+    {
+      "name": "Diamond Rush shows how far there is to go",
+      "path": "/?game=diamondrush",
+      "expectText": "more points in"
+    },
+    {
+      "name": "Diamond Rush story rung carries its own target",
+      "path": "/?game=diamondrush&pmode=story&band=3&play=1",
+      "expectText": "1200"
+    },
+    {
       "name": "Diamond Rush gem board is a canvas",
       "path": "/?game=diamondrush",
       "expectSelector": ".dr-grid canvas.dr-canvas"

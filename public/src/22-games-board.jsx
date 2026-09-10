@@ -870,6 +870,21 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
     });
     setEnding(false);
   };
+  /* #145 gave a live match a way out — before it, the only exit was to abandon
+     the match and let the 48h turn timer settle it. It concedes through the
+     existing guarded forfeit endpoint, which rates the match exactly once on
+     the active→finished transition and is idempotent.
+
+     #201 moved WHERE it is offered. It was a rose-outlined button eleven pixels
+     under the board, directly beneath cells the player taps; it is published
+     into the ☰ sheet's "This match" group now (see useCgShellAction). Passing
+     null while the room is not active withdraws it, so a finished match stops
+     offering to forfeit itself. */
+  useCgShellAction(room && room.status === 'active' ? {
+    id: 'endgame', danger: true, disabled: ending,
+    label: ending ? 'Ending…' : '🏳️ End game',
+    onSelect: () => endGame(false),
+  } : null);
   const { secs, fmt } = useTimer(!!(room && room.status === 'active'));
   const secsRef = useRef(0); secsRef.current = secs;
   const movesRef = useRef(0);
@@ -948,15 +963,6 @@ function BoardOnlineRoom({ gameId, roomId, myPlayerNum, onWin, onStepChange }) {
         ) : null;
       })()}
       <View st={st} myPlayerNum={myPlayerNum} isMyTurn={isMyTurn} submit={submit} />
-      {/* #145 — there was NO way to end a match once it started; the only exit
-          was to abandon it and let the 48h turn timer settle it. Concedes
-          through the existing guarded forfeit endpoint, which rates the match
-          exactly once on the active→finished transition and is idempotent. */}
-      {room.status === 'active' && (
-        <button className="brd-endgame" onClick={() => endGame(false)} disabled={ending}>
-          {ending ? 'Ending…' : '🏳️ End game'}
-        </button>
-      )}
     </div>
   );
 }

@@ -251,6 +251,28 @@ Checkers and Gomoku only ever played at full depth.
   `gameModeOpts` like `ChutesLaddersGame` does. **Don't re-add a per-game
   picker** — a game that needs something the shared picker lacks should
   declare it (see `variantPicker`, `roomApiBase`).
+- **A live match's destructive control lives in the ☰ sheet, not under the
+  board.** "🏳️ End game" used to sit eleven pixels below the board in both
+  `MancalaOnlineGame` and `BoardOnlineRoom`, directly beneath the pits/cells
+  a player taps — and for a Mancala seat 2 or a flipped board there is no
+  "safe" side, because whichever row is yours is the one you tap (#201). The
+  game publishes it into the sheet's "This match" group with
+  **`useCgShellAction`** (`03-classic-shell.jsx`) instead: the game is
+  ClassicShell's `children`, so it cannot pass a `sheetSections` entry, and
+  this context is the channel. Two rules come with it — the hook's effect
+  deps are the button's LOOK (label, disabled) and the handler is called
+  through a ref, because `onSelect` closes over live state and gets a fresh
+  identity every render; and the Menu tab now exists whenever there is
+  EITHER a `menuConfig` or a published action, so a shell without a menu
+  cannot swallow one. Publishing `null` (match not active) withdraws it, so
+  a finished match stops offering to forfeit itself. The waiting-room
+  "Close this room" button stays inline: that screen has no board to mis-tap.
+- **`?room=<code>&seat=1|2`** enters a live online match directly. Entering
+  one was otherwise possible ONLY by tapping a your-turn card on Home, so no
+  proposal check and no before/after screenshot could reach the in-match
+  chrome at all. It is checked before the `modeSelect` branch, like
+  `?result=1` and `?pmode=`. `?demo=yourturn` re-arms active checkers room
+  `DEMOYT` with the viewer as player 2, which is what the checks pair it with.
 - **`roomApiBase`** is the whole accommodation for Mancala's older room
   routes (`/api/mancala/rooms`, its own table): the flow, the copy and the
   error handling stay shared. Create responses are read as

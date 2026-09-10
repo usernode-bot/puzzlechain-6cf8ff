@@ -1352,6 +1352,21 @@
       "expectSelector": "canvas.rv-canvas"
     },
     {
+      "name": "Concede lives in the game menu, not under the board",
+      "path": "/?demo=yourturn&game=checkers&room=DEMOYT&seat=2&sheet=menu",
+      "expectSelector": ".cg-sheet.open .cg-sheet-action.danger"
+    },
+    {
+      "name": "Online match menu offers End game",
+      "path": "/?demo=yourturn&game=checkers&room=DEMOYT&seat=2&sheet=menu",
+      "expectText": "End game"
+    },
+    {
+      "name": "Room deep link enters a live online match",
+      "path": "/?demo=yourturn&game=checkers&room=DEMOYT&seat=2",
+      "expectSelector": ".cg-shell canvas.ck-canvas"
+    },
+    {
       "name": "Gomoku board is a canvas (confirm bar stays)",
       "path": "/?game=gomoku&mode=2p",
       "expectSelector": "canvas.gmk-canvas"

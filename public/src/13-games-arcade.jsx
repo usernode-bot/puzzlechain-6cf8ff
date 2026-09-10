@@ -1095,12 +1095,36 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       { val: bigC, lbl: 'Best cascade' }, { val: bestCombo, lbl: 'Best combo' },
     ]),
     cgLeaderboardSection('diamondrush'),
-    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
+    cgRulesSection([`WIN: reach ${TARGET} points within ${START_MOVES} moves. Falling short is a loss, however high you scored.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
-        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
+        <CgStatus items={[{ l: 'Score', v: `${score}` }, { l: 'Target', v: `${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
+        {/* #209 — the run's progression, off the REAL win condition rather
+            than a number invented for the HUD: finish above TARGET before
+            START_MOVES runs out, which is exactly what `finish(sc, win, mv)`
+            decides on. Score and Target are their own pills now (they were one
+            "340/800" pill, which reads as a score, not as a goal), and the bar
+            plus the line under it say how far there is to go and whether the
+            moves can still get you there. Both story and arcade have a real
+            target — free play falls back to the same 800/18 the game has
+            always used — so this renders in every mode. */}
+        <CuiBar height={36} build={(W) => {
+          const pad = Math.floor(W * 0.06);
+          const bw = Math.max(20, W - pad * 2);
+          const reached = score >= TARGET;
+          const left = Math.max(0, TARGET - score);
+          return [
+            { id: 'dr-meter', kind: 'meter', r: [pad, 3, bw, 9], p: TARGET > 0 ? score / TARGET : 0, done: reached,
+              twinLabel: `Progress ${score} of ${TARGET} points` },
+            { id: 'dr-goal', kind: 'label', r: [0, 16, W, 18], font: 11.5,
+              label: reached
+                ? `🎉 Target reached — ${moves} ${moves === 1 ? 'move' : 'moves'} left to build on it`
+                : `${left} more ${left === 1 ? 'point' : 'points'} in ${moves} ${moves === 1 ? 'move' : 'moves'}`,
+              color: reached ? PAL.emerald : PAL.muted },
+          ];
+        }} />
         <CuiBar height={44} build={(W) => {
           const br = cuiRow(Math.floor(W * 0.08), 0, Math.floor(W * 0.84), 40, 3);
           return ['hint', 'shuffle', 'extraTime'].map((type, i) => ({

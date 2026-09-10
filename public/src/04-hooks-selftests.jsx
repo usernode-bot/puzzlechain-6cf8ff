@@ -1705,10 +1705,47 @@ function cuiDrawLabel(ctx, c) {
   ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, y + h / 2, w - 4);
 }
 
+/* A progress meter: a track with a fill, `p` in 0..1. Colours resolve at DRAW
+   time from PAL (never from a colour captured in build()), so a theme flip
+   repaints it correctly — the same rule the canvas palette note in CLAUDE.md
+   states. `done` swaps accent for emerald: a bar that has reached its goal
+   should say so without needing a second label to explain it. */
+function cuiDrawMeter(ctx, c) {
+  const [x, y, w, h] = c.r;
+  const p = Math.max(0, Math.min(1, Number(c.p) || 0));
+  const r = Math.min(h / 2, 6);
+  const path = (px, py, pw, ph) => {
+    ctx.beginPath();
+    if (pw <= 0) return;
+    if (ctx.roundRect) { ctx.roundRect(px, py, pw, ph, Math.min(r, pw / 2)); return; }
+    const rr = Math.min(r, pw / 2, ph / 2);
+    ctx.moveTo(px + rr, py);
+    ctx.arcTo(px + pw, py, px + pw, py + ph, rr);
+    ctx.arcTo(px + pw, py + ph, px, py + ph, rr);
+    ctx.arcTo(px, py + ph, px, py, rr);
+    ctx.arcTo(px, py, px + pw, py, rr);
+    ctx.closePath();
+  };
+  path(x, y, w, h);
+  ctx.fillStyle = PAL.well || PAL.card;
+  ctx.fill();
+  const fw = Math.round(w * p);
+  if (fw > 0) {
+    path(x, y, fw, h);
+    ctx.fillStyle = c.done ? PAL.emerald : PAL.accent;
+    ctx.fill();
+  }
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = PAL.border;
+  path(x, y, w, h);
+  ctx.stroke();
+}
+
 function cuiDrawControls(ctx, controls, pressedId) {
   for (const c of controls) {
     if (c.noDraw) continue; // twin-only entry (prose the draw pass renders itself)
     if (c.kind === 'pill') cuiDrawPill(ctx, c);
+    else if (c.kind === 'meter') cuiDrawMeter(ctx, c);
     else if (c.kind === 'label') cuiDrawLabel(ctx, c);
     else cuiDrawButton(ctx, c, pressedId === c.id);
   }

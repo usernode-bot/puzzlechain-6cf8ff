@@ -2703,7 +2703,30 @@ app.get('/api/daily', async (req, res) => {
           );
         }
       }
-      // The badge itself, on the same guarded insert the live award uses.
+      /* AND THE LOCKED HALF HAS TO BE ASSERTED TOO.
+
+         The point of this collection screen is an EARNED badge sitting beside
+         LOCKED ones, so the fixture has to be able to say a ladder is
+         unfinished — not merely decline to finish it. On a database that is
+         never reset, "unfinished" is not a state you can assume: one
+         story_complete row left behind by any earlier session renders the
+         locked example as earned instead, and the check that asserts on it
+         fails with nothing in its own proposal to explain why. Same rule as
+         the bands above — say what you mean, do not add to what is there. */
+      const unfinishedLadders = ['minefinder', 'cratepush'];
+      await pool.query(
+        `DELETE FROM user_achievements
+          WHERE user_id = $1 AND type = 'story_complete'
+            AND metadata->>'gameId' = ANY($2::text[])`,
+        [req.user.id, unfinishedLadders]
+      );
+      // cratepush is the never-started example (minefinder is the one rung
+      // short of done, seeded above), so it must have no progress at all.
+      await pool.query(
+        `DELETE FROM game_progress WHERE user_id = $1 AND game_id = 'cratepush'`,
+        [req.user.id]
+      );
+      // The earned badge itself, on the same guarded insert the live award uses.
       await pool.query(
         `INSERT INTO user_achievements (user_id, type, game_id, metadata)
          SELECT $1, 'story_complete', 'sudoku', $2::jsonb

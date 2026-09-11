@@ -1393,6 +1393,16 @@ reasons nothing in its own proposal could explain. Both now delete the bands
 above the depth they are claiming before inserting. Any new fixture that seeds
 a COUNT of something owes the same treatment.
 
+**The LOCKED half of a fixture is state too.** `demo=storybadges` exists to put
+an earned badge beside locked ones, so it has to be able to say a ladder is
+unfinished rather than merely decline to finish it — one leftover
+`story_complete` row renders the locked example as earned, and the check
+asserting on it fails with nothing in its own proposal to explain why. It now
+clears the `story_complete` achievement AND the progress rows for its two
+unfinished examples (`minefinder`, one rung short; `cratepush`, never started)
+before seeding the finished one. If a check asserts that something is ABSENT or
+UNEARNED, the fixture has to make it so.
+
 ### New deep links
 
 `?result=1` mounts a game and opens a representative results card over its

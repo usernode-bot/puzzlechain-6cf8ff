@@ -733,14 +733,23 @@ function App() {
          replayable at all. `arcadeReplaySeed` is set when the player picked a
          past run out of their history; a fresh Play rolls a new one. */
       if (playMode === 'arcade') {
-        const seed = beginArcadeRun(arcadeReplaySeed);
+        /* #196 — a RESUMED arcade run is the same run, so it reopens with the
+           seed it was dealt and the anchor it was already given. Rolling a
+           fresh seed here would hand the player a different board than the one
+           their saved position belongs to, and a second /start would anchor a
+           run the finish is not going to claim. `arcadeReplaySeed` (history
+           replay) still wins, because that IS asking for a different run. */
+        const resumeRec = practiceMode ? null : readRunSave(game.id, 'arcade', arcadeBandId);
+        const resumeSeed = arcadeReplaySeed == null && resumeRec && Number.isFinite(resumeRec.seed)
+          ? resumeRec.seed : null;
+        const seed = beginArcadeRun(arcadeReplaySeed != null ? arcadeReplaySeed : resumeSeed);
         /* Claim the run server-side so the finish has a clock it did not get
            from us. Fire-and-forget on purpose: the board must not wait on a
            request. A run that never gets an id still plays and still lands in
            the player's history — it just settles as unverified, which is the
            right outcome for a run the server never saw begin. */
-        arcadeRunIdRef.current = null;
-        if (authOk) {
+        arcadeRunIdRef.current = resumeSeed != null && resumeRec.runId ? resumeRec.runId : null;
+        if (authOk && arcadeRunIdRef.current == null) {
           api(`/api/arcade/${game.id}/start`, {
             method: 'POST',
             body: JSON.stringify({ band: arcadeBandId, seed }),
@@ -1022,6 +1031,67 @@ function App() {
     if (q.blockedGameId === gameId) q.blockedGameId = null;
   };
 
+  /* The story/arcade half of resume (#187 / #196). Device-local, never the
+     attempt row — see the note in renderGameBody.
+
+     Three rules, each of which exists because of something that would
+     otherwise go wrong:
+
+     - NOTHING IS SAVED UNTIL A MOVE IS MADE. A save of an untouched board is
+       worth nothing and is actively harmful: proposal checks mount story
+       boards to assert on their FRESH state, and a save written by one of them
+       would hydrate into the next and change the board it was asserting on.
+     - THE FINISH GUARD IS THE SAME ONE THE DAILY USES. handleWin/handleLose
+       call cancelProgressSave() before anything else, and useAutosave flushes
+       again on unmount — without honouring that flag a trailing flush would
+       write the save back after the finish had cleared it, and the next visit
+       would resume a run that was already over.
+     - AN ARCADE RUN RECORDS ITS SEED AND ITS RUN ID. A story rung rebuilds the
+       same board from (game, band) on any day, so it needs neither; an arcade
+       board comes from the run's own seed, and its finish is checked against
+       the anchor /api/arcade/:id/start stamped. Resume both or the run comes
+       back as a different board, settling unverified. */
+  const saveLocalRun = (progress, steps, secs) => {
+    const g = currentGame;
+    if (!g || practiceMode) return;
+    if (playMode !== 'story' && playMode !== 'arcade') return;
+    if (saveQueueRef.current.blockedGameId === g.id) return;
+    if (!(steps > 0)) return;
+    const band = playMode === 'arcade' ? arcadeBandId : storyBand;
+    writeRunSave(g.id, playMode, band, {
+      v: 1,
+      progress,
+      steps,
+      elapsedSecs: secs,
+      savedAt: Date.now(),
+      seed: playMode === 'arcade' ? currentArcadeSeed() : null,
+      runId: playMode === 'arcade' ? arcadeRunIdRef.current : null,
+    });
+  };
+
+  // Dropped when the run ends and at the four deliberate start-fresh moments,
+  // which is what playAgainKey already marks.
+  const dropLocalRun = (gameId, mode, band) => {
+    if (mode !== 'story' && mode !== 'arcade') return;
+    clearRunSave(gameId, mode, band);
+  };
+
+  /* Read ONCE per (game, mode, band) — and again when playAgainKey moves,
+     because that is the signal that a fresh run was asked for and the record
+     has just been dropped. The games read savedProgress in their useState
+     initialisers, so what matters is the value on the render that mounts
+     them. */
+  const resumeDemoSeeded = useRef(false);
+  if (!resumeDemoSeeded.current) { resumeDemoSeeded.current = true; seedResumeDemo(offset); }
+
+  const localRunProgress = React.useMemo(() => {
+    if (!currentGame || practiceMode) return null;
+    if (playMode !== 'story' && playMode !== 'arcade') return null;
+    const band = playMode === 'arcade' ? arcadeBandId : storyBand;
+    return hydrateRunSave(readRunSave(currentGame.id, playMode, band), offset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentGame && currentGame.id, playMode, arcadeBandId, storyBand, practiceMode, playAgainKey, offset]);
+
   const handleSaveProgress = (progress, steps, secs) => {
     if (!currentGame) return;
     // #122 — remember the latest snapshot even for guests / blocked queues, so
@@ -1215,6 +1285,8 @@ function App() {
        the shell decides what that means in the mode it was opened in. */
     if (playMode === 'story') {
       const bandIdx = typeof storyBand === 'number' ? storyBand : 0;
+      // The run is over: its local resume record is done with (#187).
+      dropLocalRun(currentGame.id, 'story', bandIdx);
       const clearBody = await handleBandCleared(bandIdx, { score, steps, timeSecs });
       const total = (clearBody && clearBody.total) || (storyProgress[currentGame.id] || {}).total || 0;
       // Issue #183 — the ladder-completion badge. Only a FRESH award pops the
@@ -1232,6 +1304,7 @@ function App() {
     }
     if (playMode === 'arcade') {
       const band = arcadeBandId;
+      dropLocalRun(currentGame.id, 'arcade', band);
       const { ok, body } = await api(`/api/arcade/${currentGame.id}/finish`, {
         method: 'POST',
         body: JSON.stringify({
@@ -1481,6 +1554,8 @@ function App() {
           }),
         }).catch(() => {});
       }
+      dropLocalRun(currentGame.id, playMode,
+        playMode === 'arcade' ? arcadeBandId : storyBand);
       setLoseData({
         steps, timeSecs, score: lostScore, finalScore: lostScore,
         share: meta && meta.share, answer: meta && meta.answer,
@@ -1618,6 +1693,13 @@ function App() {
   };
 
   const playAgain = () => {
+    /* A deliberate restart, so the local resume record goes with it — without
+       this the remount would hydrate straight back into the run that just
+       ended (#187). */
+    if (currentGame) {
+      dropLocalRun(currentGame.id, playMode,
+        playMode === 'arcade' ? arcadeBandId : storyBand);
+    }
     setWinData(null);
     setLoseData(null);
     setReviewMode(false);
@@ -1793,15 +1875,22 @@ function App() {
       band: playMode === 'arcade' ? arcadeBandId : playMode === 'story' ? storyBand : null,
       onBandCleared: playMode === 'story' ? handleBandCleared : undefined,
     };
-    /* ONLY A DAILY RESUMES. The progress row is the daily attempt row — it is
-       keyed by (user, game, UTC day) and exists only once /start has claimed
-       the day. A story or arcade run has no such row, so saving into it 409s
-       (a console error, which trips the no-console-errors check) and READING
-       from it is worse: a half-finished daily board would hydrate into a story
-       rung that is supposed to be a fixed, retryable deal. Neither mode wants
-       resume anyway — a story rung is stable by seed, so restarting it costs
-       nothing, and an arcade run is meant to be thrown away. */
+    /* ONLY A DAILY RESUMES *INTO THE ATTEMPT ROW*. That row is keyed by
+       (user, game, UTC day) and exists only once /start has claimed the day, so
+       a story or arcade run saving into it 409s (a console error, which trips
+       the no-console-errors check) and READING from it is worse: a
+       half-finished daily board would hydrate into a story rung that is
+       supposed to be a fixed, retryable deal.
+
+       Every word of that is about the SERVER, and none of it was ever a reason
+       for a story rung to lose ten minutes of work to a reload (#187 / #196) —
+       which is exactly what happened, because with both props null the game had
+       nowhere to write anything down. Story and arcade now resume from a
+       DEVICE-LOCAL record instead, so the attempt row is untouched and the
+       twenty-odd game components need no changes: they already know how to
+       hydrate from savedProgress and to write through onSaveProgress. */
     const resumable = playMode === 'daily' && !practiceMode;
+    const localResumable = (playMode === 'story' || playMode === 'arcade') && !practiceMode;
     switch (currentGame.shell) {
       case 'self':
         // Full-screen, gesture-first game that renders its own ClassicShell.
@@ -1937,8 +2026,10 @@ function App() {
               }}
               onMoveTile={logsOwnMoves && !practiceMode ? recordDailyMove : undefined}
               offset={offset}
-              savedProgress={resumable ? progressFor(attempts[currentGame.id]) : null}
-              onSaveProgress={resumable ? handleSaveProgress : null}
+              savedProgress={resumable ? progressFor(attempts[currentGame.id])
+                : localResumable ? localRunProgress : null}
+              onSaveProgress={resumable ? handleSaveProgress
+                : localResumable ? saveLocalRun : null}
               resetKey={playAgainKey}
             />
           </div>

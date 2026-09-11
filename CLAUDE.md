@@ -1531,6 +1531,63 @@ unfinished examples (`minefinder`, one rung short; `cratepush`, never started)
 before seeding the finished one. If a check asserts that something is ABSENT or
 UNEARNED, the fixture has to make it so.
 
+### Story and arcade resume from a DEVICE-LOCAL record (#187 / #196)
+
+"Only a daily resumes" was a rule about the daily ATTEMPT ROW, and it was read
+as a rule about players keeping their work. `savedProgress`/`onSaveProgress`
+are that row: a story run writing into it 409s, and reading from it would
+hydrate a half-finished daily into a rung meant to be a fixed, retryable deal.
+Both reasons are about the SERVER. Neither was ever a reason for a story rung
+to lose ten minutes of deduction to a reload — which is what it did, with both
+props null and nothing written down anywhere. Reported as a crash (#187, P0)
+and as "spontaneous reloads" (#196); measured, Sudoku Story L4 went from
+`Steps 1 / Filled 41 / 00:08` to `Steps 0 / Filled 40 / 00:01` across a plain
+reload.
+
+Story and arcade now get `savedProgress`/`onSaveProgress` backed by
+**localStorage**, one record per `(game, mode, band)`
+(`readRunSave`/`writeRunSave`/`clearRunSave`/`hydrateRunSave` in
+`05-core-lib.jsx`). **No game component changed** — they already know how to
+hydrate from `savedProgress` and write through `onSaveProgress`; those props
+just had nothing to point at outside a daily. The attempt row is untouched, so
+the 409 rule stands exactly as before.
+
+Four things hold it together, each for a concrete reason:
+
+- **The board has to come back IDENTICAL**, so the two modes record different
+  things. A story rung's seed has no day component, so it rebuilds the same
+  board on any day from any device — nothing extra to store. An arcade board
+  comes from the RUN's seed, so the record carries the seed **and** the run id
+  it was anchored with, and `startRun` reopens with both; roll a fresh seed and
+  the player gets a different board than their saved position belongs to, and a
+  second `/start` anchors a run the finish will not claim.
+- **Nothing is saved until a move is made** (`steps > 0`). A save of an
+  untouched board is worthless, and worse: proposal checks mount story boards
+  to assert on their FRESH state, and a save written by one would hydrate into
+  the next.
+- **The finish guard is the daily's guard.** `saveLocalRun` honours
+  `saveQueueRef.current.blockedGameId`, which `cancelProgressSave()` sets at the
+  top of `handleWin`/`handleLose` — otherwise `useAutosave`'s unmount flush
+  writes the record back *after* the finish cleared it, and the next visit
+  resumes a run that was already over. The record is dropped on every ending and
+  in `playAgain`.
+- **`dayNum` is stamped on the way out.** The games' gate is
+  `savedProgress.dayNum === utcDayNum(offset)` — a same-BOARD check that a daily
+  expresses as a same-day one. A story or arcade board is not day-scoped, so
+  stamping says "yes, this is for the board you are about to build" in the only
+  vocabulary twenty game components already speak.
+
+Scoped to the `shell: 'daily'` branch of `renderGameBody`, which is where both
+reported games live (Sudoku and Word Search) and where a saved position IS the
+board you left. The classic-shell story games are real-time or score-attack, so
+a mid-run snapshot is a much larger job and a separate decision.
+
+`?resumedemo=1` writes the same record a real run leaves, so a part-played
+board is reachable by URL. It is deliberately generic — step count and clock
+with an empty progress object — so it works on any game; a board that does not
+recognise the progress falls back to a fresh deal and still comes up mid-run on
+the clock, which is the thing being asserted.
+
 ### A lost run in a MODE has to be able to stay in it (#213)
 
 The win card has carried a mode action since #176 — "📖 Back to the levels" /
@@ -1733,6 +1790,34 @@ TouchList and a TouchList is an object, so `e.touches ? …` is true even when
 EMPTY — which is exactly what touchend carries. Nothing hit it before because
 touchend was only ever a bare "fire" signal that never asked where the finger
 was; aim-on-tap asks.
+### Mancala's sowing, and where a score belongs (#202)
+
+**The sowing was never instant.** Every stone has been animated one at a time
+since the start; the gap was a flat **80 ms**, which is under the ~100 ms a
+person needs to register a discrete event — so a four-stone move was over in
+320 ms and read as one jump rather than four placements. That is what the
+report calls "turbo".
+
+A flat number cannot fix it, because the pits are not all the same size:
+whatever reads well for four stones drags for fifteen. `mncSowDelay(n)` derives
+the gap from the COUNT — 170 ms each for a small handful, tightening as the
+handful grows, bounded at both ends. 4 stones take 680 ms, 8 take 1100 ms,
+15 take 1100 ms. **`MNC_SOW_BUDGET` is the single knob** — it is the length of
+a typical move; the two bounds only stop the extremes being silly.
+`cgReducedMotion()` collapses the wait to zero: the stones still land in order,
+they just stop waiting to be watched.
+
+**The store counts moved to the HUD.** They were drawn in the middle of each
+store, directly over the seed pile they were counting — the number obscured the
+thing it described and the thing it described obscured the number. The store
+now holds seeds and a name; the score is a pill above the board in all three
+modes (bot, local, online), where every other score in this app lives.
+
+In the bot HUD the pill they replace was **"ZK"**, a verified/unverified
+read-out with a tick, a cross and a lightning bolt. #224 removed every other
+one of those at an admin's request and this was a third surface nobody had
+spotted. The verification itself is untouched — it is the READ-OUT that goes,
+exactly as in #224.
 
 ### New deep links
 

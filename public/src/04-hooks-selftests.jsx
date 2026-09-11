@@ -890,6 +890,28 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #202 — how long a stone takes to be sown. The reported "instant turbo"
+     was a flat 80 ms gap, under the ~100 ms a person needs to register a
+     discrete event, so four stones read as one jump. The shape that fixes it
+     has to hold at both ends: generous for a small handful, tightening as the
+     handful grows, and bounded so a big pit is still quick. */
+  check('mancala-sowing', () => {
+    const d4 = mncSowDelay(4), d8 = mncSowDelay(8), d15 = mncSowDelay(15);
+    if (d4 < 100) throw new Error('a small handful must be slow enough to see, got ' + d4);
+    if (!(d4 >= d8 && d8 >= d15)) throw new Error('a bigger handful must not be slower per stone');
+    if (d4 > MNC_SOW_MAX || d15 < MNC_SOW_MIN) throw new Error('the gap must stay inside its bounds');
+    /* A typical move stays inside the budget; the bounds only catch extremes.
+       The slack is `n` because the gap is rounded to whole milliseconds per
+       stone, so n stones can carry up to n ms of rounding. */
+    for (const n of [6, 8, 10, 12, 15]) {
+      if (mncSowDelay(n) * n > MNC_SOW_BUDGET + n) throw new Error(n + ' stones overrun the budget');
+    }
+    // A one-stone move is a move, and a garbage count is not a crash.
+    if (mncSowDelay(1) !== MNC_SOW_MAX) throw new Error('one stone gets the longest gap');
+    if (!(mncSowDelay(0) > 0) || !(mncSowDelay(-3) > 0)) throw new Error('a nonsense count still yields a delay');
+    return true;
+  });
+
   /* #217 — Ludo's tokens are now their own tap targets. The old layout
      stepped each token 5px down-right by its INDEX, which put a lone token
      off-centre and smeared a stack into something no finger can pick apart;
@@ -1108,6 +1130,45 @@ function runClientSelfTests(styleReady) {
       const a = hrSpawnPlan(cfg, seeded(b), cfg.limit);
       const c = hrSpawnPlan(cfg, seeded(b), cfg.limit);
       if (a.length !== c.length) throw new Error('level ' + (b + 1) + ' spawn plan is not deterministic');
+    }
+    return true;
+  });
+
+  /* #187 / #196 — the local resume record for story and arcade runs. These are
+     the properties that keep it from doing harm: it is scoped per (game, mode,
+     band) so two rungs cannot overwrite each other, it refuses to answer for a
+     daily (whose resume is the server's attempt row and must stay that way),
+     and it stamps the day on the way out so the games' same-board gate passes
+     for a board that is not day-scoped. */
+  check('local-run-save', () => {
+    const K = (g, m, b) => runSaveKey(g, m, b);
+    if (K('sudoku', 'story', 3) === K('sudoku', 'story', 4)) throw new Error('two rungs must not share a key');
+    if (K('sudoku', 'story', 3) === K('wordhunt', 'story', 3)) throw new Error('two games must not share a key');
+    if (K('sudoku', 'story', 3) === K('sudoku', 'arcade', 3)) throw new Error('two modes must not share a key');
+    // A daily has a server-side resume and must never be answered from here.
+    if (readRunSave('sudoku', 'daily', null) !== null) throw new Error('a daily must not read a local run save');
+    let wrote = false;
+    try { writeRunSave('sudoku', 'daily', null, { v: 1, progress: { a: 1 } }); wrote = !!localStorage.getItem(K('sudoku', 'daily', null)); } catch (_) {}
+    if (wrote) { try { localStorage.removeItem(K('sudoku', 'daily', null)); } catch (_) {} throw new Error('a daily must not write a local run save'); }
+
+    // Round trip, then clear. Uses a game id nothing else touches.
+    const gid = '__selftest__';
+    try {
+      clearRunSave(gid, 'story', 0);
+      if (readRunSave(gid, 'story', 0) !== null) throw new Error('a cleared save must read back as nothing');
+      writeRunSave(gid, 'story', 0, { v: 1, progress: { grid: [1, 2] }, steps: 7, elapsedSecs: 99, savedAt: Date.now() });
+      const rec = readRunSave(gid, 'story', 0);
+      if (!rec || rec.steps !== 7) throw new Error('a written save must read back');
+      const h = hydrateRunSave(rec, 0);
+      if (h.steps !== 7 || h.elapsedSecs !== 99) throw new Error('hydrate must carry steps and the clock');
+      if (h.dayNum !== utcDayNum(0)) throw new Error('hydrate must stamp today, or every game rejects it');
+      if (!Array.isArray(h.grid)) throw new Error('hydrate must carry the progress through');
+      // An old record is dropped rather than resumed into.
+      writeRunSave(gid, 'story', 0, { v: 1, progress: { grid: [1] }, steps: 1, elapsedSecs: 1, savedAt: Date.now() - RUN_SAVE_MAX_AGE_MS - 1000 });
+      if (readRunSave(gid, 'story', 0) !== null) throw new Error('a stale save must expire');
+      if (hydrateRunSave(null, 0) !== null) throw new Error('nothing hydrates to nothing');
+    } finally {
+      clearRunSave(gid, 'story', 0);
     }
     return true;
   });

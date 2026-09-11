@@ -735,6 +735,131 @@ ${emitTapHighlightRules()}
   border: 2px solid ${C.border}; border-radius: 10px; background: #10131c;
   touch-action: none; max-width: 100%;
 }
+/* ---- Story auto-advance overlay (tally -> banner -> countdown) ---- */
+.adv-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--c-scrim);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 55;
+  /* Bare env() is always 0px inside the platform's app frame — the forwarded
+     custom property is the value that is real there, env() the standalone
+     fallback. */
+  padding:
+    calc(1.25rem + var(--un-safe-inset-top, env(safe-area-inset-top, 0px)))
+    1.25rem
+    calc(1.25rem + var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+/* Banner + countdown phases: a takeover, not a veil (see the JSX comment). */
+.adv-overlay.adv-solid { background: ${ca('bg', 'f0')}; }
+.adv-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 18px;
+  padding: 1.6rem 1.5rem;
+  text-align: center;
+  max-width: 340px;
+  width: 100%;
+  box-shadow: 0 20px 50px var(--c-shadow-lg);
+  animation: advPop 220ms ease-out;
+}
+.adv-tally .adv-tally-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: ${C.text};
+}
+.adv-tally-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: ${C.gold};
+  line-height: 1.15;
+  margin: 0.5rem 0 0.1rem;
+}
+.adv-tally-sub {
+  font-size: 0.85rem;
+  color: ${C.muted};
+}
+.adv-banner {
+  text-align: center;
+  max-width: 420px;
+  width: 100%;
+  animation: advPop 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.adv-banner-game {
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: ${C.muted};
+  margin-bottom: 0.6rem;
+}
+.adv-banner-band {
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: ${C.text};
+}
+.adv-banner-of {
+  font-size: 1rem;
+  color: ${C.muted};
+  margin-top: 0.25rem;
+}
+.adv-note {
+  font-size: 0.9rem;
+  color: ${C.muted};
+  margin-top: 0.8rem;
+  padding: 0.5rem 0.75rem;
+  background: ${ca('accent', '1f')};
+  border-radius: 10px;
+  display: inline-block;
+}
+.adv-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 4rem;
+  font-weight: 800;
+  line-height: 1;
+  color: ${C.accent};
+  animation: advCount 600ms ease-out;
+}
+.adv-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+  width: 100%;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.adv-actions .tappable {
+  width: 100%;
+  border-radius: 12px;
+  padding: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid ${C.border};
+  background: ${C.card};
+  color: ${C.text};
+}
+.adv-actions .tappable.adv-primary {
+  background: ${C.accent};
+  border-color: ${C.accent};
+  color: #fff;
+}
+@keyframes advPop {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes advCount {
+  from { opacity: 0.2; transform: scale(1.35); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 /* ---- Win overlay ---- */
 .win-overlay {
   position: fixed;
@@ -2735,6 +2860,12 @@ ${emitTapHighlightRules()}
   .cnl-roll-btn {
     animation: none !important;
     transition: none !important;
+  }
+  /* Story auto-advance: the tally shows its final number immediately, the
+     banner appears without scaling and the countdown is three plain frames.
+     Timing is unchanged — only the movement goes. */
+  .adv-card, .adv-banner, .adv-count {
+    animation: none !important;
   }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed] { transform: none !important; }

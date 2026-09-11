@@ -237,6 +237,38 @@ function modeSeed(playMode, gameId, band, offset) {
 }
 
 
+/* #185 — the one-line "what changes on this rung" note. Every story ladder
+   ramps the same way (the rungs are a difficulty ladder by construction), so
+   this is a position-on-the-ladder sentence rather than a per-game table: one
+   source, shared by the pre-game band picker and the auto-advance banner, so
+   the two can never describe the same rung differently. `band` is 0-based. */
+function storyBandNote(band, total) {
+  const n = Number(total) || 0;
+  const i = Number(band) || 0;
+  if (n <= 1) return 'One band — clear it to finish the ladder.';
+  if (i <= 0) return 'The gentlest rung — a warm-up for the ladder.';
+  if (i >= n - 1) return 'The final rung — the hardest this ladder gets.';
+  const frac = i / (n - 1);
+  if (frac < 0.34) return 'A step up: a little bigger, a little tighter.';
+  if (frac < 0.67) return 'Mid-ladder: less room for a wasted move.';
+  return 'Near the top: tight margins, no easy openings.';
+}
+
+/* What a whole ladder pays, for the completion card. Mirrors
+   STORY_TOTAL_POINTS / storyBandAward in server.js — the server is still the
+   only thing that AWARDS anything; this recomputes the same sum so the card
+   can name it without a round-trip. Keep the constant and the formula in step
+   with server.js if the ladder is ever rebalanced. */
+const STORY_TOTAL_POINTS = 2000;
+function storyLadderTotal(total) {
+  const n = Number(total) || 0;
+  if (n <= 0) return 0;
+  const denom = (n * (n + 1)) / 2;
+  let sum = 0;
+  for (let b = 0; b < n; b++) sum += Math.round(STORY_TOTAL_POINTS * ((b + 1) / denom));
+  return sum;
+}
+
 // Periodically persist a game's in-progress state so a resumed attempt picks up
 // the exact board, step count, and accumulated timer. `getState()` returns
 // `{ progress, steps, secs }`; it's read through a ref so the interval and the

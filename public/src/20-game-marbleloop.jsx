@@ -2,7 +2,21 @@
    Zuma — frog shooter (Classic, leaderboard)
    ============================================================ */
 const ZUMA_W = 300, ZUMA_H = 400;
-const ZUMA_BALL_R = 11;
+/* #212 — BIGGER MARBLES, and the number is measured rather than picked.
+   ZUMA_DIAM is the chain's spacing, so raising the radius makes the CHAIN
+   longer and it reaches the skull sooner: the size is a difficulty knob
+   whether you meant it to be or not. Chain length as a share of its own track,
+   at the old 11 and at 13:
+
+     free L1  39% -> 46%    story 1  40% -> 47%    story 4  40% -> 46%
+     free L2  51% -> 60%    story 2  47% -> 55%    story 5  35% -> 41%
+     free L3  53% -> 62%    story 3  38% -> 44%    story 6  38% -> 45%
+
+   The tightest board still starts with 38% of its track empty, so nothing
+   becomes unwinnable — and the marble gains about 40% in area, which is the
+   part a player notices. Re-measure (scratch script in the #212 notes) if the
+   levels or the paths are ever retuned. */
+const ZUMA_BALL_R = 13;
 const ZUMA_DIAM = ZUMA_BALL_R * 2 + 2;
 const ZUMA_SHOT_SPEED = 300;
 const FROG_X = 150, FROG_Y = 218;
@@ -142,6 +156,63 @@ function zumaRandColor(numColors, rng) {
   return ZUMA_COLORS_ALL[Math.floor((rng || Math.random)() * numColors)];
 }
 
+/* #212 — WHERE THE SHOT WOULD LAND.
+
+   The trajectory guide has to stop somewhere honest, so it is computed rather
+   than drawn as a fixed-length line: march the ray from the cannon and return
+   the first chain marble it would touch, or the point where it leaves the
+   board. Pure, so `marbleloop-aim` can hold it — and it is the same geometry
+   the shot itself uses (a ball is hit when the centres are within 2R), so the
+   line cannot promise a hit the shot does not make.
+
+   The step is half a radius: fine enough not to tunnel through a marble,
+   coarse enough that a full-length ray is a few dozen iterations. */
+function zumaAimPath(chain, pd, ox, oy, angle, w, h) {
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  const step = ZUMA_BALL_R / 2;
+  const maxSteps = Math.ceil((Math.max(w, h) * 1.5) / step);
+  const r2 = (ZUMA_BALL_R * 2) * (ZUMA_BALL_R * 2);
+  let x = ox, y = oy;
+  for (let i = 1; i <= maxSteps; i++) {
+    x = ox + dx * step * i;
+    y = oy + dy * step * i;
+    if (x < -ZUMA_BALL_R || x > w + ZUMA_BALL_R || y < -ZUMA_BALL_R || y > h + ZUMA_BALL_R) {
+      return { x, y, hit: -1 };
+    }
+    if (pd) {
+      for (let j = 0; j < chain.length; j++) {
+        if (chain[j].dist < 0 || chain[j].dist > pd.totalLen) continue;
+        const pt = zumaPointAtDist(pd, chain[j].dist);
+        const ddx = x - pt.x, ddy = y - pt.y;
+        if (ddx * ddx + ddy * ddy < r2) return { x: pt.x, y: pt.y, hit: j };
+      }
+    }
+  }
+  return { x, y, hit: -1 };
+}
+
+/* #212 — THE SUPPLY BOT.
+
+   "Program the bot to supply the required colour matches when fewer than 5
+   marbles remain." A chain that short can hold colours the cannon is no longer
+   dealing, and then the level cannot be finished at all — you are left firing
+   marbles that match nothing while the last few crawl to the skull. Below
+   ZUMA_SUPPLY_AT the cannon deals only from what is actually still ON the
+   chain, so every marble you are given is one that can clear something.
+
+   It does NOT pick the best colour, only a possible one: which of the
+   remaining colours to fire, and where, is still the player's problem. */
+const ZUMA_SUPPLY_AT = 5;
+
+function zumaSupplyColor(chain, numColors, rng) {
+  const live = [];
+  for (const b of chain) if (live.indexOf(b.color) === -1) live.push(b.color);
+  if (!chain.length || chain.length >= ZUMA_SUPPLY_AT || !live.length) {
+    return zumaRandColor(numColors, rng);
+  }
+  return live[Math.floor((rng || Math.random)() * live.length)];
+}
+
 function zumaCheckMatches(chain, idx) {
   if (chain.length === 0 || idx < 0 || idx >= chain.length) return 0;
   const color = chain[idx].color;
@@ -223,6 +294,22 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
   const chainRef = useRef([]);
   const shotRef = useRef(null);
   const frogAngleRef = useRef(-Math.PI / 2);
+  /* #212 — A TAP AIMS; THE NEXT ONE FIRES.
+
+     A tap used to fire immediately at wherever the finger landed, which on a
+     phone means you find out where you were aiming by watching the marble go
+     there. Same shape as the answer Gomoku already uses for a board too dense
+     to poke at: show the intent, then confirm it. A tap that points somewhere
+     materially different from the current aim RE-AIMS instead of firing
+     (ZUMA_REAIM_RAD), so correcting yourself never costs a marble.
+
+     The MOUSE keeps its old behaviour, because hovering already shows the aim
+     continuously — on that input the hover IS the first tap. `aimed` exists
+     only so the guide can be drawn once an aim has actually been taken rather
+     than sitting on screen from the first frame. */
+  const aimedRef = useRef(false);
+  const [aimed, setAimed] = useState(false);
+  const ZUMA_REAIM_RAD = 0.12;
   const curColorRef = useRef(ZUMA_COLORS_ALL[0]);
   const nxtColorRef = useRef(ZUMA_COLORS_ALL[1]);
   const pathDataRef = useRef(null);
@@ -403,6 +490,36 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
       // Ball loaded in frog
       ctx.beginPath(); ctx.arc(FROG_X, FROG_Y, 8, 0, Math.PI*2);
       ctx.fillStyle = curColorRef.current; ctx.fill();
+      /* #212 — THE TRAJECTORY GUIDE. Drawn only once an aim has been TAKEN, so
+         it is the answer to "where will this go" rather than permanent chrome,
+         and it ends where the shot would actually land — zumaAimPath walks the
+         same 2R test the collision uses, so the line cannot promise a hit the
+         marble does not make. A marker sits on the marble it would strike; a
+         shot that hits nothing simply runs off the board.
+
+         Hardcoded white, like the rest of the frog: intrinsic game art, not
+         chrome, so it does not follow the theme. */
+      if (aimedRef.current && !shotRef.current && !doneRef.current) {
+        const aim = zumaAimPath(chainRef.current, pathDataRef.current,
+          FROG_X, FROG_Y, angle, ZUMA_W, ZUMA_H);
+        ctx.save();
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.moveTo(FROG_X + Math.cos(angle) * 22, FROG_Y + Math.sin(angle) * 22);
+        ctx.lineTo(aim.x, aim.y);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (aim.hit >= 0) {
+          ctx.beginPath();
+          ctx.arc(aim.x, aim.y, ZUMA_BALL_R + 3, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
       // Aim pointer
       ctx.beginPath();
       ctx.moveTo(FROG_X+Math.cos(angle)*20, FROG_Y+Math.sin(angle)*20);
@@ -421,9 +538,9 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
         ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, ZUMA_W, ZUMA_H);
         ctx.font = 'bold 16px "Space Grotesk",system-ui,sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#e2e8f0'; ctx.fillText('Tap to shoot!', ZUMA_W/2, ZUMA_H/2);
+        ctx.fillStyle = '#e2e8f0'; ctx.fillText('Tap to aim, tap again to fire', ZUMA_W/2, ZUMA_H/2);
         ctx.font = '13px "Space Grotesk",system-ui,sans-serif';
-        ctx.fillStyle = '#64748b'; ctx.fillText('Move pointer to aim', ZUMA_W/2, ZUMA_H/2+24);
+        ctx.fillStyle = '#64748b'; ctx.fillText('The dotted line shows where it lands', ZUMA_W/2, ZUMA_H/2+24);
       }
       ctx.restore();
     }
@@ -547,18 +664,42 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
     return () => { alive = false; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [loopRunning, resetKey]);
 
+  /* The branch has to test LENGTH, not existence — #208's rule, and this file
+     had the old version. `e.touches` on a TouchEvent is always a TouchList and
+     a TouchList is an object, so `e.touches ? …` is true even when it is
+     EMPTY, which is exactly what touchend carries: the finger that just lifted
+     is in `changedTouches`. Reading touches[0].clientX there throws. Nothing
+     hit it before because touchend was only ever used as a bare "fire" signal
+     and never asked where the finger was; #212's aim-on-tap asks. */
   const getCanvasCoords = (e, canvas) => {
     const rect = canvas.getBoundingClientRect();
     const sx = ZUMA_W / rect.width, sy = ZUMA_H / rect.height;
-    const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    const cy = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: (cx - rect.left)*sx, y: (cy - rect.top)*sy };
+    const p = (e.changedTouches && e.changedTouches.length) ? e.changedTouches[0]
+      : (e.touches && e.touches.length) ? e.touches[0] : e;
+    return { x: (p.clientX - rect.left)*sx, y: (p.clientY - rect.top)*sy };
   };
 
   const updateAim = e => {
     const c = canvasRef.current; if (!c) return;
     const { x, y } = getCanvasCoords(e, c);
     frogAngleRef.current = Math.atan2(y - FROG_Y, x - FROG_X);
+  };
+
+  /* A TOUCH tap aims; the next one fires. Re-aiming is free: if the tap points
+     somewhere materially different from the current aim it just moves the aim,
+     so correcting yourself never costs a marble. */
+  const touchAimOrFire = (e) => {
+    const c = canvasRef.current; if (!c) return;
+    if (doneRef.current || shotRef.current) return;
+    const { x, y } = getCanvasCoords(e, c);
+    const a = Math.atan2(y - FROG_Y, x - FROG_X);
+    let d = Math.abs(a - frogAngleRef.current) % (Math.PI * 2);
+    if (d > Math.PI) d = Math.PI * 2 - d;
+    if (aimedRef.current && d <= ZUMA_REAIM_RAD) { shoot(); return; }
+    frogAngleRef.current = a;
+    aimedRef.current = true;
+    setAimed(true);
+    cgSound('move');
   };
 
   const shoot = () => {
@@ -579,8 +720,41 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
       color: shotColor,
     };
     curColorRef.current = nxtColorRef.current;
-    nxtColorRef.current = zumaRandColor(lv.colors, playMode ? prand : null);
+    // #212 — below ZUMA_SUPPLY_AT the cannon deals only colours still on the
+    // chain, so the last few marbles are always clearable.
+    nxtColorRef.current = zumaSupplyColor(chainRef.current, lv.colors, playMode ? prand : null);
+    aimedRef.current = false;
+    setAimed(false);
   };
+
+  /* TOUCH IS BOUND NATIVELY, not through React's onTouch* props.
+
+     Two reasons, and the second is the one that matters. React 18 registers
+     touchmove on the ROOT as a PASSIVE listener, so an e.preventDefault()
+     inside an onTouchMove prop does nothing at all — the board was relying on
+     `.zuma-canvas { touch-action: none }` for that and calling preventDefault
+     into the void. And a listener on the element itself is one a test can
+     drive, which matters here because #212 makes touch behave DIFFERENTLY from
+     the mouse (aim, then fire) and that difference is the whole change. */
+  const touchApiRef = useRef({});
+  touchApiRef.current = { updateAim, touchAimOrFire, setAimed };
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      e.preventDefault();
+      touchApiRef.current.updateAim(e);
+      aimedRef.current = true;
+      touchApiRef.current.setAimed(true);
+    };
+    const onEnd = (e) => { e.preventDefault(); touchApiRef.current.touchAimOrFire(e); };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: false });
+    return () => {
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [activeTab]);
 
   const loadLeaderboard = async () => {
     setLbLoading(true); setLbError(false);
@@ -618,10 +792,8 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
           React.createElement('canvas', {
             ref: canvasRef,
             className: 'zuma-canvas',
-            onMouseMove: e => updateAim(e),
+            onMouseMove: e => { updateAim(e); aimedRef.current = true; if (!aimed) setAimed(true); },
             onClick: e => { updateAim(e); shoot(); },
-            onTouchMove: e => { e.preventDefault(); updateAim(e); },
-            onTouchEnd: () => shoot(),
           })
         ),
         React.createElement(CuiBar, { height: 44, build: (W) => ([

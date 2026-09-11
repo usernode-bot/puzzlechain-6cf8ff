@@ -1469,6 +1469,42 @@ with an empty progress object — so it works on any game; a board that does not
 recognise the progress falls back to a fresh deal and still comes up mid-run on
 the clock, which is the thing being asserted.
 
+### Screen transitions (#235)
+
+Navigation only — lobby, pre-game, opponent, the game, the locked day, the
+profile and friends. **Not boards, cells, cards or canvases**: the hosted
+native kit's own fidelity rules forbid animating high-frequency interactions,
+and it fights the tap primitive, which gives its feedback on finger-DOWN
+precisely so nothing has to wait. A card that animates when you tap it feels
+slower, not more native.
+
+**No JavaScript, and nothing remounts.** Each screen root genuinely mounts when
+you navigate to it, so a plain CSS animation on its class is enough. That
+matters: remounting a game at the wrong moment is how a finished 2048 board
+came back as a fresh one (#158/#160), and a transition implemented with a
+changing `key` would do exactly that.
+
+**Two variants, and the difference is not cosmetic.** A running `transform`
+changes what `getBoundingClientRect` reports, and the boards here measure
+themselves at mount (`useFitBox`, `sizeCanvas`). So:
+
+- `.screen-in` — fade plus 6px of travel. Only on screens with **no measured
+  board**: lobby, pre-game, opponent, profile, friends.
+- `.screen-in-fade` — opacity only. `.game-body` and the locked day, both of
+  which host a board that is measured on the frame it appears.
+
+The fill mode is `backwards`, so nothing is left applied afterwards — a
+lingering transform would make the element a containing block for the
+`position: fixed` sheets that open over these screens.
+
+**The in-app Reduced-motion pref now reaches CSS.** It had only ever reached JS
+call sites, because the stylesheet could see the OS media query and not the
+preference; `applyMotionPref()` mirrors it onto `<html data-reduce-motion="1">`.
+The `:root[data-reduce-motion="1"]` block and the `prefers-reduced-motion`
+media query list the same selectors — **add new motion to both**, or a player
+gets it in one place and not the other. `?motion=reduce|full` forces it, the
+way `?theme=` does.
+
 ### New deep links
 
 `?result=1` mounts a game and opens a representative results card over its

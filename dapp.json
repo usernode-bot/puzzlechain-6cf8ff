@@ -567,6 +567,26 @@
       "expectText": "streak"
     },
     {
+      "name": "The lobby arrives with a transition",
+      "path": "/?tab=home",
+      "expectSelector": ".lobby.screen-in"
+    },
+    {
+      "name": "A pre-game screen arrives with a transition",
+      "path": "/?game=nonogram",
+      "expectSelector": ".game-wrap.screen-in"
+    },
+    {
+      "name": "A board fades in rather than moving, so it measures right",
+      "path": "/?game=sudoku&practice=1&sdk=6",
+      "expectSelector": ".game-body.screen-in-fade"
+    },
+    {
+      "name": "Reduced motion in Settings reaches the stylesheet",
+      "path": "/?motion=reduce&settings=1",
+      "expectSelector": "html[data-reduce-motion=\"1\"]"
+    },
+    {
       "name": "Settings sheet opens via ?settings=1",
       "path": "/?settings=1",
       "expectSelector": ".settings-panel"

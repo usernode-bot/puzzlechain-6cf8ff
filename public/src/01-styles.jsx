@@ -3019,7 +3019,55 @@ ${emitTapHighlightRules()}
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
+/* ---- Screen transitions (#235) ----
+   Navigation only: lobby, pre-game, opponent, the game, the locked day, the
+   profile. NOT boards, cells, cards or canvases — the hosted native kit's own
+   fidelity rules forbid animating high-frequency interactions, and it fights
+   the tap primitive, which gives its feedback on finger-DOWN precisely so
+   nothing has to wait. A card that animates when you tap it feels slower.
+
+   Each screen root really does mount when you navigate to it, so this needs no
+   JavaScript and cannot remount anything — which matters here, because
+   remounting a game at the wrong moment is how a finished 2048 board came back
+   as a fresh one (#158/#160).
+
+   TWO variants, and the difference is not cosmetic. A running transform
+   changes what getBoundingClientRect reports, and the boards in this app
+   measure themselves at mount (useFitBox, sizeCanvas). So any screen that
+   hosts a measured board fades ONLY; the rest may also travel a few pixels.
+   The fill mode is BACKWARDS so nothing is left applied afterwards: a
+   lingering transform would make the element a containing block for the
+   position:fixed sheets that open over these screens. */
+@keyframes un-screen-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes un-screen-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.screen-in { animation: un-screen-in 190ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards; }
+.screen-in-fade { animation: un-screen-fade 150ms linear backwards; }
+
+/* The in-app pref, now that the root carries it (#235). Same list as the OS
+   media query below — add new motion to BOTH or a player gets it in one place
+   and not the other. */
+:root[data-reduce-motion="1"] .screen-in,
+:root[data-reduce-motion="1"] .screen-in-fade,
+:root[data-reduce-motion="1"] .cg-sheet,
+:root[data-reduce-motion="1"] .badge-strip-body,
+:root[data-reduce-motion="1"] .badge-chevron,
+:root[data-reduce-motion="1"] .cnl-roll-btn,
+:root[data-reduce-motion="1"] .ng-status.err,
+:root[data-reduce-motion="1"] .ng-status.ok {
+  animation: none !important;
+  transition: none !important;
+}
+:root[data-reduce-motion="1"] .tappable:active,
+:root[data-reduce-motion="1"] .tappable[data-pressed] { transform: none !important; }
+
 @media (prefers-reduced-motion: reduce) {
+  .screen-in, .screen-in-fade { animation: none !important; }
   .cg-sheet { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
   /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)

@@ -875,6 +875,85 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #217 — Ludo's tokens are now their own tap targets. The old layout
+     stepped each token 5px down-right by its INDEX, which put a lone token
+     off-centre and smeared a stack into something no finger can pick apart;
+     the hit test then took the topmost of the draw order, which is simply
+     the highest token number rather than the one that was aimed at. */
+  check('ludo-token-stack', () => {
+    for (const cell of [18, 22, 26]) {          // the whole range the board draws
+      const lone = ludoStackLayout(1, cell);
+      const [lx, ly] = lone.at(0);
+      if (lx !== 0 || ly !== 0) throw new Error('a lone token sits dead centre');
+      if (Math.abs(lone.r - cell * 0.425) > 0.001) throw new Error('a lone token keeps the full radius');
+      for (let n = 2; n <= 4; n++) {
+        const lay = ludoStackLayout(n, cell);
+        const pts = [];
+        for (let j = 0; j < n; j++) pts.push(lay.at(j));
+        for (const [dx, dy] of pts) {
+          if (Math.hypot(dx, dy) + lay.r > cell / 2 + 0.001) {
+            throw new Error('a stack of ' + n + ' spills out of its cell at cell=' + cell);
+          }
+        }
+        let gap = Infinity;
+        for (let a = 0; a < n; a++) {
+          for (let b = a + 1; b < n; b++) {
+            gap = Math.min(gap, Math.hypot(pts[a][0] - pts[b][0], pts[a][1] - pts[b][1]));
+          }
+        }
+        // 5px was the old fixed step; nothing may end up tighter than that.
+        if (gap < 5) throw new Error('a stack of ' + n + ' packs tighter than 5px at cell=' + cell);
+        if (lay.r < 4) throw new Error('a stack of ' + n + ' draws tokens too small to read');
+      }
+    }
+    return true;
+  });
+
+  check('ludo-token-pick', () => {
+    const cell = 26, lay = ludoStackLayout(4, cell);
+    const toks = [];
+    for (let j = 0; j < 4; j++) {
+      const [dx, dy] = lay.at(j);
+      toks.push({ i: j, cx: 100 + dx, cy: 100 + dy, r: lay.r });
+    }
+    // Aimed straight at each one, each one is what you get.
+    for (const t of toks) {
+      const got = ludoPickToken(toks, t.cx, t.cy);
+      if (!got || got.i !== t.i) throw new Error('a tap on token ' + (t.i + 1) + ' picked ' + (got ? got.i + 1 : 'nothing'));
+    }
+    // The regression: a point inside the LAST token's slop but nearer the
+    // first used to resolve to the last, because the scan ran in draw order.
+    const near = ludoPickToken(toks, toks[0].cx, toks[0].cy - 1);
+    if (!near || near.i !== 0) throw new Error('nearest centre must win, not draw order');
+    // Nothing within reach is nothing.
+    if (ludoPickToken(toks, 100, 100 + cell * 3)) throw new Error('a tap off the tokens picks none');
+    if (ludoPickToken([], 100, 100)) throw new Error('no candidates picks none');
+    return true;
+  });
+
+  /* The roll is animated, but the VALUE is still only ever the referee's —
+     the tumble is a fixed, repeat-free cycle of faces shown while the real
+     number is on its way. */
+  check('ludo-die-faces', () => {
+    for (let f = 1; f <= 6; f++) {
+      const pips = LUDO_PIPS[f];
+      if (!pips || pips.length !== f) throw new Error('face ' + f + ' must draw ' + f + ' pips');
+      for (const [px, py] of pips) {
+        if (Math.abs(px) > 1 || Math.abs(py) > 1) throw new Error('face ' + f + ' has a pip outside the die');
+      }
+    }
+    if (LUDO_TUMBLE.length !== 6 || new Set(LUDO_TUMBLE).size !== 6) {
+      throw new Error('the tumble must show each face once per cycle');
+    }
+    for (let k = 0; k < LUDO_TUMBLE.length; k++) {
+      const a = LUDO_TUMBLE[k], b = LUDO_TUMBLE[(k + 1) % LUDO_TUMBLE.length];
+      if (!LUDO_PIPS[a]) throw new Error('the tumble shows a face the die cannot draw: ' + a);
+      if (a === b) throw new Error('two consecutive tumble frames are the same face');
+    }
+    if (!(LUDO_ROLL_MS > LUDO_ROLL_TICK_MS * 4)) throw new Error('the tumble must run long enough to read as one');
+    return true;
+  });
+
   /* #206 — the turn queue. The reported "the snake fails to turn on tap or
      swipe" is these two cases: a second turn that overwrote the first, and a
      second turn refused for reversing a direction the first one was about to

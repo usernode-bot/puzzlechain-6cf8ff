@@ -1110,10 +1110,57 @@ element is missing from that list pays ~300 ms per tap on touch.
   rules before this pass.
 - **Two boards are too dense to fix with feedback alone**, and their solutions
   are the pattern to copy: **Gomoku** (15×15 ⇒ ~24 px) uses ghost-then-confirm,
-  and **Ludo** (tokens smaller than their cell, stacked 5 px apart) lists the
-  legal moves as full-size buttons under the board. Both are built in the
-  `BOARD_VIEWS` renderer, so online / pass-and-play / bot inherit them, and
-  neither changes the move payload.
+  and **Ludo** (tokens smaller than their cell) lists the legal moves as
+  full-size buttons under the board. Both are built in the `BOARD_VIEWS`
+  renderer, so online / pass-and-play / bot inherit them, and neither changes
+  the move payload. Ludo's buttons are a SECOND path now, not the only one —
+  see "Ludo: the board is a tap target too" below.
+
+### Ludo: the board is a tap target too (#217)
+
+The move buttons stayed — they are still the unambiguous path, and the issue
+asked for direct selection, not for the buttons to go. What changed is that
+the board became a target worth aiming at:
+
+- **Tokens fan out around the cell they occupy, not by their index.** The old
+  layout offset every token by `(i % 2, i / 2) * 5px`, which put a lone token
+  permanently off-centre and turned four tokens on one cell into a 5 px
+  diagonal smear. `ludoStackLayout(n, cell)` places whatever actually shares a
+  cell (across seats — safe cells and the 🏁 centre hold more than one colour)
+  on a ring around its centre, shrinking the radius as the group grows.
+  `LUDO_STACK`'s pairs are tuned so `hypot(offset) + r <= cell / 2` (the group
+  fits) and no two neighbours are closer than the old 5 px, at the smallest
+  cell the board ever draws (18 px). `ludo-token-stack` asserts both, for every
+  size in that range — **re-run it rather than eyeballing a retune**, because
+  those two constraints pull against each other and the tight end of the range
+  is where a change breaks.
+- **The hit test takes the nearest CENTRE, not the topmost of the draw order.**
+  `ludoPickToken` — topmost is just the highest token number, which is not what
+  the finger aimed at. Each candidate carries its own radius, so a lone token
+  is a bigger target than one in a stack, and a movable token draws last so its
+  gold ring is never clipped by a neighbour.
+- **The board never said it was tappable**, which is most of why #217 was filed
+  against a board that already had a hit test: an in-frame line now says so
+  whenever there is a legal move, and the move pad relabels itself as the
+  alternative.
+
+**The die is drawn as a die, and the tumble is only the wait made visible.**
+`ludoDrawDie` renders pips; the value is ALWAYS the referee's (the rules module
+locally, the server online). The tumble starts on the Roll tap — so an online
+roll has no dead beat while it is in flight — and stops a short settle after
+the real value lands, with `until` only ever moving forward so a local roll,
+which resolves in the same tick, still spins once rather than twice. The face
+cycle is a fixed repeat-free sequence (`LUDO_TUMBLE`) precisely so it is
+checkable and so nothing about it can be mistaken for the outcome.
+`cgReducedMotion()` skips it entirely.
+
+**`?ludo=stack`** seats a deterministic mid-game position (two of P1's tokens
+sharing a ring cell, a die already rolled). A fresh Ludo board has nothing on
+the ring and nothing rolled, and a proposal check can navigate but cannot tap
+Roll — so without this link neither the fan-out nor any in-move chrome is
+reachable by a check or a screenshot. It is consumed once, on mount:
+`BoardLocalGame`'s reset effect skips its own mount pass when a seeded position
+is in play, the same trap `SnakeGame`'s reset-to-chooser effect had to skip.
 
 ### 3. Nothing scrolls during play
 

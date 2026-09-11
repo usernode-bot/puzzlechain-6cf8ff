@@ -419,6 +419,29 @@ function gotdSchedule() {
 // same deterministic schedule ensureDailyFeatured uses) and a finished
 // attempt for that featured game. Idempotent; only called from IS_STAGING
 // demo fixtures.
+/* "Today is left open" has to be MADE true, not assumed.
+
+   demo=streak and demo=badges both promise a long streak with today still
+   playable. Neither of them finishes today — but demo=locked deliberately
+   does, on the same viewer, and staging carries one database across every
+   check run and never resets. So the first time demo=locked ran, today's
+   sudoku was finished forever, and every later route that wanted the PRE-GAME
+   screen got the locked screen instead. That is what took out the two #188
+   leaderboards checks (`?game=sudoku&boards=1&demo=streak`): the panel lives
+   on the pre-game screen, and the pre-game screen was never reached.
+
+   Same rule as demo=storybadges and demo=modes: a fixture has to assert the
+   state it claims, including the ABSENCE of a row. demo=locked still finishes
+   today on its own routes, because it asserts its state too — the two simply
+   have to stop depending on which one ran first. */
+async function openTodayForDemo(userId) {
+  await pool.query(
+    `DELETE FROM daily_attempts
+      WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
+    [userId]
+  );
+}
+
 async function seedFeaturedStreakDays(userId, username, nDays) {
   const schedule = gotdSchedule();
   const { rows: dRows } = await pool.query(`SELECT (now() AT TIME ZONE 'utc')::date AS d`);
@@ -2615,6 +2638,7 @@ app.get('/api/daily', async (req, res) => {
       // rows), so the streak is demonstrable under the GotD-participation
       // rule regardless of where the cutover falls relative to the seed days.
       await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 10);
+      await openTodayForDemo(req.user.id);
     }
 
     // Staging-only demo seed: give the current viewer a LONG streak plus the
@@ -2628,6 +2652,7 @@ app.get('/api/daily', async (req, res) => {
     if (IS_STAGING && req.query.demo === 'badges') {
       // Featured-game finishes so the long streak holds under the GotD rule.
       await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 60);
+      await openTodayForDemo(req.user.id);
       for (const days of STREAK_BADGE_DAYS) {
         await pool.query(
           `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)

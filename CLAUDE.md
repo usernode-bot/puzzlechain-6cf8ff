@@ -1402,6 +1402,17 @@ reasons nothing in its own proposal could explain. Both now delete the bands
 above the depth they are claiming before inserting. Any new fixture that seeds
 a COUNT of something owes the same treatment.
 
+**"Today is left open" has to be MADE true, not assumed.** `demo=streak` and
+`demo=badges` both promise a long streak with today still playable, and neither
+finishes today — but `demo=locked` deliberately does, on the same viewer. So
+the first time `demo=locked` ran, today's sudoku was finished forever, and
+every later route that wanted the PRE-GAME screen got the locked screen
+instead. That is what took out the two #188 leaderboards checks
+(`?game=sudoku&boards=1&demo=streak`): the panel lives on the pre-game screen,
+and the pre-game screen was never reached. Both now call `openTodayForDemo()`;
+`demo=locked` still finishes today on its own routes, because it asserts its
+state too. The two simply stop depending on which ran first.
+
 **The LOCKED half of a fixture is state too.** `demo=storybadges` exists to put
 an earned badge beside locked ones, so it has to be able to say a ladder is
 unfinished rather than merely decline to finish it — one leftover

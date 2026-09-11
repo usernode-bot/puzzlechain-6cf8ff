@@ -3317,64 +3317,11 @@ ${emitTapHighlightRules()}
   color: ${C.muted}; font-size: 0.88rem;
 }
 
-/* ---- Wallet screen ---- */
-.wallet-screen {
-  max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem;
-}
-.wallet-screen h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.25rem; }
-.wallet-card {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
-  padding: 1.25rem; margin-bottom: 1rem;
-}
-.wallet-card-title {
-  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
-  color: ${C.muted}; margin-bottom: 0.6rem;
-}
-.wallet-addr {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
-  color: ${C.text}; word-break: break-all; flex: 1;
-}
-.wallet-addr-row {
-  display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
-}
-.wallet-no-wallet {
-  text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
-}
-.wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
-/* ---- DApp Mode ---- */
-.dapp-badge {
-  display: inline-flex; align-items: center; gap: 0.4rem; width: 100%;
-  justify-content: center; margin: 0.6rem 0; padding: 0.5rem 0.7rem;
-  background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','66')}; color: ${C.emerald};
-  border-radius: 0.6rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
-}
-.dapp-badge.disputed { background: ${ca('rose','1a')}; border-color: ${ca('rose','66')}; color: ${C.rose}; }
-.dapp-badge-arrow { margin-left: auto; opacity: 0.7; }
-.dapp-badge-dot { font-size: 0.9rem; }
-.dapp-verified-pill {
-  font-size: 0.62rem; font-weight: 600; color: ${C.emerald};
-  background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','55')}; border-radius: 999px;
-  padding: 0.05rem 0.45rem; margin-left: 0.4rem; vertical-align: middle;
-}
-.dapp-verdict { border-radius: 0.6rem; padding: 0.7rem 0.85rem; font-weight: 600; font-size: 0.88rem; margin-bottom: 0.85rem; }
-.dapp-verdict.ok  { background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','66')}; color: ${C.emerald}; }
-.dapp-verdict.bad { background: ${ca('rose','1a')}; border: 1px solid ${ca('rose','66')}; color: ${C.rose}; }
-.dapp-verdict-reason { font-weight: 400; font-size: 0.76rem; color: ${C.muted}; margin-top: 0.35rem; }
-.dapp-kv { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem; padding: 0.2rem 0; color: ${C.text}; }
-.dapp-kv span:first-child { color: ${C.muted}; }
-.dapp-hash { font-size: 0.72rem; color: ${C.text}; word-break: break-all; line-height: 1.45; }
-.dapp-ledger { display: flex; flex-direction: column; gap: 0.25rem; max-height: 9rem; overflow-y: auto; }
-.dapp-ledger-row { display: flex; gap: 0.6rem; font-size: 0.72rem; }
-.dapp-ledger-seq { color: ${C.muted}; min-width: 2.5rem; }
-.dapp-ledger-hash { color: ${C.accent}; }
-.dapp-lrow { width: 100%; background: none; border: none; cursor: pointer; text-align: left; }
-.dapp-identity-badge {
-  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 600;
-  color: ${C.emerald}; background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','55')};
-  border-radius: 999px; padding: 0.15rem 0.55rem; margin-left: 0.5rem;
-}
-.dapp-identity-badge.unproven { color: ${C.muted}; background: ${ca('dim','33')}; border-color: ${C.dim}; }
-.dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+/* #224 — the Verified badge, the session receipt and the verified leaderboard
+   are gone at an admin's request, and their styles with them. The verification
+   MACHINERY is untouched (lib/dapp.js, game_sessions, settleDailySession's
+   tier A/B split): a request to stop showing a verdict is not a request to
+   stop reaching one. */
 
 /* ---- Badge progress pills (profile BadgeStrip + win overlay) ---- */
 .badge-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }

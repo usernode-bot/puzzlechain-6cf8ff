@@ -50,6 +50,14 @@ function CgSettings({ tick }) {
       <div className="cg-setting-row"><span className="name">Sound</span><CgToggle on={cgPrefs.sound} onClick={() => flip('sound')} /></div>
       <div className="cg-setting-row"><span className="name">Haptics</span><CgToggle on={cgPrefs.haptics} onClick={() => flip('haptics')} /></div>
       <div className="cg-setting-row"><span className="name">Reduced motion</span><CgToggle on={cgPrefs.motion} onClick={() => flip('motion')} /></div>
+      <h4 className="cg-settings-h4-spaced">Typing</h4>
+      {/* #192 — the word games draw their own keyboard, which is also the only
+          place the per-letter state is shown. This swaps it for your device's
+          own keyboard and leaves the letter colours behind as a strip. */}
+      <div className="cg-setting-row">
+        <span className="name">Use my device's keyboard<span className="cg-setting-note">Word games — your own keyboard instead of the drawn one</span></span>
+        <CgToggle on={cgPrefs.devkbd} onClick={() => flip('devkbd')} />
+      </div>
     </div>
   );
 }

@@ -1110,10 +1110,57 @@ element is missing from that list pays ~300 ms per tap on touch.
   rules before this pass.
 - **Two boards are too dense to fix with feedback alone**, and their solutions
   are the pattern to copy: **Gomoku** (15×15 ⇒ ~24 px) uses ghost-then-confirm,
-  and **Ludo** (tokens smaller than their cell, stacked 5 px apart) lists the
-  legal moves as full-size buttons under the board. Both are built in the
-  `BOARD_VIEWS` renderer, so online / pass-and-play / bot inherit them, and
-  neither changes the move payload.
+  and **Ludo** (tokens smaller than their cell) lists the legal moves as
+  full-size buttons under the board. Both are built in the `BOARD_VIEWS`
+  renderer, so online / pass-and-play / bot inherit them, and neither changes
+  the move payload. Ludo's buttons are a SECOND path now, not the only one —
+  see "Ludo: the board is a tap target too" below.
+
+### Ludo: the board is a tap target too (#217)
+
+The move buttons stayed — they are still the unambiguous path, and the issue
+asked for direct selection, not for the buttons to go. What changed is that
+the board became a target worth aiming at:
+
+- **Tokens fan out around the cell they occupy, not by their index.** The old
+  layout offset every token by `(i % 2, i / 2) * 5px`, which put a lone token
+  permanently off-centre and turned four tokens on one cell into a 5 px
+  diagonal smear. `ludoStackLayout(n, cell)` places whatever actually shares a
+  cell (across seats — safe cells and the 🏁 centre hold more than one colour)
+  on a ring around its centre, shrinking the radius as the group grows.
+  `LUDO_STACK`'s pairs are tuned so `hypot(offset) + r <= cell / 2` (the group
+  fits) and no two neighbours are closer than the old 5 px, at the smallest
+  cell the board ever draws (18 px). `ludo-token-stack` asserts both, for every
+  size in that range — **re-run it rather than eyeballing a retune**, because
+  those two constraints pull against each other and the tight end of the range
+  is where a change breaks.
+- **The hit test takes the nearest CENTRE, not the topmost of the draw order.**
+  `ludoPickToken` — topmost is just the highest token number, which is not what
+  the finger aimed at. Each candidate carries its own radius, so a lone token
+  is a bigger target than one in a stack, and a movable token draws last so its
+  gold ring is never clipped by a neighbour.
+- **The board never said it was tappable**, which is most of why #217 was filed
+  against a board that already had a hit test: an in-frame line now says so
+  whenever there is a legal move, and the move pad relabels itself as the
+  alternative.
+
+**The die is drawn as a die, and the tumble is only the wait made visible.**
+`ludoDrawDie` renders pips; the value is ALWAYS the referee's (the rules module
+locally, the server online). The tumble starts on the Roll tap — so an online
+roll has no dead beat while it is in flight — and stops a short settle after
+the real value lands, with `until` only ever moving forward so a local roll,
+which resolves in the same tick, still spins once rather than twice. The face
+cycle is a fixed repeat-free sequence (`LUDO_TUMBLE`) precisely so it is
+checkable and so nothing about it can be mistaken for the outcome.
+`cgReducedMotion()` skips it entirely.
+
+**`?ludo=stack`** seats a deterministic mid-game position (two of P1's tokens
+sharing a ring cell, a die already rolled). A fresh Ludo board has nothing on
+the ring and nothing rolled, and a proposal check can navigate but cannot tap
+Roll — so without this link neither the fan-out nor any in-move chrome is
+reachable by a check or a screenshot. It is consumed once, on mount:
+`BoardLocalGame`'s reset effect skips its own mount pass when a seeded position
+is in play, the same trap `SnakeGame`'s reset-to-chooser effect had to skip.
 
 ### 3. Nothing scrolls during play
 
@@ -1494,6 +1541,57 @@ board is reachable by URL. It is deliberately generic — step count and clock
 with an empty progress object — so it works on any game; a board that does not
 recognise the progress falls back to a fresh deal and still comes up mid-run on
 the clock, which is the thing being asserted.
+
+### A lost run in a MODE has to be able to stay in it (#213)
+
+The win card has carried a mode action since #176 — "📖 Back to the levels" /
+"🎮 Another run". The loss card never did, so the only way out of a failed
+story rung was **Back to Lobby**: the reported "forced lobby exit", and exactly
+backwards, because a rung is a fixed retryable deal and failing one is the
+moment you most want to go straight at it again. The loss card now carries the
+same action, labelled **"📖 Continue Story Quest"** after a loss.
+
+Two smaller things fell out of the same block, both dropped fields rather than
+decisions:
+
+- **"🎲 Play again for fun" was showing on story and arcade losses.** It is the
+  daily's replay of TODAY'S board through the inert practice path (#133), so on
+  a story loss it sent you to a practice run of the daily instead of back to
+  the rung. The win card had always gated it on `!modeLabel`; the loss card had
+  not.
+- **`handleLose` dropped `meta.winnerLabel`.** Every game already sends one
+  through `reportRunEnd` (Marble Loop, Hash Rush, Snake and Bounce all send
+  'Game Over') and the win card has read it since #158, so a lost story rung of
+  a marble game announced itself as **"Out of guesses"** — copy written for
+  Daily Cipher. The default stays for games that send nothing, which is Cipher,
+  the one it was written for. The "Guesses · Time" row beside it is the same
+  copy problem and is deliberately NOT touched: no game sends a label for it,
+  so fixing it would mean inventing one for thirty games rather than threading
+  through one they already send.
+
+**`handleWin` still drops `winnerLabel` on its arcade and story branches**, so
+a run you died in shows "🏆 Solved!" in those two modes. Same one-line
+omission, but it belongs to every arcade game rather than to #213.
+
+### Marble Loop's camouflage marble (#213)
+
+Five shots in a row that each pop something drop a **camouflage marble** on the
+cannon for `ZUMA_CAMO_MS`. It takes the colour of whatever it lands against
+(`zumaWildColorAt` — the longer neighbouring run wins, ties go left), so it
+always makes a match if one is there. It is spent by one shot and does **not**
+consume the queue: it sits on top of the marble you already had.
+
+It also **replaces the old `color-switch` power-up's wildcard, which never
+worked**: that one fired a marble coloured `'#ffffff'` and `zumaCheckMatches`
+compares colour strings exactly, so the "wildcard" matched nothing and left you
+strictly worse off than the marble it replaced. One wildcard rule, in one pure
+function, rather than two that disagree — `marbleloop-camouflage` asserts both
+halves, including that the old white marble matched nothing.
+
+`?zcamo=1` loads one at mount (writing nothing — it sets the same deadline the
+fifth pop would) because the marble and its countdown are otherwise reachable
+only by popping five shots in a row, which no check or screenshot can do.
+`?result=1&pmode=story|arcade` does the same job for the mode result cards.
 ### Snake's turns QUEUE (#206)
 
 "The snake fails to turn upon tap or swipe" is not a gesture problem. The
@@ -1530,6 +1628,44 @@ protects you.
 matters is that ONE tick consumes at most ONE turn — take that away and the
 queue becomes a way to reverse into your own neck.
 
+### Daily Cipher can hand typing to the DEVICE keyboard (#192)
+
+The issue asked to replace the drawn keyboard with the system one. Replacing it
+outright would have thrown away the only surface that carries the per-letter
+state — which letters are placed, which are in the word, which are spent — so
+the drawn keyboard stays the default and the device keyboard is a device-local
+preference (`cgPrefs.devkbd`, Settings → Typing). In device mode the three key
+rows are not drawn at all, the board gets that height back, and the letter
+colours move to a compact non-interactive strip (`.cw-legend`) below the canvas.
+**Flipping the default is one word** if the group decides the other way.
+
+How it works, and each part is load-bearing:
+
+- **A hidden, focusable input is the only way to ask for a system keyboard.**
+  It is off-screen with `opacity: 0`, not `display: none`, because a hidden
+  element cannot take focus. `font-size: 16px` stops iOS zooming on focus.
+- **It holds one non-breaking space forever and is never allowed to change.**
+  Every edit is read and cancelled. That is what makes BACKSPACE work: a
+  browser will not report a delete on a field it believes is already empty, so
+  a genuinely empty input can be typed into and never erased.
+- **`beforeinput`, not `keydown`.** A phone keyboard often sends no usable
+  `key` at all — predictive text reports `229` / `Unidentified`. What it always
+  sends is the text it inserted, as `e.data`.
+- **Bound NATIVELY, not through React's `onBeforeInput` prop.** React 18's
+  synthetic beforeinput is a polyfill over `textInput` and does not see every
+  `inputType` a phone produces, `deleteContentBackward` in particular.
+- **THE DOUBLE-INPUT TRAP, in a new costume.** A physical keypress while the
+  hidden input has focus fires both its `beforeinput` and the window `keydown`
+  handler the game has always had — the same shape as #one-tap-two-letters,
+  where one touch typed two letters. The window handler now stands down for any
+  event whose target is that input. `?cwtype=` still exercises the drawn keys
+  and still asserts `data-cw-typed`, in both modes.
+
+`?devkbd=1|0` forces the mode at boot, because a device preference is otherwise
+reachable only by opening Settings and tapping, which navigation cannot do.
+`.cw-board` carries `data-cw-kbd="device"|"drawn"` so a check can see which is
+live.
+
 ### Screen transitions (#235)
 
 Navigation only — lobby, pre-game, opponent, the game, the locked day, the
@@ -1565,6 +1701,49 @@ The `:root[data-reduce-motion="1"]` block and the `prefers-reduced-motion`
 media query list the same selectors — **add new motion to both**, or a player
 gets it in one place and not the other. `?motion=reduce|full` forces it, the
 way `?theme=` does.
+
+### Marble Loop: aim, then fire (#212)
+
+A tap used to fire immediately at wherever the finger landed, so on a phone you
+found out where you had been aiming by watching the marble go there. **A touch
+tap now aims; the next one fires** — the same ghost-then-confirm shape Gomoku
+already uses for a board too dense to poke at. A tap pointing somewhere
+materially different from the current aim RE-AIMS instead of firing
+(`ZUMA_REAIM_RAD`), so correcting yourself never costs a marble. The **mouse is
+unchanged**: hovering already shows the aim continuously, so on that input the
+hover *is* the first tap.
+
+**The trajectory guide is computed, not decorative.** `zumaAimPath` marches the
+ray from the cannon and returns the first chain marble it would touch, using
+the same 2R test the collision uses — so the line cannot promise a hit the
+marble does not make. It is drawn only once an aim has been taken.
+
+**The marble is bigger, and the number was measured.** `ZUMA_DIAM` is the
+chain's spacing, so the radius is a difficulty knob whether you meant it or
+not: a bigger marble makes the CHAIN longer and it reaches the skull sooner. At
+R=13 the tightest board (free L3) goes from 53% to 62% of its own track, so
+every level still starts with at least a third of the track empty.
+**Re-measure if the levels or paths are retuned** — `marbleloop-aim` fails if
+any level's chain exceeds 75% of its track.
+
+**The supply bot.** Below `ZUMA_SUPPLY_AT` (5) marbles the cannon deals only
+colours still ON the chain. A short chain can otherwise hold colours the cannon
+has stopped dealing, and then the level cannot be finished at all. It picks a
+*possible* colour, never the best one — which to fire and where is still the
+player's problem.
+
+**Touch is bound NATIVELY here, not through React's `onTouch*` props.** React 18
+registers `touchmove` on the root as a PASSIVE listener, so `e.preventDefault()`
+inside an `onTouchMove` prop does nothing — this file was calling it into the
+void and relying on `.zuma-canvas { touch-action: none }`. A listener on the
+element is also one a test can drive, which matters because touch now behaves
+differently from the mouse and that difference IS the change.
+
+`getCanvasCoords` also gained #208's length test. `e.touches` is always a
+TouchList and a TouchList is an object, so `e.touches ? …` is true even when
+EMPTY — which is exactly what touchend carries. Nothing hit it before because
+touchend was only ever a bare "fire" signal that never asked where the finger
+was; aim-on-tap asks.
 
 ### New deep links
 

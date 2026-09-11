@@ -2706,6 +2706,34 @@ ${emitTapHighlightRules()}
 }
 .cg-setting-row:last-child { border-bottom: none; }
 .cg-setting-row .name { font-size: 0.9rem; }
+/* A setting whose trade-off needs a line of explanation (#192). */
+.cg-setting-row .cg-setting-note {
+  display: block; font-size: 0.74rem; color: ${C.muted}; margin-top: 0.15rem;
+  max-width: 15rem; line-height: 1.3;
+}
+/* #192 — the letter colours, with the drawn keyboard gone. Not tappable: the
+   device keyboard is doing the typing, this is only the read-out it cannot
+   show. */
+.cw-legend {
+  display: flex; flex-wrap: wrap; gap: 3px; justify-content: center;
+  margin: 0.35rem auto 0; max-width: 480px;
+}
+.cw-legend-key {
+  font-size: 0.66rem; font-weight: 700; line-height: 1;
+  padding: 3px 4px; border-radius: 4px; min-width: 1.05rem; text-align: center;
+  background: ${C.border}; color: ${C.text};
+}
+.cw-legend-key.on-green { background: ${C.emerald}; color: #fff; }
+.cw-legend-key.on-yellow { background: ${C.gold}; color: #fff; }
+.cw-legend-key.on-gray { background: ${C.rose}; color: #fff; }
+/* The input the device keyboard types into. Focusable and off-screen rather
+   than display:none, because a hidden element cannot take focus and so cannot
+   open a keyboard at all. */
+.cw-hidden-input {
+  position: absolute; opacity: 0; pointer-events: none;
+  width: 1px; height: 1px; left: 0; top: 0; border: 0; padding: 0;
+  font-size: 16px;   /* iOS zooms a focused input under 16px */
+}
 .cg-settings-h4-spaced { margin-top: 1.15rem; }
 
 /* ---- Theme picker (light / dark / system) ---- */

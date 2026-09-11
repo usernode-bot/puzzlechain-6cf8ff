@@ -1780,10 +1780,11 @@ function App() {
             onLose={handleLose}
             onStepChange={setStepCount}
             offset={offset}
-            /* Phase 1 (#160) — these games are now kept MOUNTED and frozen
-               behind the shared results card, so any per-game end panel must
-               stand down (only Hash Rush has one). */
-            resultShown={!!winData || !!loseData || !!practiceResult}
+            /* #215 — `resultShown` is gone with the panel it silenced. Phase 1
+               (#160) added it because Hash Rush drew an end panel of its own;
+               that panel turned out to exist only in the gap before the shared
+               card arrived, so it was deleted and no shell:'self' game has one
+               now. Keep it that way: the shared results card is the ending. */
             resetKey={playAgainKey}
             menuConfig={classicMenuConfig}
             gameMode={classicGameMode}
@@ -1985,7 +1986,15 @@ function App() {
      render below unmount the body and put the results card over a blank page.
      Snake, Block Fit, Diamond Rush and Hash Rush now keep their final board
      frozen behind the card like every other game. */
+  /* #195 — `reviewBoard: false` in the registry opts a game out of the review
+     step. Reviewing a frozen board is worth a tap when the board IS the result
+     (a solved nonogram, a final 2048 grid); for Daily Cipher the result card
+     already reveals the answer and the score, so the board behind it repeats
+     what you just read and the overlay is one more thing to dismiss. It is a
+     declarative flag rather than an id check here, because "does my board say
+     anything after the run" is a property of a game, not of the shell. */
   const boardReviewable = screen === 'game' && !!currentGame && !!resultData
+    && currentGame.reviewBoard !== false
     && (!resultData.gameId || resultData.gameId === currentGame.id);
 
   /* #162 — dismissing a results card reveals the board behind it. One handler

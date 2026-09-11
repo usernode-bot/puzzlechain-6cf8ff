@@ -1061,11 +1061,6 @@ ${emitTapHighlightRules()}
 .pregame-band.done { color: ${C.emerald}; border-color: ${ca('emerald', '55')}; }
 .pregame-band.locked { opacity: 0.4; cursor: not-allowed; }
 .pregame-band[data-pressed] { background: ${C.well}; }
-.pregame-band .rec {
-  display: block; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
-  color: ${C.muted}; margin-top: 0.1rem;
-}
 .pregame-band-note {
   margin-top: 0.45rem; font-size: 0.72rem; line-height: 1.4; color: ${C.muted};
 }; background: ${ca('accent','14')};
@@ -3499,7 +3494,6 @@ ${emitTapHighlightRules()}
 .hr-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,10,18,0.6); text-align: center; padding: 1rem; }
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
-.hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
 
 /* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }

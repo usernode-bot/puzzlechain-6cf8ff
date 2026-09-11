@@ -149,7 +149,7 @@ const GAME_REGISTRY = {
   zuma:              { name: 'Marble Loop',              category: 'classic', dailyMode: true, tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now

@@ -823,6 +823,72 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #215 — Hash Rush's four tap-to-mine rules, and the level targets derived
+     from them. These are the whole of what the issue asked for, so they are
+     the things a retune must not quietly undo. */
+  check('hashrush-strike-rules', () => {
+    const st = () => ({ score: 0, tokens: 0, boost: 0 });
+    // A hash pays HR_TOKEN_SCORE, doubled while boosted.
+    let s = st();
+    hrApplyStrike(s, { type: 'hash' });
+    if (s.score !== HR_TOKEN_SCORE || s.tokens !== 1) throw new Error('a hash must pay ' + HR_TOKEN_SCORE);
+    s.boost = 3;
+    hrApplyStrike(s, { type: 'hash' });
+    if (s.score !== HR_TOKEN_SCORE * (1 + HR_BOOST_MULT)) throw new Error('a boosted hash must pay double');
+    // Lightning ADDS. The pre-#215 bug was an assignment, which threw away
+    // whatever was left of the boost you already had.
+    s = st();
+    hrApplyStrike(s, { type: 'bolt' });
+    hrApplyStrike(s, { type: 'bolt' });
+    if (s.boost !== HR_BOOST_SECS * 2) throw new Error('two bolts must stack, got ' + s.boost);
+    s.boost = HR_BOOST_MAX;
+    hrApplyStrike(s, { type: 'bolt' });
+    if (s.boost !== HR_BOOST_MAX) throw new Error('stacked boost must cap at ' + HR_BOOST_MAX);
+    // TNT costs points, and cannot push a score negative.
+    s = st(); s.score = 25;
+    hrApplyStrike(s, { type: 'tnt' });
+    if (s.score !== 25 - HR_TNT_PENALTY) throw new Error('TNT must cost ' + HR_TNT_PENALTY);
+    hrApplyStrike(s, { type: 'tnt' });
+    hrApplyStrike(s, { type: 'tnt' });
+    if (s.score !== 0) throw new Error('TNT must not drive a score below zero, got ' + s.score);
+    // The hit box: nearest object in the tapped lane wins, and a strike
+    // outside the window connects with nothing.
+    const W = 300, laneW = W / HR_LANES;
+    const objs = [{ lane: 1, y: 100, type: 'hash' }, { lane: 1, y: 160, type: 'tnt' }, { lane: 0, y: 100, type: 'hash' }];
+    const mid = laneW * 1.5;
+    if (hrPickAt(objs, mid, 105, W) !== 0) throw new Error('a strike must take the nearest object in its lane');
+    if (hrPickAt(objs, mid, 158, W) !== 1) throw new Error('a strike lower down must take the lower object');
+    if (hrPickAt(objs, mid, 100 + HR_TAP_R + 40, W) === 0) throw new Error('a strike well clear of an object must miss it');
+    if (hrPickAt(objs, laneW * 2.5, 100, W) !== -1) throw new Error('an empty lane must yield nothing');
+    if (hrPickAt([{ lane: 1, y: 100, type: 'hash', hit: true }], mid, 100, W) !== -1) throw new Error('an already-mined object must not be struck twice');
+    return true;
+  });
+
+  /* The target every bounded level asks for is DERIVED from that level's own
+     spawn stream (see hrTargetFor), so this is the check that a retune of the
+     ladder cannot set a goal the game does not deal enough hashes to reach. */
+  check('hashrush-level-targets', () => {
+    const seeded = (band) => mulberry32(hashStr('hashrush:story:' + band) >>> 0);
+    let prev = 0;
+    for (let b = 0; b < HR_STORY.length; b++) {
+      const cfg = { ...HR_STORY[b], limit: HR_STORY[b].secs };
+      const target = hrTargetFor(cfg, seeded(b));
+      const model = hrModelRun(cfg, seeded(b), cfg.limit);
+      if (!(target > 0)) throw new Error('level ' + (b + 1) + ' has no target');
+      if (target > model.score) throw new Error('level ' + (b + 1) + ' asks for ' + target + ' and the best the model scores is ' + model.score);
+      if (target <= prev) throw new Error('level ' + (b + 1) + ' asks for ' + target + ', no more than level ' + b + "'s " + prev);
+      prev = target;
+      // Same seed, same target: two players on one rung must be given the
+      // same goal, which is the whole reason it is derived and not rolled.
+      if (hrTargetFor(cfg, seeded(b)) !== target) throw new Error('level ' + (b + 1) + ' target is not stable');
+      // And the plan it is derived from must not depend on how it is walked.
+      const a = hrSpawnPlan(cfg, seeded(b), cfg.limit);
+      const c = hrSpawnPlan(cfg, seeded(b), cfg.limit);
+      if (a.length !== c.length) throw new Error('level ' + (b + 1) + ' spawn plan is not deterministic');
+    }
+    return true;
+  });
+
   /* Snakes & Ladders V2 — the seven hand-authored tier boards must satisfy
      the authoring constraints (see snakesladders-v2/00-layouts.jsx), or a
      future retune ships a broken board: a chained jump the engine resolves

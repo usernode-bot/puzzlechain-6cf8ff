@@ -196,26 +196,6 @@
       "expectText": "Game Corner"
     },
     {
-      "name": "DApp session receipt renders",
-      "path": "/?demo=dapp",
-      "expectText": "Session Receipt"
-    },
-    {
-      "name": "DApp receipt shows chain hash",
-      "path": "/?demo=dapp",
-      "expectText": "Chain hash"
-    },
-    {
-      "name": "Verified leaderboard renders demo rows",
-      "path": "/?demo=dapp",
-      "expectText": "Staging demo Ada"
-    },
-    {
-      "name": "Disputed session shows rejection copy",
-      "path": "/?screen=session&sid=DAPPDEMOBAD",
-      "expectText": "could not be verified"
-    },
-    {
       "name": "Own profile opens via account deep link",
       "path": "/?screen=account",
       "expectText": "Your Profile"
@@ -229,11 +209,6 @@
       "name": "Streak badge ladder renders earned badges on profile",
       "path": "/?screen=account&demo=badges",
       "expectText": "Centurion"
-    },
-    {
-      "name": "Anchored daily sudoku receipt renders",
-      "path": "/?demo=anchor",
-      "expectText": "anchored"
     },
     {
       "name": "Today's Top Scores board renders in daily lobby",
@@ -1054,6 +1029,16 @@
       "name": "Minesweeper explains chording on numbers",
       "path": "/?game=minesweeper",
       "expectText": "Tap a number whose flags all match"
+    },
+    {
+      "name": "Snake says a tap steers as well as a swipe",
+      "path": "/?game=snake&sheet=rules&snake=normal",
+      "expectText": "tap the side of the board"
+    },
+    {
+      "name": "Daily Snake says a tap starts and steers",
+      "path": "/?game=snakedaily&practice=1",
+      "expectText": "Swipe or tap a side to start"
     },
     {
       "name": "Hash Rush opens on the tap-to-mine brief",

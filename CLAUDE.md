@@ -1032,6 +1032,21 @@ were **deliberately removed** and should not be re-added piecemeal:
   non-destructive; no code path touches them anymore.
 - `REDIS_URL`/ioredis (only ever the PvP matchmaking fast path) and the
   UTGO wager contract/ABIs are gone.
+- **The Verified badge, the session receipt and the verified leaderboard**
+  (#224, at a usernode admin's request). The phase-1 subtraction carved these
+  out of the dApps removal and kept them; that carve-out has ended. Gone: the
+  badge on the win overlay, the `SessionReceipt` screen and its
+  `?sid=` / `demo=dapp` / `demo=anchor` deep links, `VerifiedLeaderboard`, the
+  whole `18-dapp-verified.jsx` module, their styles and their five checks —
+  and with them the client-side `dappAnchor()`, which existed only to make the
+  badge say "anchored on-chain" and which sent a transaction through the
+  bridge to do it.
+  **The verification MACHINERY is untouched**, deliberately: `lib/dapp.js`,
+  `game_sessions` / `session_states`, `settleDailySession` and its tier A/B
+  split, and the `/api/dapp/*` routes all stay. A request to stop SHOWING a
+  verdict is not a request to stop reaching one, and the harness is what
+  `validateSession` uses to refuse an impossible score. Don't re-add a badge;
+  if the verdict needs surfacing again, that is a new decision.
 - **The Account screen and the wallet ownership proof / "On-chain login"
   identity** (home/profile cleanup pass): the Usernode-pubkey display,
   Connect / Verify / Disconnect wallet controls, the avatar "verified"
@@ -1402,6 +1417,17 @@ reasons nothing in its own proposal could explain. Both now delete the bands
 above the depth they are claiming before inserting. Any new fixture that seeds
 a COUNT of something owes the same treatment.
 
+**"Today is left open" has to be MADE true, not assumed.** `demo=streak` and
+`demo=badges` both promise a long streak with today still playable, and neither
+finishes today — but `demo=locked` deliberately does, on the same viewer. So
+the first time `demo=locked` ran, today's sudoku was finished forever, and
+every later route that wanted the PRE-GAME screen got the locked screen
+instead. That is what took out the two #188 leaderboards checks
+(`?game=sudoku&boards=1&demo=streak`): the panel lives on the pre-game screen,
+and the pre-game screen was never reached. Both now call `openTodayForDemo()`;
+`demo=locked` still finishes today on its own routes, because it asserts its
+state too. The two simply stop depending on which ran first.
+
 **The LOCKED half of a fixture is state too.** `demo=storybadges` exists to put
 an earned badge beside locked ones, so it has to be able to say a ladder is
 unfinished rather than merely decline to finish it — one leftover
@@ -1468,6 +1494,41 @@ board is reachable by URL. It is deliberately generic — step count and clock
 with an empty progress object — so it works on any game; a board that does not
 recognise the progress falls back to a fresh deal and still comes up mid-run on
 the clock, which is the thing being asserted.
+### Snake's turns QUEUE (#206)
+
+"The snake fails to turn upon tap or swipe" is not a gesture problem. The
+swipes arrive, `.snake-board` and `.dsnk-board` both carry `touch-action: none`
+so the browser never steals them, and `useGestures` is wired identically in
+both snakes. The bug was that **a turn had nowhere to wait.**
+
+Both snakes held ONE pending direction (`nextDir`) and validated every new turn
+against the direction currently being TRAVELLED. A corner is two turns and a
+tick is 90-200 ms, so between them these ate a large share of real inputs:
+
+- the second turn **overwrote** the first, so the snake never made the first
+  one — swipe up then left around a corner and it simply goes left;
+- or the second turn was **rejected as a reversal** of a direction the first
+  turn was about to change. Heading up with left already pending, "down" is a
+  legal move after that left; it was refused because down reverses *up*.
+  Measured in a browser before the fix: that input returns having done nothing.
+
+`snakeQueueTurn(dir, cur, queue)` is now the whole rule, pure and shared by
+both snakes: turns queue up to `SNAKE_TURN_QUEUE` (2 — it remembers a corner,
+it is not an input buffer) and each is checked against the last direction
+**queued** rather than the last travelled, because that is the one it will
+actually follow on from. One tick consumes one turn, which is what keeps
+"a snake may not double back into itself" true however fast you swipe.
+
+**A tap steers now as well** (`snakeTapDir`), which the issue asked for and
+which previously only started the run. The board is cut into four triangles by
+its diagonals and a tap means the one it lands in — absolute, so it needs no
+knowledge of the current heading and cannot mean two things at once; dead
+centre means nothing. It goes through the same queue, so the reverse rule still
+protects you.
+
+`snake-turn-queue` holds both halves. If you retune this, the property that
+matters is that ONE tick consumes at most ONE turn — take that away and the
+queue becomes a way to reverse into your own neck.
 
 ### Screen transitions (#235)
 

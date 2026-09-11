@@ -789,6 +789,48 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #206 — the turn queue. The reported "the snake fails to turn on tap or
+     swipe" is these two cases: a second turn that overwrote the first, and a
+     second turn refused for reversing a direction the first one was about to
+     change. A corner is two turns and a tick is 90-200 ms, so both happen
+     constantly. */
+  check('snake-turn-queue', () => {
+    const R = SNAKE_DIRS.right, U = SNAKE_DIRS.up, D = SNAKE_DIRS.down, L = SNAKE_DIRS.left;
+    const same = (a, b) => a && b && a.x === b.x && a.y === b.y;
+    // The corner that used to lose its first half: up then left while going right.
+    let q = snakeQueueTurn('up', R, []);
+    if (!q || q.length !== 1 || !same(q[0], U)) throw new Error('the first turn of a corner must queue');
+    q = snakeQueueTurn('left', R, q);
+    if (!q || q.length !== 2 || !same(q[1], L)) throw new Error('the second turn of a corner must queue behind the first, not replace it');
+    // Each turn is judged against the one BEFORE IT IN THE QUEUE, not against
+    // the direction still being travelled.
+    if (snakeQueueTurn('down', U, [L]) === null) throw new Error('down is legal after a queued left, whatever the snake is doing now');
+    if (snakeQueueTurn('down', L, [U]) !== null) throw new Error('down must still be refused behind a queued up');
+    // Doubling back is still impossible, which is the whole reason one tick
+    // may only consume one turn.
+    if (snakeQueueTurn('left', R, []) !== null) throw new Error('a snake may not reverse into itself');
+    if (snakeQueueTurn('up', D, []) !== null) throw new Error('a snake may not reverse into itself');
+    // A turn you are already making is not a turn.
+    if (snakeQueueTurn('right', R, []) !== null) throw new Error('the direction already travelled is not a turn');
+    if (snakeQueueTurn('up', R, [U]) !== null) throw new Error('the direction already queued is not a turn');
+    // The queue is two deep: it remembers a corner, it is not an input buffer.
+    if (snakeQueueTurn('right', R, [U, L]) !== null) throw new Error('the queue must hold at most ' + SNAKE_TURN_QUEUE);
+    if (snakeQueueTurn('nowhere', R, []) !== null) throw new Error('an unknown direction is not a turn');
+    if (snakeQueueTurn('up', null, []) !== null) throw new Error('no current direction, no turn');
+
+    // A tap means the triangle it lands in, so it cannot mean two things.
+    if (snakeTapDir(50, 5, 100, 100) !== 'up') throw new Error('the top triangle means up');
+    if (snakeTapDir(50, 95, 100, 100) !== 'down') throw new Error('the bottom triangle means down');
+    if (snakeTapDir(5, 50, 100, 100) !== 'left') throw new Error('the left triangle means left');
+    if (snakeTapDir(95, 50, 100, 100) !== 'right') throw new Error('the right triangle means right');
+    if (snakeTapDir(50, 50, 100, 100) !== null) throw new Error('the centre means nothing');
+    if (snakeTapDir(10, 10, 0, 0) !== null) throw new Error('an unmeasured board means nothing');
+    // Just inside a diagonal resolves to the nearer edge, never to neither.
+    if (snakeTapDir(20, 18, 100, 100) !== 'up') throw new Error('a tap above the diagonal is up');
+    if (snakeTapDir(18, 20, 100, 100) !== 'left') throw new Error('a tap left of the diagonal is left');
+    return true;
+  });
+
   /* #188 — a whole family of rules can go dead in one keystroke.
 
      `.pregame-deal` was missing its semicolon and its closing brace, and the

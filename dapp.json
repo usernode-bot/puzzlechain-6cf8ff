@@ -1076,6 +1076,16 @@
       "expectText": "Camouflage"
     },
     {
+      "name": "Marble Loop tells you a tap aims first",
+      "path": "/?howto=zuma",
+      "expectText": "Tap once to aim"
+    },
+    {
+      "name": "Marble Loop promises a finishable endgame",
+      "path": "/?howto=zuma",
+      "expectText": "only deals colours still on the chain"
+    },
+    {
       "name": "Daily Cipher names the day's theme",
       "path": "/?game=cryptowordle&practice=1",
       "expectText": "Today's theme"

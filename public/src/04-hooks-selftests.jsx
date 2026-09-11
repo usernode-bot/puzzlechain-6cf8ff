@@ -823,6 +823,58 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #212 — the aim ray and the supply bot. Both are pure, and both are things
+     a player is told: the guide promises where the marble lands, and below
+     five marbles the cannon promises every colour it deals can still clear
+     something. */
+  check('marbleloop-aim', () => {
+    const pd = zumaComputePathData([{ x: 0, y: 100 }, { x: 300, y: 100 }]);
+    // A ray with an empty chain runs off the board and reports no hit.
+    let r = zumaAimPath([], pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== -1) throw new Error('nothing to hit means no hit');
+    if (r.y > 0) throw new Error('a ray with nothing in the way must leave the board');
+    // A marble straight ahead is found, and the guide stops ON it.
+    const chain = [{ color: '#f43f5e', dist: 150 }];
+    r = zumaAimPath(chain, pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== 0) throw new Error('a marble in the path must be found');
+    if (Math.abs(r.x - 150) > 1 || Math.abs(r.y - 100) > 1) throw new Error('the guide must stop on the marble it found');
+    // One well off to the side is not in the path.
+    r = zumaAimPath([{ color: '#f43f5e', dist: 20 }], pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== -1) throw new Error('a marble the ray misses is not a hit');
+    // A marble not yet on the track cannot be aimed at.
+    r = zumaAimPath([{ color: '#f43f5e', dist: -40 }], pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== -1) throw new Error('a marble off the near end of the track is not on the board');
+
+    // The supply bot: below the threshold every colour dealt is one that is
+    // still on the chain, so the last marbles can always be cleared.
+    const A = ZUMA_COLORS_ALL[0], B = ZUMA_COLORS_ALL[3];
+    const short = [{ color: A, dist: 1 }, { color: B, dist: 2 }];
+    for (let i = 0; i < 40; i++) {
+      const c = zumaSupplyColor(short, 5, mulberry32(i >>> 0));
+      if (c !== A && c !== B) throw new Error('a short chain must only be dealt colours it still holds');
+    }
+    // At or above the threshold it is the ordinary draw again, so the game
+    // does not quietly become easy for the whole second half of a level.
+    const long = [];
+    for (let i = 0; i < ZUMA_SUPPLY_AT; i++) long.push({ color: A, dist: i });
+    let sawOther = false;
+    for (let i = 0; i < 60; i++) if (zumaSupplyColor(long, 5, mulberry32(i >>> 0)) !== A) sawOther = true;
+    if (!sawOther) throw new Error('a full chain must still be dealt the full palette');
+    // An empty chain has nothing to supply from and must not throw.
+    if (!zumaSupplyColor([], 5, mulberry32(1))) throw new Error('an empty chain still deals a marble');
+
+    // The marble is bigger than it was, and no level is choked by it: the
+    // longest chain still leaves a third of its own track empty.
+    if (ZUMA_BALL_R < 13) throw new Error('the marble was enlarged on purpose (#212)');
+    for (const lvl of ZUMA_LEVELS) {
+      const p = zumaComputePathData(lvl.path);
+      if (lvl.ballCount * ZUMA_DIAM > p.totalLen * 0.75) {
+        throw new Error('a level starts with too little track left: ' + lvl.ballCount + ' marbles');
+      }
+    }
+    return true;
+  });
+
   /* #206 — the turn queue. The reported "the snake fails to turn on tap or
      swipe" is these two cases: a second turn that overwrote the first, and a
      second turn refused for reversing a direction the first one was about to

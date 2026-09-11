@@ -333,8 +333,8 @@ const GAMES = [
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Shoot to match', body: 'Aim and tap to fire a coloured marble into the moving chain. Three or more of a colour clear.' },
-      { title: 'Beat the chain', body: 'Clear the whole chain before it reaches the skull. Gaps and combos multiply your score.' },
+      { title: 'Aim, then fire', body: 'Tap once to aim — a dotted line shows exactly where the marble will land. Tap again to fire it. Three or more of a colour clear.' },
+      { title: 'Beat the chain', body: 'Clear the whole chain before it reaches the skull. Gaps and combos multiply your score. With fewer than five marbles left the cannon only deals colours still on the chain, so the end is always finishable.' },
       { title: 'Earn a camouflage marble', body: 'Five shots in a row that each clear something drop a rainbow marble onto the cannon for 10 seconds. It takes the colour of whatever it lands against, so it always makes a match.' },
     ],
     component: ZumaGame,

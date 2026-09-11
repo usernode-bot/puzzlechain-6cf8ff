@@ -899,6 +899,46 @@ ${emitTapHighlightRules()}
 .score-row.total { font-weight: 600; font-size: 1.05rem; padding-top: 0.5rem; }
 .score-row.total .v { color: ${C.gold}; }
 
+/* #241 — the arcade moment. The card's default state is the ONE thing a
+   player just earned, at a size you can read across a room; the breakdown,
+   the badge furniture and the leaderboard live behind .win-more. Measured at
+   390x780 before the split: 955px of content in a 740px box, and that was
+   with an EMPTY leaderboard. */
+.win-earned { margin: 0.1rem 0 1.1rem; }
+.win-earned .we-k {
+  display: block; font-size: 0.68rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: ${C.muted};
+}
+.win-earned .we-v {
+  display: block; font-family: 'JetBrains Mono', monospace;
+  font-size: 3.1rem; line-height: 1.08; font-weight: 700; color: ${C.gold};
+  font-variant-numeric: tabular-nums;
+}
+.win-earned .we-note { display: block; font-size: 0.82rem; color: ${C.emerald}; }
+.win-flourish {
+  font-size: 0.92rem; font-weight: 600; color: ${C.text};
+  background: var(--c-well); border-radius: 999px;
+  padding: 0.4rem 0.9rem; display: inline-block; margin-bottom: 1.1rem;
+}
+.win-more {
+  width: 100%; margin-top: 0.35rem; background: none; border: none;
+  color: ${C.muted}; font-family: inherit; font-size: 0.85rem;
+  padding: 0.55rem; cursor: pointer; border-radius: 10px;
+}
+.win-more:hover { color: ${C.text}; background: var(--c-well); }
+.win-details { margin-top: 0.5rem; }
+.win-details > *:last-child { margin-bottom: 0; }
+
+/* The pop is on the TROPHY, never on the number: an animation that does not
+   run (a hidden tab, a screenshot capture) must not leave the score unreadable,
+   and this one only ever affects an emoji. */
+@keyframes un-win-pop {
+  0%   { transform: scale(0.4) rotate(-14deg); }
+  62%  { transform: scale(1.14) rotate(4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.win-card .trophy { animation: un-win-pop 420ms cubic-bezier(0.2, 0.8, 0.3, 1.2); }
+
 .primary-btn {
   width: 100%;
   background: ${C.accent};
@@ -927,7 +967,7 @@ ${emitTapHighlightRules()}
   margin-bottom: 0.6rem; background: ${C.surface};
   border: 1px solid ${C.border}; color: ${C.text};
 }
-.review-btn:hover { border-color: ${C.accent}; background: ${C.well}; }
+.review-btn:hover { border-color: ${C.accent}; background: var(--c-well); }
 
 /* Play Again is the PRIMARY action on a result card: you have just finished a
    game, and the loudest thing on the screen should not be leaving. The ring is
@@ -1072,7 +1112,7 @@ ${emitTapHighlightRules()}
 }
 .pregame-band.done { color: ${C.emerald}; border-color: ${ca('emerald', '55')}; }
 .pregame-band.locked { opacity: 0.4; cursor: not-allowed; }
-.pregame-band[data-pressed] { background: ${C.well}; }
+.pregame-band[data-pressed] { background: var(--c-well); }
 .pregame-band .rec {
   display: block; font-family: 'JetBrains Mono', monospace;
   font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
@@ -3059,7 +3099,8 @@ ${emitTapHighlightRules()}
 :root[data-reduce-motion="1"] .badge-chevron,
 :root[data-reduce-motion="1"] .cnl-roll-btn,
 :root[data-reduce-motion="1"] .ng-status.err,
-:root[data-reduce-motion="1"] .ng-status.ok {
+:root[data-reduce-motion="1"] .ng-status.ok,
+:root[data-reduce-motion="1"] .win-card .trophy {
   animation: none !important;
   transition: none !important;
 }
@@ -3080,6 +3121,7 @@ ${emitTapHighlightRules()}
     transition: none !important;
   }
   .ng-status.err, .ng-status.ok { animation: none !important; }
+  .win-card .trophy { animation: none !important; }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed] { transform: none !important; }
 }

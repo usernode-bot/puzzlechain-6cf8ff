@@ -875,6 +875,21 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* `C` is built from PALETTES.light's KEYS only, so `${C.well}` — or any
+     other DERIVED token (well-strong, scrim, the shadow trio, the *-hover
+     pair) — interpolates the string "undefined", and the browser drops the
+     whole declaration. It is the same silent-failure shape as
+     token-alpha-concat, and it had killed .review-btn:hover and
+     .pregame-band[data-pressed] outright. Reach for var(--c-well) instead. */
+  check('css-no-undefined-token', () => {
+    const i = css.indexOf('undefined');
+    if (i >= 0) {
+      throw new Error('the stylesheet interpolates undefined — use var(--c-…) for a '
+        + 'derived token. Near: ' + css.slice(Math.max(0, i - 80), i + 12));
+    }
+    return true;
+  });
+
   /* #202 — how long a stone takes to be sown. The reported "instant turbo"
      was a flat 80 ms gap, under the ~100 ms a person needs to register a
      discrete event, so four stones read as one jump. The shape that fixes it

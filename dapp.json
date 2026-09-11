@@ -1061,9 +1061,19 @@
       "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
     },
     {
-      "name": "A finished Hash Rush board draws no end panel of its own",
-      "path": "/?game=hashrush&play=1&hrdead=1",
-      "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
+      "name": "A lost story run offers to continue the ladder",
+      "path": "/?game=zuma&result=1&pmode=story",
+      "expectText": "Continue Story Quest"
+    },
+    {
+      "name": "A lost arcade run offers another run",
+      "path": "/?game=zuma&result=1&pmode=arcade",
+      "expectText": "Another run"
+    },
+    {
+      "name": "Marble Loop shows the camouflage marble's countdown",
+      "path": "/?game=zuma&zcamo=1",
+      "expectText": "Camouflage"
     },
     {
       "name": "Marble Loop tells you a tap aims first",

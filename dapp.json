@@ -1061,11 +1061,6 @@
       "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
     },
     {
-      "name": "A finished Hash Rush board draws no end panel of its own",
-      "path": "/?game=hashrush&play=1&hrdead=1",
-      "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
-    },
-    {
       "name": "Marble Loop tells you a tap aims first",
       "path": "/?howto=zuma",
       "expectText": "Tap once to aim"
@@ -1074,6 +1069,16 @@
       "name": "Marble Loop promises a finishable endgame",
       "path": "/?howto=zuma",
       "expectText": "only deals colours still on the chain"
+    },
+    {
+      "name": "Mancala shows both stores as HUD scores",
+      "path": "/?game=mancala&mode=bot",
+      "expectText": "AI"
+    },
+    {
+      "name": "Mancala's local game scores both players in the HUD",
+      "path": "/?game=mancala&mode=2p",
+      "expectText": "P2"
     },
     {
       "name": "Daily Cipher names the day's theme",

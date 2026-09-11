@@ -841,6 +841,28 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #202 — how long a stone takes to be sown. The reported "instant turbo"
+     was a flat 80 ms gap, under the ~100 ms a person needs to register a
+     discrete event, so four stones read as one jump. The shape that fixes it
+     has to hold at both ends: generous for a small handful, tightening as the
+     handful grows, and bounded so a big pit is still quick. */
+  check('mancala-sowing', () => {
+    const d4 = mncSowDelay(4), d8 = mncSowDelay(8), d15 = mncSowDelay(15);
+    if (d4 < 100) throw new Error('a small handful must be slow enough to see, got ' + d4);
+    if (!(d4 >= d8 && d8 >= d15)) throw new Error('a bigger handful must not be slower per stone');
+    if (d4 > MNC_SOW_MAX || d15 < MNC_SOW_MIN) throw new Error('the gap must stay inside its bounds');
+    /* A typical move stays inside the budget; the bounds only catch extremes.
+       The slack is `n` because the gap is rounded to whole milliseconds per
+       stone, so n stones can carry up to n ms of rounding. */
+    for (const n of [6, 8, 10, 12, 15]) {
+      if (mncSowDelay(n) * n > MNC_SOW_BUDGET + n) throw new Error(n + ' stones overrun the budget');
+    }
+    // A one-stone move is a move, and a garbage count is not a crash.
+    if (mncSowDelay(1) !== MNC_SOW_MAX) throw new Error('one stone gets the longest gap');
+    if (!(mncSowDelay(0) > 0) || !(mncSowDelay(-3) > 0)) throw new Error('a nonsense count still yields a delay');
+    return true;
+  });
+
   /* #206 — the turn queue. The reported "the snake fails to turn on tap or
      swipe" is these two cases: a second turn that overwrote the first, and a
      second turn refused for reversing a direction the first one was about to

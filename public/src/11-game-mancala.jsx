@@ -124,16 +124,16 @@ function MncBoardCanvas({ pits, pitState, storeGlowL, storeGlowR, labelL, labelR
         ctx.clip();
         drawStones(s.idx, s.x + g.storeW / 2, g.pad + storeH / 2, g.storeW / 2.4, true);
         ctx.restore();
-        const fs = Math.max(8, Math.round(g.storeW * 0.22));
+        /* #202 — the COUNT has moved to the HUD. It used to be drawn here, in
+           the middle of the store, directly over the seed pile it was counting
+           — so the number obscured the thing it described and the thing it
+           described obscured the number. The store now holds seeds and a name;
+           the score is a pill above the board, where a score belongs. */
         ctx.font = `600 ${Math.max(6, Math.round(g.storeW * 0.16))}px 'Space Grotesk', sans-serif`;
         ctx.fillStyle = MNC_WOOD.label;
-        ctx.fillText(s.label.toUpperCase().slice(0, 6), s.x + g.storeW / 2, g.pad + storeH * 0.24);
-        ctx.font = `600 ${fs}px 'JetBrains Mono', monospace`;
-        ctx.fillStyle = s.glow ? palOf(s.glow, MNC_WOOD.text) : MNC_WOOD.text;
-        ctx.fillText(String(pits[s.idx]), s.x + g.storeW / 2, g.pad + storeH / 2 + fs * 0.35);
-        ctx.font = `600 ${Math.max(6, Math.round(g.storeW * 0.14))}px 'Space Grotesk', sans-serif`;
+        ctx.fillText(s.label.toUpperCase().slice(0, 6), s.x + g.storeW / 2, g.pad + storeH * 0.18);
         ctx.fillStyle = MNC_WOOD.label;
-        ctx.fillText('STORE', s.x + g.storeW / 2, g.pad + storeH * 0.8);
+        ctx.fillText('STORE', s.x + g.storeW / 2, g.pad + storeH * 0.86);
       }
 
       // Pits.
@@ -207,6 +207,34 @@ function mncPlayClick() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.08);
   } catch {}
+}
+
+/* #202 — HOW FAST A STONE IS SOWN.
+
+   The report calls the sowing "instant turbo", and it is not instant — every
+   stone has been animated one at a time since the start. It is that the gap
+   was a flat 80 ms, which is under the ~100 ms a person needs to register a
+   discrete event, so a four-stone move was over in 320 ms and read as one
+   jump rather than four placements.
+
+   A flat number cannot fix that on its own, because the pits are not all the
+   same size: whatever reads well for four stones drags for fifteen. So the
+   per-stone gap is derived from the COUNT — generous for a small handful,
+   tightening as the handful grows, and bounded at both ends so a big pit is
+   still quick and a small one is still legible.
+
+     4 stones  -> 170 ms each,  680 ms total
+     8 stones  -> 137 ms each, 1100 ms total
+    15 stones  ->  73 ms each, 1100 ms total
+
+   MNC_SOW_BUDGET is the single knob: it is the length of a typical move, and
+   the two bounds only stop the extremes from being silly. Pure, so
+   `mancala-sowing` can hold the shape rather than the numbers. */
+const MNC_SOW_MIN = 70, MNC_SOW_MAX = 170, MNC_SOW_BUDGET = 1100;
+
+function mncSowDelay(stones) {
+  const n = Math.max(1, stones | 0);
+  return Math.round(Math.max(MNC_SOW_MIN, Math.min(MNC_SOW_MAX, MNC_SOW_BUDGET / n)));
 }
 
 // Pure distribution function: picks up stones from pitIdx for player and sows them.
@@ -587,11 +615,14 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
       {activeTab === 'game' && (
         <div>
           <CuiBar height={72} build={(W) => {
-            const pr = cuiRow(0, 0, W, 46, 3);
+            // #202 — the two stores are SCORES, so they are pills like every
+            // other score in this app rather than numbers painted over seeds.
+            const pr = cuiRow(0, 0, W, 46, 4);
             return [
-              { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
-              { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
-              { id: 'p-turn', kind: 'pill', r: pr[2], label: 'Turn', value: done ? (winner === 'draw' ? 'Draw' : `P${winner}`) : `P${player}`, color: done ? undefined : palOf(activeColor, undefined) },
+              { id: 'p-p1', kind: 'pill', r: pr[0], label: 'P1', value: pits[6], color: palOf(p1Color, undefined) },
+              { id: 'p-p2', kind: 'pill', r: pr[1], label: 'P2', value: pits[13], color: palOf(p2Color, undefined) },
+              { id: 'p-time', kind: 'pill', r: pr[2], label: 'Time', value: fmt, gold: true },
+              { id: 'p-turn', kind: 'pill', r: pr[3], label: 'Turn', value: done ? (winner === 'draw' ? 'Draw' : `P${winner}`) : `P${player}`, color: done ? undefined : palOf(activeColor, undefined) },
               { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
                 label: done ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : `Game over — Player ${winner} wins! 🎉`) : `Player ${player}'s turn` },
             ];
@@ -1040,7 +1071,9 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
       setFlashPits(new Set([sequence[step]]));
       if (soundOnRef.current) mncPlayClick();
       step++;
-      setTimeout(animate, 80);
+      // Reduced motion means reduced motion: the stones still land in order,
+      // they just stop waiting to be watched.
+      setTimeout(animate, cgReducedMotion() ? 0 : mncSowDelay(sequence.length));
     };
     setTimeout(animate, 0);
   };
@@ -1148,13 +1181,21 @@ function MancalaAIGame({ onWin, onStepChange, resetKey, difficulty }) {
     <div>
       {resumeOffer && <ClassicResumeBanner onResume={applyResume} onDismiss={dismissResume} />}
       <CuiBar height={72} build={(W) => {
+        /* #202 — the two stores are SCORES and belong in pills, not painted
+           over the seed pile they are counting.
+
+           The pill they replace was "ZK", a verified/unverified indicator with
+           a tick, a cross and a lightning bolt. #224 has just removed every
+           other one of those at an admin's request; this was a third surface
+           nobody had spotted, and the HUD needed the room. The verification
+           itself is untouched — it is the READ-OUT that goes, exactly as in
+           #224. */
         const pr = cuiRow(0, 0, W, 46, 4);
         return [
-          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
-          { id: 'p-moves', kind: 'pill', r: pr[1], label: 'Moves', value: moves },
-          { id: 'p-diff', kind: 'pill', r: pr[2], label: 'Diff', value: String(difficulty).toUpperCase() },
-          { id: 'p-zk', kind: 'pill', r: pr[3], label: 'ZK', value: verifying ? '…' : verified === true ? '✓' : verified === false ? '✗' : sessionIdRef.current ? '⚡' : '—',
-            color: verifying ? PAL.gold : verified === true ? PAL.emerald : verified === false ? PAL.rose : sessionIdRef.current ? PAL.accent : PAL.muted },
+          { id: 'p-you', kind: 'pill', r: pr[0], label: 'You', value: pits[6], color: palOf(p1Color, undefined) },
+          { id: 'p-ai', kind: 'pill', r: pr[1], label: 'AI', value: pits[13], color: palOf(p2Color, undefined) },
+          { id: 'p-time', kind: 'pill', r: pr[2], label: 'Time', value: fmt, gold: true },
+          { id: 'p-diff', kind: 'pill', r: pr[3], label: 'Diff', value: String(difficulty).toUpperCase() },
           { id: 'banner', kind: 'label', r: [0, 50, W, 20], font: 12.5, bold: true, color: done ? PAL.muted : palOf(activeColor, undefined),
             label: done
               ? (winner === 'draw' ? "Game over — It's a draw! 🤝" : winner === 1 ? 'Game over — You win! 🎉' : 'Game over — AI wins! 🤖')
@@ -1347,11 +1388,12 @@ function MancalaOnlineGame({ onWin, onStepChange, roomId, myPlayerNum }) {
   return (
     <div>
       <CuiBar height={opponentDisconnected ? 68 : 46} build={(W) => {
-        const pr = cuiRow(0, 0, W, 46, 3);
+        const pr = cuiRow(0, 0, W, 46, 4);
         const out = [
-          { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
-          { id: 'p-turn', kind: 'pill', r: pr[1], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
-          { id: 'p-conn', kind: 'pill', r: pr[2], label: 'Online', value: opponentDisconnected ? '●' : '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
+          { id: 'p-p1', kind: 'pill', r: pr[0], label: 'P1', value: pits[6] },
+          { id: 'p-p2', kind: 'pill', r: pr[1], label: 'P2', value: pits[13] },
+          { id: 'p-turn', kind: 'pill', r: pr[2], label: 'Turn', value: turnLabel, color: isMyTurn ? palOf(myColor, undefined) : PAL.muted },
+          { id: 'p-conn', kind: 'pill', r: pr[3], label: 'Online', value: opponentDisconnected ? '●' : '●', color: opponentDisconnected ? PAL.gold : PAL.emerald },
         ];
         if (opponentDisconnected) {
           out.push({ id: 'disc', kind: 'label', r: [0, 50, W, 18], label: 'Opponent connection lost — waiting for reconnect…', gold: true, font: 12 });

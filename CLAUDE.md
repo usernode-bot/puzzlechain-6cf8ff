@@ -1590,6 +1590,34 @@ TouchList and a TouchList is an object, so `e.touches ? …` is true even when
 EMPTY — which is exactly what touchend carries. Nothing hit it before because
 touchend was only ever a bare "fire" signal that never asked where the finger
 was; aim-on-tap asks.
+### Mancala's sowing, and where a score belongs (#202)
+
+**The sowing was never instant.** Every stone has been animated one at a time
+since the start; the gap was a flat **80 ms**, which is under the ~100 ms a
+person needs to register a discrete event — so a four-stone move was over in
+320 ms and read as one jump rather than four placements. That is what the
+report calls "turbo".
+
+A flat number cannot fix it, because the pits are not all the same size:
+whatever reads well for four stones drags for fifteen. `mncSowDelay(n)` derives
+the gap from the COUNT — 170 ms each for a small handful, tightening as the
+handful grows, bounded at both ends. 4 stones take 680 ms, 8 take 1100 ms,
+15 take 1100 ms. **`MNC_SOW_BUDGET` is the single knob** — it is the length of
+a typical move; the two bounds only stop the extremes being silly.
+`cgReducedMotion()` collapses the wait to zero: the stones still land in order,
+they just stop waiting to be watched.
+
+**The store counts moved to the HUD.** They were drawn in the middle of each
+store, directly over the seed pile they were counting — the number obscured the
+thing it described and the thing it described obscured the number. The store
+now holds seeds and a name; the score is a pill above the board in all three
+modes (bot, local, online), where every other score in this app lives.
+
+In the bot HUD the pill they replace was **"ZK"**, a verified/unverified
+read-out with a tick, a cross and a lightning bolt. #224 removed every other
+one of those at an admin's request and this was a third surface nobody had
+spotted. The verification itself is untouched — it is the READ-OUT that goes,
+exactly as in #224.
 
 ### New deep links
 

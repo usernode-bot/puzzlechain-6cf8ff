@@ -13,6 +13,34 @@ function badgeProgressHints(streak, solveCount) {
   return hints;
 }
 
+/* #241 — the earned score, counted up. The rule this is built around: the
+   REAL number is what renders first, and the count-up only ever starts from
+   INSIDE a frame that actually ran. A screenshot capture and a throttled
+   background tab both fire no rAF at all, and a card that reads "+0" because
+   its animation never started would be worse than no animation — so the
+   fallback is the finished state, not the opening one. It always lands on the
+   exact value, and `data-win-earned` carries it whatever the frame count. */
+const WIN_COUNT_MS = 620;
+function WinEarned({ value }) {
+  const n = Number.isFinite(value) ? value : 0;
+  const [shown, setShown] = useState(n);
+  useEffect(() => {
+    setShown(n);
+    if (cgReducedMotion() || n <= 0) return;
+    let raf = 0, start = 0, alive = true;
+    const step = (t) => {
+      if (!alive) return;
+      if (!start) start = t;
+      const p = Math.min(1, (t - start) / WIN_COUNT_MS);
+      setShown(Math.round(n * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { alive = false; if (raf) cancelAnimationFrame(raf); };
+  }, [n]);
+  return <span className="we-v" data-win-earned={n}>+{shown}</span>;
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=friends / ?screen=session deep links for testing.
@@ -22,16 +50,8 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('screen');
     if (s === 'friends') return 'friends';
-    if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'session'
-  // DApp session receipt being viewed (session id), and identity-verified flag.
-  // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
-  const [receiptSessionId, setReceiptSessionId] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('sid') || (params.get('demo') === 'anchor' ? 'DAPPDEMOSUDOKU' : null);
-  });
-  const openReceipt = (sid) => { setReceiptSessionId(sid); setScreen('session'); };
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends'
   const [currentGame, setCurrentGame] = useState(null);
   /* #176 — which of the three play modes the current game was opened in.
      null means "no play-mode axis": the head-to-head games, whose axis is the
@@ -219,6 +239,18 @@ function App() {
      ============================================================ */
   const navLock = useRef(false);
   const navReady = useRef(false);
+  /* #186 — how many entries OF OURS are behind this one. The in-app back
+     control needs to know whether there is somewhere of ours to go back TO:
+     at depth 0 the previous entry belongs to whoever loaded us, and this app
+     runs in an iframe, so calling history.back() there steps the EMBEDDING
+     page out of the app rather than unwinding a screen. Stored on the entry
+     as well as held in a ref, so a reload or a pop restores the count instead
+     of guessing it. */
+  const navDepth = useRef(0);
+  /* A render-visible mirror of the ref, so the root can carry the depth as an
+     attribute. It is deliberately NOT part of navState: it changes as a RESULT
+     of a push, and putting it in would make every push cause another one. */
+  const [navDepthTick, setNavDepthTick] = useState(0);
 
   /* The single description of "where am I", used for both push and restore.
      EVERY field must be a primitive: this object is JSON.stringify'd on each
@@ -283,10 +315,13 @@ function App() {
       const url = window.location.pathname + window.location.search + window.location.hash;
       if (!navReady.current) {
         navReady.current = true;
-        window.history.replaceState({ un: navState }, '', url);
+        navDepth.current = navDepthOf(window.history.state);
+        window.history.replaceState({ un: navState, unDepth: navDepth.current }, '', url);
       } else {
-        window.history.pushState({ un: navState }, '', url);
+        navDepth.current += 1;
+        window.history.pushState({ un: navState, unDepth: navDepth.current }, '', url);
       }
+      setNavDepthTick(navDepth.current);
     } catch {}
   }, [navKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -294,6 +329,8 @@ function App() {
     const onPop = (e) => {
       const s = e.state && e.state.un;
       navLock.current = true;
+      navDepth.current = navDepthOf(e.state);
+      setNavDepthTick(navDepth.current);
       if (!s) {
         // Popped past our first entry — land on home rather than a blank state.
         setScreen('lobby'); setCurrentGame(null); setReviewMode(false);
@@ -735,14 +772,23 @@ function App() {
          replayable at all. `arcadeReplaySeed` is set when the player picked a
          past run out of their history; a fresh Play rolls a new one. */
       if (playMode === 'arcade') {
-        const seed = beginArcadeRun(arcadeReplaySeed);
+        /* #196 — a RESUMED arcade run is the same run, so it reopens with the
+           seed it was dealt and the anchor it was already given. Rolling a
+           fresh seed here would hand the player a different board than the one
+           their saved position belongs to, and a second /start would anchor a
+           run the finish is not going to claim. `arcadeReplaySeed` (history
+           replay) still wins, because that IS asking for a different run. */
+        const resumeRec = practiceMode ? null : readRunSave(game.id, 'arcade', arcadeBandId);
+        const resumeSeed = arcadeReplaySeed == null && resumeRec && Number.isFinite(resumeRec.seed)
+          ? resumeRec.seed : null;
+        const seed = beginArcadeRun(arcadeReplaySeed != null ? arcadeReplaySeed : resumeSeed);
         /* Claim the run server-side so the finish has a clock it did not get
            from us. Fire-and-forget on purpose: the board must not wait on a
            request. A run that never gets an id still plays and still lands in
            the player's history — it just settles as unverified, which is the
            right outcome for a run the server never saw begin. */
-        arcadeRunIdRef.current = null;
-        if (authOk) {
+        arcadeRunIdRef.current = resumeSeed != null && resumeRec.runId ? resumeRec.runId : null;
+        if (authOk && arcadeRunIdRef.current == null) {
           api(`/api/arcade/${game.id}/start`, {
             method: 'POST',
             body: JSON.stringify({ band: arcadeBandId, seed }),
@@ -845,8 +891,8 @@ function App() {
        preLaunchModal, so anything below that branch would surface the mode
        chooser instead of the screen the link names. openResultDemo pins solo
        mode itself. */
-    if (params.get('result') === '1') {
-      openResultDemo(g);
+    if (params.get('result') === '1' || params.get('result') === 'win') {
+      openResultDemo(g, params.get('result') === 'win');
       setHowToGame(null);
       return;
     }
@@ -898,13 +944,55 @@ function App() {
     // through this one branch now — Mancala and Snakes & Ladders used to fall
     // through to their own in-game pickers, which is exactly the split the
     // opponent screen exists to close.
+    /* #201 — ?room=<code> (plus ?seat=1|2) enters a live online match the way
+       tapping a your-turn card on Home does. That tap was the ONLY way in, so
+       no proposal check and no before/after screenshot could ever see the
+       in-match chrome — which is exactly the surface this change moves. Pure
+       navigation: it pre-seats the room id and lets the normal polling decide
+       whether the room is real, so a bad code lands on "Room not found"
+       rather than on a broken screen.
+
+       Checked BEFORE the opponent-screen branch, for the same reason ?result=1
+       and ?pmode= are: a game with modeSelect would otherwise surface the
+       chooser instead of the room this link names. */
+    const roomParam = params.get('room');
+    if (roomParam) {
+      setClassicGameMode('online');
+      setClassicGameModeOpts({ roomId: roomParam, myPlayerNum: params.get('seat') === '2' ? 2 : 1 });
+      setPreLaunchGame(null);
+      launchGame(g);
+      setHowToGame(null);
+      return;
+    }
     if (g.modeSelect && !mmode) { openOpponentScreen(g); return; }
     if (g.modeSelect && mmode) { setClassicGameMode(mmode); }
     // ?play=1 skips the pre-game screen and claims/mounts immediately — used
     // by proposal tests that assert on in-game UI, and by "jump straight in"
     // share links.
     if (params.get('play') === '1') {
-      if (g.daily) { startRun(g); return; }
+      /* A DAILY REACHED THIS WAY IS STILL A DAILY, and the shell has to be
+         told so. This branch used to call startRun(g) alone. startRun reads
+         the mode from a REF and never sets it, so on a link with no ?pmode=
+         the shell was left with playMode === null — and `resumable` in
+         renderGameBody is `playMode === 'daily'`, which is the single gate on
+         whether a game is handed its savedProgress at all.
+
+         So a daily opened by `?game=<id>&play=1` could not resume: a claimed,
+         half-played attempt mounted as a blank board with its clock at zero.
+         That is the shape of link the share cards carry ("the no-login ?game=
+         link") and the shape the proposal checks use, which is how it showed
+         up — "Nonogram resumes its mistake count" asserts on a resumed board
+         and had no mode to resume in.
+
+         Now it takes the same two steps the ?pmode= branch above takes:
+         launchGame sets the mode, startRun claims or resumes in it. */
+      if (g.daily) {
+        const dm = defaultPlayMode(g);
+        launchGame(g, dm);
+        startRun(g, { mode: dm });
+        setHowToGame(null);
+        return;
+      }
       launchGame(g);
       setHowToGame(null); // suppress the classic first-open auto-show too
       return;
@@ -994,6 +1082,67 @@ function App() {
     const q = saveQueueRef.current;
     if (q.blockedGameId === gameId) q.blockedGameId = null;
   };
+
+  /* The story/arcade half of resume (#187 / #196). Device-local, never the
+     attempt row — see the note in renderGameBody.
+
+     Three rules, each of which exists because of something that would
+     otherwise go wrong:
+
+     - NOTHING IS SAVED UNTIL A MOVE IS MADE. A save of an untouched board is
+       worth nothing and is actively harmful: proposal checks mount story
+       boards to assert on their FRESH state, and a save written by one of them
+       would hydrate into the next and change the board it was asserting on.
+     - THE FINISH GUARD IS THE SAME ONE THE DAILY USES. handleWin/handleLose
+       call cancelProgressSave() before anything else, and useAutosave flushes
+       again on unmount — without honouring that flag a trailing flush would
+       write the save back after the finish had cleared it, and the next visit
+       would resume a run that was already over.
+     - AN ARCADE RUN RECORDS ITS SEED AND ITS RUN ID. A story rung rebuilds the
+       same board from (game, band) on any day, so it needs neither; an arcade
+       board comes from the run's own seed, and its finish is checked against
+       the anchor /api/arcade/:id/start stamped. Resume both or the run comes
+       back as a different board, settling unverified. */
+  const saveLocalRun = (progress, steps, secs) => {
+    const g = currentGame;
+    if (!g || practiceMode) return;
+    if (playMode !== 'story' && playMode !== 'arcade') return;
+    if (saveQueueRef.current.blockedGameId === g.id) return;
+    if (!(steps > 0)) return;
+    const band = playMode === 'arcade' ? arcadeBandId : storyBand;
+    writeRunSave(g.id, playMode, band, {
+      v: 1,
+      progress,
+      steps,
+      elapsedSecs: secs,
+      savedAt: Date.now(),
+      seed: playMode === 'arcade' ? currentArcadeSeed() : null,
+      runId: playMode === 'arcade' ? arcadeRunIdRef.current : null,
+    });
+  };
+
+  // Dropped when the run ends and at the four deliberate start-fresh moments,
+  // which is what playAgainKey already marks.
+  const dropLocalRun = (gameId, mode, band) => {
+    if (mode !== 'story' && mode !== 'arcade') return;
+    clearRunSave(gameId, mode, band);
+  };
+
+  /* Read ONCE per (game, mode, band) — and again when playAgainKey moves,
+     because that is the signal that a fresh run was asked for and the record
+     has just been dropped. The games read savedProgress in their useState
+     initialisers, so what matters is the value on the render that mounts
+     them. */
+  const resumeDemoSeeded = useRef(false);
+  if (!resumeDemoSeeded.current) { resumeDemoSeeded.current = true; seedResumeDemo(offset); }
+
+  const localRunProgress = React.useMemo(() => {
+    if (!currentGame || practiceMode) return null;
+    if (playMode !== 'story' && playMode !== 'arcade') return null;
+    const band = playMode === 'arcade' ? arcadeBandId : storyBand;
+    return hydrateRunSave(readRunSave(currentGame.id, playMode, band), offset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentGame && currentGame.id, playMode, arcadeBandId, storyBand, practiceMode, playAgainKey, offset]);
 
   const handleSaveProgress = (progress, steps, secs) => {
     if (!currentGame) return;
@@ -1125,13 +1274,6 @@ function App() {
           justAchievement: firstNew ? achievementBadgeFor(firstNew) : prev.justAchievement,
         };
       });
-      // DApp Mode: surface the Verified badge, then anchor on-chain (best-effort).
-      if (body && body.dapp) {
-        setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
-        dappAnchor(body.dapp).then(updated => {
-          setWinData(prev => prev ? { ...prev, dapp: updated } : prev);
-        }).catch(() => {});
-      }
     } else {
       setWinData(prev => prev ? { ...prev, syncError: true } : prev);
     }
@@ -1300,6 +1442,8 @@ function App() {
        the shell decides what that means in the mode it was opened in. */
     if (playMode === 'story') {
       const bandIdx = typeof storyBand === 'number' ? storyBand : 0;
+      // The run is over: its local resume record is done with (#187).
+      dropLocalRun(currentGame.id, 'story', bandIdx);
       const res = await handleBandCleared(bandIdx, { score, steps, timeSecs });
       const total = (res && res.total) || (storyProgress[currentGame.id] || {}).total || 0;
       // Issue #183 — the ladder-completion badge. Only a FRESH award pops the
@@ -1335,6 +1479,7 @@ function App() {
     }
     if (playMode === 'arcade') {
       const band = arcadeBandId;
+      dropLocalRun(currentGame.id, 'arcade', band);
       const { ok, body } = await api(`/api/arcade/${currentGame.id}/finish`, {
         method: 'POST',
         body: JSON.stringify({
@@ -1584,10 +1729,13 @@ function App() {
           }),
         }).catch(() => {});
       }
+      dropLocalRun(currentGame.id, playMode,
+        playMode === 'arcade' ? arcadeBandId : storyBand);
       setLoseData({
         steps, timeSecs, score: lostScore, finalScore: lostScore,
         share: meta && meta.share, answer: meta && meta.answer,
         scoreLabel: meta && meta.scoreLabel, scoreValue: meta && meta.scoreValue,
+        winnerLabel: meta && meta.winnerLabel,
         modeLabel: playMode === 'story' ? 'Story' : 'Arcade',
       });
       return;
@@ -1605,6 +1753,7 @@ function App() {
           scoreValue: meta && meta.scoreValue,
           share: meta && meta.share,
           answer: meta && meta.answer,
+          winnerLabel: meta && meta.winnerLabel,
           isClassic: true,
           gameId: currentGame.id,
         });
@@ -1626,6 +1775,7 @@ function App() {
           scoreValue: meta && meta.scoreValue,
           share: meta && meta.share,
           answer: meta && meta.answer,
+          winnerLabel: meta && meta.winnerLabel,
           guest: true,
           gameId,
         });
@@ -1640,6 +1790,7 @@ function App() {
         scoreValue: meta && meta.scoreValue,
         share: meta && meta.share,
         answer: meta && meta.answer,
+        winnerLabel: meta && meta.winnerLabel,
         hintsUsed: meta && meta.hintsUsed,
         wordsSolved: meta && meta.wordsSolved,
         wordsTotal: meta && meta.wordsTotal,
@@ -1694,6 +1845,31 @@ function App() {
     else if (tab === 'ladder' || tab === 'home') setLobbyTab(tab);
   };
 
+  /* #186 — the in-app back control, which was never a back control.
+     Every "← Back" in this app called backToLobby(), a RESET: it clears the
+     game, the result, the mode and the practice flag and sets screen to
+     'lobby'. Measured, from a board reached home → card → pre-game → Play:
+     the device back button unwound game → pregame → lobby a step at a time
+     (the #134 reducer doing its job), while "← Back" jumped straight to the
+     lobby AND pushed another entry (history.length 4 → 5), so pressing it and
+     then device-back went FORWARD into the board you had just left.
+
+     So this is not a second navigation model — it is the existing one, used.
+     The only judgement here is the fallback: at depth 0 there is no entry of
+     ours behind us (a cold deep link, which is the shape every share card
+     carries), and history.back() would leave the app. `backToLobby` is then
+     the right answer and the safe one.
+
+     The result cards' "Back to Lobby" and the Ladder tab's "← Home" keep
+     calling backToLobby directly: their labels name a destination, and going
+     there is correct. */
+  const goBack = (fallbackTab) => {
+    if (navDepth.current > 0 && typeof window !== 'undefined' && window.history) {
+      try { window.history.back(); return; } catch (e) {}
+    }
+    backToLobby(fallbackTab);
+  };
+
   /* PHASE 4 (#133) — "Play again for fun".
      Mounts the SAME component with the SAME dailyRng seed (so it is genuinely
      today's puzzle, not a random one) and a bumped resetKey, but with
@@ -1717,6 +1893,13 @@ function App() {
   };
 
   const playAgain = () => {
+    /* A deliberate restart, so the local resume record goes with it — without
+       this the remount would hydrate straight back into the run that just
+       ended (#187). */
+    if (currentGame) {
+      dropLocalRun(currentGame.id, playMode,
+        playMode === 'arcade' ? arcadeBandId : storyBand);
+    }
     setWinData(null);
     setLoseData(null);
     setReviewMode(false);
@@ -1738,7 +1921,20 @@ function App() {
      endpoint is called on either path, which is why this link is deliberately
      NOT staging-gated (the "before" screenshot comes from production). */
   const RESULT_DEMO = { score: 8432, steps: 214, timeSecs: 372, tile: 512 };
-  const openResultDemo = (game) => {
+  /* `?result=win` is the WIN card, which `?result=1` never reached: its daily
+     branch goes through practiceResult and its classic branch sets loseData,
+     so the one screen this issue is about had no URL at all. Same guarantee as
+     the rest of the link — it is local UI state and calls no endpoint (the
+     only daily write on this path is retryDailyFinish, which needs a press). */
+  const winResultDemo = (game) => ({
+    score: 1200, bonus: 240, finalScore: 1440, steps: 37, timeSecs: 214,
+    multiplier: 1.2, effectiveStreak: 6, hintsUsed: 1, prevBest: 1180,
+    gameId: game.id, demo: true,
+    justAchievement: { icon: '🧩', name: 'Puzzler' },
+    activeBadge: { icon: '🔥', name: 'Kindling' },
+    share: `Game Corner ${game.name} — 1440 pts`,
+  });
+  const openResultDemo = (game, wantWin) => {
     if (!game) return;
     setCurrentGame(game);
     setLockedReview(false);
@@ -1754,6 +1950,14 @@ function App() {
     setClassicGameModeOpts(null);
     setStepCount(0);
     setScreen('game');
+    if (wantWin) {
+      setPracticeMode(false);
+      if (game.daily) setPlayMode('daily');
+      setWinData(game.daily
+        ? winResultDemo(game)
+        : { ...winResultDemo(game), isClassic: true, bestScore: 1180, multiplier: 1, bonus: 0 });
+      return;
+    }
     if (game.daily) {
       setPracticeMode(true);
       setPracticeResult({
@@ -1763,6 +1967,17 @@ function App() {
       return;
     }
     setPracticeMode(false);
+    /* #213 — `?result=1&pmode=story|arcade` shows the result card as it looks
+       at the END OF A MODE RUN rather than a free-play one, which is where
+       "Continue Story Quest" lives. A lost story rung is reachable no other
+       way: you would have to actually lose one, and neither a proposal check
+       nor a screenshot can play. Still writes nothing — this is local UI state
+       on the same inert path the rest of ?result=1 uses. */
+    const demoMode = new URLSearchParams(window.location.search).get('pmode');
+    const modeLabel = demoMode === 'story' && supportsMode(game.id, 'story') ? 'Story'
+      : demoMode === 'arcade' && supportsMode(game.id, 'arcade') ? 'Arcade'
+      : null;
+    if (modeLabel) setPlayMode(modeLabel === 'Story' ? 'story' : 'arcade');
     setLoseData({
       steps: RESULT_DEMO.steps,
       timeSecs: RESULT_DEMO.timeSecs,
@@ -1771,7 +1986,9 @@ function App() {
       scoreLabel: game.id === '2048' ? 'Highest tile' : 'Best run',
       scoreValue: game.id === '2048' ? RESULT_DEMO.tile : RESULT_DEMO.score,
       share: `Game Corner ${game.name} — ${RESULT_DEMO.score} pts`,
-      isClassic: true,
+      winnerLabel: modeLabel ? 'Game Over' : undefined,
+      modeLabel: modeLabel || undefined,
+      isClassic: !modeLabel,
       gameId: game.id,
     });
   };
@@ -1865,15 +2082,22 @@ function App() {
        this band again" re-deals the same band. */
     const bodyKey = playMode === 'story'
       ? `story-${currentGame.id}-${storyBand}-${playAgainKey}` : undefined;
-    /* ONLY A DAILY RESUMES. The progress row is the daily attempt row — it is
-       keyed by (user, game, UTC day) and exists only once /start has claimed
-       the day. A story or arcade run has no such row, so saving into it 409s
-       (a console error, which trips the no-console-errors check) and READING
-       from it is worse: a half-finished daily board would hydrate into a story
-       rung that is supposed to be a fixed, retryable deal. Neither mode wants
-       resume anyway — a story rung is stable by seed, so restarting it costs
-       nothing, and an arcade run is meant to be thrown away. */
+    /* ONLY A DAILY RESUMES *INTO THE ATTEMPT ROW*. That row is keyed by
+       (user, game, UTC day) and exists only once /start has claimed the day, so
+       a story or arcade run saving into it 409s (a console error, which trips
+       the no-console-errors check) and READING from it is worse: a
+       half-finished daily board would hydrate into a story rung that is
+       supposed to be a fixed, retryable deal.
+
+       Every word of that is about the SERVER, and none of it was ever a reason
+       for a story rung to lose ten minutes of work to a reload (#187 / #196) —
+       which is exactly what happened, because with both props null the game had
+       nowhere to write anything down. Story and arcade now resume from a
+       DEVICE-LOCAL record instead, so the attempt row is untouched and the
+       twenty-odd game components need no changes: they already know how to
+       hydrate from savedProgress and to write through onSaveProgress. */
     const resumable = playMode === 'daily' && !practiceMode;
+    const localResumable = (playMode === 'story' || playMode === 'arcade') && !practiceMode;
     switch (currentGame.shell) {
       case 'self':
         // Full-screen, gesture-first game that renders its own ClassicShell.
@@ -1882,15 +2106,16 @@ function App() {
             key={bodyKey}
             {...modeProps}
             game={currentGame}
-            onBack={() => backToLobby('classic')}
+            onBack={() => goBack('classic')}
             onWin={handleWin}
             onLose={handleLose}
             onStepChange={setStepCount}
             offset={offset}
-            /* Phase 1 (#160) — these games are now kept MOUNTED and frozen
-               behind the shared results card, so any per-game end panel must
-               stand down (only Hash Rush has one). */
-            resultShown={!!winData || !!loseData || !!practiceResult}
+            /* #215 — `resultShown` is gone with the panel it silenced. Phase 1
+               (#160) added it because Hash Rush drew an end panel of its own;
+               that panel turned out to exist only in the gap before the shared
+               card arrived, so it was deleted and no shell:'self' game has one
+               now. Keep it that way: the shared results card is the ending. */
             resetKey={playAgainKey}
             menuConfig={classicMenuConfig}
             gameMode={classicGameMode}
@@ -1911,7 +2136,7 @@ function App() {
         return (
           <ClassicShell
             game={currentGame}
-            onExit={() => backToLobby('classic')}
+            onExit={() => goBack('classic')}
             onNewGame={() => setPlayAgainKey(k => k + 1)}
             menuConfig={classicMenuConfig}
             sheetSections={classicSections}
@@ -1938,7 +2163,7 @@ function App() {
                 gameMode={classicGameMode}
                 gameModeOpts={classicGameModeOpts}
                 onModeChange={setClassicGameMode}
-                onBack={() => backToLobby('classic')}
+                onBack={() => goBack('classic')}
               />
             </div>
           </ClassicShell>
@@ -1959,7 +2184,7 @@ function App() {
         return (
           <div className={'game-wrap' + (currentGame.fitShell ? ' fit' : '')}>
             <div className="game-head">
-              <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
+              <button className="back-btn" onClick={() => goBack()}>← Back</button>
               <div className="game-title">
                 <span>{currentGame.icon}</span> {currentGame.name}
               </div>
@@ -1981,7 +2206,25 @@ function App() {
               )}
             </div>
             <GameComponent
-              key={bodyKey}
+              /* #198 — the REPLAY controls on a daily's result card ("Play
+                 again for fun", "Another practice run") go through
+                 startPractice, which bumps playAgainKey and clears the
+                 overlay. But nothing consumed that: `resetKey` is passed
+                 below and NO daily reads it (only three classics do), and
+                 without a key React reuses this component in place, because
+                 the element type and position never change. So the card
+                 vanished and the finished run stayed exactly as it was — a
+                 dead board with its clock at zero, which is the reported
+                 "Play Again fails to launch".
+
+                 Keying on playAgainKey makes the replay an actual remount, so
+                 every daily restarts from its own initial state without any of
+                 the 23 game components needing to know about it. The key
+                 changes ONLY at the four deliberate start-fresh moments
+                 (startPractice, playAgain, a classic mode change, and
+                 ClassicShell's New Game), so a normal run is never remounted
+                 mid-play. */
+              key={playAgainKey}
               {...modeProps}
               onWin={handleWin}
               onLose={handleLose}
@@ -1992,8 +2235,10 @@ function App() {
               }}
               onMoveTile={logsOwnMoves && !practiceMode ? recordDailyMove : undefined}
               offset={offset}
-              savedProgress={resumable ? progressFor(attempts[currentGame.id]) : null}
-              onSaveProgress={resumable ? handleSaveProgress : null}
+              savedProgress={resumable ? progressFor(attempts[currentGame.id])
+                : localResumable ? localRunProgress : null}
+              onSaveProgress={resumable ? handleSaveProgress
+                : localResumable ? saveLocalRun : null}
               resetKey={playAgainKey}
             />
           </div>
@@ -2075,13 +2320,28 @@ function App() {
      render below unmount the body and put the results card over a blank page.
      Snake, Block Fit, Diamond Rush and Hash Rush now keep their final board
      frozen behind the card like every other game. */
+  /* #195 — `reviewBoard: false` in the registry opts a game out of the review
+     step. Reviewing a frozen board is worth a tap when the board IS the result
+     (a solved nonogram, a final 2048 grid); for Daily Cipher the result card
+     already reveals the answer and the score, so the board behind it repeats
+     what you just read and the overlay is one more thing to dismiss. It is a
+     declarative flag rather than an id check here, because "does my board say
+     anything after the run" is a property of a game, not of the shell. */
   const boardReviewable = screen === 'game' && !!currentGame && !!resultData
+    && currentGame.reviewBoard !== false
     && (!resultData.gameId || resultData.gameId === currentGame.id);
 
   /* #162 — dismissing a results card reveals the board behind it. One handler
      for all three overlays: only a press on the SCRIM itself counts (a press on
      the card bubbles to the same node, hence the target check), and it fires on
      pointerdown so it lands on finger-DOWN like the shared tap primitive. */
+  /* #241 — the result card opens as the arcade moment and nothing else; the
+     breakdown, the badge furniture and the leaderboard are one tap away. It
+     resets whenever the result does, so the next win opens on the moment
+     again rather than on whatever the last one was left showing. */
+  const [winDetails, setWinDetails] = useState(false);
+  useEffect(() => { setWinDetails(false); }, [winData, loseData, practiceResult]);
+
   const dismissResultCard = (e) => {
     if (e && e.target !== e.currentTarget) return;
     if (!boardReviewable) return;
@@ -2121,9 +2381,13 @@ function App() {
      followed by an unstyled one (#150). Keeping the stylesheet outside the
      boundary is what lets the fallback panel render styled. */
   return (
-    <div className={'app' + (fitActive ? ' app-fit' : '')}>
+    /* data-nav-depth is what a proposal check can actually see: a check can
+       navigate but cannot press back, and the case worth guarding is the cold
+       deep link, where depth 0 is the difference between falling back to the
+       lobby and stepping the embedding page out of the app. */
+    <div className={'app' + (fitActive ? ' app-fit' : '')} data-nav-depth={navDepthTick}>
       <nav className="nav">
-        <div className="nav-brand"><span className="logo">⬢</span> Game Corner</div>
+        <div className="nav-brand"><span className="logo">⬢</span><span className="brandword">Game Corner</span></div>
         <div className="nav-right">
           <div className="nav-stats">
             <div className="nav-stat">
@@ -2188,7 +2452,7 @@ function App() {
         <ProfileScreen
           userId={selectedUserId}
           user={user}
-          onBack={() => { setScreen('lobby'); setSelectedUserId(null); }}
+          onBack={() => goBack()}
           onOpenFriends={() => setScreen('friends')}
           onOpenSettings={() => setSettingsOpen(true)}
         />
@@ -2197,20 +2461,12 @@ function App() {
       {screen === 'friends' && (
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-          onBack={() => setScreen('lobby')}
-        />
-      )}
-
-      {screen === 'session' && (
-        <SessionReceipt
-          sessionId={receiptSessionId}
-          onBack={() => setScreen('lobby')}
-          onOpenReceipt={openReceipt}
+          onBack={() => goBack()}
         />
       )}
 
       {screen === 'lobby' && (
-        <div className="lobby">
+        <div className="lobby screen-in">
           {lobbyTab === 'ladder' ? (
             <React.Fragment>
               <button className="home-back-btn" onClick={() => setLobbyTab('home')}>← Home</button>
@@ -2431,9 +2687,53 @@ function App() {
                         Tap 📌 on any card to pin it to the top.
                       </div>
                     )}
-                    <div className="grid">
-                      {restCards.map(c => <GameCard {...cardProps(c)} />)}
-                    </div>
+                    {(() => {
+                      /* #226 — under the Daily chip, split the grid into what
+                         is still open today and what is already done. The card
+                         already knows: cardDailyId + attempts[id].finishedAt is
+                         the same pair its own "Daily ✓" badge reads, so this
+                         needs no extra fetch and cannot disagree with the badge.
+
+                         The split only appears once something IS finished, and
+                         only after the attempts have loaded. A signed-out
+                         visitor, and everyone at 00:01 UTC, would otherwise get
+                         a "Not completed (23)" heading over the whole grid and
+                         an empty section under it — a breakdown that breaks
+                         nothing down. */
+                      const dailyDone = (c) => {
+                        const id = cardDailyId(c);
+                        const a = id ? attempts[id] : null;
+                        return !!(a && a.finishedAt);
+                      };
+                      const done = homeFilter === 'daily' && !loading
+                        ? restCards.filter(dailyDone) : [];
+                      if (done.length === 0) {
+                        return (
+                          <div className="grid">
+                            {restCards.map(c => <GameCard {...cardProps(c)} />)}
+                          </div>
+                        );
+                      }
+                      const todo = restCards.filter(c => !dailyDone(c));
+                      return (
+                        <React.Fragment>
+                          <div className="home-section-title home-split-title">
+                            Still to play
+                            <span className="home-pin-count">{todo.length}</span>
+                          </div>
+                          {todo.length === 0
+                            ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
+                            : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                          <div className="home-section-title home-split-title">
+                            Completed today
+                            <span className="home-pin-count">{done.length}</span>
+                          </div>
+                          <div className="grid home-split-done">
+                            {done.map(c => <GameCard {...cardProps(c)} />)}
+                          </div>
+                        </React.Fragment>
+                      );
+                    })()}
                     {/* #234 — Today's Top Scores reads AFTER the games now.
                         It is a result of playing, not a way in, and at 135px
                         directly under the hero it was one of the four blocks
@@ -2452,9 +2752,9 @@ function App() {
       )}
 
       {screen === 'pregame' && currentGame && (
-        <div className="game-wrap">
+        <div className="game-wrap screen-in">
           <div className="game-head">
-            <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
+            <button className="back-btn" onClick={() => goBack()}>← Back</button>
             <div className="game-title">
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
@@ -2484,9 +2784,9 @@ function App() {
       )}
 
       {screen === 'opponent' && preLaunchGame && (
-        <div className="game-wrap">
+        <div className="game-wrap screen-in">
           <div className="game-head">
-            <button className="back-btn" onClick={() => backToLobby('classic')}>← Back</button>
+            <button className="back-btn" onClick={() => goBack('classic')}>← Back</button>
             <div className="game-title">
               <span>{preLaunchGame.icon}</span> {preLaunchGame.name}
             </div>
@@ -2512,9 +2812,9 @@ function App() {
         // false) there is no .fit-col in this wrap, so `.game-wrap.fit`
         // would clip the card AND fail the registry-fitshell self-test —
         // exactly what the ?demo=solvedboard checks caught.
-        <div className={'game-wrap' + (lockedReviewable && lockedReview ? ' fit' : '')}>
+        <div className={'game-wrap screen-in-fade' + (lockedReviewable && lockedReview ? ' fit' : '')}>
           <div className="game-head">
-            <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
+            <button className="back-btn" onClick={() => goBack()}>← Back</button>
             <div className="game-title">
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
@@ -2541,7 +2841,7 @@ function App() {
               nextResetUtc={nextResetUtc}
               offset={offset}
               onReset={onReset}
-              onBack={() => backToLobby()}
+              onBack={() => goBack()}
               best={bests[currentGame.id]}
               onReview={lockedReviewable ? () => setLockedReview(true) : null}
               onPractice={() => startPractice(currentGame)}
@@ -2576,7 +2876,7 @@ function App() {
           that the loss had just cleared), so "the final board" was a brand new
           one. Keeping one stable element preserves the subtree's state. */}
       {screen === 'game' && currentGame && (
-        <div className={'game-body' + (boardReviewable ? ' frozen' : '')}>
+        <div className={'game-body screen-in-fade' + (boardReviewable ? ' frozen' : '')}>
           {renderGameBody()}
         </div>
       )}
@@ -2686,12 +2986,20 @@ function App() {
          offline-retry note for an endpoint they never called. The daily
          furniture now asks for a daily. */
       const isDailyResult = !winData.isClassic && !winData.modeLabel;
-      return (
-        <div className="win-overlay" onPointerDown={dismissResultCard}>
-          <div className="win-card">
-            <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
-            <h2>{winData.winnerLabel || (winData.cashOut ? 'Locked In! 🔒' : 'Solved!')}</h2>
-            <div className="sub">{currentGame && currentGame.name}</div>
+      /* One line of context under the number, not three blocks of it. In
+         priority order: what you just unlocked, then a personal best. The
+         full record is still in the details panel. */
+      const flourish = winData.justAchievement
+        ? `${winData.justAchievement.icon} Badge unlocked — ${winData.justAchievement.name}`
+        : winData.justBadge
+          ? `${winData.justBadge.icon} ${winData.justBadge.name} — ${winData.justBadge.min}-day streak`
+          : winData.storyBadge
+          ? `${winData.storyBadge.icon} Ladder complete — ${winData.storyBadge.name}`
+          : (!winData.isClassic && winData.prevBest !== undefined
+             && (winData.prevBest == null || winData.finalScore > winData.prevBest))
+            ? '🏅 New personal best'
+            : null;
+      const scoreRows = (
             <div className="score-rows">
               <div className="score-row">
                 <span className="k">Base score</span>
@@ -2765,6 +3073,79 @@ function App() {
                 </div>
               )}
             </div>
+      );
+      /* Everything the report called "too much": the seven-row breakdown, the
+         badge furniture and today's leaderboard. None of it is gone — it is
+         one tap down, below the actions so opening it never moves them. */
+      const detailsPanel = (
+        <div className="win-details">
+          {scoreRows}
+              {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={true} />}
+              {isDailyResult && winData.justBadge && (
+                <div className="badge-unlock">
+                  <div className="bu-icon">{winData.justBadge.icon}</div>
+                  <div className="bu-title">Milestone reached!</div>
+                  <div className="bu-name">{winData.justBadge.name} · {winData.justBadge.min}-day streak</div>
+                </div>
+              )}
+              {isDailyResult && !winData.justBadge && winData.activeBadge && (
+                <div className="win-badge-row">
+                  <span className="wbr-icon">{winData.activeBadge.icon}</span>
+                  <span>{winData.activeBadge.name} badge active</span>
+                </div>
+              )}
+              {isDailyResult && winData.justAchievement && (
+                <div className="badge-unlock">
+                  <div className="bu-icon">{winData.justAchievement.icon}</div>
+                  <div className="bu-title">Badge unlocked!</div>
+                  <div className="bu-name">{winData.justAchievement.name}</div>
+                </div>
+              )}
+              {isDailyResult && !winData.guest && (() => {
+                // Next-milestone progress so every solve shows forward motion even
+                // when nothing unlocked this run. Streak progress is based on the
+                // streak this win landed in; solve progress on the lifetime count.
+                const hints = badgeProgressHints(winData.effectiveStreak || 0, solveCount);
+                if (!hints.length) return null;
+                return (
+                  <div className="win-progress">
+                    {hints.map(h => (
+                      <span key={h.key} className="badge-progress-pill">
+                        <span>{h.icon}</span> {h.text}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+              {winData.modeLabel === 'Story' && winData.storyBadge && (
+                <div className="badge-unlock">
+                  <div className="bu-icon">{winData.storyBadge.icon}</div>
+                  <div>
+                    <div className="bu-title">Ladder complete!</div>
+                    <div className="bu-name">{winData.storyBadge.name} · {winData.storyBadge.desc}</div>
+                  </div>
+                </div>
+              )}
+        </div>
+      );
+      return (
+        <div className="win-overlay" onPointerDown={dismissResultCard}>
+          <div className="win-card" data-win-details={winDetails ? 'open' : 'closed'}>
+            <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
+            <h2>{winData.winnerLabel || (winData.cashOut ? 'Locked In! 🔒' : 'Solved!')}</h2>
+            <div className="sub">{currentGame && currentGame.name}</div>
+            <div className="win-earned">
+              <span className="we-k">Earned</span>
+              <WinEarned value={winData.finalScore} />
+              {winData.multiplier > 1 && (
+                <span className="we-note">
+                  {winData.isClassic
+                    ? `Lock In ×${winData.multiplier}`
+                    : `Streak ×${winData.multiplier} · ${winData.effectiveStreak}-day`}
+                </span>
+              )}
+            </div>
+            {flourish && <div className="win-flourish">{flourish}</div>}
             {/* Final table for a multi-seat local match. Seat 1 is the device's
                 own player, so its row is marked rather than left to be counted
                 out of the list. */}
@@ -2780,42 +3161,6 @@ function App() {
                 ))}
               </div>
             )}
-            {isDailyResult && winData.justBadge && (
-              <div className="badge-unlock">
-                <div className="bu-icon">{winData.justBadge.icon}</div>
-                <div className="bu-title">Milestone reached!</div>
-                <div className="bu-name">{winData.justBadge.name} · {winData.justBadge.min}-day streak</div>
-              </div>
-            )}
-            {isDailyResult && !winData.justBadge && winData.activeBadge && (
-              <div className="win-badge-row">
-                <span className="wbr-icon">{winData.activeBadge.icon}</span>
-                <span>{winData.activeBadge.name} badge active</span>
-              </div>
-            )}
-            {isDailyResult && winData.justAchievement && (
-              <div className="badge-unlock">
-                <div className="bu-icon">{winData.justAchievement.icon}</div>
-                <div className="bu-title">Badge unlocked!</div>
-                <div className="bu-name">{winData.justAchievement.name}</div>
-              </div>
-            )}
-            {isDailyResult && !winData.guest && (() => {
-              // Next-milestone progress so every solve shows forward motion even
-              // when nothing unlocked this run. Streak progress is based on the
-              // streak this win landed in; solve progress on the lifetime count.
-              const hints = badgeProgressHints(winData.effectiveStreak || 0, solveCount);
-              if (!hints.length) return null;
-              return (
-                <div className="win-progress">
-                  {hints.map(h => (
-                    <span key={h.key} className="badge-progress-pill">
-                      <span>{h.icon}</span> {h.text}
-                    </span>
-                  ))}
-                </div>
-              );
-            })()}
             {/* PHASE 4 (#132) — the old wording ("Couldn't sync your result —
                 your puzzle is still locked for today") read like the win had
                 been thrown away, and used "locked" to describe a FAILURE, which
@@ -2852,15 +3197,6 @@ function App() {
                 those are gated on isDailyResult and must stay that way, since
                 a story run never touches the daily attempt row, streak or
                 daily badges. */}
-            {winData.modeLabel === 'Story' && winData.storyBadge && (
-              <div className="badge-unlock">
-                <div className="bu-icon">{winData.storyBadge.icon}</div>
-                <div>
-                  <div className="bu-title">Ladder complete!</div>
-                  <div className="bu-name">{winData.storyBadge.name} · {winData.storyBadge.desc}</div>
-                </div>
-              </div>
-            )}
             {winData.modeLabel === 'Story' && winData.bandTotal > 0 && (
               <div className="mode-result">
                 <div className="mode-result-title">📖 Story · level {winData.bandIndex + 1} of {winData.bandTotal}</div>
@@ -2891,15 +3227,13 @@ function App() {
                 </div>
               </div>
             )}
-            {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {/* DAILY board only. `/api/daily/:gameId/leaderboard` validates
                 :gameId against GAME_IDS and 400s on a classic id, and a 400 is
                 a console error the no-console-errors check fails on. Classics
                 reach their all-time board through ClassicShell's ☰ sheet. */}
-            {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             {winData.isClassic && (
-              <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
+              <button className="primary-btn play-again-btn" onClick={playAgain}>
                 Play Again
               </button>
             )}
@@ -2921,7 +3255,14 @@ function App() {
                 {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the levels'}
               </button>
             )}
-            <button className="primary-btn" onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            {/* One primary action per card. Where Play Again exists it is the
+                primary, so leaving steps down to the quiet style; a daily has
+                no Play Again, so Back to Lobby stays the primary there. */}
+            <button className={'primary-btn' + (winData.isClassic ? ' review-btn' : '')} onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            <button className="win-more" aria-expanded={winDetails} onClick={() => setWinDetails(v => !v)}>
+              {winDetails ? 'Hide the details ▴' : 'Score, badges & leaderboard ▾'}
+            </button>
+            {winDetails && detailsPanel}
           </div>
         </div>
       );
@@ -2931,7 +3272,18 @@ function App() {
         <div className="win-overlay" onPointerDown={dismissResultCard}>
           <div className="win-card">
             <div className="trophy">{loseData.isClassic ? '💥' : '💀'}</div>
-            <h2>{loseData.isClassic ? 'Game Over' : 'Out of guesses'}</h2>
+            {/* #213 — a game's OWN ending label, when it sent one. Every game
+                already passes `winnerLabel` through reportRunEnd (Marble Loop,
+                Hash Rush, Snake and Bounce all send 'Game Over'), and the win
+                card has read it since #158 — handleLose simply dropped it, so a
+                lost story rung of a marble game announced itself as "Out of
+                guesses". That default stays for the games that send nothing,
+                which is Daily Cipher, the one it was written for.
+                The "Guesses · Time" row below is the same copy problem and is
+                deliberately NOT touched here: no game sends a label for it, so
+                fixing it would mean inventing one for thirty games rather than
+                threading through one they already send. */}
+            <h2>{loseData.winnerLabel || (loseData.isClassic ? 'Game Over' : 'Out of guesses')}</h2>
             <div className="sub">{currentGame && currentGame.name}</div>
             <div className="score-rows">
               {loseData.answer && (
@@ -2983,7 +3335,7 @@ function App() {
             {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
-              <button className="primary-btn" style={{ marginBottom: '0.6rem', background: C.surface, border: `1px solid ${C.border}`, color: C.text }} onClick={playAgain}>
+              <button className="primary-btn play-again-btn" onClick={playAgain}>
                 Play Again
               </button>
             )}
@@ -3000,12 +3352,37 @@ function App() {
                 🔁 Try this band again
               </button>
             )}
-            {!loseData.isClassic && currentGame && playMode !== 'story' && (
+            {/* #213 — A LOST RUN IN A MODE HAS TO BE ABLE TO STAY IN IT.
+
+                The win card has carried a mode action since #176 ("📖 Back to
+                the levels" / "🎮 Another run"); the loss card never did. So the
+                only way out of a failed story rung was Back to Lobby — the
+                reported "forced lobby exit" — which is exactly backwards: a
+                rung is a fixed, retryable deal, and failing one is the moment
+                you most want to go straight at it again. The label says
+                Continue rather than Back because after a loss that is what the
+                button is for.
+
+                This is the shared card, so it fixes the exit for every story
+                and arcade game, not only the one the issue was filed against. */}
+            {loseData.modeLabel && currentGame && (
+              <button className="primary-btn play-again-btn" onClick={() => launchGame(currentGame, playMode)}>
+                {loseData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Continue Story Quest'}
+              </button>
+            )}
+            {/* Daily only. "Play again for fun" is the daily's replay of TODAY'S
+                board through the inert practice path (#133); offering it on a
+                story or arcade loss sent you to a practice run of the daily
+                instead of back to the rung you just failed. The win card has
+                always gated this on `!modeLabel` — the loss card did not. */}
+            {!loseData.isClassic && !loseData.modeLabel && currentGame && (
               <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>
             )}
-            <button className="primary-btn" onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            {/* Same rule as the win card: one primary action, and where there
+                is a Play Again it is not the one that leaves. */}
+            <button className={'primary-btn' + (loseData.isClassic || loseData.modeLabel ? ' review-btn' : '')} onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
       )}

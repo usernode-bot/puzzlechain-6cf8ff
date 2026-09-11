@@ -2142,6 +2142,13 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   const liveRef = useRef({});
   liveRef.current = { grid, mode, done, steps, secs, geom };
+  /* The step counter, advanced SYNCHRONOUSLY. pointermove is not a discrete
+     event, so React batches a stroke's paints into one render — reading
+     `steps` from liveRef for each of them would count a five-cell sweep as one
+     step, making a drag cheaper than five taps on a scored board (#222). It is
+     re-synced from state on every render, so the two can never drift. */
+  const stepsRef = useRef(0);
+  stepsRef.current = steps;
 
   const cellAt = (p) => ngCellAt(liveRef.current.geom, NG_ROWS, NG_COLS, p);
 
@@ -2158,14 +2165,15 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
 
   // `paintMode` is applied rather than the live mode, so long-press can invert
   // the action exactly the way Mine Finder does.
-  const apply = (r, c, paintMode) => {
+  /* One place decides what a changed grid MEANS — validation, the mistake
+     counter, the step, the save and the win — so a tap and a drag stroke can
+     never diverge on any of it (#222). `apply` toggles one cell and hands the
+     result here; a stroke paints into its own copy and hands it here too. */
+  const commitGrid = (g) => {
     const cur = liveRef.current;
     if (cur.done) return;
-    const g = cur.grid.map((row) => row.slice());
-    const v = g[r][c];
-    if (paintMode === 'fill') g[r][c] = v === 1 ? 0 : 1;
-    else g[r][c] = v === 2 ? 0 : 2;
-    const ns = cur.steps + 1;
+    const ns = stepsRef.current + 1;
+    stepsRef.current = ns;
     const res = ngValidate(g, rowClues, colClues);
     const won = res.solved;
     const nowWrong = res.complete && !won;
@@ -2186,8 +2194,18 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
     if (won) finish(ns, cur.secs, nm);
   };
 
+  const apply = (r, c, paintMode) => {
+    const cur = liveRef.current;
+    if (cur.done) return;
+    const g = cur.grid.map((row) => row.slice());
+    const v = g[r][c];
+    if (paintMode === 'fill') g[r][c] = v === 1 ? 0 : 1;
+    else g[r][c] = v === 2 ? 0 : 2;
+    commitGrid(g);
+  };
+
   /* A board seeded solved by ?ngfill=solved has to report itself: the win is
-     detected inside apply(), and nothing was tapped. */
+     detected inside commitGrid(), and nothing was tapped. */
   const firedRef = useRef(false);
   useEffect(() => {
     if (firedRef.current || !seeded.current || !view.solved || done) return;
@@ -2232,14 +2250,67 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
         ? `${nErr} ${nErr === 1 ? 'line can' : 'lines can'} no longer match ${nErr === 1 ? 'its clue' : 'their clues'}. Look for the red numbers.`
         : `${filled} of ${view.targetFilled} cells filled. ${view.doneCount} of ${view.lines} lines done.`;
 
+  /* #222 — drag to paint a run of cells.
+
+     A nonogram is played in RUNS: you read "7" and want seven cells, not seven
+     taps. The board only had onTap, so a 15x15 band cost 225 separate taps.
+
+     The stroke decides its value from the FIRST cell and then SETS every cell
+     it crosses, rather than toggling each one. Toggling per cell is what makes
+     a drag destroy its own work — cross a cell twice on the way back and you
+     undo it. This is also why the stroke carries its own grid copy: pointermove
+     is not a discrete event, so React batches it, and two paints in one batch
+     would both read the same pre-batch state and the second would clobber the
+     first. `seen` keeps a wobble over one cell from costing a step per frame.
+
+     Painting waits for `d.moved` (the 10px tolerance) on purpose. Below it the
+     gesture is still a tap, and usePointerCell will fire onTap on release —
+     painting early would apply the same cell twice. */
+  const strokeRef = useRef(null);
+  const beginStroke = (p) => {
+    strokeRef.current = null;
+    const t = cellAt(p);
+    if (!t) return;
+    const cur = liveRef.current;
+    if (cur.done) return;
+    const v = cur.grid[t.r][t.c];
+    const want = cur.mode === 'fill' ? (v === 1 ? 0 : 1) : (v === 2 ? 0 : 2);
+    strokeRef.current = { want, origin: t, started: false, seen: new Set(), grid: cur.grid.map((row) => row.slice()) };
+  };
+  const strokePaint = (st, r, c) => {
+    const k = r + ',' + c;
+    if (st.seen.has(k)) return;
+    st.seen.add(k);
+    if (st.grid[r][c] === st.want) return;
+    st.grid[r][c] = st.want;
+    commitGrid(st.grid.map((row) => row.slice()));
+  };
+  const strokeTo = (p, d) => {
+    const st = strokeRef.current;
+    if (!st || !d || !d.moved) return;
+    /* The cell the finger went DOWN on belongs to the run. It cannot be
+       painted on pointerdown — below the 10px tolerance the gesture is still a
+       tap, and onTap would then apply it a second time — so it is painted here,
+       the moment the gesture commits to being a drag. Without this a run drawn
+       left-to-right silently starts one cell late. */
+    if (!st.started) { st.started = true; strokePaint(st, st.origin.r, st.origin.c); }
+    const t = cellAt(p);
+    if (t) strokePaint(st, t.r, t.c);
+  };
+  const endStroke = () => { strokeRef.current = null; };
+
   usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
-    onTap: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
+    onDown: (p) => beginStroke(p),
+    onDrag: (p, d) => strokeTo(p, d),
+    onUp: () => endStroke(),
+    onTap: (p) => { endStroke(); const t = cellAt(p); if (t) apply(t.r, t.c, liveRef.current.mode); },
     // Long-press = the opposite tool, same idiom as Mine Finder.
     onLongPress: (p) => {
+      endStroke();
       const t = cellAt(p);
       if (t) apply(t.r, t.c, liveRef.current.mode === 'fill' ? 'mark' : 'fill');
     },
-    onContext: (p) => { const t = cellAt(p); if (t) apply(t.r, t.c, 'mark'); },
+    onContext: (p) => { endStroke(); const t = cellAt(p); if (t) apply(t.r, t.c, 'mark'); },
   }));
 
   useCanvasBoard(canvasRef, {
@@ -3413,6 +3484,42 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     saveNow(level.player, level.crates, 0);
   };
 
+  /* #225 — the D-pad walks while you HOLD it.
+
+     The four arrows were plain `action` controls, and cuiWrapHandlers fires an
+     action on pointer-UP: every step cost a full press-and-release, and holding
+     an arrow did nothing at all, so crossing a room meant one deliberate tap
+     per square. That is the "slow arrows" in the report — the keyboard handler
+     itself measures ~0.1ms per press, so the delay was never the canvas.
+
+     `holdDown`/`holdUp` is the mechanism the controls layer already has for
+     exactly this (Bounce's paddle uses it): it engages on finger-DOWN and
+     releases if the finger slides off. The cadence copies a keyboard — one
+     step immediately, a pause so a single tap stays a single step, then a
+     steady repeat. `move` reads stateRef, so every repeat sees the live board
+     rather than the closure it was scheduled in. */
+  const CP_HOLD_DELAY_MS = 320;
+  const CP_HOLD_REPEAT_MS = 120;
+  const holdRef = useRef({ t: null, iv: null });
+  const stopHold = () => {
+    const h = holdRef.current;
+    if (h.t) { clearTimeout(h.t); h.t = null; }
+    if (h.iv) { clearInterval(h.iv); h.iv = null; }
+  };
+  const startHold = (dx, dy) => {
+    stopHold();
+    move(dx, dy); // on PRESS, not on release
+    holdRef.current.t = setTimeout(() => {
+      holdRef.current.t = null;
+      holdRef.current.iv = setInterval(() => move(dx, dy), CP_HOLD_REPEAT_MS);
+    }, CP_HOLD_DELAY_MS);
+  };
+  useEffect(() => stopHold, []);
+
+  /* The dep array matters: without it this effect re-ran on EVERY render, so
+     the window listener was torn down and re-added once per move (measured: 17
+     add/remove pairs across 8 moves). `move` reads stateRef.current, so the
+     handler never needs rebinding to see fresh state. */
   useEffect(() => {
     const onKey = (e) => {
       const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
@@ -3420,7 +3527,7 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, []);
 
   /* The whole frame is ONE canvas (controls wave): pills, the room, the
      D-pad and Undo/Restart draw together (arrow keys still work); only the
@@ -3456,10 +3563,19 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
       : { id: 'p-room', kind: 'pill', r: pr[2], label: 'Room', value: '#' + (levelInfo.idx + 1) });
     const kw = 52, kg = 6;
     const px0 = Math.floor((W - kw * 3 - kg * 2) / 2);
-    controls.push({ id: 'up', kind: 'button', r: [px0 + kw + kg, padY, kw, KEY_H], label: '▲', font: 16, action: () => move(0, -1) });
-    controls.push({ id: 'left', kind: 'button', r: [px0, padY + KEY_H + 6, kw, KEY_H], label: '◀', font: 16, action: () => move(-1, 0) });
-    controls.push({ id: 'down', kind: 'button', r: [px0 + kw + kg, padY + KEY_H + 6, kw, KEY_H], label: '▼', font: 16, action: () => move(0, 1) });
-    controls.push({ id: 'right', kind: 'button', r: [px0 + (kw + kg) * 2, padY + KEY_H + 6, kw, KEY_H], label: '▶', font: 16, action: () => move(1, 0) });
+    /* holdDown/holdUp, not action — see #225 above. The twin still carries a
+       plain onClick through `action`, so the keyboard-and-screen-reader path
+       keeps working: a twin click is one step, which is what it should be. */
+    const arrow = (id, label, r, dx, dy) => ({
+      id, kind: 'button', r, label, font: 16,
+      holdDown: () => startHold(dx, dy),
+      holdUp: stopHold,
+      action: () => move(dx, dy),
+    });
+    controls.push(arrow('up', '▲', [px0 + kw + kg, padY, kw, KEY_H], 0, -1));
+    controls.push(arrow('left', '◀', [px0, padY + KEY_H + 6, kw, KEY_H], -1, 0));
+    controls.push(arrow('down', '▼', [px0 + kw + kg, padY + KEY_H + 6, kw, KEY_H], 0, 1));
+    controls.push(arrow('right', '▶', [px0 + (kw + kg) * 2, padY + KEY_H + 6, kw, KEY_H], 1, 0));
     const ar = cuiRow(Math.floor(W * 0.1), actY, Math.floor(W * 0.8), ACT_H, 2);
     controls.push({ id: 'undo', kind: 'button', r: ar[0], label: '↶ Undo', disabled: !hist.length, action: undo });
     controls.push({ id: 'restart', kind: 'button', r: ar[1], label: '⟲ Restart', action: restart });

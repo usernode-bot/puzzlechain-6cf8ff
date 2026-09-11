@@ -5,7 +5,7 @@ editing this repo, read the platform conventions before making
 changes:
 
 **Platform conventions (authoritative, always current):**
-https://social-vibecoding.usernodelabs.org/claude.md
+https://my.onhomeroom.com/claude.md
 
 Fetch that URL at the start of each session — it's the single source
 of truth for platform-wide behavior (auth model, `USERNODE_ENV`,
@@ -251,6 +251,28 @@ Checkers and Gomoku only ever played at full depth.
   `gameModeOpts` like `ChutesLaddersGame` does. **Don't re-add a per-game
   picker** — a game that needs something the shared picker lacks should
   declare it (see `variantPicker`, `roomApiBase`).
+- **A live match's destructive control lives in the ☰ sheet, not under the
+  board.** "🏳️ End game" used to sit eleven pixels below the board in both
+  `MancalaOnlineGame` and `BoardOnlineRoom`, directly beneath the pits/cells
+  a player taps — and for a Mancala seat 2 or a flipped board there is no
+  "safe" side, because whichever row is yours is the one you tap (#201). The
+  game publishes it into the sheet's "This match" group with
+  **`useCgShellAction`** (`03-classic-shell.jsx`) instead: the game is
+  ClassicShell's `children`, so it cannot pass a `sheetSections` entry, and
+  this context is the channel. Two rules come with it — the hook's effect
+  deps are the button's LOOK (label, disabled) and the handler is called
+  through a ref, because `onSelect` closes over live state and gets a fresh
+  identity every render; and the Menu tab now exists whenever there is
+  EITHER a `menuConfig` or a published action, so a shell without a menu
+  cannot swallow one. Publishing `null` (match not active) withdraws it, so
+  a finished match stops offering to forfeit itself. The waiting-room
+  "Close this room" button stays inline: that screen has no board to mis-tap.
+- **`?room=<code>&seat=1|2`** enters a live online match directly. Entering
+  one was otherwise possible ONLY by tapping a your-turn card on Home, so no
+  proposal check and no before/after screenshot could reach the in-match
+  chrome at all. It is checked before the `modeSelect` branch, like
+  `?result=1` and `?pmode=`. `?demo=yourturn` re-arms active checkers room
+  `DEMOYT` with the viewer as player 2, which is what the checks pair it with.
 - **`roomApiBase`** is the whole accommodation for Mancala's older room
   routes (`/api/mancala/rooms`, its own table): the flow, the copy and the
   error handling stay shared. Create responses are read as
@@ -1010,6 +1032,21 @@ were **deliberately removed** and should not be re-added piecemeal:
   non-destructive; no code path touches them anymore.
 - `REDIS_URL`/ioredis (only ever the PvP matchmaking fast path) and the
   UTGO wager contract/ABIs are gone.
+- **The Verified badge, the session receipt and the verified leaderboard**
+  (#224, at a usernode admin's request). The phase-1 subtraction carved these
+  out of the dApps removal and kept them; that carve-out has ended. Gone: the
+  badge on the win overlay, the `SessionReceipt` screen and its
+  `?sid=` / `demo=dapp` / `demo=anchor` deep links, `VerifiedLeaderboard`, the
+  whole `18-dapp-verified.jsx` module, their styles and their five checks —
+  and with them the client-side `dappAnchor()`, which existed only to make the
+  badge say "anchored on-chain" and which sent a transaction through the
+  bridge to do it.
+  **The verification MACHINERY is untouched**, deliberately: `lib/dapp.js`,
+  `game_sessions` / `session_states`, `settleDailySession` and its tier A/B
+  split, and the `/api/dapp/*` routes all stay. A request to stop SHOWING a
+  verdict is not a request to stop reaching one, and the harness is what
+  `validateSession` uses to refuse an impossible score. Don't re-add a badge;
+  if the verdict needs surfacing again, that is a new decision.
 - **The Account screen and the wallet ownership proof / "On-chain login"
   identity** (home/profile cleanup pass): the Usernode-pubkey display,
   Connect / Verify / Disconnect wallet controls, the avatar "verified"
@@ -1073,10 +1110,57 @@ element is missing from that list pays ~300 ms per tap on touch.
   rules before this pass.
 - **Two boards are too dense to fix with feedback alone**, and their solutions
   are the pattern to copy: **Gomoku** (15×15 ⇒ ~24 px) uses ghost-then-confirm,
-  and **Ludo** (tokens smaller than their cell, stacked 5 px apart) lists the
-  legal moves as full-size buttons under the board. Both are built in the
-  `BOARD_VIEWS` renderer, so online / pass-and-play / bot inherit them, and
-  neither changes the move payload.
+  and **Ludo** (tokens smaller than their cell) lists the legal moves as
+  full-size buttons under the board. Both are built in the `BOARD_VIEWS`
+  renderer, so online / pass-and-play / bot inherit them, and neither changes
+  the move payload. Ludo's buttons are a SECOND path now, not the only one —
+  see "Ludo: the board is a tap target too" below.
+
+### Ludo: the board is a tap target too (#217)
+
+The move buttons stayed — they are still the unambiguous path, and the issue
+asked for direct selection, not for the buttons to go. What changed is that
+the board became a target worth aiming at:
+
+- **Tokens fan out around the cell they occupy, not by their index.** The old
+  layout offset every token by `(i % 2, i / 2) * 5px`, which put a lone token
+  permanently off-centre and turned four tokens on one cell into a 5 px
+  diagonal smear. `ludoStackLayout(n, cell)` places whatever actually shares a
+  cell (across seats — safe cells and the 🏁 centre hold more than one colour)
+  on a ring around its centre, shrinking the radius as the group grows.
+  `LUDO_STACK`'s pairs are tuned so `hypot(offset) + r <= cell / 2` (the group
+  fits) and no two neighbours are closer than the old 5 px, at the smallest
+  cell the board ever draws (18 px). `ludo-token-stack` asserts both, for every
+  size in that range — **re-run it rather than eyeballing a retune**, because
+  those two constraints pull against each other and the tight end of the range
+  is where a change breaks.
+- **The hit test takes the nearest CENTRE, not the topmost of the draw order.**
+  `ludoPickToken` — topmost is just the highest token number, which is not what
+  the finger aimed at. Each candidate carries its own radius, so a lone token
+  is a bigger target than one in a stack, and a movable token draws last so its
+  gold ring is never clipped by a neighbour.
+- **The board never said it was tappable**, which is most of why #217 was filed
+  against a board that already had a hit test: an in-frame line now says so
+  whenever there is a legal move, and the move pad relabels itself as the
+  alternative.
+
+**The die is drawn as a die, and the tumble is only the wait made visible.**
+`ludoDrawDie` renders pips; the value is ALWAYS the referee's (the rules module
+locally, the server online). The tumble starts on the Roll tap — so an online
+roll has no dead beat while it is in flight — and stops a short settle after
+the real value lands, with `until` only ever moving forward so a local roll,
+which resolves in the same tick, still spins once rather than twice. The face
+cycle is a fixed repeat-free sequence (`LUDO_TUMBLE`) precisely so it is
+checkable and so nothing about it can be mistaken for the outcome.
+`cgReducedMotion()` skips it entirely.
+
+**`?ludo=stack`** seats a deterministic mid-game position (two of P1's tokens
+sharing a ring cell, a die already rolled). A fresh Ludo board has nothing on
+the ring and nothing rolled, and a proposal check can navigate but cannot tap
+Roll — so without this link neither the fan-out nor any in-move chrome is
+reachable by a check or a screenshot. It is consumed once, on mount:
+`BoardLocalGame`'s reset effect skips its own mount pass when a seeded position
+is in play, the same trap `SnakeGame`'s reset-to-chooser effect had to skip.
 
 ### 3. Nothing scrolls during play
 
@@ -1313,9 +1397,18 @@ Consequences:
 
 - **`boardReviewable` no longer excludes `shell:'self'`.** Its old comment
   claimed Snake/Block Fit/Diamond Rush/Hash Rush draw their own game-over
-  overlay; only **Hash Rush** does, and it now takes a `resultShown` prop and
-  stands down (its panel is absolute-positioned over its own canvas, so leaving
-  it up hides the board "View board" exists to reveal).
+  overlay; only Hash Rush did, and **it does not any more** (#215). It was
+  given a `resultShown` prop to stand down behind the shared card, and standing
+  down was all it ever did: a shared card always follows `reportRunEnd`, so the
+  panel only existed in the gap before one arrived — never rendered at all in
+  free play, one paint then swapped in the three modes whose finish awaits an
+  endpoint, and flashed a second time on Play Again (winData clears a commit
+  before the resetKey reset). That flash was the reported bug. **No
+  `shell:'self'` game draws its own end panel now, and `resultShown` is gone
+  — keep it that way; the shared results card is the ending.** Hash Rush's
+  reset is a `useLayoutEffect` so Play Again cannot paint the dead board first,
+  and `?hrdead=1` parks it in the finished-with-no-card state (writing nothing)
+  so a check can assert the panel stays absent.
 - Practice results carry a `gameId` so the "result belongs to the mounted game"
   guard still holds. The practice card was the one with no way back at all —
   no View board, no minibar, no dismiss (#158).
@@ -1325,6 +1418,52 @@ Consequences:
   `/api/daily/:gameId/leaderboard` validates against `GAME_IDS` and 400s on a
   classic id — a console error that fails the no-console-errors check. Classics
   reach their all-time board via ClassicShell's ☰ sheet.
+
+### The win card opens on ONE number (#241)
+
+The feedback was "way too much going on, with the points, the badges, and the
+leaderboard with lots of scrolling". Measured before touching it, at 390x780:
+**955px of card content in a 740px box** — and that was with an EMPTY
+leaderboard, so a real one scrolls further. After: **607px, no scroll.**
+
+- **The moment** is the trophy, the headline, the game, the earned score at
+  3.1rem, its multiplier caption, and ONE flourish line — in priority order a
+  badge unlocked, a ladder completed, or a personal best. Then the actions.
+- **Behind `.win-more`** ("Score, badges & leaderboard"): the seven-row
+  breakdown, the "badge active" row, the unlock blocks, the next-milestone
+  pills and today's leaderboard. Nothing was deleted. The toggle sits BELOW
+  the action buttons on purpose, so opening it never moves the button you were
+  reaching for, and `winDetails` resets on every new result so the next win
+  opens on the moment again.
+- **What stays on the moment besides the actions**: the offline sync note, the
+  guest sign-in CTA, the multi-seat standings table and the story/arcade
+  "what happens next" note. Those are outcomes or instructions, not trophies.
+- **The loss card is deliberately untouched** — measured at 567px (classic)
+  and 454px (daily practice), it already fits without scrolling, and a loss
+  has no earned score to build a moment around.
+
+**An animation must never be the only source of a number.** `WinEarned`
+renders the REAL value first and starts its count-up from inside the first rAF
+that actually runs, so a throttled background tab or a screenshot capture —
+neither of which fires a frame — shows the finished score rather than "+0".
+The trophy's CSS pop is on an emoji for the same reason. `data-win-earned`
+carries the true value whatever the frame count, and the `dapp.json` check
+asserts the rendered text, which is exactly the environment this protects.
+
+**`?result=win`** is the deep link. `?result=1` never reached the WIN card at
+all — its daily branch goes through `practiceResult` and its classic branch
+sets `loseData` — so the screen this issue is about had no URL, which is why
+no before screenshot of it exists anywhere. Like the rest of that link it is
+local UI state and calls no endpoint: the only daily write on the win path is
+`retryDailyFinish`, which needs a press.
+
+**`${C.x}` only works for a PALETTE key.** `C` is built from
+`PALETTES.light`'s keys, so a DERIVED token (`well`, `well-strong`, `scrim`,
+the shadow trio, the `*-hover` pair) interpolates the string `undefined` and
+the browser drops the whole declaration. `.review-btn:hover` and
+`.pregame-band[data-pressed]` had been dead that way. Use `var(--c-well)`.
+`css-no-undefined-token` scans the built stylesheet for it now — the same
+silent-failure shape `token-alpha-concat` catches on the other side.
 
 ### 4. `meta.score` on the loss path is opt-in, per game
 
@@ -1338,6 +1477,392 @@ Snake and Bounce already route their game-over through `onWin` with
 `mahjongsol`, `dropstack`, `snakedaily`, `bouncedaily`): the daily leaderboard
 filters `score > 0`, so a non-zero loss would put a FAILED run on the board.
 Streaks are unaffected either way — `computeStreak` keys off `finished_at`.
+
+### A daily deep link has to carry the daily MODE, not just the game
+
+`?game=<id>&play=1` used to call `startRun(g)` on its own. `startRun` reads the
+play mode from a **ref** and never sets it, so a link with no `?pmode=` left the
+shell at `playMode === null` — and `resumable` in `renderGameBody` is
+`playMode === 'daily'`, the single gate on whether a game is handed its
+`savedProgress` at all. So a daily opened that way **could not resume**: a
+claimed, half-played attempt mounted as a blank board with the clock at zero and
+`onSaveProgress` null. That is the shape of link the share cards carry (the
+no-login `?game=` link), and it is what made the merged check "Nonogram resumes
+its mistake count" red on main against every proposal. The branch now does what
+the `?pmode=` branch above it already did: `launchGame(g, defaultPlayMode(g))`
+to set the mode, then `startRun(g, { mode })` to claim or resume in it. A
+finished day still lands on the locked screen — both calls agree on that.
+
+**`?practice=1` is deliberately left on the old path** (`playMode` stays null):
+practice has no resume by design, and hoisting a default mode above that branch
+would send `?game=<daily>&practice=1` into the pre-game screen instead.
+
+### A staging fixture must ASSERT its state, not add to it
+
+Staging carries one database across every check run and never resets, so two
+fixtures that seed the same rows to different depths cannot both use
+`ON CONFLICT DO NOTHING` — whichever ran first wins permanently and the other
+becomes a silent no-op. `demo=storybadges` wants sudoku's ladder fully cleared;
+`demo=modes` wants it three rungs in. Once storybadges had run, `demo=modes`
+could never say what it means, and "Story picker calls each step a level"
+(which asserts the half-walked note, not the all-cleared one) failed for
+reasons nothing in its own proposal could explain. Both now delete the bands
+above the depth they are claiming before inserting. Any new fixture that seeds
+a COUNT of something owes the same treatment.
+
+**"Today is left open" has to be MADE true, not assumed.** `demo=streak` and
+`demo=badges` both promise a long streak with today still playable, and neither
+finishes today — but `demo=locked` deliberately does, on the same viewer. So
+the first time `demo=locked` ran, today's sudoku was finished forever, and
+every later route that wanted the PRE-GAME screen got the locked screen
+instead. That is what took out the two #188 leaderboards checks
+(`?game=sudoku&boards=1&demo=streak`): the panel lives on the pre-game screen,
+and the pre-game screen was never reached. Both now call `openTodayForDemo()`;
+`demo=locked` still finishes today on its own routes, because it asserts its
+state too. The two simply stop depending on which ran first.
+
+**The LOCKED half of a fixture is state too.** `demo=storybadges` exists to put
+an earned badge beside locked ones, so it has to be able to say a ladder is
+unfinished rather than merely decline to finish it — one leftover
+`story_complete` row renders the locked example as earned, and the check
+asserting on it fails with nothing in its own proposal to explain why. It now
+clears the `story_complete` achievement AND the progress rows for its two
+unfinished examples (`minefinder`, one rung short; `cratepush`, never started)
+before seeding the finished one. If a check asserts that something is ABSENT or
+UNEARNED, the fixture has to make it so.
+
+### Story and arcade resume from a DEVICE-LOCAL record (#187 / #196)
+
+"Only a daily resumes" was a rule about the daily ATTEMPT ROW, and it was read
+as a rule about players keeping their work. `savedProgress`/`onSaveProgress`
+are that row: a story run writing into it 409s, and reading from it would
+hydrate a half-finished daily into a rung meant to be a fixed, retryable deal.
+Both reasons are about the SERVER. Neither was ever a reason for a story rung
+to lose ten minutes of deduction to a reload — which is what it did, with both
+props null and nothing written down anywhere. Reported as a crash (#187, P0)
+and as "spontaneous reloads" (#196); measured, Sudoku Story L4 went from
+`Steps 1 / Filled 41 / 00:08` to `Steps 0 / Filled 40 / 00:01` across a plain
+reload.
+
+Story and arcade now get `savedProgress`/`onSaveProgress` backed by
+**localStorage**, one record per `(game, mode, band)`
+(`readRunSave`/`writeRunSave`/`clearRunSave`/`hydrateRunSave` in
+`05-core-lib.jsx`). **No game component changed** — they already know how to
+hydrate from `savedProgress` and write through `onSaveProgress`; those props
+just had nothing to point at outside a daily. The attempt row is untouched, so
+the 409 rule stands exactly as before.
+
+Four things hold it together, each for a concrete reason:
+
+- **The board has to come back IDENTICAL**, so the two modes record different
+  things. A story rung's seed has no day component, so it rebuilds the same
+  board on any day from any device — nothing extra to store. An arcade board
+  comes from the RUN's seed, so the record carries the seed **and** the run id
+  it was anchored with, and `startRun` reopens with both; roll a fresh seed and
+  the player gets a different board than their saved position belongs to, and a
+  second `/start` anchors a run the finish will not claim.
+- **Nothing is saved until a move is made** (`steps > 0`). A save of an
+  untouched board is worthless, and worse: proposal checks mount story boards
+  to assert on their FRESH state, and a save written by one would hydrate into
+  the next.
+- **The finish guard is the daily's guard.** `saveLocalRun` honours
+  `saveQueueRef.current.blockedGameId`, which `cancelProgressSave()` sets at the
+  top of `handleWin`/`handleLose` — otherwise `useAutosave`'s unmount flush
+  writes the record back *after* the finish cleared it, and the next visit
+  resumes a run that was already over. The record is dropped on every ending and
+  in `playAgain`.
+- **`dayNum` is stamped on the way out.** The games' gate is
+  `savedProgress.dayNum === utcDayNum(offset)` — a same-BOARD check that a daily
+  expresses as a same-day one. A story or arcade board is not day-scoped, so
+  stamping says "yes, this is for the board you are about to build" in the only
+  vocabulary twenty game components already speak.
+
+Scoped to the `shell: 'daily'` branch of `renderGameBody`, which is where both
+reported games live (Sudoku and Word Search) and where a saved position IS the
+board you left. The classic-shell story games are real-time or score-attack, so
+a mid-run snapshot is a much larger job and a separate decision.
+
+`?resumedemo=1` writes the same record a real run leaves, so a part-played
+board is reachable by URL. It is deliberately generic — step count and clock
+with an empty progress object — so it works on any game; a board that does not
+recognise the progress falls back to a fresh deal and still comes up mid-run on
+the clock, which is the thing being asserted.
+
+### A lost run in a MODE has to be able to stay in it (#213)
+
+The win card has carried a mode action since #176 — "📖 Back to the levels" /
+"🎮 Another run". The loss card never did, so the only way out of a failed
+story rung was **Back to Lobby**: the reported "forced lobby exit", and exactly
+backwards, because a rung is a fixed retryable deal and failing one is the
+moment you most want to go straight at it again. The loss card now carries the
+same action, labelled **"📖 Continue Story Quest"** after a loss.
+
+Two smaller things fell out of the same block, both dropped fields rather than
+decisions:
+
+- **"🎲 Play again for fun" was showing on story and arcade losses.** It is the
+  daily's replay of TODAY'S board through the inert practice path (#133), so on
+  a story loss it sent you to a practice run of the daily instead of back to
+  the rung. The win card had always gated it on `!modeLabel`; the loss card had
+  not.
+- **`handleLose` dropped `meta.winnerLabel`.** Every game already sends one
+  through `reportRunEnd` (Marble Loop, Hash Rush, Snake and Bounce all send
+  'Game Over') and the win card has read it since #158, so a lost story rung of
+  a marble game announced itself as **"Out of guesses"** — copy written for
+  Daily Cipher. The default stays for games that send nothing, which is Cipher,
+  the one it was written for. The "Guesses · Time" row beside it is the same
+  copy problem and is deliberately NOT touched: no game sends a label for it,
+  so fixing it would mean inventing one for thirty games rather than threading
+  through one they already send.
+
+**`handleWin` still drops `winnerLabel` on its arcade and story branches**, so
+a run you died in shows "🏆 Solved!" in those two modes. Same one-line
+omission, but it belongs to every arcade game rather than to #213.
+
+### Marble Loop's camouflage marble (#213)
+
+Five shots in a row that each pop something drop a **camouflage marble** on the
+cannon for `ZUMA_CAMO_MS`. It takes the colour of whatever it lands against
+(`zumaWildColorAt` — the longer neighbouring run wins, ties go left), so it
+always makes a match if one is there. It is spent by one shot and does **not**
+consume the queue: it sits on top of the marble you already had.
+
+It also **replaces the old `color-switch` power-up's wildcard, which never
+worked**: that one fired a marble coloured `'#ffffff'` and `zumaCheckMatches`
+compares colour strings exactly, so the "wildcard" matched nothing and left you
+strictly worse off than the marble it replaced. One wildcard rule, in one pure
+function, rather than two that disagree — `marbleloop-camouflage` asserts both
+halves, including that the old white marble matched nothing.
+
+`?zcamo=1` loads one at mount (writing nothing — it sets the same deadline the
+fifth pop would) because the marble and its countdown are otherwise reachable
+only by popping five shots in a row, which no check or screenshot can do.
+`?result=1&pmode=story|arcade` does the same job for the mode result cards.
+### Snake's turns QUEUE (#206)
+
+"The snake fails to turn upon tap or swipe" is not a gesture problem. The
+swipes arrive, `.snake-board` and `.dsnk-board` both carry `touch-action: none`
+so the browser never steals them, and `useGestures` is wired identically in
+both snakes. The bug was that **a turn had nowhere to wait.**
+
+Both snakes held ONE pending direction (`nextDir`) and validated every new turn
+against the direction currently being TRAVELLED. A corner is two turns and a
+tick is 90-200 ms, so between them these ate a large share of real inputs:
+
+- the second turn **overwrote** the first, so the snake never made the first
+  one — swipe up then left around a corner and it simply goes left;
+- or the second turn was **rejected as a reversal** of a direction the first
+  turn was about to change. Heading up with left already pending, "down" is a
+  legal move after that left; it was refused because down reverses *up*.
+  Measured in a browser before the fix: that input returns having done nothing.
+
+`snakeQueueTurn(dir, cur, queue)` is now the whole rule, pure and shared by
+both snakes: turns queue up to `SNAKE_TURN_QUEUE` (2 — it remembers a corner,
+it is not an input buffer) and each is checked against the last direction
+**queued** rather than the last travelled, because that is the one it will
+actually follow on from. One tick consumes one turn, which is what keeps
+"a snake may not double back into itself" true however fast you swipe.
+
+**A tap steers now as well** (`snakeTapDir`), which the issue asked for and
+which previously only started the run. The board is cut into four triangles by
+its diagonals and a tap means the one it lands in — absolute, so it needs no
+knowledge of the current heading and cannot mean two things at once; dead
+centre means nothing. It goes through the same queue, so the reverse rule still
+protects you.
+
+`snake-turn-queue` holds both halves. If you retune this, the property that
+matters is that ONE tick consumes at most ONE turn — take that away and the
+queue becomes a way to reverse into your own neck.
+
+### Daily Cipher can hand typing to the DEVICE keyboard (#192)
+
+The issue asked to replace the drawn keyboard with the system one. Replacing it
+outright would have thrown away the only surface that carries the per-letter
+state — which letters are placed, which are in the word, which are spent — so
+the drawn keyboard stays the default and the device keyboard is a device-local
+preference (`cgPrefs.devkbd`, Settings → Typing). In device mode the three key
+rows are not drawn at all, the board gets that height back, and the letter
+colours move to a compact non-interactive strip (`.cw-legend`) below the canvas.
+**Flipping the default is one word** if the group decides the other way.
+
+How it works, and each part is load-bearing:
+
+- **A hidden, focusable input is the only way to ask for a system keyboard.**
+  It is off-screen with `opacity: 0`, not `display: none`, because a hidden
+  element cannot take focus. `font-size: 16px` stops iOS zooming on focus.
+- **It holds one non-breaking space forever and is never allowed to change.**
+  Every edit is read and cancelled. That is what makes BACKSPACE work: a
+  browser will not report a delete on a field it believes is already empty, so
+  a genuinely empty input can be typed into and never erased.
+- **`beforeinput`, not `keydown`.** A phone keyboard often sends no usable
+  `key` at all — predictive text reports `229` / `Unidentified`. What it always
+  sends is the text it inserted, as `e.data`.
+- **Bound NATIVELY, not through React's `onBeforeInput` prop.** React 18's
+  synthetic beforeinput is a polyfill over `textInput` and does not see every
+  `inputType` a phone produces, `deleteContentBackward` in particular.
+- **THE DOUBLE-INPUT TRAP, in a new costume.** A physical keypress while the
+  hidden input has focus fires both its `beforeinput` and the window `keydown`
+  handler the game has always had — the same shape as #one-tap-two-letters,
+  where one touch typed two letters. The window handler now stands down for any
+  event whose target is that input. `?cwtype=` still exercises the drawn keys
+  and still asserts `data-cw-typed`, in both modes.
+
+`?devkbd=1|0` forces the mode at boot, because a device preference is otherwise
+reachable only by opening Settings and tapping, which navigation cannot do.
+`.cw-board` carries `data-cw-kbd="device"|"drawn"` so a check can see which is
+live.
+
+### Screen transitions (#235)
+
+Navigation only — lobby, pre-game, opponent, the game, the locked day, the
+profile and friends. **Not boards, cells, cards or canvases**: the hosted
+native kit's own fidelity rules forbid animating high-frequency interactions,
+and it fights the tap primitive, which gives its feedback on finger-DOWN
+precisely so nothing has to wait. A card that animates when you tap it feels
+slower, not more native.
+
+**No JavaScript, and nothing remounts.** Each screen root genuinely mounts when
+you navigate to it, so a plain CSS animation on its class is enough. That
+matters: remounting a game at the wrong moment is how a finished 2048 board
+came back as a fresh one (#158/#160), and a transition implemented with a
+changing `key` would do exactly that.
+
+**Two variants, and the difference is not cosmetic.** A running `transform`
+changes what `getBoundingClientRect` reports, and the boards here measure
+themselves at mount (`useFitBox`, `sizeCanvas`). So:
+
+- `.screen-in` — fade plus 6px of travel. Only on screens with **no measured
+  board**: lobby, pre-game, opponent, profile, friends.
+- `.screen-in-fade` — opacity only. `.game-body` and the locked day, both of
+  which host a board that is measured on the frame it appears.
+
+The fill mode is `backwards`, so nothing is left applied afterwards — a
+lingering transform would make the element a containing block for the
+`position: fixed` sheets that open over these screens.
+
+**The in-app Reduced-motion pref now reaches CSS.** It had only ever reached JS
+call sites, because the stylesheet could see the OS media query and not the
+preference; `applyMotionPref()` mirrors it onto `<html data-reduce-motion="1">`.
+The `:root[data-reduce-motion="1"]` block and the `prefers-reduced-motion`
+media query list the same selectors — **add new motion to both**, or a player
+gets it in one place and not the other. `?motion=reduce|full` forces it, the
+way `?theme=` does.
+
+### Marble Loop: aim, then fire (#212)
+
+A tap used to fire immediately at wherever the finger landed, so on a phone you
+found out where you had been aiming by watching the marble go there. **A touch
+tap now aims; the next one fires** — the same ghost-then-confirm shape Gomoku
+already uses for a board too dense to poke at. A tap pointing somewhere
+materially different from the current aim RE-AIMS instead of firing
+(`ZUMA_REAIM_RAD`), so correcting yourself never costs a marble. The **mouse is
+unchanged**: hovering already shows the aim continuously, so on that input the
+hover *is* the first tap.
+
+**The trajectory guide is computed, not decorative.** `zumaAimPath` marches the
+ray from the cannon and returns the first chain marble it would touch, using
+the same 2R test the collision uses — so the line cannot promise a hit the
+marble does not make. It is drawn only once an aim has been taken.
+
+**The marble is bigger, and the number was measured.** `ZUMA_DIAM` is the
+chain's spacing, so the radius is a difficulty knob whether you meant it or
+not: a bigger marble makes the CHAIN longer and it reaches the skull sooner. At
+R=13 the tightest board (free L3) goes from 53% to 62% of its own track, so
+every level still starts with at least a third of the track empty.
+**Re-measure if the levels or paths are retuned** — `marbleloop-aim` fails if
+any level's chain exceeds 75% of its track.
+
+**The supply bot.** Below `ZUMA_SUPPLY_AT` (5) marbles the cannon deals only
+colours still ON the chain. A short chain can otherwise hold colours the cannon
+has stopped dealing, and then the level cannot be finished at all. It picks a
+*possible* colour, never the best one — which to fire and where is still the
+player's problem.
+
+**Touch is bound NATIVELY here, not through React's `onTouch*` props.** React 18
+registers `touchmove` on the root as a PASSIVE listener, so `e.preventDefault()`
+inside an `onTouchMove` prop does nothing — this file was calling it into the
+void and relying on `.zuma-canvas { touch-action: none }`. A listener on the
+element is also one a test can drive, which matters because touch now behaves
+differently from the mouse and that difference IS the change.
+
+`getCanvasCoords` also gained #208's length test. `e.touches` is always a
+TouchList and a TouchList is an object, so `e.touches ? …` is true even when
+EMPTY — which is exactly what touchend carries. Nothing hit it before because
+touchend was only ever a bare "fire" signal that never asked where the finger
+was; aim-on-tap asks.
+### Mancala's sowing, and where a score belongs (#202)
+
+**The sowing was never instant.** Every stone has been animated one at a time
+since the start; the gap was a flat **80 ms**, which is under the ~100 ms a
+person needs to register a discrete event — so a four-stone move was over in
+320 ms and read as one jump rather than four placements. That is what the
+report calls "turbo".
+
+A flat number cannot fix it, because the pits are not all the same size:
+whatever reads well for four stones drags for fifteen. `mncSowDelay(n)` derives
+the gap from the COUNT — 170 ms each for a small handful, tightening as the
+handful grows, bounded at both ends. 4 stones take 680 ms, 8 take 1100 ms,
+15 take 1100 ms. **`MNC_SOW_BUDGET` is the single knob** — it is the length of
+a typical move; the two bounds only stop the extremes being silly.
+`cgReducedMotion()` collapses the wait to zero: the stones still land in order,
+they just stop waiting to be watched.
+
+**The store counts moved to the HUD.** They were drawn in the middle of each
+store, directly over the seed pile they were counting — the number obscured the
+thing it described and the thing it described obscured the number. The store
+now holds seeds and a name; the score is a pill above the board in all three
+modes (bot, local, online), where every other score in this app lives.
+
+In the bot HUD the pill they replace was **"ZK"**, a verified/unverified
+read-out with a tick, a cross and a lightning bolt. #224 removed every other
+one of those at an admin's request and this was a third surface nobody had
+spotted. The verification itself is untouched — it is the READ-OUT that goes,
+exactly as in #224.
+
+### The in-app "← Back" was never a back button (#186)
+
+The reported "back resets to the main homepage" is not the browser's back
+button and not the #134 reducer — both of those were already correct.
+Measured, walking home → Story card → pre-game → Play in a browser:
+
+| step | screen | history.length |
+|---|---|---|
+| start | lobby | 2 |
+| tap Story | pregame | 3 |
+| tap Play | game | 4 |
+| **device back** | pregame | 4 |
+| device back again | lobby | 4 |
+| **in-app "← Back"** | **lobby** | **5** |
+
+Every in-app back control called `backToLobby()`, which is a RESET — it clears
+the game, the result, the mode and the practice flag and sets `screen` to
+`'lobby'`. Because it changes state rather than unwinding, the reducer then
+PUSHED another entry (4 → 5), so pressing in-app back and then device back went
+*forward* into the board you had just left, and the history grew on every use.
+
+**`goBack(fallbackTab)` is the fix, and it is the existing reducer rather than
+a second one.** Each pushed entry now records its own depth (`unDepth`);
+`goBack` calls `window.history.back()` when that depth is above zero and falls
+back to `backToLobby(fallbackTab)` when it is not.
+
+- **The depth-0 fallback is a safety rule, not a nicety.** This app runs in an
+  iframe, and its `pushState` entries live in the JOINT session history. At
+  depth 0 the entry behind us belongs to whoever loaded us, so `history.back()`
+  there steps the EMBEDDING page rather than unwinding a screen. `navDepthOf`
+  therefore reads 0 for anything that is not unambiguously one of our own
+  entries — a foreign state object, a missing `un`, a non-finite or negative
+  number — so a malformed entry fails toward "go home", never toward "leave the
+  app". `nav-depth-fail-safe` asserts every one of those shapes.
+- **What did NOT change**: the result cards' "Back to Lobby" buttons and the
+  Ladder tab's "← Home". Their labels name a destination and going there is
+  correct. Only the ← controls moved.
+- The same bug existed on the social screens — Friends is reachable from your
+  own profile, and its back went to the lobby, skipping the profile. Both now
+  use `goBack()`.
+- `data-nav-depth` on the app root is what a proposal check can see, since a
+  check can navigate but cannot press back: home is `0` (the bottom of our
+  stack) and a cold deep link is `1` (the lobby entry the deep-link effect
+  pushed over, which is exactly what back returns to).
 
 ### New deep links
 
@@ -1393,3 +1918,65 @@ Sudoku" just **Sudoku**. Prefer `expectSelector` for structure and reserve
 `expectText` for copy that is genuinely part of the product's voice — and note
 that `innerText` reflects `text-transform`, so a `.plabel` reading "Board" in the
 source matches "BOARD" at runtime.
+
+## Hash Rush is a striking game now (#215)
+
+Hash Rush used to be a lane dodger: you steered a miner and collected what it
+ran into. It is **tap-to-mine**. Nothing steers — you hit what falls. Four
+rules, and they are what the issue asked for, so don't quietly undo them:
+
+- **⛏️ hash** — tapping it pays `HR_TOKEN_SCORE`, doubled while boosted.
+- **⚡ lightning** — tapping it **ADDS** `HR_BOOST_SECS` to whatever boost you
+  already have, capped at `HR_BOOST_MAX`. It used to *assign*, so a second bolt
+  threw away the remainder of the first: that was the reported "redundant
+  triggers", and it is why bolts now stack.
+- **🧨 TNT** — tapping it costs `HR_TNT_PENALTY` points, floored at zero. It
+  does **not** take a life: there is nothing to dodge any more, so the penalty
+  *is* the hazard, and leaving it alone is the correct play.
+- **A missed hash** — one that reaches the floor un-mined — is the only thing
+  that costs a life, and running out of lives is what ends an endless run.
+
+`hrPickAt` (which object a strike at x,y breaks) and `hrApplyStrike` (what it
+does) are pure and are the only copies of either rule — the pointer path, the
+keyboard path (1/2/3 or ← ↓ → strike the lowest thing in that lane) and
+`hashrush-strike-rules` all go through them. Same pair-of-pure-functions shape
+as `ngGeometry`/`ngCellAt`, for the same reason.
+
+### The spawn schedule is a function of elapsed time, not of frames
+
+The old loop accumulated a `spawnT` and fired when it crossed the interval,
+which overshoots by up to one frame **every** spawn — so a slow device was
+dealt a measurably shorter stream over the same 90 seconds. Survivable when the
+score was "how long did you last"; not survivable now that a daily's content
+and a level's target both come off that stream. `hrEveryAt` / `hrDrawObj` are
+the one rule, and `hrSpawnPlan` (ahead of time) and the loop (as time passes)
+are its two readers. **Keep them reading the same pair.**
+
+### A level's target is DERIVED, not picked
+
+"Clear winning thresholds per level" needs a number per level, and an eyeballed
+number goes stale the moment any constant moves — the `TM_LAYOUTS` /
+`MJ_LAYOUTS` trap. So `hrTargetFor` plays the level's own spawn plan with an
+explicit model of a player (`HR_MODEL_TPS` taps/sec, `HR_MODEL_LAG` reaction,
+`HR_MODEL_REACH` before an object is gone, never taps TNT) and takes
+`HR_TARGET_FRACTION` of what that scores. Story seeds are stable per band and
+the daily seed is shared, so two players on one level get the same target. It
+is computed from a **second** rng on the same seed, because the run's own
+generator is about to be consumed by play.
+
+**`HR_TARGET_FRACTION` is the single balance knob** — there are no per-level
+numbers to move. 0.7 comes from a second measurement: replaying each level 300
+times with a player who mines only part of what it reaches and fumbles into
+some TNT scores, as a share of the perfect model, ~0.92 (mines 95%, hits 3% of
+TNT), ~0.78 (85% / 8%) and ~0.59 (72% / 15%) — and those rows are almost flat
+across all six levels, which is why one constant does the job. The ladder's
+difficulty lives in stream density and TNT share instead. Note the tap BUDGET
+never binds: the model misses at most one object a level even at 3.1 spawns a
+second, because it only strikes hashes and bolts. **This game asks for accuracy,
+not speed.**
+
+The one input here that is not measured is what share a real hand actually
+mines on a phone. That is a playtest. If the ladder turns out too hard or too
+soft, move `HR_TARGET_FRACTION` and re-run `hashrush-level-targets`, which
+fails if any level asks for more than the model can score or if the targets
+stop rising.

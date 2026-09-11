@@ -75,6 +75,11 @@ const GAMES = [
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
     fitShell: true,
+    /* #195 — no "View board" step. The result card already reveals the answer
+       and the score, so the frozen board behind it repeats what you just read.
+       Every other game keeps it; this is a property of the game, not a
+       shell-wide change (see boardReviewable). */
+    reviewBoard: false,
     howToPlay: [
       { title: 'Guess the word', body: 'Type a guess and submit. Green = right letter, right spot; gold = right letter, wrong spot.' },
       { title: 'Work the stack', body: "Today's puzzle is a stack of crypto words — solve one to unlock the next. Clues unlock as you go, and free hints are capped per day." },
@@ -245,7 +250,7 @@ const GAMES = [
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
     howToPlay: [
-      { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. Eat food to grow and score.' },
+      { title: 'Steer the snake', body: 'Swipe, or tap the side of the board you want to head for. Arrow keys work too. Turns queue, so you can take a corner in one motion.' },
       { title: 'Stay alive', body: 'Hitting a wall or your own tail ends the run. Longer snakes and faster modes score more.' },
     ],
     component: SnakeGame,
@@ -328,8 +333,9 @@ const GAMES = [
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Shoot to match', body: 'Aim and tap to fire a colored ball into the moving chain. Three or more of a color clear.' },
-      { title: 'Beat the chain', body: 'Clear the whole chain before it reaches the skull. Gaps and combos multiply your score.' },
+      { title: 'Aim, then fire', body: 'Tap once to aim — a dotted line shows exactly where the marble will land. Tap again to fire it. Three or more of a colour clear.' },
+      { title: 'Beat the chain', body: 'Clear the whole chain before it reaches the skull. Gaps and combos multiply your score. With fewer than five marbles left the cannon only deals colours still on the chain, so the end is always finishable.' },
+      { title: 'Earn a camouflage marble', body: 'Five shots in a row that each clear something drop a rainbow marble onto the cannon for 10 seconds. It takes the colour of whatever it lands against, so it always makes a match.' },
     ],
     component: ZumaGame,
   },
@@ -355,13 +361,15 @@ const GAMES = [
     icon: '⛏️',
     category: 'classic',
     shell: 'self',
-    desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
+    desc: 'Tap to smash falling hashes, stack lightning, leave the TNT alone.',
     tag: 'Arcade',
     tagColor: GA.plum,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Dodge and collect', body: 'Steer your miner between lanes — grab hash tokens, dodge the invalid blocks.' },
-      { title: 'Survive', body: 'The chain speeds up the longer you last. One collision ends the run.' },
+      { title: 'Tap to mine', body: 'Swing your hammer at a falling ⛏️ hash to break it — 10 points each. A hash that reaches the floor un-mined costs a life.' },
+      { title: 'Stack the lightning', body: 'Tap ⚡ to add 5 seconds of double scoring. Bolts stack, so grabbing a second one while boosted is worth taking.' },
+      { title: 'Leave the TNT', body: 'Tapping 🧨 costs you 10 points. It is the one thing to let fall.' },
+      { title: 'Hit the target', body: 'Daily and story shifts show a target score. Reach it before the clock runs out and the shift is cleared.' },
     ],
     component: HashRushGame,
     leaderboard: true,
@@ -693,7 +701,7 @@ const GAMES = [
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'swipe', undo: 'none' },
     fitShell: true,
     howToPlay: [
-      { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. The apples appear in the same order for everyone today.' },
+      { title: 'Steer the snake', body: 'Swipe, or tap the side of the board you want to head for. Arrow keys work too. Turns queue, so you can take a corner in one motion. The apples appear in the same order for everyone today.' },
       { title: 'Eat 20 to win', body: 'Reach 20 apples and the day is yours — faster runs score higher. Hit a wall or your tail and the day is lost.' },
       { title: 'One run', body: 'This is the daily challenge — no restarts. Warm up in the free-play Snake first if you like.' },
     ],

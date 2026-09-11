@@ -5,18 +5,62 @@
 const CG_SOUND_KEY   = 'puzzlechain_cg_sound';
 const CG_HAPTICS_KEY = 'puzzlechain_cg_haptics';
 const CG_MOTION_KEY  = 'puzzlechain_cg_motion';
-const PREF_KEYS = { sound: CG_SOUND_KEY, haptics: CG_HAPTICS_KEY, motion: CG_MOTION_KEY };
+/* #192 — which keyboard a word game types with. Device-local like every other
+   pref here, and OFF by default: the drawn keyboard is the only surface that
+   carries the per-letter state (which letters are placed, which are spent), so
+   turning it off is a real trade and belongs to the player rather than to a
+   silent default. Flipping this default is one word if the group wants it. */
+const CG_DEVKBD_KEY  = 'puzzlechain_cg_devkbd';
+const PREF_KEYS = {
+  sound: CG_SOUND_KEY, haptics: CG_HAPTICS_KEY, motion: CG_MOTION_KEY, devkbd: CG_DEVKBD_KEY,
+};
 
 // Module-level prefs read by cgSound/cgHaptic without prop threading.
 const cgPrefs = {
   sound:   (() => { try { return localStorage.getItem(CG_SOUND_KEY) !== '0'; } catch { return true; } })(),
   haptics: (() => { try { return localStorage.getItem(CG_HAPTICS_KEY) !== '0'; } catch { return true; } })(),
   motion:  (() => { try { return localStorage.getItem(CG_MOTION_KEY) === '1'; } catch { return false; } })(),
+  devkbd:  (() => { try { return localStorage.getItem(CG_DEVKBD_KEY) === '1'; } catch { return false; } })(),
 };
 function cgSetPref(key, val) {
   cgPrefs[key] = val;
   try { localStorage.setItem(PREF_KEYS[key] || CG_MOTION_KEY, val ? '1' : '0'); } catch {}
+  if (key === 'motion') applyMotionPref();
 }
+/* `?devkbd=1|0` — the pref is a device setting, so the only way a proposal
+   check or a screenshot could otherwise reach the other mode is by opening
+   Settings and tapping, which navigation cannot do. Applied at boot, before
+   any game mounts. */
+(function readDevKbdParam() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('devkbd');
+    if (v === '1' || v === '0') cgPrefs.devkbd = v === '1';
+  } catch (_) {}
+})();
+/* #235 — the in-app "Reduced motion" switch has only ever reached JS call
+   sites, because CSS could see the OS media query and not the pref. Mirroring
+   it onto the root element gives the stylesheet something to match, so a
+   player who turned motion down in Settings gets that from the CSS animations
+   too and not only from the ones drawn in JS. */
+function applyMotionPref() {
+  try {
+    const el = document.documentElement;
+    if (cgPrefs.motion) el.setAttribute('data-reduce-motion', '1');
+    else el.removeAttribute('data-reduce-motion');
+  } catch (e) {}
+}
+/* ?motion=reduce|full — the pref is device-local, so a check or a screenshot
+   could otherwise reach the reduced state only by opening Settings and
+   tapping, which navigation cannot do. Same role as ?theme=, and read before
+   the attribute is applied below. */
+(function readMotionParam() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('motion');
+    if (v === 'reduce') cgPrefs.motion = true;
+    else if (v === 'full') cgPrefs.motion = false;
+  } catch (e) {}
+})();
+applyMotionPref();
 
 /* ============================================================
    Theme preference — light / dark / system (default system)
@@ -154,9 +198,23 @@ let _canvasGuardWarned = 0;
    stale-colour leak can never happen again, and the first few occurrences log
    a console error (which trips the platform's no-console-errors check).
    Deliberately NOT env-gated: identical code path in staging and production. */
+/* #208 — the guard has to return the SAME proxy every time, so it is cached
+   against the context rather than flagged on it.
+
+   It used to mark the RAW context `__unGuarded` once it had wrapped it, and
+   bail out returning that raw context on every later call. But
+   `canvas.getContext('2d')` hands back the SAME object each time, and
+   `useCanvasBoard` re-guards on EVERY frame — so only the very first frame of
+   every canvas in the app was ever guarded, and every frame after it drew
+   through an unwrapped context. The protection this comment block promises
+   ("the bug class can never silently return") had been inert since frame one,
+   which is exactly how Block Fit shipped a board that painted every placed
+   piece in the background colour without ever tripping the check. */
+const _ctxGuards = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
 function guardCanvasCtx(ctx) {
   if (!ctx || typeof Proxy === 'undefined') return ctx;
-  if (ctx.__unGuarded) return ctx;
+  const cached = _ctxGuards && _ctxGuards.get(ctx);
+  if (cached) return cached;
   try {
     const p = new Proxy(ctx, {
       get(t, k) {
@@ -178,7 +236,7 @@ function guardCanvasCtx(ctx) {
         return true;
       },
     });
-    try { Object.defineProperty(ctx, '__unGuarded', { value: true, enumerable: false }); } catch {}
+    if (_ctxGuards) _ctxGuards.set(ctx, p);
     return p;
   } catch { return ctx; }
 }
@@ -602,8 +660,27 @@ function useGestures(ref, handlers) {
   }, [ref]);
 }
 
-// Drag tracking for Block Blast pieces / Diamond Rush swaps.
+/* Drag tracking for Block Blast pieces / Diamond Rush swaps.
+
+   #208 — the branch has to test LENGTH, not existence. `e.touches` on a
+   TouchEvent is always a TouchList, and a TouchList is an object, so the old
+   `e.touches ? …` was true even when it was EMPTY — which is exactly what
+   `touchend` carries: the finger that just lifted is in `changedTouches`, and
+   `touches` holds the fingers still down, i.e. none.
+
+   So every touch DROP read `e.touches[0]` as undefined and threw
+   `Cannot read properties of undefined (reading 'clientX')`. In Block Fit that
+   throw happened inside the window `touchend` listener, before `commitDrop`
+   ran: the piece was never placed and the cell stayed empty, which is the
+   "dropped blocks fail to render, leaving empty slots" report. Because the
+   throw also skipped `setDrag(null)`, the dragged piece's ghost stayed stuck
+   on screen afterwards.
+
+   Only touch was affected — a mouse drop has neither list and falls through to
+   the event itself, which is why this was reported against mobile. */
 function pointerXY(e) {
-  const p = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+  const p = (e.touches && e.touches.length) ? e.touches[0]
+    : (e.changedTouches && e.changedTouches.length) ? e.changedTouches[0]
+    : e;
   return { x: p.clientX, y: p.clientY };
 }

@@ -231,6 +231,18 @@ function App() {
      ============================================================ */
   const navLock = useRef(false);
   const navReady = useRef(false);
+  /* #186 — how many entries OF OURS are behind this one. The in-app back
+     control needs to know whether there is somewhere of ours to go back TO:
+     at depth 0 the previous entry belongs to whoever loaded us, and this app
+     runs in an iframe, so calling history.back() there steps the EMBEDDING
+     page out of the app rather than unwinding a screen. Stored on the entry
+     as well as held in a ref, so a reload or a pop restores the count instead
+     of guessing it. */
+  const navDepth = useRef(0);
+  /* A render-visible mirror of the ref, so the root can carry the depth as an
+     attribute. It is deliberately NOT part of navState: it changes as a RESULT
+     of a push, and putting it in would make every push cause another one. */
+  const [navDepthTick, setNavDepthTick] = useState(0);
 
   /* The single description of "where am I", used for both push and restore.
      EVERY field must be a primitive: this object is JSON.stringify'd on each
@@ -295,10 +307,13 @@ function App() {
       const url = window.location.pathname + window.location.search + window.location.hash;
       if (!navReady.current) {
         navReady.current = true;
-        window.history.replaceState({ un: navState }, '', url);
+        navDepth.current = navDepthOf(window.history.state);
+        window.history.replaceState({ un: navState, unDepth: navDepth.current }, '', url);
       } else {
-        window.history.pushState({ un: navState }, '', url);
+        navDepth.current += 1;
+        window.history.pushState({ un: navState, unDepth: navDepth.current }, '', url);
       }
+      setNavDepthTick(navDepth.current);
     } catch {}
   }, [navKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -306,6 +321,8 @@ function App() {
     const onPop = (e) => {
       const s = e.state && e.state.un;
       navLock.current = true;
+      navDepth.current = navDepthOf(e.state);
+      setNavDepthTick(navDepth.current);
       if (!s) {
         // Popped past our first entry — land on home rather than a blank state.
         setScreen('lobby'); setCurrentGame(null); setReviewMode(false);
@@ -1670,6 +1687,31 @@ function App() {
     else if (tab === 'ladder' || tab === 'home') setLobbyTab(tab);
   };
 
+  /* #186 — the in-app back control, which was never a back control.
+     Every "← Back" in this app called backToLobby(), a RESET: it clears the
+     game, the result, the mode and the practice flag and sets screen to
+     'lobby'. Measured, from a board reached home → card → pre-game → Play:
+     the device back button unwound game → pregame → lobby a step at a time
+     (the #134 reducer doing its job), while "← Back" jumped straight to the
+     lobby AND pushed another entry (history.length 4 → 5), so pressing it and
+     then device-back went FORWARD into the board you had just left.
+
+     So this is not a second navigation model — it is the existing one, used.
+     The only judgement here is the fallback: at depth 0 there is no entry of
+     ours behind us (a cold deep link, which is the shape every share card
+     carries), and history.back() would leave the app. `backToLobby` is then
+     the right answer and the safe one.
+
+     The result cards' "Back to Lobby" and the Ladder tab's "← Home" keep
+     calling backToLobby directly: their labels name a destination, and going
+     there is correct. */
+  const goBack = (fallbackTab) => {
+    if (navDepth.current > 0 && typeof window !== 'undefined' && window.history) {
+      try { window.history.back(); return; } catch (e) {}
+    }
+    backToLobby(fallbackTab);
+  };
+
   /* PHASE 4 (#133) — "Play again for fun".
      Mounts the SAME component with the SAME dailyRng seed (so it is genuinely
      today's puzzle, not a random one) and a bumped resetKey, but with
@@ -1898,7 +1940,7 @@ function App() {
           <GameComponent
             {...modeProps}
             game={currentGame}
-            onBack={() => backToLobby('classic')}
+            onBack={() => goBack('classic')}
             onWin={handleWin}
             onLose={handleLose}
             onStepChange={setStepCount}
@@ -1928,7 +1970,7 @@ function App() {
         return (
           <ClassicShell
             game={currentGame}
-            onExit={() => backToLobby('classic')}
+            onExit={() => goBack('classic')}
             onNewGame={() => setPlayAgainKey(k => k + 1)}
             menuConfig={classicMenuConfig}
             sheetSections={classicSections}
@@ -1954,7 +1996,7 @@ function App() {
                 gameMode={classicGameMode}
                 gameModeOpts={classicGameModeOpts}
                 onModeChange={setClassicGameMode}
-                onBack={() => backToLobby('classic')}
+                onBack={() => goBack('classic')}
               />
             </div>
           </ClassicShell>
@@ -1975,7 +2017,7 @@ function App() {
         return (
           <div className={'game-wrap' + (currentGame.fitShell ? ' fit' : '')}>
             <div className="game-head">
-              <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
+              <button className="back-btn" onClick={() => goBack()}>← Back</button>
               <div className="game-title">
                 <span>{currentGame.icon}</span> {currentGame.name}
               </div>
@@ -2172,7 +2214,11 @@ function App() {
      followed by an unstyled one (#150). Keeping the stylesheet outside the
      boundary is what lets the fallback panel render styled. */
   return (
-    <div className={'app' + (fitActive ? ' app-fit' : '')}>
+    /* data-nav-depth is what a proposal check can actually see: a check can
+       navigate but cannot press back, and the case worth guarding is the cold
+       deep link, where depth 0 is the difference between falling back to the
+       lobby and stepping the embedding page out of the app. */
+    <div className={'app' + (fitActive ? ' app-fit' : '')} data-nav-depth={navDepthTick}>
       <nav className="nav">
         <div className="nav-brand"><span className="logo">⬢</span><span className="brandword">Game Corner</span></div>
         <div className="nav-right">
@@ -2239,7 +2285,7 @@ function App() {
         <ProfileScreen
           userId={selectedUserId}
           user={user}
-          onBack={() => { setScreen('lobby'); setSelectedUserId(null); }}
+          onBack={() => goBack()}
           onOpenFriends={() => setScreen('friends')}
           onOpenSettings={() => setSettingsOpen(true)}
         />
@@ -2248,7 +2294,7 @@ function App() {
       {screen === 'friends' && (
         <FriendsListScreen
           onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
-          onBack={() => setScreen('lobby')}
+          onBack={() => goBack()}
         />
       )}
 
@@ -2541,7 +2587,7 @@ function App() {
       {screen === 'pregame' && currentGame && (
         <div className="game-wrap screen-in">
           <div className="game-head">
-            <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
+            <button className="back-btn" onClick={() => goBack()}>← Back</button>
             <div className="game-title">
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
@@ -2573,7 +2619,7 @@ function App() {
       {screen === 'opponent' && preLaunchGame && (
         <div className="game-wrap screen-in">
           <div className="game-head">
-            <button className="back-btn" onClick={() => backToLobby('classic')}>← Back</button>
+            <button className="back-btn" onClick={() => goBack('classic')}>← Back</button>
             <div className="game-title">
               <span>{preLaunchGame.icon}</span> {preLaunchGame.name}
             </div>
@@ -2601,7 +2647,7 @@ function App() {
         // exactly what the ?demo=solvedboard checks caught.
         <div className={'game-wrap screen-in-fade' + (lockedReviewable && lockedReview ? ' fit' : '')}>
           <div className="game-head">
-            <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
+            <button className="back-btn" onClick={() => goBack()}>← Back</button>
             <div className="game-title">
               <span>{currentGame.icon}</span> {currentGame.name}
             </div>
@@ -2628,7 +2674,7 @@ function App() {
               nextResetUtc={nextResetUtc}
               offset={offset}
               onReset={onReset}
-              onBack={() => backToLobby()}
+              onBack={() => goBack()}
               best={bests[currentGame.id]}
               onReview={lockedReviewable ? () => setLockedReview(true) : null}
               onPractice={() => startPractice(currentGame)}

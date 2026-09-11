@@ -976,6 +976,16 @@
       "expectSelector": ".win-card .we-v"
     },
     {
+      "name": "Home is the bottom of the back stack",
+      "path": "/",
+      "expectSelector": ".app[data-nav-depth=\"0\"]"
+    },
+    {
+      "name": "A cold deep link has one screen to go back to",
+      "path": "/?game=sudoku&practice=1",
+      "expectSelector": ".app[data-nav-depth=\"1\"]"
+    },
+    {
       "name": "Ludo pass-and-play board renders",
       "path": "/?game=ludo&mode=2p",
       "expectSelector": "canvas.ludo-canvas"

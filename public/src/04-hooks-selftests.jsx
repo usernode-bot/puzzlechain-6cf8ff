@@ -300,6 +300,19 @@ function navPrimitive(v) {
   return null; // objects/functions/symbols can never reach the serializer
 }
 
+/* #186 — how many history entries of OURS sit behind the one handed in.
+   Read back off `history.state`, which survives a reload and a pop, so the
+   in-app back control never has to guess. Anything that is not one of our
+   own entries — a foreign state object, a null one, a hand-edited number —
+   reads as 0, which is the value that makes goBack fall back to the lobby
+   instead of calling history.back() out of the iframe. Depth is never
+   negative and never fractional: a bad value must fail SAFE, not underflow
+   into "there is somewhere to go back to". */
+function navDepthOf(state) {
+  const d = state && state.un ? state.unDepth : null;
+  return typeof d === 'number' && Number.isFinite(d) && d > 0 ? Math.floor(d) : 0;
+}
+
 /* PHASE 2 (#163) — one reusable off-screen probe for touch-action computed
    values. Created once per sweep; `read(cls)` swaps the class and re-reads, and
    getComputedStyle flushes style recalc so the value is always current. */
@@ -909,6 +922,26 @@ function runClientSelfTests(styleReady) {
     // A one-stone move is a move, and a garbage count is not a crash.
     if (mncSowDelay(1) !== MNC_SOW_MAX) throw new Error('one stone gets the longest gap');
     if (!(mncSowDelay(0) > 0) || !(mncSowDelay(-3) > 0)) throw new Error('a nonsense count still yields a delay');
+    return true;
+  });
+
+  /* #186 — the in-app back control reads this to decide between unwinding a
+     screen and going home. It runs in an IFRAME, so a wrong answer here does
+     not mis-navigate, it steps the EMBEDDING page out of the app. Everything
+     that is not unambiguously one of our own entries must therefore read 0 —
+     the value that makes goBack fall back to the lobby. */
+  check('nav-depth-fail-safe', () => {
+    if (navDepthOf({ un: { screen: 'game' }, unDepth: 3 }) !== 3) throw new Error('our own entry reports its depth');
+    if (navDepthOf({ un: { screen: 'lobby' }, unDepth: 0 }) !== 0) throw new Error('the first entry is depth 0');
+    // Not ours, in every shape a session history can hand back.
+    for (const bad of [null, undefined, {}, { unDepth: 4 }, { un: null, unDepth: 4 },
+                       { un: { screen: 'game' } }, { un: {}, unDepth: '4' },
+                       { un: {}, unDepth: NaN }, { un: {}, unDepth: Infinity },
+                       { un: {}, unDepth: -2 }, { un: {}, unDepth: true }]) {
+      if (navDepthOf(bad) !== 0) throw new Error('a foreign or malformed entry must read 0: ' + JSON.stringify(bad));
+    }
+    // A fractional depth floors rather than surviving as one.
+    if (navDepthOf({ un: {}, unDepth: 2.7 }) !== 2) throw new Error('depth is a whole number of entries');
     return true;
   });
 

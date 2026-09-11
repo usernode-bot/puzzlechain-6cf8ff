@@ -1370,6 +1370,48 @@ Snake and Bounce already route their game-over through `onWin` with
 filters `score > 0`, so a non-zero loss would put a FAILED run on the board.
 Streaks are unaffected either way — `computeStreak` keys off `finished_at`.
 
+### A daily deep link has to carry the daily MODE, not just the game
+
+`?game=<id>&play=1` used to call `startRun(g)` on its own. `startRun` reads the
+play mode from a **ref** and never sets it, so a link with no `?pmode=` left the
+shell at `playMode === null` — and `resumable` in `renderGameBody` is
+`playMode === 'daily'`, the single gate on whether a game is handed its
+`savedProgress` at all. So a daily opened that way **could not resume**: a
+claimed, half-played attempt mounted as a blank board with the clock at zero and
+`onSaveProgress` null. That is the shape of link the share cards carry (the
+no-login `?game=` link), and it is what made the merged check "Nonogram resumes
+its mistake count" red on main against every proposal. The branch now does what
+the `?pmode=` branch above it already did: `launchGame(g, defaultPlayMode(g))`
+to set the mode, then `startRun(g, { mode })` to claim or resume in it. A
+finished day still lands on the locked screen — both calls agree on that.
+
+**`?practice=1` is deliberately left on the old path** (`playMode` stays null):
+practice has no resume by design, and hoisting a default mode above that branch
+would send `?game=<daily>&practice=1` into the pre-game screen instead.
+
+### A staging fixture must ASSERT its state, not add to it
+
+Staging carries one database across every check run and never resets, so two
+fixtures that seed the same rows to different depths cannot both use
+`ON CONFLICT DO NOTHING` — whichever ran first wins permanently and the other
+becomes a silent no-op. `demo=storybadges` wants sudoku's ladder fully cleared;
+`demo=modes` wants it three rungs in. Once storybadges had run, `demo=modes`
+could never say what it means, and "Story picker calls each step a level"
+(which asserts the half-walked note, not the all-cleared one) failed for
+reasons nothing in its own proposal could explain. Both now delete the bands
+above the depth they are claiming before inserting. Any new fixture that seeds
+a COUNT of something owes the same treatment.
+
+**The LOCKED half of a fixture is state too.** `demo=storybadges` exists to put
+an earned badge beside locked ones, so it has to be able to say a ladder is
+unfinished rather than merely decline to finish it — one leftover
+`story_complete` row renders the locked example as earned, and the check
+asserting on it fails with nothing in its own proposal to explain why. It now
+clears the `story_complete` achievement AND the progress rows for its two
+unfinished examples (`minefinder`, one rung short; `cratepush`, never started)
+before seeding the finished one. If a check asserts that something is ABSENT or
+UNEARNED, the fixture has to make it so.
+
 ### New deep links
 
 `?result=1` mounts a game and opens a representative results card over its

@@ -3494,7 +3494,6 @@ ${emitTapHighlightRules()}
 .hr-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,10,18,0.6); text-align: center; padding: 1rem; }
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
-.hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
 
 /* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }

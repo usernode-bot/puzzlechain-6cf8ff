@@ -8,6 +8,59 @@ const BB_KEY    = 'puzzlechain_blockblast_history';
 const DR_KEY    = 'puzzlechain_diamondrush_history';
 const TH_KEY    = 'puzzlechain_texas_history';
 
+/* #206 — SNAKE'S TURN QUEUE.
+
+   "The snake fails to turn upon tap or swipe" is not a gesture problem — the
+   swipes arrive, and .snake-board / .dsnk-board both carry touch-action: none
+   so the browser never steals them. It is that a turn had nowhere to wait.
+
+   Both snakes held ONE pending direction and validated every new turn against
+   the direction currently being travelled. Two consequences, and between them
+   they eat a large share of the turns a player actually makes, because a
+   corner is TWO turns and a tick is 90-200 ms:
+
+     - the second turn OVERWRITES the first, so the snake never makes the first
+       one: swipe up then left around a corner and it simply goes left;
+     - or the second turn is REJECTED as a reversal of a direction the first
+       turn was about to change: heading up with left already pending, "down"
+       is a legal move after that left, and was refused because down reverses
+       UP. Measured in a browser: that input returns without doing anything.
+
+   So turns queue, up to SNAKE_TURN_QUEUE of them, and each is checked against
+   the last direction QUEUED rather than the last one travelled — which is the
+   direction it will actually follow. One tick consumes one turn, so the snake
+   still cannot double back on itself within a tick; it just stops forgetting
+   what you asked for. Pure, because that is the whole rule and a self-test can
+   hold it (`snake-turn-queue`). */
+const SNAKE_DIRS = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+const SNAKE_TURN_QUEUE = 2;
+
+function snakeQueueTurn(dir, cur, queue) {
+  const nd = SNAKE_DIRS[dir];
+  if (!nd || !cur) return null;
+  const q = Array.isArray(queue) ? queue : [];
+  if (q.length >= SNAKE_TURN_QUEUE) return null;          // hold two, not a buffer
+  // The direction this turn actually follows on from.
+  const prev = q.length ? q[q.length - 1] : cur;
+  if (nd.x === -prev.x && nd.y === -prev.y) return null;  // no doubling back
+  if (nd.x === prev.x && nd.y === prev.y) return null;    // already going that way
+  return q.concat([nd]);
+}
+
+/* Which way a TAP on the board means. The issue asks for tap as well as swipe,
+   and a tap used only to start the run. The board is cut into four triangles
+   by its diagonals and a tap means the one it lands in — absolute, so it needs
+   no knowledge of which way the snake is already going and cannot mean two
+   things at once. A tap dead in the centre means nothing. */
+function snakeTapDir(x, y, w, h) {
+  if (!(w > 0) || !(h > 0)) return null;
+  const nx = x / w - 0.5, ny = y / h - 0.5;
+  if (Math.abs(nx) < 0.08 && Math.abs(ny) < 0.08) return null;
+  return Math.abs(nx) > Math.abs(ny)
+    ? (nx > 0 ? 'right' : 'left')
+    : (ny > 0 ? 'down' : 'up');
+}
+
 function cgLoadHistory(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } }
 function cgSaveHistory(key, entry) {
   const h = cgLoadHistory(key);
@@ -147,7 +200,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
     const m = Math.floor(N / 2);
     const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
     const config = SNAKE_SPEED_CONFIG[difficulty || 'normal'];
-    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: config.initial, eaten: 0 };
+    st.current = { snake, dir: { x: 1, y: 0 }, turns: [], food: randFood(snake), speed: config.initial, eaten: 0 };
     doneRef.current = false;
     setDone(false); setScore(0); setStarted(false); setPaused(false); setPausedSecs(0); render(n => n + 1);
   };
@@ -168,7 +221,9 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   const step = () => {
     const s = st.current;
     if (!s || doneRef.current) return;
-    s.dir = s.nextDir;
+    // One tick consumes one queued turn, which is what keeps the no-doubling-back
+    // rule true however fast the player swipes (#206).
+    if (s.turns.length) s.dir = s.turns.shift();
     const head = s.snake[0];
     const nx = head.x + s.dir.x, ny = head.y + s.dir.y;
     if (nx < 0 || ny < 0 || nx >= N || ny >= N ||
@@ -204,14 +259,23 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   const turn = (dir) => {
     const s = st.current;
     if (!s || doneRef.current || paused) return;
-    const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
-    const nd = map[dir]; if (!nd) return;
-    if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
-    s.nextDir = nd;
+    const q = snakeQueueTurn(dir, s.dir, s.turns);
+    if (!q) return;
+    s.turns = q;
     if (!started) setStarted(true);
     cgSound('move');
   };
-  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started && !paused) setStarted(true); } });
+  useGestures(boardRef, {
+    onSwipe: (d) => turn(d),
+    // A tap steers as well as starting the run (#206) — see snakeTapDir.
+    onTap: (p) => {
+      if (!started && !paused) setStarted(true);
+      const el = boardRef.current; if (!el) return;
+      const r = el.getBoundingClientRect();
+      const dir = snakeTapDir(p.x - r.left, p.y - r.top, r.width, r.height);
+      if (dir) turn(dir);
+    },
+  });
   useEffect(() => {
     const onKey = (e) => {
       const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
@@ -232,7 +296,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
     ]),
     cgLeaderboardSection('snake', { url: '/api/snake/leaderboard' }),
-    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
+    cgRulesSection(['Swipe, or tap the side of the board you want to head for — arrow keys work too. Two turns queue, so a corner takes one motion.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
@@ -248,7 +312,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
             </div>
           )}
         </div>
-        <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
+        <div className="snake-hint">{started ? 'Swipe or tap a side to steer' : 'Swipe or tap a side to start'}</div>
         <CuiBar height={44} build={(W) => {
           const btns = [];
           if (started && !paused && !done) btns.push({ id: 'pause', label: 'Pause', action: () => { setPaused(true); setPausedSecs(secs); } });
@@ -275,8 +339,17 @@ function snakeDeepLinkDifficulty() {
 }
 
 /* ---- Snake — Wrapper (mode selector + gameplay) ---- */
-function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) {
-  const [difficulty, setDifficulty] = useState(snakeDeepLinkDifficulty);
+function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig, playMode, band }) {
+  /* #207 — Snake's only play mode is ARCADE, and the arcade band picker on the
+     pre-game screen already asks Easy / Normal / Hard. Landing on Snake's own
+     "Choose Difficulty" screen straight afterwards asked the same question a
+     second time, in different words, having thrown the first answer away.
+     The two vocabularies are identical (ARCADE_BAND_IDS is exactly
+     ['easy','normal','hard']), so the band IS the difficulty: take it and skip
+     the chooser. Free play, which arrives with no band, still gets it. */
+  const bandDifficulty = playMode === 'arcade' && ARCADE_BAND_IDS.indexOf(band) !== -1
+    ? band : null;
+  const [difficulty, setDifficulty] = useState(bandDifficulty || snakeDeepLinkDifficulty);
   const diffRef = useRef(difficulty);
   diffRef.current = difficulty;
   // This effect sends the player back to the chooser on a New Game. It must NOT
@@ -288,6 +361,10 @@ function SnakeGame({ onWin, onStepChange, resetKey, game, onBack, menuConfig }) 
 
   useEffect(() => {
     if (!diffMounted.current) { diffMounted.current = true; return; }
+    /* A New Game returns to the chooser — unless the band already answered
+       the question, in which case "New Game" means another run at that band,
+       not a fresh interrogation. */
+    if (bandDifficulty) { setDifficulty(bandDifficulty); return; }
     if (diffRef.current !== null) {
       setDifficulty(null);
     }
@@ -391,7 +468,14 @@ function BbGridCanvas({ grid, preview }) {
         const x = c * (cs + gapPx), y = r * (cs + gapPx);
         const pv = preview && preview[i];
         klRR(ctx, x, y, cs, cs, 4);
-        ctx.fillStyle = grid[i] || PAL.bg;
+        /* #208 — BB_COLORS are C.* tokens ('var(--c-accent)'), which a canvas
+           CANNOT resolve: the assignment is silently ignored and fillStyle
+           keeps whatever it held, i.e. the PAL.bg of the previous empty cell.
+           Every placed block therefore painted itself the background colour —
+           the board read as empty however many pieces you had dropped. The
+           tray canvas a few lines below already resolved through palOf; the
+           well did not. */
+        ctx.fillStyle = grid[i] ? palOf(grid[i], PAL.accent) : PAL.bg;
         ctx.fill();
         if (pv) {
           klRR(ctx, x, y, cs, cs, 4);
@@ -1075,12 +1159,36 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
       { val: bigC, lbl: 'Best cascade' }, { val: bestCombo, lbl: 'Best combo' },
     ]),
     cgLeaderboardSection('diamondrush'),
-    cgRulesSection([`Reach ${TARGET} points within ${START_MOVES} moves.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
+    cgRulesSection([`WIN: reach ${TARGET} points within ${START_MOVES} moves. Falling short is a loss, however high you scored.`, 'Tap a gem then an adjacent gem — or swipe — to swap.', 'Line up 3+ to clear them. Special gems: 3-match→Bomb (3×3), 5+→Lightning (row+col), 7+→Rainbow (color).', 'Falling gems can chain into cascades for big bonuses.', 'Each consecutive clear builds your combo, multiplying your score — reset on any failed swap.', 'Use power-ups (Hint, Shuffle, Extra Time) to gain an edge.']),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
       <div className="cg-stage">
-        <CgStatus items={[{ l: 'Score', v: `${score}/${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
+        <CgStatus items={[{ l: 'Score', v: `${score}` }, { l: 'Target', v: `${TARGET}` }, { l: 'Moves', v: moves }, { l: 'Combo', v: combo > 0 ? `${combo} / ×${comboMultiplier(combo).toFixed(1)}` : '—' }, { l: 'Time', v: cgFmt(secs) }]} />
+        {/* #209 — the run's progression, off the REAL win condition rather
+            than a number invented for the HUD: finish above TARGET before
+            START_MOVES runs out, which is exactly what `finish(sc, win, mv)`
+            decides on. Score and Target are their own pills now (they were one
+            "340/800" pill, which reads as a score, not as a goal), and the bar
+            plus the line under it say how far there is to go and whether the
+            moves can still get you there. Both story and arcade have a real
+            target — free play falls back to the same 800/18 the game has
+            always used — so this renders in every mode. */}
+        <CuiBar height={36} build={(W) => {
+          const pad = Math.floor(W * 0.06);
+          const bw = Math.max(20, W - pad * 2);
+          const reached = score >= TARGET;
+          const left = Math.max(0, TARGET - score);
+          return [
+            { id: 'dr-meter', kind: 'meter', r: [pad, 3, bw, 9], p: TARGET > 0 ? score / TARGET : 0, done: reached,
+              twinLabel: `Progress ${score} of ${TARGET} points` },
+            { id: 'dr-goal', kind: 'label', r: [0, 16, W, 18], font: 11.5,
+              label: reached
+                ? `🎉 Target reached — ${moves} ${moves === 1 ? 'move' : 'moves'} left to build on it`
+                : `${left} more ${left === 1 ? 'point' : 'points'} in ${moves} ${moves === 1 ? 'move' : 'moves'}`,
+              color: reached ? PAL.emerald : PAL.muted },
+          ];
+        }} />
         <CuiBar height={44} build={(W) => {
           const br = cuiRow(Math.floor(W * 0.08), 0, Math.floor(W * 0.84), 40, 3);
           return ['hint', 'shuffle', 'extraTime'].map((type, i) => ({

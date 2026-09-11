@@ -32,7 +32,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
 
   if (loading) {
     return (
-      <div className="social-page">
+      <div className="social-page screen-in">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <p style={{ color: C.muted, marginTop: '1rem' }}>Loading profile...</p>
       </div>
@@ -41,7 +41,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
 
   if (!profile) {
     return (
-      <div className="social-page">
+      <div className="social-page screen-in">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <p style={{ color: C.rose, marginTop: '1rem' }}>Profile not found</p>
       </div>
@@ -52,7 +52,7 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
   const recentGames = Array.isArray(profile.recentGames) ? profile.recentGames : [];
 
   return (
-    <div className="social-page">
+    <div className="social-page screen-in">
       <button className="back-btn" onClick={onBack}>← Back</button>
 
       <div style={{
@@ -234,7 +234,7 @@ function FriendsListScreen({ onSelectUser, onBack }) {
 
   if (loading) {
     return (
-      <div className="social-page">
+      <div className="social-page screen-in">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <p style={{ color: C.muted, marginTop: '1rem' }}>Loading friends...</p>
       </div>
@@ -242,7 +242,7 @@ function FriendsListScreen({ onSelectUser, onBack }) {
   }
 
   return (
-    <div className="social-page">
+    <div className="social-page screen-in">
       <button className="back-btn" onClick={onBack}>← Back</button>
 
       <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '1.5rem 0 1rem' }}>Friends</h2>

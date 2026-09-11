@@ -50,9 +50,12 @@ const isPlayMode = (m) => Object.prototype.hasOwnProperty.call(PLAY_MODES, m);
 /* Arcade difficulty bands. THREE for every game, deliberately coarser than a
    story ladder: story's granularity is progression, arcade's is a selector and
    has to fit in a row. All three are open from the first run — a player who
-   picks Hard on a game they have never played gets a hard board, which is why
-   the picker marks the band matching their story progress as "recommended"
-   rather than locking the others. Steering, not gating. */
+   picks Hard on a game they have never played gets a hard board, and that is
+   allowed: steering, not gating.
+
+   The picker used to mark one band "recommended" from your story progress.
+   #195 removed it — it repeated what the band names already say, and Easy /
+   Normal / Hard is not a labelling anyone needs help reading. */
 const ARCADE_BANDS = [
   { id: 'easy',   label: 'Easy',   t: 0.15 },
   { id: 'normal', label: 'Normal', t: 0.50 },

@@ -41,43 +41,34 @@ function signIntegrationPayload(payload) {
 }
 
 
-// Server-authoritative daily hint cap. Hints are FREE (the MATCH currency is
-// retired) but still capped and counted server-side so the count survives
-// reloads and a client can't reveal more clues than the day's puzzle carries.
-// Mirrors the frontend source's cwDailyRounds: the day's round count R is the FIRST draw
-// off dailyRng(offset, 'cryptowordle'), before any word is picked, so we can
-// reproduce R without porting the whole CW_WORDS list — only the round-count
-// draw needs to match byte-for-byte. Every CW_WORDS entry ships exactly
-// CW_HINTS_PER_WORD hints today, so the day's total available clues is simply
-// R * CW_HINTS_PER_WORD.
-const CW_MIN_ROWS = 4, CW_MAX_ROWS = 7;
-const CW_HINTS_PER_WORD = 2;
-function cwMulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function cwHashStr(s) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+/* Server-authoritative daily hint cap. Hints are FREE (the MATCH currency is
+   retired) but still capped and counted server-side so the count survives
+   reloads and a client can't reveal more clues than the day's puzzle carries.
+
+   #193 — this used to REDERIVE the day's round count from a seeded draw,
+   mirroring a frontend that drew R off dailyRng before picking any word. The
+   frontend stopped doing that: the count is a fixed CW_ROUNDS_PER_DAY now
+   ("Count is now fixed" in 09-game-cipher.jsx), and the 4-to-7 range the draw
+   still used is the GUESS-ROW range, not a round count. So the cap was a
+   uniform draw from {8, 10, 12, 14} against a day that always carries
+   5 * hints-per-word — and on the quarter of days the draw landed on 4, the
+   last clues of the day were refused with "No more clues" while the puzzle
+   still had them. That is the "2-hint ceiling" as a player meets it.
+
+   It is a straight multiplication now, with nothing to drift: the round count
+   is fixed, and CW_HINTS_PER_WORD is the MAXIMUM a word can offer (two written
+   clues plus the derived ones cwDerivedHints adds). The real per-word limit is
+   enforced client-side against the clues that word actually has; this is only
+   the day's abuse ceiling, so erring high is correct — every clue it counts is
+   one the client already holds locally. */
+const CW_ROUNDS_PER_DAY = 5;
+const CW_HINTS_PER_WORD = 4;
 function cwUtcDayNum() {
   const d = new Date();
   return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
 }
 function cwServerMaxHints() {
-  const dayNum = cwUtcDayNum();
-  const rng = cwMulberry32((dayNum + cwHashStr('cryptowordle')) >>> 0);
-  const rounds = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
-  return rounds * CW_HINTS_PER_WORD;
+  return CW_ROUNDS_PER_DAY * CW_HINTS_PER_WORD;
 }
 
 // Single shared connection pool to this app's Postgres DB.
@@ -158,7 +149,7 @@ const GAME_REGISTRY = {
   zuma:              { name: 'Marble Loop',              category: 'classic', dailyMode: true, tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
@@ -428,6 +419,29 @@ function gotdSchedule() {
 // same deterministic schedule ensureDailyFeatured uses) and a finished
 // attempt for that featured game. Idempotent; only called from IS_STAGING
 // demo fixtures.
+/* "Today is left open" has to be MADE true, not assumed.
+
+   demo=streak and demo=badges both promise a long streak with today still
+   playable. Neither of them finishes today — but demo=locked deliberately
+   does, on the same viewer, and staging carries one database across every
+   check run and never resets. So the first time demo=locked ran, today's
+   sudoku was finished forever, and every later route that wanted the PRE-GAME
+   screen got the locked screen instead. That is what took out the two #188
+   leaderboards checks (`?game=sudoku&boards=1&demo=streak`): the panel lives
+   on the pre-game screen, and the pre-game screen was never reached.
+
+   Same rule as demo=storybadges and demo=modes: a fixture has to assert the
+   state it claims, including the ABSENCE of a row. demo=locked still finishes
+   today on its own routes, because it asserts its state too — the two simply
+   have to stop depending on which one ran first. */
+async function openTodayForDemo(userId) {
+  await pool.query(
+    `DELETE FROM daily_attempts
+      WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
+    [userId]
+  );
+}
+
 async function seedFeaturedStreakDays(userId, username, nDays) {
   const schedule = gotdSchedule();
   const { rows: dRows } = await pool.query(`SELECT (now() AT TIME ZONE 'utc')::date AS d`);
@@ -813,6 +827,14 @@ async function migrate() {
   // re-derived from the deterministic daily seed, so only player moves live here.
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
+  /* #188 — the all-time board groups every finished attempt for one game by
+     player. Without this the query is a full scan of a table that only grows;
+     the existing indexes are keyed for "today, this game", which is the wrong
+     shape for it. Idempotent, per the platform's schema convention. */
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS daily_attempts_alltime_idx
+      ON daily_attempts (game_id, user_id) WHERE finished_at IS NOT NULL
+  `);
 
   // game_ratings is PUBLIC (leaderboard data): one Elo rating row per
   // (user, head-to-head game), updated in the room/match finish handlers
@@ -2084,6 +2106,9 @@ const PUBLIC_API_GET = [
   // null-guards req.user (anonymous ⇒ me: null, isCurrentUser: false). The
   // arcade FINISH route stays auth-gated — it pays points.
   /^\/api\/arcade\/[A-Za-z0-9_-]+\/leaderboard$/,
+  // #188 — the all-time board is the same shape as the two above and opens on
+  // the same terms; its handler null-guards req.user too.
+  /^\/api\/alltime\/[A-Za-z0-9_-]+\/leaderboard$/,
 ];
 
 // Simple in-memory per-IP sliding window over the public GET surface — the
@@ -2613,6 +2638,7 @@ app.get('/api/daily', async (req, res) => {
       // rows), so the streak is demonstrable under the GotD-participation
       // rule regardless of where the cutover falls relative to the seed days.
       await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 10);
+      await openTodayForDemo(req.user.id);
     }
 
     // Staging-only demo seed: give the current viewer a LONG streak plus the
@@ -2626,6 +2652,7 @@ app.get('/api/daily', async (req, res) => {
     if (IS_STAGING && req.query.demo === 'badges') {
       // Featured-game finishes so the long streak holds under the GotD rule.
       await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 60);
+      await openTodayForDemo(req.user.id);
       for (const days of STREAK_BADGE_DAYS) {
         await pool.query(
           `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
@@ -2692,6 +2719,17 @@ app.get('/api/daily', async (req, res) => {
         { gameId: 'minefinder', upTo: Math.max(0, storyBandCount('minefinder') - 1) },
       ];
       for (const sg of storySeed) {
+        // ASSERT the ladder's state, do not merely add to it. Staging carries
+        // one database across every check run and never resets, and two
+        // fixtures seed the SAME rows to different depths — this one wants
+        // sudoku fully cleared, demo=modes wants it three rungs in. With a
+        // plain ON CONFLICT DO NOTHING whichever ran first won permanently and
+        // the other silently became a no-op, so the check that depended on the
+        // loser failed for reasons nothing in its own proposal could explain.
+        await pool.query(
+          `DELETE FROM game_progress WHERE user_id = $1 AND game_id = $2 AND band >= $3`,
+          [req.user.id, sg.gameId, sg.upTo]
+        );
         for (let b = 0; b < sg.upTo; b++) {
           await pool.query(
             `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
@@ -2701,7 +2739,30 @@ app.get('/api/daily', async (req, res) => {
           );
         }
       }
-      // The badge itself, on the same guarded insert the live award uses.
+      /* AND THE LOCKED HALF HAS TO BE ASSERTED TOO.
+
+         The point of this collection screen is an EARNED badge sitting beside
+         LOCKED ones, so the fixture has to be able to say a ladder is
+         unfinished — not merely decline to finish it. On a database that is
+         never reset, "unfinished" is not a state you can assume: one
+         story_complete row left behind by any earlier session renders the
+         locked example as earned instead, and the check that asserts on it
+         fails with nothing in its own proposal to explain why. Same rule as
+         the bands above — say what you mean, do not add to what is there. */
+      const unfinishedLadders = ['minefinder', 'cratepush'];
+      await pool.query(
+        `DELETE FROM user_achievements
+          WHERE user_id = $1 AND type = 'story_complete'
+            AND metadata->>'gameId' = ANY($2::text[])`,
+        [req.user.id, unfinishedLadders]
+      );
+      // cratepush is the never-started example (minefinder is the one rung
+      // short of done, seeded above), so it must have no progress at all.
+      await pool.query(
+        `DELETE FROM game_progress WHERE user_id = $1 AND game_id = 'cratepush'`,
+        [req.user.id]
+      );
+      // The earned badge itself, on the same guarded insert the live award uses.
       await pool.query(
         `INSERT INTO user_achievements (user_id, type, game_id, metadata)
          SELECT $1, 'story_complete', 'sudoku', $2::jsonb
@@ -3400,6 +3461,15 @@ app.get('/api/daily', async (req, res) => {
         { gameId: 'spider', cleared: 3 },
       ];
       for (const w of walked) {
+        // Same rule as demo=storybadges: this fixture says sudoku is HALF
+        // walked, so it has to be able to say that even after storybadges has
+        // marked the same ladder complete on the same shared staging database.
+        // "Clearing a level for the first time pays" is the note a half-walked
+        // picker renders; a fully cleared one reads "All levels cleared".
+        await pool.query(
+          `DELETE FROM game_progress WHERE user_id = $1 AND game_id = $2 AND band >= $3`,
+          [req.user.id, w.gameId, w.cleared]
+        );
         for (let b = 0; b < w.cleared; b++) {
           await pool.query(
             `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
@@ -4716,6 +4786,66 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   }
 });
 
+/* GET /api/alltime/:gameId/leaderboard — every finished daily attempt this
+   game has ever recorded, summed per player (#188).
+
+   The app had two boards for a daily game and no third: today's board
+   (/api/daily/:gameId/leaderboard) and the per-band arcade boards
+   (/api/arcade/:gameId/leaderboard). "All-time" was the only one of the three
+   the report asks for that did not exist.
+
+   It ranks on TOTAL POINTS, not on a best single day, because that is what the
+   daily rewards: showing up. Ties break on fewer plays — the same points from
+   fewer days is the better record — then on who got there first.
+
+   Losses are excluded by `score > 0`, the same rule the daily board uses, so a
+   pass/fail daily's failed runs do not appear. Public on the same terms as the
+   other two boards: the handler null-guards req.user, so an anonymous caller
+   gets me: null and isCurrentUser: false. */
+app.get('/api/alltime/:gameId/leaderboard', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const friendsScope = req.query.scope === 'friends';
+  if (friendsScope && !req.user) return res.json({ entries: [], me: null, total: 0 });
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, username, points, plays, first_at,
+              ROW_NUMBER() OVER (ORDER BY points DESC, plays ASC, first_at ASC) AS rank
+         FROM (
+           SELECT user_id,
+                  MAX(username)        AS username,
+                  SUM(score)::int      AS points,
+                  COUNT(*)::int        AS plays,
+                  MIN(finished_at)     AS first_at
+             FROM daily_attempts
+            WHERE game_id = $1
+              AND finished_at IS NOT NULL
+              AND score IS NOT NULL AND score > 0
+              AND ($2::text IS NULL
+                   OR user_id = $2
+                   OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))
+            GROUP BY user_id
+         ) t`,
+      [gameId, friendsScope ? req.user.id : null]
+    );
+    const total = rows.length;
+    const uid = req.user ? req.user.id : null;
+    const shape = (r) => ({
+      rank: Number(r.rank),
+      username: r.username || 'anon',
+      points: Number(r.points),
+      plays: Number(r.plays),
+      isCurrentUser: uid != null && r.user_id === uid,
+    });
+    const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
+    const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
+    res.json({ entries, me: mineRow ? shape(mineRow) : null, total });
+  } catch (err) {
+    console.error('[alltime] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
 // "Today's Top Scores" leaderboard — GAME-OF-THE-DAY only: everyone who
 // finished today's featured game, ranked by score (fastest time, then
 // earliest finish, break ties). Returns { entries: top-N, me, total, gameId }
@@ -4792,6 +4922,36 @@ app.post('/api/mancala/rooms', async (req, res) => {
 app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
   const { roomId } = req.params;
   try {
+    /* #200 — RECOGNISE A PLAYER WHO IS ALREADY IN THIS ROOM, before trying to
+       seat them as a newcomer.
+
+       The insert-only version below could only match a room that was still
+       `waiting` with an empty seat 2, so a player who dropped out of an ACTIVE
+       match and typed their own code again fell through to the error branch and
+       was told "Room is already full or finished" — by their own room. There
+       was no way back into a game in progress at all.
+
+       This mirrors what /api/classic/:gameId/rooms/:roomId/join has done since
+       #145; mancala keeps its own table and its own routes (see roomApiBase),
+       and this is one the accommodation had not caught up on. Deliberately not
+       gated on status: rejoining a finished room shows you the final board,
+       which is a better answer than an error. */
+    const existing = await pool.query('SELECT * FROM mancala_rooms WHERE id = $1', [roomId]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    const cur = existing.rows[0];
+    const mySeat = cur.player1_id === req.user.id ? 1 : cur.player2_id === req.user.id ? 2 : 0;
+    if (mySeat === 1) {
+      // Same shape the classic route returns, so the shared picker can offer
+      // Rejoin rather than rendering a dead end.
+      return res.status(409).json({
+        error: 'That\'s your own room — rejoin it instead of joining',
+        ownRoom: true,
+        yourPlayerNum: 1,
+        room: shapeRoom(cur),
+      });
+    }
+    if (mySeat === 2) return res.json({ ...shapeRoom(cur), yourPlayerNum: 2 });
+
     const { rows } = await pool.query(
       `UPDATE mancala_rooms
          SET player2_id = $1, player2_name = $2, status = 'active', last_move_at = now()
@@ -4800,14 +4960,8 @@ app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
        RETURNING *`,
       [req.user.id, req.user.username || null, roomId]
     );
-    if (rows.length === 0) {
-      const existing = await pool.query('SELECT id, status, player2_id, player1_id FROM mancala_rooms WHERE id = $1', [roomId]);
-      if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
-      const r = existing.rows[0];
-      if (r.player1_id === req.user.id) return res.status(409).json({ error: 'You created this room — share the code with a friend' });
-      return res.status(409).json({ error: 'Room is already full or finished' });
-    }
-    res.json(shapeRoom(rows[0]));
+    if (rows.length === 0) return res.status(409).json({ error: 'Room is already full or finished', full: true });
+    res.json({ ...shapeRoom(rows[0]), yourPlayerNum: 2 });
   } catch (err) {
     console.error('[mancala] join room failed:', err.message);
     res.status(500).json({ error: 'Failed to join room' });
@@ -7220,7 +7374,7 @@ app.get('*', (req, res) => {
   <div style="max-width:24rem;padding:2rem;text-align:center">
     <h1 style="font-size:1.25rem;margin:0 0 0.5rem">Open this app inside Usernode</h1>
     <p style="color:#a1a1aa;font-size:0.9rem;margin:0 0 1.25rem">This page is served via the platform; direct visits aren't authenticated.</p>
-    <a href="https://social-vibecoding.usernodelabs.org" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
+    <a href="https://my.onhomeroom.com" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
   </div>
 </body>`);
   }

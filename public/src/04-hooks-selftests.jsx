@@ -406,6 +406,19 @@ function parentOf(s) {
   return NAV_HOME;
 }
 
+/* #186 — how many history entries of OURS sit behind the one handed in.
+   Read back off `history.state`, which survives a reload and a pop, so the
+   in-app back control never has to guess. Anything that is not one of our
+   own entries — a foreign state object, a null one, a hand-edited number —
+   reads as 0, which is the value that makes goBack fall back to the lobby
+   instead of calling history.back() out of the iframe. Depth is never
+   negative and never fractional: a bad value must fail SAFE, not underflow
+   into "there is somewhere to go back to". */
+function navDepthOf(state) {
+  const d = state && state.un ? state.unDepth : null;
+  return typeof d === 'number' && Number.isFinite(d) && d > 0 ? Math.floor(d) : 0;
+}
+
 /* PHASE 2 (#163) — one reusable off-screen probe for touch-action computed
    values. Created once per sweep; `read(cls)` swaps the class and re-reads, and
    getComputedStyle flushes style recalc so the value is always current. */
@@ -547,6 +560,73 @@ function runClientSelfTests(styleReady) {
     // A genuine MOUSE click on the same element afterwards must still work.
     tapProps(onTap).onClick({ currentTarget: el });
     if (fired !== 2) throw new Error('mouse click was swallowed (' + fired + ' total, expected 2)');
+    return true;
+  });
+
+  /* #208 — a touch DROP must yield coordinates. `e.touches` is a TouchList on
+     every TouchEvent and a TouchList is an object, so testing it for existence
+     rather than length made `touchend` — whose `touches` is empty by
+     definition — read `undefined.clientX` and throw. That throw happened
+     inside Block Fit's window listener before the piece was committed, so the
+     block was never placed and its drag ghost never cleared. Mouse was fine,
+     which is why it read as a mobile-only rendering bug. */
+  check('pointer-xy-reads-touchend', () => {
+    const touch = { clientX: 120, clientY: 240 };
+    // touchend: the lifted finger is in changedTouches, touches is EMPTY.
+    const end = pointerXY({ touches: [], changedTouches: [touch] });
+    if (end.x !== 120 || end.y !== 240) {
+      throw new Error('touchend read as ' + JSON.stringify(end) + ', expected 120,240');
+    }
+    // touchmove: the finger is still down, so touches wins.
+    const move = pointerXY({ touches: [touch], changedTouches: [{ clientX: 9, clientY: 9 }] });
+    if (move.x !== 120 || move.y !== 240) {
+      throw new Error('touchmove read as ' + JSON.stringify(move) + ', expected 120,240');
+    }
+    // mouse/pointer: neither list, so the event itself carries the point.
+    const mouse = pointerXY({ clientX: 7, clientY: 8 });
+    if (mouse.x !== 7 || mouse.y !== 8) {
+      throw new Error('mouse read as ' + JSON.stringify(mouse) + ', expected 7,8');
+    }
+    return true;
+  });
+
+  /* #214 — a Match 3 deal must contain a MULTIPLE OF THREE of every type (a
+     match is three of a kind, so anything else strands tiles), and the puzzle's
+     own target must be reachable from the deal it is given. The old deal put
+     `layers` of each of five types on the board: five of the fifty puzzles are
+     `layers: 2`, which is two of each type and therefore no possible match at
+     all, and the score ceiling everywhere else fell far below the authored
+     target. Both halves are checked here across the real target/layer range. */
+  check('match3-deal-is-winnable', () => {
+    for (let layers = 1; layers <= 6; layers++) {
+      for (const target of [800, 1200, 2000, 3200, 4800, 6000, 7200]) {
+        const cfg = m3NormalizeConfig({ targetScore: target, layers });
+        if (cfg.perType % 3 !== 0) {
+          throw new Error('layers ' + layers + ' deals ' + cfg.perType +
+            ' of each type — not a multiple of 3, so tiles strand');
+        }
+        if (cfg.perType < 3) {
+          throw new Error('layers ' + layers + ' deals ' + cfg.perType +
+            ' of each type — no match of three can exist');
+        }
+        const ceiling = cfg.pointsPerMatch * cfg.totalTriples;
+        if (ceiling < target) {
+          throw new Error('layers ' + layers + ' target ' + target +
+            ' is unreachable: ceiling is ' + ceiling);
+        }
+      }
+    }
+    // The deal itself must honour the counts it promised.
+    const cfg = m3NormalizeConfig({ targetScore: 800, layers: 2 });
+    const tiles = m3DealBoard(cfg, 90);
+    const counts = {};
+    for (const t of tiles) counts[t.type] = (counts[t.type] || 0) + 1;
+    const kinds = Object.keys(counts);
+    if (kinds.length !== 5) throw new Error('deal has ' + kinds.length + ' types, expected 5');
+    for (const k of kinds) {
+      if (counts[k] % 3 !== 0) throw new Error('type ' + k + ' dealt ' + counts[k] + ' times');
+    }
+    if (tiles.length !== cfg.perType * 5) throw new Error('deal size ' + tiles.length);
     return true;
   });
 
@@ -717,6 +797,521 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #193 — the derived clues must help without answering. They are generated
+     from the word rather than written, so nothing but this stops a short word
+     from having its whole answer spelled out one clue at a time. */
+  check('cipher-derived-hints', () => {
+    const seen = new Set();
+    for (const theme of CW_THEMES) {
+      for (const entry of theme.words) {
+        const w = entry.word;
+        const derived = cwDerivedHints(w);
+        if (derived.length < 1) throw new Error(w + ': no derived clue at all');
+        if (derived.length > 2) throw new Error(w + ': ' + derived.length + ' derived clues, expected at most 2');
+        // Never more than half the word given away by structure alone.
+        const revealed = derived.length;
+        if (revealed >= w.length - 1) throw new Error(w + ' (len ' + w.length + '): ' + revealed + ' letters revealed leaves nothing to solve');
+        if (w.length < 5 && derived.length !== 1) throw new Error(w + ': a short word must keep its last letter');
+        for (const h of derived) {
+          if (h.indexOf(w) !== -1) throw new Error(w + ': a clue spells the answer');
+        }
+        if (derived[0].indexOf('"' + w[0] + '"') === -1) throw new Error(w + ': first-letter clue names the wrong letter');
+        if (derived[1] && derived[1].indexOf('"' + w[w.length - 1] + '"') === -1) throw new Error(w + ': last-letter clue names the wrong letter');
+        seen.add(w);
+      }
+    }
+    if (seen.size < 200) throw new Error('only checked ' + seen.size + ' words — the corpus should be far larger');
+    // And the written clues still lead: the escalation is semantic, then structural.
+    const sample = CW_THEMES[0].words[0];
+    const all = [...(sample.hints || []), ...cwDerivedHints(sample.word)];
+    if (all.length <= (sample.hints || []).length) throw new Error('derived clues did not extend the list');
+    if (all[0] !== sample.hints[0]) throw new Error('a written clue must come first');
+    return true;
+  });
+
+  /* #197 — the Word Search board's states must stay READABLE in BOTH
+     palettes. This is a self-test rather than a code review because the
+     failure is silent and one-sided: every colour on that board used to be a
+     literal tuned against dark, and the light theme quietly inherited a 2.21:1
+     selection that nobody would notice unless they switched themes. Bold
+     letters at roughly half the cell are large text, so 3:1 is the bar; the
+     values here clear it with room, and this fails the build if a retheme
+     takes one back under. */
+  check('wordsearch-contrast', () => {
+    const lum = (rgb) => {
+      const f = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+    };
+    const hex = (h) => {
+      const v = String(h).replace('#', '');
+      return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+    };
+    const ratio = (a, b) => {
+      const la = lum(a), lb = lum(b);
+      return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    };
+    const over = (fg, alpha, bg) => fg.map((v, i) => Math.round(v * alpha + bg[i] * (1 - alpha)));
+    const MIN = 3; // large-text AA; the letters are 600 weight at ~half the cell
+    for (const theme of ['light', 'dark']) {
+      const P = PALETTES[theme];
+      const card = hex(P.card), text = hex(P.text), white = [255, 255, 255];
+      const cases = [
+        ['plain', text, card],
+        ['found', text, over(hex(P.emerald), 0.34, card)],
+        ['hinted', text, over(hex(P.gold), 0.20, card)],
+        ['selected', white, hex(P.accent)],
+      ];
+      for (const [name, ink, bg] of cases) {
+        const r = ratio(ink, bg);
+        if (r < MIN) throw new Error(theme + ' ' + name + ' is ' + r.toFixed(2) + ':1, under ' + MIN);
+      }
+    }
+    return true;
+  });
+
+  /* #205 — the knight's move overlay is drawn from ktMovePath, and the hit
+     test accepts whatever ktValidMoves returns. If those two ever disagree
+     the board draws a path to a square you cannot tap, or leaves a tappable
+     square with no path — the silent, only-visible-in-a-browser class of bug
+     that ngGeometry/ngCellAt exists to prevent on Nonogram. */
+  check('knight-move-paths', () => {
+    for (const size of [5, 6, 7, 8]) {
+      const n = size * size;
+      const visited = new Array(n).fill(0);
+      for (let from = 0; from < n; from++) {
+        const moves = ktValidMoves(from, visited, size, null);
+        if (moves.length === 0) throw new Error('no moves from ' + from + ' on ' + size);
+        for (const to of moves) {
+          const path = ktMovePath(from, to, size);
+          if (!path) throw new Error(size + ': no path for the legal move ' + from + '->' + to);
+          const [a, elbow, b] = path;
+          if (a[0] * size + a[1] !== from) throw new Error('path does not start at the knight');
+          if (b[0] * size + b[1] !== to) throw new Error('path does not end on the move');
+          for (const [r, c] of path) {
+            if (r < 0 || r >= size || c < 0 || c >= size) throw new Error(size + ': path leaves the board at ' + r + ',' + c);
+          }
+          // The elbow is on the LONG leg: it shares a file with the start and
+          // a rank with the end, or the other way round — never a diagonal.
+          const straight1 = a[0] === elbow[0] || a[1] === elbow[1];
+          const straight2 = b[0] === elbow[0] || b[1] === elbow[1];
+          if (!straight1 || !straight2) throw new Error(size + ': elbow is not a right angle for ' + from + '->' + to);
+          const leg1 = Math.abs(elbow[0] - a[0]) + Math.abs(elbow[1] - a[1]);
+          const leg2 = Math.abs(b[0] - elbow[0]) + Math.abs(b[1] - elbow[1]);
+          if (leg1 !== 2 || leg2 !== 1) throw new Error(size + ': legs are ' + leg1 + '/' + leg2 + ', expected 2 then 1');
+        }
+      }
+    }
+    // And nothing that is not a knight move gets a path.
+    if (ktMovePath(0, 1, 8)) throw new Error('a one-square step is not a knight move');
+    if (ktMovePath(0, 9, 8)) throw new Error('a diagonal is not a knight move');
+    if (ktMovePath(null, 5, 8)) throw new Error('no knight, no path');
+    return true;
+  });
+
+  /* #213 — the camouflage marble takes the colour of what it lands against.
+     This is the rule that makes it a bonus at all: the power-up it replaces
+     fired a marble coloured '#ffffff', and zumaCheckMatches compares colour
+     strings exactly, so that "wildcard" matched nothing and left you one
+     marble worse off than before you collected it. */
+  check('marbleloop-camouflage', () => {
+    const R = '#f43f5e', B = '#3b82f6', G = '#10b981';
+    const ch = (...cols) => cols.map((c, i) => ({ color: c, dist: i * 10 }));
+    // Ties go left, and left here is a pair, so the marble completes a three.
+    let c = ch(R, R, null, B, B);
+    if (zumaWildColorAt(c, 2) !== R) throw new Error('a tie must resolve to the left');
+    // The longer run wins, whichever side it is on.
+    c = ch(R, null, B, B, B);
+    if (zumaWildColorAt(c, 1) !== B) throw new Error('the longer neighbouring run must win');
+    c = ch(G, G, G, null, B);
+    if (zumaWildColorAt(c, 3) !== G) throw new Error('the longer run must win on the left too');
+    // One neighbour only.
+    c = ch(null, B, B);
+    if (zumaWildColorAt(c, 0) !== B) throw new Error('the head of the chain must take its only neighbour');
+    c = ch(R, R, null);
+    if (zumaWildColorAt(c, 2) !== R) throw new Error('the tail must take its only neighbour');
+    // Nothing to take a colour from.
+    if (zumaWildColorAt([{ color: null, dist: 0 }], 0) !== null) throw new Error('a lone marble has no colour to take');
+    if (zumaWildColorAt([], 0) !== null) throw new Error('an empty chain must not throw');
+    // And the resolved colour must actually POP: resolve, then match.
+    c = ch(R, R, null, B, B);
+    c[2].color = zumaWildColorAt(c, 2);
+    if (zumaCheckMatches(c, 2) !== 3) throw new Error('a resolved camouflage marble must complete the run it joined');
+    // The white marble it replaces would not have.
+    c = ch(R, R, '#ffffff', B, B);
+    if (zumaCheckMatches(c, 2) !== 0) throw new Error('the old white wildcard is supposed to match nothing');
+    return true;
+  });
+
+  /* #212 — the aim ray and the supply bot. Both are pure, and both are things
+     a player is told: the guide promises where the marble lands, and below
+     five marbles the cannon promises every colour it deals can still clear
+     something. */
+  check('marbleloop-aim', () => {
+    const pd = zumaComputePathData([{ x: 0, y: 100 }, { x: 300, y: 100 }]);
+    // A ray with an empty chain runs off the board and reports no hit.
+    let r = zumaAimPath([], pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== -1) throw new Error('nothing to hit means no hit');
+    if (r.y > 0) throw new Error('a ray with nothing in the way must leave the board');
+    // A marble straight ahead is found, and the guide stops ON it.
+    const chain = [{ color: '#f43f5e', dist: 150 }];
+    r = zumaAimPath(chain, pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== 0) throw new Error('a marble in the path must be found');
+    if (Math.abs(r.x - 150) > 1 || Math.abs(r.y - 100) > 1) throw new Error('the guide must stop on the marble it found');
+    // One well off to the side is not in the path.
+    r = zumaAimPath([{ color: '#f43f5e', dist: 20 }], pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== -1) throw new Error('a marble the ray misses is not a hit');
+    // A marble not yet on the track cannot be aimed at.
+    r = zumaAimPath([{ color: '#f43f5e', dist: -40 }], pd, 150, 300, -Math.PI / 2, 300, 400);
+    if (r.hit !== -1) throw new Error('a marble off the near end of the track is not on the board');
+
+    // The supply bot: below the threshold every colour dealt is one that is
+    // still on the chain, so the last marbles can always be cleared.
+    const A = ZUMA_COLORS_ALL[0], B = ZUMA_COLORS_ALL[3];
+    const short = [{ color: A, dist: 1 }, { color: B, dist: 2 }];
+    for (let i = 0; i < 40; i++) {
+      const c = zumaSupplyColor(short, 5, mulberry32(i >>> 0));
+      if (c !== A && c !== B) throw new Error('a short chain must only be dealt colours it still holds');
+    }
+    // At or above the threshold it is the ordinary draw again, so the game
+    // does not quietly become easy for the whole second half of a level.
+    const long = [];
+    for (let i = 0; i < ZUMA_SUPPLY_AT; i++) long.push({ color: A, dist: i });
+    let sawOther = false;
+    for (let i = 0; i < 60; i++) if (zumaSupplyColor(long, 5, mulberry32(i >>> 0)) !== A) sawOther = true;
+    if (!sawOther) throw new Error('a full chain must still be dealt the full palette');
+    // An empty chain has nothing to supply from and must not throw.
+    if (!zumaSupplyColor([], 5, mulberry32(1))) throw new Error('an empty chain still deals a marble');
+
+    // The marble is bigger than it was, and no level is choked by it: the
+    // longest chain still leaves a third of its own track empty.
+    if (ZUMA_BALL_R < 13) throw new Error('the marble was enlarged on purpose (#212)');
+    for (const lvl of ZUMA_LEVELS) {
+      const p = zumaComputePathData(lvl.path);
+      if (lvl.ballCount * ZUMA_DIAM > p.totalLen * 0.75) {
+        throw new Error('a level starts with too little track left: ' + lvl.ballCount + ' marbles');
+      }
+    }
+    return true;
+  });
+
+  /* `C` is built from PALETTES.light's KEYS only, so `${C.well}` — or any
+     other DERIVED token (well-strong, scrim, the shadow trio, the *-hover
+     pair) — interpolates the string "undefined", and the browser drops the
+     whole declaration. It is the same silent-failure shape as
+     token-alpha-concat, and it had killed .review-btn:hover and
+     .pregame-band[data-pressed] outright. Reach for var(--c-well) instead. */
+  check('css-no-undefined-token', () => {
+    const i = css.indexOf('undefined');
+    if (i >= 0) {
+      throw new Error('the stylesheet interpolates undefined — use var(--c-…) for a '
+        + 'derived token. Near: ' + css.slice(Math.max(0, i - 80), i + 12));
+    }
+    return true;
+  });
+
+  /* #202 — how long a stone takes to be sown. The reported "instant turbo"
+     was a flat 80 ms gap, under the ~100 ms a person needs to register a
+     discrete event, so four stones read as one jump. The shape that fixes it
+     has to hold at both ends: generous for a small handful, tightening as the
+     handful grows, and bounded so a big pit is still quick. */
+  check('mancala-sowing', () => {
+    const d4 = mncSowDelay(4), d8 = mncSowDelay(8), d15 = mncSowDelay(15);
+    if (d4 < 100) throw new Error('a small handful must be slow enough to see, got ' + d4);
+    if (!(d4 >= d8 && d8 >= d15)) throw new Error('a bigger handful must not be slower per stone');
+    if (d4 > MNC_SOW_MAX || d15 < MNC_SOW_MIN) throw new Error('the gap must stay inside its bounds');
+    /* A typical move stays inside the budget; the bounds only catch extremes.
+       The slack is `n` because the gap is rounded to whole milliseconds per
+       stone, so n stones can carry up to n ms of rounding. */
+    for (const n of [6, 8, 10, 12, 15]) {
+      if (mncSowDelay(n) * n > MNC_SOW_BUDGET + n) throw new Error(n + ' stones overrun the budget');
+    }
+    // A one-stone move is a move, and a garbage count is not a crash.
+    if (mncSowDelay(1) !== MNC_SOW_MAX) throw new Error('one stone gets the longest gap');
+    if (!(mncSowDelay(0) > 0) || !(mncSowDelay(-3) > 0)) throw new Error('a nonsense count still yields a delay');
+    return true;
+  });
+
+  /* #186 — the in-app back control reads this to decide between unwinding a
+     screen and going home. It runs in an IFRAME, so a wrong answer here does
+     not mis-navigate, it steps the EMBEDDING page out of the app. Everything
+     that is not unambiguously one of our own entries must therefore read 0 —
+     the value that makes goBack fall back to the lobby. */
+  check('nav-depth-fail-safe', () => {
+    if (navDepthOf({ un: { screen: 'game' }, unDepth: 3 }) !== 3) throw new Error('our own entry reports its depth');
+    if (navDepthOf({ un: { screen: 'lobby' }, unDepth: 0 }) !== 0) throw new Error('the first entry is depth 0');
+    // Not ours, in every shape a session history can hand back.
+    for (const bad of [null, undefined, {}, { unDepth: 4 }, { un: null, unDepth: 4 },
+                       { un: { screen: 'game' } }, { un: {}, unDepth: '4' },
+                       { un: {}, unDepth: NaN }, { un: {}, unDepth: Infinity },
+                       { un: {}, unDepth: -2 }, { un: {}, unDepth: true }]) {
+      if (navDepthOf(bad) !== 0) throw new Error('a foreign or malformed entry must read 0: ' + JSON.stringify(bad));
+    }
+    // A fractional depth floors rather than surviving as one.
+    if (navDepthOf({ un: {}, unDepth: 2.7 }) !== 2) throw new Error('depth is a whole number of entries');
+    return true;
+  });
+
+  /* #217 — Ludo's tokens are now their own tap targets. The old layout
+     stepped each token 5px down-right by its INDEX, which put a lone token
+     off-centre and smeared a stack into something no finger can pick apart;
+     the hit test then took the topmost of the draw order, which is simply
+     the highest token number rather than the one that was aimed at. */
+  check('ludo-token-stack', () => {
+    for (const cell of [18, 22, 26]) {          // the whole range the board draws
+      const lone = ludoStackLayout(1, cell);
+      const [lx, ly] = lone.at(0);
+      if (lx !== 0 || ly !== 0) throw new Error('a lone token sits dead centre');
+      if (Math.abs(lone.r - cell * 0.425) > 0.001) throw new Error('a lone token keeps the full radius');
+      for (let n = 2; n <= 4; n++) {
+        const lay = ludoStackLayout(n, cell);
+        const pts = [];
+        for (let j = 0; j < n; j++) pts.push(lay.at(j));
+        for (const [dx, dy] of pts) {
+          if (Math.hypot(dx, dy) + lay.r > cell / 2 + 0.001) {
+            throw new Error('a stack of ' + n + ' spills out of its cell at cell=' + cell);
+          }
+        }
+        let gap = Infinity;
+        for (let a = 0; a < n; a++) {
+          for (let b = a + 1; b < n; b++) {
+            gap = Math.min(gap, Math.hypot(pts[a][0] - pts[b][0], pts[a][1] - pts[b][1]));
+          }
+        }
+        // 5px was the old fixed step; nothing may end up tighter than that.
+        if (gap < 5) throw new Error('a stack of ' + n + ' packs tighter than 5px at cell=' + cell);
+        if (lay.r < 4) throw new Error('a stack of ' + n + ' draws tokens too small to read');
+      }
+    }
+    return true;
+  });
+
+  check('ludo-token-pick', () => {
+    const cell = 26, lay = ludoStackLayout(4, cell);
+    const toks = [];
+    for (let j = 0; j < 4; j++) {
+      const [dx, dy] = lay.at(j);
+      toks.push({ i: j, cx: 100 + dx, cy: 100 + dy, r: lay.r });
+    }
+    // Aimed straight at each one, each one is what you get.
+    for (const t of toks) {
+      const got = ludoPickToken(toks, t.cx, t.cy);
+      if (!got || got.i !== t.i) throw new Error('a tap on token ' + (t.i + 1) + ' picked ' + (got ? got.i + 1 : 'nothing'));
+    }
+    // The regression: a point inside the LAST token's slop but nearer the
+    // first used to resolve to the last, because the scan ran in draw order.
+    const near = ludoPickToken(toks, toks[0].cx, toks[0].cy - 1);
+    if (!near || near.i !== 0) throw new Error('nearest centre must win, not draw order');
+    // Nothing within reach is nothing.
+    if (ludoPickToken(toks, 100, 100 + cell * 3)) throw new Error('a tap off the tokens picks none');
+    if (ludoPickToken([], 100, 100)) throw new Error('no candidates picks none');
+    return true;
+  });
+
+  /* The roll is animated, but the VALUE is still only ever the referee's —
+     the tumble is a fixed, repeat-free cycle of faces shown while the real
+     number is on its way. */
+  check('ludo-die-faces', () => {
+    for (let f = 1; f <= 6; f++) {
+      const pips = LUDO_PIPS[f];
+      if (!pips || pips.length !== f) throw new Error('face ' + f + ' must draw ' + f + ' pips');
+      for (const [px, py] of pips) {
+        if (Math.abs(px) > 1 || Math.abs(py) > 1) throw new Error('face ' + f + ' has a pip outside the die');
+      }
+    }
+    if (LUDO_TUMBLE.length !== 6 || new Set(LUDO_TUMBLE).size !== 6) {
+      throw new Error('the tumble must show each face once per cycle');
+    }
+    for (let k = 0; k < LUDO_TUMBLE.length; k++) {
+      const a = LUDO_TUMBLE[k], b = LUDO_TUMBLE[(k + 1) % LUDO_TUMBLE.length];
+      if (!LUDO_PIPS[a]) throw new Error('the tumble shows a face the die cannot draw: ' + a);
+      if (a === b) throw new Error('two consecutive tumble frames are the same face');
+    }
+    if (!(LUDO_ROLL_MS > LUDO_ROLL_TICK_MS * 4)) throw new Error('the tumble must run long enough to read as one');
+    return true;
+  });
+
+  /* #206 — the turn queue. The reported "the snake fails to turn on tap or
+     swipe" is these two cases: a second turn that overwrote the first, and a
+     second turn refused for reversing a direction the first one was about to
+     change. A corner is two turns and a tick is 90-200 ms, so both happen
+     constantly. */
+  check('snake-turn-queue', () => {
+    const R = SNAKE_DIRS.right, U = SNAKE_DIRS.up, D = SNAKE_DIRS.down, L = SNAKE_DIRS.left;
+    const same = (a, b) => a && b && a.x === b.x && a.y === b.y;
+    // The corner that used to lose its first half: up then left while going right.
+    let q = snakeQueueTurn('up', R, []);
+    if (!q || q.length !== 1 || !same(q[0], U)) throw new Error('the first turn of a corner must queue');
+    q = snakeQueueTurn('left', R, q);
+    if (!q || q.length !== 2 || !same(q[1], L)) throw new Error('the second turn of a corner must queue behind the first, not replace it');
+    // Each turn is judged against the one BEFORE IT IN THE QUEUE, not against
+    // the direction still being travelled.
+    if (snakeQueueTurn('down', U, [L]) === null) throw new Error('down is legal after a queued left, whatever the snake is doing now');
+    if (snakeQueueTurn('down', L, [U]) !== null) throw new Error('down must still be refused behind a queued up');
+    // Doubling back is still impossible, which is the whole reason one tick
+    // may only consume one turn.
+    if (snakeQueueTurn('left', R, []) !== null) throw new Error('a snake may not reverse into itself');
+    if (snakeQueueTurn('up', D, []) !== null) throw new Error('a snake may not reverse into itself');
+    // A turn you are already making is not a turn.
+    if (snakeQueueTurn('right', R, []) !== null) throw new Error('the direction already travelled is not a turn');
+    if (snakeQueueTurn('up', R, [U]) !== null) throw new Error('the direction already queued is not a turn');
+    // The queue is two deep: it remembers a corner, it is not an input buffer.
+    if (snakeQueueTurn('right', R, [U, L]) !== null) throw new Error('the queue must hold at most ' + SNAKE_TURN_QUEUE);
+    if (snakeQueueTurn('nowhere', R, []) !== null) throw new Error('an unknown direction is not a turn');
+    if (snakeQueueTurn('up', null, []) !== null) throw new Error('no current direction, no turn');
+
+    // A tap means the triangle it lands in, so it cannot mean two things.
+    if (snakeTapDir(50, 5, 100, 100) !== 'up') throw new Error('the top triangle means up');
+    if (snakeTapDir(50, 95, 100, 100) !== 'down') throw new Error('the bottom triangle means down');
+    if (snakeTapDir(5, 50, 100, 100) !== 'left') throw new Error('the left triangle means left');
+    if (snakeTapDir(95, 50, 100, 100) !== 'right') throw new Error('the right triangle means right');
+    if (snakeTapDir(50, 50, 100, 100) !== null) throw new Error('the centre means nothing');
+    if (snakeTapDir(10, 10, 0, 0) !== null) throw new Error('an unmeasured board means nothing');
+    // Just inside a diagonal resolves to the nearer edge, never to neither.
+    if (snakeTapDir(20, 18, 100, 100) !== 'up') throw new Error('a tap above the diagonal is up');
+    if (snakeTapDir(18, 20, 100, 100) !== 'left') throw new Error('a tap left of the diagonal is left');
+    return true;
+  });
+
+  /* #188 — a whole family of rules can go dead in one keystroke.
+
+     `.pregame-deal` was missing its semicolon and its closing brace, and the
+     declarations belonging to it had been stranded ~70 lines further down. The
+     CSS parser swallowed everything in between into one invalid rule and threw
+     it away: the band picker, its selected-state highlight, the resume note and
+     the full-width Play button had all silently stopped applying, and nothing
+     failed. Probing computed style is the only thing that catches this — a text
+     scan of the css string sees the rules perfectly well, which is exactly why
+     it went unnoticed. Same canary idea as tapCanaryApplied. */
+  check('pregame-styles-applied', () => {
+    const probes = [
+      ['pregame-deal', 'borderRadius', '0px'],
+      ['pregame-band', 'borderRadius', '0px'],
+      ['pregame-band-row', 'display', 'block'],
+    ];
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:-9999px;top:-9999px';
+    document.body.appendChild(host);
+    try {
+      for (const [cls, prop, dead] of probes) {
+        const el = document.createElement('div');
+        el.className = cls;
+        host.appendChild(el);
+        const got = getComputedStyle(el)[prop];
+        if (got === dead) {
+          throw new Error('.' + cls + ' is not applying (' + prop + ' = ' + got + ') — the rule block is probably unterminated');
+        }
+      }
+    } finally {
+      host.remove();
+    }
+    return true;
+  });
+
+  /* #215 — Hash Rush's four tap-to-mine rules, and the level targets derived
+     from them. These are the whole of what the issue asked for, so they are
+     the things a retune must not quietly undo. */
+  check('hashrush-strike-rules', () => {
+    const st = () => ({ score: 0, tokens: 0, boost: 0 });
+    // A hash pays HR_TOKEN_SCORE, doubled while boosted.
+    let s = st();
+    hrApplyStrike(s, { type: 'hash' });
+    if (s.score !== HR_TOKEN_SCORE || s.tokens !== 1) throw new Error('a hash must pay ' + HR_TOKEN_SCORE);
+    s.boost = 3;
+    hrApplyStrike(s, { type: 'hash' });
+    if (s.score !== HR_TOKEN_SCORE * (1 + HR_BOOST_MULT)) throw new Error('a boosted hash must pay double');
+    // Lightning ADDS. The pre-#215 bug was an assignment, which threw away
+    // whatever was left of the boost you already had.
+    s = st();
+    hrApplyStrike(s, { type: 'bolt' });
+    hrApplyStrike(s, { type: 'bolt' });
+    if (s.boost !== HR_BOOST_SECS * 2) throw new Error('two bolts must stack, got ' + s.boost);
+    s.boost = HR_BOOST_MAX;
+    hrApplyStrike(s, { type: 'bolt' });
+    if (s.boost !== HR_BOOST_MAX) throw new Error('stacked boost must cap at ' + HR_BOOST_MAX);
+    // TNT costs points, and cannot push a score negative.
+    s = st(); s.score = 25;
+    hrApplyStrike(s, { type: 'tnt' });
+    if (s.score !== 25 - HR_TNT_PENALTY) throw new Error('TNT must cost ' + HR_TNT_PENALTY);
+    hrApplyStrike(s, { type: 'tnt' });
+    hrApplyStrike(s, { type: 'tnt' });
+    if (s.score !== 0) throw new Error('TNT must not drive a score below zero, got ' + s.score);
+    // The hit box: nearest object in the tapped lane wins, and a strike
+    // outside the window connects with nothing.
+    const W = 300, laneW = W / HR_LANES;
+    const objs = [{ lane: 1, y: 100, type: 'hash' }, { lane: 1, y: 160, type: 'tnt' }, { lane: 0, y: 100, type: 'hash' }];
+    const mid = laneW * 1.5;
+    if (hrPickAt(objs, mid, 105, W) !== 0) throw new Error('a strike must take the nearest object in its lane');
+    if (hrPickAt(objs, mid, 158, W) !== 1) throw new Error('a strike lower down must take the lower object');
+    if (hrPickAt(objs, mid, 100 + HR_TAP_R + 40, W) === 0) throw new Error('a strike well clear of an object must miss it');
+    if (hrPickAt(objs, laneW * 2.5, 100, W) !== -1) throw new Error('an empty lane must yield nothing');
+    if (hrPickAt([{ lane: 1, y: 100, type: 'hash', hit: true }], mid, 100, W) !== -1) throw new Error('an already-mined object must not be struck twice');
+    return true;
+  });
+
+  /* The target every bounded level asks for is DERIVED from that level's own
+     spawn stream (see hrTargetFor), so this is the check that a retune of the
+     ladder cannot set a goal the game does not deal enough hashes to reach. */
+  check('hashrush-level-targets', () => {
+    const seeded = (band) => mulberry32(hashStr('hashrush:story:' + band) >>> 0);
+    let prev = 0;
+    for (let b = 0; b < HR_STORY.length; b++) {
+      const cfg = { ...HR_STORY[b], limit: HR_STORY[b].secs };
+      const target = hrTargetFor(cfg, seeded(b));
+      const model = hrModelRun(cfg, seeded(b), cfg.limit);
+      if (!(target > 0)) throw new Error('level ' + (b + 1) + ' has no target');
+      if (target > model.score) throw new Error('level ' + (b + 1) + ' asks for ' + target + ' and the best the model scores is ' + model.score);
+      if (target <= prev) throw new Error('level ' + (b + 1) + ' asks for ' + target + ', no more than level ' + b + "'s " + prev);
+      prev = target;
+      // Same seed, same target: two players on one rung must be given the
+      // same goal, which is the whole reason it is derived and not rolled.
+      if (hrTargetFor(cfg, seeded(b)) !== target) throw new Error('level ' + (b + 1) + ' target is not stable');
+      // And the plan it is derived from must not depend on how it is walked.
+      const a = hrSpawnPlan(cfg, seeded(b), cfg.limit);
+      const c = hrSpawnPlan(cfg, seeded(b), cfg.limit);
+      if (a.length !== c.length) throw new Error('level ' + (b + 1) + ' spawn plan is not deterministic');
+    }
+    return true;
+  });
+
+  /* #187 / #196 — the local resume record for story and arcade runs. These are
+     the properties that keep it from doing harm: it is scoped per (game, mode,
+     band) so two rungs cannot overwrite each other, it refuses to answer for a
+     daily (whose resume is the server's attempt row and must stay that way),
+     and it stamps the day on the way out so the games' same-board gate passes
+     for a board that is not day-scoped. */
+  check('local-run-save', () => {
+    const K = (g, m, b) => runSaveKey(g, m, b);
+    if (K('sudoku', 'story', 3) === K('sudoku', 'story', 4)) throw new Error('two rungs must not share a key');
+    if (K('sudoku', 'story', 3) === K('wordhunt', 'story', 3)) throw new Error('two games must not share a key');
+    if (K('sudoku', 'story', 3) === K('sudoku', 'arcade', 3)) throw new Error('two modes must not share a key');
+    // A daily has a server-side resume and must never be answered from here.
+    if (readRunSave('sudoku', 'daily', null) !== null) throw new Error('a daily must not read a local run save');
+    let wrote = false;
+    try { writeRunSave('sudoku', 'daily', null, { v: 1, progress: { a: 1 } }); wrote = !!localStorage.getItem(K('sudoku', 'daily', null)); } catch (_) {}
+    if (wrote) { try { localStorage.removeItem(K('sudoku', 'daily', null)); } catch (_) {} throw new Error('a daily must not write a local run save'); }
+
+    // Round trip, then clear. Uses a game id nothing else touches.
+    const gid = '__selftest__';
+    try {
+      clearRunSave(gid, 'story', 0);
+      if (readRunSave(gid, 'story', 0) !== null) throw new Error('a cleared save must read back as nothing');
+      writeRunSave(gid, 'story', 0, { v: 1, progress: { grid: [1, 2] }, steps: 7, elapsedSecs: 99, savedAt: Date.now() });
+      const rec = readRunSave(gid, 'story', 0);
+      if (!rec || rec.steps !== 7) throw new Error('a written save must read back');
+      const h = hydrateRunSave(rec, 0);
+      if (h.steps !== 7 || h.elapsedSecs !== 99) throw new Error('hydrate must carry steps and the clock');
+      if (h.dayNum !== utcDayNum(0)) throw new Error('hydrate must stamp today, or every game rejects it');
+      if (!Array.isArray(h.grid)) throw new Error('hydrate must carry the progress through');
+      // An old record is dropped rather than resumed into.
+      writeRunSave(gid, 'story', 0, { v: 1, progress: { grid: [1] }, steps: 1, elapsedSecs: 1, savedAt: Date.now() - RUN_SAVE_MAX_AGE_MS - 1000 });
+      if (readRunSave(gid, 'story', 0) !== null) throw new Error('a stale save must expire');
+      if (hydrateRunSave(null, 0) !== null) throw new Error('nothing hydrates to nothing');
+    } finally {
+      clearRunSave(gid, 'story', 0);
+    }
+    return true;
+  });
+
   /* Snakes & Ladders V2 — the seven hand-authored tier boards must satisfy
      the authoring constraints (see snakesladders-v2/00-layouts.jsx), or a
      future retune ships a broken board: a chained jump the engine resolves
@@ -724,7 +1319,7 @@ function runClientSelfTests(styleReady) {
   check('cnlv2-layouts', () => {
     const expected = {
       beginner: [8, 3], amateur: [7, 5], regular: [6, 6], professional: [5, 8],
-      topplayer: [4, 10], superstar: [3, 12], legend: [2, 15],
+      topplayer: [4, 10], superstar: [3, 12], legend: [2, 14],
     };
     if (CNLV2_LAYOUTS.length !== 7) throw new Error('expected 7 tiers, got ' + CNLV2_LAYOUTS.length);
     for (const L of CNLV2_LAYOUTS) {
@@ -760,12 +1355,33 @@ function runClientSelfTests(styleReady) {
         if (destSet.has(s)) throw new Error(L.id + ': square ' + s + ' is both a jump start and a destination');
       }
       if (L.id === 'legend') {
-        const high = snk.filter((s) => s >= 80 && s <= 99).length;
-        if (high < 10) throw new Error('legend has only ' + high + ' snake heads in 80–99, needs ≥10');
         for (const s of lad) {
           if (L.ladders[s] >= 80) throw new Error('legend ladder tops out at ' + L.ladders[s] + ' — must stay below 80');
         }
       }
+    }
+    /* #203 — the part no count-based rule could catch. Legend satisfied every
+       constraint above and still took 1812 expected rolls to finish, because
+       95/97/98/99 were all snake heads and only two squares in the whole
+       board could reach 100 by an exact roll. A tier is now MEASURED: it must
+       finish in a human number of rolls, and each tier must be harder than the
+       one before it, or the ladder the picker presents is a fiction.
+
+       The cap is deliberately loose. It is not a balance target — it is the
+       line between "a long game" and "not a game", and a retune that wants
+       Legend at 400 rolls should be free to do it without editing a test. */
+    const CNLV2_MAX_EXPECTED_ROLLS = 600;
+    let prev = 0;
+    for (const L of CNLV2_LAYOUTS) {
+      const e = cnlv2ExpectedRolls(L);
+      if (!isFinite(e) || e <= 0) throw new Error(L.id + ' has no finite expected roll count — square 100 may be unreachable');
+      if (e > CNLV2_MAX_EXPECTED_ROLLS) {
+        throw new Error(L.id + ' needs ' + Math.round(e) + ' expected rolls to finish, cap is ' + CNLV2_MAX_EXPECTED_ROLLS);
+      }
+      if (e <= prev) {
+        throw new Error(L.id + ' (' + Math.round(e) + ' rolls) is not harder than the tier before it (' + Math.round(prev) + ')');
+      }
+      prev = e;
     }
     return true;
   });
@@ -1684,10 +2300,47 @@ function cuiDrawLabel(ctx, c) {
   ctx.fillText(String(c.label != null ? c.label : ''), x + w / 2, y + h / 2, w - 4);
 }
 
+/* A progress meter: a track with a fill, `p` in 0..1. Colours resolve at DRAW
+   time from PAL (never from a colour captured in build()), so a theme flip
+   repaints it correctly — the same rule the canvas palette note in CLAUDE.md
+   states. `done` swaps accent for emerald: a bar that has reached its goal
+   should say so without needing a second label to explain it. */
+function cuiDrawMeter(ctx, c) {
+  const [x, y, w, h] = c.r;
+  const p = Math.max(0, Math.min(1, Number(c.p) || 0));
+  const r = Math.min(h / 2, 6);
+  const path = (px, py, pw, ph) => {
+    ctx.beginPath();
+    if (pw <= 0) return;
+    if (ctx.roundRect) { ctx.roundRect(px, py, pw, ph, Math.min(r, pw / 2)); return; }
+    const rr = Math.min(r, pw / 2, ph / 2);
+    ctx.moveTo(px + rr, py);
+    ctx.arcTo(px + pw, py, px + pw, py + ph, rr);
+    ctx.arcTo(px + pw, py + ph, px, py + ph, rr);
+    ctx.arcTo(px, py + ph, px, py, rr);
+    ctx.arcTo(px, py, px + pw, py, rr);
+    ctx.closePath();
+  };
+  path(x, y, w, h);
+  ctx.fillStyle = PAL.well || PAL.card;
+  ctx.fill();
+  const fw = Math.round(w * p);
+  if (fw > 0) {
+    path(x, y, fw, h);
+    ctx.fillStyle = c.done ? PAL.emerald : PAL.accent;
+    ctx.fill();
+  }
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = PAL.border;
+  path(x, y, w, h);
+  ctx.stroke();
+}
+
 function cuiDrawControls(ctx, controls, pressedId) {
   for (const c of controls) {
     if (c.noDraw) continue; // twin-only entry (prose the draw pass renders itself)
     if (c.kind === 'pill') cuiDrawPill(ctx, c);
+    else if (c.kind === 'meter') cuiDrawMeter(ctx, c);
     else if (c.kind === 'label') cuiDrawLabel(ctx, c);
     else cuiDrawButton(ctx, c, pressedId === c.id);
   }

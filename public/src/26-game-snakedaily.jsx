@@ -46,7 +46,7 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
     const m = Math.floor(DSNK_N / 2);
     const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
     const sp = spawnFood(snake, 0);
-    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: sp.food, ptr: sp.ptr, eaten: 0 };
+    st.current = { snake, dir: { x: 1, y: 0 }, turns: [], food: sp.food, ptr: sp.ptr, eaten: 0 };
   }
 
   const finish = (won) => {
@@ -65,7 +65,7 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
   const step = () => {
     const s = st.current;
     if (!s || doneRef.current) return;
-    s.dir = s.nextDir;
+    if (s.turns.length) s.dir = s.turns.shift();   // one turn per tick (#206)
     const head = s.snake[0];
     const nx = head.x + s.dir.x, ny = head.y + s.dir.y;
     if (nx < 0 || ny < 0 || nx >= DSNK_N || ny >= DSNK_N ||
@@ -100,16 +100,26 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
     return () => { alive = false; cancelAnimationFrame(raf); };
   }, [done, started]);
 
+  // Same rule as the classic snake, from the same pure function (#206).
   const turn = (dir) => {
     const s = st.current;
     if (!s || doneRef.current) return;
-    const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
-    const nd = map[dir]; if (!nd) return;
-    if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
-    s.nextDir = nd;
+    const q = snakeQueueTurn(dir, s.dir, s.turns);
+    if (!q) return;
+    s.turns = q;
     if (!started) setStarted(true);
+    cgSound('move');
   };
-  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started && !done) setStarted(true); } });
+  useGestures(boardRef, {
+    onSwipe: (d) => turn(d),
+    onTap: (p) => {
+      if (!started && !done) setStarted(true);
+      const el = boardRef.current; if (!el) return;
+      const r = el.getBoundingClientRect();
+      const dir = snakeTapDir(p.x - r.left, p.y - r.top, r.width, r.height);
+      if (dir) turn(dir);
+    },
+  });
   useEffect(() => {
     const onKey = (e) => {
       const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
@@ -137,7 +147,7 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
         <SnakeCanvas n={DSNK_N} stRef={st} tick={tick} skin="daily" ariaLabel={`Daily Snake board — ${eaten}/${DSNK_TARGET} apples`} />
       </div>
       <div className="dsnk-hint">
-        {done ? 'Run over' : started ? `Eat ${DSNK_TARGET} apples — one crash ends the day` : 'Swipe (or arrow keys) to start — everyone gets the same apple trail today'}
+        {done ? 'Run over' : started ? `Eat ${DSNK_TARGET} apples — one crash ends the day` : 'Swipe or tap a side to start — everyone gets the same apple trail today'}
       </div>
     </div>
   );

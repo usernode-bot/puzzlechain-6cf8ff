@@ -520,6 +520,11 @@ function sdkDigUnique(solution, size, holes, rng) {
 // what a level is WORTH, the client owns what it looks like, and they must
 // agree on how many there are (scripts/check-registry.js asserts it).
 const SDK_BAND_COUNT = { sudoku: 6, sudokumini: 6 };
+/* #190 — how far back Undo reaches. A cap rather than an unbounded stack
+   because the buffer is what the request asks for and because a 9×9 board can
+   absorb 60-odd entries in a sitting; 20 is far more than the "I just tapped
+   the wrong number" case it exists for. */
+const SDK_UNDO_MAX = 20;
 // Arcade's three bands map onto the same ladder, so Easy/Normal/Hard are the
 // bottom, middle and top of the story range rather than a second scale.
 const ARCADE_BAND_ORDER = ['easy', 'normal', 'hard'];
@@ -602,6 +607,21 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   const effBand = playMode === 'story' ? (band || 0)
     : playMode === 'arcade' ? Math.round((arcadeIdx / 2) * (bandCount - 1))
     : 0;
+  /* #189 — the run's difficulty, named, for the gameplay HUD. Arcade prints
+     the band the player PICKED rather than the grader's word for the board it
+     maps onto: arcade Normal digs to what sdkBandLabel calls "Tricky", and
+     printing that over a run they started by pressing "Normal" reads as a
+     different setting than the one they chose. It reads the band off
+     arcadeIdx, not off `band`, so an unrecognised id names the board that was
+     actually dealt instead of naming nothing. Story has no picker, so it shows
+     the rung AND what the grader calls it — that is the first caller
+     sdkBandLabel has ever had. Daily and free play have no band, so both
+     correctly show nothing at all. */
+  const bandName = playMode === 'arcade'
+    ? `Difficulty: ${(ARCADE_BANDS[arcadeIdx] || ARCADE_BANDS[0]).label}`
+    : playMode === 'story'
+      ? `Level ${effBand + 1}: ${sdkBandLabel(difficulty === 'mini' ? 6 : 9, effBand, bandCount)}`
+      : null;
   const seedRef = useRef(null);
   const boardsRef = useRef({});
   const getBoard = (diff) => {
@@ -661,6 +681,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     <SudokuBoard
       key={difficulty}
       difficulty={difficulty}
+      bandName={bandName}
       board={getBoard(difficulty)}
       dayNum={dayNum}
       savedProgress={savedProgress}
@@ -671,7 +692,7 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
   );
 }
 
-function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProgress, onSaveProgress }) {
+function SudokuBoard({ difficulty, bandName, board, dayNum, onWin, onStepChange, savedProgress, onSaveProgress }) {
   const { puzzle, solution } = board;
   const size = puzzle.length;
   const mult = SUDOKU_MULT[difficulty] || 1;
@@ -694,6 +715,16 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   // Steps is a free counter (not encoded in the grid), so restore it whenever
   // the attempt carries one — even if the board itself couldn't be rehydrated.
   const [steps, setSteps] = useState(() => (savedProgress && Number.isFinite(savedProgress.steps) ? savedProgress.steps : 0));
+  /* #190 — the last SDK_UNDO_MAX player entries, newest last. Session-scoped
+     on purpose: a daily's saved progress is a BOARD SNAPSHOT, not a move list
+     (see the progress shapes in CLAUDE.md), so a resumed attempt starts with an
+     empty buffer rather than an invented one. Storing a move list would change
+     the daily progress shape for every Sudoku row that exists.
+
+     A hint is deliberately NOT pushed here. It reveals a solved cell, locks it,
+     and is counted server-side against the day's cap — undoing one would hand
+     back a hint the server has already spent. */
+  const [undoStack, setUndoStack] = useState([]);
   const [done, setDone] = useState(false);
   const initialSecs = savedProgress && Number.isFinite(savedProgress.elapsedSecs) ? savedProgress.elapsedSecs : 0;
   const { secs, fmt } = useTimer(!done, initialSecs);
@@ -766,9 +797,12 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
     const [r, c] = selected;
     if (isLocked(r, c)) return;
 
+    const prev = grid[r][c];
+    if (prev === val) return; // nothing changed, nothing to remember
     const ng = grid.map(row => row.slice());
     ng[r][c] = val;
     setGrid(ng);
+    setUndoStack(st => [...st, { r, c, prev, steps }].slice(-SDK_UNDO_MAX));
 
     const newSteps = steps + 1;
     setSteps(newSteps);
@@ -787,6 +821,24 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
     }
   };
 
+  /* Step back one entry. The step COUNTER rolls back with it, matching
+     Knight's Tour, which is the app's existing undo. That is not a free
+     rewind: the clock keeps running and the score reads both, so undoing is
+     paid for in time rather than in moves. */
+  const undo = () => {
+    if (done || undoStack.length === 0) return;
+    const last = undoStack[undoStack.length - 1];
+    const ng = grid.map(row => row.slice());
+    ng[last.r][last.c] = last.prev;
+    setGrid(ng);
+    setUndoStack(undoStack.slice(0, -1));
+    setSelected([last.r, last.c]); // show WHERE it went back to
+    setSteps(last.steps);
+    onStepChange(last.steps);
+    setErrors(sudokuConflicts(ng));
+    saveNow(ng, last.steps, hintedCells);
+  };
+
   const selKey = selected ? `${selected[0]},${selected[1]}` : null;
   const selBox = selected ? boxAt(selected[0], selected[1], size) : -1;
   const boldRight = (c) => size === 9 ? (c === 2 || c === 5) : c === 2;
@@ -801,14 +853,20 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
   const W = Math.floor(boxW);
   const GAP = 8, PILL_H = 46, HINT_H = 36, KEY_H = 44, ERASE_H = 38;
-  const chrome = PILL_H + HINT_H + KEY_H + ERASE_H + GAP * 4;
+  /* #189 — the difficulty line is its own track under the pills, and it costs
+     nothing in the two modes that have no difficulty to name: BAND_H is 0
+     there, so the daily's board is the same size it has always been. The
+     spacing is baked into the track rather than added as a fifth GAP, so the
+     board's y only has one term to keep in step with `chrome`. */
+  const BAND_H = bandName ? 20 : 0;
+  const chrome = PILL_H + BAND_H + HINT_H + KEY_H + ERASE_H + GAP * 4;
   const availB = Math.max(0, Math.min(W, Math.floor(boxH) - chrome));
   const sdkCell = Math.max(24, Math.min(size === 9 ? 44 : 56, Math.floor((availB - (size - 1)) / size)));
   const sdkStep = sdkCell + 1;
   const sdkSide = sdkStep * size - 1;
   const H = chrome + sdkSide;
   const boardX = Math.floor((W - sdkSide) / 2);
-  const boardY = PILL_H + GAP;
+  const boardY = PILL_H + BAND_H + GAP;
   const hintY = boardY + sdkSide + GAP;
   const keysY = hintY + HINT_H + GAP;
   const eraseY = keysY + KEY_H + GAP;
@@ -821,6 +879,14 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
     controls.push({ id: 'p-steps', kind: 'pill', r: pr[1], label: 'Steps', value: steps });
     controls.push({ id: 'p-filled', kind: 'pill', r: pr[2], label: 'Filled', value: `${filled}/${size * size}` });
     controls.push({ id: 'p-board', kind: 'pill', r: pr[3], label: 'Board', value: size === 9 ? '9×9 ×2' : '6×6' });
+    if (bandName) {
+      /* Gold and bold, not the label default: PAL.muted under a row of pills
+         reads as a caption on the pills rather than as the run's own setting,
+         and #189 asks for the difficulty to be HIGHLIGHTED. `gold` resolves at
+         DRAW time, so a theme flip recolours it — an explicit colour here
+         would be captured at render and go stale. */
+      controls.push({ id: 'p-band', kind: 'label', r: [0, PILL_H, W, BAND_H], label: bandName, font: 12, bold: true, gold: true });
+    }
     if (!done) {
       const exhausted = hints.exhausted || noEmpty;
       controls.push({
@@ -838,7 +904,19 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
       for (let n = 1; n <= size; n++) {
         controls.push({ id: 'k' + n, kind: 'button', r: kr[n - 1], label: String(n), mono: true, font: 18, action: () => place(n) });
       }
-      controls.push({ id: 'erase', kind: 'button', r: [0, eraseY, W, ERASE_H], label: 'Erase', action: () => place(0) });
+      /* #190 — Erase gives up its second half to Undo. They share a row
+         because they are the same kind of action (take that back), and the
+         hint row above is not available: its right half is already the hint
+         message's, so a button there would appear and disappear as messages
+         come and go. */
+      const half = Math.floor((W - 6) / 2);
+      controls.push({ id: 'erase', kind: 'button', r: [0, eraseY, half, ERASE_H], label: 'Erase', action: () => place(0) });
+      controls.push({
+        id: 'undo', kind: 'button', r: [W - half, eraseY, half, ERASE_H],
+        label: undoStack.length ? `↩ Undo · ${undoStack.length}` : '↩ Undo',
+        disabled: undoStack.length === 0,
+        action: undo,
+      });
     }
   }
   const ctlRef = useRef([]);
@@ -860,7 +938,7 @@ function SudokuBoard({ difficulty, board, dayNum, onWin, onStepChange, savedProg
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [grid, selected, errors, hintedCells, done, sdkCell, W, fmt, steps, pressedId, hints.hintsLeft, hints.msg, hints.buying],
+    deps: [grid, selected, errors, hintedCells, done, sdkCell, W, fmt, steps, pressedId, bandName, undoStack.length, hints.hintsLeft, hints.msg, hints.buying],
     draw: (ctx) => {
       cuiDrawControls(ctx, ctlRef.current, pressedId);
       ctx.save();

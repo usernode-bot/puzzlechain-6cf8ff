@@ -1510,6 +1510,49 @@ media query list the same selectors — **add new motion to both**, or a player
 gets it in one place and not the other. `?motion=reduce|full` forces it, the
 way `?theme=` does.
 
+### Marble Loop: aim, then fire (#212)
+
+A tap used to fire immediately at wherever the finger landed, so on a phone you
+found out where you had been aiming by watching the marble go there. **A touch
+tap now aims; the next one fires** — the same ghost-then-confirm shape Gomoku
+already uses for a board too dense to poke at. A tap pointing somewhere
+materially different from the current aim RE-AIMS instead of firing
+(`ZUMA_REAIM_RAD`), so correcting yourself never costs a marble. The **mouse is
+unchanged**: hovering already shows the aim continuously, so on that input the
+hover *is* the first tap.
+
+**The trajectory guide is computed, not decorative.** `zumaAimPath` marches the
+ray from the cannon and returns the first chain marble it would touch, using
+the same 2R test the collision uses — so the line cannot promise a hit the
+marble does not make. It is drawn only once an aim has been taken.
+
+**The marble is bigger, and the number was measured.** `ZUMA_DIAM` is the
+chain's spacing, so the radius is a difficulty knob whether you meant it or
+not: a bigger marble makes the CHAIN longer and it reaches the skull sooner. At
+R=13 the tightest board (free L3) goes from 53% to 62% of its own track, so
+every level still starts with at least a third of the track empty.
+**Re-measure if the levels or paths are retuned** — `marbleloop-aim` fails if
+any level's chain exceeds 75% of its track.
+
+**The supply bot.** Below `ZUMA_SUPPLY_AT` (5) marbles the cannon deals only
+colours still ON the chain. A short chain can otherwise hold colours the cannon
+has stopped dealing, and then the level cannot be finished at all. It picks a
+*possible* colour, never the best one — which to fire and where is still the
+player's problem.
+
+**Touch is bound NATIVELY here, not through React's `onTouch*` props.** React 18
+registers `touchmove` on the root as a PASSIVE listener, so `e.preventDefault()`
+inside an `onTouchMove` prop does nothing — this file was calling it into the
+void and relying on `.zuma-canvas { touch-action: none }`. A listener on the
+element is also one a test can drive, which matters because touch now behaves
+differently from the mouse and that difference IS the change.
+
+`getCanvasCoords` also gained #208's length test. `e.touches` is always a
+TouchList and a TouchList is an object, so `e.touches ? …` is true even when
+EMPTY — which is exactly what touchend carries. Nothing hit it before because
+touchend was only ever a bare "fire" signal that never asked where the finger
+was; aim-on-tap asks.
+
 ### New deep links
 
 `?result=1` mounts a game and opens a representative results card over its

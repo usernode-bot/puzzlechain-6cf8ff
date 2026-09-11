@@ -2683,6 +2683,17 @@ app.get('/api/daily', async (req, res) => {
         { gameId: 'minefinder', upTo: Math.max(0, storyBandCount('minefinder') - 1) },
       ];
       for (const sg of storySeed) {
+        // ASSERT the ladder's state, do not merely add to it. Staging carries
+        // one database across every check run and never resets, and two
+        // fixtures seed the SAME rows to different depths — this one wants
+        // sudoku fully cleared, demo=modes wants it three rungs in. With a
+        // plain ON CONFLICT DO NOTHING whichever ran first won permanently and
+        // the other silently became a no-op, so the check that depended on the
+        // loser failed for reasons nothing in its own proposal could explain.
+        await pool.query(
+          `DELETE FROM game_progress WHERE user_id = $1 AND game_id = $2 AND band >= $3`,
+          [req.user.id, sg.gameId, sg.upTo]
+        );
         for (let b = 0; b < sg.upTo; b++) {
           await pool.query(
             `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
@@ -3391,6 +3402,15 @@ app.get('/api/daily', async (req, res) => {
         { gameId: 'spider', cleared: 3 },
       ];
       for (const w of walked) {
+        // Same rule as demo=storybadges: this fixture says sudoku is HALF
+        // walked, so it has to be able to say that even after storybadges has
+        // marked the same ladder complete on the same shared staging database.
+        // "Clearing a level for the first time pays" is the note a half-walked
+        // picker renders; a fully cleared one reads "All levels cleared".
+        await pool.query(
+          `DELETE FROM game_progress WHERE user_id = $1 AND game_id = $2 AND band >= $3`,
+          [req.user.id, w.gameId, w.cleared]
+        );
         for (let b = 0; b < w.cleared; b++) {
           await pool.query(
             `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)

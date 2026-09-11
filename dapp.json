@@ -1101,6 +1101,16 @@
       "expectText": "only deals colours still on the chain"
     },
     {
+      "name": "Mancala shows both stores as HUD scores",
+      "path": "/?game=mancala&mode=bot",
+      "expectText": "AI"
+    },
+    {
+      "name": "Mancala's local game scores both players in the HUD",
+      "path": "/?game=mancala&mode=2p",
+      "expectText": "P2"
+    },
+    {
       "name": "Daily Cipher names the day's theme",
       "path": "/?game=cryptowordle&practice=1",
       "expectText": "Today's theme"

@@ -149,7 +149,7 @@ const GAME_REGISTRY = {
   zuma:              { name: 'Marble Loop',              category: 'classic', dailyMode: true, tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
@@ -804,6 +804,14 @@ async function migrate() {
   // re-derived from the deterministic daily seed, so only player moves live here.
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
+  /* #188 — the all-time board groups every finished attempt for one game by
+     player. Without this the query is a full scan of a table that only grows;
+     the existing indexes are keyed for "today, this game", which is the wrong
+     shape for it. Idempotent, per the platform's schema convention. */
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS daily_attempts_alltime_idx
+      ON daily_attempts (game_id, user_id) WHERE finished_at IS NOT NULL
+  `);
 
   // game_ratings is PUBLIC (leaderboard data): one Elo rating row per
   // (user, head-to-head game), updated in the room/match finish handlers
@@ -2075,6 +2083,9 @@ const PUBLIC_API_GET = [
   // null-guards req.user (anonymous ⇒ me: null, isCurrentUser: false). The
   // arcade FINISH route stays auth-gated — it pays points.
   /^\/api\/arcade\/[A-Za-z0-9_-]+\/leaderboard$/,
+  // #188 — the all-time board is the same shape as the two above and opens on
+  // the same terms; its handler null-guards req.user too.
+  /^\/api\/alltime\/[A-Za-z0-9_-]+\/leaderboard$/,
 ];
 
 // Simple in-memory per-IP sliding window over the public GET surface — the
@@ -4746,6 +4757,66 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
     res.json({ entries, me, total });
   } catch (err) {
     console.error('[daily] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+/* GET /api/alltime/:gameId/leaderboard — every finished daily attempt this
+   game has ever recorded, summed per player (#188).
+
+   The app had two boards for a daily game and no third: today's board
+   (/api/daily/:gameId/leaderboard) and the per-band arcade boards
+   (/api/arcade/:gameId/leaderboard). "All-time" was the only one of the three
+   the report asks for that did not exist.
+
+   It ranks on TOTAL POINTS, not on a best single day, because that is what the
+   daily rewards: showing up. Ties break on fewer plays — the same points from
+   fewer days is the better record — then on who got there first.
+
+   Losses are excluded by `score > 0`, the same rule the daily board uses, so a
+   pass/fail daily's failed runs do not appear. Public on the same terms as the
+   other two boards: the handler null-guards req.user, so an anonymous caller
+   gets me: null and isCurrentUser: false. */
+app.get('/api/alltime/:gameId/leaderboard', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const friendsScope = req.query.scope === 'friends';
+  if (friendsScope && !req.user) return res.json({ entries: [], me: null, total: 0 });
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, username, points, plays, first_at,
+              ROW_NUMBER() OVER (ORDER BY points DESC, plays ASC, first_at ASC) AS rank
+         FROM (
+           SELECT user_id,
+                  MAX(username)        AS username,
+                  SUM(score)::int      AS points,
+                  COUNT(*)::int        AS plays,
+                  MIN(finished_at)     AS first_at
+             FROM daily_attempts
+            WHERE game_id = $1
+              AND finished_at IS NOT NULL
+              AND score IS NOT NULL AND score > 0
+              AND ($2::text IS NULL
+                   OR user_id = $2
+                   OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))
+            GROUP BY user_id
+         ) t`,
+      [gameId, friendsScope ? req.user.id : null]
+    );
+    const total = rows.length;
+    const uid = req.user ? req.user.id : null;
+    const shape = (r) => ({
+      rank: Number(r.rank),
+      username: r.username || 'anon',
+      points: Number(r.points),
+      plays: Number(r.plays),
+      isCurrentUser: uid != null && r.user_id === uid,
+    });
+    const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
+    const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
+    res.json({ entries, me: mineRow ? shape(mineRow) : null, total });
+  } catch (err) {
+    console.error('[alltime] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });

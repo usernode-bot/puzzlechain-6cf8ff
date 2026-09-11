@@ -75,6 +75,11 @@ const GAMES = [
     tagColor: GA.teal,
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
     fitShell: true,
+    /* #195 — no "View board" step. The result card already reveals the answer
+       and the score, so the frozen board behind it repeats what you just read.
+       Every other game keeps it; this is a property of the game, not a
+       shell-wide change (see boardReviewable). */
+    reviewBoard: false,
     howToPlay: [
       { title: 'Guess the word', body: 'Type a guess and submit. Green = right letter, right spot; gold = right letter, wrong spot.' },
       { title: 'Work the stack', body: "Today's puzzle is a stack of crypto words — solve one to unlock the next. Clues unlock as you go, and free hints are capped per day." },
@@ -355,13 +360,15 @@ const GAMES = [
     icon: '⛏️',
     category: 'classic',
     shell: 'self',
-    desc: 'Dodge invalid blocks, collect hash tokens — how long can your miner survive?',
+    desc: 'Tap to smash falling hashes, stack lightning, leave the TNT alone.',
     tag: 'Arcade',
     tagColor: GA.plum,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
-      { title: 'Dodge and collect', body: 'Steer your miner between lanes — grab hash tokens, dodge the invalid blocks.' },
-      { title: 'Survive', body: 'The chain speeds up the longer you last. One collision ends the run.' },
+      { title: 'Tap to mine', body: 'Swing your hammer at a falling ⛏️ hash to break it — 10 points each. A hash that reaches the floor un-mined costs a life.' },
+      { title: 'Stack the lightning', body: 'Tap ⚡ to add 5 seconds of double scoring. Bolts stack, so grabbing a second one while boosted is worth taking.' },
+      { title: 'Leave the TNT', body: 'Tapping 🧨 costs you 10 points. It is the one thing to let fall.' },
+      { title: 'Hit the target', body: 'Daily and story shifts show a target score. Reach it before the clock runs out and the shift is cleared.' },
     ],
     component: HashRushGame,
     leaderboard: true,

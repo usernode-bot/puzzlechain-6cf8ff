@@ -1036,9 +1036,24 @@
       "expectText": "Tap a number whose flags all match"
     },
     {
-      "name": "Hash Rush rules describe drag-to-steer",
-      "path": "/?game=hashrush",
-      "expectText": "Start mining"
+      "name": "Hash Rush opens on the tap-to-mine brief",
+      "path": "/?game=hashrush&play=1",
+      "expectText": "to stack your boost"
+    },
+    {
+      "name": "A bounded Hash Rush shift names the score it wants",
+      "path": "/?game=hashrush&pmode=story&band=1&play=1",
+      "expectSelector": ".hr-wrap[data-hr-target]:not([data-hr-target=\"0\"])"
+    },
+    {
+      "name": "An endless Hash Rush run sets no target",
+      "path": "/?game=hashrush&pmode=arcade&band=hard&play=1",
+      "expectSelector": ".hr-wrap[data-hr-target=\"0\"]"
+    },
+    {
+      "name": "A finished Hash Rush board draws no end panel of its own",
+      "path": "/?game=hashrush&play=1&hrdead=1",
+      "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
     },
     {
       "name": "A finished Hash Rush board draws no end panel of its own",
@@ -1059,6 +1074,11 @@
       "name": "Daily Cipher reveals a third clue past the old ceiling",
       "path": "/?game=cryptowordle&practice=1&cwsubmit=3",
       "expectText": "Hint 3:"
+    },
+    {
+      "name": "Daily Cipher story rung serves its own words, not the daily's",
+      "path": "/?game=cryptowordle&pmode=story&band=4&play=1",
+      "expectText": "Theme: Nature"
     },
     {
       "name": "Daily Cipher: one tap = one letter",
@@ -1234,6 +1254,16 @@
       "name": "Merged card in dark theme",
       "path": "/?theme=dark",
       "expectSelector": "html[data-theme=\"dark\"] .card.paired .card-mode-btn.daily"
+    },
+    {
+      "name": "Sudoku has a leaderboards panel with all three boards",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectSelector": ".gb-sheet .cg-sheet-tab"
+    },
+    {
+      "name": "Sudoku leaderboards offer an all-time ranking",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectText": "All-time"
     },
     {
       "name": "Sudoku 9x9 board is deep-linkable and fills its column",

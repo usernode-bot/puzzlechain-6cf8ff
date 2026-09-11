@@ -1466,3 +1466,65 @@ Sudoku" just **Sudoku**. Prefer `expectSelector` for structure and reserve
 `expectText` for copy that is genuinely part of the product's voice — and note
 that `innerText` reflects `text-transform`, so a `.plabel` reading "Board" in the
 source matches "BOARD" at runtime.
+
+## Hash Rush is a striking game now (#215)
+
+Hash Rush used to be a lane dodger: you steered a miner and collected what it
+ran into. It is **tap-to-mine**. Nothing steers — you hit what falls. Four
+rules, and they are what the issue asked for, so don't quietly undo them:
+
+- **⛏️ hash** — tapping it pays `HR_TOKEN_SCORE`, doubled while boosted.
+- **⚡ lightning** — tapping it **ADDS** `HR_BOOST_SECS` to whatever boost you
+  already have, capped at `HR_BOOST_MAX`. It used to *assign*, so a second bolt
+  threw away the remainder of the first: that was the reported "redundant
+  triggers", and it is why bolts now stack.
+- **🧨 TNT** — tapping it costs `HR_TNT_PENALTY` points, floored at zero. It
+  does **not** take a life: there is nothing to dodge any more, so the penalty
+  *is* the hazard, and leaving it alone is the correct play.
+- **A missed hash** — one that reaches the floor un-mined — is the only thing
+  that costs a life, and running out of lives is what ends an endless run.
+
+`hrPickAt` (which object a strike at x,y breaks) and `hrApplyStrike` (what it
+does) are pure and are the only copies of either rule — the pointer path, the
+keyboard path (1/2/3 or ← ↓ → strike the lowest thing in that lane) and
+`hashrush-strike-rules` all go through them. Same pair-of-pure-functions shape
+as `ngGeometry`/`ngCellAt`, for the same reason.
+
+### The spawn schedule is a function of elapsed time, not of frames
+
+The old loop accumulated a `spawnT` and fired when it crossed the interval,
+which overshoots by up to one frame **every** spawn — so a slow device was
+dealt a measurably shorter stream over the same 90 seconds. Survivable when the
+score was "how long did you last"; not survivable now that a daily's content
+and a level's target both come off that stream. `hrEveryAt` / `hrDrawObj` are
+the one rule, and `hrSpawnPlan` (ahead of time) and the loop (as time passes)
+are its two readers. **Keep them reading the same pair.**
+
+### A level's target is DERIVED, not picked
+
+"Clear winning thresholds per level" needs a number per level, and an eyeballed
+number goes stale the moment any constant moves — the `TM_LAYOUTS` /
+`MJ_LAYOUTS` trap. So `hrTargetFor` plays the level's own spawn plan with an
+explicit model of a player (`HR_MODEL_TPS` taps/sec, `HR_MODEL_LAG` reaction,
+`HR_MODEL_REACH` before an object is gone, never taps TNT) and takes
+`HR_TARGET_FRACTION` of what that scores. Story seeds are stable per band and
+the daily seed is shared, so two players on one level get the same target. It
+is computed from a **second** rng on the same seed, because the run's own
+generator is about to be consumed by play.
+
+**`HR_TARGET_FRACTION` is the single balance knob** — there are no per-level
+numbers to move. 0.7 comes from a second measurement: replaying each level 300
+times with a player who mines only part of what it reaches and fumbles into
+some TNT scores, as a share of the perfect model, ~0.92 (mines 95%, hits 3% of
+TNT), ~0.78 (85% / 8%) and ~0.59 (72% / 15%) — and those rows are almost flat
+across all six levels, which is why one constant does the job. The ladder's
+difficulty lives in stream density and TNT share instead. Note the tap BUDGET
+never binds: the model misses at most one object a level even at 3.1 spawns a
+second, because it only strikes hashes and bolts. **This game asks for accuracy,
+not speed.**
+
+The one input here that is not measured is what share a real hand actually
+mines on a phone. That is a playtest. If the ladder turns out too hard or too
+soft, move `HR_TARGET_FRACTION` and re-run `hashrush-level-targets`, which
+fails if any level asks for more than the model can score or if the targets
+stop rising.

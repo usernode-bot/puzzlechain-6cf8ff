@@ -789,6 +789,40 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #213 — the camouflage marble takes the colour of what it lands against.
+     This is the rule that makes it a bonus at all: the power-up it replaces
+     fired a marble coloured '#ffffff', and zumaCheckMatches compares colour
+     strings exactly, so that "wildcard" matched nothing and left you one
+     marble worse off than before you collected it. */
+  check('marbleloop-camouflage', () => {
+    const R = '#f43f5e', B = '#3b82f6', G = '#10b981';
+    const ch = (...cols) => cols.map((c, i) => ({ color: c, dist: i * 10 }));
+    // Ties go left, and left here is a pair, so the marble completes a three.
+    let c = ch(R, R, null, B, B);
+    if (zumaWildColorAt(c, 2) !== R) throw new Error('a tie must resolve to the left');
+    // The longer run wins, whichever side it is on.
+    c = ch(R, null, B, B, B);
+    if (zumaWildColorAt(c, 1) !== B) throw new Error('the longer neighbouring run must win');
+    c = ch(G, G, G, null, B);
+    if (zumaWildColorAt(c, 3) !== G) throw new Error('the longer run must win on the left too');
+    // One neighbour only.
+    c = ch(null, B, B);
+    if (zumaWildColorAt(c, 0) !== B) throw new Error('the head of the chain must take its only neighbour');
+    c = ch(R, R, null);
+    if (zumaWildColorAt(c, 2) !== R) throw new Error('the tail must take its only neighbour');
+    // Nothing to take a colour from.
+    if (zumaWildColorAt([{ color: null, dist: 0 }], 0) !== null) throw new Error('a lone marble has no colour to take');
+    if (zumaWildColorAt([], 0) !== null) throw new Error('an empty chain must not throw');
+    // And the resolved colour must actually POP: resolve, then match.
+    c = ch(R, R, null, B, B);
+    c[2].color = zumaWildColorAt(c, 2);
+    if (zumaCheckMatches(c, 2) !== 3) throw new Error('a resolved camouflage marble must complete the run it joined');
+    // The white marble it replaces would not have.
+    c = ch(R, R, '#ffffff', B, B);
+    if (zumaCheckMatches(c, 2) !== 0) throw new Error('the old white wildcard is supposed to match nothing');
+    return true;
+  });
+
   /* Snakes & Ladders V2 — the seven hand-authored tier boards must satisfy
      the authoring constraints (see snakesladders-v2/00-layouts.jsx), or a
      future retune ships a broken board: a chained jump the engine resolves

@@ -1041,6 +1041,21 @@
       "expectText": "Start mining"
     },
     {
+      "name": "A lost story run offers to continue the ladder",
+      "path": "/?game=zuma&result=1&pmode=story",
+      "expectText": "Continue Story Quest"
+    },
+    {
+      "name": "A lost arcade run offers another run",
+      "path": "/?game=zuma&result=1&pmode=arcade",
+      "expectText": "Another run"
+    },
+    {
+      "name": "Marble Loop shows the camouflage marble's countdown",
+      "path": "/?game=zuma&zcamo=1",
+      "expectText": "Camouflage"
+    },
+    {
       "name": "Daily Cipher names the day's theme",
       "path": "/?game=cryptowordle&practice=1",
       "expectText": "Today's theme"

@@ -1361,6 +1361,57 @@ Snake and Bounce already route their game-over through `onWin` with
 filters `score > 0`, so a non-zero loss would put a FAILED run on the board.
 Streaks are unaffected either way — `computeStreak` keys off `finished_at`.
 
+### A lost run in a MODE has to be able to stay in it (#213)
+
+The win card has carried a mode action since #176 — "📖 Back to the levels" /
+"🎮 Another run". The loss card never did, so the only way out of a failed
+story rung was **Back to Lobby**: the reported "forced lobby exit", and exactly
+backwards, because a rung is a fixed retryable deal and failing one is the
+moment you most want to go straight at it again. The loss card now carries the
+same action, labelled **"📖 Continue Story Quest"** after a loss.
+
+Two smaller things fell out of the same block, both dropped fields rather than
+decisions:
+
+- **"🎲 Play again for fun" was showing on story and arcade losses.** It is the
+  daily's replay of TODAY'S board through the inert practice path (#133), so on
+  a story loss it sent you to a practice run of the daily instead of back to
+  the rung. The win card had always gated it on `!modeLabel`; the loss card had
+  not.
+- **`handleLose` dropped `meta.winnerLabel`.** Every game already sends one
+  through `reportRunEnd` (Marble Loop, Hash Rush, Snake and Bounce all send
+  'Game Over') and the win card has read it since #158, so a lost story rung of
+  a marble game announced itself as **"Out of guesses"** — copy written for
+  Daily Cipher. The default stays for games that send nothing, which is Cipher,
+  the one it was written for. The "Guesses · Time" row beside it is the same
+  copy problem and is deliberately NOT touched: no game sends a label for it,
+  so fixing it would mean inventing one for thirty games rather than threading
+  through one they already send.
+
+**`handleWin` still drops `winnerLabel` on its arcade and story branches**, so
+a run you died in shows "🏆 Solved!" in those two modes. Same one-line
+omission, but it belongs to every arcade game rather than to #213.
+
+### Marble Loop's camouflage marble (#213)
+
+Five shots in a row that each pop something drop a **camouflage marble** on the
+cannon for `ZUMA_CAMO_MS`. It takes the colour of whatever it lands against
+(`zumaWildColorAt` — the longer neighbouring run wins, ties go left), so it
+always makes a match if one is there. It is spent by one shot and does **not**
+consume the queue: it sits on top of the marble you already had.
+
+It also **replaces the old `color-switch` power-up's wildcard, which never
+worked**: that one fired a marble coloured `'#ffffff'` and `zumaCheckMatches`
+compares colour strings exactly, so the "wildcard" matched nothing and left you
+strictly worse off than the marble it replaced. One wildcard rule, in one pure
+function, rather than two that disagree — `marbleloop-camouflage` asserts both
+halves, including that the old white marble matched nothing.
+
+`?zcamo=1` loads one at mount (writing nothing — it sets the same deadline the
+fifth pop would) because the marble and its countdown are otherwise reachable
+only by popping five shots in a row, which no check or screenshot can do.
+`?result=1&pmode=story|arcade` does the same job for the mode result cards.
+
 ### New deep links
 
 `?result=1` mounts a game and opens a representative results card over its

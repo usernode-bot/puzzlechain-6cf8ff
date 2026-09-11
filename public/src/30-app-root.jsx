@@ -889,7 +889,29 @@ function App() {
     // by proposal tests that assert on in-game UI, and by "jump straight in"
     // share links.
     if (params.get('play') === '1') {
-      if (g.daily) { startRun(g); return; }
+      /* A DAILY REACHED THIS WAY IS STILL A DAILY, and the shell has to be
+         told so. This branch used to call startRun(g) alone. startRun reads
+         the mode from a REF and never sets it, so on a link with no ?pmode=
+         the shell was left with playMode === null — and `resumable` in
+         renderGameBody is `playMode === 'daily'`, which is the single gate on
+         whether a game is handed its savedProgress at all.
+
+         So a daily opened by `?game=<id>&play=1` could not resume: a claimed,
+         half-played attempt mounted as a blank board with its clock at zero.
+         That is the shape of link the share cards carry ("the no-login ?game=
+         link") and the shape the proposal checks use, which is how it showed
+         up — "Nonogram resumes its mistake count" asserts on a resumed board
+         and had no mode to resume in.
+
+         Now it takes the same two steps the ?pmode= branch above takes:
+         launchGame sets the mode, startRun claims or resumes in it. */
+      if (g.daily) {
+        const dm = defaultPlayMode(g);
+        launchGame(g, dm);
+        startRun(g, { mode: dm });
+        setHowToGame(null);
+        return;
+      }
       launchGame(g);
       setHowToGame(null); // suppress the classic first-open auto-show too
       return;

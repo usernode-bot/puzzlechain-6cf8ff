@@ -1056,6 +1056,11 @@
       "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
     },
     {
+      "name": "A finished Hash Rush board draws no end panel of its own",
+      "path": "/?game=hashrush&play=1&hrdead=1",
+      "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
+    },
+    {
       "name": "Daily Cipher names the day's theme",
       "path": "/?game=cryptowordle&practice=1",
       "expectText": "Today's theme"

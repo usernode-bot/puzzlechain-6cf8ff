@@ -1741,10 +1741,11 @@ function App() {
             onLose={handleLose}
             onStepChange={setStepCount}
             offset={offset}
-            /* Phase 1 (#160) — these games are now kept MOUNTED and frozen
-               behind the shared results card, so any per-game end panel must
-               stand down (only Hash Rush has one). */
-            resultShown={!!winData || !!loseData || !!practiceResult}
+            /* #215 — `resultShown` is gone with the panel it silenced. Phase 1
+               (#160) added it because Hash Rush drew an end panel of its own;
+               that panel turned out to exist only in the gap before the shared
+               card arrived, so it was deleted and no shell:'self' game has one
+               now. Keep it that way: the shared results card is the ending. */
             resetKey={playAgainKey}
             menuConfig={classicMenuConfig}
             gameMode={classicGameMode}

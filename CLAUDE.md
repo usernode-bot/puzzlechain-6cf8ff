@@ -1335,9 +1335,18 @@ Consequences:
 
 - **`boardReviewable` no longer excludes `shell:'self'`.** Its old comment
   claimed Snake/Block Fit/Diamond Rush/Hash Rush draw their own game-over
-  overlay; only **Hash Rush** does, and it now takes a `resultShown` prop and
-  stands down (its panel is absolute-positioned over its own canvas, so leaving
-  it up hides the board "View board" exists to reveal).
+  overlay; only Hash Rush did, and **it does not any more** (#215). It was
+  given a `resultShown` prop to stand down behind the shared card, and standing
+  down was all it ever did: a shared card always follows `reportRunEnd`, so the
+  panel only existed in the gap before one arrived — never rendered at all in
+  free play, one paint then swapped in the three modes whose finish awaits an
+  endpoint, and flashed a second time on Play Again (winData clears a commit
+  before the resetKey reset). That flash was the reported bug. **No
+  `shell:'self'` game draws its own end panel now, and `resultShown` is gone
+  — keep it that way; the shared results card is the ending.** Hash Rush's
+  reset is a `useLayoutEffect` so Play Again cannot paint the dead board first,
+  and `?hrdead=1` parks it in the finished-with-no-card state (writing nothing)
+  so a check can assert the panel stays absent.
 - Practice results carry a `gameId` so the "result belongs to the mounted game"
   guard still holds. The practice card was the one with no way back at all —
   no View board, no minibar, no dismiss (#158).

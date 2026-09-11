@@ -64,14 +64,34 @@ function hrModeConfig(playMode, band) {
            lives: HR_LIVES, limit: 0, label: 'Free play' };
 }
 
-/* `resultShown` (phase 1, #160) — true once App's shared results card owns this
-   run's ending. Hash Rush is the ONE shell:'self' classic that draws its own
-   end panel, and that panel is absolute-positioned over its canvas: leaving it
-   up would hide the very board "View board" exists to reveal, and would repeat
-   the score the shared card is already showing. Every other self-shell game
-   (Snake, Block Fit, Diamond Rush) has no end panel and needs nothing. */
+/* #215 — Hash Rush no longer draws an end panel of its own, and that is the
+   whole of the reported "brief glitchy Play Again".
+
+   Phase 1 (#160) gave it a `resultShown` prop so its panel would stand down
+   once App's shared results card owned the ending. Standing down turned out to
+   be ALL it ever did: `reportRunEnd` always reaches `onWin`/`onLose`, so a
+   shared card always follows, and the panel only ever existed in the gap
+   before one arrived. Measured in a browser:
+
+     free play  — the classic branch of handleWin sets winData synchronously,
+                  so the panel never rendered at all. Dead code.
+     arcade     — that branch AWAITS /api/arcade/:id/finish first, so the panel
+                  committed for one paint and was swapped for the shared card
+                  32 ms later against a local stub; over a real network it is a
+                  whole round trip. Daily and story await too.
+     Play Again — clearing winData drops `resultShown` a commit BEFORE the
+                  resetKey effect returns the game to idle, so the panel
+                  flashed a second time, in the exact spot the button was.
+
+   So the panel is deleted rather than re-timed: there is no state in which it
+   is the ending the player is meant to read. `finalRank` went with it — the
+   "Global rank #N" line it carried arrives after `submitClassicScore`
+   resolves, by which time the shared card is already on top of it.
+
+   The reset is a LAYOUT effect for the same reason: it has to run before the
+   paint that follows Play Again, or the dead board shows for a frame. */
 function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, menuConfig,
-                       resultShown, playMode, band, offset }) {
+                       playMode, band, offset }) {
   const cfg = useRef(null);
   if (!cfg.current) cfg.current = hrModeConfig(playMode, band);
   const MODE = cfg.current;
@@ -82,7 +102,6 @@ function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
   const [mult, setMult] = useState(1);
   const [boostLeft, setBoostLeft] = useState(0);
   const [secsLeft, setSecsLeft] = useState(MODE_LIMIT_INIT);
-  const [finalRank, setFinalRank] = useState(null);
 
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
@@ -106,12 +125,29 @@ function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
 
   const reset = () => {
     stateRef.current = fresh();
-    setScore(0); setLives(MODE.lives); setMult(1); setBoostLeft(0); setFinalRank(null);
+    setScore(0); setLives(MODE.lives); setMult(1); setBoostLeft(0);
     setSecsLeft(MODE.limit || 0);
     submittedRef.current = false;
   };
 
-  useEffect(() => { reset(); setPhase('idle'); }, [resetKey]);
+  // Layout, not passive: Play Again clears the shared card and bumps resetKey in
+  // one commit, and a passive effect would let the finished board paint once
+  // before this ran. See the note above the component.
+  React.useLayoutEffect(() => { reset(); setPhase('idle'); }, [resetKey]);
+
+  /* `?hrdead=1` — park the game in its finished state with no shared results
+     card over it. That combination is the ONLY one in which an end panel of
+     this game's own could ever have been the thing a player reads, and it is
+     unreachable by navigating: ending a run for real always produces a card.
+     So it is what the dapp.json check asserts on, and it deliberately writes
+     NOTHING — no endGame, no score submission, no endpoint — it is a render
+     state, not a run. Same role as ?sdk=9 and ?cwtype= elsewhere. */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('hrdead') !== '1') return;
+    if (!stateRef.current) stateRef.current = fresh();
+    stateRef.current.dead = true;
+    setPhase('dead');
+  }, []);
 
   // Lane shift (-1 left, +1 right).
   const shift = (dir) => {
@@ -192,8 +228,7 @@ function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
       // Only free play and arcade belong on the classic all-time board; a
       // daily and a story rung settle on their own endpoints.
       if (!playMode || playMode === 'arcade') {
-        submitClassicScore('hashrush', finalScore, { tokens: s.tokens, timeSecs: Math.round(s.elapsed) })
-          .then(r => { if (r && r.rank) setFinalRank(r.rank); });
+        submitClassicScore('hashrush', finalScore, { tokens: s.tokens, timeSecs: Math.round(s.elapsed) });
       }
       reportRunEnd(
         { cleared: !!cleared, playMode, onWin: onWinRef.current, onLose: onLoseRef.current },
@@ -382,7 +417,7 @@ function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
             ? { l: 'Left', v: `${Math.floor(secsLeft / 60)}:${String(secsLeft % 60).padStart(2, '0')}` }
             : { l: 'Mult', v: '×' + mult },
         ]} />
-        <div className="hr-wrap" ref={wrapRef}>
+        <div className="hr-wrap" ref={wrapRef} data-hr-phase={phase}>
           <canvas ref={canvasRef} className="hr-canvas" />
           {boostLeft > 0 && phase === 'playing' && (
             <div className="hr-boost-badge">⚡ Boost {boostLeft}s</div>
@@ -396,16 +431,6 @@ function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
                   : 'Mine hashes, dodge invalid blocks.'}
               </div>
               <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Start mining</button>
-            </div>
-          )}
-          {phase === 'dead' && !resultShown && (
-            <div className="hr-overlay">
-              <div className="hr-overlay-title">
-                {stateRef.current && stateRef.current.cleared ? 'Shift complete' : 'Game Over'}
-              </div>
-              <div className="hr-overlay-score">{score} pts</div>
-              {finalRank && <div className="hr-overlay-sub">Global rank #{finalRank}</div>}
-              <button className="gm-play-btn" style={{ maxWidth: 200 }} onClick={startGame}>Mine again</button>
             </div>
           )}
         </div>

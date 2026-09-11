@@ -2129,7 +2129,7 @@ function App() {
       )}
 
       {screen === 'lobby' && (
-        <div className="lobby">
+        <div className="lobby screen-in">
           {lobbyTab === 'ladder' ? (
             <React.Fragment>
               <button className="home-back-btn" onClick={() => setLobbyTab('home')}>← Home</button>
@@ -2415,7 +2415,7 @@ function App() {
       )}
 
       {screen === 'pregame' && currentGame && (
-        <div className="game-wrap">
+        <div className="game-wrap screen-in">
           <div className="game-head">
             <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
             <div className="game-title">
@@ -2447,7 +2447,7 @@ function App() {
       )}
 
       {screen === 'opponent' && preLaunchGame && (
-        <div className="game-wrap">
+        <div className="game-wrap screen-in">
           <div className="game-head">
             <button className="back-btn" onClick={() => backToLobby('classic')}>← Back</button>
             <div className="game-title">
@@ -2475,7 +2475,7 @@ function App() {
         // false) there is no .fit-col in this wrap, so `.game-wrap.fit`
         // would clip the card AND fail the registry-fitshell self-test —
         // exactly what the ?demo=solvedboard checks caught.
-        <div className={'game-wrap' + (lockedReviewable && lockedReview ? ' fit' : '')}>
+        <div className={'game-wrap screen-in-fade' + (lockedReviewable && lockedReview ? ' fit' : '')}>
           <div className="game-head">
             <button className="back-btn" onClick={() => backToLobby()}>← Back</button>
             <div className="game-title">
@@ -2539,7 +2539,7 @@ function App() {
           that the loss had just cleared), so "the final board" was a brand new
           one. Keeping one stable element preserves the subtree's state. */}
       {screen === 'game' && currentGame && (
-        <div className={'game-body' + (boardReviewable ? ' frozen' : '')}>
+        <div className={'game-body screen-in-fade' + (boardReviewable ? ' frozen' : '')}>
           {renderGameBody()}
         </div>
       )}

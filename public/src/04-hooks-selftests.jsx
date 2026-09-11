@@ -823,6 +823,41 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #188 — a whole family of rules can go dead in one keystroke.
+
+     `.pregame-deal` was missing its semicolon and its closing brace, and the
+     declarations belonging to it had been stranded ~70 lines further down. The
+     CSS parser swallowed everything in between into one invalid rule and threw
+     it away: the band picker, its selected-state highlight, the resume note and
+     the full-width Play button had all silently stopped applying, and nothing
+     failed. Probing computed style is the only thing that catches this — a text
+     scan of the css string sees the rules perfectly well, which is exactly why
+     it went unnoticed. Same canary idea as tapCanaryApplied. */
+  check('pregame-styles-applied', () => {
+    const probes = [
+      ['pregame-deal', 'borderRadius', '0px'],
+      ['pregame-band', 'borderRadius', '0px'],
+      ['pregame-band-row', 'display', 'block'],
+    ];
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:-9999px;top:-9999px';
+    document.body.appendChild(host);
+    try {
+      for (const [cls, prop, dead] of probes) {
+        const el = document.createElement('div');
+        el.className = cls;
+        host.appendChild(el);
+        const got = getComputedStyle(el)[prop];
+        if (got === dead) {
+          throw new Error('.' + cls + ' is not applying (' + prop + ' = ' + got + ') — the rule block is probably unterminated');
+        }
+      }
+    } finally {
+      host.remove();
+    }
+    return true;
+  });
+
   /* #215 — Hash Rush's four tap-to-mine rules, and the level targets derived
      from them. These are the whole of what the issue asked for, so they are
      the things a retune must not quietly undo. */

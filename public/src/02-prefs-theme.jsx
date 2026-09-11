@@ -16,7 +16,32 @@ const cgPrefs = {
 function cgSetPref(key, val) {
   cgPrefs[key] = val;
   try { localStorage.setItem(PREF_KEYS[key] || CG_MOTION_KEY, val ? '1' : '0'); } catch {}
+  if (key === 'motion') applyMotionPref();
 }
+/* #235 — the in-app "Reduced motion" switch has only ever reached JS call
+   sites, because CSS could see the OS media query and not the pref. Mirroring
+   it onto the root element gives the stylesheet something to match, so a
+   player who turned motion down in Settings gets that from the CSS animations
+   too and not only from the ones drawn in JS. */
+function applyMotionPref() {
+  try {
+    const el = document.documentElement;
+    if (cgPrefs.motion) el.setAttribute('data-reduce-motion', '1');
+    else el.removeAttribute('data-reduce-motion');
+  } catch (e) {}
+}
+/* ?motion=reduce|full — the pref is device-local, so a check or a screenshot
+   could otherwise reach the reduced state only by opening Settings and
+   tapping, which navigation cannot do. Same role as ?theme=, and read before
+   the attribute is applied below. */
+(function readMotionParam() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('motion');
+    if (v === 'reduce') cgPrefs.motion = true;
+    else if (v === 'full') cgPrefs.motion = false;
+  } catch (e) {}
+})();
+applyMotionPref();
 
 /* ============================================================
    Theme preference — light / dark / system (default system)

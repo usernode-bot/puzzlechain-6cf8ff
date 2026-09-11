@@ -1028,8 +1028,20 @@ ${emitTapHighlightRules()}
   color: ${C.muted}; margin-bottom: 0.2rem;
 }
 .pregame-stat .v { font-weight: 700; font-size: 1rem; }
+/* This rule used to be missing its semicolon AND its closing brace, and the
+   declarations that belong to it had been stranded ~70 lines further down
+   behind a stray brace-semicolon. Everything in between — the whole band-picker family,
+   the resume note, the Play button — was swallowed into one invalid rule and
+   silently discarded by the CSS parser. Verified before fixing: NONE of
+   .pregame-deal, .pregame-band, .pregame-band.on, .pregame-band-row,
+   .pregame-bands-label, .pregame-band-note, .pregame-resume-note or
+   .pregame-play appeared in document.styleSheets. */
 .pregame-deal {
-  font-size: 0.82rem; color: ${C.text}
+  font-size: 0.82rem; color: ${C.text};
+  background: ${ca('accent', '14')};
+  border: 1px solid ${ca('accent', '44')}; border-radius: 10px;
+  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
+}
 
 /* #176 — the band pickers. Story's is a numbered level list walked in order
    (cleared behind you, one open level ahead, the rest locked); arcade's is
@@ -1061,11 +1073,40 @@ ${emitTapHighlightRules()}
 .pregame-band.done { color: ${C.emerald}; border-color: ${ca('emerald', '55')}; }
 .pregame-band.locked { opacity: 0.4; cursor: not-allowed; }
 .pregame-band[data-pressed] { background: ${C.well}; }
+.pregame-band .rec {
+  display: block; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: ${C.muted}; margin-top: 0.1rem;
+}
+/* #188 — the leaderboards panel. A centred sheet rather than a bottom sheet:
+   it is a thing you read, not a menu you act from, and the tab row plus three
+   or four rows of names sits badly hugging the bottom edge on a phone. */
+.gb-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: var(--c-scrim);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.gb-sheet {
+  width: 100%; max-width: 420px; max-height: 82dvh; overflow-y: auto;
+  background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 18px; padding: 0.9rem 1rem 1rem;
+  box-shadow: 0 20px 50px var(--c-shadow-lg);
+}
+.gb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; font-weight: 700; margin-bottom: 0.7rem;
+}
+.gb-close {
+  min-width: 32px; min-height: 32px; flex: 0 0 auto;
+  background: transparent; border: 1px solid ${C.border}; border-radius: 8px;
+  color: ${C.muted}; font-family: inherit; cursor: pointer;
+}
+.gb-close:hover { color: ${C.text}; border-color: ${C.accent}; }
+.gb-bands { margin-bottom: 0.6rem; }
+
 .pregame-band-note {
   margin-top: 0.45rem; font-size: 0.72rem; line-height: 1.4; color: ${C.muted};
-}; background: ${ca('accent','14')};
-  border: 1px solid ${ca('accent','44')}; border-radius: 10px;
-  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
 }
 .pregame-resume-note {
   font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.8rem;
@@ -2950,7 +2991,55 @@ ${emitTapHighlightRules()}
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
+/* ---- Screen transitions (#235) ----
+   Navigation only: lobby, pre-game, opponent, the game, the locked day, the
+   profile. NOT boards, cells, cards or canvases — the hosted native kit's own
+   fidelity rules forbid animating high-frequency interactions, and it fights
+   the tap primitive, which gives its feedback on finger-DOWN precisely so
+   nothing has to wait. A card that animates when you tap it feels slower.
+
+   Each screen root really does mount when you navigate to it, so this needs no
+   JavaScript and cannot remount anything — which matters here, because
+   remounting a game at the wrong moment is how a finished 2048 board came back
+   as a fresh one (#158/#160).
+
+   TWO variants, and the difference is not cosmetic. A running transform
+   changes what getBoundingClientRect reports, and the boards in this app
+   measure themselves at mount (useFitBox, sizeCanvas). So any screen that
+   hosts a measured board fades ONLY; the rest may also travel a few pixels.
+   The fill mode is BACKWARDS so nothing is left applied afterwards: a
+   lingering transform would make the element a containing block for the
+   position:fixed sheets that open over these screens. */
+@keyframes un-screen-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes un-screen-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.screen-in { animation: un-screen-in 190ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards; }
+.screen-in-fade { animation: un-screen-fade 150ms linear backwards; }
+
+/* The in-app pref, now that the root carries it (#235). Same list as the OS
+   media query below — add new motion to BOTH or a player gets it in one place
+   and not the other. */
+:root[data-reduce-motion="1"] .screen-in,
+:root[data-reduce-motion="1"] .screen-in-fade,
+:root[data-reduce-motion="1"] .cg-sheet,
+:root[data-reduce-motion="1"] .badge-strip-body,
+:root[data-reduce-motion="1"] .badge-chevron,
+:root[data-reduce-motion="1"] .cnl-roll-btn,
+:root[data-reduce-motion="1"] .ng-status.err,
+:root[data-reduce-motion="1"] .ng-status.ok {
+  animation: none !important;
+  transition: none !important;
+}
+:root[data-reduce-motion="1"] .tappable:active,
+:root[data-reduce-motion="1"] .tappable[data-pressed] { transform: none !important; }
+
 @media (prefers-reduced-motion: reduce) {
+  .screen-in, .screen-in-fade { animation: none !important; }
   .cg-sheet { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
   /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)

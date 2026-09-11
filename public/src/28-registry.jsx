@@ -250,7 +250,7 @@ const GAMES = [
     tagColor: GA.lime,
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
     howToPlay: [
-      { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. Eat food to grow and score.' },
+      { title: 'Steer the snake', body: 'Swipe, or tap the side of the board you want to head for. Arrow keys work too. Turns queue, so you can take a corner in one motion.' },
       { title: 'Stay alive', body: 'Hitting a wall or your own tail ends the run. Longer snakes and faster modes score more.' },
     ],
     component: SnakeGame,
@@ -700,7 +700,7 @@ const GAMES = [
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'swipe', undo: 'none' },
     fitShell: true,
     howToPlay: [
-      { title: 'Steer the snake', body: 'Swipe (or use arrow keys) to change direction. The apples appear in the same order for everyone today.' },
+      { title: 'Steer the snake', body: 'Swipe, or tap the side of the board you want to head for. Arrow keys work too. Turns queue, so you can take a corner in one motion. The apples appear in the same order for everyone today.' },
       { title: 'Eat 20 to win', body: 'Reach 20 apples and the day is yours — faster runs score higher. Hit a wall or your tail and the day is lost.' },
       { title: 'One run', body: 'This is the daily challenge — no restarts. Warm up in the free-play Snake first if you like.' },
     ],

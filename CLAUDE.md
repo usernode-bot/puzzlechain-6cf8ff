@@ -1412,6 +1412,42 @@ unfinished examples (`minefinder`, one rung short; `cratepush`, never started)
 before seeding the finished one. If a check asserts that something is ABSENT or
 UNEARNED, the fixture has to make it so.
 
+### Snake's turns QUEUE (#206)
+
+"The snake fails to turn upon tap or swipe" is not a gesture problem. The
+swipes arrive, `.snake-board` and `.dsnk-board` both carry `touch-action: none`
+so the browser never steals them, and `useGestures` is wired identically in
+both snakes. The bug was that **a turn had nowhere to wait.**
+
+Both snakes held ONE pending direction (`nextDir`) and validated every new turn
+against the direction currently being TRAVELLED. A corner is two turns and a
+tick is 90-200 ms, so between them these ate a large share of real inputs:
+
+- the second turn **overwrote** the first, so the snake never made the first
+  one — swipe up then left around a corner and it simply goes left;
+- or the second turn was **rejected as a reversal** of a direction the first
+  turn was about to change. Heading up with left already pending, "down" is a
+  legal move after that left; it was refused because down reverses *up*.
+  Measured in a browser before the fix: that input returns having done nothing.
+
+`snakeQueueTurn(dir, cur, queue)` is now the whole rule, pure and shared by
+both snakes: turns queue up to `SNAKE_TURN_QUEUE` (2 — it remembers a corner,
+it is not an input buffer) and each is checked against the last direction
+**queued** rather than the last travelled, because that is the one it will
+actually follow on from. One tick consumes one turn, which is what keeps
+"a snake may not double back into itself" true however fast you swipe.
+
+**A tap steers now as well** (`snakeTapDir`), which the issue asked for and
+which previously only started the run. The board is cut into four triangles by
+its diagonals and a tap means the one it lands in — absolute, so it needs no
+knowledge of the current heading and cannot mean two things at once; dead
+centre means nothing. It goes through the same queue, so the reverse rule still
+protects you.
+
+`snake-turn-queue` holds both halves. If you retune this, the property that
+matters is that ONE tick consumes at most ONE turn — take that away and the
+queue becomes a way to reverse into your own neck.
+
 ### Screen transitions (#235)
 
 Navigation only — lobby, pre-game, opponent, the game, the locked day, the

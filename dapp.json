@@ -1056,6 +1056,16 @@
       "expectText": "Tap a number whose flags all match"
     },
     {
+      "name": "Snake says a tap steers as well as a swipe",
+      "path": "/?game=snake&sheet=rules&snake=normal",
+      "expectText": "tap the side of the board"
+    },
+    {
+      "name": "Daily Snake says a tap starts and steers",
+      "path": "/?game=snakedaily&practice=1",
+      "expectText": "Swipe or tap a side to start"
+    },
+    {
       "name": "Hash Rush opens on the tap-to-mine brief",
       "path": "/?game=hashrush&play=1",
       "expectText": "to stack your boost"

@@ -875,6 +875,21 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* `C` is built from PALETTES.light's KEYS only, so `${C.well}` — or any
+     other DERIVED token (well-strong, scrim, the shadow trio, the *-hover
+     pair) — interpolates the string "undefined", and the browser drops the
+     whole declaration. It is the same silent-failure shape as
+     token-alpha-concat, and it had killed .review-btn:hover and
+     .pregame-band[data-pressed] outright. Reach for var(--c-well) instead. */
+  check('css-no-undefined-token', () => {
+    const i = css.indexOf('undefined');
+    if (i >= 0) {
+      throw new Error('the stylesheet interpolates undefined — use var(--c-…) for a '
+        + 'derived token. Near: ' + css.slice(Math.max(0, i - 80), i + 12));
+    }
+    return true;
+  });
+
   /* #217 — Ludo's tokens are now their own tap targets. The old layout
      stepped each token 5px down-right by its INDEX, which put a lone token
      off-centre and smeared a stack into something no finger can pick apart;

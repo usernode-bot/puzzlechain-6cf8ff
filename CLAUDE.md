@@ -1419,6 +1419,52 @@ Consequences:
   classic id — a console error that fails the no-console-errors check. Classics
   reach their all-time board via ClassicShell's ☰ sheet.
 
+### The win card opens on ONE number (#241)
+
+The feedback was "way too much going on, with the points, the badges, and the
+leaderboard with lots of scrolling". Measured before touching it, at 390x780:
+**955px of card content in a 740px box** — and that was with an EMPTY
+leaderboard, so a real one scrolls further. After: **607px, no scroll.**
+
+- **The moment** is the trophy, the headline, the game, the earned score at
+  3.1rem, its multiplier caption, and ONE flourish line — in priority order a
+  badge unlocked, a ladder completed, or a personal best. Then the actions.
+- **Behind `.win-more`** ("Score, badges & leaderboard"): the seven-row
+  breakdown, the "badge active" row, the unlock blocks, the next-milestone
+  pills and today's leaderboard. Nothing was deleted. The toggle sits BELOW
+  the action buttons on purpose, so opening it never moves the button you were
+  reaching for, and `winDetails` resets on every new result so the next win
+  opens on the moment again.
+- **What stays on the moment besides the actions**: the offline sync note, the
+  guest sign-in CTA, the multi-seat standings table and the story/arcade
+  "what happens next" note. Those are outcomes or instructions, not trophies.
+- **The loss card is deliberately untouched** — measured at 567px (classic)
+  and 454px (daily practice), it already fits without scrolling, and a loss
+  has no earned score to build a moment around.
+
+**An animation must never be the only source of a number.** `WinEarned`
+renders the REAL value first and starts its count-up from inside the first rAF
+that actually runs, so a throttled background tab or a screenshot capture —
+neither of which fires a frame — shows the finished score rather than "+0".
+The trophy's CSS pop is on an emoji for the same reason. `data-win-earned`
+carries the true value whatever the frame count, and the `dapp.json` check
+asserts the rendered text, which is exactly the environment this protects.
+
+**`?result=win`** is the deep link. `?result=1` never reached the WIN card at
+all — its daily branch goes through `practiceResult` and its classic branch
+sets `loseData` — so the screen this issue is about had no URL, which is why
+no before screenshot of it exists anywhere. Like the rest of that link it is
+local UI state and calls no endpoint: the only daily write on the win path is
+`retryDailyFinish`, which needs a press.
+
+**`${C.x}` only works for a PALETTE key.** `C` is built from
+`PALETTES.light`'s keys, so a DERIVED token (`well`, `well-strong`, `scrim`,
+the shadow trio, the `*-hover` pair) interpolates the string `undefined` and
+the browser drops the whole declaration. `.review-btn:hover` and
+`.pregame-band[data-pressed]` had been dead that way. Use `var(--c-well)`.
+`css-no-undefined-token` scans the built stylesheet for it now — the same
+silent-failure shape `token-alpha-concat` catches on the other side.
+
 ### 4. `meta.score` on the loss path is opt-in, per game
 
 `handleLose(steps, timeSecs, meta)` takes `meta.score` (default 0) plus optional

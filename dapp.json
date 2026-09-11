@@ -956,6 +956,26 @@
       "expectText": "Tap a point"
     },
     {
+      "name": "The win card opens on one number",
+      "path": "/?game=sudoku&result=win",
+      "expectSelector": ".win-card[data-win-details=\"closed\"] .we-v[data-win-earned=\"1440\"]"
+    },
+    {
+      "name": "The win card shows the score even with no animation frames",
+      "path": "/?game=sudoku&result=win",
+      "expectText": "+1440"
+    },
+    {
+      "name": "Points, badges and the leaderboard are one tap down",
+      "path": "/?game=sudoku&result=win",
+      "expectSelector": ".win-card[data-win-details=\"closed\"]:not(:has(.score-rows)):not(:has(.lboard))"
+    },
+    {
+      "name": "A classic win gets the same one-number card",
+      "path": "/?game=2048&result=win",
+      "expectSelector": ".win-card .we-v"
+    },
+    {
       "name": "Ludo pass-and-play board renders",
       "path": "/?game=ludo&mode=2p",
       "expectSelector": "canvas.ludo-canvas"

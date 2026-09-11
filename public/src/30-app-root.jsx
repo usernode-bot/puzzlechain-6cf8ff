@@ -13,6 +13,34 @@ function badgeProgressHints(streak, solveCount) {
   return hints;
 }
 
+/* #241 — the earned score, counted up. The rule this is built around: the
+   REAL number is what renders first, and the count-up only ever starts from
+   INSIDE a frame that actually ran. A screenshot capture and a throttled
+   background tab both fire no rAF at all, and a card that reads "+0" because
+   its animation never started would be worse than no animation — so the
+   fallback is the finished state, not the opening one. It always lands on the
+   exact value, and `data-win-earned` carries it whatever the frame count. */
+const WIN_COUNT_MS = 620;
+function WinEarned({ value }) {
+  const n = Number.isFinite(value) ? value : 0;
+  const [shown, setShown] = useState(n);
+  useEffect(() => {
+    setShown(n);
+    if (cgReducedMotion() || n <= 0) return;
+    let raf = 0, start = 0, alive = true;
+    const step = (t) => {
+      if (!alive) return;
+      if (!start) start = t;
+      const p = Math.min(1, (t - start) / WIN_COUNT_MS);
+      setShown(Math.round(n * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { alive = false; if (raf) cancelAnimationFrame(raf); };
+  }, [n]);
+  return <span className="we-v" data-win-earned={n}>+{shown}</span>;
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=friends / ?screen=session deep links for testing.
@@ -811,8 +839,8 @@ function App() {
        preLaunchModal, so anything below that branch would surface the mode
        chooser instead of the screen the link names. openResultDemo pins solo
        mode itself. */
-    if (params.get('result') === '1') {
-      openResultDemo(g);
+    if (params.get('result') === '1' || params.get('result') === 'win') {
+      openResultDemo(g, params.get('result') === 'win');
       setHowToGame(null);
       return;
     }
@@ -1611,7 +1639,20 @@ function App() {
      endpoint is called on either path, which is why this link is deliberately
      NOT staging-gated (the "before" screenshot comes from production). */
   const RESULT_DEMO = { score: 8432, steps: 214, timeSecs: 372, tile: 512 };
-  const openResultDemo = (game) => {
+  /* `?result=win` is the WIN card, which `?result=1` never reached: its daily
+     branch goes through practiceResult and its classic branch sets loseData,
+     so the one screen this issue is about had no URL at all. Same guarantee as
+     the rest of the link — it is local UI state and calls no endpoint (the
+     only daily write on this path is retryDailyFinish, which needs a press). */
+  const winResultDemo = (game) => ({
+    score: 1200, bonus: 240, finalScore: 1440, steps: 37, timeSecs: 214,
+    multiplier: 1.2, effectiveStreak: 6, hintsUsed: 1, prevBest: 1180,
+    gameId: game.id, demo: true,
+    justAchievement: { icon: '🧩', name: 'Puzzler' },
+    activeBadge: { icon: '🔥', name: 'Kindling' },
+    share: `Game Corner ${game.name} — 1440 pts`,
+  });
+  const openResultDemo = (game, wantWin) => {
     if (!game) return;
     setCurrentGame(game);
     setLockedReview(false);
@@ -1627,6 +1668,14 @@ function App() {
     setClassicGameModeOpts(null);
     setStepCount(0);
     setScreen('game');
+    if (wantWin) {
+      setPracticeMode(false);
+      if (game.daily) setPlayMode('daily');
+      setWinData(game.daily
+        ? winResultDemo(game)
+        : { ...winResultDemo(game), isClassic: true, bestScore: 1180, multiplier: 1, bonus: 0 });
+      return;
+    }
     if (game.daily) {
       setPracticeMode(true);
       setPracticeResult({
@@ -1986,6 +2035,13 @@ function App() {
      for all three overlays: only a press on the SCRIM itself counts (a press on
      the card bubbles to the same node, hence the target check), and it fires on
      pointerdown so it lands on finger-DOWN like the shared tap primitive. */
+  /* #241 — the result card opens as the arcade moment and nothing else; the
+     breakdown, the badge furniture and the leaderboard are one tap away. It
+     resets whenever the result does, so the next win opens on the moment
+     again rather than on whatever the last one was left showing. */
+  const [winDetails, setWinDetails] = useState(false);
+  useEffect(() => { setWinDetails(false); }, [winData, loseData, practiceResult]);
+
   const dismissResultCard = (e) => {
     if (e && e.target !== e.currentTarget) return;
     if (!boardReviewable) return;
@@ -2547,12 +2603,20 @@ function App() {
          offline-retry note for an endpoint they never called. The daily
          furniture now asks for a daily. */
       const isDailyResult = !winData.isClassic && !winData.modeLabel;
-      return (
-        <div className="win-overlay" onPointerDown={dismissResultCard}>
-          <div className="win-card">
-            <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
-            <h2>{winData.winnerLabel || (winData.cashOut ? 'Locked In! 🔒' : 'Solved!')}</h2>
-            <div className="sub">{currentGame && currentGame.name}</div>
+      /* One line of context under the number, not three blocks of it. In
+         priority order: what you just unlocked, then a personal best. The
+         full record is still in the details panel. */
+      const flourish = winData.justAchievement
+        ? `${winData.justAchievement.icon} Badge unlocked — ${winData.justAchievement.name}`
+        : winData.justBadge
+          ? `${winData.justBadge.icon} ${winData.justBadge.name} — ${winData.justBadge.min}-day streak`
+          : winData.storyBadge
+          ? `${winData.storyBadge.icon} Ladder complete — ${winData.storyBadge.name}`
+          : (!winData.isClassic && winData.prevBest !== undefined
+             && (winData.prevBest == null || winData.finalScore > winData.prevBest))
+            ? '🏅 New personal best'
+            : null;
+      const scoreRows = (
             <div className="score-rows">
               <div className="score-row">
                 <span className="k">Base score</span>
@@ -2626,6 +2690,79 @@ function App() {
                 </div>
               )}
             </div>
+      );
+      /* Everything the report called "too much": the seven-row breakdown, the
+         badge furniture and today's leaderboard. None of it is gone — it is
+         one tap down, below the actions so opening it never moves them. */
+      const detailsPanel = (
+        <div className="win-details">
+          {scoreRows}
+              {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={true} />}
+              {isDailyResult && winData.justBadge && (
+                <div className="badge-unlock">
+                  <div className="bu-icon">{winData.justBadge.icon}</div>
+                  <div className="bu-title">Milestone reached!</div>
+                  <div className="bu-name">{winData.justBadge.name} · {winData.justBadge.min}-day streak</div>
+                </div>
+              )}
+              {isDailyResult && !winData.justBadge && winData.activeBadge && (
+                <div className="win-badge-row">
+                  <span className="wbr-icon">{winData.activeBadge.icon}</span>
+                  <span>{winData.activeBadge.name} badge active</span>
+                </div>
+              )}
+              {isDailyResult && winData.justAchievement && (
+                <div className="badge-unlock">
+                  <div className="bu-icon">{winData.justAchievement.icon}</div>
+                  <div className="bu-title">Badge unlocked!</div>
+                  <div className="bu-name">{winData.justAchievement.name}</div>
+                </div>
+              )}
+              {isDailyResult && !winData.guest && (() => {
+                // Next-milestone progress so every solve shows forward motion even
+                // when nothing unlocked this run. Streak progress is based on the
+                // streak this win landed in; solve progress on the lifetime count.
+                const hints = badgeProgressHints(winData.effectiveStreak || 0, solveCount);
+                if (!hints.length) return null;
+                return (
+                  <div className="win-progress">
+                    {hints.map(h => (
+                      <span key={h.key} className="badge-progress-pill">
+                        <span>{h.icon}</span> {h.text}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+              {winData.modeLabel === 'Story' && winData.storyBadge && (
+                <div className="badge-unlock">
+                  <div className="bu-icon">{winData.storyBadge.icon}</div>
+                  <div>
+                    <div className="bu-title">Ladder complete!</div>
+                    <div className="bu-name">{winData.storyBadge.name} · {winData.storyBadge.desc}</div>
+                  </div>
+                </div>
+              )}
+        </div>
+      );
+      return (
+        <div className="win-overlay" onPointerDown={dismissResultCard}>
+          <div className="win-card" data-win-details={winDetails ? 'open' : 'closed'}>
+            <div className="trophy">{winData.cashOut ? '💰' : '🏆'}</div>
+            <h2>{winData.winnerLabel || (winData.cashOut ? 'Locked In! 🔒' : 'Solved!')}</h2>
+            <div className="sub">{currentGame && currentGame.name}</div>
+            <div className="win-earned">
+              <span className="we-k">Earned</span>
+              <WinEarned value={winData.finalScore} />
+              {winData.multiplier > 1 && (
+                <span className="we-note">
+                  {winData.isClassic
+                    ? `Lock In ×${winData.multiplier}`
+                    : `Streak ×${winData.multiplier} · ${winData.effectiveStreak}-day`}
+                </span>
+              )}
+            </div>
+            {flourish && <div className="win-flourish">{flourish}</div>}
             {/* Final table for a multi-seat local match. Seat 1 is the device's
                 own player, so its row is marked rather than left to be counted
                 out of the list. */}
@@ -2641,42 +2778,6 @@ function App() {
                 ))}
               </div>
             )}
-            {isDailyResult && winData.justBadge && (
-              <div className="badge-unlock">
-                <div className="bu-icon">{winData.justBadge.icon}</div>
-                <div className="bu-title">Milestone reached!</div>
-                <div className="bu-name">{winData.justBadge.name} · {winData.justBadge.min}-day streak</div>
-              </div>
-            )}
-            {isDailyResult && !winData.justBadge && winData.activeBadge && (
-              <div className="win-badge-row">
-                <span className="wbr-icon">{winData.activeBadge.icon}</span>
-                <span>{winData.activeBadge.name} badge active</span>
-              </div>
-            )}
-            {isDailyResult && winData.justAchievement && (
-              <div className="badge-unlock">
-                <div className="bu-icon">{winData.justAchievement.icon}</div>
-                <div className="bu-title">Badge unlocked!</div>
-                <div className="bu-name">{winData.justAchievement.name}</div>
-              </div>
-            )}
-            {isDailyResult && !winData.guest && (() => {
-              // Next-milestone progress so every solve shows forward motion even
-              // when nothing unlocked this run. Streak progress is based on the
-              // streak this win landed in; solve progress on the lifetime count.
-              const hints = badgeProgressHints(winData.effectiveStreak || 0, solveCount);
-              if (!hints.length) return null;
-              return (
-                <div className="win-progress">
-                  {hints.map(h => (
-                    <span key={h.key} className="badge-progress-pill">
-                      <span>{h.icon}</span> {h.text}
-                    </span>
-                  ))}
-                </div>
-              );
-            })()}
             {/* PHASE 4 (#132) — the old wording ("Couldn't sync your result —
                 your puzzle is still locked for today") read like the win had
                 been thrown away, and used "locked" to describe a FAILURE, which
@@ -2713,15 +2814,6 @@ function App() {
                 those are gated on isDailyResult and must stay that way, since
                 a story run never touches the daily attempt row, streak or
                 daily badges. */}
-            {winData.modeLabel === 'Story' && winData.storyBadge && (
-              <div className="badge-unlock">
-                <div className="bu-icon">{winData.storyBadge.icon}</div>
-                <div>
-                  <div className="bu-title">Ladder complete!</div>
-                  <div className="bu-name">{winData.storyBadge.name} · {winData.storyBadge.desc}</div>
-                </div>
-              </div>
-            )}
             {winData.modeLabel === 'Story' && winData.bandTotal > 0 && (
               <div className="mode-result">
                 <div className="mode-result-title">📖 Story · level {winData.bandIndex + 1} of {winData.bandTotal}</div>
@@ -2756,7 +2848,6 @@ function App() {
                 :gameId against GAME_IDS and 400s on a classic id, and a 400 is
                 a console error the no-console-errors check fails on. Classics
                 reach their all-time board through ClassicShell's ☰ sheet. */}
-            {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={true} />}
             <ShareButton text={winData.share} />
             {winData.isClassic && (
               <button className="primary-btn play-again-btn" onClick={playAgain}>
@@ -2785,6 +2876,10 @@ function App() {
                 primary, so leaving steps down to the quiet style; a daily has
                 no Play Again, so Back to Lobby stays the primary there. */}
             <button className={'primary-btn' + (winData.isClassic ? ' review-btn' : '')} onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            <button className="win-more" aria-expanded={winDetails} onClick={() => setWinDetails(v => !v)}>
+              {winDetails ? 'Hide the details ▴' : 'Score, badges & leaderboard ▾'}
+            </button>
+            {winDetails && detailsPanel}
           </div>
         </div>
       );

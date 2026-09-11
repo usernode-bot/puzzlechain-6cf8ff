@@ -1096,6 +1096,26 @@
       "expectText": "Theme: Nature"
     },
     {
+      "name": "Daily Cipher can hand typing to the device keyboard",
+      "path": "/?game=cryptowordle&practice=1&devkbd=1",
+      "expectSelector": ".cw-board[data-cw-kbd=\"device\"]"
+    },
+    {
+      "name": "The letter colours survive the drawn keyboard going away",
+      "path": "/?game=cryptowordle&practice=1&devkbd=1",
+      "expectSelector": ".cw-legend .cw-legend-key"
+    },
+    {
+      "name": "The drawn keyboard is still the default",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectSelector": ".cw-board[data-cw-kbd=\"drawn\"]"
+    },
+    {
+      "name": "Settings offers the device keyboard",
+      "path": "/?settings=1",
+      "expectText": "Use my device's keyboard"
+    },
+    {
       "name": "Daily Cipher: one tap = one letter",
       "path": "/?game=cryptowordle&practice=1&cwtype=LEN",
       "expectSelector": ".cw-board[data-cw-typed=\"LEN\"]"

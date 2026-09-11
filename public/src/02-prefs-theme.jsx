@@ -5,19 +5,38 @@
 const CG_SOUND_KEY   = 'puzzlechain_cg_sound';
 const CG_HAPTICS_KEY = 'puzzlechain_cg_haptics';
 const CG_MOTION_KEY  = 'puzzlechain_cg_motion';
-const PREF_KEYS = { sound: CG_SOUND_KEY, haptics: CG_HAPTICS_KEY, motion: CG_MOTION_KEY };
+/* #192 — which keyboard a word game types with. Device-local like every other
+   pref here, and OFF by default: the drawn keyboard is the only surface that
+   carries the per-letter state (which letters are placed, which are spent), so
+   turning it off is a real trade and belongs to the player rather than to a
+   silent default. Flipping this default is one word if the group wants it. */
+const CG_DEVKBD_KEY  = 'puzzlechain_cg_devkbd';
+const PREF_KEYS = {
+  sound: CG_SOUND_KEY, haptics: CG_HAPTICS_KEY, motion: CG_MOTION_KEY, devkbd: CG_DEVKBD_KEY,
+};
 
 // Module-level prefs read by cgSound/cgHaptic without prop threading.
 const cgPrefs = {
   sound:   (() => { try { return localStorage.getItem(CG_SOUND_KEY) !== '0'; } catch { return true; } })(),
   haptics: (() => { try { return localStorage.getItem(CG_HAPTICS_KEY) !== '0'; } catch { return true; } })(),
   motion:  (() => { try { return localStorage.getItem(CG_MOTION_KEY) === '1'; } catch { return false; } })(),
+  devkbd:  (() => { try { return localStorage.getItem(CG_DEVKBD_KEY) === '1'; } catch { return false; } })(),
 };
 function cgSetPref(key, val) {
   cgPrefs[key] = val;
   try { localStorage.setItem(PREF_KEYS[key] || CG_MOTION_KEY, val ? '1' : '0'); } catch {}
   if (key === 'motion') applyMotionPref();
 }
+/* `?devkbd=1|0` — the pref is a device setting, so the only way a proposal
+   check or a screenshot could otherwise reach the other mode is by opening
+   Settings and tapping, which navigation cannot do. Applied at boot, before
+   any game mounts. */
+(function readDevKbdParam() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('devkbd');
+    if (v === '1' || v === '0') cgPrefs.devkbd = v === '1';
+  } catch (_) {}
+})();
 /* #235 — the in-app "Reduced motion" switch has only ever reached JS call
    sites, because CSS could see the OS media query and not the pref. Mirroring
    it onto the root element gives the stylesheet something to match, so a

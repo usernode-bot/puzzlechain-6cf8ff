@@ -782,6 +782,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
       // Held keys auto-repeat: one PRESS must be one letter, so ignore repeats
       // (and any modifier combo, which is a browser shortcut, not a guess).
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      // #192 — the device-keyboard input owns every key it receives. Letting
+      // this run too would type each letter twice, which is exactly the shape
+      // of #one-tap-two-letters in a different costume.
+      if (hidRef.current && e.target === hidRef.current) return;
       // Enter/Space on a FOCUSED on-screen key already fires that button's own
       // click. Running the window handler too would submit AND type from one
       // press, so let the button own those two keys while it has focus.
@@ -892,11 +896,15 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const XCLUE_H = tightScale < 1 ? Math.max(18, Math.round(28 * tightScale)) : 28;
   const KEY_H = tightScale < 1 ? Math.max(30, Math.round(46 * tightScale)) : 46;
   const KGAP = 4;
-  const kbdH = KEY_H * 3 + KGAP * 2;
+  /* #192 — with the device's own keyboard doing the typing, the drawn one is
+     replaced by a colour legend rendered in the DOM below the canvas. It costs
+     the canvas nothing, so the board gets the three key rows back. */
+  const devKbd = cgPrefs.devkbd;
+  const kbdH = devKbd ? 0 : KEY_H * 3 + KGAP * 2;
   const activeXtra = active ? revealedExtra : 0;
   const hasHintBar = !!(active && activeHints.length > 0 && !done);
   const chrome = PILL_H + GAP + THEME_H + GAP + TRACK_H + GAP
-    + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + kbdH + GAP : 0)
+    + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + (kbdH ? kbdH + GAP : 0) : 0)
     + (allResolved ? 34 : 0);
   const gapPx = 5;
   /* No floor on the available height: flooring it at 90 meant a board that
@@ -971,7 +979,9 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
         });
         if (hintMsg) controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintbY, Math.floor(W * 0.5), HINTB_H], label: hintMsg, font: 11 });
       }
-      // Keyboard: 3 rows, wide Enter/⌫ flanking the bottom row.
+      // Keyboard: 3 rows, wide Enter/⌫ flanking the bottom row. Skipped
+      // entirely in device-keyboard mode (#192) — see the legend below.
+      if (!devKbd) {
       const kbW = Math.min(W, 480);
       const kbX0 = Math.floor((W - kbW) / 2);
       // The key must say the same thing as the tile it came from, so a spent
@@ -997,6 +1007,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           controls.push({ id: 'bksp', kind: 'button', r: [x, y, uw * 1.6, KEY_H], label: '⌫', font: 14, noBorder: true, bg: PAL.border, radius: 6, action: backspace });
         }
       });
+      }
     }
     if (allResolved) {
       controls.push({ id: 'alldone', kind: 'label', r: [0, trackY + TRACK_H + GAP, W, 30], label: `Puzzle complete — ${solvedCount}/${roundsDef.length} words · ${totalScore} pts`, font: 14, color: PAL.text, bold: true });
@@ -1089,12 +1100,88 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     },
   });
 
+  /* #192 — DEVICE KEYBOARD.
+
+     A hidden, focusable input is what opens the system keyboard; there is no
+     other way to ask for one. It stays visually empty and is never allowed to
+     change: every edit is read from `beforeinput` and cancelled, so the field
+     holds one non-breaking space forever. That matters for backspace — a
+     browser will not report a delete on a field it believes is already empty,
+     so an input that is genuinely empty can be typed into and never erased.
+
+     `beforeinput` rather than `keydown`, because a phone keyboard often sends
+     no usable `key` at all (predictive text reports 229 / 'Unidentified').
+     What it always sends is the text it inserted, which is `e.data`.
+
+     THE DOUBLE-INPUT TRAP, in a new place. A physical keypress while this
+     input has focus fires BOTH its beforeinput and the window keydown handler
+     the game has always had. That is the same shape as #one-tap-two-letters,
+     where one touch typed two letters, so the window handler now ignores
+     anything whose target is this input and the input owns those keys
+     completely. `?cwtype=` still exercises the drawn keys, and a check asserts
+     the typed string either way. */
+  const hidRef = useRef(null);
+  const CW_HID_FILL = '\u00a0';
+  const focusDeviceKbd = () => {
+    const el = hidRef.current;
+    if (!el || !devKbd || done) return;
+    // Mobile browsers only open a keyboard for a focus() that happens inside a
+    // user gesture, which is why this hangs off the board's own pointerdown
+    // rather than an effect: an effect runs after the gesture is over.
+    try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (_) {} }
+  };
+  /* Bound NATIVELY rather than through React's onBeforeInput prop. React 18's
+     synthetic beforeinput is a polyfill layered on `textInput`, and it does not
+     see every inputType a phone keyboard produces — deleteContentBackward in
+     particular. The native event is the one that carries the contract this
+     depends on. */
+  const hidApiRef = useRef({});
+  hidApiRef.current = { typeLetter, backspace, submit };
+  useEffect(() => {
+    const el = hidRef.current;
+    if (!el) return;
+    const onBI = (e) => onHiddenBeforeInputRef.current(e);
+    const onKD = (e) => onHiddenKeyDownRef.current(e);
+    el.addEventListener('beforeinput', onBI);
+    el.addEventListener('keydown', onKD);
+    return () => {
+      el.removeEventListener('beforeinput', onBI);
+      el.removeEventListener('keydown', onKD);
+    };
+  }, [devKbd, done]);
+
+  const onHiddenBeforeInput = (e) => {
+    const t = e.inputType || '';
+    if (t === 'insertText' || t === 'insertCompositionText' || t === 'insertFromPaste') {
+      const text = (e.data || '').toUpperCase();
+      for (const ch of text) if (ch >= 'A' && ch <= 'Z') hidApiRef.current.typeLetter(ch);
+      e.preventDefault();
+      return;
+    }
+    if (t.indexOf('delete') === 0) { hidApiRef.current.backspace(); e.preventDefault(); return; }
+    if (t === 'insertLineBreak' || t === 'insertParagraph') { hidApiRef.current.submit(); e.preventDefault(); }
+  };
+  const onHiddenKeyDown = (e) => {
+    // Enter is the one key a phone keyboard reports reliably, and on a
+    // single-line field it may produce no beforeinput at all.
+    if (e.key === 'Enter') { e.preventDefault(); hidApiRef.current.submit(); return; }
+    // A hardware keyboard attached to a phone still goes through here, and
+    // Backspace on a field the browser thinks is full is reported as a delete
+    // by beforeinput — so nothing else needs handling.
+  };
+  const onHiddenBeforeInputRef = useRef(onHiddenBeforeInput);
+  onHiddenBeforeInputRef.current = onHiddenBeforeInput;
+  const onHiddenKeyDownRef = useRef(onHiddenKeyDown);
+  onHiddenKeyDownRef.current = onHiddenKeyDown;
+
   return (
     // PHASE 3 — .fit-col keeps the frame the one flexible child (fitShell).
     <div className="fit-col">
       <div
         className="cw-board cui-frame"
         ref={boxRef}
+        onPointerDown={devKbd ? focusDeviceKbd : undefined}
+        data-cw-kbd={devKbd ? 'device' : 'drawn'}
         /* The live entry, verbatim. A check asserts
            `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
            the double-input bug it would read "LLEENN" and the check fails. */
@@ -1113,6 +1200,32 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
             : `Daily Cipher — puzzle complete, ${solvedCount} of ${roundsDef.length} words`}
         />
       </div>
+      {devKbd && (
+        <input
+          ref={hidRef}
+          className="cw-hidden-input"
+          type="text"
+          defaultValue={CW_HID_FILL}
+          inputMode="text"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          enterKeyHint="go"
+          aria-label="Type your guess"
+          onBlur={(e) => { e.target.value = CW_HID_FILL; }}
+        />
+      )}
+      {devKbd && active && !done && (
+        /* The read-out the device keyboard cannot give you: which letters are
+           placed, which are in the word, which are spent. Not tappable — the
+           typing is happening elsewhere now. */
+        <div className="cw-legend" aria-hidden="true">
+          {CW_KEYS.join('').split('').map((ch) => (
+            <span key={ch} className={'cw-legend-key' + (keyState[ch] ? ' on-' + keyState[ch] : '')}>{ch}</span>
+          ))}
+        </div>
+      )}
       <CuiTwin controls={controls} />
     </div>
   );

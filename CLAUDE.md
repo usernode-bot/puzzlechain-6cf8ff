@@ -1474,6 +1474,44 @@ protects you.
 matters is that ONE tick consumes at most ONE turn — take that away and the
 queue becomes a way to reverse into your own neck.
 
+### Daily Cipher can hand typing to the DEVICE keyboard (#192)
+
+The issue asked to replace the drawn keyboard with the system one. Replacing it
+outright would have thrown away the only surface that carries the per-letter
+state — which letters are placed, which are in the word, which are spent — so
+the drawn keyboard stays the default and the device keyboard is a device-local
+preference (`cgPrefs.devkbd`, Settings → Typing). In device mode the three key
+rows are not drawn at all, the board gets that height back, and the letter
+colours move to a compact non-interactive strip (`.cw-legend`) below the canvas.
+**Flipping the default is one word** if the group decides the other way.
+
+How it works, and each part is load-bearing:
+
+- **A hidden, focusable input is the only way to ask for a system keyboard.**
+  It is off-screen with `opacity: 0`, not `display: none`, because a hidden
+  element cannot take focus. `font-size: 16px` stops iOS zooming on focus.
+- **It holds one non-breaking space forever and is never allowed to change.**
+  Every edit is read and cancelled. That is what makes BACKSPACE work: a
+  browser will not report a delete on a field it believes is already empty, so
+  a genuinely empty input can be typed into and never erased.
+- **`beforeinput`, not `keydown`.** A phone keyboard often sends no usable
+  `key` at all — predictive text reports `229` / `Unidentified`. What it always
+  sends is the text it inserted, as `e.data`.
+- **Bound NATIVELY, not through React's `onBeforeInput` prop.** React 18's
+  synthetic beforeinput is a polyfill over `textInput` and does not see every
+  `inputType` a phone produces, `deleteContentBackward` in particular.
+- **THE DOUBLE-INPUT TRAP, in a new costume.** A physical keypress while the
+  hidden input has focus fires both its `beforeinput` and the window `keydown`
+  handler the game has always had — the same shape as #one-tap-two-letters,
+  where one touch typed two letters. The window handler now stands down for any
+  event whose target is that input. `?cwtype=` still exercises the drawn keys
+  and still asserts `data-cw-typed`, in both modes.
+
+`?devkbd=1|0` forces the mode at boot, because a device preference is otherwise
+reachable only by opening Settings and tapping, which navigation cannot do.
+`.cw-board` carries `data-cw-kbd="device"|"drawn"` so a check can see which is
+live.
+
 ### Screen transitions (#235)
 
 Navigation only — lobby, pre-game, opponent, the game, the locked day, the

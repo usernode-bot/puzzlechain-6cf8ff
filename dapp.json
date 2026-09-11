@@ -1352,6 +1352,21 @@
       "expectText": "Difficulty: Hard"
     },
     {
+      "name": "A story run picks up where it was left",
+      "path": "/?game=sudoku&pmode=story&band=4&play=1&sdk=6&resumedemo=1",
+      "expectText": "Steps 12"
+    },
+    {
+      "name": "An arcade run picks up where it was left",
+      "path": "/?game=sudoku&pmode=arcade&band=hard&play=1&sdk=6&resumedemo=1",
+      "expectText": "Steps 12"
+    },
+    {
+      "name": "A story board with nothing saved still starts fresh",
+      "path": "/?game=sudoku&pmode=story&band=2&play=1&sdk=6",
+      "expectText": "Steps 0"
+    },
+    {
       "name": "Sudoku story HUD names the level and what it demands",
       "path": "/?game=sudoku&pmode=story&band=4&play=1",
       "expectText": "Level 4: Tricky"

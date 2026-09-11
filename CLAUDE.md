@@ -1485,6 +1485,63 @@ unfinished examples (`minefinder`, one rung short; `cratepush`, never started)
 before seeding the finished one. If a check asserts that something is ABSENT or
 UNEARNED, the fixture has to make it so.
 
+### Story and arcade resume from a DEVICE-LOCAL record (#187 / #196)
+
+"Only a daily resumes" was a rule about the daily ATTEMPT ROW, and it was read
+as a rule about players keeping their work. `savedProgress`/`onSaveProgress`
+are that row: a story run writing into it 409s, and reading from it would
+hydrate a half-finished daily into a rung meant to be a fixed, retryable deal.
+Both reasons are about the SERVER. Neither was ever a reason for a story rung
+to lose ten minutes of deduction to a reload — which is what it did, with both
+props null and nothing written down anywhere. Reported as a crash (#187, P0)
+and as "spontaneous reloads" (#196); measured, Sudoku Story L4 went from
+`Steps 1 / Filled 41 / 00:08` to `Steps 0 / Filled 40 / 00:01` across a plain
+reload.
+
+Story and arcade now get `savedProgress`/`onSaveProgress` backed by
+**localStorage**, one record per `(game, mode, band)`
+(`readRunSave`/`writeRunSave`/`clearRunSave`/`hydrateRunSave` in
+`05-core-lib.jsx`). **No game component changed** — they already know how to
+hydrate from `savedProgress` and write through `onSaveProgress`; those props
+just had nothing to point at outside a daily. The attempt row is untouched, so
+the 409 rule stands exactly as before.
+
+Four things hold it together, each for a concrete reason:
+
+- **The board has to come back IDENTICAL**, so the two modes record different
+  things. A story rung's seed has no day component, so it rebuilds the same
+  board on any day from any device — nothing extra to store. An arcade board
+  comes from the RUN's seed, so the record carries the seed **and** the run id
+  it was anchored with, and `startRun` reopens with both; roll a fresh seed and
+  the player gets a different board than their saved position belongs to, and a
+  second `/start` anchors a run the finish will not claim.
+- **Nothing is saved until a move is made** (`steps > 0`). A save of an
+  untouched board is worthless, and worse: proposal checks mount story boards
+  to assert on their FRESH state, and a save written by one would hydrate into
+  the next.
+- **The finish guard is the daily's guard.** `saveLocalRun` honours
+  `saveQueueRef.current.blockedGameId`, which `cancelProgressSave()` sets at the
+  top of `handleWin`/`handleLose` — otherwise `useAutosave`'s unmount flush
+  writes the record back *after* the finish cleared it, and the next visit
+  resumes a run that was already over. The record is dropped on every ending and
+  in `playAgain`.
+- **`dayNum` is stamped on the way out.** The games' gate is
+  `savedProgress.dayNum === utcDayNum(offset)` — a same-BOARD check that a daily
+  expresses as a same-day one. A story or arcade board is not day-scoped, so
+  stamping says "yes, this is for the board you are about to build" in the only
+  vocabulary twenty game components already speak.
+
+Scoped to the `shell: 'daily'` branch of `renderGameBody`, which is where both
+reported games live (Sudoku and Word Search) and where a saved position IS the
+board you left. The classic-shell story games are real-time or score-attack, so
+a mid-run snapshot is a much larger job and a separate decision.
+
+`?resumedemo=1` writes the same record a real run leaves, so a part-played
+board is reachable by URL. It is deliberately generic — step count and clock
+with an empty progress object — so it works on any game; a board that does not
+recognise the progress falls back to a fresh deal and still comes up mid-run on
+the clock, which is the thing being asserted.
+
 ### A lost run in a MODE has to be able to stay in it (#213)
 
 The win card has carried a mode action since #176 — "📖 Back to the levels" /

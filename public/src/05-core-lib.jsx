@@ -222,6 +222,116 @@ function beginArcadeRun(seed) {
 function currentArcadeSeed() { return _arcadeRunSeed; }
 function endArcadeRun() { _arcadeRunSeed = null; }
 
+/* LOCAL RUN SAVES — story and arcade (#187 / #196).
+
+   "Only a daily resumes" is a rule about the DAILY ATTEMPT ROW, not about
+   whether a player gets to keep their work. savedProgress/onSaveProgress are
+   that row: a story run writing into it 409s, and reading from it would
+   hydrate a half-finished daily into a rung that is meant to be a fixed,
+   retryable deal. Both of those reasons are about the SERVER. Neither is a
+   reason for a story rung to lose ten minutes of deduction to a reload, which
+   is what it did — reported as a "crash" (#187) and as "spontaneous reloads"
+   (#196), and in both cases the board simply came back empty because nothing
+   had ever been written down.
+
+   So story and arcade get a save that never goes near the server: one record
+   per (game, mode, band) in localStorage, device-local like every other pref
+   here. The game components need no changes at all — they already know how to
+   hydrate from savedProgress and to write through onSaveProgress, and this
+   just gives those two props something to point at outside a daily.
+
+   THE BOARD HAS TO COME BACK IDENTICAL or a saved position is nonsense, and
+   that is why the two modes are saved differently:
+     story  — the seed has no day component (see modeSeed), so the rung
+              rebuilds the same board on any day, from any device. Nothing
+              extra to record.
+     arcade — the seed belongs to the RUN. A resumed run therefore has to
+              restore the seed it was dealt, and the run id it was anchored
+              with, or the finish would look like a different run to the
+              server. Both go in the record.
+
+   `dayNum` is stamped on the way OUT, because the games' hydration gate is
+   `savedProgress.dayNum === utcDayNum(offset)` — a same-BOARD check that a
+   daily expresses as a same-day one. A story or arcade board is not
+   day-scoped, so the honest answer to "is this save for the board I am about
+   to build" is yes, and stamping it says so in the only vocabulary the twenty
+   game components already speak. */
+const RUN_SAVE_PREFIX = 'puzzlechain_run_v1:';
+const RUN_SAVE_MAX_AGE_MS = 30 * 24 * 3600 * 1000;
+
+function runSaveKey(gameId, playMode, band) {
+  return RUN_SAVE_PREFIX + gameId + ':' + playMode + ':' + (band == null ? '-' : band);
+}
+
+function readRunSave(gameId, playMode, band) {
+  if (!gameId || (playMode !== 'story' && playMode !== 'arcade')) return null;
+  try {
+    const raw = localStorage.getItem(runSaveKey(gameId, playMode, band));
+    if (!raw) return null;
+    const rec = JSON.parse(raw);
+    if (!rec || !rec.progress) return null;
+    if (rec.savedAt && Date.now() - rec.savedAt > RUN_SAVE_MAX_AGE_MS) {
+      clearRunSave(gameId, playMode, band);
+      return null;
+    }
+    return rec;
+  } catch (_) { return null; }
+}
+
+function writeRunSave(gameId, playMode, band, rec) {
+  if (!gameId || (playMode !== 'story' && playMode !== 'arcade')) return;
+  try {
+    localStorage.setItem(runSaveKey(gameId, playMode, band), JSON.stringify(rec));
+  } catch (_) { /* quota or a private window: a lost resume is not worth throwing over */ }
+}
+
+function clearRunSave(gameId, playMode, band) {
+  try { localStorage.removeItem(runSaveKey(gameId, playMode, band)); } catch (_) {}
+}
+
+// The shape the game components expect, from the record we stored.
+function hydrateRunSave(rec, offset) {
+  if (!rec || !rec.progress) return null;
+  return {
+    ...rec.progress,
+    dayNum: utcDayNum(offset),
+    steps: Number.isFinite(rec.steps) ? rec.steps : 0,
+    elapsedSecs: Number.isFinite(rec.elapsedSecs) ? rec.elapsedSecs : 0,
+  };
+}
+
+/* `?resumedemo=1` — arrive on a story or arcade board that is already part
+   way through. A half-played run is reachable no other way: you would have to
+   play one and then reload, and neither a proposal check nor a screenshot can
+   play. This writes the same localStorage record a real run leaves and lets
+   the ordinary resume path pick it up, so what it demonstrates is the real
+   mechanism rather than a mock of it — and it writes NOTHING to the server,
+   because this feature never touches the server.
+
+   Deliberately generic: it carries the step count and the clock and an
+   otherwise empty progress object, so it works on any game. A board that does
+   not recognise the (empty) progress falls back to a fresh deal and still
+   comes up mid-run on the clock, which is the thing being asserted — that a
+   story or arcade run hydrates from a local record at all. */
+function seedResumeDemo(offset) {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('resumedemo') !== '1') return;
+    const gameId = q.get('game');
+    const mode = q.get('pmode');
+    if (!gameId || (mode !== 'story' && mode !== 'arcade')) return;
+    const bandParam = q.get('level') || q.get('band');
+    const band = mode === 'arcade'
+      ? (bandParam || 'normal')
+      : Math.max(0, (parseInt(bandParam, 10) || 1) - 1);
+    if (readRunSave(gameId, mode, band)) return;   // a real run wins
+    writeRunSave(gameId, mode, band, {
+      v: 1, progress: { dayNum: utcDayNum(offset) },
+      steps: 12, elapsedSecs: 214, savedAt: Date.now(), seed: null, runId: null,
+    });
+  } catch (_) {}
+}
+
 function modeSeed(playMode, gameId, band, offset) {
   if (playMode === 'story') {
     const s = (hashStr(gameId + ':story:' + band) >>> 0);

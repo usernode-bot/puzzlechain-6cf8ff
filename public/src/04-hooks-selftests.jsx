@@ -1097,6 +1097,45 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #187 / #196 — the local resume record for story and arcade runs. These are
+     the properties that keep it from doing harm: it is scoped per (game, mode,
+     band) so two rungs cannot overwrite each other, it refuses to answer for a
+     daily (whose resume is the server's attempt row and must stay that way),
+     and it stamps the day on the way out so the games' same-board gate passes
+     for a board that is not day-scoped. */
+  check('local-run-save', () => {
+    const K = (g, m, b) => runSaveKey(g, m, b);
+    if (K('sudoku', 'story', 3) === K('sudoku', 'story', 4)) throw new Error('two rungs must not share a key');
+    if (K('sudoku', 'story', 3) === K('wordhunt', 'story', 3)) throw new Error('two games must not share a key');
+    if (K('sudoku', 'story', 3) === K('sudoku', 'arcade', 3)) throw new Error('two modes must not share a key');
+    // A daily has a server-side resume and must never be answered from here.
+    if (readRunSave('sudoku', 'daily', null) !== null) throw new Error('a daily must not read a local run save');
+    let wrote = false;
+    try { writeRunSave('sudoku', 'daily', null, { v: 1, progress: { a: 1 } }); wrote = !!localStorage.getItem(K('sudoku', 'daily', null)); } catch (_) {}
+    if (wrote) { try { localStorage.removeItem(K('sudoku', 'daily', null)); } catch (_) {} throw new Error('a daily must not write a local run save'); }
+
+    // Round trip, then clear. Uses a game id nothing else touches.
+    const gid = '__selftest__';
+    try {
+      clearRunSave(gid, 'story', 0);
+      if (readRunSave(gid, 'story', 0) !== null) throw new Error('a cleared save must read back as nothing');
+      writeRunSave(gid, 'story', 0, { v: 1, progress: { grid: [1, 2] }, steps: 7, elapsedSecs: 99, savedAt: Date.now() });
+      const rec = readRunSave(gid, 'story', 0);
+      if (!rec || rec.steps !== 7) throw new Error('a written save must read back');
+      const h = hydrateRunSave(rec, 0);
+      if (h.steps !== 7 || h.elapsedSecs !== 99) throw new Error('hydrate must carry steps and the clock');
+      if (h.dayNum !== utcDayNum(0)) throw new Error('hydrate must stamp today, or every game rejects it');
+      if (!Array.isArray(h.grid)) throw new Error('hydrate must carry the progress through');
+      // An old record is dropped rather than resumed into.
+      writeRunSave(gid, 'story', 0, { v: 1, progress: { grid: [1] }, steps: 1, elapsedSecs: 1, savedAt: Date.now() - RUN_SAVE_MAX_AGE_MS - 1000 });
+      if (readRunSave(gid, 'story', 0) !== null) throw new Error('a stale save must expire');
+      if (hydrateRunSave(null, 0) !== null) throw new Error('nothing hydrates to nothing');
+    } finally {
+      clearRunSave(gid, 'story', 0);
+    }
+    return true;
+  });
+
   /* Snakes & Ladders V2 — the seven hand-authored tier boards must satisfy
      the authoring constraints (see snakesladders-v2/00-layouts.jsx), or a
      future retune ships a broken board: a chained jump the engine resolves

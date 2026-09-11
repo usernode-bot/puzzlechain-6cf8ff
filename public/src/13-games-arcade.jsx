@@ -8,6 +8,59 @@ const BB_KEY    = 'puzzlechain_blockblast_history';
 const DR_KEY    = 'puzzlechain_diamondrush_history';
 const TH_KEY    = 'puzzlechain_texas_history';
 
+/* #206 — SNAKE'S TURN QUEUE.
+
+   "The snake fails to turn upon tap or swipe" is not a gesture problem — the
+   swipes arrive, and .snake-board / .dsnk-board both carry touch-action: none
+   so the browser never steals them. It is that a turn had nowhere to wait.
+
+   Both snakes held ONE pending direction and validated every new turn against
+   the direction currently being travelled. Two consequences, and between them
+   they eat a large share of the turns a player actually makes, because a
+   corner is TWO turns and a tick is 90-200 ms:
+
+     - the second turn OVERWRITES the first, so the snake never makes the first
+       one: swipe up then left around a corner and it simply goes left;
+     - or the second turn is REJECTED as a reversal of a direction the first
+       turn was about to change: heading up with left already pending, "down"
+       is a legal move after that left, and was refused because down reverses
+       UP. Measured in a browser: that input returns without doing anything.
+
+   So turns queue, up to SNAKE_TURN_QUEUE of them, and each is checked against
+   the last direction QUEUED rather than the last one travelled — which is the
+   direction it will actually follow. One tick consumes one turn, so the snake
+   still cannot double back on itself within a tick; it just stops forgetting
+   what you asked for. Pure, because that is the whole rule and a self-test can
+   hold it (`snake-turn-queue`). */
+const SNAKE_DIRS = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+const SNAKE_TURN_QUEUE = 2;
+
+function snakeQueueTurn(dir, cur, queue) {
+  const nd = SNAKE_DIRS[dir];
+  if (!nd || !cur) return null;
+  const q = Array.isArray(queue) ? queue : [];
+  if (q.length >= SNAKE_TURN_QUEUE) return null;          // hold two, not a buffer
+  // The direction this turn actually follows on from.
+  const prev = q.length ? q[q.length - 1] : cur;
+  if (nd.x === -prev.x && nd.y === -prev.y) return null;  // no doubling back
+  if (nd.x === prev.x && nd.y === prev.y) return null;    // already going that way
+  return q.concat([nd]);
+}
+
+/* Which way a TAP on the board means. The issue asks for tap as well as swipe,
+   and a tap used only to start the run. The board is cut into four triangles
+   by its diagonals and a tap means the one it lands in — absolute, so it needs
+   no knowledge of which way the snake is already going and cannot mean two
+   things at once. A tap dead in the centre means nothing. */
+function snakeTapDir(x, y, w, h) {
+  if (!(w > 0) || !(h > 0)) return null;
+  const nx = x / w - 0.5, ny = y / h - 0.5;
+  if (Math.abs(nx) < 0.08 && Math.abs(ny) < 0.08) return null;
+  return Math.abs(nx) > Math.abs(ny)
+    ? (nx > 0 ? 'right' : 'left')
+    : (ny > 0 ? 'down' : 'up');
+}
+
 function cgLoadHistory(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } }
 function cgSaveHistory(key, entry) {
   const h = cgLoadHistory(key);
@@ -147,7 +200,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
     const m = Math.floor(N / 2);
     const snake = [{ x: m, y: m }, { x: m - 1, y: m }, { x: m - 2, y: m }];
     const config = SNAKE_SPEED_CONFIG[difficulty || 'normal'];
-    st.current = { snake, dir: { x: 1, y: 0 }, nextDir: { x: 1, y: 0 }, food: randFood(snake), speed: config.initial, eaten: 0 };
+    st.current = { snake, dir: { x: 1, y: 0 }, turns: [], food: randFood(snake), speed: config.initial, eaten: 0 };
     doneRef.current = false;
     setDone(false); setScore(0); setStarted(false); setPaused(false); setPausedSecs(0); render(n => n + 1);
   };
@@ -168,7 +221,9 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   const step = () => {
     const s = st.current;
     if (!s || doneRef.current) return;
-    s.dir = s.nextDir;
+    // One tick consumes one queued turn, which is what keeps the no-doubling-back
+    // rule true however fast the player swipes (#206).
+    if (s.turns.length) s.dir = s.turns.shift();
     const head = s.snake[0];
     const nx = head.x + s.dir.x, ny = head.y + s.dir.y;
     if (nx < 0 || ny < 0 || nx >= N || ny >= N ||
@@ -204,14 +259,23 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
   const turn = (dir) => {
     const s = st.current;
     if (!s || doneRef.current || paused) return;
-    const map = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
-    const nd = map[dir]; if (!nd) return;
-    if (nd.x === -s.dir.x && nd.y === -s.dir.y) return;
-    s.nextDir = nd;
+    const q = snakeQueueTurn(dir, s.dir, s.turns);
+    if (!q) return;
+    s.turns = q;
     if (!started) setStarted(true);
     cgSound('move');
   };
-  useGestures(boardRef, { onSwipe: (d) => turn(d), onTap: () => { if (!started && !paused) setStarted(true); } });
+  useGestures(boardRef, {
+    onSwipe: (d) => turn(d),
+    // A tap steers as well as starting the run (#206) — see snakeTapDir.
+    onTap: (p) => {
+      if (!started && !paused) setStarted(true);
+      const el = boardRef.current; if (!el) return;
+      const r = el.getBoundingClientRect();
+      const dir = snakeTapDir(p.x - r.left, p.y - r.top, r.width, r.height);
+      if (dir) turn(dir);
+    },
+  });
   useEffect(() => {
     const onKey = (e) => {
       const k = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
@@ -232,7 +296,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
       { val: longest, lbl: 'Longest' }, { val: score, lbl: 'This run' },
     ]),
     cgLeaderboardSection('snake', { url: '/api/snake/leaderboard' }),
-    cgRulesSection(['Swipe (or arrow keys) to steer the snake.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
+    cgRulesSection(['Swipe, or tap the side of the board you want to head for — arrow keys work too. Two turns queue, so a corner takes one motion.', 'Eat the red food to grow and score.', 'Avoid the walls and your own tail.', 'It speeds up as you grow — chase a high score!', `Difficulty: ${(difficulty || 'normal').charAt(0).toUpperCase() + (difficulty || 'normal').slice(1)} — change via New Game.`]),
   ];
   return (
     <ClassicShell game={game} onExit={onBack} onNewGame={() => init()} sheetSections={sheet} menuConfig={menuConfig}>
@@ -248,7 +312,7 @@ function SnakeGameplay({ onWin, onStepChange, resetKey, game, onBack, difficulty
             </div>
           )}
         </div>
-        <div className="snake-hint">{started ? 'Swipe to steer' : 'Swipe or tap to start'}</div>
+        <div className="snake-hint">{started ? 'Swipe or tap a side to steer' : 'Swipe or tap a side to start'}</div>
         <CuiBar height={44} build={(W) => {
           const btns = [];
           if (started && !paused && !done) btns.push({ id: 'pause', label: 'Pause', action: () => { setPaused(true); setPausedSecs(secs); } });

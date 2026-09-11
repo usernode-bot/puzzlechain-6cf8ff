@@ -22,16 +22,8 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('screen');
     if (s === 'friends') return 'friends';
-    if (s === 'session' || params.get('demo') === 'dapp' || params.get('demo') === 'anchor') return 'session';
     return 'lobby';
-  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends' | 'session'
-  // DApp session receipt being viewed (session id), and identity-verified flag.
-  // ?demo=anchor deep-links to the staging-seeded anchored daily sudoku receipt.
-  const [receiptSessionId, setReceiptSessionId] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('sid') || (params.get('demo') === 'anchor' ? 'DAPPDEMOSUDOKU' : null);
-  });
-  const openReceipt = (sid) => { setReceiptSessionId(sid); setScreen('session'); };
+  }); // 'lobby' | 'game' | 'locked' | 'profile' | 'friends'
   const [currentGame, setCurrentGame] = useState(null);
   /* #176 — which of the three play modes the current game was opened in.
      null means "no play-mode axis": the head-to-head games, whose axis is the
@@ -1132,13 +1124,6 @@ function App() {
           justAchievement: firstNew ? achievementBadgeFor(firstNew) : prev.justAchievement,
         };
       });
-      // DApp Mode: surface the Verified badge, then anchor on-chain (best-effort).
-      if (body && body.dapp) {
-        setWinData(prev => prev ? { ...prev, dapp: body.dapp } : prev);
-        dappAnchor(body.dapp).then(updated => {
-          setWinData(prev => prev ? { ...prev, dapp: updated } : prev);
-        }).catch(() => {});
-      }
     } else {
       setWinData(prev => prev ? { ...prev, syncError: true } : prev);
     }
@@ -2103,14 +2088,6 @@ function App() {
         />
       )}
 
-      {screen === 'session' && (
-        <SessionReceipt
-          sessionId={receiptSessionId}
-          onBack={() => setScreen('lobby')}
-          onOpenReceipt={openReceipt}
-        />
-      )}
-
       {screen === 'lobby' && (
         <div className="lobby screen-in">
           {lobbyTab === 'ladder' ? (
@@ -2758,7 +2735,6 @@ function App() {
                 </div>
               </div>
             )}
-            {winData.dapp && <VerifiedBadge session={winData.dapp} onOpenReceipt={openReceipt} />}
             {/* DAILY board only. `/api/daily/:gameId/leaderboard` validates
                 :gameId against GAME_IDS and 400s on a classic id, and a 400 is
                 a console error the no-console-errors check fails on. Classics

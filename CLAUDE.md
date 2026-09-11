@@ -1032,6 +1032,21 @@ were **deliberately removed** and should not be re-added piecemeal:
   non-destructive; no code path touches them anymore.
 - `REDIS_URL`/ioredis (only ever the PvP matchmaking fast path) and the
   UTGO wager contract/ABIs are gone.
+- **The Verified badge, the session receipt and the verified leaderboard**
+  (#224, at a usernode admin's request). The phase-1 subtraction carved these
+  out of the dApps removal and kept them; that carve-out has ended. Gone: the
+  badge on the win overlay, the `SessionReceipt` screen and its
+  `?sid=` / `demo=dapp` / `demo=anchor` deep links, `VerifiedLeaderboard`, the
+  whole `18-dapp-verified.jsx` module, their styles and their five checks —
+  and with them the client-side `dappAnchor()`, which existed only to make the
+  badge say "anchored on-chain" and which sent a transaction through the
+  bridge to do it.
+  **The verification MACHINERY is untouched**, deliberately: `lib/dapp.js`,
+  `game_sessions` / `session_states`, `settleDailySession` and its tier A/B
+  split, and the `/api/dapp/*` routes all stay. A request to stop SHOWING a
+  verdict is not a request to stop reaching one, and the harness is what
+  `validateSession` uses to refuse an impossible score. Don't re-add a badge;
+  if the verdict needs surfacing again, that is a new decision.
 - **The Account screen and the wallet ownership proof / "On-chain login"
   identity** (home/profile cleanup pass): the Usernode-pubkey display,
   Connect / Verify / Disconnect wallet controls, the avatar "verified"

@@ -196,26 +196,6 @@
       "expectText": "Game Corner"
     },
     {
-      "name": "DApp session receipt renders",
-      "path": "/?demo=dapp",
-      "expectText": "Session Receipt"
-    },
-    {
-      "name": "DApp receipt shows chain hash",
-      "path": "/?demo=dapp",
-      "expectText": "Chain hash"
-    },
-    {
-      "name": "Verified leaderboard renders demo rows",
-      "path": "/?demo=dapp",
-      "expectText": "Staging demo Ada"
-    },
-    {
-      "name": "Disputed session shows rejection copy",
-      "path": "/?screen=session&sid=DAPPDEMOBAD",
-      "expectText": "could not be verified"
-    },
-    {
       "name": "Own profile opens via account deep link",
       "path": "/?screen=account",
       "expectText": "Your Profile"
@@ -229,11 +209,6 @@
       "name": "Streak badge ladder renders earned badges on profile",
       "path": "/?screen=account&demo=badges",
       "expectText": "Centurion"
-    },
-    {
-      "name": "Anchored daily sudoku receipt renders",
-      "path": "/?demo=anchor",
-      "expectText": "anchored"
     },
     {
       "name": "Today's Top Scores board renders in daily lobby",

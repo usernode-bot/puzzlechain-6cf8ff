@@ -1819,6 +1819,51 @@ one of those at an admin's request and this was a third surface nobody had
 spotted. The verification itself is untouched — it is the READ-OUT that goes,
 exactly as in #224.
 
+### The in-app "← Back" was never a back button (#186)
+
+The reported "back resets to the main homepage" is not the browser's back
+button and not the #134 reducer — both of those were already correct.
+Measured, walking home → Story card → pre-game → Play in a browser:
+
+| step | screen | history.length |
+|---|---|---|
+| start | lobby | 2 |
+| tap Story | pregame | 3 |
+| tap Play | game | 4 |
+| **device back** | pregame | 4 |
+| device back again | lobby | 4 |
+| **in-app "← Back"** | **lobby** | **5** |
+
+Every in-app back control called `backToLobby()`, which is a RESET — it clears
+the game, the result, the mode and the practice flag and sets `screen` to
+`'lobby'`. Because it changes state rather than unwinding, the reducer then
+PUSHED another entry (4 → 5), so pressing in-app back and then device back went
+*forward* into the board you had just left, and the history grew on every use.
+
+**`goBack(fallbackTab)` is the fix, and it is the existing reducer rather than
+a second one.** Each pushed entry now records its own depth (`unDepth`);
+`goBack` calls `window.history.back()` when that depth is above zero and falls
+back to `backToLobby(fallbackTab)` when it is not.
+
+- **The depth-0 fallback is a safety rule, not a nicety.** This app runs in an
+  iframe, and its `pushState` entries live in the JOINT session history. At
+  depth 0 the entry behind us belongs to whoever loaded us, so `history.back()`
+  there steps the EMBEDDING page rather than unwinding a screen. `navDepthOf`
+  therefore reads 0 for anything that is not unambiguously one of our own
+  entries — a foreign state object, a missing `un`, a non-finite or negative
+  number — so a malformed entry fails toward "go home", never toward "leave the
+  app". `nav-depth-fail-safe` asserts every one of those shapes.
+- **What did NOT change**: the result cards' "Back to Lobby" buttons and the
+  Ladder tab's "← Home". Their labels name a destination and going there is
+  correct. Only the ← controls moved.
+- The same bug existed on the social screens — Friends is reachable from your
+  own profile, and its back went to the lobby, skipping the profile. Both now
+  use `goBack()`.
+- `data-nav-depth` on the app root is what a proposal check can see, since a
+  check can navigate but cannot press back: home is `0` (the bottom of our
+  stack) and a cold deep link is `1` (the lobby entry the deep-link effect
+  pushed over, which is exactly what back returns to).
+
 ### New deep links
 
 `?result=1` mounts a game and opens a representative results card over its

@@ -1457,6 +1457,7 @@ function App() {
         steps, timeSecs, score: lostScore, finalScore: lostScore,
         share: meta && meta.share, answer: meta && meta.answer,
         scoreLabel: meta && meta.scoreLabel, scoreValue: meta && meta.scoreValue,
+        winnerLabel: meta && meta.winnerLabel,
         modeLabel: playMode === 'story' ? 'Story' : 'Arcade',
       });
       return;
@@ -1474,6 +1475,7 @@ function App() {
           scoreValue: meta && meta.scoreValue,
           share: meta && meta.share,
           answer: meta && meta.answer,
+          winnerLabel: meta && meta.winnerLabel,
           isClassic: true,
           gameId: currentGame.id,
         });
@@ -1495,6 +1497,7 @@ function App() {
           scoreValue: meta && meta.scoreValue,
           share: meta && meta.share,
           answer: meta && meta.answer,
+          winnerLabel: meta && meta.winnerLabel,
           guest: true,
           gameId,
         });
@@ -1509,6 +1512,7 @@ function App() {
         scoreValue: meta && meta.scoreValue,
         share: meta && meta.share,
         answer: meta && meta.answer,
+        winnerLabel: meta && meta.winnerLabel,
         hintsUsed: meta && meta.hintsUsed,
         wordsSolved: meta && meta.wordsSolved,
         wordsTotal: meta && meta.wordsTotal,
@@ -1632,6 +1636,17 @@ function App() {
       return;
     }
     setPracticeMode(false);
+    /* #213 — `?result=1&pmode=story|arcade` shows the result card as it looks
+       at the END OF A MODE RUN rather than a free-play one, which is where
+       "Continue Story Quest" lives. A lost story rung is reachable no other
+       way: you would have to actually lose one, and neither a proposal check
+       nor a screenshot can play. Still writes nothing — this is local UI state
+       on the same inert path the rest of ?result=1 uses. */
+    const demoMode = new URLSearchParams(window.location.search).get('pmode');
+    const modeLabel = demoMode === 'story' && supportsMode(game.id, 'story') ? 'Story'
+      : demoMode === 'arcade' && supportsMode(game.id, 'arcade') ? 'Arcade'
+      : null;
+    if (modeLabel) setPlayMode(modeLabel === 'Story' ? 'story' : 'arcade');
     setLoseData({
       steps: RESULT_DEMO.steps,
       timeSecs: RESULT_DEMO.timeSecs,
@@ -1640,7 +1655,9 @@ function App() {
       scoreLabel: game.id === '2048' ? 'Highest tile' : 'Best run',
       scoreValue: game.id === '2048' ? RESULT_DEMO.tile : RESULT_DEMO.score,
       share: `Game Corner ${game.name} — ${RESULT_DEMO.score} pts`,
-      isClassic: true,
+      winnerLabel: modeLabel ? 'Game Over' : undefined,
+      modeLabel: modeLabel || undefined,
+      isClassic: !modeLabel,
       gameId: game.id,
     });
   };
@@ -2777,7 +2794,18 @@ function App() {
         <div className="win-overlay" onPointerDown={dismissResultCard}>
           <div className="win-card">
             <div className="trophy">{loseData.isClassic ? '💥' : '💀'}</div>
-            <h2>{loseData.isClassic ? 'Game Over' : 'Out of guesses'}</h2>
+            {/* #213 — a game's OWN ending label, when it sent one. Every game
+                already passes `winnerLabel` through reportRunEnd (Marble Loop,
+                Hash Rush, Snake and Bounce all send 'Game Over'), and the win
+                card has read it since #158 — handleLose simply dropped it, so a
+                lost story rung of a marble game announced itself as "Out of
+                guesses". That default stays for the games that send nothing,
+                which is Daily Cipher, the one it was written for.
+                The "Guesses · Time" row below is the same copy problem and is
+                deliberately NOT touched here: no game sends a label for it, so
+                fixing it would mean inventing one for thirty games rather than
+                threading through one they already send. */}
+            <h2>{loseData.winnerLabel || (loseData.isClassic ? 'Game Over' : 'Out of guesses')}</h2>
             <div className="sub">{currentGame && currentGame.name}</div>
             <div className="score-rows">
               {loseData.answer && (
@@ -2838,14 +2866,37 @@ function App() {
                 👁 View board
               </button>
             )}
-            {!loseData.isClassic && currentGame && (
+            {/* #213 — A LOST RUN IN A MODE HAS TO BE ABLE TO STAY IN IT.
+
+                The win card has carried a mode action since #176 ("📖 Back to
+                the levels" / "🎮 Another run"); the loss card never did. So the
+                only way out of a failed story rung was Back to Lobby — the
+                reported "forced lobby exit" — which is exactly backwards: a
+                rung is a fixed, retryable deal, and failing one is the moment
+                you most want to go straight at it again. The label says
+                Continue rather than Back because after a loss that is what the
+                button is for.
+
+                This is the shared card, so it fixes the exit for every story
+                and arcade game, not only the one the issue was filed against. */}
+            {loseData.modeLabel && currentGame && (
+              <button className="primary-btn play-again-btn" onClick={() => launchGame(currentGame, playMode)}>
+                {loseData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Continue Story Quest'}
+              </button>
+            )}
+            {/* Daily only. "Play again for fun" is the daily's replay of TODAY'S
+                board through the inert practice path (#133); offering it on a
+                story or arcade loss sent you to a practice run of the daily
+                instead of back to the rung you just failed. The win card has
+                always gated this on `!modeLabel` — the loss card did not. */}
+            {!loseData.isClassic && !loseData.modeLabel && currentGame && (
               <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>
             )}
             {/* Same rule as the win card: one primary action, and where there
                 is a Play Again it is not the one that leaves. */}
-            <button className={'primary-btn' + (loseData.isClassic ? ' review-btn' : '')} onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            <button className={'primary-btn' + (loseData.isClassic || loseData.modeLabel ? ' review-btn' : '')} onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
           </div>
         </div>
       )}

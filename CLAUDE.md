@@ -1110,10 +1110,57 @@ element is missing from that list pays ~300 ms per tap on touch.
   rules before this pass.
 - **Two boards are too dense to fix with feedback alone**, and their solutions
   are the pattern to copy: **Gomoku** (15×15 ⇒ ~24 px) uses ghost-then-confirm,
-  and **Ludo** (tokens smaller than their cell, stacked 5 px apart) lists the
-  legal moves as full-size buttons under the board. Both are built in the
-  `BOARD_VIEWS` renderer, so online / pass-and-play / bot inherit them, and
-  neither changes the move payload.
+  and **Ludo** (tokens smaller than their cell) lists the legal moves as
+  full-size buttons under the board. Both are built in the `BOARD_VIEWS`
+  renderer, so online / pass-and-play / bot inherit them, and neither changes
+  the move payload. Ludo's buttons are a SECOND path now, not the only one —
+  see "Ludo: the board is a tap target too" below.
+
+### Ludo: the board is a tap target too (#217)
+
+The move buttons stayed — they are still the unambiguous path, and the issue
+asked for direct selection, not for the buttons to go. What changed is that
+the board became a target worth aiming at:
+
+- **Tokens fan out around the cell they occupy, not by their index.** The old
+  layout offset every token by `(i % 2, i / 2) * 5px`, which put a lone token
+  permanently off-centre and turned four tokens on one cell into a 5 px
+  diagonal smear. `ludoStackLayout(n, cell)` places whatever actually shares a
+  cell (across seats — safe cells and the 🏁 centre hold more than one colour)
+  on a ring around its centre, shrinking the radius as the group grows.
+  `LUDO_STACK`'s pairs are tuned so `hypot(offset) + r <= cell / 2` (the group
+  fits) and no two neighbours are closer than the old 5 px, at the smallest
+  cell the board ever draws (18 px). `ludo-token-stack` asserts both, for every
+  size in that range — **re-run it rather than eyeballing a retune**, because
+  those two constraints pull against each other and the tight end of the range
+  is where a change breaks.
+- **The hit test takes the nearest CENTRE, not the topmost of the draw order.**
+  `ludoPickToken` — topmost is just the highest token number, which is not what
+  the finger aimed at. Each candidate carries its own radius, so a lone token
+  is a bigger target than one in a stack, and a movable token draws last so its
+  gold ring is never clipped by a neighbour.
+- **The board never said it was tappable**, which is most of why #217 was filed
+  against a board that already had a hit test: an in-frame line now says so
+  whenever there is a legal move, and the move pad relabels itself as the
+  alternative.
+
+**The die is drawn as a die, and the tumble is only the wait made visible.**
+`ludoDrawDie` renders pips; the value is ALWAYS the referee's (the rules module
+locally, the server online). The tumble starts on the Roll tap — so an online
+roll has no dead beat while it is in flight — and stops a short settle after
+the real value lands, with `until` only ever moving forward so a local roll,
+which resolves in the same tick, still spins once rather than twice. The face
+cycle is a fixed repeat-free sequence (`LUDO_TUMBLE`) precisely so it is
+checkable and so nothing about it can be mistaken for the outcome.
+`cgReducedMotion()` skips it entirely.
+
+**`?ludo=stack`** seats a deterministic mid-game position (two of P1's tokens
+sharing a ring cell, a die already rolled). A fresh Ludo board has nothing on
+the ring and nothing rolled, and a proposal check can navigate but cannot tap
+Roll — so without this link neither the fan-out nor any in-move chrome is
+reachable by a check or a screenshot. It is consumed once, on mount:
+`BoardLocalGame`'s reset effect skips its own mount pass when a seeded position
+is in play, the same trap `SnakeGame`'s reset-to-chooser effect had to skip.
 
 ### 3. Nothing scrolls during play
 
@@ -1438,6 +1485,56 @@ unfinished examples (`minefinder`, one rung short; `cratepush`, never started)
 before seeding the finished one. If a check asserts that something is ABSENT or
 UNEARNED, the fixture has to make it so.
 
+### A lost run in a MODE has to be able to stay in it (#213)
+
+The win card has carried a mode action since #176 — "📖 Back to the levels" /
+"🎮 Another run". The loss card never did, so the only way out of a failed
+story rung was **Back to Lobby**: the reported "forced lobby exit", and exactly
+backwards, because a rung is a fixed retryable deal and failing one is the
+moment you most want to go straight at it again. The loss card now carries the
+same action, labelled **"📖 Continue Story Quest"** after a loss.
+
+Two smaller things fell out of the same block, both dropped fields rather than
+decisions:
+
+- **"🎲 Play again for fun" was showing on story and arcade losses.** It is the
+  daily's replay of TODAY'S board through the inert practice path (#133), so on
+  a story loss it sent you to a practice run of the daily instead of back to
+  the rung. The win card had always gated it on `!modeLabel`; the loss card had
+  not.
+- **`handleLose` dropped `meta.winnerLabel`.** Every game already sends one
+  through `reportRunEnd` (Marble Loop, Hash Rush, Snake and Bounce all send
+  'Game Over') and the win card has read it since #158, so a lost story rung of
+  a marble game announced itself as **"Out of guesses"** — copy written for
+  Daily Cipher. The default stays for games that send nothing, which is Cipher,
+  the one it was written for. The "Guesses · Time" row beside it is the same
+  copy problem and is deliberately NOT touched: no game sends a label for it,
+  so fixing it would mean inventing one for thirty games rather than threading
+  through one they already send.
+
+**`handleWin` still drops `winnerLabel` on its arcade and story branches**, so
+a run you died in shows "🏆 Solved!" in those two modes. Same one-line
+omission, but it belongs to every arcade game rather than to #213.
+
+### Marble Loop's camouflage marble (#213)
+
+Five shots in a row that each pop something drop a **camouflage marble** on the
+cannon for `ZUMA_CAMO_MS`. It takes the colour of whatever it lands against
+(`zumaWildColorAt` — the longer neighbouring run wins, ties go left), so it
+always makes a match if one is there. It is spent by one shot and does **not**
+consume the queue: it sits on top of the marble you already had.
+
+It also **replaces the old `color-switch` power-up's wildcard, which never
+worked**: that one fired a marble coloured `'#ffffff'` and `zumaCheckMatches`
+compares colour strings exactly, so the "wildcard" matched nothing and left you
+strictly worse off than the marble it replaced. One wildcard rule, in one pure
+function, rather than two that disagree — `marbleloop-camouflage` asserts both
+halves, including that the old white marble matched nothing.
+
+`?zcamo=1` loads one at mount (writing nothing — it sets the same deadline the
+fifth pop would) because the marble and its countdown are otherwise reachable
+only by popping five shots in a row, which no check or screenshot can do.
+`?result=1&pmode=story|arcade` does the same job for the mode result cards.
 ### Snake's turns QUEUE (#206)
 
 "The snake fails to turn upon tap or swipe" is not a gesture problem. The

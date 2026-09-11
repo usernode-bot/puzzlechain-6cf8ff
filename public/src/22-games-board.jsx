@@ -580,6 +580,113 @@ const LUDO_BASE_XY = {
 const LUDO_START_ABS = { 1: 0, 2: 26, 3: 13, 4: 39 };
 const LUDO_SEAT_COLORS = { 1: C.accent, 2: C.rose, 3: C.gold, 4: GA.teal };
 
+/* #217 — direct piece selection. Tokens used to be drawn at a fixed 5px
+   down-right step per token INDEX, so a lone token sat off-centre and four
+   tokens sharing a cell sat in a 5px diagonal smear that no finger can pick
+   apart. They fan out around the centre of the cell they actually occupy
+   instead: one token is dead centre at full size, and a stack spreads far
+   enough that every member keeps at least the old 5px of separation while
+   the whole group still fits inside its cell. The move pad stays — it is
+   still the unambiguous path, and this is a second, bigger target, not a
+   swap. */
+const LUDO_TAP_SLOP = 8;    // matches the old DOM token's hit-slop
+/* n -> [ring radius, token radius], both as fractions of a cell. Each pair
+   sums to at most 0.5, so however many tokens share a cell the group still
+   fits inside it; and the gap between two neighbours stays at least the old
+   5px even at the smallest cell the board ever draws (18px). Past four the
+   ring is only the 🏁 centre pile, which is never tappable. */
+const LUDO_STACK = { 1: [0, 0.425], 2: [0.22, 0.28], 3: [0.225, 0.275], 4: [0.23, 0.27] };
+const LUDO_STACK_MANY = [0.26, 0.24];
+
+function ludoStackLayout(n, cell) {
+  const [ringK, rK] = LUDO_STACK[n] || LUDO_STACK_MANY;
+  const ring = cell * ringK;
+  return {
+    r: cell * rK,
+    at: (j) => {
+      if (n <= 1) return [0, 0];
+      const a = (j / n) * Math.PI * 2 - Math.PI / 2;
+      return [ring * Math.cos(a), ring * Math.sin(a)];
+    },
+  };
+}
+
+/* Nearest CENTRE wins, not the topmost of the draw order. With tokens a few
+   pixels apart "topmost" is simply the highest token number, which is not
+   what the finger aimed at; every candidate carries its own radius because a
+   lone token is a bigger target than one in a stack. */
+function ludoPickToken(cands, x, y) {
+  let best = null, bestD = Infinity;
+  for (const t of cands) {
+    const dx = x - t.cx, dy = y - t.cy, d = dx * dx + dy * dy;
+    const rr = t.r + LUDO_TAP_SLOP;
+    if (d <= rr * rr && d < bestD) { bestD = d; best = t; }
+  }
+  return best;
+}
+
+/* The dice roll, drawn as a die rather than a digit, and tumbled rather than
+   snapped. The VALUE is always the referee's — the tumble is only the wait
+   made visible — so the face sequence here is deterministic (and checkable)
+   and the real number replaces it the moment the roll has landed. */
+const LUDO_PIPS = {
+  1: [[0, 0]],
+  2: [[-1, -1], [1, 1]],
+  3: [[-1, -1], [0, 0], [1, 1]],
+  4: [[-1, -1], [1, -1], [-1, 1], [1, 1]],
+  5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]],
+  6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],
+};
+const LUDO_TUMBLE = [3, 6, 2, 5, 1, 4];   // no two neighbours alike, incl. the wrap
+const LUDO_ROLL_MS = 720;                 // tumble length once the player taps Roll
+const LUDO_ROLL_SETTLE_MS = 180;          // ...and how long it keeps tumbling after
+const LUDO_ROLL_TICK_MS = 70;             // the value actually arrives
+
+function ludoDrawDie(ctx, x, y, size, face, spin) {
+  ctx.save();
+  ctx.translate(x + size / 2, y + size / 2);
+  if (spin) ctx.rotate(spin);
+  klRR(ctx, -size / 2, -size / 2, size, size, Math.round(size * 0.22));
+  ctx.fillStyle = PAL.card;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = PAL.border;
+  ctx.stroke();
+  const pips = LUDO_PIPS[face];
+  if (!pips) {
+    ctx.fillStyle = PAL.muted;
+    ctx.font = `${Math.round(size * 0.42)}px ` + CUI_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('\u2013', 0, 0);
+    ctx.restore();
+    return;
+  }
+  const off = size * 0.26, r = size * 0.088;
+  ctx.fillStyle = PAL.text;
+  for (const [px, py] of pips) {
+    ctx.beginPath();
+    ctx.arc(px * off, py * off, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* `?ludo=stack` seats a deterministic mid-game position: two of P1's tokens
+   share one ring cell, one is a step behind, and the die is already rolled.
+   Both halves of this issue are invisible on a fresh board — nothing is on
+   the ring and nothing has been rolled — and a proposal check can navigate
+   but cannot tap Roll, so without this link neither the fan-out nor the
+   in-move chrome is reachable by a check or a screenshot. */
+function ludoDemoState(which) {
+  if (which !== 'stack') return null;
+  const seats = { 1: [11, 11, 6, -1], 2: [-1, 3, 20, 33] };
+  return {
+    nPlayers: 2, seats, p1: seats[1], p2: seats[2], forfeited: [],
+    currentPlayer: 1, phase: 'move', die: 3, lastEvent: null,
+  };
+}
+
 function ludoTokenXY(player, pos, tokenIdx) {
   if (pos === -1) return LUDO_BASE_XY[player][tokenIdx];
   if (pos >= 51 && pos <= 56) return LUDO_HOME_XY[player][pos - 51];
@@ -603,8 +710,8 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     if (pos === -1) return st.die === 6;
     return pos + st.die <= 57;
   };
-  // Tokens flattened in DRAW order (seat asc, token asc) — the tap hit-test
-  // walks this list in reverse so the topmost of a 5px-offset stack wins.
+  // Tokens flattened in DRAW order (seat asc, token asc). Their pixel centres
+  // are assigned below, once the cell size is known.
   const toks = [];
   for (const p of seatList) {
     const out = forfeited.includes(p);
@@ -621,10 +728,23 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   const step = cell + 1;
   const PADI = 3;
   const side = step * 15 - 1 + PADI * 2;
-  const tokenC = (t) => [
-    PADI + t.gx * step + cell / 2 + (t.i % 2) * 5 - 2,
-    PADI + t.gy * step + cell / 2 + Math.floor(t.i / 2) * 5 - 2,
-  ];
+  // Fan out whatever actually shares a cell — across seats, since a safe cell
+  // and the 🏁 centre both hold tokens of more than one colour.
+  const stacks = {};
+  for (const t of toks) {
+    const k = t.gx + ',' + t.gy;
+    (stacks[k] || (stacks[k] = [])).push(t);
+  }
+  for (const k in stacks) {
+    const grp = stacks[k];
+    const lay = ludoStackLayout(grp.length, cell);
+    grp.forEach((t, j) => {
+      const [dx, dy] = lay.at(j);
+      t.cx = PADI + t.gx * step + cell / 2 + dx;
+      t.cy = PADI + t.gy * step + cell / 2 + dy;
+      t.r = lay.r;
+    });
+  }
 
   // The move pad (the unambiguous full-size path for stacked tokens), the
   // die, the roll button, the event notes and the legend all draw in-frame.
@@ -638,18 +758,54 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     const dest = pos + st.die;
     return `step ${pos} → ${dest >= 51 ? 'home column' : dest}`;
   };
+  /* The tumble. It starts on the tap (so there is no dead beat while an
+     online roll is in flight) and ends a short settle AFTER the real value
+     lands, whenever that is — `until` only ever moves forward, so a local
+     roll, which resolves in the same tick, still spins for its full length
+     rather than twice over. */
+  const [tumble, setTumble] = useState(0);
+  const spinRef = useRef({ until: 0, timer: null });
+  const spinFor = (ms) => {
+    if (cgReducedMotion()) return;
+    const sp = spinRef.current;
+    sp.until = Math.max(sp.until, Date.now() + ms);
+    if (sp.timer) return;
+    setTumble(1);
+    sp.timer = setInterval(() => {
+      if (Date.now() >= spinRef.current.until) {
+        clearInterval(spinRef.current.timer);
+        spinRef.current.timer = null;
+        setTumble(0);
+        return;
+      }
+      setTumble(t => t + 1);
+    }, LUDO_ROLL_TICK_MS);
+  };
+  useEffect(() => () => { if (spinRef.current.timer) clearInterval(spinRef.current.timer); }, []);
+  // An opponent's roll arrives as a state change with no tap of ours behind it.
+  const lastDie = useRef(st.die);
+  useEffect(() => {
+    const prev = lastDie.current;
+    lastDie.current = st.die;
+    if (st.die != null && st.die !== prev) spinFor(LUDO_ROLL_SETTLE_MS);
+  }, [st.die]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dieFace = tumble ? LUDO_TUMBLE[tumble % LUDO_TUMBLE.length] : st.die;
+
   const notes = [];
   if (st.lastEvent === 'no-move') notes.push('No legal move for that roll — turn passed.');
   if (st.lastEvent === 'capture') notes.push('💥 Capture! Token sent back to base.');
   if (forfeited.length > 0) notes.push(`${forfeited.map(p => 'P' + p).join(', ')} forfeited — the match continues.`);
   if (nPlayers > 2 && !isMyTurn) notes.push(`Waiting on P${st.currentPlayer || 1}…`);
 
+  const HINT_H = movableList.length ? 16 : 0;
   const MOVE_H = movableList.length ? 18 + movableList.length * 50 : 0;
   const ROLL_H = 54;
   const NOTES_H = notes.length * 18;
   const LEG_H = 18;
-  const H = side + (MOVE_H ? 6 + MOVE_H : 0) + 6 + ROLL_H + (NOTES_H ? 4 + NOTES_H : 0) + 4 + LEG_H;
-  let by = side + 6;
+  const H = side + (HINT_H ? 4 + HINT_H : 0) + (MOVE_H ? 6 + MOVE_H : 0) + 6 + ROLL_H
+    + (NOTES_H ? 4 + NOTES_H : 0) + 4 + LEG_H;
+  let by = side + 4;
+  const hintY = by; if (HINT_H) by += HINT_H + 6;
   const moveY = by; if (MOVE_H) by += MOVE_H + 6;
   const rollY = by; by += ROLL_H + 4;
   const notesY = by; if (NOTES_H) by += NOTES_H + 4;
@@ -657,7 +813,13 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
 
   const controls = [];
   if (movableList.length) {
-    controls.push({ id: 'ml-label', kind: 'label', r: [0, moveY, side, 16], label: `YOUR MOVES · ROLLED ${st.die}`, font: 10 });
+    // Say the board is tappable. It always was, technically, but nothing on
+    // screen said so and the tokens were too small to invite the attempt.
+    controls.push({
+      id: 'ml-hint', kind: 'label', r: [0, hintY, side, HINT_H], gold: true, font: 11,
+      label: 'Tap a glowing token to move it',
+    });
+    controls.push({ id: 'ml-label', kind: 'label', r: [0, moveY, side, 16], label: `OR PICK ONE HERE · ROLLED ${st.die}`, font: 10 });
     movableList.forEach((t, k) => {
       controls.push({
         id: 'mv' + t.i, kind: 'button',
@@ -667,7 +829,11 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
       });
     });
   }
-  controls.push({ id: 'die', kind: 'button', r: [Math.floor(side / 2) - 24, rollY, 48, 48], label: st.die == null ? '·' : String(st.die), font: 20, mono: true, disabled: true });
+  const dieX = Math.floor(side / 2) - 24;
+  controls.push({
+    id: 'die', kind: 'label', noDraw: true, r: [dieX, rollY, 48, 48],
+    label: tumble ? 'Rolling…' : st.die == null ? 'Die: not rolled yet' : `Die: ${st.die}`,
+  });
   const rollW = Math.floor(side * 0.34);
   controls.push({
     id: 'roll', kind: 'button', r: [side - rollW - 4, rollY + 4, rollW, 44],
@@ -676,7 +842,7 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
     bg: isMyTurn && phase === 'roll' ? palOf(LUDO_SEAT_COLORS[myPlayerNum] || C.accent, '#3A6ECD') : undefined,
     ink: isMyTurn && phase === 'roll' ? '#fff' : undefined,
     disabled: !isMyTurn || phase !== 'roll',
-    action: () => submit({ type: 'roll' }),
+    action: () => { spinFor(LUDO_ROLL_MS); submit({ type: 'roll' }); },
   });
   notes.forEach((n, k) => controls.push({ id: 'note' + k, kind: 'label', r: [0, notesY + k * 18, side, 18], label: n, gold: true, font: 11.5 }));
   controls.push({ id: 'legend', kind: 'label', r: [0, legY, side, 16], label: '🎲 6 leaves base & rolls again · ★ safe cells · Exact roll to finish', font: 10.5 });
@@ -685,27 +851,19 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
   ctlRef.current = controls;
   const [pressedId, setPressedId] = useState(null);
   const liveRef = useRef({});
-  liveRef.current = { toks, cell, tokenC };
+  liveRef.current = { toks, side };
   usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (pt) => {
       const lv = liveRef.current;
-      if (pt.y > side) return;
-      const rr = lv.cell * 0.425 + 8; // +8 = the old DOM token's hit-slop
-      for (let k = lv.toks.length - 1; k >= 0; k--) {
-        const t = lv.toks[k];
-        if (!t.movable) continue;
-        const [cx, cy] = lv.tokenC(t);
-        if ((pt.x - cx) * (pt.x - cx) + (pt.y - cy) * (pt.y - cy) <= rr * rr) {
-          submit({ type: 'move', token: t.i });
-          return;
-        }
-      }
+      if (pt.y > lv.side) return;
+      const hit = ludoPickToken(lv.toks.filter(t => t.movable), pt.x, pt.y);
+      if (hit) submit({ type: 'move', token: hit.i });
     },
   }));
   useCanvasBoard(canvasRef, {
     width: side,
     height: H,
-    deps: [st, cell, myPlayerNum, nPlayers, pressedId, isMyTurn],
+    deps: [st, cell, myPlayerNum, nPlayers, pressedId, isMyTurn, tumble],
     draw: (ctx) => {
       cuiDrawControls(ctx, ctlRef.current, pressedId);
       klRR(ctx, 0, 0, side, side, 10);
@@ -788,10 +946,11 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
         ctx.font = `${Math.round(cell * 0.7)}px system-ui, sans-serif`;
         ctx.fillText('🏁', x + cell / 2, y + cell / 2 + 0.5);
       }
-      // Tokens
-      for (const t of toks) {
-        const [cx, cy] = tokenC(t);
-        const r = cell * 0.425;
+      // Tokens — a movable one draws LAST so its gold ring is never clipped
+      // by a neighbour sharing the same cell (sort is stable, so the seat
+      // order within each group is untouched).
+      for (const t of toks.slice().sort((a, b) => (a.movable ? 1 : 0) - (b.movable ? 1 : 0))) {
+        const cx = t.cx, cy = t.cy, r = t.r;
         ctx.save();
         if (t.out) ctx.globalAlpha = 0.35;
         ctx.beginPath();
@@ -811,11 +970,13 @@ function LudoBoardView({ st, myPlayerNum, isMyTurn, submit }) {
           ctx.stroke();
           ctx.shadowBlur = 0;
         }
-        ctx.font = `700 ${Math.max(8, Math.round(cell * 0.42))}px system-ui, sans-serif`;
+        ctx.font = `700 ${Math.max(7, Math.round(r * 0.98))}px system-ui, sans-serif`;
         ctx.fillStyle = '#fff';
         ctx.fillText(String(t.i + 1), cx, cy + 0.5);
         ctx.restore();
       }
+      // The die, drawn last so its tumble repaints over nothing else.
+      ludoDrawDie(ctx, dieX, rollY, 48, dieFace, tumble ? (tumble % 4) * 0.13 - 0.2 : 0);
     },
   });
 
@@ -1245,7 +1406,12 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey, seats, b
      parameter. Games whose rules take no argument ignore it. */
   const nSeats = Math.min(rules && rules.maxPlayers ? rules.maxPlayers : 2,
                           Math.max(2, Number(seats) || 2));
-  const [state, setState] = useState(() => (rules ? rules.initialState(nSeats) : null));
+  // A seeded opening position, for the deep links that have to reach a
+  // mid-game board (see ludoDemoState). Consumed once, on mount.
+  const demoRef = useRef(gameId === 'ludo'
+    ? ludoDemoState(new URLSearchParams(window.location.search).get('ludo'))
+    : null);
+  const [state, setState] = useState(() => demoRef.current || (rules ? rules.initialState(nSeats) : null));
   const [over, setOver] = useState(null); // { winner }
   const [err, setErr] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -1255,6 +1421,9 @@ function BoardLocalGame({ gameId, vsBot, onWin, onStepChange, resetKey, seats, b
 
   useEffect(() => {
     if (!rules) return;
+    // The mount pass would otherwise clobber a seeded position immediately —
+    // the same trap SnakeGame's reset-to-chooser effect had to skip.
+    if (demoRef.current) { demoRef.current = null; return; }
     setState(rules.initialState(nSeats));
     setOver(null); setErr(''); setMoves(0); setThinking(false);
     submittedRef.current = false;

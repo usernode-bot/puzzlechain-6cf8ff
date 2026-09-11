@@ -961,6 +961,21 @@
       "expectSelector": "canvas.ludo-canvas"
     },
     {
+      "name": "Ludo invites the tap on the board itself",
+      "path": "/?game=ludo&mode=2p&ludo=stack",
+      "expectText": "Tap a glowing token to move it"
+    },
+    {
+      "name": "Ludo's move list is the second path, not the only one",
+      "path": "/?game=ludo&mode=2p&ludo=stack",
+      "expectText": "OR PICK ONE HERE"
+    },
+    {
+      "name": "Ludo shows the rolled die as a die",
+      "path": "/?game=ludo&mode=2p&ludo=stack",
+      "expectText": "Die: 3"
+    },
+    {
       "name": "Word Sprint found-list has its own scroll strip",
       "path": "/?game=wordsprint&practice=1",
       "expectSelector": ".fit-col .wspr-grid"
@@ -1059,6 +1074,21 @@
       "name": "A finished Hash Rush board draws no end panel of its own",
       "path": "/?game=hashrush&play=1&hrdead=1",
       "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
+    },
+    {
+      "name": "A lost story run offers to continue the ladder",
+      "path": "/?game=zuma&result=1&pmode=story",
+      "expectText": "Continue Story Quest"
+    },
+    {
+      "name": "A lost arcade run offers another run",
+      "path": "/?game=zuma&result=1&pmode=arcade",
+      "expectText": "Another run"
+    },
+    {
+      "name": "Marble Loop shows the camouflage marble's countdown",
+      "path": "/?game=zuma&zcamo=1",
+      "expectText": "Camouflage"
     },
     {
       "name": "Marble Loop tells you a tap aims first",

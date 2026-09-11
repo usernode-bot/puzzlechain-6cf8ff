@@ -1056,6 +1056,11 @@
       "expectText": "Hint 3:"
     },
     {
+      "name": "Daily Cipher story rung serves its own words, not the daily's",
+      "path": "/?game=cryptowordle&pmode=story&band=4&play=1",
+      "expectText": "Theme: Nature"
+    },
+    {
       "name": "Daily Cipher: one tap = one letter",
       "path": "/?game=cryptowordle&practice=1&cwtype=LEN",
       "expectSelector": ".cw-board[data-cw-typed=\"LEN\"]"

@@ -1061,11 +1061,6 @@ ${emitTapHighlightRules()}
 .pregame-band.done { color: ${C.emerald}; border-color: ${ca('emerald', '55')}; }
 .pregame-band.locked { opacity: 0.4; cursor: not-allowed; }
 .pregame-band[data-pressed] { background: ${C.well}; }
-.pregame-band .rec {
-  display: block; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
-  color: ${C.muted}; margin-top: 0.1rem;
-}
 .pregame-band-note {
   margin-top: 0.45rem; font-size: 0.72rem; line-height: 1.4; color: ${C.muted};
 }; background: ${ca('accent','14')};

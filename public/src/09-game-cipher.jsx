@@ -382,6 +382,51 @@ function cwThemeForDay(dayNum) {
   return CW_THEMES[((dayNum % n) + n) % n].name;
 }
 
+/* One block of the partition, named by theme and slot. cwRoundsForDay picks
+   its block from the day; the mode picker below picks one from a mode seed.
+   Both go through here so a story or arcade set is drawn from the SAME curated
+   partition the daily uses — five words that were shuffled together once, not
+   five sampled at random from 271. */
+function cwBlockAt(themeIdx, slot) {
+  const n = CW_THEMES.length;
+  const ti = ((themeIdx % n) + n) % n;
+  const theme = CW_THEMES[ti];
+  const blocks = Math.max(1, Math.floor(theme.words.length / CW_ROUNDS_PER_DAY));
+  const si = ((slot % blocks) + blocks) % blocks;
+  const shuffled = cwSeededShuffle(theme.words, hashStr('cw-rotation:' + ti));
+  return {
+    theme: theme.name,
+    words: shuffled.slice(si * CW_ROUNDS_PER_DAY, si * CW_ROUNDS_PER_DAY + CW_ROUNDS_PER_DAY),
+  };
+}
+
+/* #195 — the words a MODE serves.
+
+   Daily Cipher never learned about play modes. #176 gave it story rungs and
+   arcade bands and passed playMode/band down like every other game, but this
+   component's signature never took them: every mode called cwDailyRounds, so
+   the daily, all six story rungs and all three arcade bands served the SAME
+   five words on the same day. That is the report's "the same 5 questions
+   repeat across Daily mode, the 6 Story levels, and all Arcade modes" — not a
+   thin corpus (there are 271 words on a 54-day sliding rotation), but every
+   door opening onto the same room.
+
+   The daily is untouched and must stay so: it is the shared board, and its
+   leaderboard and share cards depend on everyone getting the same five words.
+
+   Story and arcade go through modeSeed, which is the one place that decides
+   stable-vs-fresh (see CLAUDE.md): a story rung draws the same block every
+   visit, so it stays a rung you can retry, and an arcade run draws a new one
+   each time. */
+function cwRoundsForMode(playMode, band, offset) {
+  if (playMode !== 'story' && playMode !== 'arcade') {
+    return { theme: cwThemeForDay(cwDayNum(offset)), words: cwDailyRounds(offset) };
+  }
+  const rung = playMode === 'story' ? (band || 0) : 0;
+  const { rng } = modeSeed(playMode, 'cryptowordle', rung, offset);
+  return cwBlockAt(Math.floor(rng() * CW_THEMES.length), Math.floor(rng() * 1e6));
+}
+
 
 // Guesses allowed for a given word length: one more than the length, so a
 // 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
@@ -531,10 +576,13 @@ function cwSimulateTouchTapAt(el, clientX, clientY) {
   el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX, clientY }));
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(cwDayNum(offset)).current;
-  // The day's stack of independent word rounds (stable for the render lifetime).
-  const roundsDef = useRef(cwDailyRounds(offset)).current;
+  /* The stack of independent word rounds for THIS mode, stable for the render
+     lifetime (#195). The daily is unchanged; story and arcade draw their own
+     block so they are no longer the daily wearing a different hat. */
+  const modeSet = useRef(cwRoundsForMode(playMode, band, offset)).current;
+  const roundsDef = modeSet.words;
 
   // Resume only today's saved progress (multi-round shape). Board is re-derived
   // from the seed; we persist only the mutable per-round guess words + hint use.
@@ -897,7 +945,15 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     controls.push({ id: 'p-word', kind: 'pill', r: pr[1], label: 'Word', value: `${Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/${roundsDef.length}` });
     controls.push({ id: 'p-solved', kind: 'pill', r: pr[2], label: 'Solved', value: `${solvedCount}/${roundsDef.length}` });
     controls.push({ id: 'p-points', kind: 'pill', r: pr[3], label: 'Points', value: totalScore });
-    controls.push({ id: 'theme', kind: 'label', r: [0, themeY, W, THEME_H], label: `Today's theme: ${cwThemeForDay(dayNum)}`, font: 12 });
+    /* The theme line names the set you are actually playing. "Today's theme"
+       is only true of the daily now — a story rung or an arcade run draws its
+       own block, and labelling that with the day's theme would be wrong (#195). */
+    controls.push({
+      id: 'theme', kind: 'label', r: [0, themeY, W, THEME_H], font: 12,
+      label: (playMode === 'story' || playMode === 'arcade')
+        ? `Theme: ${modeSet.theme}`
+        : `Today's theme: ${modeSet.theme}`,
+    });
     if (active) {
       // Clue prose is custom-drawn (wrapped); twin-only entries carry the text.
       controls.push({ id: 'clue', kind: 'label', noDraw: true, r: [0, clueY, W, CLUE_H], label: `Clue: ${active.def.clue} · ${wordLen} letters` });

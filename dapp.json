@@ -1610,6 +1610,16 @@
       "name": "Unfinished ladder renders as a locked story badge",
       "path": "/?screen=badges&demo=storybadges",
       "expectSelector": ".badge-chip.locked[data-badge=\"story-cratepush\"]"
+    },
+    {
+      "name": "The badge collection lists every story ladder, finished or not",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip[data-badge=\"story-cratepush\"]"
+    },
+    {
+      "name": "A ladder one rung short of done is locked, not earned",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.locked[data-badge=\"story-minefinder\"]"
     }
   ],
   "visibility": {

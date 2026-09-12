@@ -1667,6 +1667,21 @@
       "expectSelector": ".wspr-grid, .wspr-tile, canvas"
     },
     {
+      "name": "Band banner shows the next band",
+      "path": "/?advance=1",
+      "expectSelector": ".adv-banner-band"
+    },
+    {
+      "name": "Auto-advance offers Start now and Back to the ladder",
+      "path": "/?advance=1",
+      "expectSelector": ".adv-actions .tappable"
+    },
+    {
+      "name": "End of ladder shows a completion card",
+      "path": "/?advance=complete",
+      "expectText": "Ladder complete"
+    },
+    {
       "name": "Pin button renders on every home card",
       "path": "/",
       "expectSelector": ".card-pin"

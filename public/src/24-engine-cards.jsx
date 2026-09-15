@@ -2865,6 +2865,12 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   ctlRef.current = controls;
   const [pressedId, setPressedId] = useState(null);
 
+  /* Issue #294 — subscribe the board to theme flips. The cell fills below
+     read PAL at draw time, so a Light↔Dark switch must both re-render (for
+     the deps array to change) and repaint, or the canvas keeps the previous
+     theme's colours. Same pattern as the Nonogram above. */
+  const themeV = useThemeVersion();
+
   usePointerCell(canvasRef, cuiWrapHandlers(ctlRef, setPressedId, {
     onTap: (p) => {
       const i = idxAt(p);
@@ -2890,7 +2896,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   useCanvasBoard(canvasRef, {
     width: W,
     height: H,
-    deps: [cell, revealed, flags, boom, pulse, done, W, fmt, steps, flagMode, pressedId],
+    deps: [cell, revealed, flags, boom, pulse, done, W, fmt, steps, flagMode, pressedId, themeV],
     draw: (ctx) => {
       cuiDrawControls(ctx, ctlRef.current, pressedId);
       ctx.save();
@@ -2905,20 +2911,45 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
         const isMine = mines.has(i);
 
         // PAL, not C — see the canvas-colour note on guardCanvasCtx.
-        let fill = PAL.card, stroke = PAL.border;
-        if (isRev) { fill = PAL.surface; stroke = PAL.border; }
-        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; }
-        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; }
-        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; }
-
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
-        else ctx.rect(x, y, cell, cell);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = stroke;
-        ctx.stroke();
+        // #294: two distinct cell treatments so empty-vs-unclicked reads in
+        // dark mode too — revealed cells are a recessed, darkened field;
+        // untouched cells are raised tiles with a highlight/shadow bevel.
+        const rrPath = () => {
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
+          else ctx.rect(x, y, cell, cell);
+        };
+        const fillCell = (fill, stroke, lw) => {
+          rrPath();
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = lw || 1;
+          ctx.strokeStyle = stroke;
+          ctx.stroke();
+        };
+        if (isRev) {
+          fillCell('rgba(0,0,0,0.28)', PAL.border);
+          if (isMine) fillCell('rgba(205,75,58,.20)', PAL.rose);
+        } else {
+          fillCell(PAL.card, PAL.border);
+          const b = Math.max(2, Math.round(cell * 0.14));
+          const bw = Math.max(1.5, cell * 0.07);
+          ctx.lineWidth = bw;
+          ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+          ctx.beginPath();
+          ctx.moveTo(x + 1.5, y + cell - b);
+          ctx.lineTo(x + 1.5, y + 1.5);
+          ctx.lineTo(x + cell - b, y + 1.5);
+          ctx.stroke();
+          ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+          ctx.beginPath();
+          ctx.moveTo(x + 1.5, y + b);
+          ctx.lineTo(x + 1.5, y + cell - 1.5);
+          ctx.lineTo(x + cell - b, y + cell - 1.5);
+          ctx.stroke();
+        }
+        if (i === boom) fillCell('rgba(205,75,58,.55)', PAL.rose);
+        if (i === pulse) fillCell('rgba(201,162,39,.30)', PAL.gold);
 
         const cx = x + cell / 2, cy = y + cell / 2;
         if (isRev && isMine) {

@@ -441,6 +441,11 @@
       "expectSelector": "canvas.mf-canvas"
     },
     {
+      "name": "Mine Finder board draws in dark mode (#294)",
+      "path": "/?game=minefinder&practice=1&shot=dark",
+      "expectSelector": "canvas.mf-canvas"
+    },
+    {
       "name": "Mine Finder Dig/Flag mode control renders",
       "path": "/?game=minefinder&practice=1",
       "expectText": "Mode: Dig"

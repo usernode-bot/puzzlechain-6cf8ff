@@ -3172,7 +3172,7 @@ function App() {
                 ✔ Saved on this device — we'll send your result automatically as
                 soon as you're back online. Your score and streak are safe.
                 <br />
-                <button onClick={retryDailyFinish} disabled={winData.syncing}>
+                <button className="tappable" {...tapProps(retryDailyFinish, { disabled: winData.syncing })}>
                   {winData.syncing ? 'Sending…' : 'Send now'}
                 </button>
               </div>
@@ -3233,12 +3233,12 @@ function App() {
                 reach their all-time board through ClassicShell's ☰ sheet. */}
             <ShareButton text={winData.share} />
             {winData.isClassic && (
-              <button className="primary-btn play-again-btn" onClick={playAgain}>
+              <button className="primary-btn play-again-btn tappable" {...tapProps(playAgain)}>
                 Play Again
               </button>
             )}
             {boardReviewable && (
-              <button className="primary-btn review-btn" onClick={() => setReviewMode(true)}>
+              <button className="primary-btn review-btn tappable" {...tapProps(() => setReviewMode(true))}>
                 👁 View board
               </button>
             )}
@@ -3246,20 +3246,20 @@ function App() {
                 recorded. Daily games only: a classic already has Play Again,
                 and story/arcade are replayable from their pre-game screen. */}
             {isDailyResult && currentGame && (
-              <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
+              <button className="primary-btn review-btn tappable" {...tapProps(() => startPractice(currentGame))}>
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>
             )}
             {winData.modeLabel && currentGame && (
-              <button className="primary-btn review-btn" onClick={() => launchGame(currentGame, playMode)}>
+              <button className="primary-btn review-btn tappable" {...tapProps(() => launchGame(currentGame, playMode))}>
                 {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the levels'}
               </button>
             )}
             {/* One primary action per card. Where Play Again exists it is the
                 primary, so leaving steps down to the quiet style; a daily has
                 no Play Again, so Back to Lobby stays the primary there. */}
-            <button className={'primary-btn' + (winData.isClassic ? ' review-btn' : '')} onClick={() => backToLobby(winData.isClassic ? 'classic' : null)}>Back to Lobby</button>
-            <button className="win-more" aria-expanded={winDetails} onClick={() => setWinDetails(v => !v)}>
+            <button className={'primary-btn tappable' + (winData.isClassic ? ' review-btn' : '')} {...tapProps(() => backToLobby(winData.isClassic ? 'classic' : null))}>Back to Lobby</button>
+            <button className="win-more tappable" aria-expanded={winDetails} {...tapProps(() => setWinDetails(v => !v))}>
               {winDetails ? 'Hide the details ▴' : 'Score, badges & leaderboard ▾'}
             </button>
             {winDetails && detailsPanel}
@@ -3335,12 +3335,12 @@ function App() {
             {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={false} />}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
-              <button className="primary-btn play-again-btn" onClick={playAgain}>
+              <button className="primary-btn play-again-btn tappable" {...tapProps(playAgain)}>
                 Play Again
               </button>
             )}
             {boardReviewable && (
-              <button className="primary-btn review-btn" onClick={() => setReviewMode(true)}>
+              <button className="primary-btn review-btn tappable" {...tapProps(() => setReviewMode(true))}>
                 👁 View board
               </button>
             )}
@@ -3348,7 +3348,7 @@ function App() {
                 move after a loss is another go at THIS band, not the ladder
                 screen. Remounts through the same key the auto-advance uses. */}
             {loseData.modeLabel === 'Story' && currentGame && (
-              <button className="primary-btn review-btn" onClick={() => startAdvanceBand(storyBand)}>
+              <button className="primary-btn review-btn tappable" {...tapProps(() => startAdvanceBand(storyBand))}>
                 🔁 Try this band again
               </button>
             )}
@@ -3366,7 +3366,7 @@ function App() {
                 This is the shared card, so it fixes the exit for every story
                 and arcade game, not only the one the issue was filed against. */}
             {loseData.modeLabel && currentGame && (
-              <button className="primary-btn play-again-btn" onClick={() => launchGame(currentGame, playMode)}>
+              <button className="primary-btn play-again-btn tappable" {...tapProps(() => launchGame(currentGame, playMode))}>
                 {loseData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Continue Story Quest'}
               </button>
             )}
@@ -3376,13 +3376,13 @@ function App() {
                 instead of back to the rung you just failed. The win card has
                 always gated this on `!modeLabel` — the loss card did not. */}
             {!loseData.isClassic && !loseData.modeLabel && currentGame && (
-              <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
+              <button className="primary-btn review-btn tappable" {...tapProps(() => startPractice(currentGame))}>
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>
             )}
             {/* Same rule as the win card: one primary action, and where there
                 is a Play Again it is not the one that leaves. */}
-            <button className={'primary-btn' + (loseData.isClassic || loseData.modeLabel ? ' review-btn' : '')} onClick={() => backToLobby(loseData.isClassic ? 'classic' : null)}>Back to Lobby</button>
+            <button className={'primary-btn tappable' + (loseData.isClassic || loseData.modeLabel ? ' review-btn' : '')} {...tapProps(() => backToLobby(loseData.isClassic ? 'classic' : null))}>Back to Lobby</button>
           </div>
         </div>
       )}
@@ -3415,14 +3415,14 @@ function App() {
                 whole "there is some practice run screen you can't go back to
                 view board after" report. */}
             {boardReviewable && (
-              <button className="primary-btn review-btn" onClick={() => setReviewMode(true)}>
+              <button className="primary-btn review-btn tappable" {...tapProps(() => setReviewMode(true))}>
                 👁 View board
               </button>
             )}
-            <button className="primary-btn review-btn" onClick={() => startPractice(currentGame)}>
+            <button className="primary-btn review-btn tappable" {...tapProps(() => startPractice(currentGame))}>
               🎲 Another practice run
             </button>
-            <button className="primary-btn" onClick={() => backToLobby()}>Back to Lobby</button>
+            <button className="primary-btn tappable" {...tapProps(() => backToLobby())}>Back to Lobby</button>
           </div>
         </div>
       )}

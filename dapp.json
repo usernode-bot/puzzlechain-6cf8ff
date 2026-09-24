@@ -1467,6 +1467,11 @@
       "expectSelector": ".win-overlay .review-btn"
     },
     {
+      "name": "Results card exits to the lobby via tap-action buttons",
+      "path": "/?game=2048&result=1",
+      "expectSelector": ".win-overlay button.tappable.primary-btn"
+    },
+    {
       "name": "Snake keeps its board behind the results card",
       "path": "/?game=snake&result=1&snake=normal",
       "expectSelector": ".game-body.frozen .snake-board"

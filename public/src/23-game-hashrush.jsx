@@ -522,7 +522,7 @@ function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
       }
       // The floor. A hash that crosses it is lost, so it has to be a line you
       // can see coming rather than the edge of the box.
-      ctx.fillStyle = 'rgba(99,102,241,0.9)';
+      ctx.fillStyle = PAL.accent;
       ctx.fillRect(0, H - 5, W, 5);
 
       // objects

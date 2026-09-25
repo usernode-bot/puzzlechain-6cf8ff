@@ -1785,6 +1785,23 @@
       "name": "A ladder one rung short of done is locked, not earned",
       "path": "/?screen=badges&demo=storybadges",
       "expectSelector": ".badge-chip.locked[data-badge=\"story-minefinder\"]"
+    },
+    {
+      "id": "theme.accent-teal",
+      "name": "Home filter chip wears the teal accent",
+      "path": "/",
+      "expectSelector": ".home-filter-chips .home-chip.on",
+      "visual": true,
+      "impact": [
+        "public/src/00-palette.jsx",
+        "public/src/01-styles.jsx",
+        "public/index.html"
+      ]
+    },
+    {
+      "name": "Dark theme filter chip wears the teal accent",
+      "path": "/?theme=dark",
+      "expectSelector": "html[data-theme=\"dark\"] .home-filter-chips .home-chip.on"
     }
   ],
   "visibility": {

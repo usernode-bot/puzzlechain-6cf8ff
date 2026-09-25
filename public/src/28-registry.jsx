@@ -89,6 +89,7 @@ const GAMES = [
   },
   {
     id: 'minesweeper',
+    ownMusic: true,
     name: 'Mine Finder Classic',
     icon: '💣',
     category: 'classic',
@@ -135,6 +136,7 @@ const GAMES = [
   },
   {
     id: 'chutes-ladders',
+    ownMusic: true,
     name: 'Snakes & Ladders',
     icon: '🪜',
     category: 'classic',
@@ -308,6 +310,7 @@ const GAMES = [
   },
   {
     id: 'bounce',
+    ownMusic: true,
     name: 'Bounce',
     icon: '🧱',
     category: 'classic',

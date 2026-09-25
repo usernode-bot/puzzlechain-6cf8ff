@@ -25,7 +25,7 @@ const PALETTES = {
     surface: '#F3EDDF', // deeper paper — nav, wells, sheets
     card:    '#FFFFFF', // card-weight white surfaces
     border:  '#E7DFCC', // warm hairline
-    accent:  '#2D5FAE', // editorial ink-blue — shell links/buttons/tabs
+    accent:  '#0B7A70', // vivid teal — shell links/buttons/tabs (5.2:1 with white text)
     gold:    '#C9A227', // brass — reserved for streaks, wins, medals
     emerald: '#1E8F63', // deep green (success, live states)
     violet:  '#7B5CD6',
@@ -41,7 +41,7 @@ const PALETTES = {
     surface: '#12161F',
     card:    '#181D29',
     border:  '#2A3342',
-    accent:  '#6366F1',
+    accent:  '#0E8C80', // teal, balanced for white text on it AND teal text on the dark page
     gold:    '#FBBF24',
     emerald: '#34D399',
     violet:  '#A78BFA',
@@ -63,7 +63,7 @@ const DERIVED = {
     'scrim':         'rgba(38,33,18,0.52)',
     'well':          'rgba(0,0,0,0.035)',
     'well-strong':   'rgba(0,0,0,0.055)',
-    'accent-hover':  '#234C8E',
+    'accent-hover':  '#09635B',
     'emerald-hover': '#059669',
     'gold-hover':    '#A8871C',
   },
@@ -74,7 +74,7 @@ const DERIVED = {
     'scrim':         'rgba(4,6,12,0.66)',
     'well':          'rgba(255,255,255,0.045)',
     'well-strong':   'rgba(255,255,255,0.07)',
-    'accent-hover':  '#7C7FF5',
+    'accent-hover':  '#12A596',
     'emerald-hover': '#6EE7B7',
     'gold-hover':    '#FCD34D',
   },

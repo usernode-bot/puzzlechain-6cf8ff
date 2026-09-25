@@ -2993,6 +2993,52 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    /* Staging-only demo seed (#295): the Today's Dailies checklist needs both
+       of its interesting states visible at once. A fresh staging DB has no
+       attempts for today, so every chip renders open (a correct but
+       uninformative row), and the solved count never leaves zero. This finishes
+       six dailies for the viewer, today only, with round obviously-fake scores.
+
+       The SIX games are chosen the way demo=homegrid and demo=dualmode choose
+       theirs: the whole suite runs as one viewer against one staging database in
+       declaration order, so finishing a game breaks any later check that opens
+       it. These six are touched by no other fixture, and no non-practice route
+       in the suite opens them:
+         sudokumini   (its checks all use practice=1, which writes nothing)
+         knights-tour, hashrush, diamondrush, match3, zuma
+       Deliberately NOT used: mahjongsol / anagrams / cratepush (demo=homegrid
+       DELETES the viewer's attempts for those three, so whichever fixture ran
+       second would silently win), and sudoku / cryptowordle / nonogram /
+       wordhunt / minefinder / klondike / spider / snakedaily / bouncedaily /
+       dropstack / tilematchingdaily (each carries another fixture's daily
+       state).
+
+       DO UPDATE, not DO NOTHING: a row another fixture merely CLAIMED must end
+       up finished, and DO NOTHING would leave it claimed and silently arm
+       nothing. Deletes nothing, because the other fixtures' rows legitimately
+       belong to earlier checks. Idempotent; today only; strict no-op in prod. */
+    if (IS_STAGING && req.query.demo === 'dailies') {
+      const solved = [
+        ['sudokumini', 880, 22, 118],
+        ['knights-tour', 760, 41, 205],
+        ['hashrush', 640, 30, 96],
+        ['diamondrush', 720, 18, 74],
+        ['match3', 830, 26, 152],
+        ['zuma', 690, 34, 131],
+      ];
+      for (const [gid, score, steps, timeSecs] of solved) {
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+           VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, $5, $6, now())
+           ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+             SET score = EXCLUDED.score, steps = EXCLUDED.steps,
+                 time_secs = EXCLUDED.time_secs, finished_at = now()`,
+          [req.user.id, req.user.username || 'staging-demo-user', gid, score, steps, timeSecs]
+        );
+      }
+    }
+
     // Staging-only demo seed (slice 4): a claimed, unfinished NONOGRAM row so a
     // tester can land a few taps, finish, and exercise the results card's
     // "View board" against a real board. No dayNum in the payload, so the

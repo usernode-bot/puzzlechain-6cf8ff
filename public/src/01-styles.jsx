@@ -3897,6 +3897,36 @@ ${emitTapHighlightRules()}
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
 
+/* Today's Dailies checklist (#295). The SAME scroller shape as the In progress
+   row directly below it (flex, 10px gap, horizontal overflow) because the two
+   are read together and a different rhythm for each would make one of them
+   look like a mistake. Chips are narrower than the In progress cards: one
+   glyph, one name, one short state, and a row of 23 of them has to feel
+   sweepable rather than like a second grid. */
+.dcheck-wrap { margin-bottom: 0.9rem; }
+.dcheck-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.dcheck-note { color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem; }
+.dcheck-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.dcheck-chip {
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
+  padding: 8px 12px; min-width: 96px; max-width: 140px; cursor: pointer;
+  flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start;
+  font-family: inherit; color: ${C.text}; text-align: left;
+}
+.dcheck-chip:hover { border-color: ${C.accent}; }
+.dcheck-chip .dcheck-icon { font-size: 20px; line-height: 1.1; }
+.dcheck-chip .dcheck-name {
+  font-weight: 600; font-size: 12.5px; margin-top: 3px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.dcheck-chip .dcheck-state { font-size: 10.5px; margin-top: 3px; color: ${C.muted}; }
+/* Solved is the one state that pays, so it is the one state that colours: the
+   app's gold is already the win/streak colour (see the streak chip). A played
+   and lost day stays muted on purpose — it happened, it just does not score. */
+.dcheck-chip.solved { border-color: ${C.gold}; }
+.dcheck-chip.solved .dcheck-state { color: ${C.gold}; }
+.dcheck-chip.resume .dcheck-state { color: ${C.accent}; }
+
 .chat-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;
   display: flex; align-items: flex-end; justify-content: center;

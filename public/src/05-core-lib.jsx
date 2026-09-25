@@ -546,6 +546,14 @@ const STREAK_TIERS = [
    ============================================================ */
 const CHANGELOG = [
   {
+    id: 'w2026-09-25',
+    weekOf: 'Week of September 25, 2026',
+    items: [
+      'Home now opens with Today’s Dailies: one chip per daily showing what is left, what is in progress and what is already done, so you can sweep the day without scrolling the whole grid.',
+      'The row counts how many you have solved and names the Daily Sweep badge it is working toward.',
+    ],
+  },
+  {
     id: 'w2026-08-17',
     weekOf: 'Week of August 17, 2026',
     items: [

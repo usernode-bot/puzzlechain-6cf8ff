@@ -507,6 +507,61 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
   );
 }
 
+/* ============================================================
+   Today's Dailies checklist (#295)
+   ============================================================
+   A second, faster reading of state the home grid already holds. The row is
+   one chip per daily, in registry order, and the whole point is that it never
+   becomes a second source of truth: `items` is built from GAME_CARDS +
+   `attempts` (see dailyChecklistCards / dailyChipState in 29-cards.jsx), the
+   same pair every card's own "Daily ✓" badge reads, so the two cannot drift.
+
+   It follows the In progress row's shape on purpose (a horizontal strip of
+   small cards with an icon, a name and a status line) because that is the
+   app's established idiom for "here is a short list of things you can resume",
+   and the Pinned heading's count for the same reason.
+
+   A FINISHED chip stays tappable. The locked screen behind it is today's
+   result, with the board review and the unscored replay, which is a
+   destination worth offering, not a dead control to grey out. */
+function DailyChecklist({ items, solved, total, sweepEarned, onOpenDaily }) {
+  if (!items.length) return null;
+  return (
+    <div className="dcheck-wrap">
+      <div className="home-section-title dcheck-title">
+        Today's Dailies
+        <span className="home-pin-count">{dailyChecklistCount(solved, total)}</span>
+      </div>
+      {/* One line, three states, always exactly one line tall: the running
+          tally that names the badge, the badge already earned on an earlier
+          day, and the day closed out. It never grows the section, which is
+          why it is safe to render in every state on a Home page #234 pulled
+          tight. */}
+      <div className="dcheck-note">{dailyChecklistNote(solved, total, sweepEarned)}</div>
+      <div className="dcheck-strip">
+        {items.map((it) => {
+          const state = it.state;
+          const meta = DAILY_CHIP_STATES[state];
+          return (
+            <button
+              key={it.gameId}
+              type="button"
+              className={'dcheck-chip tappable ' + state}
+              data-game={it.gameId}
+              aria-label={`${it.name}, Daily: ${meta.word}`}
+              {...tapProps(() => onOpenDaily && onOpenDaily(it.game))}
+            >
+              <span className="dcheck-icon">{it.icon}</span>
+              <span className="dcheck-name">{it.name}</span>
+              {meta.marker ? <span className="dcheck-state mono">{meta.marker}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Per-game public chat room (phase 7): one room per game, 10s polling, report-
 // to-hide moderation (3 distinct reports auto-hide a message server-side).
 function ChatPanel({ game, user, onClose }) {

@@ -1785,6 +1785,35 @@
       "name": "A ladder one rung short of done is locked, not earned",
       "path": "/?screen=badges&demo=storybadges",
       "expectSelector": ".badge-chip.locked[data-badge=\"story-minefinder\"]"
+    },
+    {
+      "name": "Today's Dailies checklist renders on Home",
+      "path": "/?demo=dailies",
+      "expectSelector": ".dcheck-strip",
+      "expectText": "Today's Dailies",
+      "visual": true,
+      "id": "home.dailies-checklist",
+      "impact": [
+        "public/src/30-app-root.jsx",
+        "public/src/07-ui-chrome.jsx",
+        "public/src/01-styles.jsx",
+        "public/src/29-cards.jsx"
+      ]
+    },
+    {
+      "name": "Checklist ticks a daily that was solved today",
+      "path": "/?demo=dailies",
+      "expectSelector": ".dcheck-chip.solved[data-game='sudokumini']"
+    },
+    {
+      "name": "Checklist explains the Daily Sweep badge",
+      "path": "/?demo=dailies",
+      "expectText": "Daily Sweep"
+    },
+    {
+      "name": "Checklist renders with nothing solved yet",
+      "path": "/",
+      "expectSelector": ".dcheck-chip"
     }
   ],
   "visibility": {

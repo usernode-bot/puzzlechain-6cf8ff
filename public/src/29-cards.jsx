@@ -266,6 +266,66 @@ const cardPinId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameI
    drifting costs a stale tooltip rather than a wrong outcome. */
 const PIN_LIMIT = 8;
 
+/* TODAY'S DAILIES CHECKLIST (#295).
+   Every card that has a daily, in registry order, resolved to the registry id
+   its attempt row is keyed by. That resolution is the whole correctness story
+   here: `attempts` is keyed by REGISTRY id, never by card key, so keying this
+   list off `card.key` would read `undefined` for all four merged cards
+   (snakedaily, tilematchingdaily, bouncedaily, minefinder) and quietly show
+   them as permanently open. `cardDailyId` already answers this for the card's
+   own badge, which is why it is read here rather than re-derived. */
+function dailyChecklistCards() {
+  const out = [];
+  for (const c of GAME_CARDS) {
+    const id = cardDailyId(c);
+    if (!id) continue;
+    const game = GAMES.find(g => g.id === id);
+    if (!game) continue;
+    /* The chip reads the CARD's name and icon, not the registry entry's.
+       For the four merged pairs those differ, and the card is the right one:
+       a card is "one game as a player thinks of it" (see the header of this
+       file), so the strip says "Snake" exactly as the grid card below it does,
+       rather than the daily registry row's "Daily Snake" under a heading that
+       already says Dailies. The ID stays the registry id, because that is what
+       `attempts` and the launch path are keyed by. */
+    out.push({ card: c, gameId: id, name: c.name, icon: c.icon, game });
+  }
+  return out;
+}
+
+/* One chip's state, from the attempt row alone. `solved` is deliberately
+   "finished AND scored", which is exactly what the server's own daily_sweep
+   award reads (score > 0 rows for today), so the checklist's count and the
+   badge can never mean different things. A played-and-lost day therefore reads
+   "Played" and does not advance the count. */
+const DAILY_CHIP_STATES = {
+  open:   { marker: '',         word: 'not started' },
+  resume: { marker: '▶ Resume', word: 'in progress' },
+  solved: { marker: '✓ Played', word: 'solved' },
+  played: { marker: 'Played',   word: 'played' },
+};
+function dailyChipState(attempt) {
+  if (!attempt) return 'open';
+  if (!attempt.finishedAt) return 'resume';
+  return (attempt.score || 0) > 0 ? 'solved' : 'played';
+}
+
+/* The mono count beside the heading: "7/23 solved". Derived, never hard-coded,
+   so a daily added to the registry and to PLAY_MODES_BY_ID appears in both
+   numbers with no second edit. */
+const dailyChecklistCount = (solved, total) => `${solved}/${total} solved`;
+
+/* The one line under the heading, which is the only place the Daily Sweep
+   badge is explained anywhere in the app. Three states, in the order they
+   matter: a finished sweep, a badge already earned on any earlier day (the
+   achievement row is permanent, so the line stays earned), then the running
+   tally that names the badge. */
+function dailyChecklistNote(solved, total, sweepEarned) {
+  if (total > 0 && solved >= total) return 'Every daily is solved today. Come back after the reset.';
+  if (sweepEarned) return '🧹 Daily Sweep badge earned.';
+  return `Solve all ${total} today for the 🧹 Daily Sweep badge.`;
+}
+
 /* ============================================================
    The card
    ============================================================

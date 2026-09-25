@@ -1978,6 +1978,43 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #295 — the Today's Dailies checklist must cover EXACTLY the games that
+     declare a daily, once each. The failure this guards is silent and the only
+     symptom is a count that is one too low: a daily added to PLAY_MODES_BY_ID
+     (and to the registry, which check-registry.js enforces) would render in the
+     grid but never in the strip, or a merged card would contribute its card key
+     instead of its registry id and read as permanently open. Both are the same
+     shape of bug as `registry-cards`, which guards the grid the same way. */
+  check('dcheck-covers-every-daily', () => {
+    if (typeof dailyChecklistCards !== 'function') return true;
+    const expected = GAMES.filter(g => supportsMode(g.id, 'daily')).map(g => g.id).sort();
+    const got = dailyChecklistCards().map(c => c.gameId).sort();
+    if (got.length !== expected.length) {
+      throw new Error('checklist covers ' + got.length + ' dailies, expected ' + expected.length
+        + ' (missing: ' + expected.filter(id => got.indexOf(id) === -1).join(', ')
+        + '; extra: ' + got.filter(id => expected.indexOf(id) === -1).join(', ') + ')');
+    }
+    const seen = new Set();
+    for (const id of got) {
+      if (seen.has(id)) throw new Error('checklist lists ' + id + ' twice');
+      seen.add(id);
+    }
+    for (const id of expected) {
+      if (!seen.has(id)) throw new Error('checklist is missing the daily ' + id);
+    }
+    // Registry order, never state order: a chip that reordered itself as you
+    // swept would move under the player's thumb.
+    const cards = dailyChecklistCards();
+    const cardOrder = GAME_CARDS.map(c => c.key);
+    let last = -1;
+    for (const c of cards) {
+      const at = cardOrder.indexOf(c.card.key);
+      if (at < last) throw new Error('checklist is not in registry order at ' + c.gameId);
+      last = at;
+    }
+    return true;
+  });
+
   // Phase 7 — the rules registry must be reachable from the browser now that
   // local/bot modes share it with the server.
   check('board-rules', () => {

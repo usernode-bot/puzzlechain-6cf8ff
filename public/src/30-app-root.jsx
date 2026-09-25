@@ -2262,6 +2262,25 @@ function App() {
       .map((r) => ({ type: 'room', room: r, game: GAMES.find((g) => g.id === r.gameId) }))
       .filter((x) => x.game),
   ];
+  /* #295 — Today's Dailies checklist. One entry per card that has a daily, in
+     registry order, each carrying the state its attempt row implies. The state
+     is resolved HERE rather than in the component so the count and the strip
+     are computed from one pass and cannot disagree; the component only renders
+     what it is handed.
+
+     `solved` counts a finished, SCORED attempt, which is the server's own
+     daily_sweep rule, so the count means what the badge means. */
+  const dailyChecklistItems = dailyChecklistCards().map((c) => ({
+    gameId: c.gameId,
+    name: c.name,
+    icon: c.icon,
+    game: c.game,
+    state: dailyChipState(attempts[c.gameId]),
+  }));
+  const dailySolved = dailyChecklistItems.filter((i) => i.state === 'solved').length;
+  const dailyTotal = dailyChecklistItems.length;
+  const sweepEarned = !!(achievements && Array.isArray(achievements.types)
+    && achievements.types.indexOf('daily_sweep') !== -1);
   // Re-enter an active online match from the in-progress row: pre-seat the
   // player (roomId + seat number) through the classic game-mode opts so
   // BoardRoomGame / Chutes & Ladders skip the create/join setup screen.
@@ -2527,6 +2546,20 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
+              {/* #295 — the checklist sits directly under the hero: it is a
+                  way IN (what is left today, one tap away), and it belongs
+                  above the In progress row, which is for runs already
+                  started. Signed-in only: a guest has no per-day record, so a
+                  strip of unticked boxes would be a lie about their progress. */}
+              {authOk && !loading && (
+                <DailyChecklist
+                  items={dailyChecklistItems}
+                  solved={dailySolved}
+                  total={dailyTotal}
+                  sweepEarned={sweepEarned}
+                  onOpenDaily={(g) => { if (!loading) launchGame(g, 'daily'); }}
+                />
+              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}

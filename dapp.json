@@ -71,6 +71,18 @@
       "expectText": "Streak"
     },
     {
+      "name": "Daily cards show the streak pill (#313)",
+      "path": "/?demo=streak&tab=daily",
+      "expectSelector": ".card .card-streak[data-streak='10']",
+      "visual": true,
+      "id": "daily-cards.streak-pill",
+      "impact": [
+        "public/src/29-cards.jsx",
+        "public/src/30-app-root.jsx",
+        "public/src/01-styles.jsx"
+      ]
+    },
+    {
       "name": "Masthead tagline renders",
       "path": "/",
       "expectText": "Classic games, fresh every day."

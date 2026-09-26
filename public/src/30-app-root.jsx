@@ -2644,6 +2644,9 @@ function App() {
                   attempts: attempts,
                   bests: bests,
                   storyProgress: storyProgress,
+                  // #313 — every daily card shows the player's current streak;
+                  // the same state the nav stat and pre-game panel read.
+                  streak: authOk ? streak : 0,
                   loading: loading,
                   onPlay: playCardMode,
                   pinned: pinnedSet.has(c.key),

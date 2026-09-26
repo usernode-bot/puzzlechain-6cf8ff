@@ -1290,6 +1290,14 @@ ${emitTapHighlightRules()}
   color: ${C.dim}; font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* #316 — the personal best line sits between the state line and the mode
+   buttons, one muted tabular-figure line so it can't nudge the grid. It
+   mirrors .card-state's sizing rather than inventing a scale of its own. */
+.card-best {
+  margin-top: 0.25rem; font-size: 0.62rem; letter-spacing: 0.04em;
+  color: ${C.muted}; font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .card-mode-btn {
   display: flex; flex-direction: column; justify-content: center;
   width: 100%; min-width: 0; text-align: center;

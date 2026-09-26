@@ -507,6 +507,52 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
   );
 }
 
+/* Recently Played (Recent goal): the viewer's last five plays as one tappable
+   tile each, mirroring InProgressRow's strip shape so the lobby keeps a single
+   rhythm. Renders nothing at all when there is no history (the server only
+   sends plays the signed-in viewer made), so an empty account simply shows the
+   grid without the strip. GAMES is defined later in the bundle order, which is
+   fine: the lookup runs at render time, not at parse time. */
+function fmtPlayedAgo(iso, offset) {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const mins = Math.max(1, Math.round((Date.now() + (offset || 0) - t) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.round(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+function RecentlyPlayedRow({ items, onOpen, offset }) {
+  if (!items || !items.length) return null;
+  return (
+    <div className="inprog-row-wrap">
+      <div className="home-section-title">Recently Played</div>
+      <div className="inprog-row recent-row">
+        {items.map((p) => {
+          const g = GAMES.find(x => x.id === p.gameId);
+          if (!g) return null;
+          return (
+            <button
+              key={p.gameId}
+              className="inprog-card recent-card"
+              aria-label={'Replay ' + g.name}
+              {...tapProps(() => onOpen(p.gameId))}
+            >
+              <div className="ip-icon">{g.icon}</div>
+              <div className="ip-name">{g.name}</div>
+              <div className="ip-sub resume">▶ Replay</div>
+              {p.playedAt && (
+                <div className="ip-sub mono">{fmtPlayedAgo(p.playedAt, offset)}</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Per-game public chat room (phase 7): one room per game, 10s polling, report-
 // to-hide moderation (3 distinct reports auto-hide a message server-side).
 function ChatPanel({ game, user, onClose }) {

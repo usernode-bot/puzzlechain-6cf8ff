@@ -1702,6 +1702,16 @@
       "expectText": "on any card to pin it to the top"
     },
     {
+      "name": "Recently Played strip renders the viewer's last plays",
+      "path": "/?demo=recent",
+      "expectSelector": ".recent-row .recent-card"
+    },
+    {
+      "name": "Home with no play history hides the Recently Played strip",
+      "path": "/?demo=recentclear",
+      "expectText": "All Games"
+    },
+    {
       "name": "Nonogram flags a grid that is full but wrong",
       "path": "/?game=nonogram&practice=1&ngfill=wrong",
       "expectSelector": ".ng-status[data-ng-tone=\"err\"]"

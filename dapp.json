@@ -1,7 +1,8 @@
 {
   "name": "Game Corner",
   "icon": {
-    "emoji": "🕹️"
+    "image": "public/icon.png",
+    "emoji": "🎮"
   },
   "secrets": [
     {

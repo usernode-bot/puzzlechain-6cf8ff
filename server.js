@@ -1323,6 +1323,22 @@ async function migrate() {
     )
   `);
 
+  // game_favorites is PUBLIC — one row per (user, game) the player starred.
+  // Same data class as game_pins: a display preference over ids that are
+  // already public (every game id is a deep-link key), so a stranger reading
+  // every row learns nothing the lobby does not show. game_id holds the CARD's
+  // anchor registry id; the client resolves it back through CARD_BY_GAME_ID,
+  // which lets the four merged cards keep both of their ids.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_favorites (
+      user_id       TEXT NOT NULL,
+      username      TEXT,
+      game_id       TEXT NOT NULL,
+      favorited_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+
   // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
   // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
   // `state` JSONB is game-specific and `game_id` is validated against
@@ -2463,6 +2479,53 @@ app.delete('/api/pins/:gameId', async (req, res) => {
   }
 });
 
+// ---- Favorite games API --------------------------------------------------
+// Same auth-gated, idempotent shape as the pins API above: the favorite
+// belongs to req.user, never to an id the client names, and both routes
+// answer with the player's FULL favorite list so the client replaces its
+// optimistic set with the server's truth. No cap — a list of ids is cheap.
+
+async function readFavorites(userId) {
+  const { rows } = await pool.query(
+    `SELECT game_id FROM game_favorites WHERE user_id = $1 ORDER BY favorited_at ASC, game_id ASC`,
+    [userId]
+  );
+  return rows.map(r => r.game_id);
+}
+
+// PUT /api/favorites/:gameId — star a game. Idempotent: starring an
+// already-starred game is a success with an unchanged list.
+app.put('/api/favorites/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    await pool.query(
+      `INSERT INTO game_favorites (user_id, username, game_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [req.user.id, req.user.username || null, gameId]
+    );
+    res.json({ favorites: await readFavorites(req.user.id) });
+  } catch (err) {
+    console.error('[favorites] PUT failed:', err.message);
+    res.status(500).json({ error: 'Failed to favorite game' });
+  }
+});
+
+// DELETE /api/favorites/:gameId — unstar. Idempotent: unstarring something
+// never starred is a success with an unchanged list.
+app.delete('/api/favorites/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  try {
+    await pool.query(`DELETE FROM game_favorites WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]);
+    res.json({ favorites: await readFavorites(req.user.id) });
+  } catch (err) {
+    console.error('[favorites] DELETE failed:', err.message);
+    res.status(500).json({ error: 'Failed to unstar game' });
+  }
+});
+
 // ---- Posts API (sharing) -----------------------------------------------
 
 
@@ -2630,6 +2693,39 @@ app.get('/api/daily', async (req, res) => {
        Deletes only rows belonging to the caller; strict no-op in production. */
     if (IS_STAGING && req.query.demo === 'pinsempty') {
       await pool.query(`DELETE FROM game_pins WHERE user_id = $1`, [req.user.id]);
+    }
+
+    /* Staging-only demo seed: stars three games for the current viewer so the
+       Favorites filter chip and its per-card star state are reachable by
+       navigation alone — game_favorites is a NEW table, so staging starts
+       with zero rows and an active chip would otherwise show nothing. The
+       ids mirror the demo=pins mix (a daily, a classic, one half of a merged
+       card). Nothing the app's own logic reads is fabricated here: a favorite
+       is the player's own choice, this fixture IS the player acting (one
+       viewer, one DB, explicitly armed by the demo param), and it only ever
+       controls the chip the viewer opted into. Idempotent; strict no-op in
+       production. */
+    if (IS_STAGING && req.query.demo === 'favorites') {
+      const demoFavorites = ['sudoku', 'mancala', 'snakedaily'];
+      for (let i = 0; i < demoFavorites.length; i++) {
+        await pool.query(
+          `INSERT INTO game_favorites (user_id, username, game_id, favorited_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoFavorites[i],
+           String(demoFavorites.length - i)]
+        );
+      }
+    }
+
+    /* Staging-only counterpart to demo=favorites: clears the viewer's
+       favorites so the empty-chip state is reachable deterministically,
+       exactly as demo=pinsempty does for pins — the check suite runs as one
+       viewer against one staging DB, so the order routes ran in must not
+       decide what the chip shows. Deletes only the caller's rows; strict
+       no-op in production. */
+    if (IS_STAGING && req.query.demo === 'favempty') {
+      await pool.query(`DELETE FROM game_favorites WHERE user_id = $1`, [req.user.id]);
     }
 
     // Staging-only demo seed: gives the current viewer a 10-day consecutive
@@ -3716,6 +3812,14 @@ app.get('/api/daily', async (req, res) => {
       pins = pinRows.map(r => r.game_id);
     } catch (e) { console.warn('[daily] pins query failed (non-fatal):', e.message); }
 
+    // Favorited games — the card anchor ids this player starred, oldest
+    // first. Non-fatal: a lobby without its Favorites filter is still a
+    // lobby; the client just falls back to no stars and an empty chip view.
+    let favorites = [];
+    try {
+      favorites = await readFavorites(req.user.id);
+    } catch (e) { console.warn('[daily] favorites query failed (non-fatal):', e.message); }
+
     res.json({
       // Surface the signed-in account so the UI can confirm login +
       // that persistent data is active. Always present here (route is
@@ -3746,6 +3850,8 @@ app.get('/api/daily', async (req, res) => {
       // Games pinned to the top of the home grid (#232), oldest pin first.
       pins,
       pinLimit: PIN_LIMIT,
+      // Games starred as favorites, oldest star first.
+      favorites,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);

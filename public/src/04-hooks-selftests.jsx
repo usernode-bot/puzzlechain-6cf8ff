@@ -716,6 +716,29 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* Favorites (#308): the chip's filter is the same id → card-key resolution
+     the pin partition uses, so a star on one half of a merged pair must
+     surface that one card, every star must resolve, and an unknown id must
+     never drop the count below the cards that DID resolve. One filter that
+     reads exactly what the chip's view reads. */
+  check('favorite-card-resolution', () => {
+    const favSet = new Set();
+    const stored = ['snakedaily', 'sudoku', 'mancala', 'not-a-real-id'];
+    for (const id of stored) {
+      const c = CARD_BY_GAME_ID[id];
+      if (c) favSet.add(c.key);
+    }
+    // The unknown id resolves to nothing; the three real ones resolve to
+    // exactly three cards.
+    if (favSet.size !== 3) throw new Error('3 resolvable ids resolved to ' + favSet.size + ' cards');
+    // Snake's stored anchor id (snakedaily) must surface the merged Snake card.
+    const snake = CARD_BY_GAME_ID['snakedaily'];
+    if (!snake || !favSet.has(snake.key)) throw new Error('snake favorite did not resolve to its card');
+    const filtered = GAME_CARDS.filter(c => favSet.has(c.key));
+    if (filtered.length !== 3) throw new Error('the Favorites filter shows ' + filtered.length + ' of 3 starred cards');
+    return true;
+  });
+
   // Phase 5 (#143) — 2048 vertical swipes were inverted. A lone tile at the
   // bottom row swiped 'up' must reach row 0, and vice versa.
   check('t2048-up', () => {

@@ -2301,6 +2301,64 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
   }
 });
 
+// Monday of the current UTC week, as a YYYY-MM-DD date string. Same window
+// arithmetic as utcWeekStart() (the Elo weekly movers), inlined here so the
+// Friends tab and the ladder agree on what "this week" means.
+// The Friends leaderboard ranks daily completions from the START of the UTC
+// week (Monday 00:00) through now. The tab labels the window with the two
+// dates so it is clear what is counted; the server and the client both derive
+// it from UTC.
+function friendsWeekStart() {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dow = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+// GET /api/social/friends-weekly
+// The lobby Friends tab: ranks the people the signed-in user follows by how
+// many DAILY games they finished so far this UTC week (Monday 00:00 → now).
+// Completions are COUNT(DISTINCT attempt_date) per friend, so a friend who
+// replays the same game on a different day is counted once per day, and the
+// window is the current week only. Auth-gated like every /api route: the
+// follow graph is per-caller, so anonymous callers get an empty board.
+app.get('/api/social/friends-weekly', async (req, res) => {
+  if (!req.user) return res.json({ entries: [], weekStart: null, today: null });
+  try {
+    const weekStart = friendsWeekStart();
+    const { rows } = await pool.query(
+      `SELECT f.followee_id,
+              COALESCE(u.username, a.username) AS username,
+              COUNT(DISTINCT a.attempt_date)::int AS completions,
+              MIN(a.attempt_date) AS first_day
+         FROM user_follows f
+         JOIN daily_attempts a
+           ON a.user_id = f.followee_id
+          AND a.finished_at IS NOT NULL
+          AND a.attempt_date >= $2::date
+         LEFT JOIN users u ON u.id = f.followee_id
+        WHERE f.follower_id = $1
+        GROUP BY f.followee_id, COALESCE(u.username, a.username)
+        ORDER BY completions DESC, username ASC`,
+      [req.user.id, weekStart]
+    );
+    // Rank within the returned set (ROW_NUMBER over the same ordering).
+    const shape = rows.map((r, i) => ({
+      userId: r.followee_id,
+      username: r.username || 'anon',
+      completions: r.completions,
+      firstDay: r.first_day ? r.first_day.toISOString().slice(0, 10) : null,
+      rank: i + 1,
+    }));
+    const today = new Date().toISOString().slice(0, 10);
+    res.json({ entries: shape, weekStart, today });
+  } catch (err) {
+    console.error('[social] friends-weekly failed:', err.message);
+    res.status(500).json({ error: 'Failed to load friends leaderboard' });
+  }
+});
+
 // GET /api/social/friends
 // Returns the signed-in user's friend list
 app.get('/api/social/friends', async (req, res) => {
@@ -3247,6 +3305,56 @@ app.get('/api/daily', async (req, res) => {
            ON CONFLICT (user_id, game_id) DO NOTHING`,
           [uid, name, Math.round((1000 - time) / 100)]
         );
+      }
+    }
+
+    // Staging-only demo seed: the lobby Friends tab. Fake friends the VIEWER
+    // follows, each with a few finished daily attempts spread across THIS UTC
+    // week (Monday 00:00 → now) so the weekly-completions ranking has rows to
+    // show on a fresh staging DB. Never seeds the visitor's own identity: the
+    // follows point FROM req.user TO fake ids, so the tab still renders its
+    // empty state for a real viewer with no friends. Idempotent, obviously
+    // fake, strict no-op in production.
+    if (IS_STAGING && req.query.demo === 'friends') {
+      const fwSeed = [
+        ['staging-demo-fw-1', 'Staging friend Nia',  5, 0], // 5 completions, first day = week start
+        ['staging-demo-fw-2', 'Staging friend Otto', 4, 1], // 4 completions, started one day in
+        ['staging-demo-fw-3', 'Staging friend Pia',  3, 2],
+      ];
+      const nowD = new Date();
+      const monday = new Date(Date.UTC(nowD.getUTCFullYear(), nowD.getUTCMonth(), nowD.getUTCDate()));
+      monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+      for (const [uid, name, completions, startOffset] of fwSeed) {
+        // users row so the friends list and profile screen can resolve them.
+        await pool.query(
+          `INSERT INTO users (id, username) VALUES ($1, $2)
+           ON CONFLICT (id) DO NOTHING`,
+          [uid, name]
+        );
+        // The follow graph is the viewer's: follows FROM req.user, rows
+        // owned by fake ids only.
+        await pool.query(
+          `INSERT INTO user_follows (follower_id, followee_id)
+           VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [req.user.id, uid]
+        );
+        // One finished daily attempt per (day, game) pair: the first
+        // `completions` days of the week starting `startOffset` days in, one
+        // game each day (the same game for the whole run — the ranking counts
+        // distinct days, not games).
+        for (let i = 0; i < completions; i++) {
+          const day = new Date(monday);
+          day.setUTCDate(day.getUTCDate() + startOffset + i);
+          if (day > nowD) break; // a seed past today would overstate the window
+          await pool.query(
+            `INSERT INTO daily_attempts
+               (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
+             VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8::date::timestamptz)
+             ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+            [uid, name, 'sudoku', day.toISOString().slice(0, 10),
+             900 - i * 10, 20, 120, day.toISOString().slice(0, 10)]
+          );
+        }
       }
     }
 

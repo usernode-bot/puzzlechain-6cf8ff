@@ -171,6 +171,89 @@ function TodayChampions({ onSelectUser }) {
 }
 
 /* ============================================================
+   Friends tab (Game Corner lobby) — the people the signed-in user
+   follows, ranked by how many DAILY games they finished so far this
+   week (Monday 00:00 UTC → now; per-player count of distinct days,
+   so replaying one game on a different day still counts). Follows
+   the existing lboard/lrow leaderboard styles and the same empty
+   copy the friends-scoped boards use. Tapping a row opens that
+   player's profile via onSelectUser, exactly like TodayChampions.
+   ============================================================ */
+function FriendsWeekly({ onSelectUser }) {
+  const [state, setState] = useState({ loading: true });
+  const authOk = typeof GUEST_MODE !== 'undefined' ? !GUEST_MODE : true;
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true });
+    (async () => {
+      if (!authOk) { // signed out: no follow graph, render the guest note
+        setState({ loading: false, entries: [], weekStart: null, today: null });
+        return;
+      }
+      if (GUEST_MODE) return; // guest runs never fire requests that only 401
+      const { ok, body } = await api('/api/social/friends-weekly');
+      if (!alive) return;
+      if (ok && body) setState({ loading: false, ...body });
+      else setState({ loading: false, entries: [], weekStart: null, today: null, error: true });
+    })();
+    return () => { alive = false; };
+  }, [authOk]);
+
+  const entries = state.entries || [];
+  const ws = state.weekStart, td = state.today;
+  const windowLabel = ws && td
+    ? `${new Date(ws + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} – ${new Date(td + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`
+    : '';
+  const title = (
+    <div className="lboard-title">
+      Friends
+      <span className="lboard-count">🗓 Daily completions this week{windowLabel ? ` · ${windowLabel}` : ''}</span>
+    </div>
+  );
+
+  if (state.loading) {
+    return <div className="lboard friends-weekly"><div className="lboard-title">Friends</div><div className="lboard-empty">Loading…</div></div>;
+  }
+
+  if (state.error) {
+    return (
+      <div className="lboard friends-weekly">
+        {title}
+        <div className="lboard-empty">Could not load the friends board. Try again in a moment.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="lboard friends-weekly">
+      {title}
+      {entries.length === 0 ? (
+        <div className="lboard-empty">
+          {authOk
+            ? 'No friends on this board yet. Add friends from the Friends screen.'
+            : 'Add friends to see who is playing.'}
+        </div>
+      ) : (
+        <div className="lboard-rows">
+          {entries.map(e => (
+            <div
+              key={e.userId}
+              className={'lrow' + (onSelectUser ? ' clickable' : '')}
+              onClick={onSelectUser && e.userId ? () => onSelectUser(e.userId) : undefined}
+            >
+              <span className="lrank mono">#{e.rank}</span>
+              <span className="lname">{e.username}</span>
+              <span className="ltime mono">{e.completions} done</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    Rating ladder (phase 4) — Elo standings for the head-to-head
    games, fed by online room/match results. Shows rating, current
    win streak, and this week's movement per player.

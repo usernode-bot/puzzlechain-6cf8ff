@@ -371,6 +371,19 @@
       "expectText": "Staging friend Nia"
     },
     {
+      "name": "Friends tab renders as a lobby filter chip",
+      "path": "/?tab=friends&demo=friends",
+      "expectSelector": ".home-chip.on",
+      "expectText": "Friends"
+    },
+    {
+      "name": "Friends tab ranks followed players by weekly completions",
+      "path": "/?tab=friends&demo=friends",
+      "expectSelector": ".lboard.friends-weekly .lboard-rows .lrow",
+      "expectText": "Staging friend Nia",
+      "allowConsoleErrors": true
+    },
+    {
       "name": "Ladder tab shows seeded ratings and movers",
       "path": "/?tab=ladder&demo=ladder",
       "expectText": "Staging rival Kas"

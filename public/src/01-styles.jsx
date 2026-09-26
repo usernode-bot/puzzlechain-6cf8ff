@@ -4065,6 +4065,64 @@ ${emitTapHighlightRules()}
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
 
+/* Per-card daily streak badge: a quiet count under the daily state badge, so
+   a played card shows "how many days in a row" without shouting over the
+   grid. Same pill family as .card-daily-badge, gold to match the streak's
+   multiplier colour elsewhere in the app. */
+.card-streak-badge {
+  position: absolute; top: 0.65rem; right: 0.65rem; z-index: 1;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.56rem; font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.45rem; border-radius: 999px;
+  background: ${ca('gold', '1a')}; color: ${C.gold};
+  border: 1px solid ${ca('gold', '35')};
+}
+/* When the daily badge is also showing, the streak badge tucks under it so
+   the two never collide at the top-right corner. */
+.card-streak-badge.with-daily { top: 2.1rem; }
+
+/* Home streak calendar: a compact 5-week grid of the days a daily was
+   finished. Weekday initials + one row per week, in the same mono/muted
+   register as the rest of the home chrome. */
+.streak-calendar {
+  margin: 0.4rem 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid ${C.border};
+  border-radius: 12px;
+  background: ${C.card};
+}
+.streak-cal-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 0.6rem; margin-bottom: 0.5rem;
+}
+.streak-cal-title { font-weight: 700; font-size: 0.85rem; }
+.streak-cal-count {
+  font-size: 0.72rem; color: ${C.gold};
+  font-variant-numeric: tabular-nums;
+}
+.streak-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  justify-items: center;
+}
+.streak-wd {
+  font-size: 0.5rem; color: ${C.muted}; text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.streak-cell {
+  width: 100%; aspect-ratio: 1 / 1; max-width: 26px;
+  border-radius: 4px;
+  background: ${ca('gold', '10')};
+}
+.streak-cell.played { background: ${C.gold}; }
+.streak-cell.today {
+  outline: 2px solid var(--c-accent, #2d5fae); outline-offset: 1px;
+}
+.streak-cal-hint {
+  margin-top: 0.5rem; font-size: 0.68rem; color: ${C.muted};
+}
+
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
 .lboard, .howto-card {

@@ -1785,6 +1785,34 @@
       "name": "A ladder one rung short of done is locked, not earned",
       "path": "/?screen=badges&demo=storybadges",
       "expectSelector": ".badge-chip.locked[data-badge=\"story-minefinder\"]"
+    },
+    {
+      "name": "Home streak calendar renders",
+      "path": "/?demo=streak",
+      "expectSelector": ".streak-calendar"
+    },
+    {
+      "name": "Home streak calendar marks played days",
+      "path": "/?demo=streak",
+      "expectSelector": ".streak-cell.played"
+    },
+    {
+      "name": "Streak badge shows a day count on a played card",
+      "path": "/?demo=streak",
+      "expectSelector": ".card-streak-badge"
+    },
+    {
+      "id": "home.streak-calendar",
+      "name": "Home streak calendar and per-card streak badge render together",
+      "path": "/?demo=streak",
+      "expectSelector": ".streak-calendar",
+      "visual": true,
+      "impact": [
+        "public/src/29-cards.jsx",
+        "public/src/30-app-root.jsx",
+        "public/src/01-styles.jsx",
+        "server.js"
+      ]
     }
   ],
   "visibility": {

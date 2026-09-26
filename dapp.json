@@ -542,6 +542,11 @@
       "expectText": "streak"
     },
     {
+      "name": "Discover home shows skeleton placeholders while loading",
+      "path": "/?demo=signedout&force-loading=1",
+      "expectSelector": ".home-skeleton .skel-card"
+    },
+    {
       "name": "The lobby arrives with a transition",
       "path": "/?tab=home",
       "expectSelector": ".lobby.screen-in"

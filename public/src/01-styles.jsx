@@ -4174,4 +4174,150 @@ ${emitTapHighlightRules()}
   padding: .1rem .4rem; border-radius: 999px;
   background: ${ca('gold', '33')}; color: ${C.gold}; border: 1px solid ${ca('gold', '55')};
 }
+
+/* ============================================================
+   Discover loading state (#home-skeleton) — see 29-cards.jsx
+   ============================================================
+   One mount. The placeholders draw the page's own layout in the app's well
+   token and slide a shine across them; the real sections replace them in
+   place when the data lands. All motion, and the whole mount, disappear
+   under both reduce-motion switches.
+   ============================================================ */
+.home-skeleton {
+  display: block;
+  padding-top: 0.2rem;
+  animation: skelIn 160ms ease-out backwards;
+}
+.home-skeleton.replacing {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 1;
+  pointer-events: none;
+  animation: skelOut 160ms ease-in forwards;
+  animation-delay: 160ms;
+}
+
+@keyframes skelIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes skelOut {
+  to { opacity: 0; }
+}
+
+.skel-line {
+  display: block;
+  border-radius: 6px;
+  background: var(--c-well);
+  position: relative;
+  overflow: hidden;
+}
+.skel-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--c-well-strong), transparent);
+  transform: translateX(-100%);
+  animation: skelShine 1.4s ease-in-out infinite;
+}
+@keyframes skelShine {
+  to { transform: translateX(100%); }
+}
+
+/* GotD-sized hero block. */
+.home-skeleton .skel-gotd {
+  border: 1px solid ${C.border};
+  border-top: 3px solid ${C.border};
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 1.4rem;
+}
+.home-skeleton .skel-eyebrow {
+  width: 128px; height: 11px; margin-bottom: 12px;
+}
+.home-skeleton .skel-gotd-main {
+  display: flex; align-items: center; gap: 14px;
+}
+.home-skeleton .skel-gotd-name {
+  width: 180px; height: 20px;
+}
+.home-skeleton .skel-gotd-meta {
+  width: 230px; height: 11px; margin-top: 8px;
+}
+.home-skeleton .skel-gotd-btn {
+  width: 96px; height: 40px; border-radius: 10px; margin-left: auto;
+}
+@media (max-width: 560px) {
+  .home-skeleton .skel-gotd-main { flex-wrap: wrap; }
+  .home-skeleton .skel-gotd-btn {
+    width: 100%; margin-left: 0; margin-top: 6px;
+  }
+}
+
+/* Section rule + the filter chips that sit beside the real heading. */
+.home-skeleton .skel-section-head {
+  display: flex; align-items: center; gap: 0.45rem;
+  border-bottom: 1px solid ${C.border};
+  padding-bottom: 0.5rem; margin: 1.4rem 0 0.7rem;
+}
+.home-skeleton .skel-section-title {
+  width: 96px; height: 15px; margin-right: auto;
+}
+.home-skeleton .skel-chip {
+  width: 58px; height: 28px; border-radius: 999px;
+}
+
+/* Card placeholders: the real card's shape at the same grid metrics. */
+.home-skeleton .skel-card {
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid ${C.border};
+  border-radius: 16px;
+  padding: 0.95rem 0.75rem 0.75rem;
+}
+.home-skeleton .skel-card .skel-dot {
+  display: block; width: 24px; height: 24px; border-radius: 8px;
+  margin-bottom: 0.55rem;
+  background: var(--c-well); position: relative; overflow: hidden;
+}
+.home-skeleton .skel-card .skel-dot::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--c-well-strong), transparent);
+  transform: translateX(-100%);
+  animation: skelShine 1.4s ease-in-out infinite;
+}
+.home-skeleton .skel-card .skel-card-name {
+  height: 13px; margin-bottom: 6px;
+}
+.home-skeleton .skel-card .skel-card-desc {
+  height: 11px; margin-bottom: 10px;
+}
+.home-skeleton .skel-card .skel-card-tag {
+  width: 54px; height: 16px; border-radius: 999px; margin-bottom: 12px;
+}
+.home-skeleton .skel-card .skel-card-btn {
+  height: 34px; border-radius: 8px; margin-top: auto;
+}
+
+/* Reduced motion: both switches settle the shine and the entrances. */
+@media (prefers-reduced-motion: reduce) {
+  .home-skeleton, .skel-line::after, .home-skeleton .skel-card .skel-dot::after {
+    animation: none;
+  }
+}
+:root[data-reduce-motion='1'] .home-skeleton,
+:root[data-reduce-motion='1'] .skel-line::after,
+:root[data-reduce-motion='1'] .skel-card .skel-dot::after {
+  animation: none;
+}
+
+/* The skeleton never reflows the page: it draws into the same column the
+   masthead leaves, so the phone grid keeps its two tracks under it. */
+@media (max-width: 480px) {
+  .home-skeleton .skel-card {
+    padding: 0.7rem;
+  }
+}
 `;

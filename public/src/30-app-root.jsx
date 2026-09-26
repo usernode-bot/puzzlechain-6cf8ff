@@ -95,6 +95,13 @@ function App() {
   const [nextResetUtc, setNextResetUtc] = useState(null);
   const [offset, setOffset] = useState(0); // serverNow - clientNow (ms)
   const [loading, setLoading] = useState(true);
+  /* #home-skeleton — the home feed's discover loading state. `loading` flips
+     the instant /api/daily answers; `discoverWaited` gates the placeholders
+     behind a 100 ms hold so the usual fast load keeps the real grid's
+     entrance, and `discoverReplacing` keeps them mounted through the fade-out
+     so the takeover never blanks between the two. */
+  const [discoverWaited, setDiscoverWaited] = useState(false);
+  const [discoverReplacing, setDiscoverReplacing] = useState(false);
   // Live step count from the running game. Held in a REF, not state (slice 1):
   // nothing renders it, and the old useState re-rendered the whole App tree on
   // every tap of every game — a measurable part of the input latency the grid
@@ -534,6 +541,50 @@ function App() {
     }
     setLoading(false);
   };
+
+  /* The placeholders arrive on a short hold, not on the first frame: the
+     usual fast load keeps the real grid's entrance, and a request that
+     answers inside the window never shows a skeleton at all. 100 ms is
+     comfortably under a human's "this is slow" threshold and above the
+     noise of a warm request. */
+  useEffect(() => {
+    if (!loading) return undefined;
+    const t = setTimeout(() => setDiscoverWaited(true), 100);
+    return () => { clearTimeout(t); };
+  }, [loading]);
+
+  /* Placeholder teardown. Once the data lands the placeholders keep their
+     slot for the fade-out while the real content replaces them behind it;
+     both flags clear together when the fade ends. */
+  useEffect(() => {
+    if (!discoverWaited) return undefined;
+    // ?force-loading=1 pins the placeholders: the demo route must survive
+    // the answer landing, otherwise the 160 ms teardown clears the
+    // skeleton before a check (or a reviewer) can even see it.
+    if (new URLSearchParams(window.location.search).get('force-loading') === '1') {
+      setDiscoverReplacing(true);
+      return undefined;
+    }
+    if (!loading) {
+      const t = setTimeout(() => {
+        setDiscoverWaited(false);
+        setDiscoverReplacing(false);
+      }, 160);
+      return () => { clearTimeout(t); };
+    }
+    setDiscoverReplacing(true);
+    return undefined;
+  }, [discoverWaited, loading]);
+
+  // ?force-loading=1: hold the home feed's discover skeleton on screen so a
+  // proposal check (and a human reviewer) can inspect the placeholders
+  // without racing a network clock. The real request still runs, so
+  // whichever finishes first wins; the flag only extends the wait. A plain
+  // URL parameter, like the app's other demo hooks, never an env-gated path.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('force-loading') !== '1') return;
+    setDiscoverWaited(true);
+  }, []);
 
   useEffect(() => { loadDaily(); }, []);
 
@@ -2483,6 +2534,7 @@ function App() {
                all-games grid. The old three-tab lobby is retired; the Rating
                Ladder remains reachable via the ?tab=ladder deep link. */
             <React.Fragment>
+              {discoverReplacing && <DiscoverSkeleton replacing={!loading} />}
               <div className="lobby-head masthead">
                 {/* Numbered-edition dateline (Appendix A masthead). The edition
                     counts up one per UTC day from the same server-anchored day

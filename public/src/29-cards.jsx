@@ -277,6 +277,10 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
   const inProgress = !!(attempt && !attempt.finishedAt);
+  // #316 — the player's own fastest daily solve for this card, straight from
+  // the same all-time bests map the pre-game screen reads. Shown only when a
+  // time was ever recorded: no best, no line.
+  const bestTime = dailyId && bests && bests[dailyId] ? bests[dailyId].timeSecs : null;
 
   // State line, per recommendation 04: the card reports where you stand
   // instead of spending its width on buttons that repeat the mode labels.
@@ -323,6 +327,11 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
         {card.tag}
       </span>
       {bits.length > 0 && <div className="card-state mono">{bits.join(' · ')}</div>}
+      {dailyId && bestTime != null && (
+        <div className="card-best mono">
+          {`best: ${Math.floor(bestTime / 60)}:${String(bestTime % 60).padStart(2, '0')}`}
+        </div>
+      )}
       <div className={'card-modes n' + singleModes.length}>
         {singleModes.map(m => {
           const isDaily = m.mode === 'daily';

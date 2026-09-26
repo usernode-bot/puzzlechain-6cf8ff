@@ -9,6 +9,7 @@
       "description": "Public app-identity key that identifies Game Corner to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
       "required": true,
       "private": false,
+      "default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "staging_default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     },
     {
@@ -49,6 +50,11 @@
       "name": "Locked card after daily attempt",
       "path": "/?demo=locked",
       "expectSelector": ".card-daily-badge.done"
+    },
+    {
+      "name": "Card shows personal best time",
+      "path": "/?demo=locked",
+      "expectText": "best: 2:12"
     },
     {
       "name": "Word Search card in lobby",

@@ -9,6 +9,7 @@
       "description": "Public app-identity key that identifies Game Corner to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
       "required": true,
       "private": false,
+      "default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "staging_default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     },
     {
@@ -1685,6 +1686,31 @@
       "name": "Pin button renders on every home card",
       "path": "/",
       "expectSelector": ".card-pin"
+    },
+    {
+      "name": "Favorite star renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-fav"
+    },
+    {
+      "name": "Favorites filter chip renders",
+      "path": "/",
+      "expectText": "Favorites"
+    },
+    {
+      "name": "Favorites chip shows starred cards only",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card"
+    },
+    {
+      "name": "Favorites view stars its games",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card-fav.on"
+    },
+    {
+      "name": "Empty favorites view explains how to star",
+      "path": "/?demo=favempty&favview=1",
+      "expectText": "No favorites yet"
     },
     {
       "name": "Pinned section renders pinned games",

@@ -74,6 +74,12 @@ function App() {
   const [pins, setPins] = useState([]);
   // Transient "you are at the cap" line, cleared on the next successful pin.
   const [pinNotice, setPinNotice] = useState('');
+  /* Favorited games: the CARD ANCHOR ids this player starred, in the order
+     the server holds them. Same shape as `pins` above — the array is the
+     server's, replaced wholesale on every toggle. Also deliberately NOT a
+     navState field: a star changes which cards the active chip shows, not
+     which screen you are on, so it must not push a history entry. */
+  const [favorites, setFavorites] = useState([]);
   // The viewer's standing on the arcade band currently selected, so the
   // pre-game screen can show what there is to beat before the run starts.
   const [arcadeBest, setArcadeBest] = useState(null);
@@ -148,8 +154,20 @@ function App() {
   // also what keeps the existing "/?tab=classic" proposal checks meaningful.
   const [homeFilter, setHomeFilter] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'daily' || t === 'classic' ? t : 'all';
+    return t === 'daily' || t === 'classic' || t === 'favorites' ? t : 'all';
   });
+  /* ?favview=1 preselects the Favorites chip. Deliberately separate from
+     ?tab=favorites: ?tab= is a REAL chip a player can reach by tapping, and
+     its deep link already exists for the daily/classic chips — but it is also
+     the query the signed-out 401 lands on, and the chip only renders signed
+     in. favview is for the proposal checks (which stage an authed capture
+     identity), and it only ever sets the same chip; there is nothing to
+     restore in a history entry because a deep link IS the history entry. */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('favview') === '1') {
+      setHomeFilter('favorites');
+    }
+  }, []);
   // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
   const [featured, setFeatured] = useState(null);
   // The viewer's active online matches (your-turn row), from /api/rooms/mine.
@@ -486,6 +504,7 @@ function App() {
       SERVER_DAILY_SEEDS = body.seeds || {};
       setBests(body.bests || {});
       setPins(Array.isArray(body.pins) ? body.pins : []);
+      setFavorites(Array.isArray(body.favorites) ? body.favorites : []);
       /* #176 — story progress is loaded alongside the daily state rather than
          folded into it: it is not day-scoped, so it does not belong on a route
          whose whole contract is "today". Failure is silent because the home
@@ -519,6 +538,7 @@ function App() {
       setBadges([]);
       setAchievements({ types: [], milestones: [], stories: [] });
       setPins([]);
+      setFavorites([]);
       // Signed-out (or backend hiccup): the public read surface still supplies
       // server time, the reset countdown, and today's board seeds, so the
       // signed-out lobby stays anchored to server time.
@@ -556,6 +576,24 @@ function App() {
     if (r.status === 409) {
       setPinNotice(`You can pin up to ${PIN_LIMIT} games. Unpin one to make room.`);
     }
+  };
+
+  /* Star / unstar one card. Optimistic like togglePin, so the star flips and
+     the active Favorites view updates on the tap rather than a round trip
+     later, then RECONCILED against the array the server returns. A failure
+     reverts. No cap to reconcile — the list is unbounded, so a failure is a
+     straight revert to what was there before the tap. */
+  const toggleFavorite = async (gameId, wantFavorited) => {
+    if (!gameId || !authOk || loading) return;
+    const before = favorites;
+    cgHaptic(8);
+    setFavorites(wantFavorited
+      ? (before.includes(gameId) ? before : before.concat([gameId]))
+      : before.filter(id => id !== gameId));
+    const r = await api('/api/favorites/' + encodeURIComponent(gameId),
+      { method: wantFavorited ? 'PUT' : 'DELETE' });
+    if (r.ok && r.body && Array.isArray(r.body.favorites)) { setFavorites(r.body.favorites); return; }
+    setFavorites(Array.isArray(r.body && r.body.favorites) ? r.body.favorites : before);
   };
 
   // Home in-progress row (phase 7): the viewer's active online matches.
@@ -2603,10 +2641,22 @@ function App() {
                    non-daily mode passes Classic; a card with both passes both,
                    which is why filtering happens on modes rather than on the
                    registry's category field. */
+                /* The favorite set is resolved BEFORE the filter walks, since
+                   the Favorites chip reads it as its predicate. Same
+                   anchor-id → card-key resolution as the pin set below: a
+                   stored id resolves through CARD_BY_GAME_ID, so either half
+                   of a merged pair lights the one shared card. */
+                const favoriteSet = new Set();
+                for (const id of favorites) {
+                  const c = CARD_BY_GAME_ID[id];
+                  if (c) favoriteSet.add(c.key);
+                }
+                const starredCount = favoriteSet.size;
                 const ordered = GAME_CARDS.filter(c => {
                   if (homeFilter === 'all') return true;
                   const hasDaily = c.modes.some(m => m.mode === 'daily');
                   if (homeFilter === 'daily') return hasDaily;
+                  if (homeFilter === 'favorites') return favoriteSet.has(c.key);
                   return !hasDaily || c.modes.some(m => m.mode !== 'daily');
                 });
                 /* One launcher for every card button. `mode` is null for the
@@ -2651,6 +2701,11 @@ function App() {
                   // get no control rather than one that fails on tap.
                   onTogglePin: authOk ? togglePin : null,
                   pinDisabled: atPinCap,
+                  favorited: favoriteSet.has(c.key),
+                  // Signed-out visitors have nowhere to store a star, so they
+                  // get no control rather than one that fails on tap — the
+                  // same stance the pin control already takes.
+                  onToggleFavorite: authOk ? toggleFavorite : null,
                 });
                 return (
                   <React.Fragment>
@@ -2672,6 +2727,11 @@ function App() {
                         { id: 'all', label: 'All' },
                         { id: 'daily', label: 'Daily' },
                         { id: 'classic', label: 'Classic' },
+                        // Only rendered signed in: a signed-out visitor cannot
+                        // star anything, so a chip that always answered "no
+                        // games" would be dead UI. Appears the moment the
+                        // account is known, including at 0 stars.
+                        ...(authOk ? [{ id: 'favorites', label: 'Favorites' + (starredCount ? ` (${starredCount})` : '') }] : []),
                       ].map(f => (
                         <button
                           key={f.id}
@@ -2685,6 +2745,15 @@ function App() {
                     {authOk && pins.length === 0 && (
                       <div className="home-pin-empty">
                         Tap 📌 on any card to pin it to the top.
+                      </div>
+                    )}
+                    {/* The Favorites chip's empty state, reached the same way
+                        the player reaches the populated one: activate the
+                        chip. Says what to do, in the same register as the
+                        daily split's empty line. */}
+                    {homeFilter === 'favorites' && starredCount === 0 && (
+                      <div className="home-fav-empty">
+                        No favorites yet. Tap the star on a game card to add it here.
                       </div>
                     )}
                     {(() => {

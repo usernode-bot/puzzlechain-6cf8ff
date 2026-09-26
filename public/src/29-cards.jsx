@@ -347,3 +347,60 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
     </div>
   );
 }
+
+
+/* ============================================================
+   Discover loading state (#home-skeleton)
+   ============================================================
+   The home feed waits on one round trip (/api/daily, plus /api/rooms/mine
+   after it for signed-in visitors). On a slow phone that is a plain blank
+   column under the masthead, which reads as a broken page. These placeholders
+   draw the page's own layout in the well token and slide a shine across
+   them, so the load is visible and the finished sections replace them in
+   place (30-app-root holds the timing; 01-styles the visuals).
+
+   The shapes are deliberate, not generic: one GotD-sized hero, one section
+   rule with a chip row beside it (the filter chips live next to the heading
+   on the real page), and a six-card grid at the real card metric.
+
+   They are aria-hidden and pointer-transparent: they stay out of the reading
+   order and cannot intercept a tap. Nothing here hardcodes a hex value; both
+   the fill and the shine derive from the app's own palette tokens, and dark
+   mode follows the same flip as the rest of the page.
+   ============================================================ */
+const DISCOVER_SKELETON_CARDS = 6;
+
+function DiscoverSkeleton({ replacing }) {
+  return (
+    <div className={'home-skeleton' + (replacing ? ' replacing' : '')} aria-hidden="true">
+      <div className="skel-gotd">
+        <span className="skel-line skel-eyebrow" />
+        <div className="skel-gotd-main">
+          <span className="skel-dot" />
+          <span className="skel-line skel-gotd-name" />
+          <span className="skel-line skel-gotd-meta" />
+          <span className="skel-line skel-gotd-btn" />
+        </div>
+      </div>
+      <div className="skel-section-head">
+        <span className="skel-line skel-section-title" />
+        <span className="skel-chip" />
+        <span className="skel-chip" />
+        <span className="skel-chip" />
+      </div>
+      <div className="grid home-skel-grid">
+        {/* Not a .card: the app's client self-test measures .card widths to
+            prove the real grid is uniform, and these are not real cards. */}
+        {Array.from({ length: DISCOVER_SKELETON_CARDS }, (_, i) => (
+          <span className="skel-card" key={'skel-card-' + i}>
+            <span className="skel-dot" />
+            <span className="skel-line skel-card-name" />
+            <span className="skel-line skel-card-desc" />
+            <span className="skel-line skel-card-tag" />
+            <span className="skel-line skel-card-btn" />
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -148,7 +148,9 @@ function App() {
   // also what keeps the existing "/?tab=classic" proposal checks meaningful.
   const [homeFilter, setHomeFilter] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'daily' || t === 'classic' ? t : 'all';
+    // ?tab=friends deep-links the Friends tab (proposal tests / screenshots);
+    // the retired ?tab=daily / ?tab=classic still preselect their chips.
+    return t === 'daily' || t === 'classic' || t === 'friends' ? t : 'all';
   });
   // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
   const [featured, setFeatured] = useState(null);
@@ -2605,6 +2607,7 @@ function App() {
                    registry's category field. */
                 const ordered = GAME_CARDS.filter(c => {
                   if (homeFilter === 'all') return true;
+                  if (homeFilter === 'friends') return false; // no game cards on the Friends tab
                   const hasDaily = c.modes.some(m => m.mode === 'daily');
                   if (homeFilter === 'daily') return hasDaily;
                   return !hasDaily || c.modes.some(m => m.mode !== 'daily');
@@ -2672,6 +2675,7 @@ function App() {
                         { id: 'all', label: 'All' },
                         { id: 'daily', label: 'Daily' },
                         { id: 'classic', label: 'Classic' },
+                        { id: 'friends', label: 'Friends' },
                       ].map(f => (
                         <button
                           key={f.id}
@@ -2685,6 +2689,16 @@ function App() {
                     {authOk && pins.length === 0 && (
                       <div className="home-pin-empty">
                         Tap 📌 on any card to pin it to the top.
+                      </div>
+                    )}
+                    {homeFilter === 'friends' && authOk && !loading && (
+                      <FriendsWeekly
+                        onSelectUser={(userId) => { setSelectedUserId(userId); setScreen('profile'); }}
+                      />
+                    )}
+                    {homeFilter === 'friends' && !authOk && (
+                      <div className="home-pin-empty">
+                        Sign in to add friends and see who is playing.
                       </div>
                     )}
                     {(() => {

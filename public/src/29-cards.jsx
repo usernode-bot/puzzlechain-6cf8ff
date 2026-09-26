@@ -272,7 +272,7 @@ const PIN_LIMIT = 8;
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
+function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled, cardStreaks }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -316,6 +316,11 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
           {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}
         </span>
       )}
+      {dailyId && cardStreaks && cardStreaks[card.key] > 0 && (
+        <span className="card-streak-badge mono" data-testid="card-streak">
+          🔥 {cardStreaks[card.key]}d
+        </span>
+      )}
       <div className="card-icon">{card.icon}</div>
       <div className="card-name">{card.name}</div>
       <div className="card-desc">{card.desc}</div>
@@ -344,6 +349,80 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Daily streaks: per-card badge + Home calendar
+   ============================================================
+   Both read state the app already loads — the finished daily attempts the
+   server returns on /api/daily, plus the per-game streak map it computes from
+   the same rows. No new table, no new endpoint, no extra fetch.
+
+   THE BADGE. A card shows how many consecutive UTC days the player has
+   finished that game's daily (a run alive through yesterday still counts; one
+   missed day resets it). The server computes it; the card only renders the
+   number, so the badge can never disagree with the leaderboard's own
+   arithmetic.
+
+   THE CALENDAR. A 5-week grid (35 cells, Monday-start) of the last ~5 weeks,
+   ending today. A day the player finished at least one daily is filled;
+   today carries a ring so it can be found in the grid at a glance. Weekday
+   initials use toLocaleDateString's narrow format so the labels follow the
+   device's locale, matching the masthead dateline's behaviour. */
+
+function StreakCalendar({ playedDays, streak, offset }) {
+  const played = new Set(
+    Array.isArray(playedDays)
+      ? playedDays.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      : []
+  );
+  const nowMs = Date.now() + (offset || 0);
+  const todayDate = new Date(nowMs);
+  const todayKey = todayDate.toISOString().slice(0, 10);
+  // Grid starts on the Monday 34 days back: 35 cells ending today, so the
+  // current week is always complete on the right.
+  const start = new Date(Date.UTC(
+    todayDate.getUTCFullYear(), todayDate.getUTCMonth(), todayDate.getUTCDate()));
+  start.setUTCDate(start.getUTCDate() - 34);
+  while (start.getUTCDay() !== 1) start.setUTCDate(start.getUTCDate() - 1);
+  const cells = [];
+  const cursor = new Date(start);
+  for (let i = 0; i < 35; i++) {
+    const key = cursor.toISOString().slice(0, 10);
+    const isToday = key === todayKey;
+    const isPlayed = played.has(key);
+    cells.push(
+      <span
+        key={key}
+        className={'streak-cell' + (isToday ? ' today' : '') + (isPlayed ? ' played' : '')}
+        title={key}
+      />
+    );
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  const weekdayLabels = [];
+  const wl = new Date(start);
+  for (let i = 0; i < 7; i++) {
+    weekdayLabels.push(
+      <span key={i} className="streak-wd mono">
+        {wl.toLocaleDateString('en-US', { weekday: 'narrow', timeZone: 'UTC' })}
+      </span>
+    );
+    wl.setUTCDate(wl.getUTCDate() + 1);
+  }
+  return (
+    <div className="streak-calendar" data-testid="streak-calendar" aria-label={'Daily play calendar, ' + streak + ' day streak'}>
+      <div className="streak-cal-head">
+        <span className="streak-cal-title">Daily streak</span>
+        <span className="streak-cal-count mono">{streak} day{streak === 1 ? '' : 's'}</span>
+      </div>
+      <div className="streak-grid" role="img">
+        {weekdayLabels}
+        {cells}
+      </div>
+      <div className="streak-cal-hint">Played at least one daily on marked days.</div>
     </div>
   );
 }

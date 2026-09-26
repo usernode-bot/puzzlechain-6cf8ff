@@ -2014,7 +2014,76 @@ async function computeStreak(userId) {
     streak++;
     cursor = prevUtcDay(cursor);
   }
-  return streak;
+  return { streak, playedDays: Array.from(days).sort().reverse().slice(0, 35) };
+}
+
+// Per-game daily streaks for the home cards: one entry per game the player has
+// EVER finished a daily attempt for, as { gameId, streak } where streak is the
+// consecutive-day run ending today (or yesterday, if today is still open, so a
+// live streak does not show as broken mid-day). Days are counted from the
+// finished daily_attempts rows directly, so a game's streak advances the
+// moment that game's attempt is recorded and never depends on the featured
+// rotation or on daily_featured having a row. Pure read; no new table.
+async function perGameStreaks(userId) {
+  const { rows } = await pool.query(
+    `SELECT game_id, attempt_date::text AS d
+       FROM daily_attempts
+      WHERE user_id = $1 AND finished_at IS NOT NULL
+      ORDER BY attempt_date DESC
+      LIMIT 400`,
+    [userId]
+  );
+  const byGame = new Map();
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = prevUtcDay(today);
+  for (const r of rows) {
+    const gid = r.game_id;
+    if (!byGame.has(gid)) byGame.set(gid, new Set());
+    byGame.get(gid).add(r.d);
+  }
+  const out = {};
+  for (const [gid, days] of byGame) {
+    let cursor;
+    if (days.has(today)) cursor = today;
+    else if (days.has(yesterday)) cursor = yesterday;
+    else continue; // this game's streak is broken; treat as 0 (absent)
+    let n = 0;
+    while (days.has(cursor)) { n++; cursor = prevUtcDay(cursor); }
+    if (n > 0) out[gid] = n;
+  }
+  return out;
+}
+
+/* Per-game daily streaks for the home-card badges: one entry per game the
+   player has EVER finished a daily attempt for, as its current consecutive-day
+   run (same alive-through-yesterday rule as the headline streak). Computed
+   from the existing daily_attempts rows; no new table, no new endpoint. */
+async function perGameStreaks(userId) {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT game_id, attempt_date::text AS d
+       FROM daily_attempts
+      WHERE user_id = $1 AND finished_at IS NOT NULL
+      ORDER BY game_id ASC, attempt_date DESC
+      LIMIT 400`,
+    [userId]
+  );
+  const byGame = new Map();
+  for (const r of rows) {
+    if (!byGame.has(r.game_id)) byGame.set(r.game_id, []);
+    byGame.get(r.game_id).push(r.d);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = prevUtcDay(today);
+  const out = {};
+  for (const [gid, days] of byGame) {
+    const set = new Set(days);
+    let cursor = set.has(today) ? today : set.has(yesterday) ? yesterday : null;
+    if (!cursor) continue;
+    let n = 0;
+    while (set.has(cursor)) { n++; cursor = prevUtcDay(cursor); }
+    if (n > 0) out[gid] = n;
+  }
+  return out;
 }
 
 // The set of streak-milestone day thresholds a user has ever reached, as a
@@ -2250,7 +2319,8 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
     // Live, authoritative streak (computed from finished daily_attempts) rather
     // than the stale user_stats_snapshot.current_streak column, plus the set of
     // permanent streak-milestone badges this player has earned.
-    const liveStreak = await computeStreak(viewedUserId);
+    const liveStreakInfo = await computeStreak(viewedUserId);
+    const liveStreak = liveStreakInfo.streak;
     const badges = await earnedStreakBadges(viewedUserId);
     const achievements = await earnedAchievementBadges(viewedUserId);
 
@@ -3664,7 +3734,8 @@ app.get('/api/daily', async (req, res) => {
     const attempts = {};
     for (const row of rows) attempts[row.game_id] = shapeAttempt(row);
 
-    const streak = await computeStreak(req.user.id);
+    const streakInfo = await computeStreak(req.user.id);
+    const streak = streakInfo.streak;
     const badges = await earnedStreakBadges(req.user.id);
     const achievements = await earnedAchievementBadges(req.user.id);
     // Server-issued daily seeds (phase 2): today's per-game board seeds. The
@@ -3728,6 +3799,12 @@ app.get('/api/daily', async (req, res) => {
       serverNowUtc: new Date().toISOString(),
       nextResetUtc: nextResetUtc(),
       streak,
+      // Recent played-day flags for the Home streak calendar (most recent
+      // first), computed from the same rows the streak reads.
+      playedDays: (streakInfo && Array.isArray(streakInfo.playedDays))
+        ? streakInfo.playedDays : [],
+      // Per-game current daily streaks for the home card badges.
+      gameStreaks: await perGameStreaks(req.user.id),
       // Permanent streak-milestone badges (day thresholds) this user has ever
       // earned — kept even after a streak resets, so the lobby/profile can show
       // a player's collected badges independent of the current streak.
@@ -3994,8 +4071,11 @@ async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, move
 
 
   // Recompute the streak now that today is finished so the client can
-  // reconcile its optimistic value without a full reload.
-  const streak = await computeStreak(user.id);
+  // reconcile its optimistic value without a full reload. The calendar window
+  // rides along so the Home calendar flips today's cell without a reload.
+  const streakInfo = await computeStreak(user.id);
+  const streak = streakInfo.streak;
+  const playedDays = streakInfo.playedDays;
 
   // Newly-awarded achievements THIS finish, so the client can pop a one-time
   // celebration. Both the streak-milestone block and the non-streak award()
@@ -4158,7 +4238,7 @@ async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, move
     }
   }
 
-  return { attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, solveCount: lifetimeSolves, dapp: dappSession, newAchievements };
+  return { attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, playedDays, solveCount: lifetimeSolves, dapp: dappSession, newAchievements };
 }
 
 app.post('/api/daily/:gameId/finish', async (req, res) => {

@@ -79,6 +79,11 @@ function App() {
   const [arcadeBest, setArcadeBest] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
+  // Recent finished-daily UTC day strings (newest first), for the Home
+  // streak calendar. Server-computed from the same rows the streak reads.
+  const [playedDays, setPlayedDays] = useState([]);
+  // Per-game daily streaks (gameId -> days), server-computed.
+  const [gameStreaks, setGameStreaks] = useState({});
   // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
   // even after a streak resets, so the lobby can show a collected-badges strip.
   const [badges, setBadges] = useState([]);
@@ -472,6 +477,8 @@ function App() {
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
+      setPlayedDays(Array.isArray(body.playedDays) ? body.playedDays : []);
+      setGameStreaks(body.gameStreaks && typeof body.gameStreaks === 'object' ? body.gameStreaks : {});
       setSolveCount(Number.isFinite(body.solveCount) ? body.solveCount : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
@@ -1239,6 +1246,10 @@ function App() {
       // Reconcile against the server's authoritative streak + reward + new
       // achievement badges, and clear any prior sync-error flag.
       if (body && typeof body.streak === 'number') setStreak(body.streak);
+      if (body && Array.isArray(body.playedDays)) setPlayedDays(body.playedDays);
+      if (body && body.gameStreaks && typeof body.gameStreaks === 'object') {
+        setGameStreaks(body.gameStreaks);
+      }
       if (body && Number.isFinite(body.solveCount)) setSolveCount(body.solveCount);
       const newAch = (body && Array.isArray(body.newAchievements)) ? body.newAchievements : [];
       if (newAch.length) {
@@ -2534,51 +2545,14 @@ function App() {
                   onOpenRoom={resumeRoom}
                 />
               )}
+              {authOk && (
+                <StreakCalendar
+                  playedDays={playedDays}
+                  streak={streak}
+                  offset={offset}
+                />
+              )}
               {(() => {
-                const gameCard = (g) => {
-                  // Only daily games carry the per-day finished/in-progress lock state.
-                  const a = attempts[g.id];
-                  const finished = !!g.daily && !!(a && a.finishedAt);
-                  const inProgress = !!g.daily && !!a && !finished;
-                  return (
-                    <div
-                      key={g.id}
-                      className={`card${finished ? ' done locked' : ''}${inProgress ? ' inprogress' : ''}`}
-                      style={{ '--accent': g.tagColor }}
-                      onClick={() => {
-                        if (loading) return;
-                        if (g.modeSelect) { openOpponentScreen(g); return; }
-                        launchGame(g);
-                      }}
-                    >
-                      {g.daily && (
-                        <span className={'card-daily-badge' + (finished ? ' done' : inProgress ? ' resume' : ' fresh')}>
-                          {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}
-                        </span>
-                      )}
-                      <div className="card-icon">{g.icon}</div>
-                      <div className="card-name">{g.name}</div>
-                      <div className="card-desc">{g.desc}</div>
-                      {finished ? (
-                        <div className="card-lock">
-                          🔒 {a.score != null
-                            ? <span>+{a.score} pts · resets in {fmtCountdown(
-                                (nextResetUtc ? new Date(nextResetUtc).getTime() : 0) - (Date.now() + offset))}</span>
-                            : <span>Played · locked until reset</span>}
-                        </div>
-                      ) : inProgress ? (
-                        <div className="card-resume">▶ In progress · resume</div>
-                      ) : (
-                        <span
-                          className="tag mono"
-                          style={{ background: g.tagColor + '22', color: g.tagColor }}
-                        >
-                          {g.tag}
-                        </span>
-                      )}
-                    </div>
-                  );
-                };
                 // One merged list (slice 2). Registry order is preserved
                 // within each group and dailies lead, so the fresh puzzles are
                 // what a player meets first; the corner badge, not a section
@@ -2638,11 +2612,21 @@ function App() {
                 const pinnedCards = ordered.filter(c => pinnedSet.has(c.key));
                 const restCards = ordered.filter(c => !pinnedSet.has(c.key));
                 const atPinCap = pins.length >= PIN_LIMIT;
+                // Per-card daily streaks, read once per render from the
+                // finished-attempt state the cards already receive.
+                const cardStreaks = {};
+                for (const c of GAME_CARDS) {
+                  const d = cardDailyId(c);
+                  if (d && typeof gameStreaks[d] === 'number' && gameStreaks[d] > 0) {
+                    cardStreaks[c.key] = gameStreaks[d];
+                  }
+                }
                 const cardProps = (c) => ({
                   key: c.key,
                   card: c,
                   attempts: attempts,
                   bests: bests,
+                  cardStreaks: cardStreaks,
                   storyProgress: storyProgress,
                   loading: loading,
                   onPlay: playCardMode,

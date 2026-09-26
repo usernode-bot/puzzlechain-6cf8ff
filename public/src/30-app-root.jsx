@@ -72,6 +72,9 @@ function App() {
      navState field: a pin changes what the home grid looks like, not which
      screen you are on, so it must not push a history entry. */
   const [pins, setPins] = useState([]);
+  // Recently Played (Recent goal): the viewer's last few plays, as
+  // [{ gameId, playedAt }] from /api/daily. Most recent first.
+  const [recentPlays, setRecentPlays] = useState([]);
   // Transient "you are at the cap" line, cleared on the next successful pin.
   const [pinNotice, setPinNotice] = useState('');
   // The viewer's standing on the arcade band currently selected, so the
@@ -486,6 +489,7 @@ function App() {
       SERVER_DAILY_SEEDS = body.seeds || {};
       setBests(body.bests || {});
       setPins(Array.isArray(body.pins) ? body.pins : []);
+      setRecentPlays(Array.isArray(body.recentPlays) ? body.recentPlays : []);
       /* #176 — story progress is loaded alongside the daily state rather than
          folded into it: it is not day-scoped, so it does not belong on a route
          whose whole contract is "today". Failure is silent because the home
@@ -519,6 +523,7 @@ function App() {
       setBadges([]);
       setAchievements({ types: [], milestones: [], stories: [] });
       setPins([]);
+      setRecentPlays([]);
       // Signed-out (or backend hiccup): the public read surface still supplies
       // server time, the reset countdown, and today's board seeds, so the
       // signed-out lobby stays anchored to server time.
@@ -730,6 +735,19 @@ function App() {
     setWinData(null);
     setLoseData(null);
     setScreen('pregame');
+  };
+
+  /* Recently Played (Recent goal) — one tap back into a game from the strip.
+     Head-to-head cards route through the opponent picker like their lobby
+     buttons do (a room cannot be auto-joined); everything else goes through
+     launchGame, so a daily replay lands on its own pre-game/locked flow and a
+     classic mounts straight away. Same guard pattern as the card buttons. */
+  const replayRecent = (gameId) => {
+    if (loading || !authOk) return;
+    const g = GAMES.find(x => x.id === gameId);
+    if (!g) return;
+    if (g.modeSelect) { openOpponentScreen(g); return; }
+    launchGame(g);
   };
 
   // Claim (or resume) the day's single attempt and mount the game. Extracted
@@ -2532,6 +2550,13 @@ function App() {
                   items={inProgressItems}
                   onOpenDaily={(g) => { if (!loading) launchGame(g); }}
                   onOpenRoom={resumeRoom}
+                />
+              )}
+              {authOk && (
+                <RecentlyPlayedRow
+                  items={recentPlays}
+                  onOpen={replayRecent}
+                  offset={offset}
                 />
               )}
               {(() => {

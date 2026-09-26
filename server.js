@@ -1323,6 +1323,27 @@ async function migrate() {
     )
   `);
 
+  /* game_plays is PUBLIC (Recent goal) — which games this player launched and
+     when, powering the lobby's Recently Played strip. Same exposure class as
+     game_pins: per-user gameplay activity over ids that are already public
+     lobby keys, so a stranger reading every row learns nothing they could not
+     read by watching the lobby. One row per (user, game); each new play
+     bumps played_at and plays. No foreign keys (public-table rule). */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_plays (
+      user_id   TEXT NOT NULL,
+      game_id   TEXT NOT NULL,
+      username  TEXT,
+      plays     INTEGER NOT NULL DEFAULT 1,
+      played_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS game_plays_recent_idx
+       ON game_plays(user_id, played_at DESC)`
+  );
+
   // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
   // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
   // `state` JSONB is game-specific and `game_id` is validated against
@@ -2424,6 +2445,35 @@ async function readPins(userId) {
   return rows.map(r => r.game_id);
 }
 
+/* ---- Recently Played tracking (Recent goal) ------------------------------
+   Every "I played this game" moment funnels through recordGamePlay. Fire-and-
+   forget by design: a tracking failure must never cost a player the score,
+   attempt or rating the surrounding route exists to record, so the caller
+   wraps it (or the helper swallows everything) and moves on. */
+async function recordGamePlay(userId, username, gameId) {
+  try {
+    await pool.query(
+      `INSERT INTO game_plays (user_id, username, game_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, game_id) DO UPDATE SET
+         played_at = now(),
+         plays = game_plays.plays + 1,
+         username = COALESCE(EXCLUDED.username, game_plays.username)`,
+      [userId, username || null, gameId]
+    );
+  } catch (e) { console.warn('[plays] record failed (non-fatal):', e.message); }
+}
+
+// The caller's five most recent plays (most recent first) for the lobby strip.
+async function readRecentPlays(userId, limit) {
+  const { rows } = await pool.query(
+    `SELECT game_id, played_at FROM game_plays
+      WHERE user_id = $1 ORDER BY played_at DESC, game_id ASC LIMIT $2`,
+    [userId, limit]
+  );
+  return rows.map(r => ({ gameId: r.game_id, playedAt: r.played_at }));
+}
+
 // POST /api/pins/:gameId — pin a game to the top of the home grid.
 app.post('/api/pins/:gameId', async (req, res) => {
   const { gameId } = req.params;
@@ -2630,6 +2680,37 @@ app.get('/api/daily', async (req, res) => {
        Deletes only rows belonging to the caller; strict no-op in production. */
     if (IS_STAGING && req.query.demo === 'pinsempty') {
       await pool.query(`DELETE FROM game_pins WHERE user_id = $1`, [req.user.id]);
+    }
+
+    /* Staging-only demo seed (Recent goal): five plays for the current viewer
+       so the Recently Played strip, its most-recent-first ordering and its
+       replay buttons are reachable by navigation alone. game_plays is a NEW
+       table, so staging starts empty and none of that would otherwise render.
+       Staggered timestamps make the ordering visible in a screenshot. Only the
+       viewer's OWN rows are written/read, so nothing the strip concludes is
+       fabricated by the seed itself; delete via demo=recentclear.
+       Strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'recent') {
+      const demoPlays = ['sudoku', 'mancala', 'snake', 'tilematching', 'wordhunt'];
+      for (let i = 0; i < demoPlays.length; i++) {
+        await pool.query(
+          `INSERT INTO game_plays (user_id, username, game_id, played_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoPlays[i],
+           String((i + 1) * 25)]
+        );
+      }
+    }
+
+    /* Staging-only counterpart to demo=recent (Recent goal): clears the
+       viewer's play history so the no-history home (no strip at all) is
+       reachable deterministically. Same rationale as demo=pinsempty: the
+       proposal-check suite runs as one viewer against one staging DB, so a
+       plain `/` assertion on the hidden state would depend on route order.
+       Deletes only rows belonging to the caller; strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'recentclear') {
+      await pool.query(`DELETE FROM game_plays WHERE user_id = $1`, [req.user.id]);
     }
 
     // Staging-only demo seed: gives the current viewer a 10-day consecutive
@@ -3716,6 +3797,12 @@ app.get('/api/daily', async (req, res) => {
       pins = pinRows.map(r => r.game_id);
     } catch (e) { console.warn('[daily] pins query failed (non-fatal):', e.message); }
 
+    // Recently Played (Recent goal) — this player's five most recent launches
+    // for the lobby strip. Non-fatal for the same reason as pins.
+    let recentPlays = [];
+    try { recentPlays = await readRecentPlays(req.user.id, 5); }
+    catch (e) { console.warn('[daily] recentPlays query failed (non-fatal):', e.message); }
+
     res.json({
       // Surface the signed-in account so the UI can confirm login +
       // that persistent data is active. Always present here (route is
@@ -3746,6 +3833,8 @@ app.get('/api/daily', async (req, res) => {
       // Games pinned to the top of the home grid (#232), oldest pin first.
       pins,
       pinLimit: PIN_LIMIT,
+      // Most recent launches for the lobby's Recently Played strip (Recent goal).
+      recentPlays,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);
@@ -3789,6 +3878,8 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
         seed,
       });
     }
+    // Recently Played tracking (Recent goal): a claimed attempt is a play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), seed });
   } catch (err) {
     console.error('[daily] start failed:', err.message);
@@ -3930,6 +4021,10 @@ async function settleDailySession({ user, gameId, score, steps, timeSecs, moves,
 // Returns the finish response payload, or null when there is no claimed,
 // unfinished attempt today (callers map that to 409). Throws on DB errors.
 async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, moves, replay, progress }) {
+  // Recently Played tracking (Recent goal): this finish WAS a play. Fire-and-
+  // forget via the helper's own catch, so a tracking failure never delays the
+  // badges, streak or settlement the rest of this function computes.
+  recordGamePlay(user.id, user.username, gameId);
 
   // Read the player's previous best for this game BEFORE today's finish is
   // committed, so it naturally excludes the in-flight attempt (its
@@ -4391,6 +4486,8 @@ app.post('/api/story/:gameId/clear', async (req, res) => {
 
   try {
     const award = storyBandAward(gameId, band);
+    // Recently Played tracking (Recent goal): a band clear is a play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     const claim = await pool.query(
       `INSERT INTO game_progress
          (user_id, game_id, band, awarded_points, best_score, best_time_secs, best_steps, plays)
@@ -4495,6 +4592,8 @@ app.post('/api/arcade/:gameId/start', async (req, res) => {
   if (!isArcadeBand(band)) return res.status(400).json({ error: 'Unknown band' });
   const seed = Math.max(0, Math.min(4294967295, Number(req.body && req.body.seed) || 0));
   try {
+    // Recently Played tracking (Recent goal): claiming the run is the play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     const { rows } = await pool.query(
       `INSERT INTO arcade_runs (user_id, username, game_id, band, seed, score, started_at)
        VALUES ($1, $2, $3, $4, $5, 0, now()) RETURNING id`,
@@ -4905,6 +5004,8 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
 // Create a new room. Retries up to 3 times on ID collision.
 app.post('/api/mancala/rooms', async (req, res) => {
   const initPits = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
+  // Recently Played tracking (Recent goal): hosting a room is playing it.
+  recordGamePlay(req.user.id, req.user.username, 'mancala');
   let roomId = generateRoomId();
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -4926,6 +5027,8 @@ app.post('/api/mancala/rooms', async (req, res) => {
 // Join an existing waiting room as player 2.
 app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
   const { roomId } = req.params;
+  // Recently Played tracking (Recent goal): sitting down in the room is a play.
+  recordGamePlay(req.user.id, req.user.username, 'mancala');
   try {
     /* #200 — RECOGNISE A PLAYER WHO IS ALREADY IN THIS ROOM, before trying to
        seat them as a newcomer.
@@ -5407,6 +5510,8 @@ async function expireStaleMancalaRoom(r) {
 app.post('/api/classic/:gameId/rooms', async (req, res) => {
   const { gameId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // Recently Played tracking (Recent goal): hosting a room is playing it.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   const rules = boardRules.getRules(gameId);
   const seatCap = rules && rules.maxPlayers ? rules.maxPlayers : 2;
   const wanted = Number((req.body || {}).players) || 2;
@@ -5445,6 +5550,8 @@ app.post('/api/classic/:gameId/rooms', async (req, res) => {
 app.post('/api/classic/:gameId/rooms/:roomId/join', async (req, res) => {
   const { gameId, roomId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // Recently Played tracking (Recent goal): sitting down in the room is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { rows: cur } = await pool.query(
@@ -5638,6 +5745,8 @@ app.post('/api/classic/:gameId/rooms/:roomId/score', async (req, res) => {
   if (!CLASSIC_RACE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Race not supported for this game' });
   const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
   if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): crossing the finish line is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
@@ -5715,6 +5824,8 @@ app.post('/api/classic/:gameId/score', async (req, res) => {
   if (!CLASSIC_SCORE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
   if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted solo run is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   const extra = (req.body.extra && typeof req.body.extra === 'object' && !Array.isArray(req.body.extra))
     ? req.body.extra : null;
   try {
@@ -5929,6 +6040,8 @@ app.post('/api/mancala/score/verify', async (req, res) => {
   }
 
   try {
+    // Recently Played tracking (Recent goal): a settled solo run is a play.
+    recordGamePlay(req.user.id, req.user.username, 'mancala');
     const { rows } = await pool.query(
       `SELECT * FROM mancala_sessions WHERE id = $1`,
       [sessionId]
@@ -6192,6 +6305,8 @@ app.post('/api/snake/score', async (req, res) => {
   const length = Number.isFinite(req.body.length) ? Math.round(req.body.length) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'snake');
   try {
     // Get previous best before updating
     const { rows: prevRows } = await pool.query(
@@ -6317,6 +6432,8 @@ app.post('/api/bounce/score', async (req, res) => {
   const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'bounce');
   try {
     // Get previous best before updating
     const { rows: prevRows } = await pool.query(
@@ -6438,6 +6555,8 @@ app.post('/api/zuma/score', async (req, res) => {
   const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'zuma');
   try {
     const { rows: prevRows } = await pool.query(
       `SELECT best_score FROM zuma_scores WHERE user_id = $1`,
@@ -6779,6 +6898,8 @@ app.post('/api/tilematch/scores/submit', async (req, res) => {
   const highestLevel  = Number.isFinite(req.body.highestLevel)  ? Math.round(req.body.highestLevel)  : 0;
   const totalCleared  = Number.isFinite(req.body.totalCleared)  ? Math.round(req.body.totalCleared)  : 0;
   const sessionScore  = Number.isFinite(req.body.sessionScore)  ? Math.round(req.body.sessionScore)  : 0;
+  // Recently Played tracking (Recent goal): a submitted session is a play.
+  recordGamePlay(req.user.id, req.user.username, 'tilematching');
   try {
     await pool.query(
       `INSERT INTO tilematch_scores
@@ -6894,6 +7015,8 @@ app.post('/api/dapp/sessions/start', async (req, res) => {
   if (!dapp.getEngine(gameId)) return res.status(400).json({ error: 'Game not yet supported by DApp Mode' });
   let seed = Number.isFinite(req.body.seed) ? Math.round(req.body.seed) : null;
   if (seed === null) seed = Math.floor(Math.random() * 0x7fffffff);
+  // Recently Played tracking (Recent goal): claiming the session is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     const id = newSessionId();
     await pool.query(
@@ -7176,6 +7299,8 @@ app.post('/api/match3/start/:puzzleId', async (req, res) => {
   const puzzle = MATCH3_PUZZLES.find(p => p.id === puzzleId);
   if (!puzzle) return res.status(400).json({ error: 'Unknown puzzle' });
 
+  // Recently Played tracking (Recent goal): opening a puzzle is the play.
+  recordGamePlay(req.user.id, req.user.username, 'match3');
   try {
     const { rows: session } = await pool.query(
       'SELECT * FROM match3_session WHERE user_id = $1',

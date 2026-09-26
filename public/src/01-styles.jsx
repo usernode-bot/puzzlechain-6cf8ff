@@ -3896,6 +3896,13 @@ ${emitTapHighlightRules()}
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
+/* Recently Played tiles (Recent goal) reuse the inprog-card look, but as real
+   buttons: strip the browser chrome back to the shared card surface. */
+.recent-card {
+  font-family: inherit; text-align: left; color: ${C.text};
+  background: ${C.card}; border: 1px solid ${C.border};
+}
+.recent-card:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
 
 .chat-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;

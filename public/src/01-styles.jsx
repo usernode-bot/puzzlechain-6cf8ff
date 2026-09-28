@@ -12,6 +12,17 @@ ${paletteVars('light')}
 ${paletteVars('dark')}
 }
 
+/* The hosted native kit's accent follows ours in both themes, so kit
+   switches, action sheets, toasts and pull-to-refresh match the teal.
+   Overridden here, never by forking kit CSS. */
+:root, :root[data-theme="dark"] {
+  --un-accent: var(--c-accent);
+  --un-accent-contrast: #fff;
+  /* The toast surface is dark in both themes, so its action label is a
+     light teal in both. */
+  --un-toast-action: #5EEAD4;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
@@ -4009,7 +4020,7 @@ ${emitTapHighlightRules()}
   padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
   color: ${C.muted}; cursor: pointer; touch-action: manipulation;
 }
-.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: ${ca('accent','1a')}; }
 /* The pin control (#232). It sits in the card's top-right corner, which the
    daily badge already used, so the badge's right offset below clears it
    unconditionally rather than only on cards that render a pin, so a daily and
@@ -4061,7 +4072,7 @@ ${emitTapHighlightRules()}
   letter-spacing: 0.07em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;
 }
-.card-daily-badge.fresh  { background: rgba(45,95,174,.14); color: ${C.accent};  border-color: rgba(45,95,174,.30); }
+.card-daily-badge.fresh  { background: ${ca('accent','24')}; color: ${C.accent};  border-color: ${ca('accent','4d')}; }
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
 

@@ -206,6 +206,10 @@ function App() {
   // (from /api/daily), and the game whose How-to-Play modal is open (null =
   // closed). The modal renders above every screen/shell.
   const [bests, setBests] = useState({});
+  // All-time per-game figures (/api/my/scores): pts (daily points), best
+  // (classic/PB-table best), record (head-to-head W/L/D). Consumed by the
+  // home cards' state line and the profile's "All-time scores" section.
+  const [myScores, setMyScores] = useState({});
   const [howToGame, setHowToGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -493,6 +497,13 @@ function App() {
       api('/api/story').then(r => {
         if (r.ok && r.body && r.body.progress) setStoryProgress(r.body.progress);
       }).catch(() => {});
+      // The caller's all-time per-game figures (pts / best / W-L record),
+      // rendered on the home cards' state line and the profile's
+      // "All-time scores" section. Fire-and-forget like /api/story: failure
+      // degrades to today's behaviour (no score segments, no section).
+      api('/api/my/scores').then(r => {
+        if (r.ok && r.body && r.body.scores) setMyScores(r.body.scores);
+      }).catch(() => {});
       setFeatured(body.featured || null);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
@@ -518,6 +529,7 @@ function App() {
       setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [], stories: [] });
+      setMyScores({});
       setPins([]);
       // Signed-out (or backend hiccup): the public read surface still supplies
       // server time, the reset countdown, and today's board seeds, so the
@@ -2452,6 +2464,7 @@ function App() {
         <ProfileScreen
           userId={selectedUserId}
           user={user}
+          myScores={myScores}
           onBack={() => goBack()}
           onOpenFriends={() => setScreen('friends')}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -2644,6 +2657,7 @@ function App() {
                   attempts: attempts,
                   bests: bests,
                   storyProgress: storyProgress,
+                  myScores: myScores,
                   loading: loading,
                   onPlay: playCardMode,
                   pinned: pinnedSet.has(c.key),

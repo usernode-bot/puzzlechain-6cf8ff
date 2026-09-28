@@ -1808,6 +1808,26 @@
       "name": "Dark theme filter chip wears the teal accent",
       "path": "/?theme=dark",
       "expectSelector": "html[data-theme=\"dark\"] .home-filter-chips .home-chip.on"
+    },
+    {
+      "name": "All-time scores section on own profile",
+      "path": "/?screen=profile&demo=myscores",
+      "expectText": "All-time scores"
+    },
+    {
+      "name": "All-time scores list holds a figure",
+      "path": "/?screen=profile&demo=myscores",
+      "expectText": "+800 pts"
+    },
+    {
+      "name": "Card state line carries the all-time score",
+      "path": "/?demo=myscores",
+      "expectText": "+320 pts"
+    },
+    {
+      "name": "Card without a daily still shows its all-time best",
+      "path": "/?demo=myscores",
+      "expectText": "Best 350"
     }
   ],
   "visibility": {

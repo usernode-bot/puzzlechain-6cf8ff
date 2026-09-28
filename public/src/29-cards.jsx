@@ -272,7 +272,34 @@ const PIN_LIMIT = 8;
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
+/* The card's all-time figure (myScores from /api/my/scores), in the
+   pts -> best -> record priority, read across every registry id the card
+   speaks for (a merged pair carries two: Snake / Daily Snake and friends).
+   Returns null when nothing is recorded so the state line is unchanged —
+   a signed-out visitor or a game never played renders exactly as before. */
+const cardMyScoreBit = (card, myScores) => {
+  if (!myScores) return null;
+  const ids = new Set(card.modes.map(m => m.gameId));
+  if (card.gameId) ids.add(card.gameId);
+  let pts = 0, hasPts = false, best = 0, hasBest = false, rec = null;
+  for (const id of ids) {
+    const s = myScores[id];
+    if (!s) continue;
+    if (Number.isFinite(s.pts) && s.pts > 0) { hasPts = true; pts += s.pts; }
+    if (Number.isFinite(s.best) && s.best > 0) { hasBest = true; best = Math.max(best, s.best); }
+    if (s.record && (s.record.wins + s.record.losses + s.record.draws) > 0) rec = s.record;
+  }
+  if (hasPts) return `+${pts.toLocaleString()} pts`;
+  if (hasBest) return `Best ${best.toLocaleString()}`;
+  if (rec) {
+    const parts = [`${rec.wins}W`, `${rec.losses}L`];
+    if (rec.draws > 0) parts.push(`${rec.draws}D`);
+    return parts.join(' · ');
+  }
+  return null;
+};
+
+function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -288,6 +315,10 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
     if (p && p.total) bits.push(`Story ${p.cleared}/${p.total}`);
     else bits.push('Story');
   }
+  // All-time figure LAST, so any assertion on the line's leading segments
+  // ("Daily ✓", "Story 3/10") keeps passing when it appears.
+  const scoreBit = cardMyScoreBit(card, myScores);
+  if (scoreBit) bits.push(scoreBit);
 
   /* EVERY CARD ENDS IN A BUTTON. A card with one way to play used to be one
      big tap target instead, which made the grid inconsistent to read and to

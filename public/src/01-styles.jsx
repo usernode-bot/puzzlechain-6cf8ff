@@ -3908,6 +3908,39 @@ ${emitTapHighlightRules()}
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
 
+/* Daily checklist (#295): a horizontal scroller of one chip per daily game.
+   Scrollbar is hidden on purpose — the cut-off chip at the right edge is the
+   affordance — and snap keeps a partial chip from landing half-read. States
+   follow the daily badge palette: emerald done, gold resume, plain todo. */
+.dl-wrap { margin-bottom: 0.4rem; }
+.dl-row {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px;
+  scrollbar-width: none; -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.dl-row::-webkit-scrollbar { display: none; }
+.dl-check {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
+  padding: 6px 13px 6px 7px; font-family: inherit; font-size: 13px;
+  color: ${C.text}; cursor: pointer; scroll-snap-align: start;
+  white-space: nowrap;
+}
+.dl-check:hover { border-color: ${C.accent}; }
+.dl-mark {
+  width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+  border: 1.5px solid ${C.border};
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; font-weight: 700; color: white;
+}
+.dl-icon { font-size: 15px; line-height: 1; }
+.dl-name { font-weight: 600; }
+.dl-check.done { border-color: ${ca('emerald','4d')}; }
+.dl-check.done .dl-mark { background: ${C.emerald}; border-color: ${C.emerald}; }
+.dl-check.done .dl-name { color: ${C.muted}; }
+.dl-check.resume .dl-mark { border-color: ${C.gold}; color: ${C.gold}; }
+
 .chat-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;
   display: flex; align-items: flex-end; justify-content: center;

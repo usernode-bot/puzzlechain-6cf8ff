@@ -52,6 +52,26 @@
       "expectSelector": ".card-daily-badge.done"
     },
     {
+      "name": "Daily checklist strip renders on home",
+      "path": "/",
+      "expectSelector": ".dl-row"
+    },
+    {
+      "name": "Daily checklist chips list every daily",
+      "path": "/",
+      "expectSelector": ".dl-row .dl-check"
+    },
+    {
+      "name": "Daily checklist checks off a played daily",
+      "path": "/?demo=locked",
+      "expectSelector": ".dl-row .dl-check.done"
+    },
+    {
+      "name": "Daily checklist counter renders",
+      "path": "/?demo=locked",
+      "expectSelector": ".dl-wrap .home-pin-count"
+    },
+    {
       "name": "Word Search card in lobby",
       "path": "/",
       "expectText": "Word Search"

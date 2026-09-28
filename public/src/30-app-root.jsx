@@ -2527,6 +2527,25 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
+              {/* #295 — the day's dailies as a checkable horizontal strip,
+                  directly under the featured hero. It reads the same
+                  `attempts` map the grid's badges read and launches through
+                  launchGame like a card button, so it needs no state of its
+                  own. Hidden while attempts load — an all-unchecked strip
+                  that fills in a beat later reads as a glitch. Signed-out
+                  visitors still get it: the chips sit unchecked and a tap
+                  lands on the pre-game screen's sign-in CTA, same as the
+                  grid's cards do. */}
+              {!loading && (
+                <DailyChecklist
+                  attempts={attempts}
+                  loading={loading}
+                  onPlay={(gameId) => {
+                    const g = GAMES.find((x) => x.id === gameId);
+                    if (g) launchGame(g, 'daily');
+                  }}
+                />
+              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}

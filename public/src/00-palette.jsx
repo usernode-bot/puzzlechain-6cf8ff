@@ -157,6 +157,7 @@ const TAPPABLE_CLASSES = [
   'tappable',
   'mf-canvas', 'board-canvas',
   'card-pin',
+  'dl-check',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors

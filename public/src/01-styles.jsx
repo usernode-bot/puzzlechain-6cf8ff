@@ -4065,6 +4065,34 @@ ${emitTapHighlightRules()}
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
 
+/* #313 — the per-card streak pill. It sits in the state footer beside the tag,
+   reads the same brass the nav streak stat uses (gold is this app's reserved
+   streak colour), and is deliberately a pill not a badge: it is status, not
+   state, so it stays visible on played, resumed and fresh cards alike. */
+.card-streak {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.62rem; font-weight: 600; letter-spacing: 0.02em;
+  color: ${C.gold};
+  background: ${ca('gold', '14')};
+  border: 1px solid ${ca('gold', '55')};
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.card-streak .cs-flame { font-size: 0.7rem; line-height: 1; }
+.card-streak .cs-days { color: ${C.gold}; opacity: 0.75; }
+
+/* The footer row that carries the tag and (when the card has a daily) the
+   streak pill. align-items: baseline keeps the two pill shapes on one line
+   whatever the flame glyph does to the pill's inner baseline. */
+.card-footer {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem;
+  /* Carries the tag row's old margin-top: auto, so the leftover space of a
+     stretched tile still becomes even padding above the footer. */
+  margin-top: auto;
+}
+.card-footer > .tag { margin-top: 0; }
+
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
 .lboard, .howto-card {

@@ -272,7 +272,7 @@ const PIN_LIMIT = 8;
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
+function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled, streak }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -282,6 +282,10 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
   // instead of spending its width on buttons that repeat the mode labels.
   const bits = [];
   if (dailyId) bits.push(finished ? 'Daily ✓' : inProgress ? 'Daily ▶' : 'Daily · new');
+  // #313 — a signed-in player's current streak rides on every card that offers
+  // a daily (the merged cards included: cardDailyId covers them). Zero stays
+  // off the card: a 0-day streak is not information the card needs, and the
+  // nav stat still shows it.
   const storyMode = card.modes.find(m => m.mode === 'story');
   if (storyMode) {
     const p = (storyProgress && storyProgress[storyMode.gameId]) || null;
@@ -319,9 +323,21 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
       <div className="card-icon">{card.icon}</div>
       <div className="card-name">{card.name}</div>
       <div className="card-desc">{card.desc}</div>
-      <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
-        {card.tag}
-      </span>
+      {/* #313 — the state footer. The tag and the streak pill share one row;
+          without the wrapper the pill (a flex item like the tag) drops to
+          its own line and pushes the buttons down. */}
+      <div className="card-footer">
+        <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
+          {card.tag}
+        </span>
+        {dailyId && streak > 0 && (
+          <span className="card-streak mono" data-streak={streak} title={`${streak}-day streak`}>
+            <span className="cs-flame" aria-hidden="true">🔥</span>
+            <span>{streak}</span>
+            <span className="cs-days">d</span>
+          </span>
+        )}
+      </div>
       {bits.length > 0 && <div className="card-state mono">{bits.join(' · ')}</div>}
       <div className={'card-modes n' + singleModes.length}>
         {singleModes.map(m => {

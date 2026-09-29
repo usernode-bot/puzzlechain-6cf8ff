@@ -3896,6 +3896,32 @@ ${emitTapHighlightRules()}
 
 .inprog-row-wrap { margin-bottom: 0.4rem; }
 .inprog-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+
+/* Daily Challenges strip (issue #295): one compact tile per game with a
+   daily mode, in a horizontal scroll row that mirrors .inprog-row's overflow
+   guarantee (#236 — the row scrolls, the page never does). */
+.daily-checklist-wrap { margin-bottom: 0.4rem; }
+.daily-checklist-row {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;
+  overscroll-behavior: contain;
+}
+.daily-tile {
+  display: flex; align-items: center; gap: 7px;
+  font-family: inherit; text-align: left; color: ${C.text};
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  padding: 7px 10px; min-width: 108px; flex-shrink: 0; cursor: pointer;
+}
+.daily-tile:hover { border-color: ${C.accent}; }
+.daily-tile:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
+.daily-tile.fresh { border-color: ${C.accent}; }
+.daily-tile.fresh .dc-state { color: ${C.accent}; }
+.daily-tile .dc-icon { font-size: 18px; line-height: 1; }
+.daily-tile .dc-text { display: flex; flex-direction: column; }
+.daily-tile .dc-name { font-weight: 600; font-size: 12px; white-space: nowrap; }
+.daily-tile .dc-state { font-size: 10.5px; color: ${C.muted}; margin-top: 2px; white-space: nowrap; }
+.daily-tile .dc-state.resume { color: ${C.gold}; }
+.daily-tile.played { opacity: 0.55; }
+.daily-tile .dc-state.played { color: ${C.emerald}; }
 .inprog-card {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 12px;
   padding: 10px 14px; min-width: 150px; cursor: pointer; flex-shrink: 0;

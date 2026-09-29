@@ -1844,6 +1844,21 @@
       "name": "Dark theme filter chip wears the teal accent",
       "path": "/?theme=dark",
       "expectSelector": "html[data-theme=\"dark\"] .home-filter-chips .home-chip.on"
+    },
+    {
+      "name": "Daily Challenges strip renders in lobby",
+      "path": "/",
+      "expectSelector": ".daily-checklist-row"
+    },
+    {
+      "name": "Daily Challenges strip tile",
+      "path": "/",
+      "expectText": "New today"
+    },
+    {
+      "name": "Daily Challenges finished tile checkmarks",
+      "path": "/?demo=locked",
+      "expectSelector": ".daily-tile.played"
     }
   ],
   "visibility": {

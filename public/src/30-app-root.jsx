@@ -41,6 +41,49 @@ function WinEarned({ value }) {
   return <span className="we-v" data-win-earned={n}>+{shown}</span>;
 }
 
+/* Daily Challenges strip (issue #295): one compact tile per game card that
+   has a daily mode, laid out like the In progress row but smaller so the
+   whole day's set is scannable in one swipe. State reads only the attempts
+   map the /api/daily load hydrates, so tiles flip reactively — the same
+   finishedAt check the game cards' NEW TODAY / RESUME / PLAYED badge uses.
+   Merged cards (Snake / Daily Snake and friends) key off cardDailyId's
+   registry id so the attempts lookup and the launch target agree. */
+function DailyChecklistRow({ attempts, loading, launchGame }) {
+  const items = [];
+  for (const card of GAME_CARDS) {
+    const dailyId = cardDailyId(card);
+    if (!dailyId) continue;
+    const g = GAMES.find(x => x.id === dailyId);
+    if (!g) continue;
+    const a = attempts[dailyId];
+    items.push({ key: dailyId, g, state: (a && a.finishedAt) ? 'played' : a ? 'resumed' : 'new' });
+  }
+  if (loading || !items.length) return null;
+  return (
+    <div className="daily-checklist-wrap">
+      <div className="home-section-title">Daily Challenges</div>
+      <div className="daily-checklist-row">
+        {items.map(({ key, g, state }) => (
+          <button
+            key={key}
+            className={'daily-tile' + (state === 'played' ? ' played' : '')}
+            aria-label={`Play ${g.name} Daily Challenge`}
+            {...tapProps(() => { if (!loading) launchGame(g, 'daily'); })}
+          >
+            <span className="dc-icon">{g.icon}</span>
+            <span className="dc-text">
+              <span className="dc-name">{g.name}</span>
+              <span className={'dc-state ' + state}>
+                {state === 'played' ? '✓ Played' : state === 'resumed' ? '▶ Resume' : 'New today'}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=friends / ?screen=session deep links for testing.
@@ -2583,6 +2626,13 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
+              {!loading && (
+                <DailyChecklistRow
+                  attempts={attempts}
+                  loading={loading}
+                  launchGame={launchGame}
+                />
+              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}

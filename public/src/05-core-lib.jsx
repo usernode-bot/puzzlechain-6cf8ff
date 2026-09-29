@@ -177,6 +177,13 @@ const corpusSeed = corpusPick;    // `seeds`-shaped corpora
 const corpusLevel = corpusPick;   // `levels`-shaped corpora
 const corpusBands = (gameId) => (_corpusCache[gameId] ? _corpusCache[gameId].bands || 0 : 0);
 
+// Seconds → "M:SS"-style clock, as used on result cards, game screens and the
+// home card's personal-best line. Shared at module level so each surface shows
+// the same shape; components that predate it keep their local copies (which
+// shadow this one harmlessly).
+const fmtTime = (s) =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
 /* WHEN "THE RUN ENDED" IS NOT "THE RUN SUCCEEDED".
 
    The real-time games (Marble Loop, Bounce, Snake) have always reported BOTH

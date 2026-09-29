@@ -355,6 +355,16 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
           );
         })}
       </div>
+      {/* Personal best for the card's daily, under the buttons as requested.
+          Only when a recorded winning time exists — missing/zero/NaN show no
+          line at all, exactly as before. */}
+      {(() => {
+        const b = dailyId && bests ? bests[dailyId] : null;
+        const t = b && Number.isFinite(b.timeSecs) ? b.timeSecs : null;
+        return t ? (
+          <div className="card-state mono">best: {fmtTime(t)}</div>
+        ) : null;
+      })()}
     </div>
   );
 }

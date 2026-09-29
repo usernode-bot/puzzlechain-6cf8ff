@@ -840,6 +840,7 @@ const GB_TABS = [
   { id: 'daily', label: 'Daily' },
   { id: 'level', label: 'Level' },
   { id: 'alltime', label: 'All-time' },
+  { id: 'weekly', label: 'Weekly' },
 ];
 
 function GbRows({ rows, me, cols, empty }) {
@@ -868,10 +869,11 @@ function GameBoards({ game, onClose }) {
   const [state, setState] = useState({ loading: true });
 
   // Each tab is a different endpoint of the same shape, so one fetch serves all
-  // three; band only participates on the arcade ladder.
+  // four; band only participates on the arcade ladder.
   const url = tab === 'daily' ? `/api/daily/${game.id}/leaderboard`
     : tab === 'level' ? `/api/arcade/${game.id}/leaderboard?band=${encodeURIComponent(band)}`
-    : `/api/alltime/${game.id}/leaderboard`;
+    : tab === 'alltime' ? `/api/alltime/${game.id}/leaderboard`
+    : `/api/weekly/${game.id}/leaderboard`;
 
   useEffect(() => {
     let alive = true;
@@ -890,11 +892,14 @@ function GameBoards({ game, onClose }) {
     ? { a: (e) => `${e.points} pts`, b: (e) => `${e.plays}d` }
     : tab === 'level'
       ? { a: (e) => `${e.bestScore != null ? e.bestScore : e.score || 0} pts`, b: (e) => (e.runs != null ? `${e.runs}r` : '—') }
+      : tab === 'weekly'
+        ? { a: (e) => `${e.score} pts`, b: (e) => lbFmtTime(e.timeSecs) }
       : { a: (e) => lbFmtTime(e.timeSecs), b: (e) => (e.steps != null ? `${e.steps} st` : '—') };
   const empty = scope === 'friends' ? LB_FRIENDS_EMPTY
     : tab === 'daily' ? "Nobody has solved today's puzzle yet."
       : tab === 'level' ? 'No runs on this band yet.'
-        : 'No finished games yet — play one and you are on the board.';
+        : tab === 'weekly' ? 'No finished games yet this week — play one and you are on the board.'
+          : 'No finished games yet — play one and you are on the board.';
 
   return (
     <div className="gb-sheet-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -925,7 +930,9 @@ function GameBoards({ game, onClose }) {
             ? 'Total points across every daily you have finished. Ties go to fewer days played.'
             : tab === 'level'
               ? 'Your best arcade run on each difficulty band.'
-              : "Today's solvers, fastest first."}
+              : tab === 'weekly'
+                ? 'Best score since Monday. Ties go to fewer plays.'
+                : "Today's solvers, fastest first."}
         </div>
       </div>
     </div>

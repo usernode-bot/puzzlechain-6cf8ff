@@ -1368,6 +1368,16 @@
       "expectText": "All-time"
     },
     {
+      "name": "Sudoku leaderboards offer a weekly ranking",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectText": "Weekly"
+    },
+    {
+      "name": "Weekly leaderboard readable without auth (null-guarded)",
+      "path": "/api/weekly/sudoku/leaderboard",
+      "expectText": "entries"
+    },
+    {
       "name": "Sudoku 9x9 board is deep-linkable and fills its column",
       "path": "/?game=sudoku&practice=1&sdk=9",
       "expectSelector": ".sudoku.s9 canvas.sdk-canvas"

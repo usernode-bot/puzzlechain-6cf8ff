@@ -2151,6 +2151,9 @@ const PUBLIC_API_GET = [
   // #188 — the all-time board is the same shape as the two above and opens on
   // the same terms; its handler null-guards req.user too.
   /^\/api\/alltime\/[A-Za-z0-9_-]+\/leaderboard$/,
+  // Weekly board — the same shape again, scoped to the current UTC week. Its
+  // handler null-guards req.user like the other two.
+  /^\/api\/weekly\/[A-Za-z0-9_-]+\/leaderboard$/,
 ];
 
 // Simple in-memory per-IP sliding window over the public GET surface — the
@@ -5052,6 +5055,75 @@ app.get('/api/alltime/:gameId/leaderboard', async (req, res) => {
     res.json({ entries, me: mineRow ? shape(mineRow) : null, total });
   } catch (err) {
     console.error('[alltime] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+/* GET /api/weekly/:gameId/leaderboard — the current UTC week's best results
+   per player, one row per player. The board resets itself on the Monday UTC
+   boundary (the same window the Elo "weekly movers" use): utcWeekStart()
+   returns that Monday as YYYY-MM-DD, which matches attempt_date, so a
+   `attempt_date >= utcWeekStart()` filter needs no cleanup job and no upper
+   bound — future dates do not occur in this table.
+
+   A player's weekly result is their SINGLE BEST attempt, not a sum — the same
+   "best score" framing the daily board uses, comparable week to week. The
+   aggregation therefore picks each player's best ROW first (ordered by the
+   fixed criteria below) and then numbers one row per player, so the displayed
+   time/steps belong to that best attempt rather than unrelated minimums.
+
+   The ordering is fixed across every game — score first, then fastest time,
+   fewest steps, earliest finish — deliberately NOT the per-game tieBreak the
+   daily board reads from the manifest: a weekly high-score board rewards
+   score consistently regardless of game type. Losses are excluded by
+   `score > 0`, the same rule the daily and all-time boards use. Public on the
+   same terms as the other boards: the handler null-guards req.user, so an
+   anonymous caller gets me: null and isCurrentUser: false. */
+app.get('/api/weekly/:gameId/leaderboard', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // ?scope=friends (phase 4): same board, filtered to the caller + the people
+  // they follow (user_follows), ranks recomputed inside the filtered set.
+  // Anonymous callers have no follow graph — return an empty board.
+  const friendsScope = req.query.scope === 'friends';
+  if (friendsScope && !req.user) return res.json({ entries: [], me: null, total: 0 });
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, username, score, steps, time_secs, finished_at,
+              ROW_NUMBER() OVER (ORDER BY score DESC, time_secs ASC, steps ASC, finished_at ASC) AS rank
+         FROM (
+           SELECT DISTINCT ON (user_id)
+                  user_id, username, score, steps, time_secs, finished_at
+             FROM daily_attempts
+            WHERE game_id = $1
+              AND attempt_date >= $3::date
+              AND finished_at IS NOT NULL
+              AND score IS NOT NULL AND score > 0
+              AND ($2::text IS NULL
+                   OR user_id = $2
+                   OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))
+            ORDER BY user_id, score DESC, time_secs ASC, steps ASC, finished_at ASC
+         ) best
+        ORDER BY score DESC, time_secs ASC, steps ASC, finished_at ASC`,
+      [gameId, friendsScope ? req.user.id : null, utcWeekStart()]
+    );
+    const total = rows.length;
+    // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
+    const uid = req.user ? req.user.id : null;
+    const shape = (r) => ({
+      rank: Number(r.rank),
+      username: r.username || 'anon',
+      timeSecs: r.time_secs,
+      steps: r.steps,
+      score: r.score,
+      isCurrentUser: uid != null && r.user_id === uid,
+    });
+    const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
+    const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
+    const me = mineRow ? shape(mineRow) : null;
+    res.json({ entries, me, total });
+  } catch (err) {
+    console.error('[weekly] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });

@@ -160,7 +160,7 @@ function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverM
         const isExploded = gameOverMine === i;
         const adjVal = adjacency ? adjacency[i] : 0;
 
-        let fill = light ? MS_LIGHT.hidden : PAL.card;
+        let fill = light ? MS_LIGHT.hidden : PAL.border;
         if (isRev) fill = light ? MS_LIGHT.revealed : PAL.surface;
         if (isMineVisible) fill = light ? MS_LIGHT.mineDead : 'rgba(205,75,58,.25)';
         if (isExploded) fill = light ? MS_LIGHT.exploded : 'rgba(205,75,58,.60)';

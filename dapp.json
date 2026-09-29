@@ -1073,6 +1073,11 @@
       "expectText": "Flag"
     },
     {
+      "name": "Mine Finder Classic board renders in dark theme",
+      "path": "/?game=minesweeper&theme=dark",
+      "expectSelector": "canvas.ms-canvas"
+    },
+    {
       "name": "Minesweeper explains chording on numbers",
       "path": "/?game=minesweeper",
       "expectText": "Tap a number whose flags all match"

@@ -3907,6 +3907,13 @@ ${emitTapHighlightRules()}
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
+/* Recently Played tiles (Recent goal) reuse the inprog-card look, but as real
+   buttons: strip the browser chrome back to the shared card surface. */
+.recent-card {
+  font-family: inherit; text-align: left; color: ${C.text};
+  background: ${C.card}; border: 1px solid ${C.border};
+}
+.recent-card:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
 
 /* Daily checklist (#295): a horizontal scroller of one chip per daily game.
    Scrollbar is hidden on purpose — the cut-off chip at the right edge is the
@@ -4073,6 +4080,23 @@ ${emitTapHighlightRules()}
 .card-pin.on[data-pressed] { transform: rotate(-20deg) scale(0.86); }
 .card-pin[disabled] { opacity: 0.18; cursor: default; }
 
+/* The favorite star. Same 44px touch square and corner placement as .card-pin,
+   but stacked BELOW it so the two controls never collide, and clear of the
+   daily badge (which .card-pin already pushed left). The unfilled star is a
+   bare outline at the pin's resting opacity; the filled one is unfiltered and
+   fully opaque, which is the whole "filled vs empty" read. */
+.card-fav {
+  position: absolute; top: 2.7rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; opacity: 0.32;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.card-fav:hover { opacity: 0.6; }
+.card-fav.on { opacity: 1; }
+.card-fav.on { color: ${C.gold}; }
+.card-fav[data-pressed] { transform: scale(0.86); }
+
 /* The Pinned section's heading and the two lines that explain it. */
 .home-pinned-title { display: flex; align-items: baseline; gap: 0.5rem; }
 .home-pin-count {
@@ -4096,6 +4120,10 @@ ${emitTapHighlightRules()}
    being a boxed 58px banner between the filter chips and the first game. One
    muted line, in the same register as the chips it follows. */
 .home-pin-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
+/* The Favorites chip's empty state. Same register as .home-pin-empty above. */
+.home-fav-empty {
   color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
 }
 

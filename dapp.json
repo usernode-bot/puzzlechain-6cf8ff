@@ -73,6 +73,11 @@
       "expectText": "Streak"
     },
     {
+      "name": "Streak chip renders on daily cards",
+      "path": "/?demo=streak",
+      "expectSelector": ".card-streak-chip"
+    },
+    {
       "name": "Masthead tagline renders",
       "path": "/",
       "expectText": "Classic games, fresh every day."

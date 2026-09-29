@@ -274,7 +274,7 @@ const PIN_LIMIT = 8;
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled, favorited, onToggleFavorite }) {
+function GameCard({ card, attempts, bests, storyProgress, loading, streak, authOk, onPlay, pinned, onTogglePin, pinDisabled, favorited, onToggleFavorite }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -349,6 +349,13 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
               aria-label={`${card.name} — ${label}`}
               {...tapProps(() => { if (!loading) onPlay(m.gameId, m.mode); })}
             >
+              {isDaily && authOk && streak > 0 && !loading && (
+                <span
+                  className="card-streak-chip"
+                  title={`${streak}-day streak`}
+                  aria-label={`${streak}-day streak`}
+                >🔥 {streak}</span>
+              )}
               <span className="cmb-label">{label}</span>
               <span className="cmb-caption">{caption}</span>
             </button>

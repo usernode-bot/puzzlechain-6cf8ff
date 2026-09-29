@@ -1330,6 +1330,7 @@ ${emitTapHighlightRules()}
   font-size: 0.62rem; line-height: 1.25; margin-top: 0.05rem;
   color: ${C.muted};
 }
+.card-mode-btn.daily { position: relative; } /* anchors the #313 streak chip */
 .card-mode-btn.story:hover, .card-mode-btn.arcade:hover { border-color: var(--accent, ${C.accent}); }
 .card-mode-btn.story:hover .cmb-label,
 .card-mode-btn.arcade:hover .cmb-label { color: var(--accent, ${C.accent}); }
@@ -4103,6 +4104,19 @@ ${emitTapHighlightRules()}
 .card-daily-badge.fresh  { background: ${ca('accent','24')}; color: ${C.accent};  border-color: ${ca('accent','4d')}; }
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
+/* #313 — app-wide daily streak, shown on every card with a Daily button.
+   Overlay in the button's top-right corner so nothing reflows; display-only. */
+.card-streak-chip {
+  /* Straddles the button's top-right corner: raised so its bottom stays
+     above the centered "Daily" label's glyphs (~8px from the button top),
+     it can never cover the label or caption at any card width or streak
+     length. The 0.5rem it rises lands in .card-modes' own top margin. */
+  position: absolute; top: -0.5rem; right: 0.2rem; z-index: 1; pointer-events: none;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 600;
+  line-height: 1;
+  padding: 0.12rem 0.4rem; border-radius: 999px;
+  background: ${ca('gold','16')}; color: ${C.gold}; border: 1px solid ${ca('gold','35')};
+}
 
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,

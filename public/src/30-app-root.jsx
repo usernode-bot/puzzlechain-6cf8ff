@@ -2720,6 +2720,8 @@ function App() {
                   bests: bests,
                   storyProgress: storyProgress,
                   loading: loading,
+                  streak: streak,
+                  authOk: authOk,
                   onPlay: playCardMode,
                   pinned: pinnedSet.has(c.key),
                   // Signed-out visitors have nowhere to store a pin, so they

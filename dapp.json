@@ -1203,6 +1203,11 @@
       "expectSelector": ".cw-board[data-cw-rows=\"2\"]"
     },
     {
+      "name": "Daily Cipher frame fits its box",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectSelector": ".cw-board[data-cw-fit=\"1\"]"
+    },
+    {
       "name": "Word Search board renders in the light theme",
       "path": "/?game=wordhunt&practice=1&theme=light",
       "expectSelector": "canvas.ws-canvas"

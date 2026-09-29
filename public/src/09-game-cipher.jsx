@@ -907,16 +907,18 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + (kbdH ? kbdH + GAP : 0) : 0)
     + (allResolved ? 34 : 0);
   const gapPx = 5;
-  /* No floor on the available height: flooring it at 90 meant a board that
-     could not fit simply drew past the bottom of its own frame. The tile floor
-     scales the same way, so a short screen gets a smaller board instead of a
-     clipped one. */
-  const minTile = tightScale < 1 ? 14 : 20;
+  /* No floor on the available height, and none on the tile either: flooring
+     either meant a frame that could not fit simply drew past the bottom of its
+     own box, and the drawn keyboard — the last thing on the canvas — was what
+     got clipped (#298). The tile now shrinks as far as the height demands, so
+     `H <= tightH` always holds and every key row stays on screen. A
+     zero/negative availB already collapses the grid to nothing via the
+     Math.max(0, …) above; degenerate, but the keys stay drawn. */
   const availB = Math.max(0, Math.floor(boxH) - chrome);
-  const tile = active ? Math.max(minTile, Math.min(56, Math.floor(Math.min(
+  const tile = active ? Math.min(56, Math.floor(Math.min(
     (Math.min(W, boardWidth) - gapPx * (wordLen - 1)) / wordLen,
     (availB - gapPx * (maxGuesses - 1)) / maxGuesses
-  )))) : 0;
+  ))) : 0;
   const bw = active ? tile * wordLen + gapPx * (wordLen - 1) : 0;
   const bh = active ? tile * maxGuesses + gapPx * (maxGuesses - 1) : 0;
   const H = chrome + bh;
@@ -1190,6 +1192,9 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
            live on the canvas, where no check can read a pixel, so this is the
            assertable half: a row exists to be coloured (#194). */
         data-cw-rows={active ? active.guesses.length : 0}
+        /* The fit invariant, assertable: the frame (the keyboard is drawn
+           last) is never taller than the measured box, so nothing clips (#298). */
+        data-cw-fit={H <= tightH ? '1' : undefined}
       >
         <canvas
           ref={canvasRef}

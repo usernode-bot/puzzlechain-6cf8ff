@@ -12,6 +12,17 @@ ${paletteVars('light')}
 ${paletteVars('dark')}
 }
 
+/* The hosted native kit's accent follows ours in both themes, so kit
+   switches, action sheets, toasts and pull-to-refresh match the teal.
+   Overridden here, never by forking kit CSS. */
+:root, :root[data-theme="dark"] {
+  --un-accent: var(--c-accent);
+  --un-accent-contrast: #fff;
+  /* The toast surface is dark in both themes, so its action label is a
+     light teal in both. */
+  --un-toast-action: #5EEAD4;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
@@ -4016,7 +4027,7 @@ ${emitTapHighlightRules()}
   padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
   color: ${C.muted}; cursor: pointer; touch-action: manipulation;
 }
-.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: ${ca('accent','1a')}; }
 /* The pin control (#232). It sits in the card's top-right corner, which the
    daily badge already used, so the badge's right offset below clears it
    unconditionally rather than only on cards that render a pin, so a daily and
@@ -4035,6 +4046,23 @@ ${emitTapHighlightRules()}
 .card-pin[data-pressed] { transform: scale(0.86); }
 .card-pin.on[data-pressed] { transform: rotate(-20deg) scale(0.86); }
 .card-pin[disabled] { opacity: 0.18; cursor: default; }
+
+/* The favorite star. Same 44px touch square and corner placement as .card-pin,
+   but stacked BELOW it so the two controls never collide, and clear of the
+   daily badge (which .card-pin already pushed left). The unfilled star is a
+   bare outline at the pin's resting opacity; the filled one is unfiltered and
+   fully opaque, which is the whole "filled vs empty" read. */
+.card-fav {
+  position: absolute; top: 2.7rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; opacity: 0.32;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.card-fav:hover { opacity: 0.6; }
+.card-fav.on { opacity: 1; }
+.card-fav.on { color: ${C.gold}; }
+.card-fav[data-pressed] { transform: scale(0.86); }
 
 /* The Pinned section's heading and the two lines that explain it. */
 .home-pinned-title { display: flex; align-items: baseline; gap: 0.5rem; }
@@ -4061,6 +4089,10 @@ ${emitTapHighlightRules()}
 .home-pin-empty {
   color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
 }
+/* The Favorites chip's empty state. Same register as .home-pin-empty above. */
+.home-fav-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
 
 .card-daily-badge {
   position: absolute; top: 0.65rem; right: 2.7rem; z-index: 1;
@@ -4068,7 +4100,7 @@ ${emitTapHighlightRules()}
   letter-spacing: 0.07em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;
 }
-.card-daily-badge.fresh  { background: rgba(45,95,174,.14); color: ${C.accent};  border-color: rgba(45,95,174,.30); }
+.card-daily-badge.fresh  { background: ${ca('accent','24')}; color: ${C.accent};  border-color: ${ca('accent','4d')}; }
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
 

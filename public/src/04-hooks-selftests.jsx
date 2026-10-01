@@ -1775,6 +1775,47 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #323 — the desktop width step, measured. From 1024px up, .game-wrap widens
+     to the lobby's 920px cap and the board boxes inside it step up with it; at
+     phone/tablet widths the media query does not apply at all and the old caps
+     still hold. A regression in either direction (the media query dropped, the
+     wrap rule moved out of it, or a board cap left behind) shows up as the
+     measured widths disagreeing with the viewport. The narrow guard keeps this
+     quiet on a phone-sized check frame, where the mobile layout is correct. */
+  checkStyled('game-wrap-desktop-size', () => {
+    const wrap = document.querySelector('.game-wrap');
+    if (!wrap) return true; // no game screen mounted right now
+    const vw = document.documentElement.clientWidth;
+    if (vw < 1024) return true; // mobile layout, the media query is off by design
+    const CS = getComputedStyle(wrap);
+    const wrapCap = parseFloat(CS.maxWidth);
+    const want = Math.min(vw, 920);
+    if (wrapCap !== want) {
+      throw new Error('.game-wrap caps at ' + wrapCap + 'px at a ' + vw
+        + 'px viewport (expected ' + want + 'px)');
+    }
+    const got = wrap.getBoundingClientRect().width;
+    if (got < want - 4) {
+      throw new Error('.game-wrap renders ' + Math.round(got) + 'px in a ' + vw
+        + 'px viewport (expected ~' + want + 'px)');
+    }
+    // And the boards the wider column was raised for must use it. Each of
+    // these was a fixed pixel cap at phone widths; at desktop widths the cap
+    // steps up, so the measured width must reach at least the OLD cap (which
+    // would have been its ceiling before #323) — a board that ignores the
+    // wider column reports the stale size exactly this way.
+    const BOARDS = '.sudoku, .cw-board, .wspr-grid, .dsnk-board';
+    const board = wrap.querySelector(BOARDS);
+    if (board) {
+      const bw = board.getBoundingClientRect().width;
+      if (bw >= 40 && bw < 361) {
+        throw new Error(board.className + ' renders ' + Math.round(bw)
+          + 'px inside a ' + Math.round(want) + 'px column — the desktop cap did not reach it');
+      }
+    }
+    return true;
+  });
+
   /* #167 — the games grid must read as even tiles. Measured, because every way
      this regresses is a layout effect no static scan sees: re-adding
      `align-items: start` to .grid, dropping `grid-auto-rows: 1fr`, an unclamped

@@ -278,6 +278,11 @@
       "expectText": "Hint"
     },
     {
+      "name": "Sudoku practice board mounts with the game header",
+      "path": "/?game=sudoku&practice=1",
+      "expectSelector": ".game-wrap .sudoku"
+    },
+    {
       "name": "Daily Tile Match shows Hint bar",
       "path": "/?game=tilematchingdaily&practice=1",
       "expectText": "Hint"

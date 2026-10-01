@@ -757,6 +757,20 @@ ${emitTapHighlightRules()}
    a fixed full-viewport layer, so the fixed minibar would sit on top of the
    bottom of the stage; reserve the same gutter .game-wrap already gets. */
 .game-body.frozen .cg-stage { padding-bottom: 5.5rem; }
+/* #323 — give the game screens desktop room. Below this width nothing changes:
+   every rule here lives in a min-width media query, so phones and tablets keep
+   the sizes they have. At 1024px and up the wrap widens to the lobby's 920px
+   cap and the fixed board caps that sit inside it step up proportionally, so
+   the extra column width is actually used rather than absorbed as padding.
+   Minesweeper's board box is inside .cg-stage (not .game-wrap) and already
+   sizes itself from the viewport, so it is deliberately left alone. */
+@media (min-width: 1024px) {
+  .game-wrap { max-width: 920px; }
+  .fit-col .sudoku { max-width: 620px; }
+  .wordsearch { max-width: 620px; }
+  .cw-board { max-width: 720px; }
+  .fit-col .wspr-grid, .fit-col .dsnk-board { max-width: 520px; }
+}
 /* PHASE 4 (#134) — the freeze used to kill the whole reviewed subtree, INCLUDING
    the header the shell renders inside it. That is why Back stopped working after
    "View board", and it hit every in-frame classic game's whole topbar (exit, ☰,

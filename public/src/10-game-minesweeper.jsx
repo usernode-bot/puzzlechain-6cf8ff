@@ -161,15 +161,21 @@ function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverM
         const adjVal = adjacency ? adjacency[i] : 0;
 
         let fill = light ? MS_LIGHT.hidden : PAL.card;
-        if (isRev) fill = light ? MS_LIGHT.revealed : PAL.surface;
+        if (isRev) fill = light ? MS_LIGHT.revealed : MINE_DARK_TILES.revealed;
         if (isMineVisible) fill = light ? MS_LIGHT.mineDead : 'rgba(205,75,58,.25)';
         if (isExploded) fill = light ? MS_LIGHT.exploded : 'rgba(205,75,58,.60)';
-        klRR(ctx, x, y, cell, cell, radius);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = light ? MS_LIGHT.grid : PAL.border;
-        ctx.stroke();
+        if (!light && !isRev && !isMineVisible && !isExploded) {
+          // #294 — a covered cell is a raised key in dark mode.
+          mineDrawDarkHidden(ctx, x, y, cell, radius);
+        } else {
+          klRR(ctx, x, y, cell, cell, radius);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = light ? MS_LIGHT.grid
+            : (isRev && !isExploded ? MINE_DARK_TILES.revealedLn : PAL.border);
+          ctx.stroke();
+        }
 
         const cx = x + cell / 2, cy = y + cell / 2;
         if (isExploded) {

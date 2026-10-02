@@ -1,7 +1,8 @@
 {
   "name": "Game Corner",
   "icon": {
-    "emoji": "🕹️"
+    "image": "public/icon.png",
+    "emoji": "🎮"
   },
   "secrets": [
     {
@@ -9,6 +10,7 @@
       "description": "Public app-identity key that identifies Game Corner to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
       "required": true,
       "private": false,
+      "default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "staging_default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     },
     {
@@ -26,6 +28,21 @@
       "expectText": "Game Corner"
     },
     {
+      "name": "Nav wordmark sits on one line in the compact header",
+      "path": "/",
+      "expectSelector": ".nav .nav-brand .brandword"
+    },
+    {
+      "name": "Daily filter splits out what is completed today",
+      "path": "/?tab=daily&demo=locked",
+      "expectText": "Completed today"
+    },
+    {
+      "name": "Daily filter's completed section holds a card",
+      "path": "/?tab=daily&demo=locked",
+      "expectSelector": ".grid.home-split-done .card"
+    },
+    {
       "name": "Lobby renders",
       "path": "/",
       "expectText": "Game Corner"
@@ -33,7 +50,7 @@
     {
       "name": "Locked card after daily attempt",
       "path": "/?demo=locked",
-      "expectText": "resets in"
+      "expectSelector": ".card-daily-badge.done"
     },
     {
       "name": "Word Search card in lobby",
@@ -56,9 +73,9 @@
       "expectText": "Streak"
     },
     {
-      "name": "New masthead tagline renders",
+      "name": "Masthead tagline renders",
       "path": "/",
-      "expectText": "no pay-to-win"
+      "expectText": "Classic games, fresh every day."
     },
     {
       "name": "Leaderboard seed boots cleanly",
@@ -181,26 +198,6 @@
       "expectText": "Game Corner"
     },
     {
-      "name": "DApp session receipt renders",
-      "path": "/?demo=dapp",
-      "expectText": "Session Receipt"
-    },
-    {
-      "name": "DApp receipt shows chain hash",
-      "path": "/?demo=dapp",
-      "expectText": "Chain hash"
-    },
-    {
-      "name": "Verified leaderboard renders demo rows",
-      "path": "/?demo=dapp",
-      "expectText": "Staging demo Ada"
-    },
-    {
-      "name": "Disputed session shows rejection copy",
-      "path": "/?screen=session&sid=DAPPDEMOBAD",
-      "expectText": "could not be verified"
-    },
-    {
       "name": "Own profile opens via account deep link",
       "path": "/?screen=account",
       "expectText": "Your Profile"
@@ -216,14 +213,14 @@
       "expectText": "Centurion"
     },
     {
-      "name": "Anchored daily sudoku receipt renders",
-      "path": "/?demo=anchor",
-      "expectText": "anchored"
-    },
-    {
       "name": "Today's Top Scores board renders in daily lobby",
       "path": "/?demo=leaderboard",
       "expectText": "Today's Top Scores"
+    },
+    {
+      "name": "Home leads with the games grid",
+      "path": "/",
+      "expectSelector": ".lobby .grid .card .card-mode-btn"
     },
     {
       "name": "Today's Top Scores lists a seeded solver",
@@ -299,6 +296,16 @@
       "name": "How-to-Play stays behind its button on the pre-game screen",
       "path": "/?game=tilematchingdaily",
       "expectSelector": ".pregame-howto-btn"
+    },
+    {
+      "name": "How to play and Game chat are buttons, not footnote links",
+      "path": "/?game=tilematchingdaily",
+      "expectSelector": ".pregame-actions .pregame-howto-btn"
+    },
+    {
+      "name": "The same pair are buttons on the opponent screen",
+      "path": "/?game=checkers",
+      "expectSelector": ".pregame-actions .pregame-howto-btn"
     },
     {
       "name": "Snakes & Ladders mode select offers Versus Bot",
@@ -537,6 +544,26 @@
       "expectText": "streak"
     },
     {
+      "name": "The lobby arrives with a transition",
+      "path": "/?tab=home",
+      "expectSelector": ".lobby.screen-in"
+    },
+    {
+      "name": "A pre-game screen arrives with a transition",
+      "path": "/?game=nonogram",
+      "expectSelector": ".game-wrap.screen-in"
+    },
+    {
+      "name": "A board fades in rather than moving, so it measures right",
+      "path": "/?game=sudoku&practice=1&sdk=6",
+      "expectSelector": ".game-body.screen-in-fade"
+    },
+    {
+      "name": "Reduced motion in Settings reaches the stylesheet",
+      "path": "/?motion=reduce&settings=1",
+      "expectSelector": "html[data-reduce-motion=\"1\"]"
+    },
+    {
       "name": "Settings sheet opens via ?settings=1",
       "path": "/?settings=1",
       "expectSelector": ".settings-panel"
@@ -644,6 +671,11 @@
       "expectText": "PLAYED"
     },
     {
+      "name": "Home grid lists multiple game cards",
+      "path": "/?demo=homegrid",
+      "expectSelector": ".grid > .card + .card"
+    },
+    {
       "name": "Home filter chips render",
       "path": "/?tab=classic",
       "expectSelector": ".home-filter-chips"
@@ -651,7 +683,7 @@
     {
       "name": "Home daily reset countdown renders",
       "path": "/",
-      "expectText": "New daily puzzles at midnight UTC"
+      "expectSelector": ".gotd-hero .gotd-meta"
     },
     {
       "name": "Nonogram canvas board renders in-game",
@@ -733,6 +765,11 @@
       "name": "Snakes & Ladders Legend board deep-links into a running game",
       "path": "/?game=chutes-ladders&mode=bot&cnldiff=legend",
       "expectSelector": ".cnl-board-wrap canvas.cnl-canvas"
+    },
+    {
+      "name": "Legend board names its tier on the gameplay HUD",
+      "path": "/?game=chutes-ladders&mode=bot&cnldiff=legend",
+      "expectText": "Legend"
     },
     {
       "name": "Snakes & Ladders six-player hotseat renders",
@@ -921,9 +958,54 @@
       "expectText": "Tap a point"
     },
     {
+      "name": "The win card opens on one number",
+      "path": "/?game=sudoku&result=win",
+      "expectSelector": ".win-card[data-win-details=\"closed\"] .we-v[data-win-earned=\"1440\"]"
+    },
+    {
+      "name": "The win card shows the score even with no animation frames",
+      "path": "/?game=sudoku&result=win",
+      "expectText": "+1440"
+    },
+    {
+      "name": "Points, badges and the leaderboard are one tap down",
+      "path": "/?game=sudoku&result=win",
+      "expectSelector": ".win-card[data-win-details=\"closed\"]:not(:has(.score-rows)):not(:has(.lboard))"
+    },
+    {
+      "name": "A classic win gets the same one-number card",
+      "path": "/?game=2048&result=win",
+      "expectSelector": ".win-card .we-v"
+    },
+    {
+      "name": "Home is the bottom of the back stack",
+      "path": "/",
+      "expectSelector": ".app[data-nav-depth=\"0\"]"
+    },
+    {
+      "name": "A cold deep link has one screen to go back to",
+      "path": "/?game=sudoku&practice=1",
+      "expectSelector": ".app[data-nav-depth=\"1\"]"
+    },
+    {
       "name": "Ludo pass-and-play board renders",
       "path": "/?game=ludo&mode=2p",
       "expectSelector": "canvas.ludo-canvas"
+    },
+    {
+      "name": "Ludo invites the tap on the board itself",
+      "path": "/?game=ludo&mode=2p&ludo=stack",
+      "expectText": "Tap a glowing token to move it"
+    },
+    {
+      "name": "Ludo's move list is the second path, not the only one",
+      "path": "/?game=ludo&mode=2p&ludo=stack",
+      "expectText": "OR PICK ONE HERE"
+    },
+    {
+      "name": "Ludo shows the rolled die as a die",
+      "path": "/?game=ludo&mode=2p&ludo=stack",
+      "expectText": "Die: 3"
     },
     {
       "name": "Word Sprint found-list has its own scroll strip",
@@ -996,14 +1078,109 @@
       "expectText": "Tap a number whose flags all match"
     },
     {
-      "name": "Hash Rush rules describe drag-to-steer",
-      "path": "/?game=hashrush",
-      "expectText": "Start mining"
+      "name": "Snake says a tap steers as well as a swipe",
+      "path": "/?game=snake&sheet=rules&snake=normal",
+      "expectText": "tap the side of the board"
+    },
+    {
+      "name": "Daily Snake says a tap starts and steers",
+      "path": "/?game=snakedaily&practice=1",
+      "expectText": "Swipe or tap a side to start"
+    },
+    {
+      "name": "Hash Rush opens on the tap-to-mine brief",
+      "path": "/?game=hashrush&play=1",
+      "expectText": "to stack your boost"
+    },
+    {
+      "name": "A bounded Hash Rush shift names the score it wants",
+      "path": "/?game=hashrush&pmode=story&band=1&play=1",
+      "expectSelector": ".hr-wrap[data-hr-target]:not([data-hr-target=\"0\"])"
+    },
+    {
+      "name": "An endless Hash Rush run sets no target",
+      "path": "/?game=hashrush&pmode=arcade&band=hard&play=1",
+      "expectSelector": ".hr-wrap[data-hr-target=\"0\"]"
+    },
+    {
+      "name": "A finished Hash Rush board draws no end panel of its own",
+      "path": "/?game=hashrush&play=1&hrdead=1",
+      "expectSelector": ".hr-wrap[data-hr-phase=\"dead\"]:not(:has(.hr-overlay))"
+    },
+    {
+      "name": "A lost story run offers to continue the ladder",
+      "path": "/?game=zuma&result=1&pmode=story",
+      "expectText": "Continue Story Quest"
+    },
+    {
+      "name": "A lost arcade run offers another run",
+      "path": "/?game=zuma&result=1&pmode=arcade",
+      "expectText": "Another run"
+    },
+    {
+      "name": "Marble Loop shows the camouflage marble's countdown",
+      "path": "/?game=zuma&zcamo=1",
+      "expectText": "Camouflage"
+    },
+    {
+      "name": "Marble Loop tells you a tap aims first",
+      "path": "/?howto=zuma",
+      "expectText": "Tap once to aim"
+    },
+    {
+      "name": "Marble Loop promises a finishable endgame",
+      "path": "/?howto=zuma",
+      "expectText": "only deals colours still on the chain"
+    },
+    {
+      "name": "Mancala shows both stores as HUD scores",
+      "path": "/?game=mancala&mode=bot",
+      "expectText": "AI"
+    },
+    {
+      "name": "Mancala's local game scores both players in the HUD",
+      "path": "/?game=mancala&mode=2p",
+      "expectText": "P2"
     },
     {
       "name": "Daily Cipher names the day's theme",
       "path": "/?game=cryptowordle&practice=1",
       "expectText": "Today's theme"
+    },
+    {
+      "name": "Daily Cipher offers more than two clues per word",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectText": "4 left"
+    },
+    {
+      "name": "Daily Cipher reveals a third clue past the old ceiling",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=3",
+      "expectText": "Hint 3:"
+    },
+    {
+      "name": "Daily Cipher story rung serves its own words, not the daily's",
+      "path": "/?game=cryptowordle&pmode=story&band=4&play=1",
+      "expectText": "Theme: Nature"
+    },
+    {
+      "name": "Daily Cipher can hand typing to the device keyboard",
+      "path": "/?game=cryptowordle&practice=1&devkbd=1",
+      "expectSelector": ".cw-board[data-cw-kbd=\"device\"]"
+    },
+    {
+      "name": "The letter colours survive the drawn keyboard going away",
+      "path": "/?game=cryptowordle&practice=1&devkbd=1",
+      "expectSelector": ".cw-legend .cw-legend-key"
+    },
+    {
+      "name": "The drawn keyboard is still the default",
+      "path": "/?game=cryptowordle&practice=1",
+      "expectSelector": ".cw-board[data-cw-kbd=\"drawn\"]"
+    },
+    {
+      "name": "Settings offers the device keyboard",
+      "path": "/?settings=1",
+      "expectText": "Use my device's keyboard"
     },
     {
       "name": "Daily Cipher: one tap = one letter",
@@ -1014,6 +1191,21 @@
       "name": "Daily Cipher: backspace removes exactly one letter",
       "path": "/?game=cryptowordle&practice=1&cwtype=LEN-",
       "expectSelector": ".cw-board[data-cw-typed=\"LE\"]"
+    },
+    {
+      "name": "Daily Cipher scores a guess so its feedback colours render",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=1",
+      "expectSelector": ".cw-board[data-cw-rows=\"1\"]"
+    },
+    {
+      "name": "Daily Cipher scores two guesses in a row",
+      "path": "/?game=cryptowordle&practice=1&cwsubmit=2",
+      "expectSelector": ".cw-board[data-cw-rows=\"2\"]"
+    },
+    {
+      "name": "Word Search board renders in the light theme",
+      "path": "/?game=wordhunt&practice=1&theme=light",
+      "expectSelector": "canvas.ws-canvas"
     },
     {
       "name": "Word Search grid is the larger 10x10 board",
@@ -1166,6 +1358,16 @@
       "expectSelector": "html[data-theme=\"dark\"] .card.paired .card-mode-btn.daily"
     },
     {
+      "name": "Sudoku has a leaderboards panel with all three boards",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectSelector": ".gb-sheet .cg-sheet-tab"
+    },
+    {
+      "name": "Sudoku leaderboards offer an all-time ranking",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectText": "All-time"
+    },
+    {
       "name": "Sudoku 9x9 board is deep-linkable and fills its column",
       "path": "/?game=sudoku&practice=1&sdk=9",
       "expectSelector": ".sudoku.s9 canvas.sdk-canvas"
@@ -1175,6 +1377,41 @@
       "path": "/?game=sudoku&practice=1&sdk=9",
       "expectSelector": ".sudoku.s9 canvas.sdk-canvas",
       "expectText": "Erase"
+    },
+    {
+      "name": "Sudoku offers an Undo beside Erase",
+      "path": "/?game=sudoku&practice=1&sdk=9",
+      "expectText": "Undo"
+    },
+    {
+      "name": "Sudoku Mini offers an Undo too",
+      "path": "/?game=sudokumini&practice=1",
+      "expectText": "Undo"
+    },
+    {
+      "name": "Sudoku arcade HUD names the difficulty that was chosen",
+      "path": "/?game=sudoku&pmode=arcade&band=hard&play=1",
+      "expectText": "Difficulty: Hard"
+    },
+    {
+      "name": "A story run picks up where it was left",
+      "path": "/?game=sudoku&pmode=story&band=4&play=1&sdk=6&resumedemo=1",
+      "expectText": "Steps 12"
+    },
+    {
+      "name": "An arcade run picks up where it was left",
+      "path": "/?game=sudoku&pmode=arcade&band=hard&play=1&sdk=6&resumedemo=1",
+      "expectText": "Steps 12"
+    },
+    {
+      "name": "A story board with nothing saved still starts fresh",
+      "path": "/?game=sudoku&pmode=story&band=2&play=1&sdk=6",
+      "expectText": "Steps 0"
+    },
+    {
+      "name": "Sudoku story HUD names the level and what it demands",
+      "path": "/?game=sudoku&pmode=story&band=4&play=1",
+      "expectText": "Level 4: Tricky"
     },
     {
       "name": "Sudoku 6x6 Mini board is deep-linkable",
@@ -1232,6 +1469,11 @@
       "expectSelector": ".win-overlay .review-btn"
     },
     {
+      "name": "Results card exits to the lobby via tap-action buttons",
+      "path": "/?game=2048&result=1",
+      "expectSelector": ".win-overlay button.tappable.primary-btn"
+    },
+    {
       "name": "Snake keeps its board behind the results card",
       "path": "/?game=snake&result=1&snake=normal",
       "expectSelector": ".game-body.frozen .snake-board"
@@ -1287,6 +1529,11 @@
       "expectSelector": "canvas.kt-canvas"
     },
     {
+      "name": "Knight's Tour story board starts with the knight placed",
+      "path": "/?game=knights-tour&pmode=story&band=1&play=1",
+      "expectSelector": "canvas.kt-canvas[aria-label*=\"1 of 25\"]"
+    },
+    {
       "name": "Crate Push room is a canvas",
       "path": "/?game=cratepush&practice=1",
       "expectSelector": "canvas.cp-canvas"
@@ -1295,6 +1542,21 @@
       "name": "Daily Cipher guess grid is a canvas",
       "path": "/?game=cryptowordle&practice=1",
       "expectSelector": ".cw-board canvas.cw-canvas"
+    },
+    {
+      "name": "Diamond Rush names its target on the HUD",
+      "path": "/?game=diamondrush",
+      "expectText": "Target"
+    },
+    {
+      "name": "Diamond Rush shows how far there is to go",
+      "path": "/?game=diamondrush",
+      "expectText": "more points in"
+    },
+    {
+      "name": "Diamond Rush story rung carries its own target",
+      "path": "/?game=diamondrush&pmode=story&band=3&play=1",
+      "expectText": "1200"
     },
     {
       "name": "Diamond Rush gem board is a canvas",
@@ -1332,17 +1594,42 @@
       "expectSelector": "canvas.rv-canvas"
     },
     {
+      "name": "Concede lives in the game menu, not under the board",
+      "path": "/?demo=yourturn&game=checkers&room=DEMOYT&seat=2&sheet=menu",
+      "expectSelector": ".cg-sheet.open .cg-sheet-action.danger"
+    },
+    {
+      "name": "Online match menu offers End game",
+      "path": "/?demo=yourturn&game=checkers&room=DEMOYT&seat=2&sheet=menu",
+      "expectText": "End game"
+    },
+    {
+      "name": "Room deep link enters a live online match",
+      "path": "/?demo=yourturn&game=checkers&room=DEMOYT&seat=2",
+      "expectSelector": ".cg-shell canvas.ck-canvas"
+    },
+    {
+      "name": "Play Again is the primary action on a classic result",
+      "path": "/?game=checkers&result=1",
+      "expectSelector": ".win-card .play-again-btn"
+    },
+    {
+      "name": "Reversi result card carries the same Play Again",
+      "path": "/?game=reversi&result=1",
+      "expectSelector": ".win-card .play-again-btn"
+    },
+    {
       "name": "Gomoku board is a canvas (confirm bar stays)",
       "path": "/?game=gomoku&mode=2p",
       "expectSelector": "canvas.gmk-canvas"
     },
     {
-      "name": "Story ladder pre-game screen",
+      "name": "Story level picker pre-game screen",
       "path": "/?game=sudoku&pmode=story&demo=modes",
       "expectSelector": ".pregame-band"
     },
     {
-      "name": "Story band deep link mounts its board",
+      "name": "Story level deep link mounts its board",
       "path": "/?game=cratepush&pmode=story&band=8&play=1",
       "expectSelector": ".cp-game"
     },
@@ -1350,6 +1637,26 @@
       "name": "Arcade pre-game offers three bands",
       "path": "/?game=2048&pmode=arcade&demo=modes",
       "expectSelector": ".pregame-band.wide"
+    },
+    {
+      "name": "Story picker calls each step a level",
+      "path": "/?game=sudoku&pmode=story&demo=modes",
+      "expectText": "Clearing a level for the first time pays"
+    },
+    {
+      "name": "Story picker reports every level cleared",
+      "path": "/?game=zuma&pmode=story&demo=modes",
+      "expectText": "All levels cleared"
+    },
+    {
+      "name": "Spider story runs to six levels",
+      "path": "/?game=spider&pmode=story&demo=modes",
+      "expectText": "3/6"
+    },
+    {
+      "name": "Story level deep link accepts ?level=",
+      "path": "/?game=cratepush&pmode=story&level=8&play=1",
+      "expectSelector": ".cp-game"
     },
     {
       "name": "Arcade run history is shareable and replayable",
@@ -1380,6 +1687,163 @@
       "name": "Top of a story ladder shows the completion card",
       "path": "/?advance=complete",
       "expectText": "Ladder complete"
+    },
+    {
+      "name": "Pin button renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-pin"
+    },
+    {
+      "name": "Favorite star renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-fav"
+    },
+    {
+      "name": "Favorites filter chip renders",
+      "path": "/",
+      "expectText": "Favorites"
+    },
+    {
+      "name": "Favorites chip shows starred cards only",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card"
+    },
+    {
+      "name": "Favorites view stars its games",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card-fav.on"
+    },
+    {
+      "name": "Empty favorites view explains how to star",
+      "path": "/?demo=favempty&favview=1",
+      "expectText": "No favorites yet"
+    },
+    {
+      "name": "Pinned section renders pinned games",
+      "path": "/?demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Pinned section survives the Daily filter",
+      "path": "/?tab=daily&demo=pins",
+      "expectSelector": ".home-pinned-title"
+    },
+    {
+      "name": "Home with nothing pinned explains how to pin",
+      "path": "/?demo=pinsempty",
+      "expectText": "on any card to pin it to the top"
+    },
+    {
+      "name": "Recently Played strip renders the viewer's last plays",
+      "path": "/?demo=recent",
+      "expectSelector": ".recent-row .recent-card"
+    },
+    {
+      "name": "Home with no play history hides the Recently Played strip",
+      "path": "/?demo=recentclear",
+      "expectText": "All Games"
+    },
+    {
+      "name": "Nonogram flags a grid that is full but wrong",
+      "path": "/?game=nonogram&practice=1&ngfill=wrong",
+      "expectSelector": ".ng-status[data-ng-tone=\"err\"]"
+    },
+    {
+      "name": "Nonogram warns when a line can no longer match",
+      "path": "/?game=nonogram&practice=1&ngfill=error",
+      "expectSelector": ".ng-status[data-ng-tone=\"warn\"]"
+    },
+    {
+      "name": "Nonogram announces the solve",
+      "path": "/?game=nonogram&practice=1&ngfill=solved",
+      "expectSelector": ".win-overlay .win-card"
+    },
+    {
+      "name": "Mine Finder's first story band deals a 7 by 7 field",
+      "path": "/?game=minefinder&pmode=story&band=1&play=1",
+      "expectSelector": "canvas[aria-label^='Mine Finder, 7 by 7 field']"
+    },
+    {
+      "name": "Mine Finder's largest story band deals a 13 by 13 field",
+      "path": "/?game=minefinder&pmode=story&band=6&play=1",
+      "expectSelector": "canvas[aria-label^='Mine Finder, 13 by 13 field']"
+    },
+    {
+      "name": "Nonogram resumes its mistake count",
+      "path": "/?demo=ngmistake&game=nonogram&play=1",
+      "expectText": "Mistakes so far: 2"
+    },
+    {
+      "name": "Nonogram top story band fits its board",
+      "path": "/?game=nonogram&pmode=story&band=6&play=1",
+      "expectSelector": ".ng-status[data-ng-tone=\"info\"]"
+    },
+    {
+      "name": "Nonogram error tone reads in dark mode",
+      "path": "/?game=nonogram&practice=1&ngfill=wrong&theme=dark",
+      "expectSelector": ".ng-status.err"
+    },
+    {
+      "name": "Tile Match free-play board is URL-reachable",
+      "path": "/?game=tilematching&play=1&tmlevel=900",
+      "expectSelector": "canvas.tm-canvas"
+    },
+    {
+      "name": "Tile Match board footprint on a fresh story board",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1",
+      "expectSelector": ".tm-board-box[data-tm-units=\"5x3\"]"
+    },
+    {
+      "name": "Tile Match board footprint holds after tiles clear",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1&tmcleared=12",
+      "expectSelector": ".tm-board-box[data-tm-units=\"5x3\"]"
+    },
+    {
+      "name": "Tile Match tile holder fits the frame mid-run",
+      "path": "/?game=tilematching&pmode=story&band=1&play=1&tmcleared=12",
+      "expectSelector": ".tm-board-box[data-tm-tray-fits=\"1\"]"
+    },
+    {
+      "name": "Story ladder badge renders on the badge screen",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.active[data-badge=\"story-sudoku\"]"
+    },
+    {
+      "name": "Badge collection lists the Story ladders group",
+      "path": "/?screen=account&demo=storybadges",
+      "expectText": "Story ladders"
+    },
+    {
+      "name": "Unfinished ladder renders as a locked story badge",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.locked[data-badge=\"story-cratepush\"]"
+    },
+    {
+      "name": "The badge collection lists every story ladder, finished or not",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip[data-badge=\"story-cratepush\"]"
+    },
+    {
+      "name": "A ladder one rung short of done is locked, not earned",
+      "path": "/?screen=badges&demo=storybadges",
+      "expectSelector": ".badge-chip.locked[data-badge=\"story-minefinder\"]"
+    },
+    {
+      "id": "theme.accent-teal",
+      "name": "Home filter chip wears the teal accent",
+      "path": "/",
+      "expectSelector": ".home-filter-chips .home-chip.on",
+      "visual": true,
+      "impact": [
+        "public/src/00-palette.jsx",
+        "public/src/01-styles.jsx",
+        "public/index.html"
+      ]
+    },
+    {
+      "name": "Dark theme filter chip wears the teal accent",
+      "path": "/?theme=dark",
+      "expectSelector": "html[data-theme=\"dark\"] .home-filter-chips .home-chip.on"
     }
   ],
   "visibility": {
@@ -1387,6 +1851,7 @@
     "view": "public"
   },
   "admins": [
-    "evan"
+    "evan",
+    "snait"
   ]
 }

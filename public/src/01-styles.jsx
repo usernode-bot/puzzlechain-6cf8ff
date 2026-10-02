@@ -12,6 +12,17 @@ ${paletteVars('light')}
 ${paletteVars('dark')}
 }
 
+/* The hosted native kit's accent follows ours in both themes, so kit
+   switches, action sheets, toasts and pull-to-refresh match the teal.
+   Overridden here, never by forking kit CSS. */
+:root, :root[data-theme="dark"] {
+  --un-accent: var(--c-accent);
+  --un-accent-contrast: #fff;
+  /* The toast surface is dark in both themes, so its action label is a
+     light teal in both. */
+  --un-toast-action: #5EEAD4;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
@@ -34,10 +45,18 @@ body {
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 
 /* ---- Nav bar ---- */
+/* #223 — the bar was 78px tall at 390px wide, and it is sticky, so it cost
+   that on EVERY screen, above every board. Two thirds of it was one thing:
+   "Game Corner" plus the score/streak/gear/avatar cluster came to 374px of
+   min-content inside a 350px content box, so the wordmark WRAPPED to two
+   lines and set the bar's height from the brand rather than from the stats.
+   Nothing is dropped here — the wordmark is held on one line, the type is
+   stepped down, and the padding and gaps are tightened until the stats are
+   the tallest thing in the bar again. Measured back to 50px. */
 .nav {
   background: ${C.surface};
   border-bottom: 1px solid ${C.border};
-  padding: 0.9rem 1.25rem;
+  padding: 0.45rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -47,25 +66,34 @@ body {
 }
 .nav-brand {
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.02rem;
+  line-height: 1.2;
+  /* Load-bearing: without it the wordmark wraps and the bar grows 24px.
+     It raises the brand's min-content width, which is why the narrow
+     media queries below tighten the cluster to match (see #236). */
+  white-space: nowrap;
   letter-spacing: -0.01em;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 .nav-brand .logo { color: ${C.accent}; }
-.nav-stats { display: flex; gap: 1.5rem; }
+.nav-stats { display: flex; gap: 1rem; }
 .nav-stat { text-align: right; }
 .nav-stat .label {
-  font-size: 0.62rem;
+  font-size: 0.56rem;
+  line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: ${C.muted};
 }
+/* The stacked label + value is the bar's height floor now, so both carry an
+   explicit line-height: the default leading was adding 8px of nothing. */
 .nav-stat .value {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 0.92rem;
+  line-height: 1.25;
 }
 .nav-stat .value.score { color: ${C.gold}; }
 .nav-stat .value.streak { color: ${C.emerald}; }
@@ -151,6 +179,16 @@ body {
   color: ${C.muted};
 }
 .badge-strip-head .badge-strip-count { color: ${C.text}; }
+/* Sub-heading inside the badge collection — separates the story-ladder chips
+   (one per game with a story mode) from the streak/achievement chips above. */
+.badge-strip-sub {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${C.muted};
+}
 /* Badge accordion trigger — base styles, mobile activation via @media (max-width: 560px) */
 .badge-strip-trigger {
   display: flex; align-items: center; justify-content: space-between;
@@ -215,20 +253,20 @@ body {
 }
 
 /* ---- Account indicator ---- */
-.nav-right { display: flex; align-items: center; gap: 1.25rem; }
+.nav-right { display: flex; align-items: center; gap: 0.75rem; }
 .account-chip {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   background: ${C.card};
   border: 1px solid ${C.border};
   border-radius: 999px;
-  padding: 0.35rem 0.7rem 0.35rem 0.45rem;
+  padding: 0.25rem 0.6rem 0.25rem 0.3rem;
   cursor: default;
 }
 .account-chip .avatar {
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.35rem;
+  height: 1.35rem;
   border-radius: 50%;
   background: ${C.accent};
   color: white;
@@ -250,6 +288,66 @@ body {
 .account-chip.on { cursor: pointer; font-family: inherit; color: ${C.text}; transition: border-color 0.12s ease; }
 .account-chip.on:hover { border-color: ${C.accent}; }
 
+/* #236 — the page wrapper shared by the profile and friends screens.
+   These sit directly under .app, which is a COLUMN flex container, so they
+   are flex items — and an auto horizontal margin opts a flex item out of
+   align-items: stretch. That is the same trap the .fit-col boards hit: with
+   no definite width the box falls back to fit-content, and fit-content is
+   clamped UP to min-content. The profile's min-content is ~460px (an
+   unbreakable username plus a recent-games row that cannot shrink), so the
+   whole page scrolled sideways on every phone — 70px at 390, 140px at 320.
+   width: 100% restores a definite width; max-width still centres it on
+   desktop. min-width: 0 keeps the item shrinkable if the container ever
+   becomes a ROW flex, where the automatic minimum size would apply instead. */
+.social-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+}
+/* A username is user-supplied and can be one long unbreakable token, which is
+   what made min-content exceed the viewport in the first place. Let it wrap
+   rather than push the page wide, and let its column shrink. */
+.profile-id { min-width: 0; }
+/* Recent-games row. The date and the score are fixed-width monospace and do
+   not shrink, so on a narrow card they left the game name almost nothing —
+   "Daily Cipher" truncating to "Dail…". Below 460px the meta pair drops to
+   its own line instead of competing with the name for the same one. */
+.prr {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.2rem; font-size: 0.88rem;
+}
+.prr-icon { font-size: 1.1rem; flex: 0 0 auto; }
+.prr-name { flex: 1 1 auto; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prr-meta { display: flex; align-items: center; gap: 0.6rem; flex: 0 0 auto; }
+.prr-date { color: ${C.muted}; font-size: 0.78rem; }
+.prr-score { font-size: 0.82rem; white-space: nowrap; }
+@media (max-width: 460px) {
+  .prr { flex-wrap: wrap; row-gap: 0.15rem; }
+  /* The name takes the rest of the first line beside the icon; the meta pair
+     wraps below and lines up under the name, not the icon. */
+  .prr-meta { width: 100%; padding-left: 1.7rem; justify-content: flex-start; }
+}
+.profile-id h2 { overflow-wrap: anywhere; }
+.bounce-start-btn {
+  pointer-events: auto;
+  min-height: 44px; padding: 0 1.4rem; margin-top: 0.35rem;
+  font-size: 0.95rem; font-weight: 700;
+}
+.bounce-start-hint { font-size: 0.75rem; color: ${C.muted}; }
+/* #214 — Match 3's end-of-puzzle screen. The game set a 'won'/'lost' phase
+   that nothing rendered, so a finished puzzle showed "Loading..." forever. */
+.m3-result {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.5rem; padding: 2rem 1.25rem; text-align: center;
+}
+.m3-result-icon { font-size: 2.6rem; line-height: 1; }
+.m3-result-title { font-size: 1.25rem; font-weight: 700; color: ${C.text}; }
+.m3-result-sub { font-size: 0.88rem; color: ${C.muted}; }
+.m3-result-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; justify-content: center; }
+.m3-result-btn { min-height: 44px; padding: 0 1.2rem; border-radius: 12px; font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.m3-result-btn-quiet { background: ${C.surface}; border: 1px solid ${C.border}; color: ${C.text}; }
 /* Profile "Connections" section — Friends entry, shown on mobile only. */
 .account-connection-row {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -275,9 +373,9 @@ body {
 
 @media (max-width: 560px) {
   .account-chip .who { display: none; }
-  .account-chip { padding: 0.35rem; }
-  .nav-right { gap: 0.8rem; }
-  .nav-stats { gap: 1rem; }
+  .account-chip { padding: 0.25rem; }
+  .nav-right { gap: 0.6rem; }
+  .nav-stats { gap: 0.8rem; }
   .lobby { padding: 1rem 0.75rem; }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
@@ -291,6 +389,25 @@ body {
   .badge-strip-body.open { max-height: 600px; opacity: 1; } /* 600px > any realistic badge grid height */
   .badge-chevron { display: inline-block; }
   .badge-strip-trigger { cursor: pointer; pointer-events: auto; }
+}
+
+/* The top bar's own contribution to horizontal scroll, and the last 9px of
+   #236. The brand and the stats/settings/account cluster are both flex items
+   with an automatic minimum size, so neither shrinks: below ~330px their
+   combined min-content simply exceeds the viewport and the WHOLE app scrolls
+   sideways, profile included. Nothing is dropped here — the gaps and the
+   bar's own padding are just tightened enough to fit a 320px screen. */
+@media (max-width: 380px) {
+  .nav { padding-left: 0.6rem; padding-right: 0.6rem; }
+  .nav-right { gap: 0.4rem; }
+  .nav-stats { gap: 0.55rem; }
+  /* The wordmark is nowrap now, so it can no longer absorb the squeeze by
+     wrapping. On the smallest screens it TRUNCATES instead — never
+     display:none, because a clipped node still reports its full text to
+     innerText, so the checks that assert on "Game Corner" from a game
+     screen keep passing, and #236's horizontal scroll still cannot happen. */
+  .nav-brand { min-width: 0; }
+  .nav-brand .brandword { overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* ---- Lobby ---- */
@@ -324,9 +441,24 @@ body {
   grid-auto-rows: 1fr;
 }
 
-@media (max-width: 380px) {
+/* #182 — phones get TWO cards per row, not one.
+
+   The old rule here was a single-column override below 380px, but the
+   one-column phone grid was never really that rule's doing: .lobby drops to
+   0.75rem side padding at 560px, so the content box is (viewport - 24px), and
+   auto-fill needs 200 + 16 + 200 = 416px for a second track. 320/390/430px
+   phones all fall short, so EVERY phone got one column and a ~9,800px scroll
+   through 30 cards. Removing the override alone fixes nothing — the track
+   floor has to come down too, which is what this rule does.
+
+   minmax(0, 1fr) rather than a bare 1fr: 1fr is minmax(auto, 1fr), whose auto
+   floor is the card's min-content width, and a long unbroken game name would
+   push the track wider than half the row and overflow. grid-auto-rows: 1fr
+   above still applies, so the uniform-tile-height guarantee is untouched. */
+@media (max-width: 560px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
   }
 }
 
@@ -635,10 +767,7 @@ ${emitTapHighlightRules()}
 .game-body.frozen .cg-topbar,
 .game-body.frozen .cg-topbar *,
 .game-body.frozen .result-minibar { pointer-events: auto; }
-.review-btn {
-  margin-bottom: 0.6rem; background: ${C.surface};
-  border: 1px solid ${C.border}; color: ${C.text};
-}
+
 .result-minibar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
@@ -735,131 +864,6 @@ ${emitTapHighlightRules()}
   border: 2px solid ${C.border}; border-radius: 10px; background: #10131c;
   touch-action: none; max-width: 100%;
 }
-/* ---- Story auto-advance overlay (tally -> banner -> countdown) ---- */
-.adv-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--c-scrim);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 55;
-  /* Bare env() is always 0px inside the platform's app frame — the forwarded
-     custom property is the value that is real there, env() the standalone
-     fallback. */
-  padding:
-    calc(1.25rem + var(--un-safe-inset-top, env(safe-area-inset-top, 0px)))
-    1.25rem
-    calc(1.25rem + var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px)));
-}
-/* Banner + countdown phases: a takeover, not a veil (see the JSX comment). */
-.adv-overlay.adv-solid { background: ${ca('bg', 'f0')}; }
-.adv-card {
-  background: ${C.card};
-  border: 1px solid ${C.border};
-  border-radius: 18px;
-  padding: 1.6rem 1.5rem;
-  text-align: center;
-  max-width: 340px;
-  width: 100%;
-  box-shadow: 0 20px 50px var(--c-shadow-lg);
-  animation: advPop 220ms ease-out;
-}
-.adv-tally .adv-tally-label {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: ${C.text};
-}
-.adv-tally-num {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 2.6rem;
-  font-weight: 700;
-  color: ${C.gold};
-  line-height: 1.15;
-  margin: 0.5rem 0 0.1rem;
-}
-.adv-tally-sub {
-  font-size: 0.85rem;
-  color: ${C.muted};
-}
-.adv-banner {
-  text-align: center;
-  max-width: 420px;
-  width: 100%;
-  animation: advPop 260ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.adv-banner-game {
-  font-size: 0.85rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: ${C.muted};
-  margin-bottom: 0.6rem;
-}
-.adv-banner-band {
-  font-size: 3.2rem;
-  font-weight: 800;
-  line-height: 1;
-  color: ${C.text};
-}
-.adv-banner-of {
-  font-size: 1rem;
-  color: ${C.muted};
-  margin-top: 0.25rem;
-}
-.adv-note {
-  font-size: 0.9rem;
-  color: ${C.muted};
-  margin-top: 0.8rem;
-  padding: 0.5rem 0.75rem;
-  background: ${ca('accent', '1f')};
-  border-radius: 10px;
-  display: inline-block;
-}
-.adv-count {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 4rem;
-  font-weight: 800;
-  line-height: 1;
-  color: ${C.accent};
-  animation: advCount 600ms ease-out;
-}
-.adv-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  margin-top: 1.5rem;
-  width: 100%;
-  max-width: 320px;
-  margin-left: auto;
-  margin-right: auto;
-}
-.adv-actions .tappable {
-  width: 100%;
-  border-radius: 12px;
-  padding: 0.75rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  border: 1px solid ${C.border};
-  background: ${C.card};
-  color: ${C.text};
-}
-.adv-actions .tappable.adv-primary {
-  background: ${C.accent};
-  border-color: ${C.accent};
-  color: #fff;
-}
-@keyframes advPop {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
-@keyframes advCount {
-  from { opacity: 0.2; transform: scale(1.35); }
-  to { opacity: 1; transform: scale(1); }
-}
-
 /* ---- Win overlay ---- */
 .win-overlay {
   position: fixed;
@@ -906,6 +910,46 @@ ${emitTapHighlightRules()}
 .score-row.total { font-weight: 600; font-size: 1.05rem; padding-top: 0.5rem; }
 .score-row.total .v { color: ${C.gold}; }
 
+/* #241 — the arcade moment. The card's default state is the ONE thing a
+   player just earned, at a size you can read across a room; the breakdown,
+   the badge furniture and the leaderboard live behind .win-more. Measured at
+   390x780 before the split: 955px of content in a 740px box, and that was
+   with an EMPTY leaderboard. */
+.win-earned { margin: 0.1rem 0 1.1rem; }
+.win-earned .we-k {
+  display: block; font-size: 0.68rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: ${C.muted};
+}
+.win-earned .we-v {
+  display: block; font-family: 'JetBrains Mono', monospace;
+  font-size: 3.1rem; line-height: 1.08; font-weight: 700; color: ${C.gold};
+  font-variant-numeric: tabular-nums;
+}
+.win-earned .we-note { display: block; font-size: 0.82rem; color: ${C.emerald}; }
+.win-flourish {
+  font-size: 0.92rem; font-weight: 600; color: ${C.text};
+  background: var(--c-well); border-radius: 999px;
+  padding: 0.4rem 0.9rem; display: inline-block; margin-bottom: 1.1rem;
+}
+.win-more {
+  width: 100%; margin-top: 0.35rem; background: none; border: none;
+  color: ${C.muted}; font-family: inherit; font-size: 0.85rem;
+  padding: 0.55rem; cursor: pointer; border-radius: 10px;
+}
+.win-more:hover { color: ${C.text}; background: var(--c-well); }
+.win-details { margin-top: 0.5rem; }
+.win-details > *:last-child { margin-bottom: 0; }
+
+/* The pop is on the TROPHY, never on the number: an animation that does not
+   run (a hidden tab, a screenshot capture) must not leave the score unreadable,
+   and this one only ever affects an emoji. */
+@keyframes un-win-pop {
+  0%   { transform: scale(0.4) rotate(-14deg); }
+  62%  { transform: scale(1.14) rotate(4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.win-card .trophy { animation: un-win-pop 420ms cubic-bezier(0.2, 0.8, 0.3, 1.2); }
+
 .primary-btn {
   width: 100%;
   background: ${C.accent};
@@ -920,6 +964,43 @@ ${emitTapHighlightRules()}
   transition: background 0.12s ease;
 }
 .primary-btn:hover { background: var(--c-accent-hover); }
+
+/* Result-card button hierarchy. These MUST sit after .primary-btn.
+
+   #216 — .review-btn was declared ~150 lines earlier, at the same specificity,
+   so .primary-btn's accent background won and every secondary button on the
+   result card rendered as a primary one. It had never applied. That is also
+   why Play Again carried an inline copy of these exact declarations twice:
+   inline was the only way to beat the cascade, and it left the card with one
+   dark button among a column of purple ones — the button the report says is
+   hard to see. Moving the rule down fixes the whole column at once. */
+.review-btn {
+  margin-bottom: 0.6rem; background: ${C.surface};
+  border: 1px solid ${C.border}; color: ${C.text};
+}
+.review-btn:hover { border-color: ${C.accent}; background: var(--c-well); }
+
+/* Play Again is the PRIMARY action on a result card: you have just finished a
+   game, and the loudest thing on the screen should not be leaving. The ring is
+   an OUTLINE and the glow a FILTER, deliberately — box-shadow is not ours to
+   use here, because the hosted native kit puts its own shadow on every button
+   and wins, so a box-shadow glow would silently do nothing. Outline costs no
+   layout either: it draws outside the border box, so nothing on the card
+   moves. */
+.play-again-btn {
+  margin-bottom: 0.6rem;
+  background: ${C.accent};
+  color: white;
+  border: 1px solid ${ca('accent', '99')};
+  outline: 2px solid ${ca('accent', '7a')};
+  outline-offset: 2px;
+  filter: drop-shadow(0 0 6px ${ca('accent', '66')});
+}
+.play-again-btn:hover {
+  background: var(--c-accent-hover);
+  outline-color: ${ca('accent', 'b3')};
+  filter: drop-shadow(0 0 9px ${ca('accent', '8c')});
+}
 
 /* ---- Locked screen ---- */
 .locked-card {
@@ -998,11 +1079,23 @@ ${emitTapHighlightRules()}
   color: ${C.muted}; margin-bottom: 0.2rem;
 }
 .pregame-stat .v { font-weight: 700; font-size: 1rem; }
+/* This rule used to be missing its semicolon AND its closing brace, and the
+   declarations that belong to it had been stranded ~70 lines further down
+   behind a stray brace-semicolon. Everything in between — the whole band-picker family,
+   the resume note, the Play button — was swallowed into one invalid rule and
+   silently discarded by the CSS parser. Verified before fixing: NONE of
+   .pregame-deal, .pregame-band, .pregame-band.on, .pregame-band-row,
+   .pregame-bands-label, .pregame-band-note, .pregame-resume-note or
+   .pregame-play appeared in document.styleSheets. */
 .pregame-deal {
-  font-size: 0.82rem; color: ${C.text}
+  font-size: 0.82rem; color: ${C.text};
+  background: ${ca('accent', '14')};
+  border: 1px solid ${ca('accent', '44')}; border-radius: 10px;
+  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
+}
 
-/* #176 — the band pickers. Story's is a numbered ladder walked in order
-   (cleared behind you, one open rung ahead, the rest locked); arcade's is
+/* #176 — the band pickers. Story's is a numbered level list walked in order
+   (cleared behind you, one open level ahead, the rest locked); arcade's is
    three wide buttons with no lock at all, because all three difficulties are
    open from the first run and the recommendation steers instead of gating. */
 .pregame-bands { margin-top: 0.9rem; text-align: left; }
@@ -1030,17 +1123,41 @@ ${emitTapHighlightRules()}
 }
 .pregame-band.done { color: ${C.emerald}; border-color: ${ca('emerald', '55')}; }
 .pregame-band.locked { opacity: 0.4; cursor: not-allowed; }
-.pregame-band[data-pressed] { background: ${C.well}; }
+.pregame-band[data-pressed] { background: var(--c-well); }
 .pregame-band .rec {
   display: block; font-family: 'JetBrains Mono', monospace;
   font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
   color: ${C.muted}; margin-top: 0.1rem;
 }
+/* #188 — the leaderboards panel. A centred sheet rather than a bottom sheet:
+   it is a thing you read, not a menu you act from, and the tab row plus three
+   or four rows of names sits badly hugging the bottom edge on a phone. */
+.gb-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: var(--c-scrim);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.gb-sheet {
+  width: 100%; max-width: 420px; max-height: 82dvh; overflow-y: auto;
+  background: ${C.surface}; border: 1px solid ${C.border};
+  border-radius: 18px; padding: 0.9rem 1rem 1rem;
+  box-shadow: 0 20px 50px var(--c-shadow-lg);
+}
+.gb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; font-weight: 700; margin-bottom: 0.7rem;
+}
+.gb-close {
+  min-width: 32px; min-height: 32px; flex: 0 0 auto;
+  background: transparent; border: 1px solid ${C.border}; border-radius: 8px;
+  color: ${C.muted}; font-family: inherit; cursor: pointer;
+}
+.gb-close:hover { color: ${C.text}; border-color: ${C.accent}; }
+.gb-bands { margin-bottom: 0.6rem; }
+
 .pregame-band-note {
   margin-top: 0.45rem; font-size: 0.72rem; line-height: 1.4; color: ${C.muted};
-}; background: ${ca('accent','14')};
-  border: 1px solid ${ca('accent','44')}; border-radius: 10px;
-  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
 }
 .pregame-resume-note {
   font-size: 0.82rem; color: ${C.gold}; margin-bottom: 0.8rem;
@@ -1048,11 +1165,42 @@ ${emitTapHighlightRules()}
 .pregame-play { width: 100%; }
 .pregame-play:disabled { opacity: 0.5; cursor: default; }
 .pregame-signedout { font-size: 0.78rem; color: ${C.muted}; margin-top: 0.6rem; }
-.pregame-howto-btn {
-  margin-top: 0.8rem; background: none; border: none; color: ${C.accent};
-  font-family: inherit; font-size: 0.85rem; cursor: pointer; padding: 0.3rem;
+/* #240 — "How to play" and the game's chat room were trailing text links
+   under the Play button: no border, no background, 0.3rem of padding and a
+   ~28px tap target, sitting in the position a page gives its footnotes. One of
+   them is the game's instructions, which a first-time player needs BEFORE
+   pressing Play, and the other is the only social surface a game has.
+   They are a pair of real buttons on their own row now, each filling half the
+   width with a 44px target — visible without competing with Play, which keeps
+   the filled accent treatment to itself. */
+.pregame-actions {
+  display: flex; gap: 0.5rem; margin-top: 0.8rem;
 }
-.pregame-howto-btn:hover { text-decoration: underline; }
+.pregame-howto-btn {
+  flex: 1 1 0; min-width: 0; min-height: 44px;
+  display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+  background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px;
+  color: ${C.text}; font-family: inherit; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; padding: 0.3rem 0.5rem;
+  transition: border-color 0.12s, color 0.12s;
+}
+.pregame-howto-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
+/* #239 — "one page wherever possible, and not require scrolling".
+   The pre-game screen is the first thing a tap on a game card lands on, and
+   at 390x667 (an iPhone SE / 8, and any phone in a shorter window) it stood
+   716px tall: the Play button and the How-to-play / Game chat links sat below
+   the fold, so the screen whose entire job is a Play button opened without one
+   in sight. Nothing is removed or hidden — the card's own breathing room is
+   spent instead, and only on viewports too short to afford it. Keyed on
+   max-HEIGHT, so a roomy phone is untouched. */
+@media (max-height: 730px) {
+  .pregame-card { margin: 0.75rem auto; padding: 1.25rem 1.25rem; }
+  .pregame-icon { font-size: 2.1rem; margin-bottom: 0.25rem; }
+  .pregame-card .sub { margin-bottom: 0.7rem; }
+  .pregame-chips { margin-bottom: 0.7rem; }
+  .pregame-stats { margin-bottom: 0.7rem; }
+  .pregame-actions { margin-top: 0.5rem; }
+}
 
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
@@ -1080,14 +1228,23 @@ ${emitTapHighlightRules()}
 .howto-step-body { font-size: 0.82rem; color: ${C.muted}; line-height: 1.45; }
 
 /* "?" help button in the in-game headers */
+/* #240 — the daily header's "?" and chat buttons were 1.9rem muted circles,
+   while the SAME two controls in the classic shell's topbar are 2.4rem and
+   full-contrast (.cg-btn). Two shells disagreeing about how important the
+   instructions are is not a design decision, and the daily side lost: at
+   30px these sat under the 44px tap target the rest of the app aims for and
+   read as disabled. Sized and coloured to match .cg-btn. */
 .help-btn {
   margin-left: auto; background: ${C.surface}; border: 1px solid ${C.border};
-  border-radius: 50%; width: 1.9rem; height: 1.9rem; color: ${C.muted};
-  font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  border-radius: 50%; width: 2.4rem; height: 2.4rem; color: ${C.text};
+  font-family: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: border-color 0.12s, color 0.12s;
 }
 .help-btn:hover { border-color: ${C.accent}; color: ${C.accent}; }
+/* Only the first of the pair pushes off the title; the second sits beside it
+   rather than opening a second gap. */
+.help-btn + .help-btn { margin-left: 0; }
 
 /* ---- Locked lobby card ---- */
 .card.locked { cursor: default; }
@@ -1357,6 +1514,29 @@ ${emitTapHighlightRules()}
 
 @media (max-width: 480px) {
   .lobby-tab { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+
+  /* #182 — compact card metrics for the two-up phone grid. At 390px each
+     track is ~178px, so the card's desktop padding/type scale eats most of
+     the tile. Everything the card shows is KEPT and scaled down: two of the
+     merged cards name their variants only in .card-desc (and dapp.json
+     asserts those strings), so hiding it would remove real content, not just
+     decoration. .card-mode-btn's min-height stays 44px — only its horizontal
+     padding gives way. */
+  .grid > .card { padding: 0.75rem; border-radius: 12px; }
+  .grid > .card .card-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .grid > .card .card-name { font-size: 0.95rem; }
+  .grid > .card .card-desc {
+    font-size: 0.75rem;
+    min-height: 2.6em;
+    margin-bottom: 0.5rem;
+  }
+  .grid > .card .card-daily-badge {
+    top: 0.45rem;
+    right: 0.45rem;
+    font-size: 0.5rem;
+    padding: 0.18rem 0.35rem;
+  }
+  .grid > .card .card-mode-btn { padding: 0.45rem 0.2rem; }
 }
 
 /* ---- Minesweeper ---- */
@@ -2130,7 +2310,9 @@ ${emitTapHighlightRules()}
   justify-content: center;
   gap: 0.5rem;
   z-index: 5;
-  cursor: pointer;
+  /* #211 — the backdrop is INERT so a finger reaches the canvas underneath,
+     which is what aims the paddle and launches. Only the button takes input. */
+  pointer-events: none;
   color: ${C.text};
   font-size: 0.9rem;
   text-align: center;
@@ -2254,7 +2436,13 @@ ${emitTapHighlightRules()}
   font-size: 0.9rem;
 }
 /* ---- Tile Match ---- */
-.tm-wrap { max-width: 400px; margin: 0 auto; }
+/* width:100% is load-bearing, not decorative (#210, same class of bug as
+   #149): .cg-stage is align-items:center, so with only an auto margin this
+   wrap took its FIT-CONTENT width, which is the canvas's own CSS width, which
+   useCanvasBoard writes back from the measured box. That loop settles at the
+   UA's default 300px canvas on every device, which is what made the free-play
+   tile holder hang off the frame. A definite width breaks the loop. */
+.tm-wrap { width: 100%; max-width: 400px; margin: 0 auto; }
 .tm-wrap.fit-col { max-width: 520px; }
 /* The canvas board box (both variants): the daily's carries tm-board-fit so
    it is the fit column's flexible region; classic takes natural height and
@@ -2569,6 +2757,34 @@ ${emitTapHighlightRules()}
 }
 .cg-setting-row:last-child { border-bottom: none; }
 .cg-setting-row .name { font-size: 0.9rem; }
+/* A setting whose trade-off needs a line of explanation (#192). */
+.cg-setting-row .cg-setting-note {
+  display: block; font-size: 0.74rem; color: ${C.muted}; margin-top: 0.15rem;
+  max-width: 15rem; line-height: 1.3;
+}
+/* #192 — the letter colours, with the drawn keyboard gone. Not tappable: the
+   device keyboard is doing the typing, this is only the read-out it cannot
+   show. */
+.cw-legend {
+  display: flex; flex-wrap: wrap; gap: 3px; justify-content: center;
+  margin: 0.35rem auto 0; max-width: 480px;
+}
+.cw-legend-key {
+  font-size: 0.66rem; font-weight: 700; line-height: 1;
+  padding: 3px 4px; border-radius: 4px; min-width: 1.05rem; text-align: center;
+  background: ${C.border}; color: ${C.text};
+}
+.cw-legend-key.on-green { background: ${C.emerald}; color: #fff; }
+.cw-legend-key.on-yellow { background: ${C.gold}; color: #fff; }
+.cw-legend-key.on-gray { background: ${C.rose}; color: #fff; }
+/* The input the device keyboard types into. Focusable and off-screen rather
+   than display:none, because a hidden element cannot take focus and so cannot
+   open a keyboard at all. */
+.cw-hidden-input {
+  position: absolute; opacity: 0; pointer-events: none;
+  width: 1px; height: 1px; left: 0; top: 0; border: 0; padding: 0;
+  font-size: 16px;   /* iOS zooms a focused input under 16px */
+}
 .cg-settings-h4-spaced { margin-top: 1.15rem; }
 
 /* ---- Theme picker (light / dark / system) ---- */
@@ -2688,6 +2904,11 @@ ${emitTapHighlightRules()}
   margin-top: 0.5rem;
 }
 .cg-sheet-action:hover { border-color: ${C.accent}; }
+/* #201 — the concede action. Destructive, so it reads as destructive, but it
+   is a sheet row like the others rather than the loudest thing on the board. */
+.cg-sheet-action.danger { color: ${C.rose}; border-color: ${ca('rose', '55')}; }
+.cg-sheet-action.danger:hover { border-color: ${C.rose}; }
+.cg-sheet-action[disabled] { opacity: 0.55; cursor: default; }
 
 /* Game Menu (Menu tab) */
 .cg-menu-section { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -2849,7 +3070,146 @@ ${emitTapHighlightRules()}
   .cg-shell { --cg-board: min(70vh, 44vw, 460px); }
   .cg-stage { flex-direction: row; flex-wrap: wrap; }
 }
+/* ---- Screen transitions (#235) ----
+   Navigation only: lobby, pre-game, opponent, the game, the locked day, the
+   profile. NOT boards, cells, cards or canvases — the hosted native kit's own
+   fidelity rules forbid animating high-frequency interactions, and it fights
+   the tap primitive, which gives its feedback on finger-DOWN precisely so
+   nothing has to wait. A card that animates when you tap it feels slower.
+
+   Each screen root really does mount when you navigate to it, so this needs no
+   JavaScript and cannot remount anything — which matters here, because
+   remounting a game at the wrong moment is how a finished 2048 board came back
+   as a fresh one (#158/#160).
+
+   TWO variants, and the difference is not cosmetic. A running transform
+   changes what getBoundingClientRect reports, and the boards in this app
+   measure themselves at mount (useFitBox, sizeCanvas). So any screen that
+   hosts a measured board fades ONLY; the rest may also travel a few pixels.
+   The fill mode is BACKWARDS so nothing is left applied afterwards: a
+   lingering transform would make the element a containing block for the
+   position:fixed sheets that open over these screens. */
+@keyframes un-screen-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes un-screen-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.screen-in { animation: un-screen-in 190ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards; }
+.screen-in-fade { animation: un-screen-fade 150ms linear backwards; }
+
+/* The in-app pref, now that the root carries it (#235). Same list as the OS
+   media query below — add new motion to BOTH or a player gets it in one place
+   and not the other. */
+:root[data-reduce-motion="1"] .screen-in,
+:root[data-reduce-motion="1"] .screen-in-fade,
+:root[data-reduce-motion="1"] .cg-sheet,
+:root[data-reduce-motion="1"] .badge-strip-body,
+:root[data-reduce-motion="1"] .badge-chevron,
+:root[data-reduce-motion="1"] .cnl-roll-btn,
+:root[data-reduce-motion="1"] .ng-status.err,
+:root[data-reduce-motion="1"] .ng-status.ok,
+:root[data-reduce-motion="1"] .win-card .trophy {
+  animation: none !important;
+  transition: none !important;
+}
+:root[data-reduce-motion="1"] .tappable:active,
+:root[data-reduce-motion="1"] .tappable[data-pressed] { transform: none !important; }
+
+/* ---- #185 — between-bands auto-advance overlay ----
+   z-index 55 sits it above the win overlay (50): cancelling swaps one for the
+   other, so both exist for a frame. Colours come from tokens and ca() only —
+   an alpha byte concatenated onto a var() token is not a colour at all (see
+   the token-alpha-concat self-test). */
+.adv-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--c-scrim);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 55;
+  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+.adv-card {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 18px;
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 20px 50px var(--c-shadow-lg);
+  animation: advPop 0.24s ease-out;
+}
+.adv-tally-label {
+  color: ${C.muted};
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.adv-tally-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: ${C.gold};
+  line-height: 1.1;
+  margin: 0.3rem 0 0.35rem;
+  animation: advPop 0.34s ease-out;
+}
+.adv-note { color: ${C.muted}; font-size: 0.82rem; line-height: 1.45; }
+.adv-next {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid ${C.border};
+}
+.adv-banner {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.45rem;
+  background: ${ca('accent','1f')};
+  border: 1px solid ${ca('accent','44')};
+  border-radius: 12px;
+  padding: 0.6rem 0.9rem;
+}
+.adv-banner-band { font-size: 1.3rem; font-weight: 700; color: ${C.accent}; }
+.adv-banner-of { font-size: 0.85rem; color: ${C.muted}; }
+.adv-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+.adv-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: ${C.text};
+  min-width: 1.3rem;
+  display: inline-block;
+  animation: advCount 0.85s ease-out;
+}
+.adv-crown { font-size: 2.6rem; }
+.adv-done-title { font-size: 1.4rem; font-weight: 700; margin: 0.4rem 0 0.55rem; }
+.adv-actions { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.35rem; }
+.adv-actions .primary-btn { margin: 0; }
+@keyframes advPop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes advCount {
+  from { transform: scale(1.5); opacity: 0.35; }
+  to { transform: scale(1); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .screen-in, .screen-in-fade { animation: none !important; }
   .cg-sheet { transition: none !important; }
   .badge-strip-body, .badge-chevron { transition: none !important; }
   /* PHASE 6 — the block used to cover four selectors, one of which (.tm-grid)
@@ -2861,14 +3221,13 @@ ${emitTapHighlightRules()}
     animation: none !important;
     transition: none !important;
   }
-  /* Story auto-advance: the tally shows its final number immediately, the
-     banner appears without scaling and the countdown is three plain frames.
-     Timing is unchanged — only the movement goes. */
-  .adv-card, .adv-banner, .adv-count {
-    animation: none !important;
-  }
+  .ng-status.err, .ng-status.ok { animation: none !important; }
+  .win-card .trophy { animation: none !important; }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed] { transform: none !important; }
+  /* #185 — the between-bands overlay still counts down; it just stops
+     bouncing while it does. */
+  .adv-card, .adv-tally-num, .adv-count { animation: none !important; }
 }
 
 /* ---- Knight's Tour ---- */
@@ -3104,64 +3463,11 @@ ${emitTapHighlightRules()}
   color: ${C.muted}; font-size: 0.88rem;
 }
 
-/* ---- Wallet screen ---- */
-.wallet-screen {
-  max-width: 540px; margin: 0 auto; padding: 1.5rem 1.25rem;
-}
-.wallet-screen h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.25rem; }
-.wallet-card {
-  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 14px;
-  padding: 1.25rem; margin-bottom: 1rem;
-}
-.wallet-card-title {
-  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
-  color: ${C.muted}; margin-bottom: 0.6rem;
-}
-.wallet-addr {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
-  color: ${C.text}; word-break: break-all; flex: 1;
-}
-.wallet-addr-row {
-  display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
-}
-.wallet-no-wallet {
-  text-align: center; padding: 2rem 1rem; color: ${C.muted}; font-size: 0.9rem;
-}
-.wallet-btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
-/* ---- DApp Mode ---- */
-.dapp-badge {
-  display: inline-flex; align-items: center; gap: 0.4rem; width: 100%;
-  justify-content: center; margin: 0.6rem 0; padding: 0.5rem 0.7rem;
-  background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','66')}; color: ${C.emerald};
-  border-radius: 0.6rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
-}
-.dapp-badge.disputed { background: ${ca('rose','1a')}; border-color: ${ca('rose','66')}; color: ${C.rose}; }
-.dapp-badge-arrow { margin-left: auto; opacity: 0.7; }
-.dapp-badge-dot { font-size: 0.9rem; }
-.dapp-verified-pill {
-  font-size: 0.62rem; font-weight: 600; color: ${C.emerald};
-  background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','55')}; border-radius: 999px;
-  padding: 0.05rem 0.45rem; margin-left: 0.4rem; vertical-align: middle;
-}
-.dapp-verdict { border-radius: 0.6rem; padding: 0.7rem 0.85rem; font-weight: 600; font-size: 0.88rem; margin-bottom: 0.85rem; }
-.dapp-verdict.ok  { background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','66')}; color: ${C.emerald}; }
-.dapp-verdict.bad { background: ${ca('rose','1a')}; border: 1px solid ${ca('rose','66')}; color: ${C.rose}; }
-.dapp-verdict-reason { font-weight: 400; font-size: 0.76rem; color: ${C.muted}; margin-top: 0.35rem; }
-.dapp-kv { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem; padding: 0.2rem 0; color: ${C.text}; }
-.dapp-kv span:first-child { color: ${C.muted}; }
-.dapp-hash { font-size: 0.72rem; color: ${C.text}; word-break: break-all; line-height: 1.45; }
-.dapp-ledger { display: flex; flex-direction: column; gap: 0.25rem; max-height: 9rem; overflow-y: auto; }
-.dapp-ledger-row { display: flex; gap: 0.6rem; font-size: 0.72rem; }
-.dapp-ledger-seq { color: ${C.muted}; min-width: 2.5rem; }
-.dapp-ledger-hash { color: ${C.accent}; }
-.dapp-lrow { width: 100%; background: none; border: none; cursor: pointer; text-align: left; }
-.dapp-identity-badge {
-  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 600;
-  color: ${C.emerald}; background: ${ca('emerald','1a')}; border: 1px solid ${ca('emerald','55')};
-  border-radius: 999px; padding: 0.15rem 0.55rem; margin-left: 0.5rem;
-}
-.dapp-identity-badge.unproven { color: ${C.muted}; background: ${ca('dim','33')}; border-color: ${C.dim}; }
-.dapp-wallet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+/* #224 — the Verified badge, the session receipt and the verified leaderboard
+   are gone at an admin's request, and their styles with them. The verification
+   MACHINERY is untouched (lib/dapp.js, game_sessions, settleDailySession's
+   tier A/B split): a request to stop showing a verdict is not a request to
+   stop reaching one. */
 
 /* ---- Badge progress pills (profile BadgeStrip + win overlay) ---- */
 .badge-progress { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }
@@ -3230,6 +3536,8 @@ ${emitTapHighlightRules()}
   font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
 }
 .brd-myroom button.ghost { background: transparent; color: ${C.muted}; border: 1px solid ${C.border}; }
+/* #201 left this on the waiting-room "Close this room" button only — the live
+   match's concede moved into the ☰ sheet, where it is not under the board. */
 .brd-endgame {
   min-height: 44px; padding: 0 1rem; margin: 0.7rem auto 0; display: block;
   background: transparent; border: 1px solid ${C.rose}; border-radius: 12px;
@@ -3396,13 +3704,27 @@ ${emitTapHighlightRules()}
 .hr-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,10,18,0.6); text-align: center; padding: 1rem; }
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
-.hr-overlay-score { font-size: 2.2rem; font-weight: 800; color: ${C.gold}; font-family: 'JetBrains Mono', monospace; }
 
 /* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
 .p6-banner {
   background: rgb(var(--c-gold-rgb) / 12%); border: 1px solid rgb(var(--c-gold-rgb) / 40%); color: ${C.gold};
   border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: center; margin: 0 0 10px;
+}
+/* #218 — banner tones. The base rule is brass (a notice); these three carry a
+   verdict, so they borrow the palette's own semantic hues. The info tone is the
+   neutral running-progress state, deliberately quieter than the base. */
+.p6-banner.info {
+  background: var(--c-well); border-color: ${C.border}; color: ${C.muted};
+}
+.p6-banner.warn {
+  background: rgb(var(--c-gold-rgb) / 14%); border-color: rgb(var(--c-gold-rgb) / 45%); color: ${C.gold};
+}
+.p6-banner.err {
+  background: rgb(var(--c-rose-rgb) / 14%); border-color: rgb(var(--c-rose-rgb) / 45%); color: ${C.rose};
+}
+.p6-banner.ok {
+  background: rgb(var(--c-emerald-rgb) / 14%); border-color: rgb(var(--c-emerald-rgb) / 45%); color: ${C.emerald};
 }
 
 /* #170 — the Klondike board is a canvas now (cards are drawn, not DOM), so
@@ -3420,6 +3742,18 @@ ${emitTapHighlightRules()}
 /* Nonogram — canvas board (slice 5). The clue gutters are drawn inside the
    canvas so grid + clues scale together off one useFitBox measurement. */
 .ng-game { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0.5rem; }
+/* The status line is always rendered (its text changes, never its presence), so
+   it reserves its own height and the board below it never shifts as the verdict
+   changes. Two lines' worth: the longest tone wraps on a phone. */
+.ng-status {
+  min-height: 2.9em; display: flex; align-items: center; justify-content: center;
+  line-height: 1.35; margin: 0;
+}
+.ng-status.err, .ng-status.ok { animation: ngStatusPop 260ms ease-out; }
+@keyframes ngStatusPop {
+  0% { transform: scale(0.97); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
 .ng-boardbox {
   flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
 }
@@ -3526,9 +3860,14 @@ ${emitTapHighlightRules()}
   box-shadow: 0 1px 2px var(--c-shadow-sm);
 }
 .wn-strip-body {
-  flex: 1; text-align: left; background: none; border: none; cursor: pointer;
+  flex: 1; min-width: 0; text-align: left; background: none; border: none; cursor: pointer;
   color: ${C.text}; font-family: inherit; font-size: 13px; line-height: 1.45;
   padding: 9px 4px 9px 12px;
+  /* #234 — one line. This strip wrapped to three on a phone, spending ~95px
+     of the first screen on a changelog entry before a single game card. The
+     headline plus "See all >" is the whole job; the panel behind it holds the
+     detail. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .wn-strip-body strong { font-family: 'Fraunces', Georgia, serif; }
 .wn-more { color: ${C.accent}; font-weight: 600; white-space: nowrap; }
@@ -3568,6 +3907,13 @@ ${emitTapHighlightRules()}
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
+/* Recently Played tiles (Recent goal) reuse the inprog-card look, but as real
+   buttons: strip the browser chrome back to the shared card surface. */
+.recent-card {
+  font-family: inherit; text-align: left; color: ${C.text};
+  background: ${C.card}; border: 1px solid ${C.border};
+}
+.recent-card:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
 
 .chat-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;
@@ -3675,20 +4021,86 @@ ${emitTapHighlightRules()}
 .home-daily-note {
   color: ${C.muted}; font-size: 0.82rem; margin: 0.5rem 0 0.6rem;
 }
-.home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
 .home-chip {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
   padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
   color: ${C.muted}; cursor: pointer; touch-action: manipulation;
 }
-.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: ${ca('accent','1a')}; }
+/* The pin control (#232). It sits in the card's top-right corner, which the
+   daily badge already used, so the badge's right offset below clears it
+   unconditionally rather than only on cards that render a pin, so a daily and
+   a classic card line their badges up the same way. 44px square is the touch
+   minimum; the glyph inside it is small, so the padding does the work. */
+.card-pin {
+  position: absolute; top: 0.15rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 0.95rem; line-height: 1; opacity: 0.32;
+  filter: grayscale(1);
+  transition: opacity .12s ease, transform .12s ease, filter .12s ease;
+}
+.card-pin:hover { opacity: 0.6; }
+.card-pin.on { opacity: 1; filter: none; transform: rotate(-20deg); }
+.card-pin[data-pressed] { transform: scale(0.86); }
+.card-pin.on[data-pressed] { transform: rotate(-20deg) scale(0.86); }
+.card-pin[disabled] { opacity: 0.18; cursor: default; }
+
+/* The favorite star. Same 44px touch square and corner placement as .card-pin,
+   but stacked BELOW it so the two controls never collide, and clear of the
+   daily badge (which .card-pin already pushed left). The unfilled star is a
+   bare outline at the pin's resting opacity; the filled one is unfiltered and
+   fully opaque, which is the whole "filled vs empty" read. */
+.card-fav {
+  position: absolute; top: 2.7rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; opacity: 0.32;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.card-fav:hover { opacity: 0.6; }
+.card-fav.on { opacity: 1; }
+.card-fav.on { color: ${C.gold}; }
+.card-fav[data-pressed] { transform: scale(0.86); }
+
+/* The Pinned section's heading and the two lines that explain it. */
+.home-pinned-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.home-pin-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600;
+  color: ${C.muted}; letter-spacing: 0.05em;
+}
+.home-pin-tip { color: ${C.muted}; font-size: 0.78rem; margin: 0 0 0.9rem; }
+/* #226 — the Daily chip's completed / still-to-play split. Same column-rule
+   heading as every other home section, so the grid reads as one page with two
+   headings rather than two grids. The finished cards are dimmed a little, not
+   collapsed: they still carry today's score and the tap that reviews the
+   board, so hiding them would lose the thing you'd go looking for. */
+.home-split-title { display: flex; align-items: baseline; gap: 0.5rem; margin-top: 1.4rem; }
+.home-split-empty { color: ${C.muted}; font-size: 0.82rem; margin: 0.6rem 0 0.2rem; }
+.grid.home-split-done .card { opacity: 0.72; }
+.grid.home-split-done .card:hover, .grid.home-split-done .card:focus-within { opacity: 1; }
+.home-pin-full {
+  color: ${C.rose}; font-size: 0.78rem; margin: 0 0 0.6rem; font-weight: 600;
+}
+/* #234 — the pin hint teaches a real feature, so it stays; it just stops
+   being a boxed 58px banner between the filter chips and the first game. One
+   muted line, in the same register as the chips it follows. */
+.home-pin-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
+/* The Favorites chip's empty state. Same register as .home-pin-empty above. */
+.home-fav-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
+
 .card-daily-badge {
-  position: absolute; top: 0.65rem; right: 0.65rem; z-index: 1;
+  position: absolute; top: 0.65rem; right: 2.7rem; z-index: 1;
   font-family: 'JetBrains Mono', monospace; font-size: 0.56rem; font-weight: 600;
   letter-spacing: 0.07em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;
 }
-.card-daily-badge.fresh  { background: rgba(45,95,174,.14); color: ${C.accent};  border-color: rgba(45,95,174,.30); }
+.card-daily-badge.fresh  { background: ${ca('accent','24')}; color: ${C.accent};  border-color: ${ca('accent','4d')}; }
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
 

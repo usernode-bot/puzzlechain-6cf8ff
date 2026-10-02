@@ -50,6 +50,14 @@ function CgSettings({ tick }) {
       <div className="cg-setting-row"><span className="name">Sound</span><CgToggle on={cgPrefs.sound} onClick={() => flip('sound')} /></div>
       <div className="cg-setting-row"><span className="name">Haptics</span><CgToggle on={cgPrefs.haptics} onClick={() => flip('haptics')} /></div>
       <div className="cg-setting-row"><span className="name">Reduced motion</span><CgToggle on={cgPrefs.motion} onClick={() => flip('motion')} /></div>
+      <h4 className="cg-settings-h4-spaced">Typing</h4>
+      {/* #192 — the word games draw their own keyboard, which is also the only
+          place the per-letter state is shown. This swaps it for your device's
+          own keyboard and leaves the letter colours behind as a strip. */}
+      <div className="cg-setting-row">
+        <span className="name">Use my device's keyboard<span className="cg-setting-note">Word games — your own keyboard instead of the drawn one</span></span>
+        <CgToggle on={cgPrefs.devkbd} onClick={() => flip('devkbd')} />
+      </div>
     </div>
   );
 }
@@ -288,8 +296,22 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
       const { ok, status, body } = await api(`${roomBase}/rooms/${code}/join`, { method: 'POST' });
       setBusy(false);
       if (ok) onPlay('online', { roomAction: 'join', roomId: code, myPlayerNum: (body && body.yourPlayerNum) || 2 });
+      /* #200 — a 409 that names YOUR OWN seat is a rejoin, not an error.
+
+         #145 taught the server to answer "that is your own room" with the room
+         and your seat number, precisely so this could offer a way back in. The
+         client never used it: every 409 rendered "Room is full or you created
+         it" — which is, word for word, the dead end #145's own comment says it
+         was fixing. So the server half shipped and the client half did not, and
+         a player who left their own match could not get back into it in ANY of
+         the seven online games. */
+      else if (status === 409 && body && (body.ownRoom || body.yourPlayerNum)) {
+        onPlay('online', { roomAction: 'join', roomId: code, myPlayerNum: body.yourPlayerNum || 1 });
+      }
       else if (status === 404) setError('Room not found. Check the code.');
-      else if (status === 409) setError('Room is full or you created it.');
+      // "or you created it" is gone: your own room is a rejoin now, so a 409
+      // that reaches here really is somebody else's full or finished room.
+      else if (status === 409) setError('That room is full or already finished.');
       else setError('Could not join. Try again.');
     }
   };
@@ -440,6 +462,42 @@ function ClassicModePicker({ game, onPlay, onGlossary }) {
 
 // The Menu tab of the ClassicShell bottom sheet: New Game, Save Game (bot
 // only), and Post to Feed (after a result).
+/* #201 — a live match's concede action belongs in the ☰ sheet, not eleven
+   pixels under the board. The game that OWNS that action is rendered as
+   ClassicShell's `children` by App, though, so it cannot hand up a
+   `sheetSections` entry the way a registry-declared section does. This context
+   is the channel: a descendant publishes an action while it is mounted and
+   withdraws it on unmount, and the shell renders it in the Menu tab.
+
+   It is a LIST rather than a single slot deliberately. Nothing publishes two
+   today, but a shell that silently dropped the second would be a bug that only
+   surfaces in whichever game adds one. */
+const CgShellActionsContext = React.createContext(null);
+
+/* Publish one sheet action for as long as the caller is mounted.
+
+   The effect deps are the button's LOOK, not the handler: `action.onSelect`
+   closes over live state (which match, whether the request is already in
+   flight) and gets a new identity every render, so depending on it would
+   re-publish continuously. The published entry calls through a ref instead, so
+   the handler is always this render's, never a stale one. */
+function useCgShellAction(action) {
+  const ctx = React.useContext(CgShellActionsContext);
+  const id = action && action.id;
+  const live = useRef(action);
+  live.current = action;
+  const label = action ? action.label : null;
+  const disabled = !!(action && action.disabled);
+  useEffect(() => {
+    if (!ctx || !id) return;
+    ctx.publish({
+      id, label, disabled, danger: !!(live.current && live.current.danger),
+      run: () => { const a = live.current; if (a && a.onSelect) a.onSelect(); },
+    });
+    return () => ctx.withdraw(id);
+  }, [ctx, id, label, disabled]);
+}
+
 function ClassicGameMenuSection({ game, gameMode, lastResult, onNewGameMode, onSaveGame, onClose, onGlossary }) {
   const [picking, setPicking] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'plain'
@@ -517,10 +575,39 @@ function classicSheetDeepLink() {
 }
 
 function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuConfig, onHowTo, onChat }) {
+  // Sheet actions published by the mounted game (see useCgShellAction).
+  const [shellActions, setShellActions] = useState([]);
+  const actionsApi = useRef(null);
+  if (!actionsApi.current) {
+    actionsApi.current = {
+      publish: (a) => setShellActions(list => [...list.filter(x => x.id !== a.id), a]),
+      withdraw: (id) => setShellActions(list => list.filter(x => x.id !== id)),
+    };
+  }
   const sections = [
-    ...(menuConfig ? [{
+    /* The Menu tab now exists whenever there is EITHER a menuConfig or a
+       published action. Gating it on menuConfig alone would silently swallow
+       a game's action in any shell that has no menu. */
+    ...((menuConfig || shellActions.length > 0) ? [{
       id: 'menu', label: 'Menu',
-      render: () => <ClassicGameMenuSection {...menuConfig} onClose={() => setSheetOpen(false)} />,
+      render: () => (
+        <>
+          {menuConfig && <ClassicGameMenuSection {...menuConfig} onClose={() => setSheetOpen(false)} />}
+          {shellActions.length > 0 && (
+            <div className="cg-menu-section" style={{ marginTop: menuConfig ? '0.9rem' : 0 }}>
+              <div className="cg-menu-label">This match</div>
+              {shellActions.map(a => (
+                <button
+                  key={a.id}
+                  className={'cg-sheet-action' + (a.danger ? ' danger' : '')}
+                  disabled={!!a.disabled}
+                  onClick={() => { setSheetOpen(false); a.run(); }}
+                >{a.label}</button>
+              ))}
+            </div>
+          )}
+        </>
+      ),
     }] : []),
     ...(sheetSections || []),
     { id: 'settings', label: 'Settings', render: () => <CgSettings /> },
@@ -555,7 +642,7 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
         <button className="cg-btn" onClick={toggleSound} title="Sound" aria-label="Sound">{cgPrefs.sound ? '🔊' : '🔇'}</button>
         <button className="cg-btn" onClick={() => open()} title="Menu" aria-label="Menu">☰</button>
       </div>
-      {children}
+      <CgShellActionsContext.Provider value={actionsApi.current}>{children}</CgShellActionsContext.Provider>
       <div className={'cg-sheet-backdrop' + (sheetOpen ? ' open' : '')} onClick={() => setSheetOpen(false)} />
       <div className={'cg-sheet' + (sheetOpen ? ' open' : '')}>
         <div className="cg-sheet-handle" />

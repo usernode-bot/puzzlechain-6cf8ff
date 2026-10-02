@@ -5,6 +5,11 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const dapp = require('./lib/dapp');
 const boardRules = require('./lib/board-rules');
+
+// The platform's address, injected by the platform at deploy (#2047). Never
+// written out here: a hardcoded hostname is what broke this app when the
+// platform moved domains. Empty only outside the platform (local runs).
+const PLATFORM_ORIGIN = (process.env.USERNODE_PLATFORM_ORIGIN || '').replace(/\/+$/, '');
 // Mancala's pure rules moved to the rules registry (phase 5); keep the local
 // names so the routes / bot AI / ZK replay / daily challenge stay untouched.
 const { srvMncOpposite, srvMncDistribute, srvMncApplyMove } = boardRules;
@@ -41,43 +46,34 @@ function signIntegrationPayload(payload) {
 }
 
 
-// Server-authoritative daily hint cap. Hints are FREE (the MATCH currency is
-// retired) but still capped and counted server-side so the count survives
-// reloads and a client can't reveal more clues than the day's puzzle carries.
-// Mirrors the frontend source's cwDailyRounds: the day's round count R is the FIRST draw
-// off dailyRng(offset, 'cryptowordle'), before any word is picked, so we can
-// reproduce R without porting the whole CW_WORDS list — only the round-count
-// draw needs to match byte-for-byte. Every CW_WORDS entry ships exactly
-// CW_HINTS_PER_WORD hints today, so the day's total available clues is simply
-// R * CW_HINTS_PER_WORD.
-const CW_MIN_ROWS = 4, CW_MAX_ROWS = 7;
-const CW_HINTS_PER_WORD = 2;
-function cwMulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function cwHashStr(s) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+/* Server-authoritative daily hint cap. Hints are FREE (the MATCH currency is
+   retired) but still capped and counted server-side so the count survives
+   reloads and a client can't reveal more clues than the day's puzzle carries.
+
+   #193 — this used to REDERIVE the day's round count from a seeded draw,
+   mirroring a frontend that drew R off dailyRng before picking any word. The
+   frontend stopped doing that: the count is a fixed CW_ROUNDS_PER_DAY now
+   ("Count is now fixed" in 09-game-cipher.jsx), and the 4-to-7 range the draw
+   still used is the GUESS-ROW range, not a round count. So the cap was a
+   uniform draw from {8, 10, 12, 14} against a day that always carries
+   5 * hints-per-word — and on the quarter of days the draw landed on 4, the
+   last clues of the day were refused with "No more clues" while the puzzle
+   still had them. That is the "2-hint ceiling" as a player meets it.
+
+   It is a straight multiplication now, with nothing to drift: the round count
+   is fixed, and CW_HINTS_PER_WORD is the MAXIMUM a word can offer (two written
+   clues plus the derived ones cwDerivedHints adds). The real per-word limit is
+   enforced client-side against the clues that word actually has; this is only
+   the day's abuse ceiling, so erring high is correct — every clue it counts is
+   one the client already holds locally. */
+const CW_ROUNDS_PER_DAY = 5;
+const CW_HINTS_PER_WORD = 4;
 function cwUtcDayNum() {
   const d = new Date();
   return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
 }
 function cwServerMaxHints() {
-  const dayNum = cwUtcDayNum();
-  const rng = cwMulberry32((dayNum + cwHashStr('cryptowordle')) >>> 0);
-  const rounds = CW_MIN_ROWS + Math.floor(rng() * (CW_MAX_ROWS - CW_MIN_ROWS + 1));
-  return rounds * CW_HINTS_PER_WORD;
+  return CW_ROUNDS_PER_DAY * CW_HINTS_PER_WORD;
 }
 
 // Single shared connection pool to this app's Postgres DB.
@@ -158,7 +154,7 @@ const GAME_REGISTRY = {
   zuma:              { name: 'Marble Loop',              category: 'classic', dailyMode: true, tier: 'B',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
@@ -233,29 +229,50 @@ const GAME_IDS = new Set(
 // Any game id known to the hub (used by DApp session validation).
 const ALL_GAME_IDS = new Set(Object.keys(GAME_REGISTRY));
 
+/* Most games a single player may pin to the top of the home grid (#232). The
+   client mirrors this as PIN_LIMIT in public/src/29-cards.jsx purely to grey
+   out the control once it is reached; THIS value is the authoritative one —
+   the insert below refuses the 9th pin regardless of what the client sends. */
+const PIN_LIMIT = 8;
+
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
 const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
 
 /* ============================================================
-   Play modes (#176) — story ladders and arcade bands
+   Play modes (#176) — story levels and arcade bands
    ============================================================
    Mirrors PLAY_MODES_BY_ID in public/src/29-cards.jsx. The client owns the
-   card copy; the server owns what a mode is worth and whether a rung has
+   card copy; the server owns what a mode is worth and whether a level has
    already been claimed, because both are cheatable from the client.
 
-   STORY_BANDS is the rung count per game. Bands, not levels: Tile Match
-   generates 1000 levels and Mahjong has 6 layouts, so paying per level would
-   make one game worth a hundred times another for the same "finished the
-   story" achievement. Every ladder is normalised to 4–8 rungs here, and
-   storyBandAward below spends the SAME total budget on every game however
-   many rungs it has — later bands simply weigh more than earlier ones. */
+   STORY_BANDS is the story LEVEL count per game. (The identifier and the
+   `game_progress.band` column keep their original names on purpose — the
+   #184 rename is display-only, and `band` is part of a live primary key.)
+   A story level is a difficulty step, not one of a game's own levels: Tile
+   Match generates 1000 of those and Mahjong has 6 layouts, so paying per
+   level-of-content would make one game worth a hundred times another for the
+   same "finished the story" achievement.
+
+   Every game's story is capped to STORY_LEVEL_MIN..STORY_LEVEL_MAX levels
+   (#184), and storyBandAward below spends the SAME total budget on every game
+   however many levels it has: later levels simply weigh more than earlier
+   ones. scripts/check-registry.js enforces the bound AND that each client
+   difficulty table is the same length as its entry here, because a server
+   bump without the matching client bump silently replays the old hardest
+   board at the top of the ladder. */
+const STORY_LEVEL_MIN = 6;
+const STORY_LEVEL_MAX = 10;
+// What a NEWLY added story starts at. Start at the floor and earn the extra
+// levels with content: the four games above the floor are there because they
+// have a ladder of real, distinguishable difficulty to spend them on.
+const STORY_LEVEL_DEFAULT = 6;
 const STORY_BANDS = {
-  sudoku: 6, sudokumini: 5, wordhunt: 6, cryptowordle: 6,
-  klondike: 5, spider: 3, mahjongsol: 6, anagrams: 5,
+  sudoku: 6, sudokumini: 6, wordhunt: 6, cryptowordle: 6,
+  klondike: 6, spider: 6, mahjongsol: 6, anagrams: 6,
   nonogram: 6, cratepush: 8, minefinder: 6,
-  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 5,
-  hashrush: 5, match3: 5, 'knights-tour': 6,
+  tilematching: 10, bounce: 6, diamondrush: 8, zuma: 6,
+  hashrush: 6, match3: 6, 'knights-tour': 6,
 };
 const storyBandCount = (gameId) => STORY_BANDS[gameId] || 0;
 
@@ -407,6 +424,29 @@ function gotdSchedule() {
 // same deterministic schedule ensureDailyFeatured uses) and a finished
 // attempt for that featured game. Idempotent; only called from IS_STAGING
 // demo fixtures.
+/* "Today is left open" has to be MADE true, not assumed.
+
+   demo=streak and demo=badges both promise a long streak with today still
+   playable. Neither of them finishes today — but demo=locked deliberately
+   does, on the same viewer, and staging carries one database across every
+   check run and never resets. So the first time demo=locked ran, today's
+   sudoku was finished forever, and every later route that wanted the PRE-GAME
+   screen got the locked screen instead. That is what took out the two #188
+   leaderboards checks (`?game=sudoku&boards=1&demo=streak`): the panel lives
+   on the pre-game screen, and the pre-game screen was never reached.
+
+   Same rule as demo=storybadges and demo=modes: a fixture has to assert the
+   state it claims, including the ABSENCE of a row. demo=locked still finishes
+   today on its own routes, because it asserts its state too — the two simply
+   have to stop depending on which one ran first. */
+async function openTodayForDemo(userId) {
+  await pool.query(
+    `DELETE FROM daily_attempts
+      WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
+    [userId]
+  );
+}
+
 async function seedFeaturedStreakDays(userId, username, nDays) {
   const schedule = gotdSchedule();
   const { rows: dRows } = await pool.query(`SELECT (now() AT TIME ZONE 'utc')::date AS d`);
@@ -568,6 +608,10 @@ const STREAK_BADGE_DAYS = [3, 7, 30, 50, 100, 180, 365];
 //   daily_sweep    — finished ALL daily games within one UTC day.
 //   podium         — held rank #1 on a game's daily leaderboard at finish time.
 //   solve_milestone — lifetime finished+won solves crossed 10/50/100.
+//   story_complete  — cleared every band of one game's Story ladder. One
+//                    badge per (user, game); the game id lives in
+//                    metadata.gameId so a single `type` covers all ladders,
+//                    exactly as solve_milestone parameterises by count.
 const SPEED_DEMON_MAX_SECS = 60;
 // Per-game "no wasted moves" thresholds (the single balance knob for the
 // Flawless badge — tune here). Only the move-counted daily games qualify;
@@ -589,23 +633,28 @@ async function earnedAchievementBadges(userId) {
       `SELECT type, metadata
          FROM user_achievements
         WHERE user_id = $1
-          AND type IN ('first_solve','speed_demon','flawless','daily_sweep','podium','solve_milestone')`,
+          AND type IN ('first_solve','speed_demon','flawless','daily_sweep','podium','solve_milestone','story_complete')`,
       [userId]
     );
     const types = new Set();
     const milestones = new Set();
+    const stories = new Set();
     for (const r of rows) {
       types.add(r.type);
       if (r.type === 'solve_milestone' && r.metadata && Number.isFinite(+r.metadata.count)) {
         milestones.add(+r.metadata.count);
       }
+      if (r.type === 'story_complete' && r.metadata && typeof r.metadata.gameId === 'string') {
+        stories.add(r.metadata.gameId);
+      }
     }
     return {
       types: Array.from(types),
       milestones: Array.from(milestones).sort((a, b) => a - b),
+      stories: Array.from(stories).sort(),
     };
   } catch {
-    return { types: [], milestones: [] };
+    return { types: [], milestones: [], stories: [] };
   }
 }
 
@@ -783,6 +832,14 @@ async function migrate() {
   // re-derived from the deterministic daily seed, so only player moves live here.
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
+  /* #188 — the all-time board groups every finished attempt for one game by
+     player. Without this the query is a full scan of a table that only grows;
+     the existing indexes are keyed for "today, this game", which is the wrong
+     shape for it. Idempotent, per the platform's schema convention. */
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS daily_attempts_alltime_idx
+      ON daily_attempts (game_id, user_id) WHERE finished_at IS NOT NULL
+  `);
 
   // game_ratings is PUBLIC (leaderboard data): one Elo rating row per
   // (user, head-to-head game), updated in the room/match finish handlers
@@ -1080,6 +1137,31 @@ async function migrate() {
     ON user_achievements(created_at DESC)
   `);
 
+  /* Backfill story_complete badges for ladders finished before the badge
+     existed. Idempotent by the same NOT EXISTS guard the live award uses, so
+     it is a cheap no-op on every boot after the first. A ladder counts as
+     complete when the user holds every band 0..n-1 of that game. */
+  try {
+    for (const [gameId, bands] of Object.entries(STORY_BANDS)) {
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+         SELECT gp.user_id, 'story_complete', $1, $3::jsonb
+           FROM game_progress gp
+          WHERE gp.game_id = $1 AND gp.band >= 0 AND gp.band < $2::int
+          GROUP BY gp.user_id
+         HAVING COUNT(DISTINCT gp.band) = $2::int
+            AND NOT EXISTS (
+              SELECT 1 FROM user_achievements ua
+               WHERE ua.user_id = gp.user_id AND ua.type = 'story_complete'
+                 AND ua.metadata->>'gameId' = $1
+            )`,
+        [gameId, bands, JSON.stringify({ gameId, bands })]
+      );
+    }
+  } catch (e) {
+    console.warn('[migrate] story_complete backfill skipped:', e.message);
+  }
+
   // tilematch_scores is PUBLIC: personal-best scores for the Tile Match Puzzle
   // (1000-level mode). One row per user, upserted with GREATEST.
   await pool.query(`
@@ -1224,6 +1306,59 @@ async function migrate() {
   `);
   await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS save_hash TEXT`);
   await pool.query(`ALTER TABLE user_game_state ADD COLUMN IF NOT EXISTS anchor_tx_hash TEXT`);
+
+  /* game_pins is PUBLIC — which games a player pinned to the top of their home
+     grid (#232). It is a display preference over ids that are already public
+     (every game id is a deep-link key), so a stranger reading every row learns
+     nothing they could not read off the lobby. game_id holds the CARD's anchor
+     registry id; the client resolves it back to a card through CARD_BY_GAME_ID,
+     which is what lets the four merged cards keep both of their ids. */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_pins (
+      user_id   TEXT NOT NULL,
+      username  TEXT,
+      game_id   TEXT NOT NULL,
+      pinned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+
+  /* game_plays is PUBLIC (Recent goal) — which games this player launched and
+     when, powering the lobby's Recently Played strip. Same exposure class as
+     game_pins: per-user gameplay activity over ids that are already public
+     lobby keys, so a stranger reading every row learns nothing they could not
+     read by watching the lobby. One row per (user, game); each new play
+     bumps played_at and plays. No foreign keys (public-table rule). */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_plays (
+      user_id   TEXT NOT NULL,
+      game_id   TEXT NOT NULL,
+      username  TEXT,
+      plays     INTEGER NOT NULL DEFAULT 1,
+      played_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS game_plays_recent_idx
+       ON game_plays(user_id, played_at DESC)`
+  );
+
+  // game_favorites is PUBLIC — one row per (user, game) the player starred.
+  // Same data class as game_pins: a display preference over ids that are
+  // already public (every game id is a deep-link key), so a stranger reading
+  // every row learns nothing the lobby does not show. game_id holds the CARD's
+  // anchor registry id; the client resolves it back through CARD_BY_GAME_ID,
+  // which lets the four merged cards keep both of their ids.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_favorites (
+      user_id       TEXT NOT NULL,
+      username      TEXT,
+      game_id       TEXT NOT NULL,
+      favorited_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
 
   // classic_rooms is PUBLIC: open room-code multiplayer for Classic Games
   // (currently Chutes & Ladders). Mirrors mancala_rooms but is generic — the
@@ -2013,6 +2148,9 @@ const PUBLIC_API_GET = [
   // null-guards req.user (anonymous ⇒ me: null, isCurrentUser: false). The
   // arcade FINISH route stays auth-gated — it pays points.
   /^\/api\/arcade\/[A-Za-z0-9_-]+\/leaderboard$/,
+  // #188 — the all-time board is the same shape as the two above and opens on
+  // the same terms; its handler null-guards req.user too.
+  /^\/api\/alltime\/[A-Za-z0-9_-]+\/leaderboard$/,
 ];
 
 // Simple in-memory per-IP sliding window over the public GET surface — the
@@ -2309,6 +2447,135 @@ app.delete('/api/social/unfollow/:userId', async (req, res) => {
   }
 });
 
+// ---- Pinned games API (#232) --------------------------------------------
+// Auth-gated like every other /api route: the pin belongs to req.user, never
+// to an id the client names. Both routes answer with the player's FULL pin
+// list so the client replaces its optimistic array with the server's truth
+// rather than trying to reproduce the cap's arithmetic locally.
+
+async function readPins(userId) {
+  const { rows } = await pool.query(
+    `SELECT game_id FROM game_pins WHERE user_id = $1 ORDER BY pinned_at ASC, game_id ASC`,
+    [userId]
+  );
+  return rows.map(r => r.game_id);
+}
+
+/* ---- Recently Played tracking (Recent goal) ------------------------------
+   Every "I played this game" moment funnels through recordGamePlay. Fire-and-
+   forget by design: a tracking failure must never cost a player the score,
+   attempt or rating the surrounding route exists to record, so the caller
+   wraps it (or the helper swallows everything) and moves on. */
+async function recordGamePlay(userId, username, gameId) {
+  try {
+    await pool.query(
+      `INSERT INTO game_plays (user_id, username, game_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, game_id) DO UPDATE SET
+         played_at = now(),
+         plays = game_plays.plays + 1,
+         username = COALESCE(EXCLUDED.username, game_plays.username)`,
+      [userId, username || null, gameId]
+    );
+  } catch (e) { console.warn('[plays] record failed (non-fatal):', e.message); }
+}
+
+// The caller's five most recent plays (most recent first) for the lobby strip.
+async function readRecentPlays(userId, limit) {
+  const { rows } = await pool.query(
+    `SELECT game_id, played_at FROM game_plays
+      WHERE user_id = $1 ORDER BY played_at DESC, game_id ASC LIMIT $2`,
+    [userId, limit]
+  );
+  return rows.map(r => ({ gameId: r.game_id, playedAt: r.played_at }));
+}
+
+// POST /api/pins/:gameId — pin a game to the top of the home grid.
+app.post('/api/pins/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    // The cap is enforced INSIDE the insert: a count-then-insert pair would let
+    // two taps in flight at once both see 7 and both land.
+    const { rowCount } = await pool.query(
+      `INSERT INTO game_pins (user_id, username, game_id)
+       SELECT $1, $2, $3
+        WHERE (SELECT count(*) FROM game_pins WHERE user_id = $1) < $4
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [req.user.id, req.user.username || null, gameId, PIN_LIMIT]
+    );
+    const pins = await readPins(req.user.id);
+    if (!rowCount && !pins.includes(gameId)) {
+      return res.status(409).json({ error: 'Pin limit reached', limit: PIN_LIMIT, pins });
+    }
+    res.json({ pins, limit: PIN_LIMIT });
+  } catch (err) {
+    console.error('[pins] POST failed:', err.message);
+    res.status(500).json({ error: 'Failed to pin game' });
+  }
+});
+
+// DELETE /api/pins/:gameId — unpin. Idempotent: unpinning something that was
+// never pinned is a success with an unchanged list.
+app.delete('/api/pins/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  try {
+    await pool.query(`DELETE FROM game_pins WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]);
+    res.json({ pins: await readPins(req.user.id), limit: PIN_LIMIT });
+  } catch (err) {
+    console.error('[pins] DELETE failed:', err.message);
+    res.status(500).json({ error: 'Failed to unpin game' });
+  }
+});
+
+// ---- Favorite games API --------------------------------------------------
+// Same auth-gated, idempotent shape as the pins API above: the favorite
+// belongs to req.user, never to an id the client names, and both routes
+// answer with the player's FULL favorite list so the client replaces its
+// optimistic set with the server's truth. No cap — a list of ids is cheap.
+
+async function readFavorites(userId) {
+  const { rows } = await pool.query(
+    `SELECT game_id FROM game_favorites WHERE user_id = $1 ORDER BY favorited_at ASC, game_id ASC`,
+    [userId]
+  );
+  return rows.map(r => r.game_id);
+}
+
+// PUT /api/favorites/:gameId — star a game. Idempotent: starring an
+// already-starred game is a success with an unchanged list.
+app.put('/api/favorites/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    await pool.query(
+      `INSERT INTO game_favorites (user_id, username, game_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [req.user.id, req.user.username || null, gameId]
+    );
+    res.json({ favorites: await readFavorites(req.user.id) });
+  } catch (err) {
+    console.error('[favorites] PUT failed:', err.message);
+    res.status(500).json({ error: 'Failed to favorite game' });
+  }
+});
+
+// DELETE /api/favorites/:gameId — unstar. Idempotent: unstarring something
+// never starred is a success with an unchanged list.
+app.delete('/api/favorites/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  try {
+    await pool.query(`DELETE FROM game_favorites WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]);
+    res.json({ favorites: await readFavorites(req.user.id) });
+  } catch (err) {
+    console.error('[favorites] DELETE failed:', err.message);
+    res.status(500).json({ error: 'Failed to unstar game' });
+  }
+});
+
 // ---- Posts API (sharing) -----------------------------------------------
 
 
@@ -2440,6 +2707,108 @@ app.get('/api/daily', async (req, res) => {
       );
     }
 
+    /* Staging-only demo seed (#232): pins three games for the current viewer
+       so the Pinned section, its filter behaviour and the pin's "on" state are
+       all reachable by navigation alone. game_pins is a NEW table, so staging
+       starts with zero rows and none of that would otherwise render.
+
+       The three ids are deliberately mixed — a daily (sudoku), a classic
+       (mancala) and one half of a merged card (snakedaily) — and pinned in an
+       order that is NOT their registry order, so a screenshot shows the
+       section sorting by registry position rather than by recency. Nothing the
+       app's own logic reads is fabricated here: a pin only ever moves a card
+       up the grid. Idempotent; strict no-op in production. */
+    if (IS_STAGING && (req.query.demo === 'pins' || req.query.demo === 'pinsfull')) {
+      const demoPins = req.query.demo === 'pinsfull'
+        ? ['snakedaily', 'mancala', 'sudoku', 'nonogram', 'checkers',
+           'dropstack', '2048', 'wordhunt']
+        : ['snakedaily', 'mancala', 'sudoku'];
+      for (let i = 0; i < demoPins.length; i++) {
+        await pool.query(
+          `INSERT INTO game_pins (user_id, username, game_id, pinned_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoPins[i],
+           String(demoPins.length - i)]
+        );
+      }
+    }
+
+    /* Staging-only counterpart to demo=pins (#232): clears the viewer's pins so
+       the zero-pin home — the shape a real player sees before they pin anything —
+       is reachable DETERMINISTICALLY. A pin is durable by design, and the whole
+       proposal-check suite runs as one viewer against one staging DB, so a plain
+       `/` assertion on the empty state would pass or fail purely on whether a
+       demo=pins route ran earlier in the file. This makes that order irrelevant.
+       Deletes only rows belonging to the caller; strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'pinsempty') {
+      await pool.query(`DELETE FROM game_pins WHERE user_id = $1`, [req.user.id]);
+    }
+
+    /* Staging-only demo seed (Recent goal): five plays for the current viewer
+       so the Recently Played strip, its most-recent-first ordering and its
+       replay buttons are reachable by navigation alone. game_plays is a NEW
+       table, so staging starts empty and none of that would otherwise render.
+       Staggered timestamps make the ordering visible in a screenshot. Only the
+       viewer's OWN rows are written/read, so nothing the strip concludes is
+       fabricated by the seed itself; delete via demo=recentclear.
+       Strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'recent') {
+      const demoPlays = ['sudoku', 'mancala', 'snake', 'tilematching', 'wordhunt'];
+      for (let i = 0; i < demoPlays.length; i++) {
+        await pool.query(
+          `INSERT INTO game_plays (user_id, username, game_id, played_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoPlays[i],
+           String((i + 1) * 25)]
+        );
+      }
+    }
+
+    /* Staging-only demo seed: stars three games for the current viewer so the
+       Favorites filter chip and its per-card star state are reachable by
+       navigation alone — game_favorites is a NEW table, so staging starts
+       with zero rows and an active chip would otherwise show nothing. The
+       ids mirror the demo=pins mix (a daily, a classic, one half of a merged
+       card). Nothing the app's own logic reads is fabricated here: a favorite
+       is the player's own choice, this fixture IS the player acting (one
+       viewer, one DB, explicitly armed by the demo param), and it only ever
+       controls the chip the viewer opted into. Idempotent; strict no-op in
+       production. */
+    if (IS_STAGING && req.query.demo === 'favorites') {
+      const demoFavorites = ['sudoku', 'mancala', 'snakedaily'];
+      for (let i = 0; i < demoFavorites.length; i++) {
+        await pool.query(
+          `INSERT INTO game_favorites (user_id, username, game_id, favorited_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoFavorites[i],
+           String(demoFavorites.length - i)]
+        );
+      }
+    }
+
+    /* Staging-only counterpart to demo=recent (Recent goal): clears the
+       viewer's play history so the no-history home (no strip at all) is
+       reachable deterministically. Same rationale as demo=pinsempty: the
+       proposal-check suite runs as one viewer against one staging DB, so a
+       plain `/` assertion on the hidden state would depend on route order.
+       Deletes only rows belonging to the caller; strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'recentclear') {
+      await pool.query(`DELETE FROM game_plays WHERE user_id = $1`, [req.user.id]);
+    }
+
+    /* Staging-only counterpart to demo=favorites: clears the viewer's
+       favorites so the empty-chip state is reachable deterministically,
+       exactly as demo=pinsempty does for pins — the check suite runs as one
+       viewer against one staging DB, so the order routes ran in must not
+       decide what the chip shows. Deletes only the caller's rows; strict
+       no-op in production. */
+    if (IS_STAGING && req.query.demo === 'favempty') {
+      await pool.query(`DELETE FROM game_favorites WHERE user_id = $1`, [req.user.id]);
+    }
+
     // Staging-only demo seed: gives the current viewer a 10-day consecutive
     // streak (finished sudoku attempts for the last 10 UTC days BEFORE today)
     // so the multiplier tier UI is demonstrable — nav badge, lobby next-tier
@@ -2451,6 +2820,7 @@ app.get('/api/daily', async (req, res) => {
       // rows), so the streak is demonstrable under the GotD-participation
       // rule regardless of where the cutover falls relative to the seed days.
       await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 10);
+      await openTodayForDemo(req.user.id);
     }
 
     // Staging-only demo seed: give the current viewer a LONG streak plus the
@@ -2464,6 +2834,7 @@ app.get('/api/daily', async (req, res) => {
     if (IS_STAGING && req.query.demo === 'badges') {
       // Featured-game finishes so the long streak holds under the GotD rule.
       await seedFeaturedStreakDays(req.user.id, req.user.username || 'staging-demo-user', 60);
+      await openTodayForDemo(req.user.id);
       for (const days of STREAK_BADGE_DAYS) {
         await pool.query(
           `INSERT INTO user_achievements (user_id, type, game_id, score, metadata)
@@ -2502,6 +2873,88 @@ app.get('/api/daily', async (req, res) => {
           [req.user.id, a.type, a.type === 'solve_milestone' ? a.meta.count : null, JSON.stringify(a.meta)]
         );
       }
+      // One story_complete per ladder, so the Story ladders group in the badge
+      // strip also reads fully earned. Without this, broadening the strip by 18
+      // chips would quietly break this fixture's "everything unlocked" promise.
+      for (const [sGameId, sBands] of Object.entries(STORY_BANDS)) {
+        await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+           SELECT $1, 'story_complete', $2, $3::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements
+               WHERE user_id = $1 AND type = 'story_complete'
+                 AND metadata->>'gameId' = $2
+            )`,
+          [req.user.id, sGameId, JSON.stringify({ gameId: sGameId, bands: sBands })]
+        );
+      }
+    }
+
+    // Staging-only demo seed for the Story-ladder completion badge: one ladder
+    // finished (Sudoku, all 6 bands + its badge), one part-walked (Mine Finder,
+    // 5 of 6 — still locked), and one untouched (Crate Push), so the badge
+    // strip shows an earned story chip next to locked ones. Idempotent, no-op
+    // in prod.
+    if (IS_STAGING && req.query.demo === 'storybadges') {
+      const storySeed = [
+        { gameId: 'sudoku',     upTo: storyBandCount('sudoku') },
+        { gameId: 'minefinder', upTo: Math.max(0, storyBandCount('minefinder') - 1) },
+      ];
+      for (const sg of storySeed) {
+        // ASSERT the ladder's state, do not merely add to it. Staging carries
+        // one database across every check run and never resets, and two
+        // fixtures seed the SAME rows to different depths — this one wants
+        // sudoku fully cleared, demo=modes wants it three rungs in. With a
+        // plain ON CONFLICT DO NOTHING whichever ran first won permanently and
+        // the other silently became a no-op, so the check that depended on the
+        // loser failed for reasons nothing in its own proposal could explain.
+        await pool.query(
+          `DELETE FROM game_progress WHERE user_id = $1 AND game_id = $2 AND band >= $3`,
+          [req.user.id, sg.gameId, sg.upTo]
+        );
+        for (let b = 0; b < sg.upTo; b++) {
+          await pool.query(
+            `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+            [req.user.id, sg.gameId, b, 600 + b * 80, 320 - b * 15, 55 + b * 7]
+          );
+        }
+      }
+      /* AND THE LOCKED HALF HAS TO BE ASSERTED TOO.
+
+         The point of this collection screen is an EARNED badge sitting beside
+         LOCKED ones, so the fixture has to be able to say a ladder is
+         unfinished — not merely decline to finish it. On a database that is
+         never reset, "unfinished" is not a state you can assume: one
+         story_complete row left behind by any earlier session renders the
+         locked example as earned instead, and the check that asserts on it
+         fails with nothing in its own proposal to explain why. Same rule as
+         the bands above — say what you mean, do not add to what is there. */
+      const unfinishedLadders = ['minefinder', 'cratepush'];
+      await pool.query(
+        `DELETE FROM user_achievements
+          WHERE user_id = $1 AND type = 'story_complete'
+            AND metadata->>'gameId' = ANY($2::text[])`,
+        [req.user.id, unfinishedLadders]
+      );
+      // cratepush is the never-started example (minefinder is the one rung
+      // short of done, seeded above), so it must have no progress at all.
+      await pool.query(
+        `DELETE FROM game_progress WHERE user_id = $1 AND game_id = 'cratepush'`,
+        [req.user.id]
+      );
+      // The earned badge itself, on the same guarded insert the live award uses.
+      await pool.query(
+        `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+         SELECT $1, 'story_complete', 'sudoku', $2::jsonb
+          WHERE NOT EXISTS (
+            SELECT 1 FROM user_achievements
+             WHERE user_id = $1 AND type = 'story_complete'
+               AND metadata->>'gameId' = 'sudoku'
+          )`,
+        [req.user.id, JSON.stringify({ gameId: 'sudoku', bands: storyBandCount('sudoku') })]
+      );
     }
 
     // Staging-only demo seed: populate today's per-game leaderboards with a
@@ -2732,6 +3185,36 @@ app.get('/api/daily', async (req, res) => {
                steps = EXCLUDED.steps, elapsed_secs = EXCLUDED.elapsed_secs,
                progress = EXCLUDED.progress`,
         [req.user.id, req.user.username || 'staging-demo-user', JSON.stringify({ reviewDemo: true })]
+      );
+    }
+
+    /* Staging-only demo seed (#218): a claimed, unfinished NONOGRAM row whose
+       grid is FULLY DECIDED and provably wrong, so the "filled but does not
+       match" verdict, the red clue numbers and the mistake counter are all
+       reachable by navigation alone (a proposal check cannot tap 64 cells).
+
+       Even rows all filled, odd rows all marked empty. That can never be the
+       day's answer whatever the seed: ngBuildForBand rejects any picture with
+       an empty row, so a row of zero filled cells cannot match its clue. No
+       blank cells remain, so the grid reads as complete. Today's daily is band
+       1 (8x8), which is the size the client's ngFits check requires.
+       Idempotent; today only; strict no-op in prod. */
+    if (IS_STAGING && req.query.demo === 'ngmistake') {
+      const ngDay = Math.floor(Date.now() / 86400000);
+      const ngGrid = Array.from({ length: 8 }, (_, r) => new Array(8).fill(r % 2 === 0 ? 1 : 2));
+      await pool.query(
+        `INSERT INTO daily_attempts
+           (user_id, username, game_id, attempt_date, steps, elapsed_secs, progress)
+         VALUES ($1, $2, 'nonogram', (now() AT TIME ZONE 'utc')::date, 64, 180, $3::jsonb)
+         ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+           SET finished_at = NULL, score = NULL, time_secs = NULL,
+               steps = EXCLUDED.steps, elapsed_secs = EXCLUDED.elapsed_secs,
+               progress = EXCLUDED.progress`,
+        [
+          req.user.id,
+          req.user.username || 'staging-demo-user',
+          JSON.stringify({ dayNum: ngDay, grid: ngGrid, mistakes: 2 }),
+        ]
       );
     }
 
@@ -3146,15 +3629,37 @@ app.get('/api/daily', async (req, res) => {
        renders every rung as unreachable-and-unstarted, and the arcade board is
        an empty list with no rank to be outside of. Idempotent. */
     if (IS_STAGING && req.query.demo === 'modes') {
-      // Half of Sudoku's 6-rung ladder cleared, so the pre-game screen shows
-      // ticks, an open rung and locked rungs all at once.
-      for (let b = 0; b < 3; b++) {
+      /* Three shapes of the same screen, because the level picker reads
+         differently in each and only one of them was reachable before (#184):
+           sudoku — half walked: ticks, one open level, locked levels.
+           zuma   — every level cleared, which is the only way to see the
+                    "All levels cleared" note and an all-ticked picker.
+           spider — 3 of 6, the count the header renders as "3/6". Spider's
+                    story went from 3 levels to 6, so it is also the game where
+                    a stale client table would show as a short picker. */
+      const walked = [
+        { gameId: 'sudoku', cleared: 3 },
+        { gameId: 'zuma',   cleared: 6 },
+        { gameId: 'spider', cleared: 3 },
+      ];
+      for (const w of walked) {
+        // Same rule as demo=storybadges: this fixture says sudoku is HALF
+        // walked, so it has to be able to say that even after storybadges has
+        // marked the same ladder complete on the same shared staging database.
+        // "Clearing a level for the first time pays" is the note a half-walked
+        // picker renders; a fully cleared one reads "All levels cleared".
         await pool.query(
-          `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
-           VALUES ($1, 'sudoku', $2, $3, $4, $5, now())
-           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
-          [req.user.id, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
+          `DELETE FROM game_progress WHERE user_id = $1 AND game_id = $2 AND band >= $3`,
+          [req.user.id, w.gameId, w.cleared]
         );
+        for (let b = 0; b < w.cleared; b++) {
+          await pool.query(
+            `INSERT INTO game_progress (user_id, game_id, band, best_score, best_time_secs, best_steps, cleared_at)
+             VALUES ($1, $2, $3, $4, $5, $6, now())
+             ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+            [req.user.id, w.gameId, b, 700 + b * 90, 300 - b * 20, 60 + b * 8]
+          );
+        }
       }
       // Rivals on the Normal arcade board for 2048, plus a modest viewer row
       // that sits outside the top 3 — the case the pinned `me` row exists for.
@@ -3377,6 +3882,31 @@ app.get('/api/daily', async (req, res) => {
       solveCount = (scRows[0] && scRows[0].n) || 0;
     } catch { solveCount = 0; }
 
+    // Pinned games (#232) — the card anchor ids this player pinned, oldest
+    // first. Non-fatal: a lobby without its Pinned section is still a lobby.
+    let pins = [];
+    try {
+      const { rows: pinRows } = await pool.query(
+        `SELECT game_id FROM game_pins WHERE user_id = $1 ORDER BY pinned_at ASC, game_id ASC`,
+        [req.user.id]
+      );
+      pins = pinRows.map(r => r.game_id);
+    } catch (e) { console.warn('[daily] pins query failed (non-fatal):', e.message); }
+
+    // Recently Played (Recent goal) — this player's five most recent launches
+    // for the lobby strip. Non-fatal for the same reason as pins.
+    let recentPlays = [];
+    try { recentPlays = await readRecentPlays(req.user.id, 5); }
+    catch (e) { console.warn('[daily] recentPlays query failed (non-fatal):', e.message); }
+
+    // Favorited games — the card anchor ids this player starred, oldest
+    // first. Non-fatal: a lobby without its Favorites filter is still a
+    // lobby; the client just falls back to no stars and an empty chip view.
+    let favorites = [];
+    try {
+      favorites = await readFavorites(req.user.id);
+    } catch (e) { console.warn('[daily] favorites query failed (non-fatal):', e.message); }
+
     res.json({
       // Surface the signed-in account so the UI can confirm login +
       // that persistent data is active. Always present here (route is
@@ -3404,6 +3934,13 @@ app.get('/api/daily', async (req, res) => {
       featured,
       // All-time personal bests per daily game ({ gameId: { score, timeSecs } }).
       bests,
+      // Games pinned to the top of the home grid (#232), oldest pin first.
+      pins,
+      pinLimit: PIN_LIMIT,
+      // Most recent launches for the lobby's Recently Played strip (Recent goal).
+      recentPlays,
+      // Games starred as favorites, oldest star first.
+      favorites,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);
@@ -3447,6 +3984,8 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
         seed,
       });
     }
+    // Recently Played tracking (Recent goal): a claimed attempt is a play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), seed });
   } catch (err) {
     console.error('[daily] start failed:', err.message);
@@ -3588,6 +4127,10 @@ async function settleDailySession({ user, gameId, score, steps, timeSecs, moves,
 // Returns the finish response payload, or null when there is no claimed,
 // unfinished attempt today (callers map that to 409). Throws on DB errors.
 async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, moves, replay, progress }) {
+  // Recently Played tracking (Recent goal): this finish WAS a play. Fire-and-
+  // forget via the helper's own catch, so a tracking failure never delays the
+  // badges, streak or settlement the rest of this function computes.
+  recordGamePlay(user.id, user.username, gameId);
 
   // Read the player's previous best for this game BEFORE today's finish is
   // committed, so it naturally excludes the in-flight attempt (its
@@ -4049,6 +4592,8 @@ app.post('/api/story/:gameId/clear', async (req, res) => {
 
   try {
     const award = storyBandAward(gameId, band);
+    // Recently Played tracking (Recent goal): a band clear is a play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     const claim = await pool.query(
       `INSERT INTO game_progress
          (user_id, game_id, band, awarded_points, best_score, best_time_secs, best_steps, plays)
@@ -4088,7 +4633,39 @@ app.post('/api/story/:gameId/clear', async (req, res) => {
     let cleared = 0;
     while (cleared < total && have.has(cleared)) cleared += 1;
 
-    res.json({ ok: true, band, total, cleared, awarded: firstClear ? award : 0, firstClear });
+    /* story_complete badge — awarded the moment the ladder reads as fully
+       cleared. Evaluated on EVERY clear, not only a first clear: the last rung
+       a player fills may well be one they are replaying out of order, and the
+       badge is about the ladder's state, not this one row. The guarded insert
+       is the idempotency (one row per user per gameId, forever), so re-running
+       this is free. Best-effort: a badge failure must never cost the player
+       the band they just cleared. */
+    const newAchievements = [];
+    const ladderComplete = cleared >= total;
+    if (ladderComplete) {
+      try {
+        const ach = await pool.query(
+          `INSERT INTO user_achievements (user_id, type, game_id, metadata)
+           SELECT $1, 'story_complete', $2, $3::jsonb
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_achievements
+               WHERE user_id = $1 AND type = 'story_complete'
+                 AND metadata->>'gameId' = $2
+            )
+           RETURNING type`,
+          [req.user.id, gameId, JSON.stringify({ gameId, bands: total })]
+        );
+        if (ach.rows.length) newAchievements.push({ type: 'story_complete', gameId, bands: total });
+      } catch (e) {
+        console.warn('[story] badge award failed:', e.message);
+      }
+    }
+
+    res.json({
+      ok: true, band, total, cleared,
+      awarded: firstClear ? award : 0, firstClear,
+      ladderComplete, newAchievements,
+    });
   } catch (e) {
     console.error('[story] clear failed:', e.message);
     res.status(500).json({ error: 'Could not record band' });
@@ -4121,6 +4698,8 @@ app.post('/api/arcade/:gameId/start', async (req, res) => {
   if (!isArcadeBand(band)) return res.status(400).json({ error: 'Unknown band' });
   const seed = Math.max(0, Math.min(4294967295, Number(req.body && req.body.seed) || 0));
   try {
+    // Recently Played tracking (Recent goal): claiming the run is the play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     const { rows } = await pool.query(
       `INSERT INTO arcade_runs (user_id, username, game_id, band, seed, score, started_at)
        VALUES ($1, $2, $3, $4, $5, 0, now()) RETURNING id`,
@@ -4417,6 +4996,66 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   }
 });
 
+/* GET /api/alltime/:gameId/leaderboard — every finished daily attempt this
+   game has ever recorded, summed per player (#188).
+
+   The app had two boards for a daily game and no third: today's board
+   (/api/daily/:gameId/leaderboard) and the per-band arcade boards
+   (/api/arcade/:gameId/leaderboard). "All-time" was the only one of the three
+   the report asks for that did not exist.
+
+   It ranks on TOTAL POINTS, not on a best single day, because that is what the
+   daily rewards: showing up. Ties break on fewer plays — the same points from
+   fewer days is the better record — then on who got there first.
+
+   Losses are excluded by `score > 0`, the same rule the daily board uses, so a
+   pass/fail daily's failed runs do not appear. Public on the same terms as the
+   other two boards: the handler null-guards req.user, so an anonymous caller
+   gets me: null and isCurrentUser: false. */
+app.get('/api/alltime/:gameId/leaderboard', async (req, res) => {
+  const { gameId } = req.params;
+  if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  const friendsScope = req.query.scope === 'friends';
+  if (friendsScope && !req.user) return res.json({ entries: [], me: null, total: 0 });
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, username, points, plays, first_at,
+              ROW_NUMBER() OVER (ORDER BY points DESC, plays ASC, first_at ASC) AS rank
+         FROM (
+           SELECT user_id,
+                  MAX(username)        AS username,
+                  SUM(score)::int      AS points,
+                  COUNT(*)::int        AS plays,
+                  MIN(finished_at)     AS first_at
+             FROM daily_attempts
+            WHERE game_id = $1
+              AND finished_at IS NOT NULL
+              AND score IS NOT NULL AND score > 0
+              AND ($2::text IS NULL
+                   OR user_id = $2
+                   OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))
+            GROUP BY user_id
+         ) t`,
+      [gameId, friendsScope ? req.user.id : null]
+    );
+    const total = rows.length;
+    const uid = req.user ? req.user.id : null;
+    const shape = (r) => ({
+      rank: Number(r.rank),
+      username: r.username || 'anon',
+      points: Number(r.points),
+      plays: Number(r.plays),
+      isCurrentUser: uid != null && r.user_id === uid,
+    });
+    const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
+    const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
+    res.json({ entries, me: mineRow ? shape(mineRow) : null, total });
+  } catch (err) {
+    console.error('[alltime] leaderboard failed:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
 // "Today's Top Scores" leaderboard — GAME-OF-THE-DAY only: everyone who
 // finished today's featured game, ranked by score (fastest time, then
 // earliest finish, break ties). Returns { entries: top-N, me, total, gameId }
@@ -4471,6 +5110,8 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
 // Create a new room. Retries up to 3 times on ID collision.
 app.post('/api/mancala/rooms', async (req, res) => {
   const initPits = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
+  // Recently Played tracking (Recent goal): hosting a room is playing it.
+  recordGamePlay(req.user.id, req.user.username, 'mancala');
   let roomId = generateRoomId();
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -4492,7 +5133,39 @@ app.post('/api/mancala/rooms', async (req, res) => {
 // Join an existing waiting room as player 2.
 app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
   const { roomId } = req.params;
+  // Recently Played tracking (Recent goal): sitting down in the room is a play.
+  recordGamePlay(req.user.id, req.user.username, 'mancala');
   try {
+    /* #200 — RECOGNISE A PLAYER WHO IS ALREADY IN THIS ROOM, before trying to
+       seat them as a newcomer.
+
+       The insert-only version below could only match a room that was still
+       `waiting` with an empty seat 2, so a player who dropped out of an ACTIVE
+       match and typed their own code again fell through to the error branch and
+       was told "Room is already full or finished" — by their own room. There
+       was no way back into a game in progress at all.
+
+       This mirrors what /api/classic/:gameId/rooms/:roomId/join has done since
+       #145; mancala keeps its own table and its own routes (see roomApiBase),
+       and this is one the accommodation had not caught up on. Deliberately not
+       gated on status: rejoining a finished room shows you the final board,
+       which is a better answer than an error. */
+    const existing = await pool.query('SELECT * FROM mancala_rooms WHERE id = $1', [roomId]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    const cur = existing.rows[0];
+    const mySeat = cur.player1_id === req.user.id ? 1 : cur.player2_id === req.user.id ? 2 : 0;
+    if (mySeat === 1) {
+      // Same shape the classic route returns, so the shared picker can offer
+      // Rejoin rather than rendering a dead end.
+      return res.status(409).json({
+        error: 'That\'s your own room — rejoin it instead of joining',
+        ownRoom: true,
+        yourPlayerNum: 1,
+        room: shapeRoom(cur),
+      });
+    }
+    if (mySeat === 2) return res.json({ ...shapeRoom(cur), yourPlayerNum: 2 });
+
     const { rows } = await pool.query(
       `UPDATE mancala_rooms
          SET player2_id = $1, player2_name = $2, status = 'active', last_move_at = now()
@@ -4501,14 +5174,8 @@ app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
        RETURNING *`,
       [req.user.id, req.user.username || null, roomId]
     );
-    if (rows.length === 0) {
-      const existing = await pool.query('SELECT id, status, player2_id, player1_id FROM mancala_rooms WHERE id = $1', [roomId]);
-      if (existing.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
-      const r = existing.rows[0];
-      if (r.player1_id === req.user.id) return res.status(409).json({ error: 'You created this room — share the code with a friend' });
-      return res.status(409).json({ error: 'Room is already full or finished' });
-    }
-    res.json(shapeRoom(rows[0]));
+    if (rows.length === 0) return res.status(409).json({ error: 'Room is already full or finished', full: true });
+    res.json({ ...shapeRoom(rows[0]), yourPlayerNum: 2 });
   } catch (err) {
     console.error('[mancala] join room failed:', err.message);
     res.status(500).json({ error: 'Failed to join room' });
@@ -4949,6 +5616,8 @@ async function expireStaleMancalaRoom(r) {
 app.post('/api/classic/:gameId/rooms', async (req, res) => {
   const { gameId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // Recently Played tracking (Recent goal): hosting a room is playing it.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   const rules = boardRules.getRules(gameId);
   const seatCap = rules && rules.maxPlayers ? rules.maxPlayers : 2;
   const wanted = Number((req.body || {}).players) || 2;
@@ -4987,6 +5656,8 @@ app.post('/api/classic/:gameId/rooms', async (req, res) => {
 app.post('/api/classic/:gameId/rooms/:roomId/join', async (req, res) => {
   const { gameId, roomId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // Recently Played tracking (Recent goal): sitting down in the room is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { rows: cur } = await pool.query(
@@ -5180,6 +5851,8 @@ app.post('/api/classic/:gameId/rooms/:roomId/score', async (req, res) => {
   if (!CLASSIC_RACE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Race not supported for this game' });
   const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
   if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): crossing the finish line is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
@@ -5257,6 +5930,8 @@ app.post('/api/classic/:gameId/score', async (req, res) => {
   if (!CLASSIC_SCORE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
   if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted solo run is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   const extra = (req.body.extra && typeof req.body.extra === 'object' && !Array.isArray(req.body.extra))
     ? req.body.extra : null;
   try {
@@ -5471,6 +6146,8 @@ app.post('/api/mancala/score/verify', async (req, res) => {
   }
 
   try {
+    // Recently Played tracking (Recent goal): a settled solo run is a play.
+    recordGamePlay(req.user.id, req.user.username, 'mancala');
     const { rows } = await pool.query(
       `SELECT * FROM mancala_sessions WHERE id = $1`,
       [sessionId]
@@ -5734,6 +6411,8 @@ app.post('/api/snake/score', async (req, res) => {
   const length = Number.isFinite(req.body.length) ? Math.round(req.body.length) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'snake');
   try {
     // Get previous best before updating
     const { rows: prevRows } = await pool.query(
@@ -5859,6 +6538,8 @@ app.post('/api/bounce/score', async (req, res) => {
   const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'bounce');
   try {
     // Get previous best before updating
     const { rows: prevRows } = await pool.query(
@@ -5980,6 +6661,8 @@ app.post('/api/zuma/score', async (req, res) => {
   const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'zuma');
   try {
     const { rows: prevRows } = await pool.query(
       `SELECT best_score FROM zuma_scores WHERE user_id = $1`,
@@ -6321,6 +7004,8 @@ app.post('/api/tilematch/scores/submit', async (req, res) => {
   const highestLevel  = Number.isFinite(req.body.highestLevel)  ? Math.round(req.body.highestLevel)  : 0;
   const totalCleared  = Number.isFinite(req.body.totalCleared)  ? Math.round(req.body.totalCleared)  : 0;
   const sessionScore  = Number.isFinite(req.body.sessionScore)  ? Math.round(req.body.sessionScore)  : 0;
+  // Recently Played tracking (Recent goal): a submitted session is a play.
+  recordGamePlay(req.user.id, req.user.username, 'tilematching');
   try {
     await pool.query(
       `INSERT INTO tilematch_scores
@@ -6436,6 +7121,8 @@ app.post('/api/dapp/sessions/start', async (req, res) => {
   if (!dapp.getEngine(gameId)) return res.status(400).json({ error: 'Game not yet supported by DApp Mode' });
   let seed = Number.isFinite(req.body.seed) ? Math.round(req.body.seed) : null;
   if (seed === null) seed = Math.floor(Math.random() * 0x7fffffff);
+  // Recently Played tracking (Recent goal): claiming the session is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     const id = newSessionId();
     await pool.query(
@@ -6718,6 +7405,8 @@ app.post('/api/match3/start/:puzzleId', async (req, res) => {
   const puzzle = MATCH3_PUZZLES.find(p => p.id === puzzleId);
   if (!puzzle) return res.status(400).json({ error: 'Unknown puzzle' });
 
+  // Recently Played tracking (Recent goal): opening a puzzle is the play.
+  recordGamePlay(req.user.id, req.user.username, 'match3');
   try {
     const { rows: session } = await pool.query(
       'SELECT * FROM match3_session WHERE user_id = $1',
@@ -6921,7 +7610,7 @@ app.get('*', (req, res) => {
   <div style="max-width:24rem;padding:2rem;text-align:center">
     <h1 style="font-size:1.25rem;margin:0 0 0.5rem">Open this app inside Usernode</h1>
     <p style="color:#a1a1aa;font-size:0.9rem;margin:0 0 1.25rem">This page is served via the platform; direct visits aren't authenticated.</p>
-    <a href="https://social-vibecoding.usernodelabs.org" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
+    <a href="${PLATFORM_ORIGIN}" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Go to Usernode</a>
   </div>
 </body>`);
   }

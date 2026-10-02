@@ -382,6 +382,51 @@ function cwThemeForDay(dayNum) {
   return CW_THEMES[((dayNum % n) + n) % n].name;
 }
 
+/* One block of the partition, named by theme and slot. cwRoundsForDay picks
+   its block from the day; the mode picker below picks one from a mode seed.
+   Both go through here so a story or arcade set is drawn from the SAME curated
+   partition the daily uses — five words that were shuffled together once, not
+   five sampled at random from 271. */
+function cwBlockAt(themeIdx, slot) {
+  const n = CW_THEMES.length;
+  const ti = ((themeIdx % n) + n) % n;
+  const theme = CW_THEMES[ti];
+  const blocks = Math.max(1, Math.floor(theme.words.length / CW_ROUNDS_PER_DAY));
+  const si = ((slot % blocks) + blocks) % blocks;
+  const shuffled = cwSeededShuffle(theme.words, hashStr('cw-rotation:' + ti));
+  return {
+    theme: theme.name,
+    words: shuffled.slice(si * CW_ROUNDS_PER_DAY, si * CW_ROUNDS_PER_DAY + CW_ROUNDS_PER_DAY),
+  };
+}
+
+/* #195 — the words a MODE serves.
+
+   Daily Cipher never learned about play modes. #176 gave it story rungs and
+   arcade bands and passed playMode/band down like every other game, but this
+   component's signature never took them: every mode called cwDailyRounds, so
+   the daily, all six story rungs and all three arcade bands served the SAME
+   five words on the same day. That is the report's "the same 5 questions
+   repeat across Daily mode, the 6 Story levels, and all Arcade modes" — not a
+   thin corpus (there are 271 words on a 54-day sliding rotation), but every
+   door opening onto the same room.
+
+   The daily is untouched and must stay so: it is the shared board, and its
+   leaderboard and share cards depend on everyone getting the same five words.
+
+   Story and arcade go through modeSeed, which is the one place that decides
+   stable-vs-fresh (see CLAUDE.md): a story rung draws the same block every
+   visit, so it stays a rung you can retry, and an arcade run draws a new one
+   each time. */
+function cwRoundsForMode(playMode, band, offset) {
+  if (playMode !== 'story' && playMode !== 'arcade') {
+    return { theme: cwThemeForDay(cwDayNum(offset)), words: cwDailyRounds(offset) };
+  }
+  const rung = playMode === 'story' ? (band || 0) : 0;
+  const { rng } = modeSeed(playMode, 'cryptowordle', rung, offset);
+  return cwBlockAt(Math.floor(rng() * CW_THEMES.length), Math.floor(rng() * 1e6));
+}
+
 
 // Guesses allowed for a given word length: one more than the length, so a
 // 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
@@ -415,6 +460,31 @@ function cwScoreGuess(guess, answer) {
     if (counts[guess[i]] > 0) { res[i] = 'yellow'; counts[guess[i]]--; }
   }
   return res;
+}
+
+/* #193 — the third and fourth clue, DERIVED rather than written.
+
+   The "2-hint ceiling" the report hit is not a number anyone chose: every one
+   of the 271 corpus entries ships exactly two hand-written hints, and the Hint
+   button reads `activeHints.length`, so two is simply all a word has. Raising a
+   cap would change nothing — there is no third clue to reveal.
+
+   Hand-writing a third for 271 words would be 271 lines of invented copy that
+   nobody can review against the puzzle. These are derived from the answer
+   instead, so every word gains them for free and they cannot contradict it.
+   They also escalate correctly: the two written clues are semantic ("what is
+   this thing"), and when those have not been enough the next help a stuck
+   player wants is structural.
+
+   The last letter is withheld from short words on purpose. Giving first AND
+   last of a 4-letter word leaves two, which is not a clue any more; at five
+   letters or more it still leaves real work. */
+function cwDerivedHints(word) {
+  const w = String(word || '').toUpperCase();
+  if (w.length < 3) return [];
+  const out = [`It starts with "${w[0]}".`];
+  if (w.length >= 5) out.push(`It ends with "${w[w.length - 1]}".`);
+  return out;
 }
 
 // Multi-word daily puzzle: each UTC day is a deterministic stack of independent
@@ -459,6 +529,33 @@ function cwTypeScript() {
   } catch (e) { return ''; }
 }
 
+/* #194's companion fixture: `?cwsubmit=N&practice=1` plays N deterministic
+   WRONG guesses so a route can reach a board that has feedback on it at all.
+   `?cwtype=` deliberately never submits, and it cannot be made to: the guess
+   it types is a fixed string, so on a day whose first word is a different
+   length it would not be submittable anyway.
+
+   This submits a filler of the ACTIVE word's own length instead, so it works
+   on every day's board rather than on the days a hard-coded word happens to
+   fit. Without it the before/after screenshots of a feedback-colour change
+   are two pictures of an empty grid.
+
+   PRACTICE ONLY, and that is the whole safety argument: a real guess spends
+   one of the day's attempts, and practiceMode is the app's existing inert
+   path (App short-circuits handleWin/handleLose and suppresses saves before
+   any endpoint). Off the practice route this returns 0 and nothing happens. */
+function cwSubmitScript() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('practice') !== '1') return 0;
+    const n = parseInt(p.get('cwsubmit') || '0', 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(3, n)) : 0;
+  } catch (e) { return 0; }
+}
+// The filler letter. Q is the rarest letter in the corpus, so a filler row is
+// almost always all-wrong — which is the state this fixture exists to show.
+const CW_FILLER_CH = 'Q';
+
 function cwSimulateTouchTapAt(el, clientX, clientY) {
   const opts = {
     bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1,
@@ -479,10 +576,13 @@ function cwSimulateTouchTapAt(el, clientX, clientY) {
   el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX, clientY }));
 }
 
-function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress }) {
+function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(cwDayNum(offset)).current;
-  // The day's stack of independent word rounds (stable for the render lifetime).
-  const roundsDef = useRef(cwDailyRounds(offset)).current;
+  /* The stack of independent word rounds for THIS mode, stable for the render
+     lifetime (#195). The daily is unchanged; story and arcade draw their own
+     block so they are no longer the daily wearing a different hat. */
+  const modeSet = useRef(cwRoundsForMode(playMode, band, offset)).current;
+  const roundsDef = modeSet.words;
 
   // Resume only today's saved progress (multi-round shape). Board is re-derived
   // from the seed; we persist only the mutable per-round guess words + hint use.
@@ -567,7 +667,11 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
 
   // Per-round clue reveal: wrong guesses in THIS round + hints applied to it,
   // capped at the round's available clues. Cost ramp is global across rounds.
-  const activeHints = active ? (active.def.hints || []) : [];
+  /* Written clues first, derived ones after — the order IS the escalation, and
+     revealedExtra walks it from the front. */
+  const activeHints = active
+    ? [...(active.def.hints || []), ...cwDerivedHints(active.def.word)]
+    : [];
   const activeWrong = active ? active.guesses.filter(g => g.word !== active.def.word).length : 0;
   const activeHintsApplied = active ? (hintsByRound[activeIdx] || 0) : 0;
   const revealedExtra = active ? Math.min(activeWrong + activeHintsApplied, activeHints.length) : 0;
@@ -678,6 +782,10 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
       // Held keys auto-repeat: one PRESS must be one letter, so ignore repeats
       // (and any modifier combo, which is a browser shortcut, not a guess).
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      // #192 — the device-keyboard input owns every key it receives. Letting
+      // this run too would type each letter twice, which is exactly the shape
+      // of #one-tap-two-letters in a different costume.
+      if (hidRef.current && e.target === hidRef.current) return;
       // Enter/Space on a FOCUSED on-screen key already fires that button's own
       // click. Running the window handler too would submit AND type from one
       // press, so let the button own those two keys while it has focus.
@@ -729,6 +837,25 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, []);
 
+  /* `?cwsubmit=N` (practice only) — see cwSubmitScript. It goes through the
+     same `submit` the Enter key calls, via the ref, so the guess is scored,
+     rendered and keyboard-tinted by exactly the code a player exercises. One
+     pass per round-state change, guarded by a ref so a re-render cannot
+     replay a guess that has already been spent. */
+  const cwFillRef = useRef(0);
+  useEffect(() => {
+    const want = cwSubmitScript();
+    if (!want || cwFillRef.current >= want) return;
+    if (!active || done) return;
+    cwFillRef.current += 1;
+    const t = setTimeout(() => {
+      const len = active.def.word.length;
+      setCur(CW_FILLER_CH.repeat(len));
+      setTimeout(() => apiRef.current.submit(), 40);
+    }, 120);
+    return () => clearTimeout(t);
+  }, [activeIdx, roundGuesses]);
+
   const wordLen = active ? active.def.word.length : 5;
   const maxGuesses = active ? active.maxG : 6;
   const boardWidth = Math.min(wordLen * 52, 440);
@@ -741,16 +868,52 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   const canvasRef = useRef(null);
   const { boxW, boxH } = useFitBox(boxRef, { cols: 1, rows: 1, maxCell: 100000 });
   const W = Math.floor(boxW);
-  const GAP = 8, PILL_H = 46, THEME_H = 20, TRACK_H = 24, CLUE_H = 34, XCLUE_H = 28, HINTB_H = 36, KEY_H = 46, KGAP = 4;
-  const kbdH = KEY_H * 3 + KGAP * 2;
+  /* #191 — the chrome has to give way before the board clips.
+     Every one of these was a fixed pixel height, so on a short viewport the
+     chrome alone (a 146px keyboard, the pills, the theme line, the track and
+     the clue) plus the board's own 20px-per-tile floor came to 524px whatever
+     the space actually was. `.cw-board` is `overflow: hidden`, so the excess
+     was simply cut off — 43px lost at 360x640, 115px at 360x568, and the
+     bottom keyboard row with it. The board stopped shrinking and started
+     disappearing instead.
+
+     The keyboard is by far the biggest block, so it is the one that scales;
+     the pill row follows it down a little. Below the reference height they
+     shrink in proportion, floored at a still-tappable size, which buys the
+     board enough room to fit rather than clip. `.fit-col` fits or it clips —
+     there is no scrollbar to fall back on. */
+  const FIT_REF_H = 700;
+  const tightH = Math.max(0, Math.floor(boxH));
+  const tightScale = tightH > 0 && tightH < FIT_REF_H ? tightH / FIT_REF_H : 1;
+  const GAP = tightScale < 1 ? 6 : 8;
+  const PILL_H = tightScale < 1 ? Math.max(38, Math.round(46 * tightScale)) : 46;
+  const THEME_H = 20, TRACK_H = 24, CLUE_H = 34, HINTB_H = 36;
+  /* #193 doubled how many extra clues can be on screen at once, and each one
+     costs XCLUE_H of chrome the board does not get. So it scales like #191's
+     other constants rather than staying fixed: four clues on a short phone
+     would otherwise take 112px off the board, which is exactly the clipping
+     #191 fixed, arriving by a different route. */
+  const XCLUE_H = tightScale < 1 ? Math.max(18, Math.round(28 * tightScale)) : 28;
+  const KEY_H = tightScale < 1 ? Math.max(30, Math.round(46 * tightScale)) : 46;
+  const KGAP = 4;
+  /* #192 — with the device's own keyboard doing the typing, the drawn one is
+     replaced by a colour legend rendered in the DOM below the canvas. It costs
+     the canvas nothing, so the board gets the three key rows back. */
+  const devKbd = cgPrefs.devkbd;
+  const kbdH = devKbd ? 0 : KEY_H * 3 + KGAP * 2;
   const activeXtra = active ? revealedExtra : 0;
   const hasHintBar = !!(active && activeHints.length > 0 && !done);
   const chrome = PILL_H + GAP + THEME_H + GAP + TRACK_H + GAP
-    + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + kbdH + GAP : 0)
+    + (active ? CLUE_H + activeXtra * XCLUE_H + GAP + (hasHintBar ? HINTB_H + GAP : 0) + (kbdH ? kbdH + GAP : 0) : 0)
     + (allResolved ? 34 : 0);
   const gapPx = 5;
-  const availB = Math.max(90, Math.floor(boxH) - chrome);
-  const tile = active ? Math.max(20, Math.min(56, Math.floor(Math.min(
+  /* No floor on the available height: flooring it at 90 meant a board that
+     could not fit simply drew past the bottom of its own frame. The tile floor
+     scales the same way, so a short screen gets a smaller board instead of a
+     clipped one. */
+  const minTile = tightScale < 1 ? 14 : 20;
+  const availB = Math.max(0, Math.floor(boxH) - chrome);
+  const tile = active ? Math.max(minTile, Math.min(56, Math.floor(Math.min(
     (Math.min(W, boardWidth) - gapPx * (wordLen - 1)) / wordLen,
     (availB - gapPx * (maxGuesses - 1)) / maxGuesses
   )))) : 0;
@@ -790,7 +953,15 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     controls.push({ id: 'p-word', kind: 'pill', r: pr[1], label: 'Word', value: `${Math.min(activeIdx < 0 ? roundsDef.length : activeIdx + 1, roundsDef.length)}/${roundsDef.length}` });
     controls.push({ id: 'p-solved', kind: 'pill', r: pr[2], label: 'Solved', value: `${solvedCount}/${roundsDef.length}` });
     controls.push({ id: 'p-points', kind: 'pill', r: pr[3], label: 'Points', value: totalScore });
-    controls.push({ id: 'theme', kind: 'label', r: [0, themeY, W, THEME_H], label: `Today's theme: ${cwThemeForDay(dayNum)}`, font: 12 });
+    /* The theme line names the set you are actually playing. "Today's theme"
+       is only true of the daily now — a story rung or an arcade run draws its
+       own block, and labelling that with the day's theme would be wrong (#195). */
+    controls.push({
+      id: 'theme', kind: 'label', r: [0, themeY, W, THEME_H], font: 12,
+      label: (playMode === 'story' || playMode === 'arcade')
+        ? `Theme: ${modeSet.theme}`
+        : `Today's theme: ${modeSet.theme}`,
+    });
     if (active) {
       // Clue prose is custom-drawn (wrapped); twin-only entries carry the text.
       controls.push({ id: 'clue', kind: 'label', noDraw: true, r: [0, clueY, W, CLUE_H], label: `Clue: ${active.def.clue} · ${wordLen} letters` });
@@ -808,14 +979,17 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
         });
         if (hintMsg) controls.push({ id: 'hint-msg', kind: 'label', r: [Math.floor(W * 0.5), hintbY, Math.floor(W * 0.5), HINTB_H], label: hintMsg, font: 11 });
       }
-      // Keyboard: 3 rows, wide Enter/⌫ flanking the bottom row.
+      // Keyboard: 3 rows, wide Enter/⌫ flanking the bottom row. Skipped
+      // entirely in device-keyboard mode (#192) — see the legend below.
+      if (!devKbd) {
       const kbW = Math.min(W, 480);
       const kbX0 = Math.floor((W - kbW) / 2);
+      // The key must say the same thing as the tile it came from, so a spent
+      // letter is red here too — a red tile over a grey key is two answers.
       const keyBg = (ch) => keyState[ch] === 'green' ? PAL.emerald
         : keyState[ch] === 'yellow' ? PAL.gold
-        : keyState[ch] === 'gray' ? PAL.dim : PAL.border;
-      const keyInk = (ch) => keyState[ch] === 'gray' ? PAL.muted
-        : keyState[ch] ? '#fff' : PAL.text;
+        : keyState[ch] === 'gray' ? PAL.rose : PAL.border;
+      const keyInk = (ch) => keyState[ch] ? '#fff' : PAL.text;
       CW_KEYS.forEach((row, ri) => {
         const y = kbdY + ri * (KEY_H + KGAP);
         const units = row.length + (ri === 2 ? 3.2 : 0); // two 1.6-wide keys
@@ -833,6 +1007,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
           controls.push({ id: 'bksp', kind: 'button', r: [x, y, uw * 1.6, KEY_H], label: '⌫', font: 14, noBorder: true, bg: PAL.border, radius: 6, action: backspace });
         }
       });
+      }
     }
     if (allResolved) {
       controls.push({ id: 'alldone', kind: 'label', r: [0, trackY + TRACK_H + GAP, W, 30], label: `Puzzle complete — ${solvedCount}/${roundsDef.length} words · ${totalScore} pts`, font: 14, color: PAL.text, bold: true });
@@ -858,8 +1033,11 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
         const stepX = 26;
         let x = Math.floor(W / 2 - ((n - 1) * stepX) / 2);
         roundState.forEach((r, i) => {
+          /* #194's check mark. The track already carried the cross for a
+             missed word; a solved one was a filled dot, which said "this one
+             is over" but not "you got it". It costs no layout to say both. */
           ctx.fillStyle = r.solved ? PAL.emerald : r.missed ? PAL.rose : i === activeIdx ? PAL.accent : PAL.dim;
-          ctx.fillText(r.solved ? '●' : r.missed ? '✗' : i === activeIdx ? '▶' : '○', x, trackY + TRACK_H / 2);
+          ctx.fillText(r.solved ? '✓' : r.missed ? '✗' : i === activeIdx ? '▶' : '○', x, trackY + TRACK_H / 2);
           x += stepX;
         });
       }
@@ -897,7 +1075,13 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
             if (state === 'filled') border = PAL.muted;
             else if (state === 'green') { bg = PAL.emerald; border = PAL.emerald; ink = '#fff'; }
             else if (state === 'yellow') { bg = PAL.gold; border = PAL.gold; ink = '#fff'; }
-            else if (state === 'gray') { bg = PAL.dim; border = PAL.dim; }
+            /* #194 — an absent letter is RED, not grey. Grey read as "empty"
+               rather than as "wrong": PAL.dim is also the unfilled tile's
+               border, so a spent guess and a blank row were nearly the same
+               object at a glance. A present-but-misplaced letter deliberately
+               stays gold — the issue asks for red only for the wrong ones, and
+               three states need three colours. */
+            else if (state === 'gray') { bg = PAL.rose; border = PAL.rose; ink = '#fff'; }
             klRR(ctx, x + 1, y + 1, tile - 2, tile - 2, 8);
             ctx.fillStyle = bg;
             ctx.fill();
@@ -916,16 +1100,96 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     },
   });
 
+  /* #192 — DEVICE KEYBOARD.
+
+     A hidden, focusable input is what opens the system keyboard; there is no
+     other way to ask for one. It stays visually empty and is never allowed to
+     change: every edit is read from `beforeinput` and cancelled, so the field
+     holds one non-breaking space forever. That matters for backspace — a
+     browser will not report a delete on a field it believes is already empty,
+     so an input that is genuinely empty can be typed into and never erased.
+
+     `beforeinput` rather than `keydown`, because a phone keyboard often sends
+     no usable `key` at all (predictive text reports 229 / 'Unidentified').
+     What it always sends is the text it inserted, which is `e.data`.
+
+     THE DOUBLE-INPUT TRAP, in a new place. A physical keypress while this
+     input has focus fires BOTH its beforeinput and the window keydown handler
+     the game has always had. That is the same shape as #one-tap-two-letters,
+     where one touch typed two letters, so the window handler now ignores
+     anything whose target is this input and the input owns those keys
+     completely. `?cwtype=` still exercises the drawn keys, and a check asserts
+     the typed string either way. */
+  const hidRef = useRef(null);
+  const CW_HID_FILL = '\u00a0';
+  const focusDeviceKbd = () => {
+    const el = hidRef.current;
+    if (!el || !devKbd || done) return;
+    // Mobile browsers only open a keyboard for a focus() that happens inside a
+    // user gesture, which is why this hangs off the board's own pointerdown
+    // rather than an effect: an effect runs after the gesture is over.
+    try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (_) {} }
+  };
+  /* Bound NATIVELY rather than through React's onBeforeInput prop. React 18's
+     synthetic beforeinput is a polyfill layered on `textInput`, and it does not
+     see every inputType a phone keyboard produces — deleteContentBackward in
+     particular. The native event is the one that carries the contract this
+     depends on. */
+  const hidApiRef = useRef({});
+  hidApiRef.current = { typeLetter, backspace, submit };
+  useEffect(() => {
+    const el = hidRef.current;
+    if (!el) return;
+    const onBI = (e) => onHiddenBeforeInputRef.current(e);
+    const onKD = (e) => onHiddenKeyDownRef.current(e);
+    el.addEventListener('beforeinput', onBI);
+    el.addEventListener('keydown', onKD);
+    return () => {
+      el.removeEventListener('beforeinput', onBI);
+      el.removeEventListener('keydown', onKD);
+    };
+  }, [devKbd, done]);
+
+  const onHiddenBeforeInput = (e) => {
+    const t = e.inputType || '';
+    if (t === 'insertText' || t === 'insertCompositionText' || t === 'insertFromPaste') {
+      const text = (e.data || '').toUpperCase();
+      for (const ch of text) if (ch >= 'A' && ch <= 'Z') hidApiRef.current.typeLetter(ch);
+      e.preventDefault();
+      return;
+    }
+    if (t.indexOf('delete') === 0) { hidApiRef.current.backspace(); e.preventDefault(); return; }
+    if (t === 'insertLineBreak' || t === 'insertParagraph') { hidApiRef.current.submit(); e.preventDefault(); }
+  };
+  const onHiddenKeyDown = (e) => {
+    // Enter is the one key a phone keyboard reports reliably, and on a
+    // single-line field it may produce no beforeinput at all.
+    if (e.key === 'Enter') { e.preventDefault(); hidApiRef.current.submit(); return; }
+    // A hardware keyboard attached to a phone still goes through here, and
+    // Backspace on a field the browser thinks is full is reported as a delete
+    // by beforeinput — so nothing else needs handling.
+  };
+  const onHiddenBeforeInputRef = useRef(onHiddenBeforeInput);
+  onHiddenBeforeInputRef.current = onHiddenBeforeInput;
+  const onHiddenKeyDownRef = useRef(onHiddenKeyDown);
+  onHiddenKeyDownRef.current = onHiddenKeyDown;
+
   return (
     // PHASE 3 — .fit-col keeps the frame the one flexible child (fitShell).
     <div className="fit-col">
       <div
         className="cw-board cui-frame"
         ref={boxRef}
+        onPointerDown={devKbd ? focusDeviceKbd : undefined}
+        data-cw-kbd={devKbd ? 'device' : 'drawn'}
         /* The live entry, verbatim. A check asserts
            `.cw-board[data-cw-typed="LEN"]` after the ?cwtype= replay — with
            the double-input bug it would read "LLEENN" and the check fails. */
         data-cw-typed={cur}
+        /* How many guesses the ACTIVE round has scored. The feedback colours
+           live on the canvas, where no check can read a pixel, so this is the
+           assertable half: a row exists to be coloured (#194). */
+        data-cw-rows={active ? active.guesses.length : 0}
       >
         <canvas
           ref={canvasRef}
@@ -936,6 +1200,32 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
             : `Daily Cipher — puzzle complete, ${solvedCount} of ${roundsDef.length} words`}
         />
       </div>
+      {devKbd && (
+        <input
+          ref={hidRef}
+          className="cw-hidden-input"
+          type="text"
+          defaultValue={CW_HID_FILL}
+          inputMode="text"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          enterKeyHint="go"
+          aria-label="Type your guess"
+          onBlur={(e) => { e.target.value = CW_HID_FILL; }}
+        />
+      )}
+      {devKbd && active && !done && (
+        /* The read-out the device keyboard cannot give you: which letters are
+           placed, which are in the word, which are spent. Not tappable — the
+           typing is happening elsewhere now. */
+        <div className="cw-legend" aria-hidden="true">
+          {CW_KEYS.join('').split('').map((ch) => (
+            <span key={ch} className={'cw-legend-key' + (keyState[ch] ? ' on-' + keyState[ch] : '')}>{ch}</span>
+          ))}
+        </div>
+      )}
       <CuiTwin controls={controls} />
     </div>
   );

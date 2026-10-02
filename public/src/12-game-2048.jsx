@@ -324,6 +324,11 @@ function T2048BoardCanvas({ grid }) {
 }
 
 function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode, band, offset }) {
+  /* #204 — the arcade band, named. Only arcade has one: the daily is a fixed
+     deal and free play has no band, so both correctly show nothing. */
+  const bandLabel = playMode === 'arcade'
+    ? ((ARCADE_BANDS.find((b) => b.id === band) || {}).label || null)
+    : null;
   // Arcade picks a four-rate; every other mode plays the standard one.
   const fourRate = playMode === 'arcade'
     ? (T2048_FOUR_RATE[band] || T2048_DEFAULT_FOUR)
@@ -538,15 +543,28 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
 
       {activeTab === 'game' && (
         <div>
-          <CuiBar height={46} build={(W) => {
+          {/* #204 — the arcade band is 2048's difficulty, and once the run
+              started nothing on screen said which one you had picked. It is a
+              real difference in play (the four-rate: 5%, 10% or 30% of spawns
+              are a 4), so a score is not comparable without it. Rendered as a
+              line under the pills rather than a sixth pill, which would not
+              fit five-across on a phone. */}
+          <CuiBar height={bandLabel ? 66 : 46} build={(W) => {
             const pr = cuiRow(0, 0, W, 46, 5);
-            return [
+            const out = [
               { id: 'p-score', kind: 'pill', r: pr[0], label: 'Score', value: score.toLocaleString() + (scoreDelta !== null ? ` +${scoreDelta}` : '') },
               { id: 'p-best', kind: 'pill', r: pr[1], label: 'Best', value: bestScore.toLocaleString() },
               { id: 'p-tile', kind: 'pill', r: pr[2], label: 'Tile', value: maxTile || '—' },
               { id: 'p-moves', kind: 'pill', r: pr[3], label: 'Moves', value: moves },
               { id: 'p-time', kind: 'pill', r: pr[4], label: 'Time', value: fmtSecs(elapsedSecs), gold: true },
             ];
+            if (bandLabel) {
+              out.push({
+                id: 'p-band', kind: 'label', r: [0, 48, W, 18], font: 12, color: PAL.muted,
+                label: `Difficulty: ${bandLabel}`,
+              });
+            }
+            return out;
           }} />
 
           <div

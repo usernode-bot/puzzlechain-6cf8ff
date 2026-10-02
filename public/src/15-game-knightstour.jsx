@@ -29,6 +29,27 @@ function ktValidMoves(pos, visited, size = 8, blocked = null) {
   return out;
 }
 
+/* #205 — the SHAPE of a knight's move, as three board squares: where it
+   starts, where it turns, where it lands. The board drew a flat tint on the
+   destination and nothing else, which tells you where you may land but not
+   why — and "why" is the whole thing a player is learning here.
+
+   The elbow is on the LONG leg, which is the way the move is taught: two
+   squares in one direction, then one across. Pure, and the only place the
+   overlay's geometry lives, so the drawn path cannot drift from the move the
+   hit test accepts (that pair is what #218 cost us on Nonogram). Returns null
+   for anything that is not a legal knight step. */
+function ktMovePath(from, to, size) {
+  if (from === null || to === null) return null;
+  const r0 = Math.floor(from / size), c0 = from % size;
+  const r1 = Math.floor(to / size), c1 = to % size;
+  const dr = r1 - r0, dc = c1 - c0;
+  const ar = Math.abs(dr), ac = Math.abs(dc);
+  if (!((ar === 2 && ac === 1) || (ar === 1 && ac === 2))) return null;
+  const elbow = ar === 2 ? [r0 + dr, c0] : [r0, c0 + dc];
+  return [[r0, c0], elbow, [r1, c1]];
+}
+
 /* Warnsdorff's rule: always step to the square with the fewest onward moves.
    It finds a full tour on almost every solvable instance almost instantly,
    which is exactly the property that lets the generator VERIFY a board before
@@ -119,7 +140,7 @@ function KtBoardCanvas({ size, blocked, visited, currentPos, validMvs, done, onC
   useCanvasBoard(canvasRef, {
     width: side,
     height: side,
-    deps: [visited, currentPos, done, cell, size, blocked],
+    deps: [visited, currentPos, done, cell, size, blocked, validMvs],
     draw: (ctx) => {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -130,7 +151,6 @@ function KtBoardCanvas({ size, blocked, visited, currentPos, validMvs, done, onC
         const isCurrent = idx === currentPos;
         const isVisited = visited[idx] > 0;
         const isBlocked = !!(blocked && blocked.has(idx));
-        const isValid = !done && !isCurrent && !isBlocked && validMvs.includes(idx);
         ctx.fillStyle = isLight ? PAL.surface : PAL.card;
         ctx.fillRect(x, y, cell, cell);
         if (isBlocked) {
@@ -147,7 +167,6 @@ function KtBoardCanvas({ size, blocked, visited, currentPos, validMvs, done, onC
           ctx.restore();
           continue;
         }
-        if (isValid) { ctx.fillStyle = 'rgba(58,110,205,0.25)'; ctx.fillRect(x, y, cell, cell); }
         if (isCurrent) {
           ctx.fillStyle = 'rgba(58,110,205,0.15)';
           ctx.fillRect(x, y, cell, cell);
@@ -155,12 +174,63 @@ function KtBoardCanvas({ size, blocked, visited, currentPos, validMvs, done, onC
           ctx.strokeStyle = PAL.accent;
           ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
         }
-        const cx = x + cell / 2, cy = y + cell / 2;
-        if (isCurrent) {
+      }
+      /* #205 — the legal moves, drawn as the L the knight actually travels.
+         This is a SECOND pass on purpose: the paths cross other squares, so
+         drawing them inside the per-cell loop would let a later cell's
+         background paint over an earlier cell's line. Squares first, then the
+         paths, then the glyphs — so a number is never buried under a line. */
+      const cc = (rc) => [rc[1] * cell + cell / 2, rc[0] * cell + cell / 2];
+      if (!done && currentPos !== null) {
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (const mv of validMvs) {
+          const path = ktMovePath(currentPos, mv, size);
+          if (!path) continue;
+          const pts = path.map(cc);
+          // Two strokes: a wide translucent body so eight overlapping paths
+          // still read as separate ribbons, and a thin bright core on top.
+          /* Alpha comes from globalAlpha, NOT from ca(): ca() emits a
+             var(--c-…) string, which is a CSS colour and is invalid on a
+             canvas — guardCanvasCtx swallows it and logs. PAL is the live
+             palette, so this still re-themes. */
+          ctx.beginPath();
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          ctx.lineTo(pts[1][0], pts[1][1]);
+          ctx.lineTo(pts[2][0], pts[2][1]);
+          ctx.strokeStyle = PAL.accent;
+          ctx.globalAlpha = 0.2;
+          ctx.lineWidth = Math.max(4, cell * 0.16);
+          ctx.stroke();
+          ctx.globalAlpha = 0.85;
+          ctx.lineWidth = Math.max(1.5, cell * 0.05);
+          ctx.stroke();
+          // The landing square keeps a target of its own: the path says how,
+          // the ring says where, and the ring is what a finger aims at.
+          const [ex, ey] = pts[2];
+          ctx.beginPath();
+          ctx.arc(ex, ey, Math.max(6, cell * 0.26), 0, Math.PI * 2);
+          ctx.fillStyle = PAL.accent;
+          ctx.globalAlpha = 0.18;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.lineWidth = Math.max(1.5, cell * 0.055);
+          ctx.strokeStyle = PAL.accent;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      // Glyph pass: the knight and the visit numbers ride on top of everything.
+      for (let idx = 0; idx < size * size; idx++) {
+        if (blocked && blocked.has(idx)) continue;
+        const r = Math.floor(idx / size), c = idx % size;
+        const cx = c * cell + cell / 2, cy = r * cell + cell / 2;
+        if (idx === currentPos) {
           ctx.font = `${Math.round(cell * 0.55)}px system-ui, sans-serif`;
           ctx.fillStyle = PAL.text;
           ctx.fillText('♞', cx, cy + 1);
-        } else if (isVisited) {
+        } else if (visited[idx] > 0) {
           ctx.font = `600 ${Math.max(9, Math.round(cell * 0.28))}px 'JetBrains Mono', monospace`;
           ctx.fillStyle = PAL.muted;
           ctx.fillText(String(visited[idx]), cx, cy);

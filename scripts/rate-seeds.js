@@ -284,8 +284,11 @@ function main() {
   fs.mkdirSync(outDir, { recursive: true });
 
   const jobs = [
-    ['klondike', DEAL.klDeal, klSolve, { count, nodeCap: 60000, bands: 5 }],
-    ['spider',   DEAL.spDeal, spSolve, { count, nodeCap: 60000, bands: 3 }],
+    // Band counts mirror STORY_BANDS in server.js (#184: 6 to 10 levels), and
+    // scripts/check-registry.js re-reads the emitted `bands` field to assert
+    // it. Bumping one here means regenerating and committing the corpus.
+    ['klondike', DEAL.klDeal, klSolve, { count, nodeCap: 60000, bands: 6 }],
+    ['spider',   DEAL.spDeal, spSolve, { count, nodeCap: 60000, bands: 6 }],
   ];
   for (const [name, dealFn, solveFn, opts] of jobs) {
     const { kept: seeds, cuts } = rate(name, dealFn, solveFn, opts);

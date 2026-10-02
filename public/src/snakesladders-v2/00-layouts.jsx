@@ -14,7 +14,10 @@
    - no square is both a jump start and a jump destination (the engine
      applies exactly ONE jump per landing, so chains would be ambiguous)
    - no two jumps share a start square
-   - Legend: ≥10 of its 15 snake heads in 80–99, ladders top out < 80.
+   - every tier must be PLAYABLE and the tiers must get harder in order —
+     measured by cnlv2ExpectedRolls (below), not by counting snakes. #203's
+     Legend passed every count-based rule and still needed 1812 expected rolls.
+   - Legend: both ladders top out < 80, so the last two rows are walked.
 
    Everything here is CNLV2_-prefixed: the old file's CNL_* names and
    window.boardRules' browser globals share this one script scope, and
@@ -52,18 +55,83 @@ const CNLV2_LAYOUTS = [
     snakes:  { 15: 3, 24: 6, 38: 12, 45: 19, 59: 37, 67: 40, 76: 54, 83: 49, 90: 62, 94: 71, 97: 65, 99: 58 },
   },
   {
-    // The summit is a minefield: 11 of 15 heads sit in 80–99, 99 drops to
-    // single digits, and both ladders top out below 80 so the last two rows
-    // must be walked square by square.
+    /* #203 — the summit used to be a wall, not a gauntlet: 11 of 15 heads sat
+       in 80–99, and 95/97/98/99 were ALL heads, so the only squares from which
+       an exact roll could reach 100 were 94 and 96. Measured through the
+       board's own Markov chain that is 1812 expected rolls to finish — roughly
+       an hour of tapping for one pawn, which is what the report meant by
+       "mathematically unwinnable" (it is finishable with probability 1; it is
+       not playable).
+
+       Legend is still by far the hardest tier and still ends on a snake at 99.
+       What changed is WHERE the difficulty sits: a long, snake-dense climb
+       (eight heads between 18 and 76 against only two ladders, both topping out
+       below 80) and then a stepped run-in — heads every third square from 81 to
+       93, 94 through 98 clear, and one last snake on 99 that drops you to
+       single digits. 362 expected rolls: 5× faster than before and 1.7× the
+       tier below it, so the ladder still ends where it should.
+
+       `cnlv2-layouts` measures this now rather than counting heads. The old
+       "≥10 heads in 80–99" rule was the CAUSE, and it could not have caught
+       this: head count says nothing about whether 100 is reachable. */
     id: 'legend', label: 'Legend',
     ladders: { 10: 42, 31: 66 },
     snakes:  {
-      18: 5, 36: 14, 53: 29, 68: 47,
-      80: 44, 82: 57, 84: 26, 86: 50, 88: 33, 91: 70,
-      93: 64, 95: 38, 97: 75, 98: 52, 99: 7,
+      18: 5, 27: 9, 36: 14, 45: 21, 53: 29, 61: 34, 68: 47, 76: 55,
+      81: 35, 84: 26, 87: 32, 90: 62, 93: 64, 99: 7,
     },
   },
 ];
+
+/* How long a tier actually TAKES, exactly — the expected number of dice rolls
+   for one pawn to get from square 0 to square 100.
+
+   Solving it beats simulating it: the board is an absorbing Markov chain, so
+   E[s] = 1 + (1/6)·Σ E[dest(s, d)] is 100 linear equations in 100 unknowns and
+   Gauss-Jordan gives the answer to full precision in about a millisecond. A
+   simulation would need millions of trials to separate a slow tier from an
+   impossible one, and would still be noisy.
+
+   `dest` mirrors the engine in 03-game.jsx: an overshoot past 100 stays put,
+   otherwise the pawn lands and takes at most one jump. The extra roll on a 6,
+   the three-6 forfeit and the collision knockback are deliberately NOT modelled
+   — none of them changes which squares are reachable, which is what this is
+   for. Pure and self-contained so `cnlv2-layouts` can assert on it. */
+function cnlv2ExpectedRolls(layout) {
+  const jump = Object.assign({}, layout.ladders, layout.snakes);
+  const n = 100;                       // unknowns E[0..99]; E[100] is 0
+  const W = n + 1;                     // one augmented column
+  const A = new Float64Array(n * W);
+  for (let s = 0; s < n; s++) {
+    A[s * W + s] += 1;
+    A[s * W + n] = 1;                  // the roll that is being taken
+    for (let d = 1; d <= 6; d++) {
+      let t = s + d;
+      t = t > 100 ? s : (jump[t] !== undefined ? jump[t] : t);
+      if (t < 100) A[s * W + t] -= 1 / 6;
+    }
+  }
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col; r < n; r++) {
+      if (Math.abs(A[r * W + col]) > Math.abs(A[piv * W + col])) piv = r;
+    }
+    if (piv !== col) {
+      for (let j = col; j < W; j++) {
+        const tmp = A[col * W + j]; A[col * W + j] = A[piv * W + j]; A[piv * W + j] = tmp;
+      }
+    }
+    const inv = 1 / A[col * W + col];
+    for (let j = col; j < W; j++) A[col * W + j] *= inv;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = A[r * W + col];
+      if (f === 0) continue;
+      for (let j = col; j < W; j++) A[r * W + j] -= f * A[col * W + j];
+    }
+  }
+  return A[0 * W + n];
+}
 
 function cnlv2LayoutById(id) {
   return CNLV2_LAYOUTS.find((l) => l.id === id) || CNLV2_LAYOUTS[0];

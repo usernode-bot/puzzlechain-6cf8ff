@@ -267,9 +267,10 @@ function LadderScreen() {
 // ({ types, milestones }). Consumed by the profile BadgeStrip.
 function badgeChips(badges, achievements) {
   const earnedDays = new Set(badges || []);
-  const ach = achievements || { types: [], milestones: [] };
+  const ach = achievements || { types: [], milestones: [], stories: [] };
   const earnedTypes = new Set(ach.types || []);
   const earnedMilestones = new Set(ach.milestones || []);
+  const earnedStories = new Set(ach.stories || []);
 
   const chips = [];
   for (const b of STREAK_BADGES) {
@@ -281,12 +282,25 @@ function badgeChips(badges, achievements) {
   for (const b of SOLVE_MILESTONE_BADGES) {
     chips.push({ key: `m${b.count}`, icon: b.icon, name: b.name, sub: b.desc, earned: earnedMilestones.has(b.count) });
   }
+  // Story-ladder completions — one chip per game that HAS a story ladder, so
+  // the collection shows what is left to finish, not only what is done. The
+  // list is derived from PLAY_MODES_BY_ID rather than hand-written, so a game
+  // that gains or loses a story ladder needs no edit here; the order follows
+  // GAMES so it matches the lobby grid.
+  for (const g of (typeof GAMES !== 'undefined' ? GAMES : [])) {
+    if (typeof supportsMode !== 'function' || !supportsMode(g.id, 'story')) continue;
+    const chip = storyBadgeChip(g.id);
+    if (!chip) continue;
+    chips.push({ ...chip, group: 'story', earned: earnedStories.has(g.id) });
+  }
   return chips;
 }
 
 function BadgeStrip({ badges, achievements, streak, solveCount }) {
-  const chips = badgeChips(badges, achievements);
-  const earnedCount = chips.filter(c => c.earned).length;
+  const allChips = badgeChips(badges, achievements);
+  const chips = allChips.filter(c => c.group !== 'story');
+  const storyChips = allChips.filter(c => c.group === 'story');
+  const earnedCount = allChips.filter(c => c.earned).length;
   // Next-milestone progress pills (formerly on the home Badges panel) —
   // rendered only when the caller supplies the live streak/solve counts,
   // i.e. on the viewer's own profile.
@@ -298,7 +312,7 @@ function BadgeStrip({ badges, achievements, streak, solveCount }) {
     <div className="badge-strip-wrap">
       <div className="badge-strip-head">
         <span>Badges</span>
-        <span className="badge-strip-count mono">{earnedCount} / {chips.length}</span>
+        <span className="badge-strip-count mono">{earnedCount} / {allChips.length}</span>
       </div>
       {hints.length > 0 && (
         <div className="badge-progress">
@@ -310,17 +324,32 @@ function BadgeStrip({ badges, achievements, streak, solveCount }) {
         </div>
       )}
       <div className="badge-strip">
-        {chips.map(c => (
-          <div
-            key={c.key}
-            className={`badge-chip${c.earned ? ' active' : ' locked'}`}
-            title={`${c.name}${c.earned ? '' : ' (locked)'} — ${c.sub}`}
-          >
-            <span className="badge-chip-icon">{c.icon}</span>
-            <span className="badge-chip-name">{c.name}</span>
-          </div>
-        ))}
+        {chips.map(c => <BadgeChip key={c.key} chip={c} />)}
       </div>
+      {storyChips.length > 0 && (
+        <>
+          <div className="badge-strip-sub">Story ladders</div>
+          <div className="badge-strip">
+            {storyChips.map(c => <BadgeChip key={c.key} chip={c} />)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* One badge tile. `data-badge` carries the chip key so a navigation-only
+   proposal check can assert on a specific badge's earned/locked state, which
+   the class alone cannot express. */
+function BadgeChip({ chip }) {
+  return (
+    <div
+      className={`badge-chip${chip.earned ? ' active' : ' locked'}`}
+      data-badge={chip.key}
+      title={`${chip.name}${chip.earned ? '' : ' (locked)'} — ${chip.sub}`}
+    >
+      <span className="badge-chip-icon">{chip.icon}</span>
+      <span className="badge-chip-name">{chip.name}</span>
     </div>
   );
 }
@@ -471,6 +500,52 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
                 </div>
               )}
             </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* Recently Played (Recent goal): the viewer's last five plays as one tappable
+   tile each, mirroring InProgressRow's strip shape so the lobby keeps a single
+   rhythm. Renders nothing at all when there is no history (the server only
+   sends plays the signed-in viewer made), so an empty account simply shows the
+   grid without the strip. GAMES is defined later in the bundle order, which is
+   fine: the lookup runs at render time, not at parse time. */
+function fmtPlayedAgo(iso, offset) {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const mins = Math.max(1, Math.round((Date.now() + (offset || 0) - t) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.round(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+function RecentlyPlayedRow({ items, onOpen, offset }) {
+  if (!items || !items.length) return null;
+  return (
+    <div className="inprog-row-wrap">
+      <div className="home-section-title">Recently Played</div>
+      <div className="inprog-row recent-row">
+        {items.map((p) => {
+          const g = GAMES.find(x => x.id === p.gameId);
+          if (!g) return null;
+          return (
+            <button
+              key={p.gameId}
+              className="inprog-card recent-card"
+              aria-label={'Replay ' + g.name}
+              {...tapProps(() => onOpen(p.gameId))}
+            >
+              <div className="ip-icon">{g.icon}</div>
+              <div className="ip-name">{g.name}</div>
+              <div className="ip-sub resume">▶ Replay</div>
+              {p.playedAt && (
+                <div className="ip-sub mono">{fmtPlayedAgo(p.playedAt, offset)}</div>
+              )}
+            </button>
           );
         })}
       </div>
@@ -740,16 +815,133 @@ function OpponentScreen({ game, onPlay, onHowTo, onChat }) {
         </div>
       )}
 
-      <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
-      {onChat && <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>}
+      <div className="pregame-actions">
+        <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+        {onChat && <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>}
+      </div>
     </div>
   );
 }
 
 
+/* #188 — one place to see where you stand in a game, with the three rankings
+   the report asks for.
+
+   Two of the three already existed and simply had nowhere to be seen from: the
+   daily board only ever appeared on the result card (so you had to finish
+   today's puzzle to read it), and the per-band arcade boards were only reachable
+   from an arcade run. All-time is the one that had no endpoint at all.
+
+   "Level" is the arcade band ladder rather than the story rungs, deliberately.
+   Story pays once on first clear, so a story ranking would be a list of who has
+   finished, in the order they happened to arrive — not a standing. Arcade keeps
+   a best per band, which is what a ladder means. */
+const GB_TABS = [
+  { id: 'daily', label: 'Daily' },
+  { id: 'level', label: 'Level' },
+  { id: 'alltime', label: 'All-time' },
+];
+
+function GbRows({ rows, me, cols, empty }) {
+  const meVisible = me && rows.some((e) => e.isCurrentUser);
+  if (!rows.length) return <div className="lboard-empty">{empty}</div>;
+  const row = (e, pinned) => (
+    <div key={(pinned ? 'me-' : '') + e.rank} className={'lrow' + (e.isCurrentUser ? ' me' : '') + (pinned ? ' pinned' : '')}>
+      <span className="lrank mono">#{e.rank}</span>
+      <span className="lname">{e.username}{e.isCurrentUser ? ' (you)' : ''}</span>
+      <span className="ltime mono">{cols.a(e)}</span>
+      <span className="lsteps mono">{cols.b(e)}</span>
+    </div>
+  );
+  return (
+    <div className="lboard-rows">
+      {rows.map((e) => row(e, false))}
+      {me && !meVisible && row(me, true)}
+    </div>
+  );
+}
+
+function GameBoards({ game, onClose }) {
+  const [tab, setTab] = useState('daily');
+  const [band, setBand] = useState('normal');
+  const [scope, setScope] = useState(lbInitialScope);
+  const [state, setState] = useState({ loading: true });
+
+  // Each tab is a different endpoint of the same shape, so one fetch serves all
+  // three; band only participates on the arcade ladder.
+  const url = tab === 'daily' ? `/api/daily/${game.id}/leaderboard`
+    : tab === 'level' ? `/api/arcade/${game.id}/leaderboard?band=${encodeURIComponent(band)}`
+    : `/api/alltime/${game.id}/leaderboard`;
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true });
+    (async () => {
+      const q = scope === 'friends' ? (url.indexOf('?') === -1 ? '?scope=friends' : '&scope=friends') : '';
+      const { ok, body } = await api(url + q);
+      if (!alive) return;
+      setState(ok && body ? { loading: false, ...body } : { loading: false, entries: [], me: null, total: 0, error: true });
+    })();
+    return () => { alive = false; };
+  }, [url, scope]);
+
+  const rows = state.entries || [];
+  const cols = tab === 'alltime'
+    ? { a: (e) => `${e.points} pts`, b: (e) => `${e.plays}d` }
+    : tab === 'level'
+      ? { a: (e) => `${e.bestScore != null ? e.bestScore : e.score || 0} pts`, b: (e) => (e.runs != null ? `${e.runs}r` : '—') }
+      : { a: (e) => lbFmtTime(e.timeSecs), b: (e) => (e.steps != null ? `${e.steps} st` : '—') };
+  const empty = scope === 'friends' ? LB_FRIENDS_EMPTY
+    : tab === 'daily' ? "Nobody has solved today's puzzle yet."
+      : tab === 'level' ? 'No runs on this band yet.'
+        : 'No finished games yet — play one and you are on the board.';
+
+  return (
+    <div className="gb-sheet-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="gb-sheet" role="dialog" aria-label={`${game.name} leaderboards`}>
+        <div className="gb-head">
+          <span>{game.icon} {game.name} — leaderboards</span>
+          <button className="gb-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="cg-sheet-tabs">
+          {GB_TABS.map((t) => (
+            <button key={t.id} className={'cg-sheet-tab' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>{t.label}</button>
+          ))}
+        </div>
+        {tab === 'level' && (
+          <div className="pregame-band-row wide gb-bands">
+            {ARCADE_BANDS.map((b) => (
+              <button key={b.id} className={'pregame-band wide tappable' + (b.id === band ? ' on' : '')}
+                {...tapProps(() => setBand(b.id))}>{b.label}</button>
+            ))}
+          </div>
+        )}
+        <LbScopeTabs scope={scope} onChange={setScope} />
+        {state.loading
+          ? <div className="lboard-empty">Loading…</div>
+          : <GbRows rows={rows} me={state.me} cols={cols} empty={empty} />}
+        <div className="lboard-note">
+          {tab === 'alltime'
+            ? 'Total points across every daily you have finished. Ties go to fewer days played.'
+            : tab === 'level'
+              ? 'Your best arcade run on each difficulty band.'
+              : "Today's solvers, fastest first."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
                          playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest,
                          onReplayRun }) {
+  /* `?boards=1` opens the panel at mount. The boards are behind a tap, and a
+     screen behind a tap is invisible to proposal checks and to the before/after
+     screenshots alike — the same reason ?sheet= exists for the classic shell. */
+  const [boardsOpen, setBoardsOpen] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('boards') === '1'; }
+    catch (e) { return false; }
+  });
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const resuming = !!(attempt && !attempt.finishedAt);
   const m = game.manifest || {};
@@ -797,7 +989,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         )}
         {isStory && bandTotal > 0 && (
           <div className="pregame-stat">
-            <div className="l">Cleared</div>
+            <div className="l">Levels cleared</div>
             <div className="v mono">{bandCleared}/{bandTotal}</div>
           </div>
         )}
@@ -820,18 +1012,18 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         </div>
       )}
       {isStory && bandTotal > 0 && (
-        <div className="pregame-bands" role="group" aria-label="Choose a band">
-          <div className="pregame-bands-label">Band</div>
+        <div className="pregame-bands" role="group" aria-label="Choose a level">
+          <div className="pregame-bands-label">Level</div>
           <div className="pregame-band-row">
             {Array.from({ length: bandTotal }, (_, i) => {
               const done = i < bandCleared;
-              const locked = i > bandCleared;   // the ladder is walked in order
+              const locked = i > bandCleared;   // levels are walked in order
               return (
                 <button
                   key={i}
                   className={'pregame-band tappable' + (i === storyBand ? ' on' : '') + (done ? ' done' : '') + (locked ? ' locked' : '')}
                   disabled={locked}
-                  aria-label={`Band ${i + 1}${done ? ', cleared' : ''}`}
+                  aria-label={`Level ${i + 1}${done ? ', cleared' : ''}`}
                   {...tapProps(() => { if (!locked) onStoryBand && onStoryBand(i); })}
                 >{done ? '✓' : i + 1}</button>
               );
@@ -839,8 +1031,8 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
           </div>
           <div className="pregame-band-note">
             {bandCleared >= bandTotal
-              ? 'Ladder complete — replay any band for practice. Points are paid once, on first clear.'
-              : 'Clearing a band for the first time pays. Replays are for practice.'}
+              ? 'All levels cleared: badge earned. Replay any level for practice; points are paid once, on first clear.'
+              : 'Clearing a level for the first time pays. Replays are for practice.'}
           </div>
         </div>
       )}
@@ -848,25 +1040,21 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         <div className="pregame-bands" role="group" aria-label="Choose a difficulty">
           <div className="pregame-bands-label">Difficulty</div>
           <div className="pregame-band-row wide">
-            {ARCADE_BANDS.map(b => {
-              /* All three are open from the first run. The recommendation is
-                 STEERING, not gating: a player who picks Hard on a game they
-                 have never touched gets a hard board and concludes the game is
-                 broken, so the band matching their ladder progress is marked
-                 rather than the others being locked. */
-              const rec = bandTotal > 0 &&
-                b.id === (bandCleared === 0 ? 'easy' : bandCleared >= bandTotal ? 'hard' : 'normal');
-              return (
-                <button
-                  key={b.id}
-                  className={'pregame-band wide tappable' + (b.id === arcadeBandId ? ' on' : '')}
-                  aria-label={`${b.label}${rec ? ', recommended' : ''}`}
-                  {...tapProps(() => onArcadeBand && onArcadeBand(b.id))}
-                >
-                  {b.label}{rec && <span className="rec">recommended</span>}
-                </button>
-              );
-            })}
+            {/* #195 — the per-band "recommended" tag is gone. It was steering
+                rather than gating (all three bands are open from the first
+                run), but it repeated what the band names already say: Easy is
+                the easy one. The note under the row still explains what arcade
+                scoring rewards, which is the part a player cannot infer. */}
+            {ARCADE_BANDS.map(b => (
+              <button
+                key={b.id}
+                className={'pregame-band wide tappable' + (b.id === arcadeBandId ? ' on' : '')}
+                aria-label={b.label}
+                {...tapProps(() => onArcadeBand && onArcadeBand(b.id))}
+              >
+                {b.label}
+              </button>
+            ))}
           </div>
           <div className="pregame-band-note">
             A fresh board every run. Beating your own best on this band scores;
@@ -887,10 +1075,23 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
           to put your run on the leaderboard and start a streak.
         </div>
       )}
-      <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
-      {onChat && (
-        <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>
-      )}
+      {/* #240 — these two were trailing text links under the Play button, the
+          quietest thing on the screen. They are the game's instructions and
+          its room; a first-time player needs the first one before they press
+          Play at all. Now a pair of real buttons on their own row, each a
+          44px tap target. */}
+      <div className="pregame-actions">
+        <button className="pregame-howto-btn" onClick={onHowTo}>❓ How to play</button>
+        {onChat && (
+          <button className="pregame-howto-btn" onClick={onChat}>💬 Game chat</button>
+        )}
+        {/* #188 — the boards were only readable AFTER a run: today's from the
+            result card, the arcade ladder from inside an arcade run. Here they
+            are before you play, which is when "where do I stand" is a reason
+            to press Play. */}
+        <button className="pregame-howto-btn" onClick={() => setBoardsOpen(true)}>🏆 Leaderboards</button>
+      </div>
+      {boardsOpen && <GameBoards game={game} onClose={() => setBoardsOpen(false)} />}
     </div>
   );
 }

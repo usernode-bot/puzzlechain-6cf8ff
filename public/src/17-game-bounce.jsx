@@ -8,7 +8,13 @@ const BOUNCE_W       = 360;
 const BOUNCE_H       = 480;
 const BOUNCE_PADDLE_W = 64;
 const BOUNCE_PADDLE_H = 10;
-const BOUNCE_PADDLE_Y = BOUNCE_H - 30;
+/* #211 — the paddle sat 30px off the floor, which on a phone is under the
+   thumb holding the device and, in a browser, behind the bottom toolbar.
+   Raised to 64px so it is reachable. The ball's death line stays at the well
+   floor (stepBall tests against BOUNCE_H), so a miss now falls a little
+   further before it counts — the well keeps its shape and only the paddle
+   moves. */
+const BOUNCE_PADDLE_Y = BOUNCE_H - 64;
 const BOUNCE_BALL_R  = 6;
 const BOUNCE_COLS    = 9;
 const BOUNCE_BRICK_H = 16;
@@ -689,9 +695,27 @@ function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, off
               onClick={() => launch()}
             />
             {!started && !done && (
-              <div className="bounce-start-overlay" onClick={() => launch()}>
+              /* #211 — this used to be a full-board div with `pointer-events:
+                 auto` and nothing but an onClick. It covered the canvas, so a
+                 finger never reached the canvas's own onTouchStart — the thing
+                 that both aims the paddle and calls launch() — and the overlay
+                 itself carried `touch-action: auto`, so the browser was free to
+                 treat the press as a pan and swallow the click. Tapping to
+                 start simply did not work.
+
+                 The backdrop is now inert (`pointer-events: none` in CSS) so
+                 drags fall through to the canvas and you can still aim, and the
+                 launch is an explicit BUTTON rather than "tap anywhere", which
+                 is what the report asked for on web. */
+              <div className="bounce-start-overlay">
                 <div style={{ fontSize: '2rem' }}>🧱</div>
-                <div>Move to aim, then tap / press Space to launch</div>
+                <div>Move to aim, then launch</div>
+                <button
+                  type="button"
+                  className="primary-btn bounce-start-btn"
+                  onClick={() => launch()}
+                >▶ Start</button>
+                <div className="bounce-start-hint">or tap the board / press Space</div>
               </div>
             )}
           </div>

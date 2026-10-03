@@ -2472,6 +2472,43 @@ function mfFlood(startIdx, counts, cols = 9, rows = 9) {
 const MF_NUM_COLORS = [null, 'accent', 'emerald', 'rose', 'violet', 'gold', '#06b6d4', '#be123c', 'muted'];
 const MF_GAP = 3;
 
+/* #294 — dark-mode tiles for BOTH mine games. They used to be PAL.card
+   (#181D29) for a covered cell and PAL.surface (#12161F) for an uncovered
+   one: a 1.07:1 difference with the same hairline on both, so on a dark
+   screen an empty uncovered cell and a covered one looked the same. Like the
+   light board's MS_LIGHT greys these are board art, pinned here rather than
+   added as palette tokens. A covered cell is a raised slate key (1.9:1 against
+   an uncovered cell, with a lit top edge and a dark lip along the bottom). An
+   uncovered cell is a flat dark well with a faint outline. The digits sit on
+   the darker well, so each one has slightly more contrast than before. Light
+   mode does not use these. */
+const MINE_DARK_TILES = {
+  hidden:     '#3A4458', // raised face
+  hiddenHi:   '#56627A', // lit top edge
+  hiddenLip:  '#1A202B', // bottom lip / outline
+  revealed:   '#0E121A', // recessed well
+  revealedLn: '#222A37', // well outline
+};
+
+/* Draw one covered cell in dark mode: lip, face, then the lit top edge.
+   Shared by Mine Finder and Mine Finder Classic. */
+function mineDrawDarkHidden(ctx, x, y, cell, radius) {
+  const T = MINE_DARK_TILES;
+  const lip = Math.max(2, Math.round(cell * 0.08));
+  klRR(ctx, x, y, cell, cell, radius);
+  ctx.fillStyle = T.hiddenLip;
+  ctx.fill();
+  klRR(ctx, x, y, cell, cell - lip, radius);
+  ctx.fillStyle = T.hidden;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = T.hiddenHi;
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y + 0.5);
+  ctx.lineTo(x + cell - radius, y + 0.5);
+  ctx.stroke();
+}
+
 /* ============================================================
    Mine Finder — no-guess generation (#176)
    ============================================================
@@ -2898,6 +2935,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const radius = Math.max(3, Math.round(cell * 0.16));
+      const dark = themeState.resolved === 'dark';
       for (let i = 0; i < MF_COLS * MF_ROWS; i++) {
         const r = Math.floor(i / MF_COLS), c = i % MF_COLS;
         const x = c * cellStep, y = r * cellStep;
@@ -2906,19 +2944,28 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
 
         // PAL, not C — see the canvas-colour note on guardCanvasCtx.
         let fill = PAL.card, stroke = PAL.border;
-        if (isRev) { fill = PAL.surface; stroke = PAL.border; }
-        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; }
-        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; }
-        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; }
+        if (isRev) {
+          fill = dark ? MINE_DARK_TILES.revealed : PAL.surface;
+          stroke = dark ? MINE_DARK_TILES.revealedLn : PAL.border;
+        }
+        let special = false;
+        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; special = true; }
+        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; special = true; }
+        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; special = true; }
 
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
-        else ctx.rect(x, y, cell, cell);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = stroke;
-        ctx.stroke();
+        if (dark && !isRev && !special) {
+          // #294 — a covered cell is a raised key in dark mode.
+          mineDrawDarkHidden(ctx, x, y, cell, radius);
+        } else {
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
+          else ctx.rect(x, y, cell, cell);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = stroke;
+          ctx.stroke();
+        }
 
         const cx = x + cell / 2, cy = y + cell / 2;
         if (isRev && isMine) {

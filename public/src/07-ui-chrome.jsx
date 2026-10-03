@@ -507,6 +507,54 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
   );
 }
 
+// Daily checklist (#295): one chip per daily game, in a horizontal scroller,
+// so a player can sweep every deal without hunting the grid. The checked
+// state reads the SAME source the cards' "✓ PLAYED" badge reads —
+// cardDailyId + attempts[id].finishedAt from /api/daily — so it cannot
+// disagree with the grid and needs no second fetch. In-progress shows ▶,
+// unplayed shows an empty circle. A tap launches the chip's daily id through
+// the normal launch path (finished → locked screen, else pre-game), exactly
+// like the card's own Daily button.
+function DailyChecklist({ attempts, loading, onPlay }) {
+  const cards = GAME_CARDS.filter((c) => cardDailyId(c));
+  if (!cards.length) return null;
+  const stateOf = (c) => {
+    const id = cardDailyId(c);
+    const a = id ? attempts[id] : null;
+    if (a && a.finishedAt) return 'done';
+    if (a) return 'resume';
+    return 'todo';
+  };
+  const done = cards.filter((c) => stateOf(c) === 'done').length;
+  return (
+    <div className="dl-wrap">
+      <div className="home-section-title">
+        Daily checklist
+        <span className="home-pin-count mono">{done}/{cards.length}</span>
+      </div>
+      <div className="dl-row" role="list" aria-label="Daily challenges to play today">
+        {cards.map((c) => {
+          const s = stateOf(c);
+          const id = cardDailyId(c);
+          return (
+            <button
+              key={c.key}
+              role="listitem"
+              className={'dl-check tappable ' + s}
+              aria-label={`${c.name} daily — ${s === 'done' ? 'played today' : s === 'resume' ? 'in progress' : 'not played yet'}`}
+              {...tapProps(() => { if (!loading) onPlay(id); })}
+            >
+              <span className="dl-mark" aria-hidden="true">{s === 'done' ? '✓' : s === 'resume' ? '▶' : ''}</span>
+              <span className="dl-icon" aria-hidden="true">{c.icon}</span>
+              <span className="dl-name">{c.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* Recently Played (Recent goal): the viewer's last five plays as one tappable
    tile each, mirroring InProgressRow's strip shape so the lobby keeps a single
    rhythm. Renders nothing at all when there is no history (the server only

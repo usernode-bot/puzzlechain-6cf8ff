@@ -713,6 +713,40 @@
       "expectSelector": ".home-filter-chips"
     },
     {
+      "name": "Category chip row lists the real categories (#301)",
+      "path": "/",
+      "expectSelector": ".home-filter-chips .home-chip[aria-selected]"
+    },
+    {
+      "name": "Cards chip filters the lobby to card games (#301)",
+      "path": "/?tab=Cards",
+      "expectText": "Klondike Solitaire",
+      "expectSelector": ".home-chip.on"
+    },
+    {
+      "name": "Action chip filters the lobby to action games (#301)",
+      "path": "/?tab=Action",
+      "expectText": "Hash Rush"
+    },
+    {
+      "name": "Word chip filters the lobby to word games (#301)",
+      "path": "/?tab=Word",
+      "expectText": "Word Search"
+    },
+    {
+      "name": "Lobby category chips and larger desktop cards (#301, #323)",
+      "path": "/?tab=Puzzle",
+      "expectSelector": ".home-filter-chips .home-chip.on",
+      "visual": true,
+      "id": "lobby.categories-and-card-size",
+      "impact": [
+        "public/src/28-registry.jsx",
+        "public/src/29-cards.jsx",
+        "public/src/30-app-root.jsx",
+        "public/src/01-styles.jsx"
+      ]
+    },
+    {
       "name": "Home daily reset countdown renders",
       "path": "/",
       "expectSelector": ".gotd-hero .gotd-meta"

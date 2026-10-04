@@ -150,6 +150,7 @@ const MERGED_CARDS = [
     name: 'Tile Match Puzzle',
     icon: '🀄',
     tag: 'Puzzle',
+    category: 'Puzzle',
     tagColor: GA.violet,
     // The blurb LEADS with the variant name ("Daily Tile Match Puzzle"):
     // a merged dapp.json test asserts it renders on the lobby card, and the
@@ -166,6 +167,7 @@ const MERGED_CARDS = [
     name: 'Mine Finder',
     icon: '💣',
     tag: 'Risk',
+    category: 'Logic',
     tagColor: GA.coral,
     // Leads with "Mine Finder Classic" for the same reason — see the
     // Tile Match card above.
@@ -181,6 +183,7 @@ const MERGED_CARDS = [
     name: 'Snake',
     icon: '🐍',
     tag: 'Arcade',
+    category: 'Arcade',
     tagColor: GA.lime,
     desc: "Steer, eat, grow — don't hit a wall or your own tail.",
     modes: [
@@ -193,6 +196,7 @@ const MERGED_CARDS = [
     name: 'Bounce',
     icon: '🧱',
     tag: 'Arcade',
+    category: 'Arcade',
     tagColor: GA.coral,
     desc: 'Smash every brick with a bouncing ball.',
     modes: [
@@ -229,6 +233,7 @@ function buildGameCards(games) {
       name: g.name,
       icon: g.icon,
       tag: g.tag,
+      category: g.category,
       tagColor: g.tagColor,
       desc: g.desc,
       modes,          // [] for the head-to-head games — one Play button, below
@@ -262,6 +267,13 @@ const cardDailyId = (card) => {
    one card. Two controls share this: the pin (#232) and the favorite star. */
 const cardAnchorId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
 const cardPinId = cardAnchorId;
+
+/* The category a card filters under (#301). The card carries its own copy, so
+   a merged card (whose registry halves can disagree) still has exactly one
+   answer. Falls back through the anchor id to the registry and finally to a
+   neutral 'Puzzle', which is what an unknown id would have been tagged
+   anyway — a missing category must never drop a card out of every chip. */
+const cardCategory = (card) => card.category || 'Puzzle';
 
 /* Mirrors PIN_LIMIT in server.js. Used ONLY to grey out the control once the
    player is at the cap — the server refuses the 9th pin either way, so the two

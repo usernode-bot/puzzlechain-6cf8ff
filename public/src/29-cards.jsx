@@ -254,12 +254,14 @@ const cardDailyId = (card) => {
   return d ? d.gameId : null;
 };
 
-/* The registry id a pin (#232) is stored under: the card's ANCHOR id. Cards
-   are a client-side composition and can be recomposed; registry ids never
-   move, so the durable thing to write to the database is one of the ids the
-   card speaks for. Reads come back through CARD_BY_GAME_ID, which already maps
-   either half of a merged pair onto the one card. */
-const cardPinId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
+/* The registry id a PER-CARD, PER-USER control stores under: the card's
+   ANCHOR id. Cards are a client-side composition and can be recomposed;
+   registry ids never move, so the durable thing to write to the database is
+   one of the ids the card speaks for. Reads come back through
+   CARD_BY_GAME_ID, which already maps either half of a merged pair onto the
+   one card. Two controls share this: the pin (#232) and the favorite star. */
+const cardAnchorId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
+const cardPinId = cardAnchorId;
 
 /* Mirrors PIN_LIMIT in server.js. Used ONLY to grey out the control once the
    player is at the cap — the server refuses the 9th pin either way, so the two
@@ -299,7 +301,7 @@ const cardMyScoreBit = (card, myScores) => {
   return null;
 };
 
-function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
+function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onPlay, pinned, onTogglePin, pinDisabled, streak, favorited, onToggleFavorite }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -309,6 +311,10 @@ function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onP
   // instead of spending its width on buttons that repeat the mode labels.
   const bits = [];
   if (dailyId) bits.push(finished ? 'Daily ✓' : inProgress ? 'Daily ▶' : 'Daily · new');
+  // #313 — a signed-in player's current streak rides on every card that offers
+  // a daily (the merged cards included: cardDailyId covers them). Zero stays
+  // off the card: a 0-day streak is not information the card needs, and the
+  // nav stat still shows it.
   const storyMode = card.modes.find(m => m.mode === 'story');
   if (storyMode) {
     const p = (storyProgress && storyProgress[storyMode.gameId]) || null;
@@ -342,6 +348,15 @@ function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onP
           {...tapProps(() => { onTogglePin(cardPinId(card), !pinned); }, { disabled: !pinned && pinDisabled })}
         >📌</button>
       )}
+      {onToggleFavorite && (
+        <button
+          className={'card-fav tappable' + (favorited ? ' on' : '')}
+          aria-pressed={favorited ? 'true' : 'false'}
+          aria-label={favorited ? `Remove ${card.name} from favorites` : `Add ${card.name} to favorites`}
+          title={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          {...tapProps(() => { onToggleFavorite(cardAnchorId(card), !favorited); })}
+        >{favorited ? '★' : '☆'}</button>
+      )}
       {dailyId && (
         <span className={'card-daily-badge' + (finished ? ' done' : inProgress ? ' resume' : ' fresh')}>
           {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}
@@ -350,9 +365,21 @@ function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onP
       <div className="card-icon">{card.icon}</div>
       <div className="card-name">{card.name}</div>
       <div className="card-desc">{card.desc}</div>
-      <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
-        {card.tag}
-      </span>
+      {/* #313 — the state footer. The tag and the streak pill share one row;
+          without the wrapper the pill (a flex item like the tag) drops to
+          its own line and pushes the buttons down. */}
+      <div className="card-footer">
+        <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
+          {card.tag}
+        </span>
+        {dailyId && streak > 0 && (
+          <span className="card-streak mono" data-streak={streak} title={`${streak}-day streak`}>
+            <span className="cs-flame" aria-hidden="true">🔥</span>
+            <span>{streak}</span>
+            <span className="cs-days">d</span>
+          </span>
+        )}
+      </div>
       {bits.length > 0 && <div className="card-state mono">{bits.join(' · ')}</div>}
       <div className={'card-modes n' + singleModes.length}>
         {singleModes.map(m => {

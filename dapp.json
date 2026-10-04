@@ -10,6 +10,7 @@
       "description": "Public app-identity key that identifies Game Corner to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
       "required": true,
       "private": false,
+      "default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "staging_default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     },
     {
@@ -52,6 +53,26 @@
       "expectSelector": ".card-daily-badge.done"
     },
     {
+      "name": "Daily checklist strip renders on home",
+      "path": "/",
+      "expectSelector": ".dl-row"
+    },
+    {
+      "name": "Daily checklist chips list every daily",
+      "path": "/",
+      "expectSelector": ".dl-row .dl-check"
+    },
+    {
+      "name": "Daily checklist checks off a played daily",
+      "path": "/?demo=locked",
+      "expectSelector": ".dl-row .dl-check.done"
+    },
+    {
+      "name": "Daily checklist counter renders",
+      "path": "/?demo=locked",
+      "expectSelector": ".dl-wrap .home-pin-count"
+    },
+    {
       "name": "Word Search card in lobby",
       "path": "/",
       "expectText": "Word Search"
@@ -70,6 +91,18 @@
       "name": "Streak demo seeds and nav stat renders",
       "path": "/?demo=streak",
       "expectText": "Streak"
+    },
+    {
+      "name": "Daily cards show the streak pill (#313)",
+      "path": "/?demo=streak&tab=daily",
+      "expectSelector": ".card .card-streak[data-streak='10']",
+      "visual": true,
+      "id": "daily-cards.streak-pill",
+      "impact": [
+        "public/src/29-cards.jsx",
+        "public/src/30-app-root.jsx",
+        "public/src/01-styles.jsx"
+      ]
     },
     {
       "name": "Masthead tagline renders",
@@ -1693,6 +1726,31 @@
       "expectSelector": ".card-pin"
     },
     {
+      "name": "Favorite star renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-fav"
+    },
+    {
+      "name": "Favorites filter chip renders",
+      "path": "/",
+      "expectText": "Favorites"
+    },
+    {
+      "name": "Favorites chip shows starred cards only",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card"
+    },
+    {
+      "name": "Favorites view stars its games",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card-fav.on"
+    },
+    {
+      "name": "Empty favorites view explains how to star",
+      "path": "/?demo=favempty&favview=1",
+      "expectText": "No favorites yet"
+    },
+    {
       "name": "Pinned section renders pinned games",
       "path": "/?demo=pins",
       "expectSelector": ".home-pinned-title"
@@ -1706,6 +1764,16 @@
       "name": "Home with nothing pinned explains how to pin",
       "path": "/?demo=pinsempty",
       "expectText": "on any card to pin it to the top"
+    },
+    {
+      "name": "Recently Played strip renders the viewer's last plays",
+      "path": "/?demo=recent",
+      "expectSelector": ".recent-row .recent-card"
+    },
+    {
+      "name": "Home with no play history hides the Recently Played strip",
+      "path": "/?demo=recentclear",
+      "expectText": "All Games"
     },
     {
       "name": "Nonogram flags a grid that is full but wrong",

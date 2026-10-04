@@ -3833,6 +3833,51 @@ app.get('/api/daily', async (req, res) => {
       }
     }
 
+    if (IS_STAGING && req.query.demo === 'myscores') {
+      /* Seeds the VIEWER's own all-time figures — /api/my/scores is
+         caller-keyed, so this fixture must attribute rows to req.user (a
+         fixture seeding fake users would show nothing on their profile).
+         Past UTC dates only, so it never collides with demo=locked /
+         demo=streak, which finish today's rows; every insert is
+         DO NOTHING, so re-runs and other fixtures' rows are preserved. */
+      const msSeed = [
+        ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
+      ];
+      for (const [gid, daysAgo, score] of msSeed) {
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, score, steps, time_secs, started_at, finished_at)
+           VALUES ($1, $2, $3, ((now() AT TIME ZONE 'utc')::date - $4::int), $5, 42, 95,
+                   now() - ($4::int * '1 day'::interval), now() - ($4::int * '1 day'::interval))
+           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+          [req.user.id, req.user.username, gid, daysAgo, score]
+        );
+      }
+      const msClassic = [
+        ['minesweeper', 950], ['2048', 18432], ['chutes-ladders', 5],
+      ];
+      for (const [gid, score] of msClassic) {
+        await pool.query(
+          `INSERT INTO classic_scores (user_id, username, game_id, best_score, games_played)
+           VALUES ($1, $2, $3, $4, 3)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username, gid, score]
+        );
+      }
+      await pool.query(
+        `INSERT INTO snake_scores (user_id, username, best_score, best_length, best_time_secs, games_played)
+         VALUES ($1, $2, 350, 42, 118, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id, req.user.username]
+      );
+      await pool.query(
+        `INSERT INTO game_ratings (user_id, username, game_id, elo, win_streak, best_streak, wins, losses, draws)
+         VALUES ($1, $2, 'checkers', 1046, 2, 3, 4, 2, 0)
+         ON CONFLICT (user_id, game_id) DO NOTHING`,
+        [req.user.id, req.user.username]
+      );
+    }
+
     const { rows } = await pool.query(
       `SELECT * FROM daily_attempts
        WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
@@ -6082,6 +6127,97 @@ app.get('/api/ladder/:gameId', async (req, res) => {
   } catch (err) {
     console.error('[ladder] load failed:', err.message);
     res.status(500).json({ error: 'Failed to load ladder' });
+  }
+});
+
+// ---- The caller's own all-time scores, every game -------------------------
+// One auth-gated read covering every figure the app records per game:
+//   pts    — all-time daily points (daily_attempts, the exact filter the
+//            all-time leaderboard ranks on, so the two agree)
+//   best   — the game's own classic/PB-table best (classic_scores plus the
+//            per-game snake/breakout/zuma/mancala/tilematch/match3 tables)
+//   record — head-to-head wins/losses/draws (game_ratings)
+// The two score systems never mix: a daily's score is multiplied points, a
+// classic's best_score is the game's own raw score, so they stay separate
+// fields and the client labels them differently ("+N pts" / "Best N").
+// Registered above the app.get('*') catch-all; NOT in PUBLIC_API_GET — it is
+// caller-keyed (req.user.id) and deliberately exposes no other user.
+app.get('/api/my/scores', async (req, res) => {
+  const uid = req.user.id;
+  try {
+    const scores = {};
+    const ensure = (gid) => (scores[gid] || (scores[gid] = {}));
+    // All-time daily points, grouped per game. Losses (score 0) are excluded,
+    // like every leaderboard.
+    const daily = await pool.query(
+      `SELECT game_id, SUM(score)::int AS pts
+         FROM daily_attempts
+        WHERE user_id = $1
+          AND finished_at IS NOT NULL
+          AND score IS NOT NULL AND score > 0
+        GROUP BY game_id`,
+      [uid]
+    );
+    for (const r of daily.rows) {
+      if (r.pts == null) continue;
+      ensure(r.game_id).pts = Number(r.pts);
+    }
+    // Classic bests — the GREATEST-upserted per-game table.
+    const classic = await pool.query(
+      `SELECT game_id, MAX(best_score)::int AS best
+         FROM classic_scores
+        WHERE user_id = $1
+        GROUP BY game_id`,
+      [uid]
+    );
+    for (const r of classic.rows) {
+      if (r.best == null) continue;
+      ensure(r.game_id).best = Number(r.best);
+    }
+    // Per-game PB tables: snake/bounce/zuma/tilematch hold one row per user,
+    // mancala one per difficulty and match3 one per puzzle — MAX across them.
+    // Each branch is a bare aggregate, so zero rows yield one NULL row that
+    // the `best IS NOT NULL` filter drops.
+    const pb = await pool.query(
+      `SELECT 'snake' AS game_id, MAX(best_score)::int AS best
+         FROM snake_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'bounce', MAX(best_score)::int
+         FROM breakout_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'zuma', MAX(best_score)::int
+         FROM zuma_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'mancala', MAX(best_score)::int
+         FROM mancala_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'tilematching', MAX(best_session_score)::int
+         FROM tilematch_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'match3', MAX(best_score)::int
+         FROM match3_scores WHERE user_id = $1`,
+      [uid]
+    );
+    for (const r of pb.rows) {
+      if (r.best == null) continue;
+      ensure(r.game_id).best = Number(r.best);
+    }
+    // Head-to-head records. Unrated seats (local modes, 3–4P ludo) never write
+    // a row, so absence is the correct answer for them.
+    const ratings = await pool.query(
+      `SELECT game_id, wins, losses, draws
+         FROM game_ratings
+        WHERE user_id = $1`,
+      [uid]
+    );
+    for (const r of ratings.rows) {
+      if (!H2H_GAME_IDS.has(r.game_id)) continue;
+      ensure(r.game_id).record = { wins: r.wins, losses: r.losses, draws: r.draws };
+    }
+    res.json({ scores });
+  } catch (err) {
+    console.error('[my-scores] load failed:', err.message);
+    res.status(500).json({ error: 'Failed to load scores' });
   }
 });
 

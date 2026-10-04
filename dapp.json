@@ -1,7 +1,8 @@
 {
   "name": "Game Corner",
   "icon": {
-    "emoji": "🕹️"
+    "image": "public/icon.png",
+    "emoji": "🎮"
   },
   "secrets": [
     {
@@ -9,6 +10,7 @@
       "description": "Public app-identity key that identifies Game Corner to the Usernode dApps-integration surface; returned alongside HMAC-signed integration payloads so callers can attribute them to this app. Public (non-secret); set the production value in Settings → Secrets. Staging uses a well-known Hardhat account #1 address.",
       "required": true,
       "private": false,
+      "default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "staging_default": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     },
     {
@@ -49,6 +51,26 @@
       "name": "Locked card after daily attempt",
       "path": "/?demo=locked",
       "expectSelector": ".card-daily-badge.done"
+    },
+    {
+      "name": "Daily checklist strip renders on home",
+      "path": "/",
+      "expectSelector": ".dl-row"
+    },
+    {
+      "name": "Daily checklist chips list every daily",
+      "path": "/",
+      "expectSelector": ".dl-row .dl-check"
+    },
+    {
+      "name": "Daily checklist checks off a played daily",
+      "path": "/?demo=locked",
+      "expectSelector": ".dl-row .dl-check.done"
+    },
+    {
+      "name": "Daily checklist counter renders",
+      "path": "/?demo=locked",
+      "expectSelector": ".dl-wrap .home-pin-count"
     },
     {
       "name": "Word Search card in lobby",
@@ -1479,6 +1501,11 @@
       "expectSelector": ".win-overlay .review-btn"
     },
     {
+      "name": "Results card exits to the lobby via tap-action buttons",
+      "path": "/?game=2048&result=1",
+      "expectSelector": ".win-overlay button.tappable.primary-btn"
+    },
+    {
       "name": "Snake keeps its board behind the results card",
       "path": "/?game=snake&result=1&snake=normal",
       "expectSelector": ".game-body.frozen .snake-board"
@@ -1699,6 +1726,31 @@
       "expectSelector": ".card-pin"
     },
     {
+      "name": "Favorite star renders on every home card",
+      "path": "/",
+      "expectSelector": ".card-fav"
+    },
+    {
+      "name": "Favorites filter chip renders",
+      "path": "/",
+      "expectText": "Favorites"
+    },
+    {
+      "name": "Favorites chip shows starred cards only",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card"
+    },
+    {
+      "name": "Favorites view stars its games",
+      "path": "/?demo=favorites&favview=1",
+      "expectSelector": ".card-fav.on"
+    },
+    {
+      "name": "Empty favorites view explains how to star",
+      "path": "/?demo=favempty&favview=1",
+      "expectText": "No favorites yet"
+    },
+    {
       "name": "Pinned section renders pinned games",
       "path": "/?demo=pins",
       "expectSelector": ".home-pinned-title"
@@ -1712,6 +1764,16 @@
       "name": "Home with nothing pinned explains how to pin",
       "path": "/?demo=pinsempty",
       "expectText": "on any card to pin it to the top"
+    },
+    {
+      "name": "Recently Played strip renders the viewer's last plays",
+      "path": "/?demo=recent",
+      "expectSelector": ".recent-row .recent-card"
+    },
+    {
+      "name": "Home with no play history hides the Recently Played strip",
+      "path": "/?demo=recentclear",
+      "expectText": "All Games"
     },
     {
       "name": "Nonogram flags a grid that is full but wrong",
@@ -1797,6 +1859,23 @@
       "name": "A ladder one rung short of done is locked, not earned",
       "path": "/?screen=badges&demo=storybadges",
       "expectSelector": ".badge-chip.locked[data-badge=\"story-minefinder\"]"
+    },
+    {
+      "id": "theme.accent-teal",
+      "name": "Home filter chip wears the teal accent",
+      "path": "/",
+      "expectSelector": ".home-filter-chips .home-chip.on",
+      "visual": true,
+      "impact": [
+        "public/src/00-palette.jsx",
+        "public/src/01-styles.jsx",
+        "public/index.html"
+      ]
+    },
+    {
+      "name": "Dark theme filter chip wears the teal accent",
+      "path": "/?theme=dark",
+      "expectSelector": "html[data-theme=\"dark\"] .home-filter-chips .home-chip.on"
     }
   ],
   "visibility": {

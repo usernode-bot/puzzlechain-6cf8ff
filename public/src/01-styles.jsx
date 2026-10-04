@@ -12,6 +12,17 @@ ${paletteVars('light')}
 ${paletteVars('dark')}
 }
 
+/* The hosted native kit's accent follows ours in both themes, so kit
+   switches, action sheets, toasts and pull-to-refresh match the teal.
+   Overridden here, never by forking kit CSS. */
+:root, :root[data-theme="dark"] {
+  --un-accent: var(--c-accent);
+  --un-accent-contrast: #fff;
+  /* The toast surface is dark in both themes, so its action label is a
+     light teal in both. */
+  --un-toast-action: #5EEAD4;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
@@ -3896,6 +3907,46 @@ ${emitTapHighlightRules()}
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
+/* Recently Played tiles (Recent goal) reuse the inprog-card look, but as real
+   buttons: strip the browser chrome back to the shared card surface. */
+.recent-card {
+  font-family: inherit; text-align: left; color: ${C.text};
+  background: ${C.card}; border: 1px solid ${C.border};
+}
+.recent-card:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
+
+/* Daily checklist (#295): a horizontal scroller of one chip per daily game.
+   Scrollbar is hidden on purpose — the cut-off chip at the right edge is the
+   affordance — and snap keeps a partial chip from landing half-read. States
+   follow the daily badge palette: emerald done, gold resume, plain todo. */
+.dl-wrap { margin-bottom: 0.4rem; }
+.dl-row {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px;
+  scrollbar-width: none; -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.dl-row::-webkit-scrollbar { display: none; }
+.dl-check {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
+  padding: 6px 13px 6px 7px; font-family: inherit; font-size: 13px;
+  color: ${C.text}; cursor: pointer; scroll-snap-align: start;
+  white-space: nowrap;
+}
+.dl-check:hover { border-color: ${C.accent}; }
+.dl-mark {
+  width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+  border: 1.5px solid ${C.border};
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; font-weight: 700; color: white;
+}
+.dl-icon { font-size: 15px; line-height: 1; }
+.dl-name { font-weight: 600; }
+.dl-check.done { border-color: ${ca('emerald','4d')}; }
+.dl-check.done .dl-mark { background: ${C.emerald}; border-color: ${C.emerald}; }
+.dl-check.done .dl-name { color: ${C.muted}; }
+.dl-check.resume .dl-mark { border-color: ${C.gold}; color: ${C.gold}; }
 
 .chat-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;
@@ -4009,7 +4060,7 @@ ${emitTapHighlightRules()}
   padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
   color: ${C.muted}; cursor: pointer; touch-action: manipulation;
 }
-.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: ${ca('accent','1a')}; }
 /* The pin control (#232). It sits in the card's top-right corner, which the
    daily badge already used, so the badge's right offset below clears it
    unconditionally rather than only on cards that render a pin, so a daily and
@@ -4028,6 +4079,23 @@ ${emitTapHighlightRules()}
 .card-pin[data-pressed] { transform: scale(0.86); }
 .card-pin.on[data-pressed] { transform: rotate(-20deg) scale(0.86); }
 .card-pin[disabled] { opacity: 0.18; cursor: default; }
+
+/* The favorite star. Same 44px touch square and corner placement as .card-pin,
+   but stacked BELOW it so the two controls never collide, and clear of the
+   daily badge (which .card-pin already pushed left). The unfilled star is a
+   bare outline at the pin's resting opacity; the filled one is unfiltered and
+   fully opaque, which is the whole "filled vs empty" read. */
+.card-fav {
+  position: absolute; top: 2.7rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; opacity: 0.32;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.card-fav:hover { opacity: 0.6; }
+.card-fav.on { opacity: 1; }
+.card-fav.on { color: ${C.gold}; }
+.card-fav[data-pressed] { transform: scale(0.86); }
 
 /* The Pinned section's heading and the two lines that explain it. */
 .home-pinned-title { display: flex; align-items: baseline; gap: 0.5rem; }
@@ -4054,6 +4122,10 @@ ${emitTapHighlightRules()}
 .home-pin-empty {
   color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
 }
+/* The Favorites chip's empty state. Same register as .home-pin-empty above. */
+.home-fav-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
 
 .card-daily-badge {
   position: absolute; top: 0.65rem; right: 2.7rem; z-index: 1;
@@ -4061,7 +4133,7 @@ ${emitTapHighlightRules()}
   letter-spacing: 0.07em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;
 }
-.card-daily-badge.fresh  { background: rgba(45,95,174,.14); color: ${C.accent};  border-color: rgba(45,95,174,.30); }
+.card-daily-badge.fresh  { background: ${ca('accent','24')}; color: ${C.accent};  border-color: ${ca('accent','4d')}; }
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
 

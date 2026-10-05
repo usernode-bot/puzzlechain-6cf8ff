@@ -1296,6 +1296,92 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #326 — Jet Run's contact rules and its derived course targets. The game
+     has nothing to shoot at, so its hazards are gates, storm clouds and the
+     shields they cost; these are the rules a retune must not quietly undo,
+     mirroring hashrush-strike-rules: one pure pair owns the hit boxes and the
+     costs, and the frame loop and these checks all go through it. */
+  check('jetrun-course-rules', () => {
+    const W = 300;
+    const mk = (type, fx, fw, y) => ({ type, fx, fw, y });
+    // A gate is two posts standing at the edges of its gap; the middle of the
+    // gap is clear, a post is a hazard.
+    const gate = mk('gate', 0.5, 0.30, 100); // gap 90px wide, centred at 150
+    if (dfPickAt([gate], 150, 100, W) !== -1) throw new Error('the middle of a gate gap must be clear');
+    if (dfPickAt([gate], 185, 100, W) !== 0) throw new Error('a gate post must be a hazard');
+    // A storm cloud is a hazard; clear sky is not.
+    const cloud = mk('cloud', 0.5, 0.20, 200);
+    if (dfPickAt([cloud], 150, 200, W) !== 0) throw new Error('a storm cloud must be a hazard');
+    if (dfPickAt([cloud], 150, 140, W) !== -1) throw new Error('clear sky must not be a hazard');
+    // Stars are pickups, never hazards — dfStarAt is the one that sees them.
+    if (dfPickAt([mk('star', 0.5, 0.05, 100)], 150, 100, W) !== -1) throw new Error('a star must not be a hazard');
+    if (dfStarAt([mk('star', 0.5, 0.05, 100)], 150, 100, W) !== 0) throw new Error('a star must be collectable');
+    // Nearest contact wins when two hazards overlap the jet.
+    const near = mk('gate', 0.5, 0.30, 130);
+    if (dfPickAt([gate, near], 185, 120, W) !== 1) throw new Error('the nearest contact must win');
+    if (dfPickAt([near, gate], 185, 120, W) !== 0) throw new Error('the nearest contact must win, order aside');
+    // An already-hit object never bills twice.
+    if (dfPickAt([mk('cloud', 0.5, 0.20, 100)], 150, 100, W) !== 0) throw new Error('precondition');
+    if (dfPickAt([{ type: 'cloud', fx: 0.5, fw: 0.20, y: 100, hit: true }], 150, 100, W) !== -1) throw new Error('a hit cloud must not bill twice');
+    // The gate line: inside the gap is a pass, a post is a clip, outside both
+    // is a miss.
+    if (dfGateVerdict(150, 150, 45) !== 'pass') throw new Error('inside the gap must be a pass');
+    if (dfGateVerdict(150 + 57, 150, 45) !== 'clip') throw new Error('a post must be a clip');
+    if (dfGateVerdict(150 + 100, 150, 45) !== 'miss') throw new Error('clear of both must be a miss');
+    // The combo ladder: 5 gates per step, capped at ×5. And what a contact
+    // costs: a hazard takes a shield AND the combo, a star pays flat.
+    if (dfMultFor(0) !== 1 || dfMultFor(4) !== 1 || dfMultFor(5) !== 2 || dfMultFor(100) !== DF_MAX_MULT) {
+      throw new Error('the combo multiplier ladder is wrong');
+    }
+    const s = { score: 0, shields: 3, combo: 0 };
+    dfApplyHit(s, 'star');
+    if (s.score !== DF_STAR_SCORE || s.shields !== 3) throw new Error('a star must pay flat and never touch the shields');
+    s.combo = 4;
+    dfApplyHit(s, 'cloud');
+    if (s.shields !== 2 || s.combo !== 0) throw new Error('a storm must cost a shield and the combo');
+    dfApplyHit(s, 'pylon');
+    if (s.shields !== 1) throw new Error('a pylon must cost a shield');
+    // A storm is never parked inside a gate's gap — that would be a shield
+    // loss no steering can avoid, which is a tax rather than a puzzle.
+    const plan = dfCoursePlan({ speed: 200, spawnEvery: 0.6, cloudRate: 0.4, starRate: 0.2, gap: 0.26 }, mulberry32(424242), 120);
+    let lastGateFx = null;
+    for (const o of plan) {
+      if (o.type === 'gate') lastGateFx = o.fx;
+      else if (o.type === 'cloud' && lastGateFx != null && Math.abs(o.fx - lastGateFx) < 0.18) {
+        throw new Error('a cloud must not sit on the previous gate\'s gap');
+      }
+    }
+    return true;
+  });
+
+  /* Jet Run's targets are derived the same way Hash Rush's are (dfTargetFor),
+     so the same property checks hold: every rung has a reachable, strictly
+     rising, per-seed-stable target, and its course plan is deterministic. */
+  check('jetrun-level-targets', () => {
+    const seeded = (band) => mulberry32(hashStr('jetrun:story:' + band) >>> 0);
+    let prev = 0;
+    for (let b = 0; b < DF_STORY.length; b++) {
+      const cfg = { ...DF_STORY[b], limit: DF_STORY[b].secs };
+      const target = dfTargetFor(cfg, seeded(b));
+      const model = dfModelRun(cfg, seeded(b), cfg.limit);
+      if (!(target > 0)) throw new Error('level ' + (b + 1) + ' has no target');
+      if (target > model.score) throw new Error('level ' + (b + 1) + ' asks for ' + target + ' and the best the model scores is ' + model.score);
+      if (target <= prev) throw new Error('level ' + (b + 1) + ' asks for ' + target + ', no more than level ' + b + "'s " + prev);
+      prev = target;
+      if (dfModeConfig('story', b).limit !== DF_STORY[b].secs) {
+        throw new Error('level ' + (b + 1) + ' config lost its clock');
+      }
+      // Same seed, same target: two players on one rung must be given the
+      // same goal.
+      if (dfTargetFor(cfg, seeded(b)) !== target) throw new Error('level ' + (b + 1) + ' target is not stable');
+      // And the plan it is derived from must not depend on how it is walked.
+      const a = dfCoursePlan(cfg, seeded(b), cfg.limit);
+      const c = dfCoursePlan(cfg, seeded(b), cfg.limit);
+      if (a.length !== c.length) throw new Error('level ' + (b + 1) + ' course plan is not deterministic');
+    }
+    return true;
+  });
+
   /* #187 / #196 — the local resume record for story and arcade runs. These are
      the properties that keep it from doing harm: it is scoped per (game, mode,
      band) so two rungs cannot overwrite each other, it refuses to answer for a

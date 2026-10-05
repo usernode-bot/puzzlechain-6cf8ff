@@ -155,6 +155,13 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  // Request #326 ("aerial combat with F-16s") lands here as Jet Run: the
+  // platform's content rules ban combat and weapons as game mechanics, so the
+  // jet threads gates, dodges storm clouds and collects fuel stars — nothing
+  // is shot at. Tier B: no lib/dapp.js engine, finishes settle through the
+  // snapshot + timing heuristics like the other self-shell games without one.
+  jetrun:            { name: 'Jet Run',           category: 'classic', dailyMode: true, tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
@@ -237,7 +244,7 @@ const PIN_LIMIT = 8;
 
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
-const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
+const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders', 'jetrun']);
 
 /* ============================================================
    Play modes (#176) — story levels and arcade bands
@@ -273,6 +280,7 @@ const STORY_BANDS = {
   nonogram: 6, cratepush: 8, minefinder: 6,
   tilematching: 10, bounce: 6, diamondrush: 8, zuma: 6,
   hashrush: 6, match3: 6, 'knights-tour': 6,
+  jetrun: 6,
 };
 const storyBandCount = (gameId) => STORY_BANDS[gameId] || 0;
 
@@ -3641,6 +3649,10 @@ app.get('/api/daily', async (req, res) => {
         { gameId: 'sudoku', cleared: 3 },
         { gameId: 'zuma',   cleared: 6 },
         { gameId: 'spider', cleared: 3 },
+        // Jet Run's ladder half-walked too (request #326): 2 of 6, so the new
+        // game shows ticks AND an open rung AND locked ones the same way the
+        // classics above do.
+        { gameId: 'jetrun', cleared: 2 },
       ];
       for (const w of walked) {
         // Same rule as demo=storybadges: this fixture says sudoku is HALF
@@ -3683,6 +3695,32 @@ app.get('/api/daily', async (req, res) => {
         `INSERT INTO arcade_bests
            (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
          VALUES ($1, $2, '2048', 'normal', 11200, 210, 268, 4, now())
+         ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+        [req.user.id, req.user.username || null]
+      );
+      // Rivals on Jet Run's Normal board too (request #326), same shape as the
+      // 2048 block above but with its own fake users and a modest viewer row
+      // outside the top 3. Same ON CONFLICT DO NOTHING idempotence.
+      const jrRivals = [
+        { name: 'Staging flyer Ada',  score: 480 },
+        { name: 'Staging flyer Borg', score: 420 },
+        { name: 'Staging flyer Cleo', score: 360 },
+        { name: 'Staging flyer Dax',  score: 300 },
+        { name: 'Staging flyer Evy',  score: 240 },
+      ];
+      for (let i = 0; i < jrRivals.length; i++) {
+        await pool.query(
+          `INSERT INTO arcade_bests
+             (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
+           VALUES ($1, $2, 'jetrun', 'normal', $3, 150, 60, 3, now())
+           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+          [`staging-jet-${i + 1}`, jrRivals[i].name, jrRivals[i].score]
+        );
+      }
+      await pool.query(
+        `INSERT INTO arcade_bests
+           (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
+         VALUES ($1, $2, 'jetrun', 'normal', 180, 140, 45, 2, now())
          ON CONFLICT (user_id, game_id, band) DO NOTHING`,
         [req.user.id, req.user.username || null]
       );

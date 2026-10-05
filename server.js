@@ -448,6 +448,22 @@ async function openTodayForDemo(userId) {
 }
 
 async function seedFeaturedStreakDays(userId, username, nDays) {
+  /* ASSERT the streak LENGTH, do not merely add days to it. Staging carries
+     one database across every check run and never resets, and two fixtures seed
+     the viewer's past daily attempts to DIFFERENT depths — demo=streak wants 10
+     days, demo=badges wants 60. With a plain ON CONFLICT DO NOTHING whichever
+     ran first won permanently: once demo=badges had run, the streak-pill
+     fixture saw a 60-day streak and looked for a `data-streak="10"` that could
+     never render. Drop the caller's own finished attempts from BEFORE the
+     window this call is claiming first, so the consecutive run is exactly
+     nDays no matter what ran earlier. Today is left to the caller
+     (openTodayForDemo); only the caller's own rows are touched. */
+  await pool.query(
+    `DELETE FROM daily_attempts
+      WHERE user_id = $1
+        AND attempt_date < ((now() AT TIME ZONE 'utc')::date - $2::int)`,
+    [userId, nDays]
+  );
   const schedule = gotdSchedule();
   const { rows: dRows } = await pool.query(`SELECT (now() AT TIME ZONE 'utc')::date AS d`);
   const today = dRows[0].d;
@@ -3834,12 +3850,28 @@ app.get('/api/daily', async (req, res) => {
     }
 
     if (IS_STAGING && req.query.demo === 'myscores') {
-      /* Seeds the VIEWER's own all-time figures — /api/my/scores is
+      /* ASSERTS the VIEWER's own all-time figures — /api/my/scores is
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
-         Past UTC dates only, so it never collides with demo=locked /
-         demo=streak, which finish today's rows; every insert is
-         DO NOTHING, so re-runs and other fixtures' rows are preserved. */
+
+         Same rule as demo=storybadges / demo=modes: say what the figures ARE,
+         do not add to what is already there. Staging carries one database
+         across every check run and never resets, and demo=streak /
+         demo=badges seed prior daily attempts for THIS viewer across a dozen
+         games (plus a snakedaily row that turns the Snake card's "Best 350"
+         into a points figure). With plain DO NOTHING inserts the totals summed
+         across those fixtures, so the card and profile figures this fixture
+         claims could never render once a streak fixture had run. Clear ALL of
+         the caller's attempts first, today's included: this is the LAST
+         fixture route in the manifest, so nothing after it depends on a today
+         row another fixture left behind, and demo=dualmode's finished
+         snakedaily row would otherwise sum into the Snake card and hide the
+         "Best 350" this fixture asserts. Then seed the exact set it claims.
+         Strict no-op in prod. */
+      await pool.query(
+        `DELETE FROM daily_attempts WHERE user_id = $1`,
+        [req.user.id]
+      );
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];

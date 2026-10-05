@@ -462,6 +462,19 @@ body {
   }
 }
 
+/* #323 — on a desktop the games were three-to-four tiny tiles across a 920px
+   column, so the art and the mode buttons read as an index rather than as
+   something to tap. Above the phone breakpoint the column widens and the
+   track floor rises, which yields two big tiles across instead of four small
+   ones. Only the track floor and the column width change — every card rule,
+   the uniform-tile-height guarantee and the phone grid above are untouched,
+   and grid-two-up / grid-no-single-column still hold. The 561px floor matches
+   the phone breakpoint so the two never both apply. */
+@media (min-width: 561px) {
+  .lobby { max-width: 1160px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+}
+
 .card {
   background: ${C.card};
   border: 1px solid ${C.border};

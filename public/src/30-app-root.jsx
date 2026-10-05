@@ -157,7 +157,11 @@ function App() {
   // also what keeps the existing "/?tab=classic" proposal checks meaningful.
   const [homeFilter, setHomeFilter] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'daily' || t === 'classic' || t === 'favorites' ? t : 'all';
+    if (t === 'daily' || t === 'classic' || t === 'favorites') return t;
+    /* #301 — a category chip is also a real, tappable filter, so its deep link
+       is just the label. Unknown values still fall through to 'all'. */
+    if (t && GAME_CATEGORIES.has(t)) return t;
+    return 'all';
   });
   /* ?favview=1 preselects the Favorites chip. Deliberately separate from
      ?tab=favorites: ?tab= is a REAL chip a player can reach by tapping, and
@@ -1909,7 +1913,9 @@ function App() {
     setClassicLastResult(null);
     setPreLaunchGame(null);
     if (typeof tab !== 'string' || !tab) return;
-    if (tab === 'daily' || tab === 'classic') { setLobbyTab('home'); setHomeFilter(tab); }
+    if (tab === 'daily' || tab === 'classic' || GAME_CATEGORIES.has(tab)) {
+      setLobbyTab('home'); setHomeFilter(tab);
+    }
     else if (tab === 'ladder' || tab === 'home') setLobbyTab(tab);
   };
 
@@ -2087,7 +2093,7 @@ function App() {
   };
 
   // Build the menu config passed into ClassicShell for classic games.
-  const classicMenuConfig = (currentGame && currentGame.category === 'classic') ? {
+  const classicMenuConfig = (currentGame && currentGame.lobbyGroup === 'classic') ? {
     game: currentGame,
     gameMode: classicGameMode,
     lastResult: classicLastResult,
@@ -2679,8 +2685,8 @@ function App() {
                 // what a player meets first; the corner badge, not a section
                 // heading, is what marks a card as a daily.
                 const registryOrder = [
-                  ...GAMES.filter(g => g.category === 'daily'),
-                  ...GAMES.filter(g => g.category !== 'daily'),
+                  ...GAMES.filter(g => g.lobbyGroup === 'daily'),
+                  ...GAMES.filter(g => g.lobbyGroup !== 'daily'),
                 ];
                 /* #146 — walk the registry order ONCE, emitting a merged card
                    the first time either half of a pair is met and skipping the
@@ -2714,7 +2720,9 @@ function App() {
                   const hasDaily = c.modes.some(m => m.mode === 'daily');
                   if (homeFilter === 'daily') return hasDaily;
                   if (homeFilter === 'favorites') return favoriteSet.has(c.key);
-                  return !hasDaily || c.modes.some(m => m.mode !== 'daily');
+                  if (homeFilter === 'classic') return !hasDaily || c.modes.some(m => m.mode !== 'daily');
+                  /* #301 — anything left is a game category. */
+                  return cardCategory(c) === homeFilter;
                 });
                 /* One launcher for every card button. `mode` is null for the
                    head-to-head cards, whose axis is the opponent picker inside
@@ -2788,6 +2796,9 @@ function App() {
                         { id: 'all', label: 'All' },
                         { id: 'daily', label: 'Daily' },
                         { id: 'classic', label: 'Classic' },
+                        /* #301 — the real categories, in the fixed order the
+                           registry declares, so the row never reshuffles. */
+                        ...GAME_CATEGORY_ORDER.map(cat => ({ id: cat, label: cat })),
                         // Only rendered signed in: a signed-out visitor cannot
                         // star anything, so a chip that always answered "no
                         // games" would be dead UI. Appears the moment the
@@ -2815,6 +2826,15 @@ function App() {
                     {homeFilter === 'favorites' && starredCount === 0 && (
                       <div className="home-fav-empty">
                         No favorites yet. Tap the star on a game card to add it here.
+                      </div>
+                    )}
+                    {/* #301 — a category chip with nothing under it says so
+                        rather than rendering a bare heading over an empty
+                        grid. In practice every category has cards; this is the
+                        guard that keeps that true if the vocabulary drifts. */}
+                    {GAME_CATEGORIES.has(homeFilter) && ordered.length === 0 && (
+                      <div className="home-fav-empty">
+                        No {homeFilter} games yet. Try another category.
                       </div>
                     )}
                     {(() => {

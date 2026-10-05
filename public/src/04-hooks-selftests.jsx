@@ -510,6 +510,14 @@ function countTracks(value) {
    filed against the tap-target registry when the real cause was a crash that
    unmounted the stylesheet (#150). One honest `stylesheet-*` failure beats 18
    phantom ones, so the computed-style checks are SKIPPED instead. */
+/* The category the registry declares for an id, or null for an unknown one.
+   Used by the category self-tests to cross-check a card against the ids it
+   speaks for. */
+function GAME_REGISTRY_CATEGORY(id) {
+  const g = GAMES.find(x => x.id === id);
+  return g ? g.category : null;
+}
+
 function runClientSelfTests(styleReady) {
   const fails = [];
   const check = (name, fn) => {
@@ -736,6 +744,69 @@ function runClientSelfTests(styleReady) {
     if (!snake || !favSet.has(snake.key)) throw new Error('snake favorite did not resolve to its card');
     const filtered = GAME_CARDS.filter(c => favSet.has(c.key));
     if (filtered.length !== 3) throw new Error('the Favorites filter shows ' + filtered.length + ' of 3 starred cards');
+    return true;
+  });
+
+  /* #301 — the category chip row. Two things have to hold or a chip either
+     goes dead or double-counts a card: every card resolves to exactly ONE
+     category, and every chip's predicate is a lossless partition of the wall
+     (each card appears under exactly one category, and the categories together
+     hold the whole grid). A merged card carries its own category copy, so it
+     is counted once even though its two registry halves can disagree. */
+  check('category-partition', () => {
+    const seen = new Map();
+    for (const c of GAME_CARDS) {
+      const cat = cardCategory(c);
+      if (!GAME_CATEGORIES.has(cat)) {
+        throw new Error('card ' + c.key + ' has category ' + cat + ', which is not in GAME_CATEGORY_ORDER');
+      }
+      seen.set(cat, (seen.get(cat) || 0) + 1);
+    }
+    // Every category is non-empty (a chip that always answers "no games" is
+    // dead UI) and the counts sum to the whole grid (no card is unreachable
+    // from every chip).
+    for (const cat of GAME_CATEGORY_ORDER) {
+      if (!seen.get(cat)) throw new Error('category ' + cat + ' matches no card');
+    }
+    const total = GAME_CATEGORY_ORDER.reduce((n, cat) => n + seen.get(cat), 0);
+    if (total !== GAME_CARDS.length) {
+      throw new Error('categories hold ' + total + ' cards but the grid has ' + GAME_CARDS.length);
+    }
+    return true;
+  });
+
+  /* #301 — the curated vocabulary must not drift back into the old tag noise:
+     no trailing-S near-duplicates (Word / Words), and no legacy words that are
+     not categories. This is what keeps the chip row readable as it grows. */
+  check('category-tag-pairs', () => {
+    // The old tag vocabulary's near-duplicates and one-off words are retired:
+    // a chip labelled "Words" next to "Word", or "Campaign"/"Strategy"/"Risk"
+    // as categories, is the drift this pins shut.
+    const banned = new Set(['Words', 'Campaign', 'Strategy', 'Risk']);
+    for (const g of GAMES) {
+      if (!GAME_CATEGORIES.has(g.category)) {
+        throw new Error(g.id + ' has no valid category (' + g.category + ')');
+      }
+      if (banned.has(g.category)) {
+        throw new Error(g.id + ' uses the retired category word ' + g.category);
+      }
+    }
+    // Every CARD carries the category it filters under, and a merged card's
+    // two registry halves must have been reconciled into one — so a card can
+    // never be absent from the category chip that names it.
+    for (const c of GAME_CARDS) {
+      const cat = cardCategory(c);
+      if (!GAME_CATEGORIES.has(cat)) {
+        throw new Error('card ' + c.key + ' resolves to no category');
+      }
+      if (c.modes.length) {
+        const declared = new Set(c.modes.map(m => GAME_REGISTRY_CATEGORY(m.gameId)));
+        declared.delete(null);
+        if (declared.size > 1) {
+          throw new Error('card ' + c.key + ' merges ids in ' + [...declared].join(' and '));
+        }
+      }
+    }
     return true;
   });
 

@@ -1355,9 +1355,9 @@ function App() {
      the daily's consume-on-start claim works. A replay of a cleared band is
      inert by design: story pays the first time and never again. */
   const handleBandCleared = async (bandIndex, meta) => {
-    if (practiceMode || !authOk) return;
+    if (practiceMode || !authOk) return null;
     const gameId = currentGame && currentGame.id;
-    if (!gameId) return;
+    if (!gameId) return null;
     const { ok, body } = await api(`/api/story/${gameId}/clear`, {
       method: 'POST',
       body: JSON.stringify({
@@ -2292,7 +2292,7 @@ function App() {
                  (startPractice, playAgain, a classic mode change, and
                  ClassicShell's New Game), so a normal run is never remounted
                  mid-play. */
-              key={playAgainKey}
+              key={bodyKey || playAgainKey}
               {...modeProps}
               onWin={handleWin}
               onLose={handleLose}

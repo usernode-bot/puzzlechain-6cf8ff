@@ -449,7 +449,7 @@ function KnightsTourGame({ onWin, onStepChange, resetKey, playMode, band, offset
         </div>
       )}
 
-      <div className="kt-bottom-nav">
+      <div className="kt-bottom-nav safe-bottom">
         {['game', 'leaderboard', 'history'].map(tab => (
           <button
             key={tab}

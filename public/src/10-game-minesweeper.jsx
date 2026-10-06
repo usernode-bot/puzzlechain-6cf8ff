@@ -550,7 +550,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
-      <div className="ms-bottom-nav">
+      <div className="ms-bottom-nav safe-bottom">
         {['game', 'history', 'leaderboard', 'settings'].map(tab => (
           <button
             key={tab}

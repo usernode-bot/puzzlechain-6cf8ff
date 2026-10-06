@@ -777,7 +777,7 @@ function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, off
         </div>
       )}
 
-      <div className="t2048-bottom-nav">
+      <div className="t2048-bottom-nav safe-bottom">
         {['game', 'leaderboard'].map(tab => (
           <button
             key={tab}

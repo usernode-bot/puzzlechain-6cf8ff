@@ -1894,6 +1894,18 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #328 — safe areas are ONE rule. Bare env(safe-area-inset-*) is 0px inside
+     the platform iframe, so any use outside the token definition is inert on
+     a notched phone. Everything reads var(--safe-*), defined once on :root. */
+  check('safe-area-single-rule', () => {
+    const stray = (css.match(/env\(safe-area-inset-[a-z]+/g) || []).length;
+    if (stray !== 4) throw new Error('env(safe-area-inset-*) must appear only in the four --safe-* definitions, found ' + stray);
+    const rs = getComputedStyle(document.documentElement);
+    const missing = ['top', 'right', 'bottom', 'left'].filter((d) => rs.getPropertyValue('--safe-' + d) === '');
+    if (missing.length) throw new Error('--safe-* tokens not defined on :root: ' + missing.join(', '));
+    return true;
+  });
+
   /* #150 — navState is JSON.stringify'd every render, so ONE non-primitive
      field (a SyntheticEvent handed to backToLobby as `tab`) threw
      "Converting circular structure to JSON" and unmounted the whole root.

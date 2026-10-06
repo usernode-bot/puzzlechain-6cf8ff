@@ -3837,9 +3837,36 @@ app.get('/api/daily', async (req, res) => {
       /* Seeds the VIEWER's own all-time figures — /api/my/scores is
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
-         Past UTC dates only, so it never collides with demo=locked /
-         demo=streak, which finish today's rows; every insert is
-         DO NOTHING, so re-runs and other fixtures' rows are preserved. */
+
+         Staging carries ONE database across every check run and never
+         resets, so this fixture has to ASSERT its state, not add to it —
+         the same rule demo=storybadges and demo=modes follow. demo=streak
+         and demo=badges already finished this viewer's past-date
+         daily_attempts, and demo=ladder wrote a rating row; with plain
+         ON CONFLICT DO NOTHING those earlier rows win, /api/my/scores
+         SUMS them (sudoku 4,820 rather than 320), and the merged Snake
+         card prefers that pts over its classic best — so the figures this
+         fixture names never render. Clear the viewer's rows for the games
+         it names first, including the card-union daily ids that would
+         otherwise mask a seeded best (snakedaily over snake, minefinder
+         over minesweeper). */
+      await pool.query(
+        `DELETE FROM daily_attempts
+          WHERE user_id = $1
+            AND attempt_date < (now() AT TIME ZONE 'utc')::date
+            AND game_id IN ('sudoku', '2048', 'wordsprint', 'minefinder', 'snakedaily')`,
+        [req.user.id]
+      );
+      await pool.query(
+        `DELETE FROM classic_scores
+          WHERE user_id = $1 AND game_id IN ('minesweeper', '2048', 'chutes-ladders')`,
+        [req.user.id]
+      );
+      await pool.query(`DELETE FROM snake_scores WHERE user_id = $1`, [req.user.id]);
+      await pool.query(
+        `DELETE FROM game_ratings WHERE user_id = $1 AND game_id = 'checkers'`,
+        [req.user.id]
+      );
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];

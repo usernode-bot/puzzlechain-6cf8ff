@@ -11,6 +11,18 @@ ${paletteVars('light')}
 :root[data-theme="dark"] {
 ${paletteVars('dark')}
 }
+/* ---- Safe-area tokens (#328) ----
+   The ONE definition. Bare env(safe-area-inset-*) is always 0px inside the
+   platform's cross-origin iframe, so the bridge forwards the real insets as
+   --un-safe-inset-*; env() is the fallback when the app is opened standalone.
+   Every inset below reads these four, never env() directly. Both resolve to
+   0px on desktop and notchless devices, so nothing moves there. */
+:root {
+  --safe-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px));
+  --safe-right: var(--un-safe-inset-right, env(safe-area-inset-right, 0px));
+  --safe-bottom: var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--un-safe-inset-left, env(safe-area-inset-left, 0px));
+}
 
 /* The hosted native kit's accent follows ours in both themes, so kit
    switches, action sheets, toasts and pull-to-refresh match the teal.
@@ -26,7 +38,7 @@ ${paletteVars('dark')}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
-html { background: ${C.bg}; }
+html { background: ${C.bg}; scroll-padding-top: var(--safe-top); scroll-padding-bottom: var(--safe-bottom); }
 
 body {
   font-family: 'Space Grotesk', system-ui, sans-serif;
@@ -43,6 +55,9 @@ body {
 #root { min-height: 100vh; }
 
 .app { min-height: 100vh; display: flex; flex-direction: column; }
+/* Page-scrolling screens end clear of the home indicator. The fitted shell
+   (.app-fit) already pads its own bottom, so it is excluded. */
+.app:not(.app-fit) { padding-bottom: var(--safe-bottom); }
 
 /* ---- Nav bar ---- */
 /* #223 — the bar was 78px tall at 390px wide, and it is sticky, so it cost
@@ -56,7 +71,7 @@ body {
 .nav {
   background: ${C.surface};
   border-bottom: 1px solid ${C.border};
-  padding: 0.45rem 1.25rem;
+  padding: calc(0.45rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) 0.45rem calc(1.25rem + var(--safe-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -572,7 +587,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0.7rem 0.9rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  padding: 0.7rem 0.9rem calc(0.7rem + var(--safe-bottom));
   gap: 0.45rem;
 }
 .game-wrap.fit .game-head { flex: 0 0 auto; margin-bottom: 0; }
@@ -756,7 +771,7 @@ ${emitTapHighlightRules()}
    Hash Rush) are frozen behind the results card now too. Their ClassicShell is
    a fixed full-viewport layer, so the fixed minibar would sit on top of the
    bottom of the stage; reserve the same gutter .game-wrap already gets. */
-.game-body.frozen .cg-stage { padding-bottom: 5.5rem; }
+.game-body.frozen .cg-stage { padding-bottom: calc(5.5rem + var(--safe-bottom)); }
 /* PHASE 4 (#134) — the freeze used to kill the whole reviewed subtree, INCLUDING
    the header the shell renders inside it. That is why Back stopped working after
    "View board", and it hit every in-frame classic game's whole topbar (exit, ☰,
@@ -771,7 +786,7 @@ ${emitTapHighlightRules()}
 .result-minibar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 0.85rem 1.1rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  padding: 0.85rem calc(1.1rem + var(--safe-right)) calc(0.85rem + var(--safe-bottom)) calc(1.1rem + var(--safe-left));
   background: ${C.card}; border: none; border-top: 1px solid ${C.border};
   box-shadow: 0 -6px 22px rgba(63,51,24,0.14);
   font-family: inherit; font-size: 0.92rem; font-weight: 600; color: ${C.text};
@@ -874,7 +889,7 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  padding: calc(1.25rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) calc(1.25rem + var(--safe-bottom)) calc(1.25rem + var(--safe-left));
   overflow-y: auto;
 }
 .win-card {
@@ -886,8 +901,8 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   width: 100%;
   box-shadow: 0 20px 50px var(--c-shadow-lg);
-  max-height: calc(100vh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  max-height: calc(100dvh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100vh - 2.5rem - var(--safe-top) - var(--safe-bottom));
+  max-height: calc(100dvh - 2.5rem - var(--safe-top) - var(--safe-bottom));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -1136,7 +1151,7 @@ ${emitTapHighlightRules()}
   position: fixed; inset: 0; z-index: 70;
   background: var(--c-scrim);
   display: flex; align-items: center; justify-content: center;
-  padding: 1rem;
+  padding: calc(1rem + var(--safe-top)) calc(1rem + var(--safe-right)) calc(1rem + var(--safe-bottom)) calc(1rem + var(--safe-left));
 }
 .gb-sheet {
   width: 100%; max-width: 420px; max-height: 82dvh; overflow-y: auto;
@@ -1205,7 +1220,8 @@ ${emitTapHighlightRules()}
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 220;
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(1rem + var(--safe-top)) calc(1rem + var(--safe-right)) calc(1rem + var(--safe-bottom)) calc(1rem + var(--safe-left));
 }
 .howto-card {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
@@ -2648,7 +2664,7 @@ ${emitTapHighlightRules()}
   overflow: hidden;
   overscroll-behavior: none;
   z-index: 40;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   --cg-chrome: 3.6rem;
   --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem), 560px);
 }
@@ -2704,7 +2720,7 @@ ${emitTapHighlightRules()}
   padding: clamp(0.5rem, 2vh, 1rem) 0.6rem;
   overflow: hidden;
 }
-.cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
+.cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; scroll-padding-bottom: var(--safe-bottom); }
 
 /* Bottom sheet */
 .cg-sheet-backdrop {
@@ -2726,7 +2742,7 @@ ${emitTapHighlightRules()}
   background: ${C.surface};
   border-top: 1px solid ${C.border};
   border-radius: 18px 18px 0 0;
-  padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  padding: 0.5rem 1rem calc(1rem + var(--safe-bottom));
   max-height: 82dvh;
   overflow-y: auto;
   transform: translateY(110%);
@@ -3132,7 +3148,7 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 55;
-  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  padding: calc(1.25rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) calc(1.25rem + var(--safe-bottom)) calc(1.25rem + var(--safe-left));
   overflow-y: auto;
 }
 .adv-card {
@@ -3563,7 +3579,7 @@ ${emitTapHighlightRules()}
    because it floats over a live board — a marker must never eat a tap. */
 .practice-ribbon.pinned {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(0.6rem + var(--safe-bottom));
   z-index: 60; pointer-events: none;
   background: ${C.card}; border: 1px solid ${C.violet};
   box-shadow: var(--c-shadow-md);
@@ -3956,6 +3972,7 @@ ${emitTapHighlightRules()}
   background: ${C.surface}; border: 1px solid ${C.border}; border-bottom: none;
   border-radius: 18px 18px 0 0; width: 100%; max-width: 560px;
   height: min(72vh, 640px); display: flex; flex-direction: column;
+  padding-bottom: var(--safe-bottom);
 }
 .chat-head {
   display: flex; align-items: center; justify-content: space-between;

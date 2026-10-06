@@ -3886,8 +3886,29 @@ app.get('/api/daily', async (req, res) => {
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
          Past UTC dates only, so it never collides with demo=locked /
-         demo=streak, which finish today's rows; every insert is
-         DO NOTHING, so re-runs and other fixtures' rows are preserved. */
+         demo=streak, which finish today's rows. */
+      // ASSERT ITS STATE, not add to it. demo=streak / demo=badges seed the
+      // viewer's finished past days at whatever game the GotD schedule
+      // featured (score-900 rows), and staging carries one database across
+      // every check run — so sudoku, 2048 and snakedaily rows already sit
+      // beside these inserts and DO NOTHING preserves them. The sums this
+      // fixture names (+320 / +800) and the Snake card's "Best 350" fall-through
+      // (snakedaily pts would win the card's pts-over-best priority) are then
+      // wrong however many times this route re-runs. Clear the viewer's
+      // finished rows for the games it speaks for before inserting: past
+      // dates only for its own three dailies (today's rows belong to
+      // demo=locked), snakedaily on every date. Every streak/badge claim
+      // re-asserts itself on its own demo routes, so the delete cannot
+      // starve them — their inserts are re-run by their fixture.
+      await pool.query(
+        `DELETE FROM daily_attempts
+          WHERE user_id = $1
+            AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
+            AND (game_id = 'snakedaily'
+                 OR (game_id IN ('sudoku', '2048', 'wordsprint')
+                     AND attempt_date < (now() AT TIME ZONE 'utc')::date))`,
+        [req.user.id]
+      );
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];

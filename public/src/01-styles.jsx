@@ -4126,6 +4126,19 @@ ${emitTapHighlightRules()}
 .home-fav-empty {
   color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
 }
+/* #321 — the All Games search box. Follows the .chat-input pattern (card
+   background, hairline border, 10px radius, teal focus); only PALETTE keys
+   are interpolated. The empty line is .home-fav-empty's register exactly. */
+.home-search {
+  width: 100%; padding: 0.55rem 0.8rem; margin: 0 0 0.6rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  color: ${C.text}; font-family: inherit; font-size: 0.9rem; outline: none;
+}
+.home-search:focus { border-color: ${C.accent}; }
+.home-search::placeholder { color: ${C.muted}; }
+.home-search-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
 
 .card-daily-badge {
   position: absolute; top: 0.65rem; right: 2.7rem; z-index: 1;

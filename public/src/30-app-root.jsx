@@ -159,6 +159,14 @@ function App() {
     const t = new URLSearchParams(window.location.search).get('tab');
     return t === 'daily' || t === 'classic' || t === 'favorites' ? t : 'all';
   });
+  /* #321 — type-to-filter on the All Games grid. Same shape as homeFilter:
+     one URL parameter read at mount (?q=, so the navigation-only proposal
+     checks can reach a filtered grid), deliberately NOT a navState field —
+     typing narrows the grid, it does not move "where am I", so it pushes no
+     history entry. Nothing persisted: a reload starts empty, like the chips. */
+  const [homeSearch, setHomeSearch] = useState(() =>
+    new URLSearchParams(window.location.search).get('q') || ''
+  );
   /* ?favview=1 preselects the Favorites chip. Deliberately separate from
      ?tab=favorites: ?tab= is a REAL chip a player can reach by tapping, and
      its deep link already exists for the daily/classic chips — but it is also
@@ -2709,7 +2717,13 @@ function App() {
                   if (c) favoriteSet.add(c.key);
                 }
                 const starredCount = favoriteSet.size;
+                /* #321 — search runs as the FIRST predicate of this same walk,
+                   so the chips, the pin partition and the Daily split all read
+                   the already-narrowed list and can never disagree with it —
+                   the same ordering claim the #232 comment below makes. */
+                const q = homeSearch.trim().toLowerCase();
                 const ordered = GAME_CARDS.filter(c => {
+                  if (q && !c.name.toLowerCase().includes(q)) return false;
                   if (homeFilter === 'all') return true;
                   const hasDaily = c.modes.some(m => m.mode === 'daily');
                   if (homeFilter === 'daily') return hasDaily;
@@ -2783,6 +2797,18 @@ function App() {
                     )}
                     {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
                     <div className="home-section-title">All Games</div>
+                    {/* #321 — the search box, between the heading and the chips.
+                        One field, no button: the grid narrows as you type, and
+                        deleting the text brings it back. Not a tap target (it is
+                        an input), so TAPPABLE_CLASSES is untouched. */}
+                    <input
+                      type="text"
+                      className="home-search"
+                      placeholder="Search games…"
+                      aria-label="Search games"
+                      value={homeSearch}
+                      onChange={(e) => setHomeSearch(e.target.value)}
+                    />
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },
@@ -2815,6 +2841,17 @@ function App() {
                     {homeFilter === 'favorites' && starredCount === 0 && (
                       <div className="home-fav-empty">
                         No favorites yet. Tap the star on a game card to add it here.
+                      </div>
+                    )}
+                    {/* #321 — a search that matches nothing says so, in the
+                        same register as the Favorites and daily-split empty
+                        lines above. The Favorites line keeps firing only when
+                        the player has no stars at all; a search that hides
+                        every starred game leaves `ordered` empty and this line
+                        takes over. */}
+                    {q && ordered.length === 0 && (
+                      <div className="home-search-empty">
+                        No games match "{homeSearch.trim()}".
                       </div>
                     )}
                     {(() => {

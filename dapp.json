@@ -1896,6 +1896,21 @@
       "name": "Card without a daily still shows its all-time best",
       "path": "/?demo=myscores",
       "expectText": "Best 350"
+    },
+    {
+      "name": "Home search box renders above the filter chips",
+      "path": "/",
+      "expectSelector": ".home-search"
+    },
+    {
+      "name": "Search narrows the All Games grid to a match",
+      "path": "/?q=snake",
+      "expectText": "Snake"
+    },
+    {
+      "name": "A search that matches nothing shows the empty line",
+      "path": "/?q=zzzz",
+      "expectText": "No games match"
     }
   ],
   "visibility": {

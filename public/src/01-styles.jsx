@@ -1200,6 +1200,10 @@ ${emitTapHighlightRules()}
   .pregame-chips { margin-bottom: 0.7rem; }
   .pregame-stats { margin-bottom: 0.7rem; }
   .pregame-actions { margin-top: 0.5rem; }
+  /* The first-run panel is extra content on a first visit; tighten it on
+     short viewports so Play stays near the fold (see #239 above). */
+  .walkthrough { margin-bottom: 0.5rem; padding: .55rem .65rem; }
+  .walkthrough-step { margin-bottom: .3rem; }
 }
 
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
@@ -4268,6 +4272,29 @@ ${emitTapHighlightRules()}
   background: ${ca('accent', '24')}; color: ${C.accent};
   font-size: .62rem; font-weight: 700;
 }
+
+/* #334 — first-run walkthrough (#334's .walkthrough, styled after the
+   opponent screen's brief it can stand in for: same pale well, same number
+   circles) plus a thin accent border and the steps laid out like the
+   How-to-Play modal's. "Got it" reuses .pregame-howto-btn, full width, so it
+   never competes with the filled Play button. */
+.walkthrough {
+  width: 100%; margin: .15rem 0 .8rem;
+  padding: .7rem .8rem; border-radius: 12px;
+  background: var(--c-well); border: 1px solid ${ca('accent', '44')};
+  text-align: left;
+}
+.walkthrough-title {
+  font-weight: 700; font-size: .9rem; color: ${C.text};
+  margin-bottom: .45rem;
+}
+.walkthrough-step {
+  display: flex; gap: .5rem; align-items: baseline;
+  font-size: .8rem; line-height: 1.4; color: ${C.muted};
+  margin-bottom: .35rem;
+}
+.walkthrough-step b { color: ${C.text}; font-weight: 600; }
+.walkthrough-ok { width: 100%; margin-top: .4rem; flex: 0 0 auto; }
 .opp-lb { margin-top: 1.1rem; border-top: 1px solid ${C.border}; padding-top: 0.8rem; }
 .mnc-ranked-pill {
   margin-left: .4rem; font-size: .68rem; font-weight: 700; vertical-align: middle;

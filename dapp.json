@@ -1317,7 +1317,17 @@
     {
       "name": "Opponent screen carries the game brief, not just a mode list",
       "path": "/?game=gomoku",
-      "expectSelector": ".opp-brief"
+      "expectSelector": ".opp-brief-row, .walkthrough-step"
+    },
+    {
+      "name": "First-run walkthrough shows on the pre-game screen",
+      "path": "/?game=sudoku&pmode=story&walkthrough=1",
+      "expectSelector": ".pregame-card .walkthrough[data-walkthrough='first-run'] .walkthrough-ok"
+    },
+    {
+      "name": "First-run walkthrough replaces the brief on the opponent screen",
+      "path": "/?game=checkers&walkthrough=1",
+      "expectSelector": ".pregame-card[data-first-run='1'] .walkthrough"
     },
     {
       "name": "How to play is a button on the opponent screen, not a popup",

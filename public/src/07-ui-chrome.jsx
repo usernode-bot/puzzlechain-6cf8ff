@@ -798,12 +798,41 @@ function ArcadeRuns({ gameId, authOk, onReplay }) {
    same wherever you reach them from, and there is one place to add the next
    one.
    ============================================================ */
+/* #334 — the first-run walkthrough. ONE panel, rendered by whichever pre-board
+   screen the game reaches. It reuses the game's howToPlay cards (the long form
+   behind the "?") so no second copy of the copy exists, reuses `.opp-brief-n`
+   for the numbered steps so it looks like the opponent screen's brief it can
+   stand in for, and never opens over a board — the phase-3 rule that the
+   How-to-Play modal never opens by itself holds; this lives ON the screen you
+   land on before playing. */
+function GameWalkthrough({ game, onDismiss }) {
+  return (
+    <div className="walkthrough" data-walkthrough="first-run">
+      <div className="walkthrough-title">👋 First time playing {game.name}?</div>
+      {game.howToPlay.map((c, i) => (
+        <div className="walkthrough-step" key={i}>
+          <span className="opp-brief-n">{i + 1}</span>
+          <span><b>{c.title}</b> {c.body}</span>
+        </div>
+      ))}
+      <button className="pregame-howto-btn walkthrough-ok" onClick={onDismiss}>Got it</button>
+    </div>
+  );
+}
+
 function OpponentScreen({ game, onPlay, onHowTo, onChat }) {
   /* The variant glossary belongs to this screen while it is the one asking the
      question, so it is local state rather than another app-level overlay —
      Snakes & Ladders is the only game with a board variant, and its own
      in-game header already owns the same modal once a match is running. */
   const [glossary, setGlossary] = useState(false);
+  /* #334 — the screen mounts fresh on each visit, so the gate initialises per
+     visit. Choosing an opponent counts as seen, same as "Got it"; leaving via
+     ← Back writes nothing, so a player who only peeked still gets it. */
+  const [firstRun, setFirstRun] = useState(() => shouldShowWalkthrough(game));
+  const dismissWalkthrough = () => { markGameSeen(game.id); setFirstRun(false); };
+  /* Choosing an opponent also puts the walkthrough away for good. */
+  const pickerPlay = (...args) => { markGameSeen(game.id); onPlay(...args); };
   const m = game.manifest || {};
   const modes = game.modes || [];
   const hasBot = modes.indexOf('bot') !== -1;
@@ -813,7 +842,7 @@ function OpponentScreen({ game, onPlay, onHowTo, onChat }) {
      off `modes` instead of being hardcoded for the five board games. */
   const heading = hasBot || hasLocal2p ? 'Choose an opponent' : 'Choose how to play';
   return (
-    <div className="pregame-card" style={{ '--accent': game.tagColor || C.accent }}>
+    <div className="pregame-card" data-first-run={firstRun ? '1' : '0'} style={{ '--accent': game.tagColor || C.accent }}>
       <div className="pregame-icon">{game.icon}</div>
       <h2>{game.name}</h2>
       <div className="sub">{game.desc}</div>
@@ -827,24 +856,30 @@ function OpponentScreen({ game, onPlay, onHowTo, onChat }) {
         {modes.indexOf('online') !== -1 && <span className="pregame-chip">🌐 Online</span>}
       </div>
 
-      {/* What the game actually is, in the player's own terms. The how-to
-          cards are the long form behind the "?" — this is the one-line version
-          you need before choosing an opponent. */}
-      {game.howToPlay && game.howToPlay.length > 0 && (
-        <div className="opp-brief">
-          {game.howToPlay.slice(0, 2).map((c, i) => (
-            <div className="opp-brief-row" key={i}>
-              <span className="opp-brief-n">{i + 1}</span>
-              <span><b>{c.title}</b> {c.body}</span>
-            </div>
-          ))}
-        </div>
+      {/* While the walkthrough shows it takes the brief's place, so the same
+          steps are not on the screen twice; once dismissed, the brief returns. */}
+      {firstRun && game.howToPlay && game.howToPlay.length > 0 ? (
+        <GameWalkthrough game={game} onDismiss={dismissWalkthrough} />
+      ) : (
+        /* What the game actually is, in the player's own terms. The how-to
+           cards are the long form behind the "?" — this is the one-line version
+           you need before choosing an opponent. */
+        game.howToPlay && game.howToPlay.length > 0 && (
+          <div className="opp-brief">
+            {game.howToPlay.slice(0, 2).map((c, i) => (
+              <div className="opp-brief-row" key={i}>
+                <span className="opp-brief-n">{i + 1}</span>
+                <span><b>{c.title}</b> {c.body}</span>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       <div className="pregame-bands-label">{heading}</div>
       <ClassicModePicker
         game={game}
-        onPlay={onPlay}
+        onPlay={pickerPlay}
         onGlossary={game.variantPicker ? () => setGlossary(true) : undefined}
       />
       {glossary && <MokshaGlossaryModal onClose={() => setGlossary(false)} />}
@@ -990,6 +1025,11 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
     try { return new URLSearchParams(window.location.search).get('boards') === '1'; }
     catch (e) { return false; }
   });
+  /* #334 — first-run walkthrough, one visit at a time (this screen mounts fresh
+     on every visit). Pressing Play counts as seen, same as "Got it". */
+  const [firstRun, setFirstRun] = useState(() => shouldShowWalkthrough(game));
+  const dismissWalkthrough = () => { markGameSeen(game.id); setFirstRun(false); };
+  const handlePlay = () => { markGameSeen(game.id); onPlay(); };
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const resuming = !!(attempt && !attempt.finishedAt);
   const m = game.manifest || {};
@@ -1006,7 +1046,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
   const bandTotal = prog ? prog.total : 0;
   const bandCleared = prog ? prog.cleared : 0;
   return (
-    <div className="pregame-card" style={{ '--accent': game.tagColor || C.accent }}>
+    <div className="pregame-card" data-first-run={firstRun ? '1' : '0'} style={{ '--accent': game.tagColor || C.accent }}>
       <div className="pregame-icon">{game.icon}</div>
       <h2>{game.name}</h2>
       <div className="sub">{game.desc}</div>
@@ -1018,6 +1058,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
         {m.undo === 'free' && <span className="pregame-chip">↩︎ Undo allowed</span>}
         {m.undo === 'booster' && <span className="pregame-chip">↩︎ Limited boosters</span>}
       </div>
+      {firstRun && <GameWalkthrough game={game} onDismiss={dismissWalkthrough} />}
       <div className="pregame-stats">
         <div className="pregame-stat">
           <div className="l">{isArcade ? 'Best on this band' : 'Personal best'}</div>
@@ -1114,7 +1155,7 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
       {resuming && (
         <div className="pregame-resume-note">▶ You have a run in progress — jump back in where you left off.</div>
       )}
-      <button className="primary-btn pregame-play" onClick={onPlay}>
+      <button className="primary-btn pregame-play" onClick={handlePlay}>
         {resuming ? '▶ Resume' : !authOk && game.daily ? 'Play as guest' : 'Play'}
       </button>
       {game.daily && !authOk && (

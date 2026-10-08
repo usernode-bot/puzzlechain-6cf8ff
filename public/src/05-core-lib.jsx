@@ -289,6 +289,41 @@ function clearRunSave(gameId, playMode, band) {
   try { localStorage.removeItem(runSaveKey(gameId, playMode, band)); } catch (_) {}
 }
 
+/* First-run walkthrough (#334) — which games THIS DEVICE has opened. Device-
+   local like every other pref (the theme, the typing preference): which games
+   you have already been shown the basics of is not account data, so it never
+   touches the server. One key per registry id, so the two-id classics (Snake /
+   Daily Snake and friends) are tracked separately, each on the screen it
+   actually reaches. */
+const SEEN_GAME_PREFIX = 'pc_seen_';
+
+function hasSeenGame(id) {
+  if (!id) return false;
+  try { return localStorage.getItem(SEEN_GAME_PREFIX + id) === '1'; }
+  catch (_) { return false; }
+}
+
+function markGameSeen(id) {
+  if (!id) return;
+  try { localStorage.setItem(SEEN_GAME_PREFIX + id, '1'); }
+  catch (_) { /* quota or a private window: the panel re-showing is not worth throwing over */ }
+}
+
+/* `?walkthrough=1` forces the panel for checks and screenshots, even on a game
+   already marked seen — the same shape as `?boards=1`'s guarded read. */
+function walkthroughForced() {
+  try { return new URLSearchParams(window.location.search).get('walkthrough') === '1'; }
+  catch (_) { return false; }
+}
+
+/* The gate: a game with how-to-play steps that this device has never opened
+   (or one forced open by the deep link). A game with no steps shows nothing —
+   there is nothing to say that the "?" button doesn't already do better. */
+function shouldShowWalkthrough(game) {
+  if (!game || !game.howToPlay || !game.howToPlay.length) return false;
+  return walkthroughForced() || !hasSeenGame(game.id);
+}
+
 // The shape the game components expect, from the record we stored.
 function hydrateRunSave(rec, offset) {
   if (!rec || !rec.progress) return null;

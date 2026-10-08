@@ -1335,6 +1335,37 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #334 — the first-run walkthrough's seen record. The record is what keeps
+     the panel a first-run feature: it must round-trip per registry id (the
+     two-id classics are tracked separately by construction — the key carries
+     the id), read as unseen before it exists and after it is cleared, and the
+     write must land under the exact key the gate reads. */
+  check('walkthrough-seen-record', () => {
+    const key = SEEN_GAME_PREFIX + '__selftest__';
+    const withSteps = { id: '__selftest__', howToPlay: [{ title: 't', body: 'b' }] };
+    const forced = walkthroughForced();   // this boot may carry ?walkthrough=1
+    try { localStorage.removeItem(key); } catch (_) {}
+    if (hasSeenGame('__selftest__')) throw new Error('a game never opened must read as unseen');
+    if (shouldShowWalkthrough(withSteps) !== (forced || true)) {
+      throw new Error('an unseen game with steps must show the walkthrough');
+    }
+    if (shouldShowWalkthrough({ id: '__selftest__', howToPlay: [] }) !== false) {
+      throw new Error('a game with no steps must never show the walkthrough');
+    }
+    markGameSeen('__selftest__');
+    try {
+      if (localStorage.getItem(key) !== '1') throw new Error('the write must land on pc_seen_<id>');
+      if (!hasSeenGame('__selftest__')) throw new Error('a marked game must read as seen');
+      // Seen puts it away unless ?walkthrough=1 forces it — both halves hold.
+      if (shouldShowWalkthrough(withSteps) !== forced) {
+        throw new Error('a seen game must not show the walkthrough unless forced');
+      }
+    } finally {
+      try { localStorage.removeItem(key); } catch (_) {}
+    }
+    return true;
+  });
+
   /* Snakes & Ladders V2 — the seven hand-authored tier boards must satisfy
      the authoring constraints (see snakesladders-v2/00-layouts.jsx), or a
      future retune ships a broken board: a chained jump the engine resolves

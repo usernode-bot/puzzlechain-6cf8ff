@@ -3839,25 +3839,30 @@ app.get('/api/daily', async (req, res) => {
       /* Seeds the VIEWER's own all-time figures — /api/my/scores is
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
-         Past UTC dates only, so it never collides with demo=locked /
-         homegrid / dualmode, which finish TODAY's rows (the profile's
-         recent list and the lobby's PLAYED indicator seed from those and
-         must survive). Everything before today IS asserted, because
-         /api/my/scores reads three per-viewer tables this fixture is the
-         sole declaration of for the viewer:
-           • daily_attempts points SUM over every finished day, so the
-             long-streak fixtures (demo=streak / demo=badges seed 900 on
-             each of 60 prior days) would add thousands to a game's total;
-           • snake_scores is read MAX across its rows, so another demo's
-             owned row would outrank this 350;
-           • classic_scores is read MAX(best_score) per game.
-         Without the deletes the all-time figure assertions never see the
-         numbers they look for. CLAUDE.md: a fixture that seeds a COUNT
-         must clear what would otherwise survive — ON CONFLICT DO NOTHING
-         alone silently keeps the first writer's rows. */
+         This fixture is the caller's SOLE declaration of their all-time
+         figures, so it ASSERTS its state: the deletes below clear whatever an
+         earlier route in the same suite left behind, because the shared
+         staging DB and viewer made which tests ran first decide what these
+         four checks saw. CLAUDE.md: a fixture that seeds a COUNT must clear
+         what would otherwise survive — ON CONFLICT DO NOTHING alone keeps
+         the first writer's rows.
+           • daily_attempts: /api/my/scores SUMS every finished day, so the
+             long-streak fixtures (demo=streak / demo=badges seed 900 on each
+             of 60 prior days) added thousands to a game's total.
+           • snake_scores / classic_scores: read MAX across rows, so another
+             demo's owned row outranked this fixture's 350 / 950.
+           • snakedaily: the Snake card MERGES the classic arcade id and the
+             daily id, and the state line prefers daily points over best, so
+             the demo=dualmode finished run (610 pts, today) outranked the
+             arcade best. This is the "card WITHOUT a daily" assertion, so its
+             daily row must go — today's OTHER rows (locked sudoku, homegrid
+             klondike/spider, dualmode bouncedaily, the profile's recent list
+             and the lobby's PLAYED indicator) are deliberately left alone. */
       await pool.query(
         `DELETE FROM daily_attempts
-          WHERE user_id = $1 AND attempt_date < (now() AT TIME ZONE 'utc')::date`,
+          WHERE user_id = $1
+            AND (attempt_date < (now() AT TIME ZONE 'utc')::date
+                 OR game_id = 'snakedaily')`,
         [req.user.id]
       );
       await pool.query(`DELETE FROM snake_scores WHERE user_id = $1`, [req.user.id]);

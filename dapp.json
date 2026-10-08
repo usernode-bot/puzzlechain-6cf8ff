@@ -1896,6 +1896,11 @@
       "name": "Card without a daily still shows its all-time best",
       "path": "/?demo=myscores",
       "expectText": "Best 350"
+    },
+    {
+      "name": "A long chapter pages instead of scrolling",
+      "path": "/?game=dracula&play=1",
+      "expectSelector": ".drac-card .tp-more"
     }
   ],
   "visibility": {

@@ -3840,8 +3840,28 @@ app.get('/api/daily', async (req, res) => {
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
          Past UTC dates only, so it never collides with demo=locked /
-         demo=streak, which finish today's rows; every insert is
-         DO NOTHING, so re-runs and other fixtures' rows are preserved. */
+         homegrid / dualmode, which finish TODAY's rows (the profile's
+         recent list and the lobby's PLAYED indicator seed from those and
+         must survive). Everything before today IS asserted, because
+         /api/my/scores reads three per-viewer tables this fixture is the
+         sole declaration of for the viewer:
+           • daily_attempts points SUM over every finished day, so the
+             long-streak fixtures (demo=streak / demo=badges seed 900 on
+             each of 60 prior days) would add thousands to a game's total;
+           • snake_scores is read MAX across its rows, so another demo's
+             owned row would outrank this 350;
+           • classic_scores is read MAX(best_score) per game.
+         Without the deletes the all-time figure assertions never see the
+         numbers they look for. CLAUDE.md: a fixture that seeds a COUNT
+         must clear what would otherwise survive — ON CONFLICT DO NOTHING
+         alone silently keeps the first writer's rows. */
+      await pool.query(
+        `DELETE FROM daily_attempts
+          WHERE user_id = $1 AND attempt_date < (now() AT TIME ZONE 'utc')::date`,
+        [req.user.id]
+      );
+      await pool.query(`DELETE FROM snake_scores WHERE user_id = $1`, [req.user.id]);
+      await pool.query(`DELETE FROM classic_scores WHERE user_id = $1`, [req.user.id]);
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];

@@ -121,6 +121,8 @@ let migrationsReady = false;
 //   undo           — undo policy: 'none' | 'free' (unlimited take-backs) |
 //                    'booster' (limited, counted uses).
 const GAME_REGISTRY = {
+  dracula:           { name: 'Escape from Dracula', category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   sudoku:            { name: 'Sudoku',            category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   sudokumini:        { name: 'Sudoku Mini',        category: 'daily',   tier: 'A',

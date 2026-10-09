@@ -1901,6 +1901,28 @@
       "name": "A long chapter pages instead of scrolling",
       "path": "/?game=dracula&play=1",
       "expectSelector": ".drac-card .tp-more"
+    },
+    {
+      "name": "Pre-game daily difficulty picker renders",
+      "path": "/?game=wordsprint",
+      "expectSelector": ".pregame-bands",
+      "expectText": "Difficulty"
+    },
+    {
+      "name": "Pre-game daily picker shows the Hard band note",
+      "path": "/?game=zuma&pmode=daily&band=hard",
+      "expectText": "The hardest path in the ladder"
+    },
+    {
+      "name": "Minesweeper arcade Hard deals the 10 by 10 board",
+      "path": "/?game=minesweeper&pmode=arcade&band=hard&play=1",
+      "expectSelector": "canvas[aria-label*=\"10 by 10 board\"]"
+    },
+    {
+      "name": "Daily leaderboards carry Easy/Normal/Hard band tabs",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectSelector": ".lb-band-tabs",
+      "expectText": "Hard"
     }
   ],
   "visibility": {

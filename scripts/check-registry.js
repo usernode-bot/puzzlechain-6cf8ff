@@ -180,6 +180,23 @@ for (const [id, n] of Object.entries(STORY_BANDS)) {
   }
 }
 
+/* 6. Daily difficulty bands (#331). Every id that declares a 'daily' mode is
+      playable on Easy/Normal/Hard, and DAILY_BAND_NOTES (29-cards.jsx) is the
+      copy the pre-game picker shows beside each. An id with no entry means a
+      picker row that has nothing to say about what its band changes; an entry
+      with no daily id means copy for a picker that can never render. Same
+      shape as rules 2 and 3 — one declaration table checked against another. */
+const DAILY_BAND_NOTES = literal(cards, 'DAILY_BAND_NOTES', '29-cards.jsx');
+const bandNotesIds = new Set(Object.keys(DAILY_BAND_NOTES));
+for (const id of diff(clientDaily, bandNotesIds)) {
+  fail(`${id}: declares a 'daily' mode but has no DAILY_BAND_NOTES entry — ` +
+       `the pre-game band picker would render a band with no copy`);
+}
+for (const id of diff(bandNotesIds, clientDaily)) {
+  fail(`${id}: has a DAILY_BAND_NOTES entry but declares no 'daily' mode — ` +
+       `copy for a band picker that never renders`);
+}
+
 /* 5. The client's per-game difficulty table has to be as long as the server's
       level count. Each entry names where level i's content comes from:
         count  — that table must have EXACTLY n entries

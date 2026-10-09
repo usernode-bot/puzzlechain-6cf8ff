@@ -1898,6 +1898,11 @@
       "expectText": "Best 350"
     },
     {
+      "name": "A long chapter pages instead of scrolling",
+      "path": "/?game=dracula&play=1",
+      "expectSelector": ".drac-card .tp-more"
+    },
+    {
       "name": "Pre-game daily difficulty picker renders",
       "path": "/?game=wordsprint",
       "expectSelector": ".pregame-bands",

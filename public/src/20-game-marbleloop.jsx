@@ -975,7 +975,7 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
           );
         })()
       ),
-      React.createElement('div', { className: 't2048-bottom-nav' },
+      React.createElement('div', { className: 't2048-bottom-nav safe-bottom' },
         ['game', 'leaderboard'].map(tab =>
           React.createElement('button', {
             key: tab,

@@ -2119,6 +2119,39 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #331 — the daily's Easy/Hard mix the day anchor per (game, band), but
+     Normal must hash to EXACTLY the pre-band seed: every existing daily board,
+     resume record and tier-A replay is keyed to it, so a divergent Normal
+     stream would silently deal every existing player a different board. The
+     games list spans both seed shapes (server-issued and legacy-derived) and
+     offsets vary so no single lucky pair can pass. */
+  check('daily-band-normal-unchanged', () => {
+    if (typeof dailyRng !== 'function') return true;
+    const games = ['sudoku', 'wordsearch', 'cryptowordle', 'tilematchingdaily',
+      'klondike', 'cratepush', 'zuma', 'snakedaily', 'bouncedaily', '2048', 'wordsprint'];
+    for (const g of games) {
+      for (let off = 0; off < 5; off++) {
+        const base = dailyRng(off, g);
+        const normal = dailyRng(off, g, 'normal');
+        const normalNull = dailyRng(off, g, null);
+        for (let i = 0; i < 4; i++) {
+          const b = base(), n = normal(), nn = normalNull();
+          if (b !== n || b !== nn) {
+            throw new Error("dailyRng(" + off + ", '" + g + "') diverges from its " +
+              'Normal-band stream — Normal must stay byte-identical to the pre-band seed');
+          }
+        }
+        // And Easy/Hard must be three DIFFERENT boards off the same anchor —
+        // fresh rngs each, so the comparison is first-draw to first-draw.
+        const a = dailyRng(off, g)(), e = dailyRng(off, g, 'easy')(), h = dailyRng(off, g, 'hard')();
+        if (!(a !== e && a !== h && e !== h)) {
+          throw new Error("bands of '" + g + "' on offset " + off + ' share a stream');
+        }
+      }
+    }
+    return true;
+  });
+
   /* #210, the CSS half, measured. `.tm-wrap` sits in `.cg-stage`, which is
      `align-items: center`, so without a definite width it took its
      fit-content width — the canvas's own CSS width, which useCanvasBoard

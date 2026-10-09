@@ -498,16 +498,19 @@ function BbGridCanvas({ grid, preview }) {
 }
 
 function BlockBlastBoard({ onStepChange, resetKey, onEnd, playMode, band, offset }) {
-  // Only arcade narrows the pool; the daily and free play use all of it.
-  const bbBand = playMode === 'arcade' ? band : null;
+  // Arcade narrows the pool; the daily's Easy/Hard (#331) borrow the same
+  // narrowing, and Normal daily and free play use all of it.
+  const bbBand = (playMode === 'arcade' || playMode === 'daily') && (band === 'easy' || band === 'hard')
+    ? band : null;
   const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
   /* One rng for the whole run so the offer sequence is reproducible: the daily
-     seeds from today's server seed, arcade from a fresh per-run seed that is
-     kept for replay, and free play stays on Math.random (null). */
+     seeds from today's server seed (band-mixed for Easy/Hard), arcade from a
+     fresh per-run seed that is kept for replay, and free play stays on
+     Math.random (null). */
   const rngRef = useRef(undefined);
   if (rngRef.current === undefined) {
     rngRef.current = (playMode === 'daily' || playMode === 'arcade')
-      ? modeSeed(playMode, 'blockblast', 0, offset).rng
+      ? modeSeed(playMode, 'blockblast', playMode === 'daily' ? (bbBand || 0) : 0, offset).rng
       : null;
   }
   const bbRng = rngRef.current;
@@ -953,7 +956,12 @@ function DiamondRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, 
   const drBandIdx = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
       ? [1, 4, 7][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
-      : null;
+      : /* #331 — the daily's Easy/Hard are the ladder's gentlest and hardest
+           rungs; Normal keeps the classic 800/18 deal (rung 1's numbers,
+           reached here through the null branch below). */
+        (playMode === 'daily' && (band === 'easy' || band === 'hard'))
+          ? (band === 'easy' ? 0 : DR_BANDS.length - 1)
+          : null;
   const drSpec = drBandIdx != null ? DR_BANDS[Math.min(DR_BANDS.length - 1, drBandIdx)] : null;
   const TARGET = drSpec ? drSpec.target : 800;
   const START_MOVES = drSpec ? drSpec.moves : 18;

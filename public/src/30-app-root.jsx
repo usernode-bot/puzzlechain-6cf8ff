@@ -60,10 +60,25 @@ function App() {
   const [playMode, setPlayMode] = useState(null);
   const [arcadeBandId, setArcadeBandId] = useState('normal');
   const [storyBand, setStoryBand] = useState(0);
+  /* #331 — which difficulty the current daily run is on. Seeded from the
+     remembered pref (02-prefs-theme's cgDailyBandPref), changed on the
+     pre-game band picker, sent on the /start claim, and restored from a
+     resumed attempt row (whose band is authoritative). */
+  const [dailyBandId, setDailyBandId] = useState(() => cgDailyBandPref());
+  const setDailyBand = (b) => {
+    const v = isDailyBand(b) ? b : 'normal';
+    setDailyBandId(v);
+    cgSetDailyBandPref(v);
+  };
+  /* The band a PRACTICE replay runs under: the attempt row's band when the
+     replay was asked for from a result card or the locked screen (you are
+     replaying the deal you actually played), else Normal (`?practice=1`). */
+  const [practiceBandId, setPracticeBandId] = useState('normal');
   // Refs shadowing the two above, so startRun can read them without waiting a
   // render when a deep link sets the mode and starts the run in one go.
   const playModeRef = useRef(playMode);   playModeRef.current = playMode;
   const arcadeBandRef = useRef(arcadeBandId); arcadeBandRef.current = arcadeBandId;
+  const dailyBandRef = useRef(dailyBandId);   dailyBandRef.current = dailyBandId;
   // gameId -> { cleared, total } for the card state line and the story picker.
   const [storyProgress, setStoryProgress] = useState({});
   /* Pinned games (#232): the CARD ANCHOR ids this player pinned, in the order
@@ -297,6 +312,7 @@ function App() {
     playMode: navPrimitive(playMode),
     storyBand: Number.isFinite(storyBand) ? storyBand : 0,
     arcadeBandId: navPrimitive(arcadeBandId),
+    dailyBandId: navPrimitive(dailyBandId),
     overlay: settingsOpen ? 'settings' : howToGame ? 'howto' : chatGame ? 'chat' : whatsNewOpen ? 'whatsnew' : null,
     overlayArg: navPrimitive(howToGame ? howToGame.id : chatGame ? (chatGame.id || chatGame) : null),
   };
@@ -374,6 +390,7 @@ function App() {
       setPlayMode(isPlayMode(s.playMode) ? s.playMode : null);
       setStoryBand(Number.isFinite(s.storyBand) ? s.storyBand : 0);
       setArcadeBandId(ARCADE_BAND_IDS.indexOf(s.arcadeBandId) !== -1 ? s.arcadeBandId : 'normal');
+      setDailyBandId(isDailyBand(s.dailyBandId) ? s.dailyBandId : 'normal');
       if (s.screen === 'game' || s.screen === 'pregame' || s.screen === 'locked' || s.screen === 'opponent') {
         const g = GAMES.find(x => x.id === s.gameId);
         if (g) {
@@ -459,6 +476,7 @@ function App() {
           method: 'POST',
           body: JSON.stringify({
             seed: run.seed, score: run.score, steps: run.steps, timeSecs: run.secs,
+            band: run.band,
             moves: Array.isArray(run.moves) ? run.moves : [],
             replay: run.replay === true,
           }),
@@ -828,6 +846,7 @@ function App() {
   const startRun = async (game, over) => {
     const playMode = (over && over.mode) || playModeRef.current;
     const arcadeBandId = (over && over.arcadeBand) || arcadeBandRef.current;
+    const dailyBandId = (over && over.dailyBand) || dailyBandRef.current;
     allowProgressSave(game.id); // claiming/resuming a run lifts the finish guard
     // Cached and request-deduped, so this is free after the first open.
     if (CORPUS_GAMES.has(game.id)) await loadCorpus(game.id);
@@ -895,6 +914,9 @@ function App() {
         // is already claimed, so do NOT call /start again. A resumed run's
         // earlier moves predate this page load, so its finish can't be
         // replay-validated (server falls back to tier-B heuristics).
+        // #331 — the row's band is authoritative for the resumed run: the
+        // board being hydrated was dealt under it.
+        if (existing.band) setDailyBandId(isDailyBand(existing.band) ? existing.band : 'normal');
         dailyRunLog.current = { moves: [], replayOk: false };
         setCurrentGame(game);
         setStepCount(existing.steps || 0);
@@ -904,7 +926,10 @@ function App() {
       }
       return;
     }
-    const { ok, status, body } = await api(`/api/daily/${game.id}/start`, { method: 'POST' });
+    const { ok, status, body } = await api(`/api/daily/${game.id}/start`, {
+      method: 'POST',
+      body: JSON.stringify({ band: dailyBandId }),
+    });
     // Merge the seed issued with the claim — covers a client that sat on the
     // lobby across the UTC reset, whose mount-time seeds are yesterday's.
     if (body && Number.isFinite(body.seed)) SERVER_DAILY_SEEDS[game.id] = body.seed;
@@ -995,13 +1020,19 @@ function App() {
       let band = null;
       if (pmode === 'story' && bandParam) band = Math.max(0, (parseInt(bandParam, 10) || 1) - 1);
       if (pmode === 'arcade' && ARCADE_BAND_IDS.indexOf(bandParam) !== -1) band = bandParam;
+      /* #331 — the daily's difficulty is selectable by link the same way the
+         arcade's is, so the Easy and Hard deals are reachable by navigation
+         (a check or a screenshot cannot tap the picker). */
+      if (pmode === 'daily' && DAILY_BANDS.indexOf(bandParam) !== -1) band = bandParam;
       launchGame(g, pmode);
       if (pmode === 'story' && band != null) setStoryBand(band);
       if (pmode === 'arcade' && band != null) setArcadeBandId(band);
+      if (pmode === 'daily' && band != null) setDailyBand(band);
       if (params.get('play') === '1') {
         startRun(g, {
           mode: pmode,
           arcadeBand: pmode === 'arcade' ? (band || arcadeBandId) : undefined,
+          dailyBand: pmode === 'daily' ? (band || dailyBandId) : undefined,
         });
         setHowToGame(null);
       }
@@ -1056,8 +1087,15 @@ function App() {
          launchGame sets the mode, startRun claims or resumes in it. */
       if (g.daily) {
         const dm = defaultPlayMode(g);
+        /* ?band= works without ?pmode=daily too (`?game=x&play=1&band=easy`):
+           the daily defaults to its daily mode here, so the band belongs to
+           it. Passed through `over` because the ref will not see the setter
+           within this tick. */
+        const bParam = params.get('band');
+        const bOk = DAILY_BANDS.indexOf(bParam) !== -1 ? bParam : null;
+        if (bOk) setDailyBand(bOk);
         launchGame(g, dm);
-        startRun(g, { mode: dm });
+        startRun(g, { mode: dm, dailyBand: bOk || undefined });
         setHowToGame(null);
         return;
       }
@@ -1252,16 +1290,20 @@ function App() {
   // game's own spoiler-free result line, then rank + the playable no-login
   // challenge link. `rank` is optional — the card reads fine while it's still
   // being fetched (or for guests before the rank preview lands).
-  const buildShareCard = (gameId, resultLine, rank) => {
+  // #331 — `band` is the run's difficulty: the "same deal" link carries
+  // `&band=` so the recipient opens the SAME board the sender played, not the
+  // Normal board. Normal is the default and adds nothing.
+  const buildShareCard = (gameId, resultLine, rank, band) => {
     const d = new Date(Date.now() + offset);
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
     const lines = [`Game Corner No. ${utcDayNum(offset) - 20000} · ${dateStr}`];
     // Game result lines historically self-prefix the app name; strip it so
     // the card doesn't read "Game Corner … Game Corner …".
     if (resultLine) lines.push(resultLine.replace(/^Game Corner /, ''));
+    const bandQ = (band === 'easy' || band === 'hard') ? `&band=${band}` : '';
     lines.push(
       (Number.isFinite(rank) ? `#${rank} on today's board · ` : '') +
-      `Play the same deal (no login): ${window.location.origin}/?game=${gameId}`
+      `Play the same deal (no login): ${window.location.origin}/?game=${gameId}${bandQ}`
     );
     return lines.join('\n');
   };
@@ -1623,9 +1665,16 @@ function App() {
       if (!authOk) {
         const log = dailyRunLog.current;
         const seed = serverDailySeed(gameId);
+        // #331 — a guest run was played on the band the pre-game picker chose;
+        // committing it under that band (below, and server-side in /commit)
+        // ranks it against the same deal it was played on. Score stays the raw
+        // base: the streak multiplier is a signed-in reward, and the band
+        // multiplier only exists to keep per-band boards comparable, which a
+        // raw score already is within its own board.
+        const guestBand = isDailyBand(dailyBandRef.current) ? dailyBandRef.current : 'normal';
         if (seed != null) {
           savePendingRun(gameId, {
-            dayNum: utcDayNum(offset), gameId, seed,
+            dayNum: utcDayNum(offset), gameId, seed, band: guestBand,
             score, steps, secs: timeSecs,
             moves: log.moves.slice(0, 800),
             replay: log.replayOk && log.moves.some(m => Number.isInteger(m.tileType)),
@@ -1635,18 +1684,19 @@ function App() {
         setWinData({
           score, bonus: 0, finalScore: score, steps, timeSecs,
           multiplier: 1, effectiveStreak: 0,
+          band: guestBand,
           guest: true, guestSaved: seed != null,
-          share: buildShareCard(gameId, meta && meta.share),
+          share: buildShareCard(gameId, meta && meta.share, null, guestBand),
           gameId,
         });
         try {
           const { ok, body } = await api(
-            `/api/public/daily/${gameId}/rank-preview?timeSecs=${Math.round(timeSecs || 0)}&steps=${Math.round(steps || 0)}&score=${Math.round(score || 0)}`
+            `/api/public/daily/${gameId}/rank-preview?timeSecs=${Math.round(timeSecs || 0)}&steps=${Math.round(steps || 0)}&score=${Math.round(score || 0)}&band=${guestBand}`
           );
           if (ok && body && Number.isFinite(body.rank)) {
             // Would-be rank into the CTA and the share card's rank line alike.
             setWinData(prev => (prev && prev.guest
-              ? { ...prev, guestRank: body.rank, guestOf: body.of, share: buildShareCard(gameId, meta && meta.share, body.rank) }
+              ? { ...prev, guestRank: body.rank, guestOf: body.of, share: buildShareCard(gameId, meta && meta.share, body.rank, guestBand) }
               : prev));
           }
         } catch {}
@@ -1662,7 +1712,14 @@ function App() {
         && attempts[featured.gameId].score != null;
       const effectiveStreak = (isFeaturedWin && !featuredDoneToday) ? streak + 1 : streak;
       const multiplier = streakMultiplier(effectiveStreak);
-      const finalScore = Math.round(score * multiplier);
+      /* #331 — the band multiplier on top of the streak multiplier. The run's
+         band is read from the ref (startRun may have set it in the same tick a
+         deep link fired) and Normal is the no-op so every pre-band flow scores
+         byte-identically. Carried onto winData so the end card can say which
+         board this was. */
+      const runBand = isDailyBand(dailyBandRef.current) ? dailyBandRef.current : 'normal';
+      const bandMult = DAILY_BAND_MULT[runBand] != null ? DAILY_BAND_MULT[runBand] : 1;
+      const finalScore = Math.round(score * multiplier * bandMult);
       const bonus = finalScore - score;
       setStreak(effectiveStreak);
       // Personal-best comparison for the end screen (phase 3), captured BEFORE
@@ -1687,13 +1744,14 @@ function App() {
       // call below, so the player always gets a clear "Solved!" confirmation.
       setWinData({
         score, bonus, finalScore, steps, timeSecs, multiplier, effectiveStreak,
+        band: runBand,
         prevBest,
         activeBadge: activeBadge(effectiveStreak),
         justBadge: unlocked,
         // Three-line share card: edition/date, the game's spoiler-free result
         // line, then rank + the playable no-login challenge link. The rank
         // line is threaded in below once the finish lands on the board.
-        share: meta && meta.share ? buildShareCard(gameId, meta.share) : undefined,
+        share: meta && meta.share ? buildShareCard(gameId, meta.share, null, runBand) : undefined,
         hintsUsed: meta && meta.hintsUsed,
         wordsSolved: meta && meta.wordsSolved,
         wordsTotal: meta && meta.wordsTotal,
@@ -1709,11 +1767,11 @@ function App() {
       // reads fine without a rank if the fetch loses or hasn't landed.
       if (meta && meta.share) {
         try {
-          const { ok, body } = await api(`/api/daily/${gameId}/leaderboard`);
+          const { ok, body } = await api(`/api/daily/${gameId}/leaderboard?band=${encodeURIComponent(runBand)}`);
           const rank = ok && body && body.me && Number.isFinite(body.me.rank) ? body.me.rank : null;
           if (rank) {
             setWinData(prev => (prev && !prev.isClassic && prev.gameId === gameId)
-              ? { ...prev, myRank: rank, share: buildShareCard(gameId, meta.share, rank) }
+              ? { ...prev, myRank: rank, share: buildShareCard(gameId, meta.share, rank, runBand) }
               : prev);
           }
         } catch {}
@@ -1948,6 +2006,11 @@ function App() {
     // Same rule as startRun: a corpus game must not deal from its fallback
     // just because practice skipped the screen that warms the table.
     if (CORPUS_GAMES.has(game.id)) await loadCorpus(game.id);
+    // Replay the deal the attempt was actually played on (#331). With no
+    // attempt (e.g. the ?practice=1 deep link) Normal is the honest default —
+    // it is the deal the day has always been.
+    const att = attempts[game.id];
+    setPracticeBandId(att && isDailyBand(att.band) ? att.band : 'normal');
     setCurrentGame(game);
     setPracticeMode(true);
     setPracticeResult(null);
@@ -2021,8 +2084,14 @@ function App() {
     if (wantWin) {
       setPracticeMode(false);
       if (game.daily) setPlayMode('daily');
+      // #331 — `?band=easy|hard` with `?result=win` shows the win card as a
+      // band run ends: the caption under the earned score and the Difficulty
+      // row in the details. Pure local UI state, like the rest of the demo.
+      const rDemo = new URLSearchParams(window.location.search).get('band');
+      const rBand = (rDemo === 'easy' || rDemo === 'hard') ? rDemo : 'normal';
+      setDailyBand(rBand);
       setWinData(game.daily
-        ? winResultDemo(game)
+        ? { ...winResultDemo(game), band: rBand }
         : { ...winResultDemo(game), isClassic: true, bestScore: 1180, multiplier: 1, bonus: 0 });
       return;
     }
@@ -2140,7 +2209,15 @@ function App() {
     const modeProps = {
       gameId: currentGame.id,
       playMode,
-      band: playMode === 'arcade' ? arcadeBandId : playMode === 'story' ? storyBand : null,
+      /* #331 — the daily's band. A daily runs on its band whether or not the
+         shell knows the mode (the ?practice=1 link mounts with playMode null),
+         so the gate is the game's daily flag, not playMode === 'daily'. A
+         practice replay runs on the attempt's band; a live run on the picked
+         one. Classics keep null exactly as before. */
+      band: playMode === 'arcade' ? arcadeBandId
+        : playMode === 'story' ? storyBand
+        : currentGame.daily ? (practiceMode ? practiceBandId : dailyBandId)
+        : null,
       onBandCleared: playMode === 'story' ? handleBandCleared : undefined,
     };
     /* #185 — a story game caches its board in a useRef at mount, so moving the
@@ -2907,6 +2984,8 @@ function App() {
             onArcadeBand={setArcadeBandId}
             arcadeBest={arcadeBest}
             onReplayRun={(run) => replayArcadeRun(currentGame, run)}
+            dailyBandId={dailyBandId}
+            onDailyBand={setDailyBand}
             onHowTo={() => setHowToGame(currentGame)}
             onChat={authOk ? () => setChatGame(currentGame) : undefined}
           />
@@ -3147,6 +3226,17 @@ function App() {
                   <span className="v mono">+{winData.bonus}</span>
                 </div>
               )}
+              {/* #331 — a daily's difficulty band. Only off the default board:
+                  Normal's multiplier is 1, so the row would say nothing. Story
+                  and arcade wins carry no `band`, and classic wins are gated
+                  out, so this renders on the daily path alone. */}
+              {!winData.isClassic && winData.band && winData.band !== 'normal'
+                && DAILY_BAND_MULT[winData.band] != null && (
+                <div className="score-row bonus">
+                  <span className="k">Difficulty · {winData.band === 'hard' ? 'Hard' : 'Easy'}</span>
+                  <span className="v mono">×{DAILY_BAND_MULT[winData.band]}</span>
+                </div>
+              )}
               {Number.isFinite(winData.wordsTotal) && (
                 <div className="score-row">
                   <span className="k">Words solved</span>
@@ -3210,7 +3300,13 @@ function App() {
       const detailsPanel = (
         <div className="win-details">
           {scoreRows}
-              {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={true} />}
+              {currentGame && playMode === 'daily' && (
+                <Leaderboard
+                  gameId={currentGame.id}
+                  solved={true}
+                  defaultBand={isDailyBand(winData.band) ? winData.band : 'normal'}
+                />
+              )}
               {isDailyResult && winData.justBadge && (
                 <div className="badge-unlock">
                   <div className="bu-icon">{winData.justBadge.icon}</div>
@@ -3272,6 +3368,15 @@ function App() {
                   {winData.isClassic
                     ? `Lock In ×${winData.multiplier}`
                     : `Streak ×${winData.multiplier} · ${winData.effectiveStreak}-day`}
+                </span>
+              )}
+              {/* #331 — the run's difficulty, when it is not the default board.
+                  A caption, not a block: #241 keeps the card's opening on ONE
+                  number, and the band is a qualifier of that number. */}
+              {!winData.isClassic && winData.band && winData.band !== 'normal'
+                && DAILY_BAND_MULT[winData.band] != null && (
+                <span className="we-note">
+                  {winData.band === 'hard' ? 'Hard board' : 'Easy board'} · ×{DAILY_BAND_MULT[winData.band]}
                 </span>
               )}
             </div>
@@ -3462,7 +3567,13 @@ function App() {
               </div>
             )}
             {/* Daily board only — see the note on the win card above. */}
-            {currentGame && playMode === 'daily' && <Leaderboard gameId={currentGame.id} solved={false} />}
+            {currentGame && playMode === 'daily' && (
+              <Leaderboard
+                gameId={currentGame.id}
+                solved={false}
+                defaultBand={attempts[currentGame.id] && isDailyBand(attempts[currentGame.id].band) ? attempts[currentGame.id].band : 'normal'}
+              />
+            )}
             <ShareButton text={loseData.share} />
             {loseData.isClassic && (
               <button className="primary-btn play-again-btn tappable" {...tapProps(playAgain)}>

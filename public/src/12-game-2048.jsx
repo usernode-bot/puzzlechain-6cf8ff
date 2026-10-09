@@ -329,16 +329,21 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
   const bandLabel = playMode === 'arcade'
     ? ((ARCADE_BANDS.find((b) => b.id === band) || {}).label || null)
     : null;
-  // Arcade picks a four-rate; every other mode plays the standard one.
+  // Arcade picks a four-rate; the daily's Easy/Hard (#331) borrow the same
+  // dial — fewer 4s on Easy, many more on Hard — and every other mode plays
+  // the standard one.
+  const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : null;
   const fourRate = playMode === 'arcade'
     ? (T2048_FOUR_RATE[band] || T2048_DEFAULT_FOUR)
-    : T2048_DEFAULT_FOUR;
+    : dailyBand
+      ? T2048_FOUR_RATE[dailyBand]
+      : T2048_DEFAULT_FOUR;
   /* One spawn stream for the run. Free play keeps Math.random (null), so the
      saved-board resume and the all-time leaderboard behave exactly as before. */
   const rngRef = useRef(undefined);
   if (rngRef.current === undefined) {
     rngRef.current = (playMode === 'daily' || playMode === 'arcade')
-      ? modeSeed(playMode, '2048', 0, offset).rng
+      ? modeSeed(playMode, '2048', dailyBand || 0, offset).rng
       : null;
   }
   const t2048Rng = rngRef.current;

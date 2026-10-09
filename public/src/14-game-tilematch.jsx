@@ -1252,7 +1252,7 @@ const TM_DAILY_TIME_LIMIT = 300; // 5 minutes — the boards are bigger now
 
 const TM_DAILY_HINT_CAP = 5; // paid hints per day for the Daily Tile Match
 
-function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile }) {
+function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, savedProgress, onSaveProgress, boardSeedOverride, onMoveTile, band }) {
   const [tiles, setTiles] = useState([]);
   const [bar, setBar] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -1273,7 +1273,18 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
   const dayNum = cwDayNum(offset || 0);
   // Today's layout + difficulty band (slice 8). Recomputed per render from the
   // server-anchored day number, so it can't drift from the seed.
-  const dayCfg = tmDailyConfig(dayNum);
+  // #331 — Easy/Hard swap ONLY the layout: Easy takes the gentlest rung of the
+  // measured ladder, Hard the hardest. Type/set counts, boosters and the seed
+  // stay the day's own (the tier-A engine mirrors those constants — changing
+  // them here would silently settle every Easy/Hard finish as disputed), and a
+  // different layout under the same seed is already a different deal.
+  const dailyBand = (band === 'easy' || band === 'hard') ? band : null;
+  const dayCfg = (() => {
+    const cfg = tmDailyConfig(dayNum);
+    if (!dailyBand) return cfg;
+    const layout = dailyBand === 'easy' ? TM_LAYOUTS[0] : TM_LAYOUTS[TM_LAYOUTS.length - 1];
+    return { ...cfg, layout, layoutIdx: TM_LAYOUTS.indexOf(layout) };
+  })();
   // `hydrated` guards the autosave effects from firing before the board exists.
   const hydratedRef = useRef(false);
 
@@ -1345,7 +1356,8 @@ function TileMatchingDailyGame({ onWin, onLose, onStepChange, resetKey, offset, 
     setBarFull(false);
     setFlashIds(new Set());
     hydratedRef.current = true;
-  }, [resetKey, offset, boardSeedOverride]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey, offset, boardSeedOverride, dailyBand]);
 
   // Autosave the mutable board state. The per-change effect captures every move
   // (tile placed, undo, shuffle, clear); useAutosave covers idle timer advance

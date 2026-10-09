@@ -601,11 +601,20 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
      daily keeps the original generators untouched so today's board is
      unchanged by any of this. */
   const bandCount = SDK_BAND_COUNT[seedKey] || 6;
+  /* #331 — the daily's difficulty band. Easy/Hard run the SAME ladder story
+     uses (gentlest / toughest dig through sdkGenerateForBand) off the day's
+     band-mixed seed; Normal keeps the original generators and the original
+     seed untouched. The band arrives as a STRING — the numeric arcade/story
+     band never equals 'easy'/'hard', so the mix can never accidentally fire. */
+  const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard')
+    ? band : null;
   const arcadeIdx = playMode === 'arcade'
     ? Math.max(0, ARCADE_BAND_ORDER.indexOf(band))
     : 0;
   const effBand = playMode === 'story' ? (band || 0)
     : playMode === 'arcade' ? Math.round((arcadeIdx / 2) * (bandCount - 1))
+    : dailyBand === 'easy' ? 0
+    : dailyBand === 'hard' ? bandCount - 1
     : 0;
   /* #189 — the run's difficulty, named, for the gameplay HUD. Arcade prints
      the band the player PICKED rather than the grader's word for the board it
@@ -621,7 +630,9 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
     ? `Difficulty: ${(ARCADE_BANDS[arcadeIdx] || ARCADE_BANDS[0]).label}`
     : playMode === 'story'
       ? `Level ${effBand + 1}: ${sdkBandLabel(difficulty === 'mini' ? 6 : 9, effBand, bandCount)}`
-      : null;
+      : dailyBand
+        ? `Difficulty: ${dailyBand[0].toUpperCase() + dailyBand.slice(1)}`
+        : null;
   const seedRef = useRef(null);
   const boardsRef = useRef({});
   const getBoard = (diff) => {
@@ -630,6 +641,11 @@ function SudokuGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress
       if (playMode === 'story' || playMode === 'arcade') {
         const { rng, seed } = modeSeed(playMode, seedKey, effBand, offset);
         seedRef.current = seed;
+        boardsRef.current[diff] = sdkGenerateForBand(rng, size, effBand, bandCount);
+      } else if (dailyBand) {
+        // #331 — a band daily digs to the same rung story does, off the band's
+        // own seed stream. Normal keeps the untouched generators below.
+        const rng = dailyRng(offset, seedKey, dailyBand);
         boardsRef.current[diff] = sdkGenerateForBand(rng, size, effBand, bandCount);
       } else if (size === 6) {
         boardsRef.current[diff] = generateSudoku6(dailyRng(offset, seedKey));

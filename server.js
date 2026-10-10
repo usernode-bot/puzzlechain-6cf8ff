@@ -3876,8 +3876,28 @@ app.get('/api/daily', async (req, res) => {
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
          Past UTC dates only, so it never collides with demo=locked /
-         demo=streak, which finish today's rows; every insert is
-         DO NOTHING, so re-runs and other fixtures' rows are preserved. */
+         demo=streak, which finish today's rows.
+
+         It also ASSERTS the figures it promises instead of adding to them.
+         Staging carries one database across every check run and never
+         resets, and other fixtures attribute rows to this same viewer for
+         these same games: demo=streak / demo=badges seed a 900-point
+         finished attempt for each prior day's FEATURED game, and the
+         featured rotation covers sudoku, 2048 and Daily Snake. Whichever
+         dates those windows happen to slide over decides whether a 900-row
+         for one of the asserted games already exists — DO NOTHING could not
+         undo it, so the sums read +1220 where the checks read +320,
+         depending only on the calendar. So: clear the rows the asserted
+         figures are summed from first, then insert exactly the promised
+         ones. The four checks that read these figures run after every other
+         fixture in the suite, and the fixtures whose rows were cleared
+         re-seed them on their own routes' next navigation. */
+      await pool.query(
+        `DELETE FROM daily_attempts
+          WHERE user_id = $1
+            AND game_id IN ('sudoku', '2048', 'wordsprint', 'snakedaily')`,
+        [req.user.id]
+      );
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];
@@ -3902,16 +3922,21 @@ app.get('/api/daily', async (req, res) => {
           [req.user.id, req.user.username, gid, score]
         );
       }
+      // snake_scores and game_ratings are single rows per user (per game),
+      // so UPSERT the asserted values: a re-run must CORRECT them, not
+      // no-op behind whatever a previous run or fixture left there.
       await pool.query(
         `INSERT INTO snake_scores (user_id, username, best_score, best_length, best_time_secs, games_played)
          VALUES ($1, $2, 350, 42, 118, 3)
-         ON CONFLICT (user_id) DO NOTHING`,
+         ON CONFLICT (user_id) DO UPDATE SET
+           best_score = 350, best_length = 42, best_time_secs = 118, games_played = 3`,
         [req.user.id, req.user.username]
       );
       await pool.query(
         `INSERT INTO game_ratings (user_id, username, game_id, elo, win_streak, best_streak, wins, losses, draws)
          VALUES ($1, $2, 'checkers', 1046, 2, 3, 4, 2, 0)
-         ON CONFLICT (user_id, game_id) DO NOTHING`,
+         ON CONFLICT (user_id, game_id) DO UPDATE SET
+           elo = 1046, win_streak = 2, best_streak = 3, wins = 4, losses = 2, draws = 0`,
         [req.user.id, req.user.username]
       );
     }

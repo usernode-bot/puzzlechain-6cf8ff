@@ -822,24 +822,39 @@ function runClientSelfTests(styleReady) {
 
   /* #193 — the derived clues must help without answering. They are generated
      from the word rather than written, so nothing but this stops a short word
-     from having its whole answer spelled out one clue at a time. */
+     from having its whole answer spelled out one clue at a time. Every word
+     carries exactly TWO derived clues so the per-word clue count is uniform
+     however long the day's words run — the short word's second clue is the
+     repetition status, never a letter. */
   check('cipher-derived-hints', () => {
     const seen = new Set();
     for (const theme of CW_THEMES) {
       for (const entry of theme.words) {
         const w = entry.word;
         const derived = cwDerivedHints(w);
-        if (derived.length < 1) throw new Error(w + ': no derived clue at all');
-        if (derived.length > 2) throw new Error(w + ': ' + derived.length + ' derived clues, expected at most 2');
-        // Never more than half the word given away by structure alone.
-        const revealed = derived.length;
+        if (derived.length !== 2) throw new Error(w + ': ' + derived.length + ' derived clues, expected exactly 2');
+        // Never more than half the word given away by structure alone: count
+        // only the POSITIONAL clues — the short word's repetition-status clue
+        // reveals no letter at all.
+        const revealed = w.length >= 5 ? 2 : 1;
         if (revealed >= w.length - 1) throw new Error(w + ' (len ' + w.length + '): ' + revealed + ' letters revealed leaves nothing to solve');
-        if (w.length < 5 && derived.length !== 1) throw new Error(w + ': a short word must keep its last letter');
         for (const h of derived) {
           if (h.indexOf(w) !== -1) throw new Error(w + ': a clue spells the answer');
         }
         if (derived[0].indexOf('"' + w[0] + '"') === -1) throw new Error(w + ': first-letter clue names the wrong letter');
-        if (derived[1] && derived[1].indexOf('"' + w[w.length - 1] + '"') === -1) throw new Error(w + ': last-letter clue names the wrong letter');
+        if (w.length >= 5) {
+          if (derived[1].indexOf('"' + w[w.length - 1] + '"') === -1) throw new Error(w + ': last-letter clue names the wrong letter');
+        } else {
+          // The short-word clue must state the repetition status, and state
+          // it TRUTHFULLY — a wrong status clue misdirects worse than none.
+          if (derived[1].indexOf('more than once') === -1) throw new Error(w + ': short-word clue is not a repetition-status clue');
+          if (derived[1].indexOf('"') !== -1) throw new Error(w + ': short-word clue must not name a letter');
+          const counts = {};
+          for (const ch of w) counts[ch] = (counts[ch] || 0) + 1;
+          const repeats = Object.keys(counts).some(ch => counts[ch] > 1);
+          const saysNone = derived[1].indexOf('No letter') === 0;
+          if (saysNone === repeats) throw new Error(w + ': repetition clue contradicts the word');
+        }
         seen.add(w);
       }
     }

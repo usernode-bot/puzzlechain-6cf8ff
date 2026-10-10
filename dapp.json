@@ -53,6 +53,11 @@
       "expectSelector": ".card-daily-badge.done"
     },
     {
+      "name": "Card shows personal best time",
+      "path": "/?demo=locked",
+      "expectText": "best: 2:12"
+    },
+    {
       "name": "Daily checklist strip renders on home",
       "path": "/",
       "expectSelector": ".dl-row"

@@ -420,17 +420,75 @@ function cwBlockAt(themeIdx, slot) {
    each time. */
 function cwRoundsForMode(playMode, band, offset) {
   if (playMode !== 'story' && playMode !== 'arcade') {
-    return { theme: cwThemeForDay(cwDayNum(offset)), words: cwDailyRounds(offset) };
+    // #331 — the daily's difficulty band: same theme, a different block of
+    // the SAME partition, steered by average word length. The rotation, the
+    // theme and the un-banded block are all untouched.
+    const dailyBand = cwDailyBandFor(band);
+    return {
+      theme: cwThemeForDay(cwDayNum(offset)),
+      words: dailyBand ? cwBandBlockFor(cwDayNum(offset), dailyBand) : cwDailyRounds(offset),
+    };
   }
   const rung = playMode === 'story' ? (band || 0) : 0;
   const { rng } = modeSeed(playMode, 'cryptowordle', rung, offset);
+  /* #331 (part 2) — the arcade band was decorative here: modeSeed draws a
+     fresh block per run, so Easy and Hard served the same distribution of
+     words and the band changed nothing a player could feel. The band now
+     steers WHICH block a fresh draw lands on — Easy picks the shortest-worded
+     of six candidates, Hard the longest. The guess dial below follows the
+     same band. */
+  if (playMode === 'arcade' && (band === 'easy' || band === 'hard')) {
+    let best = null, bestAvg = -1;
+    for (let k = 0; k < 6; k++) {
+      const blk = cwBlockAt(Math.floor(rng() * CW_THEMES.length), Math.floor(rng() * 1e6));
+      const avg = blk.words.reduce((a, w) => a + w.length, 0) / blk.words.length;
+      if (bestAvg < 0 || (band === 'easy' ? avg < bestAvg : avg > bestAvg)) { best = blk; bestAvg = avg; }
+    }
+    return best;
+  }
   return cwBlockAt(Math.floor(rng() * CW_THEMES.length), Math.floor(rng() * 1e6));
 }
 
+/* #331 — the daily's difficulty band, from the band prop (a string on the
+   daily path; story/arcade pass numbers, which never equal 'easy'/'hard'). */
+function cwDailyBandFor(band) {
+  return (band === 'easy' || band === 'hard') ? band : null;
+}
+
+/* The band's block: the day's theme, the block of the fixed partition whose
+   average word length is the SHORTEST (Easy) or LONGEST (Hard). Scanning the
+   same shuffle the day's own block came from keeps every band's words inside
+   the curated 5-word blocks and the sliding no-repeat guarantee intact. */
+function cwBandBlockFor(dayNum, dailyBand) {
+  const n = CW_THEMES.length;
+  const themeIdx = ((dayNum % n) + n) % n;
+  const theme = CW_THEMES[themeIdx];
+  const blocks = Math.max(1, Math.floor(theme.words.length / CW_ROUNDS_PER_DAY));
+  const shuffled = cwSeededShuffle(theme.words, hashStr('cw-rotation:' + themeIdx));
+  let best = 0;
+  let bestAvg = -1;
+  for (let b = 0; b < blocks; b++) {
+    const block = shuffled.slice(b * CW_ROUNDS_PER_DAY, b * CW_ROUNDS_PER_DAY + CW_ROUNDS_PER_DAY);
+    const avg = block.reduce((a, w) => a + w.length, 0) / block.length;
+    if (bestAvg < 0 || (dailyBand === 'easy' ? avg < bestAvg : avg > bestAvg)) {
+      best = b; bestAvg = avg;
+    }
+  }
+  return shuffled.slice(best * CW_ROUNDS_PER_DAY, best * CW_ROUNDS_PER_DAY + CW_ROUNDS_PER_DAY);
+}
 
 // Guesses allowed for a given word length: one more than the length, so a
 // 3-letter word gives 4 tries and an 8-letter word gives 9. Single knob.
 const cwMaxGuesses = (wordLen) => wordLen + 1;
+
+// #331 — the band's guess dial: one EXTRA guess on Easy, one FEWER on Hard
+// (floored at 2 — a word you get one shot at is not a puzzle). cwRoundPoints
+// deliberately stays on the BASE cap above: the points table must not need to
+// know a band exists, and an extra Easy guess already bottoms out at its
+// 60-point floor.
+const cwBandGuessDelta = (dailyBand) => dailyBand === 'easy' ? 1 : dailyBand === 'hard' ? -1 : 0;
+const cwMaxGuessesFor = (wordLen, dailyBand) =>
+  Math.max(2, cwMaxGuesses(wordLen) + cwBandGuessDelta(dailyBand));
 
 const CW_EMOJI = { green: '🟩', yellow: '🟨', gray: '⬛' };
 const CW_KEYS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
@@ -598,6 +656,12 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
      block so they are no longer the daily wearing a different hat. */
   const modeSet = useRef(cwRoundsForMode(playMode, band, offset)).current;
   const roundsDef = modeSet.words;
+  // #331 — the difficulty band this run plays (null off daily/arcade, where
+  // the band never lands). Steers the guess allowance and, on the daily, the
+  // block itself (see cwRoundsForMode).
+  const bandDial = playMode === 'daily' || playMode === 'arcade'
+    ? cwDailyBandFor(band) : null;
+  const maxGFor = (wordLen) => cwMaxGuessesFor(wordLen, bandDial);
 
   // Resume only today's saved progress (multi-round shape). Board is re-derived
   // from the seed; we persist only the mutable per-round guess words + hint use.
@@ -608,7 +672,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
     const words = resumed && Array.isArray(resumed.rounds[i]) ? resumed.rounds[i] : [];
     return words
       .filter(w => typeof w === 'string' && w.length === rd.word.length)
-      .slice(0, cwMaxGuesses(rd.word.length))
+      .slice(0, maxGFor(rd.word.length))
       .map(w => ({ word: w, result: cwScoreGuess(w, rd.word) }));
   });
   const initHintsByRound = () => roundsDef.map((_, i) =>
@@ -628,7 +692,7 @@ function CryptoWordleGame({ onWin, onLose, onStepChange, offset, savedProgress, 
   // Derive per-round status (solved / missed / active) from the submitted guesses.
   const resolveRounds = (guessArrays) => roundsDef.map((rd, i) => {
     const gs = guessArrays[i] || [];
-    const maxG = cwMaxGuesses(rd.word.length);
+    const maxG = maxGFor(rd.word.length);
     const solved = gs.length > 0 && gs[gs.length - 1].word === rd.word;
     const missed = !solved && gs.length >= maxG;
     return { def: rd, guesses: gs, maxG, solved, missed, resolved: solved || missed };

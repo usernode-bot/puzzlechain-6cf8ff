@@ -1929,6 +1929,54 @@
       "name": "Story picker opens Jet Run's ladder",
       "path": "/?game=jetrun&pmode=story&demo=modes",
       "expectSelector": ".pregame-band"
+    },
+    {
+      "name": "Classic shell is inset from the safe area (fixed top bar)",
+      "path": "/?game=snake&sheet=leaderboard",
+      "expectSelector": ".cg-shell .cg-topbar",
+      "visual": true,
+      "id": "safe-area.classic-shell",
+      "impact": [
+        "public/src/01-styles.jsx",
+        "public/index.html"
+      ]
+    },
+    {
+      "name": "Classic menu sheet clears the home indicator",
+      "path": "/?game=snake&sheet=leaderboard",
+      "expectSelector": ".cg-sheet.open"
+    },
+    {
+      "name": "Results card clears the safe area top and bottom",
+      "path": "/?game=2048&result=win",
+      "expectSelector": ".win-overlay .win-card"
+    },
+    {
+      "name": "The fixed results minibar clears the home indicator",
+      "path": "/?game=snake&result=1&snake=normal&review=1",
+      "expectSelector": ".result-minibar"
+    },
+    {
+      "name": "Pre-game daily difficulty picker renders",
+      "path": "/?game=wordsprint",
+      "expectSelector": ".pregame-bands",
+      "expectText": "Difficulty"
+    },
+    {
+      "name": "Pre-game daily picker shows the Hard band note",
+      "path": "/?game=zuma&pmode=daily&band=hard",
+      "expectText": "The hardest path in the ladder"
+    },
+    {
+      "name": "Minesweeper arcade Hard deals the 10 by 10 board",
+      "path": "/?game=minesweeper&pmode=arcade&band=hard&play=1",
+      "expectSelector": "canvas[aria-label*=\"10 by 10 board\"]"
+    },
+    {
+      "name": "Daily leaderboards carry Easy/Normal/Hard band tabs",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectSelector": ".lb-band-tabs",
+      "expectText": "Hard"
     }
   ],
   "visibility": {

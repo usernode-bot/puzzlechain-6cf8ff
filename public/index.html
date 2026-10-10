@@ -97,7 +97,7 @@
   <!-- Inline data-URI favicon so the browser never requests /favicon.ico,
        which the JWT auth gate would 401 (and that 401 logs a console error
        tripping the no-console-errors check). -->
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230A0D14'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%236366F1'%3E%E2%AC%A2%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23312E81'/%3E%3Crect x='2' y='8.5' width='28' height='15' rx='4' fill='%2318181B'/%3E%3Crect x='3' y='9.5' width='26' height='13' rx='3' fill='%23E4E4E7'/%3E%3Crect x='7.5' y='11.5' width='3' height='9' fill='%2318181B'/%3E%3Crect x='4.5' y='14.5' width='9' height='3' fill='%2318181B'/%3E%3Ccircle cx='21.2' cy='17.8' r='2.4' fill='%23DC2626' stroke='%2318181B' stroke-width='.8'/%3E%3Ccircle cx='26' cy='14.3' r='2.4' fill='%23DC2626' stroke='%2318181B' stroke-width='.8'/%3E%3C/svg%3E">
 
   <!-- Boot-shell styles only. Self-contained: these must work even when
        app.jsx fails to load/compile, so they do NOT depend on the app's
@@ -105,24 +105,39 @@
        small block. -->
   <style>
     html, body { margin: 0; }
+    /* Same forwarded-inset tokens the app uses (see 01-styles.jsx): the bridge
+       publishes --un-safe-inset-* on <html> and leaves them unset standalone,
+       where the env() fallback is correct. The boot shell must not sit under
+       the home indicator either. */
+    :root {
+      --pc-safe-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px));
+      --pc-safe-right: var(--un-safe-inset-right, env(safe-area-inset-right, 0px));
+      --pc-safe-bottom: var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px));
+      --pc-safe-left: var(--un-safe-inset-left, env(safe-area-inset-left, 0px));
+    }
     body {
       background: #FAF6EE; color: #1F2B47;
       font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
     }
     #boot-loader {
       position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem;
+      align-items: center; justify-content: center; gap: 1rem;
+      padding: calc(1.5rem + var(--pc-safe-top)) calc(1.5rem + var(--pc-safe-right))
+               calc(1.5rem + var(--pc-safe-bottom)) calc(1.5rem + var(--pc-safe-left));
     }
     #boot-loader .pc-spinner {
       width: 38px; height: 38px; border-radius: 50%;
-      border: 3px solid rgba(45,95,174,0.22); border-top-color: #2D5FAE;
+      border: 3px solid rgba(11,122,112,0.22); border-top-color: #0B7A70;
       animation: pc-spin 0.8s linear infinite;
     }
     #boot-loader .pc-loading-text { color: #5E6A87; font-size: 0.9rem; letter-spacing: 0.02em; }
     @keyframes pc-spin { to { transform: rotate(360deg); } }
     .pc-boot-error {
       position: fixed; inset: 0; display: flex; align-items: center;
-      justify-content: center; padding: 1.5rem; box-sizing: border-box;
+      justify-content: center; box-sizing: border-box;
+      padding: calc(1.5rem + var(--pc-safe-top)) calc(1.5rem + var(--pc-safe-right))
+               calc(1.5rem + var(--pc-safe-bottom)) calc(1.5rem + var(--pc-safe-left));
+      overflow-y: auto;
     }
     .pc-boot-error .card {
       max-width: 26rem; width: 100%; box-sizing: border-box; text-align: center;
@@ -137,7 +152,7 @@
       font: inherit; font-size: 0.92rem; padding: 0.6rem 1rem; border-radius: 0.6rem;
       cursor: pointer; border: 1px solid transparent;
     }
-    .pc-boot-error .primary { background: #2D5FAE; color: #fff; }
+    .pc-boot-error .primary { background: #0B7A70; color: #fff; }
     .pc-boot-error .secondary { background: transparent; color: #5E6A87; border-color: #E7DFCC; }
     .pc-boot-error .secondary.done { color: #1E8F63; border-color: #bfd9c9; }
     .pc-boot-error textarea {
@@ -152,13 +167,13 @@
     html[data-theme="dark"] { color-scheme: dark; }
     html[data-theme="dark"] body { background: #0A0D14; color: #ECEFF6; }
     html[data-theme="dark"] #boot-loader .pc-spinner {
-      border-color: rgba(99,102,241,0.24); border-top-color: #6366F1;
+      border-color: rgba(14,140,128,0.24); border-top-color: #0E8C80;
     }
     html[data-theme="dark"] #boot-loader .pc-loading-text { color: #8B95A8; }
     html[data-theme="dark"] .pc-boot-error .card { background: #181D29; border-color: #2A3342; }
     html[data-theme="dark"] .pc-boot-error h1 { color: #ECEFF6; }
     html[data-theme="dark"] .pc-boot-error p { color: #8B95A8; }
-    html[data-theme="dark"] .pc-boot-error .primary { background: #6366F1; color: #fff; }
+    html[data-theme="dark"] .pc-boot-error .primary { background: #0E8C80; color: #fff; }
     html[data-theme="dark"] .pc-boot-error .secondary { color: #8B95A8; border-color: #2A3342; }
     html[data-theme="dark"] .pc-boot-error .secondary.done { color: #34D399; border-color: #2f6b52; }
     html[data-theme="dark"] .pc-boot-error textarea {

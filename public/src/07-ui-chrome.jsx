@@ -38,24 +38,51 @@ function AccountChip({ loading, authOk, user, onOpen }) {
 const lbFmtTime = s =>
   s == null ? '—' : `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-function Leaderboard({ gameId, solved }) {
+/* #331 — Easy | Normal | Hard band pills for the daily per-game boards,
+   reusing the lb-scope-tab styling. Rendered through the small helper so the
+   loading state and the data state share one markup. */
+function LbBandTabsInner(band, onChange) {
+  return DAILY_BANDS.map(b => (
+    <button
+      key={b}
+      className={'lb-scope-tab' + (band === b ? ' active' : '')}
+      onClick={() => onChange(b)}
+    >{b[0].toUpperCase() + b.slice(1)}</button>
+  ));
+}
+
+function Leaderboard({ gameId, solved, defaultBand }) {
   const [state, setState] = useState({ loading: true });
   const [scope, setScope] = useState(lbInitialScope);
+  // #331 — the per-band boards. A daily's difficulty is its own ranked board,
+  // so the table defaults to the band the viewer played today (the caller
+  // passes it from the attempt row) and `?lbband=` deep-links a band, the same
+  // way ?lbscope= does for scope.
+  const [band, setBand] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('lbband');
+      if (q && isDailyBand(q)) return q;
+    } catch (e) {}
+    return isDailyBand(defaultBand) ? defaultBand : 'normal';
+  });
 
   useEffect(() => {
     let alive = true;
     setState({ loading: true });
     (async () => {
-      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard${scope === 'friends' ? '?scope=friends' : ''}`);
+      const qs = [];
+      if (scope === 'friends') qs.push('scope=friends');
+      if (band !== 'normal') qs.push('band=' + encodeURIComponent(band));
+      const { ok, body } = await api(`/api/daily/${gameId}/leaderboard${qs.length ? '?' + qs.join('&') : ''}`);
       if (!alive) return;
       if (ok && body) setState({ loading: false, ...body });
       else setState({ loading: false, entries: [], me: null, total: 0, error: true });
     })();
     return () => { alive = false; };
-  }, [gameId, scope]);
+  }, [gameId, scope, band]);
 
   if (state.loading) {
-    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lboard-empty">Loading…</div></div>;
+    return <div className="lboard"><div className="lboard-title">Today's leaderboard</div><LbScopeTabs scope={scope} onChange={setScope} /><div className="lb-band-tabs">{LbBandTabsInner(band, setBand)}</div><div className="lboard-empty">Loading…</div></div>;
   }
 
   const entries = state.entries || [];
@@ -69,9 +96,14 @@ function Leaderboard({ gameId, solved }) {
         {state.total > 0 && <span className="lboard-count">{state.total} solved</span>}
       </div>
       <LbScopeTabs scope={scope} onChange={setScope} />
+      <div className="lb-band-tabs">{LbBandTabsInner(band, setBand)}</div>
       {entries.length === 0 ? (
         <div className="lboard-empty">
-          {scope === 'friends' ? LB_FRIENDS_EMPTY : "Be the first to solve today's puzzle."}
+          {scope === 'friends'
+            ? LB_FRIENDS_EMPTY
+            : band !== 'normal'
+              ? `No one has solved today's ${band === 'hard' ? 'Hard' : 'Easy'} board yet.`
+              : "Be the first to solve today's puzzle."}
         </div>
       ) : (
         <div className="lboard-rows">
@@ -507,6 +539,100 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
   );
 }
 
+// Daily checklist (#295): one chip per daily game, in a horizontal scroller,
+// so a player can sweep every deal without hunting the grid. The checked
+// state reads the SAME source the cards' "✓ PLAYED" badge reads —
+// cardDailyId + attempts[id].finishedAt from /api/daily — so it cannot
+// disagree with the grid and needs no second fetch. In-progress shows ▶,
+// unplayed shows an empty circle. A tap launches the chip's daily id through
+// the normal launch path (finished → locked screen, else pre-game), exactly
+// like the card's own Daily button.
+function DailyChecklist({ attempts, loading, onPlay }) {
+  const cards = GAME_CARDS.filter((c) => cardDailyId(c));
+  if (!cards.length) return null;
+  const stateOf = (c) => {
+    const id = cardDailyId(c);
+    const a = id ? attempts[id] : null;
+    if (a && a.finishedAt) return 'done';
+    if (a) return 'resume';
+    return 'todo';
+  };
+  const done = cards.filter((c) => stateOf(c) === 'done').length;
+  return (
+    <div className="dl-wrap">
+      <div className="home-section-title">
+        Daily checklist
+        <span className="home-pin-count mono">{done}/{cards.length}</span>
+      </div>
+      <div className="dl-row" role="list" aria-label="Daily challenges to play today">
+        {cards.map((c) => {
+          const s = stateOf(c);
+          const id = cardDailyId(c);
+          return (
+            <button
+              key={c.key}
+              role="listitem"
+              className={'dl-check tappable ' + s}
+              aria-label={`${c.name} daily — ${s === 'done' ? 'played today' : s === 'resume' ? 'in progress' : 'not played yet'}`}
+              {...tapProps(() => { if (!loading) onPlay(id); })}
+            >
+              <span className="dl-mark" aria-hidden="true">{s === 'done' ? '✓' : s === 'resume' ? '▶' : ''}</span>
+              <span className="dl-icon" aria-hidden="true">{c.icon}</span>
+              <span className="dl-name">{c.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* Recently Played (Recent goal): the viewer's last five plays as one tappable
+   tile each, mirroring InProgressRow's strip shape so the lobby keeps a single
+   rhythm. Renders nothing at all when there is no history (the server only
+   sends plays the signed-in viewer made), so an empty account simply shows the
+   grid without the strip. GAMES is defined later in the bundle order, which is
+   fine: the lookup runs at render time, not at parse time. */
+function fmtPlayedAgo(iso, offset) {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const mins = Math.max(1, Math.round((Date.now() + (offset || 0) - t) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.round(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+function RecentlyPlayedRow({ items, onOpen, offset }) {
+  if (!items || !items.length) return null;
+  return (
+    <div className="inprog-row-wrap">
+      <div className="home-section-title">Recently Played</div>
+      <div className="inprog-row recent-row">
+        {items.map((p) => {
+          const g = GAMES.find(x => x.id === p.gameId);
+          if (!g) return null;
+          return (
+            <button
+              key={p.gameId}
+              className="inprog-card recent-card"
+              aria-label={'Replay ' + g.name}
+              {...tapProps(() => onOpen(p.gameId))}
+            >
+              <div className="ip-icon">{g.icon}</div>
+              <div className="ip-name">{g.name}</div>
+              <div className="ip-sub resume">▶ Replay</div>
+              {p.playedAt && (
+                <div className="ip-sub mono">{fmtPlayedAgo(p.playedAt, offset)}</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Per-game public chat room (phase 7): one room per game, 10s polling, report-
 // to-hide moderation (3 distinct reports auto-hide a message server-side).
 function ChatPanel({ game, user, onClose }) {
@@ -817,13 +943,24 @@ function GbRows({ rows, me, cols, empty }) {
 
 function GameBoards({ game, onClose }) {
   const [tab, setTab] = useState('daily');
-  const [band, setBand] = useState('normal');
+  // #331 — the daily now has three ranked deals, so the Daily tab carries the
+  // same Easy/Normal/Hard pills as the Level tab's arcade bands. `?lbband=`
+  // deep-links a band, the same way the per-game Leaderboard reads it.
+  const [band, setBand] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('lbband');
+      if (q && isDailyBand(q)) return q;
+    } catch (e) {}
+    return 'normal';
+  });
   const [scope, setScope] = useState(lbInitialScope);
   const [state, setState] = useState({ loading: true });
 
   // Each tab is a different endpoint of the same shape, so one fetch serves all
-  // three; band only participates on the arcade ladder.
-  const url = tab === 'daily' ? `/api/daily/${game.id}/leaderboard`
+  // three; band participates on the Daily and Level tabs (daily difficulty and
+  // arcade band respectively — two dials that happen to share one state slot).
+  const url = tab === 'daily'
+    ? `/api/daily/${game.id}/leaderboard${band !== 'normal' ? '?band=' + encodeURIComponent(band) : ''}`
     : tab === 'level' ? `/api/arcade/${game.id}/leaderboard?band=${encodeURIComponent(band)}`
     : `/api/alltime/${game.id}/leaderboard`;
 
@@ -846,7 +983,10 @@ function GameBoards({ game, onClose }) {
       ? { a: (e) => `${e.bestScore != null ? e.bestScore : e.score || 0} pts`, b: (e) => (e.runs != null ? `${e.runs}r` : '—') }
       : { a: (e) => lbFmtTime(e.timeSecs), b: (e) => (e.steps != null ? `${e.steps} st` : '—') };
   const empty = scope === 'friends' ? LB_FRIENDS_EMPTY
-    : tab === 'daily' ? "Nobody has solved today's puzzle yet."
+    : tab === 'daily'
+      ? band !== 'normal'
+        ? `No one has solved today's ${band === 'hard' ? 'Hard' : 'Easy'} board yet.`
+        : "Nobody has solved today's puzzle yet."
       : tab === 'level' ? 'No runs on this band yet.'
         : 'No finished games yet — play one and you are on the board.';
 
@@ -862,6 +1002,9 @@ function GameBoards({ game, onClose }) {
             <button key={t.id} className={'cg-sheet-tab' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>{t.label}</button>
           ))}
         </div>
+        {tab === 'daily' && (
+          <div className="lb-band-tabs">{LbBandTabsInner(band, setBand)}</div>
+        )}
         {tab === 'level' && (
           <div className="pregame-band-row wide gb-bands">
             {ARCADE_BANDS.map((b) => (
@@ -888,7 +1031,7 @@ function GameBoards({ game, onClose }) {
 
 function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
                          playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest,
-                         onReplayRun }) {
+                         onReplayRun, dailyBandId, onDailyBand }) {
   /* `?boards=1` opens the panel at mount. The boards are behind a tap, and a
      screen behind a tap is invisible to proposal checks and to the before/after
      screenshots alike — the same reason ?sheet= exists for the classic shell. */
@@ -911,6 +1054,12 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
   const prog = (storyProgress && storyProgress[game.id]) || null;
   const bandTotal = prog ? prog.total : 0;
   const bandCleared = prog ? prog.cleared : 0;
+  // #331 — the daily band this pre-game screen would play. If today's attempt
+  // already exists the band is fixed at whatever it was claimed on (server
+  // rows carry `band`; pre-band rows read as 'normal'), and the picker locks.
+  const claimed = !!attempt;
+  const activeBand = claimed && attempt && isDailyBand(attempt.band)
+    ? attempt.band : (dailyBandId || 'normal');
   return (
     <div className="pregame-card" style={{ '--accent': game.tagColor || C.accent }}>
       <div className="pregame-icon">{game.icon}</div>
@@ -962,7 +1111,37 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
       </div>
       {isDaily && (
         <div className="pregame-deal">
-          🌍 Everyone plays this <strong>exact deal</strong> today — one attempt, same board for all.
+          🌍 Everyone on your difficulty plays this <strong>exact deal</strong> today — one attempt.
+        </div>
+      )}
+      {/* #331 — the daily's difficulty band, before the one attempt is spent.
+          The board is derived from the day's seed MIXED with the band, so Easy
+          and Hard are different deals from the same day anchor, and each is
+          ranked on its own board. Once today's attempt has been claimed the
+          band is fixed (the lock is one attempt per day, not one per band), so
+          the picker shows what was played rather than offering a switch. */}
+      {isDaily && (
+        <div className="pregame-bands" role="group" aria-label="Choose a difficulty">
+          <div className="pregame-bands-label">Difficulty</div>
+          <div className="pregame-band-row wide">
+            {DAILY_BANDS.map(b => (
+              <button
+                key={b}
+                className={'pregame-band wide tappable' + (b === activeBand ? ' on' : '') + (claimed ? ' locked' : '')}
+                disabled={claimed}
+                aria-label={b[0].toUpperCase() + b.slice(1)}
+                {...tapProps(() => onDailyBand && onDailyBand(b))}
+              >{b[0].toUpperCase() + b.slice(1)}</button>
+            ))}
+          </div>
+          <div className="pregame-band-note">
+            {activeBand === 'easy' ? 'Easy board · ×0.8 points'
+              : activeBand === 'hard' ? 'Hard board · ×1.25 points'
+              : 'Normal board · ×1 point'}
+            {(DAILY_BAND_NOTES[game.id] && DAILY_BAND_NOTES[game.id][activeBand])
+              ? ` · ${DAILY_BAND_NOTES[game.id][activeBand]}` : ''}
+            {claimed ? ' — already played today, this was your board.' : ''}
+          </div>
         </div>
       )}
       {isStory && bandTotal > 0 && (
@@ -1079,9 +1258,18 @@ function LockedScreen({ game, attempt, nextResetUtc, offset, onReset, onBack, be
           {best && best.score != null && (
             <div className="score-row"><span className="k">Personal best</span><span className="v">+{best.score}</span></div>
           )}
+          {/* #331 — name the board the day was played on when it wasn't the
+              default. Rows pre-dating bands read as Normal and stay silent. */}
+          {attempt && isDailyBand(attempt.band) && attempt.band !== 'normal' && (
+            <div className="score-row"><span className="k">Difficulty</span><span className="v">{attempt.band === 'hard' ? 'Hard board · ×1.25' : 'Easy board · ×0.8'}</span></div>
+          )}
         </div>
       )}
-      <Leaderboard gameId={game.id} solved={solved} />
+      <Leaderboard
+        gameId={game.id}
+        solved={solved}
+        defaultBand={attempt && isDailyBand(attempt.band) ? attempt.band : 'normal'}
+      />
       {onReview && (
         <button className="primary-btn review-btn" onClick={onReview}>👁 View board</button>
       )}

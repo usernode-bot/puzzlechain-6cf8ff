@@ -2,6 +2,15 @@
    Game 4 — Minesweeper (8×8, 10 mines, classic game)
    ============================================================ */
 const MS_ROWS = 8, MS_COLS = 8, MS_MINES = 10, MS_SAFE = MS_ROWS * MS_COLS - MS_MINES; // 54
+/* #331 — the arcade picker's Easy/Normal/Hard chips were decorative: every band
+   dealt the same 8×8/10 board. Normal keeps the free-play constants
+   byte-for-byte; Easy thins the minefield, Hard grows the board. */
+const MS_BANDS = {
+  easy: { rows: 8, cols: 8, mines: 6 },
+  normal: { rows: MS_ROWS, cols: MS_COLS, mines: MS_MINES },
+  hard: { rows: 10, cols: 10, mines: 22 },
+};
+const msConfFor = (band) => (band && MS_BANDS[band]) || MS_BANDS.normal;
 
 const MS_HISTORY_KEY = 'puzzlechain_minesweeper_history';
 const MS_HISTORY_MAX = 50;
@@ -39,7 +48,7 @@ function msBestRunsSection() {
                     <span className={`ms-outcome-chip ${h.outcome}`}>{h.outcome === 'win' ? 'Win' : 'Loss'}</span>
                     <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtD(h.date)}</span>
                     <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
-                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/54 · {h.secs}s</span>
+                    <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/{h.safeTotal || 54} · {h.secs}s</span>
                   </div>
                 ))}
               </div>
@@ -50,36 +59,38 @@ function msBestRunsSection() {
   };
 }
 
-function generateMines(firstR, firstC) {
+function generateMines(firstR, firstC, conf) {
+  const rows = conf.rows, cols = conf.cols;
   const protected_ = new Set();
   for (let dr = -1; dr <= 1; dr++) {
     for (let dc = -1; dc <= 1; dc++) {
       const r = firstR + dr, c = firstC + dc;
-      if (r >= 0 && r < MS_ROWS && c >= 0 && c < MS_COLS)
-        protected_.add(r * MS_COLS + c);
+      if (r >= 0 && r < rows && c >= 0 && c < cols)
+        protected_.add(r * cols + c);
     }
   }
   const indices = [];
-  for (let i = 0; i < MS_ROWS * MS_COLS; i++) if (!protected_.has(i)) indices.push(i);
+  for (let i = 0; i < rows * cols; i++) if (!protected_.has(i)) indices.push(i);
   // Fisher-Yates on eligible indices
   for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
-  return new Set(indices.slice(0, MS_MINES));
+  return new Set(indices.slice(0, conf.mines));
 }
 
-function computeAdjacency(mineSet) {
-  const adj = new Int8Array(MS_ROWS * MS_COLS);
-  for (let r = 0; r < MS_ROWS; r++) {
-    for (let c = 0; c < MS_COLS; c++) {
-      const idx = r * MS_COLS + c;
+function computeAdjacency(mineSet, conf) {
+  const rows = conf.rows, cols = conf.cols;
+  const adj = new Int8Array(rows * cols);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
       if (mineSet.has(idx)) { adj[idx] = -1; continue; }
       let count = 0;
       for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
         if (dr === 0 && dc === 0) continue;
         const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < MS_ROWS && nc >= 0 && nc < MS_COLS && mineSet.has(nr * MS_COLS + nc)) count++;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && mineSet.has(nr * cols + nc)) count++;
       }
       adj[idx] = count;
     }
@@ -87,7 +98,8 @@ function computeAdjacency(mineSet) {
   return adj;
 }
 
-function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
+function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged, conf) {
+  const cols = conf.cols, rows = conf.rows;
   const next = new Set(prevRevealed);
   const queue = [startIdx];
   while (queue.length) {
@@ -95,11 +107,11 @@ function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
     if (next.has(idx) || mineSet.has(idx) || flagged.has(idx)) continue;
     next.add(idx);
     if (adjacency[idx] === 0) {
-      const r = Math.floor(idx / MS_COLS), c = idx % MS_COLS;
+      const r = Math.floor(idx / cols), c = idx % cols;
       for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
         if (dr === 0 && dc === 0) continue;
         const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < MS_ROWS && nc >= 0 && nc < MS_COLS) queue.push(nr * MS_COLS + nc);
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) queue.push(nr * cols + nc);
       }
     }
   }
@@ -113,20 +125,21 @@ function floodReveal(startIdx, adjacency, mineSet, prevRevealed, flagged) {
    theme (the old data-ms-theme pair), not the raw palette: base art is dark,
    light pins its own greys — intrinsic to this board, like the daily's. */
 const MS_LIGHT = { grid: '#9ca3af', hidden: '#e5e7eb', revealed: '#f9fafb', mineDead: '#fca5a5', exploded: '#f87171' };
-function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverMine, done, onCellTap, onCellFlag, onCellAlt }) {
+function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverMine, done, onCellTap, onCellFlag, onCellAlt, conf }) {
+  const board = conf || msConfFor(null);
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
-  const { cell } = useFitBox(boxRef, { cols: MS_COLS, rows: MS_ROWS, minCell: 26, maxCell: 46, gap: 2 });
+  const { cell } = useFitBox(boxRef, { cols: board.cols, rows: board.rows, minCell: 26, maxCell: 46, gap: 2 });
   const cellStep = cell + 2;
-  const boardPx = cellStep * MS_COLS - 2;
+  const boardPx = cellStep * board.cols - 2;
 
   const liveRef = useRef({});
   liveRef.current = { revealed, flagged, done, cellStep };
   const idxAt = (p) => {
     const cs = liveRef.current.cellStep;
     const c = Math.floor(p.x / cs), r = Math.floor(p.y / cs);
-    if (c < 0 || c >= MS_COLS || r < 0 || r >= MS_ROWS) return -1;
-    return r * MS_COLS + c;
+    if (c < 0 || c >= board.cols || r < 0 || r >= board.rows) return -1;
+    return r * board.cols + c;
   };
   usePointerCell(canvasRef, {
     onTap: (p) => { const i = idxAt(p); if (i >= 0 && !liveRef.current.done) onCellTap(i); },
@@ -151,8 +164,8 @@ function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverM
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const radius = Math.max(3, Math.round(cell * 0.16));
-      for (let i = 0; i < MS_ROWS * MS_COLS; i++) {
-        const r = Math.floor(i / MS_COLS), c = i % MS_COLS;
+      for (let i = 0; i < board.rows * board.cols; i++) {
+        const r = Math.floor(i / board.cols), c = i % board.cols;
         const x = c * cellStep, y = r * cellStep;
         const isRev = revealed.has(i);
         const isFlag = flagged.has(i);
@@ -161,15 +174,21 @@ function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverM
         const adjVal = adjacency ? adjacency[i] : 0;
 
         let fill = light ? MS_LIGHT.hidden : PAL.card;
-        if (isRev) fill = light ? MS_LIGHT.revealed : PAL.surface;
+        if (isRev) fill = light ? MS_LIGHT.revealed : MINE_DARK_TILES.revealed;
         if (isMineVisible) fill = light ? MS_LIGHT.mineDead : 'rgba(205,75,58,.25)';
         if (isExploded) fill = light ? MS_LIGHT.exploded : 'rgba(205,75,58,.60)';
-        klRR(ctx, x, y, cell, cell, radius);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = light ? MS_LIGHT.grid : PAL.border;
-        ctx.stroke();
+        if (!light && !isRev && !isMineVisible && !isExploded) {
+          // #294 — a covered cell is a raised key in dark mode.
+          mineDrawDarkHidden(ctx, x, y, cell, radius);
+        } else {
+          klRR(ctx, x, y, cell, cell, radius);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = light ? MS_LIGHT.grid
+            : (isRev && !isExploded ? MINE_DARK_TILES.revealedLn : PAL.border);
+          ctx.stroke();
+        }
 
         const cx = x + cell / 2, cy = y + cell / 2;
         if (isExploded) {
@@ -196,17 +215,23 @@ function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverM
         ref={canvasRef}
         className="ms-canvas board-canvas"
         role="grid"
-        aria-label={`Minesweeper, 8 by 8 board, ${revealed.size} cells revealed`}
+        aria-label={`Minesweeper, ${board.cols} by ${board.rows} board, ${revealed.size} cells revealed`}
       />
     </div>
   );
 }
 
-function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
+function MinesweeperGame({ onWin, onLose, onStepChange, resetKey, playMode, band }) {
   // The board follows the APP theme now (its own light/dark button is gone —
   // one control, in Settings). Base .ms-* rules are dark and
   // [data-ms-theme="light"] overrides them, so the resolved value maps directly.
   const { resolved: theme } = useTheme();
+  /* #331 — the band is an arcade-only string here (story/arcade numeric bands
+     never equal 'easy'/'hard', and classics get null), so a plain string gate
+     cannot cross modes. */
+  const msBand = playMode === 'arcade' && (band === 'easy' || band === 'hard') ? band : null;
+  const msConf = msConfFor(msBand);
+  const safeTotal = msConf.rows * msConf.cols - msConf.mines;
   const [activeTab, setActiveTab] = useState('game');
   const [mineSet, setMineSet] = useState(null);
   const [adjacency, setAdjacency] = useState(null);
@@ -234,7 +259,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     setSteps(0);
     setActiveTab('game');
     setMusicPaused(false);
-  }, [resetKey]);
+  }, [resetKey, msBand]);
 
   // Background music: plays while a game is live (board generated on first
   // reveal), sound is enabled, and the player hasn't paused it. Starting only
@@ -261,16 +286,16 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     ? Array.from(revealed).filter(i => !mineSet.has(i)).length
     : 0;
   const cashOutActive = safeRevealed >= 10 && !done;
-  const cashoutMultiplier = parseFloat((1.0 + safeRevealed / MS_SAFE).toFixed(2));
+  const cashoutMultiplier = parseFloat((1.0 + safeRevealed / safeTotal).toFixed(2));
 
   const handleReveal = (idx) => {
     if (done || revealed.has(idx) || flagged.has(idx)) return;
-    const r = Math.floor(idx / MS_COLS), c = idx % MS_COLS;
+    const r = Math.floor(idx / msConf.cols), c = idx % msConf.cols;
 
     let mines = mineSet, adj = adjacency;
     if (!mines) {
-      mines = generateMines(r, c);
-      adj = computeAdjacency(mines);
+      mines = generateMines(r, c, msConf);
+      adj = computeAdjacency(mines, msConf);
       setMineSet(mines);
       setAdjacency(adj);
     }
@@ -287,20 +312,20 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       const entry = {
         id: String(Date.now()),
         date: new Date().toISOString().slice(0, 10),
-        outcome: 'loss', score: 0, steps: newSteps, secs, safeRevealed, cashOut: false, cashoutMultiplier: null,
+        outcome: 'loss', score: 0, steps: newSteps, secs, safeRevealed, safeTotal, cashOut: false, cashoutMultiplier: null,
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
-      const shareText = `Mine Finder Classic ${entry.date} — 💥 Game Over · ${safeRevealed}/54 safe · ${secs}s · +0 pts`;
+      const shareText = `Mine Finder Classic ${entry.date} — 💥 Game Over · ${safeRevealed}/${safeTotal} safe · ${secs}s · +0 pts`;
       onLose(newSteps, secs, { share: shareText });
       return;
     }
 
-    const newRevealed = floodReveal(idx, adj, mines, revealed, flagged);
+    const newRevealed = floodReveal(idx, adj, mines, revealed, flagged, msConf);
     setRevealed(newRevealed);
 
     const newSafeRevealed = Array.from(newRevealed).filter(i => !mines.has(i)).length;
-    if (newSafeRevealed >= MS_SAFE) {
+    if (newSafeRevealed >= safeTotal) {
       // Full board clear
       setDone(true);
       cgSound('win'); cgHaptic([15, 30, 15]);
@@ -309,11 +334,11 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       const entry = {
         id: String(Date.now()),
         date: dateStr,
-        outcome: 'win', score: baseScore, steps: newSteps, secs, safeRevealed: newSafeRevealed, cashOut: false, cashoutMultiplier: 1.0,
+        outcome: 'win', score: baseScore, steps: newSteps, secs, safeRevealed: newSafeRevealed, safeTotal, cashOut: false, cashoutMultiplier: 1.0,
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
-      const shareText = `Mine Finder Classic ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/54 safe · ${secs}s · +${baseScore} pts`;
+      const shareText = `Mine Finder Classic ${dateStr} — ✅ Full Clear · ${newSafeRevealed}/${safeTotal} safe · ${secs}s · +${baseScore} pts`;
       submitClassicScore('minesweeper', baseScore, { safeRevealed: newSafeRevealed, timeSecs: secs });
       onWin(baseScore, newSteps, secs, { share: shareText, cashOut: false });
     }
@@ -329,11 +354,11 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     const entry = {
       id: String(Date.now()),
       date: dateStr,
-      outcome: 'win', score: finalScore, steps, secs, safeRevealed, cashOut: true, cashoutMultiplier,
+      outcome: 'win', score: finalScore, steps, secs, safeRevealed, safeTotal, cashOut: true, cashoutMultiplier,
     };
     msSaveEntry(entry);
     setGameHistory(msLoadHistory());
-    const shareText = `Mine Finder Classic ${dateStr} — 🔒×${cashoutMultiplier} · ${safeRevealed}/54 safe · ${secs}s · +${finalScore} pts`;
+    const shareText = `Mine Finder Classic ${dateStr} — 🔒×${cashoutMultiplier} · ${safeRevealed}/${safeTotal} safe · ${secs}s · +${finalScore} pts`;
     submitClassicScore('minesweeper', finalScore, { safeRevealed, timeSecs: secs });
     onWin(finalScore, steps, secs, { share: shareText, cashOut: true, cashoutMultiplier });
   };
@@ -357,12 +382,12 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     if (!revealed.has(idx)) return false;
     const n = adjacency[idx];
     if (!(n > 0)) return false;
-    const r = Math.floor(idx / MS_COLS), c = idx % MS_COLS;
+    const r = Math.floor(idx / msConf.cols), c = idx % msConf.cols;
     const neigh = [];
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
       if (!dr && !dc) continue;
       const rr = r + dr, cc = c + dc;
-      if (rr >= 0 && rr < MS_ROWS && cc >= 0 && cc < MS_COLS) neigh.push(rr * MS_COLS + cc);
+      if (rr >= 0 && rr < msConf.rows && cc >= 0 && cc < msConf.cols) neigh.push(rr * msConf.cols + cc);
     }
     const flags = neigh.filter(i => flagged.has(i));
     if (flags.length !== n) return false;
@@ -382,36 +407,36 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
       const entry = {
         id: String(Date.now()),
         date: new Date().toISOString().slice(0, 10),
-        outcome: 'loss', score: 0, steps: newSteps, secs, safeRevealed, cashOut: false, cashoutMultiplier: null,
+        outcome: 'loss', score: 0, steps: newSteps, secs, safeRevealed, safeTotal, cashOut: false, cashoutMultiplier: null,
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
       onLose(newSteps, secs, {
-        share: `Mine Finder Classic ${entry.date} — 💥 Game Over · ${safeRevealed}/54 safe · ${secs}s · +0 pts`,
+        share: `Mine Finder Classic ${entry.date} — 💥 Game Over · ${safeRevealed}/${safeTotal} safe · ${secs}s · +0 pts`,
       });
       return true;
     }
 
     let next = revealed;
-    for (const i of toOpen) next = floodReveal(i, adjacency, mineSet, next, flagged);
+    for (const i of toOpen) next = floodReveal(i, adjacency, mineSet, next, flagged, msConf);
     setRevealed(next);
     cgSound('move');
 
     const newSafe = Array.from(next).filter(i => !mineSet.has(i)).length;
-    if (newSafe >= MS_SAFE) {
+    if (newSafe >= safeTotal) {
       setDone(true);
       cgSound('win'); cgHaptic([15, 30, 15]);
       const baseScore = Math.max(newSafe * 30 - secs * 2, 100) + 200;
       const dateStr = new Date().toISOString().slice(0, 10);
       const entry = {
         id: String(Date.now()), date: dateStr,
-        outcome: 'win', score: baseScore, steps: newSteps, secs, safeRevealed: newSafe, cashOut: false, cashoutMultiplier: 1.0,
+        outcome: 'win', score: baseScore, steps: newSteps, secs, safeRevealed: newSafe, safeTotal, cashOut: false, cashoutMultiplier: 1.0,
       };
       msSaveEntry(entry);
       setGameHistory(msLoadHistory());
       submitClassicScore('minesweeper', baseScore, { safeRevealed: newSafe, timeSecs: secs });
       onWin(baseScore, newSteps, secs, {
-        share: `Mine Finder Classic ${dateStr} — ✅ Full Clear · ${newSafe}/54 safe · ${secs}s · +${baseScore} pts`,
+        share: `Mine Finder Classic ${dateStr} — ✅ Full Clear · ${newSafe}/${safeTotal} safe · ${secs}s · +${baseScore} pts`,
         cashOut: false,
       });
     }
@@ -431,7 +456,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
     handleReveal(idx);
   };
 
-  const minesLeft = MS_MINES - flagged.size;
+  const minesLeft = msConf.mines - flagged.size;
 
   const fmtDate = (d) => { const [y, m, day] = d.split('-'); return `${m}/${day}/${y.slice(2)}`; };
 
@@ -445,7 +470,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
             return [
               { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: timeFmt, gold: true },
               { id: 'p-mines', kind: 'pill', r: pr[1], label: 'Mines Left', value: minesLeft },
-              { id: 'p-safe', kind: 'pill', r: pr[2], label: 'Safe Revealed', value: `${safeRevealed}/${MS_SAFE}` },
+              { id: 'p-safe', kind: 'pill', r: pr[2], label: 'Safe Revealed', value: `${safeRevealed}/${safeTotal}` },
             ];
           }} />
 
@@ -475,6 +500,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
             onCellTap={handleCellTap}
             onCellFlag={handleFlag}
             onCellAlt={(idx) => { if (flagMode) handleReveal(idx); else handleFlag(idx); cgHaptic(12); }}
+            conf={msConf}
           />
 
           <CuiBar height={50} build={(W) => {
@@ -502,7 +528,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
                   <span className={`ms-outcome-chip ${h.outcome}`}>{h.outcome === 'win' ? 'Win' : 'Loss'}</span>
                   <span style={{ color: C.muted, fontSize: '0.75rem' }}>{fmtDate(h.date)}</span>
                   <span className="mono" style={{ color: C.gold }}>+{h.score}</span>
-                  <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/54 · {h.secs}s</span>
+                  <span style={{ color: C.muted, fontSize: '0.75rem' }}>{h.safeRevealed}/{h.safeTotal || 54} · {h.secs}s</span>
                 </div>
               ))}
           </div>
@@ -544,7 +570,7 @@ function MinesweeperGame({ onWin, onLose, onStepChange, resetKey }) {
         </div>
       )}
 
-      <div className="ms-bottom-nav">
+      <div className="ms-bottom-nav safe-bottom">
         {['game', 'history', 'leaderboard', 'settings'].map(tab => (
           <button
             key={tab}

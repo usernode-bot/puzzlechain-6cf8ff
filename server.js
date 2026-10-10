@@ -294,6 +294,20 @@ const ARCADE_BANDS = ['easy', 'normal', 'hard'];
 const ARCADE_BAND_MULT = { easy: 0.6, normal: 1.0, hard: 1.6 };
 const isArcadeBand = (b) => ARCADE_BANDS.indexOf(b) !== -1;
 
+/* Daily difficulty bands (#331) — Easy/Normal/Hard, chosen on the pre-game
+   screen and stored on the attempt row. Easy/Hard deal a different seeded
+   board from the same day's anchor (the client's dailySeedFor mixes the band
+   into the seed); the leaderboard filters by band so a win is ranked against
+   the same deal it was played on. DAILY_BAND_MULT scales what a win pays —
+   mirrored from the client's DAILY_BAND_MULT, which the client applies to the
+   final score it posts (the same client-authoritative trust model as the
+   streak multiplier); this constant documents the contract. Normal must stay
+   byte-identical to the pre-band deal, so every existing seeded board and
+   check keeps passing. */
+const DAILY_BANDS = ['easy', 'normal', 'hard'];
+const DAILY_BAND_MULT = { easy: 0.8, normal: 1.0, hard: 1.25 };
+const isDailyBand = (b) => DAILY_BANDS.indexOf(b) !== -1;
+
 /* Rank thresholds pay ONCE each, ever, per (user, game, band). Paying for rank
    POSITION instead would let a player drift up as other scores decay, or
    oscillate across a boundary and collect repeatedly. */
@@ -832,6 +846,12 @@ async function migrate() {
   // re-derived from the deterministic daily seed, so only player moves live here.
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
+  /* #331 — the difficulty band the attempt was played on. Nullable: rows
+     written before the bands existed are Normal by construction (the pre-band
+     deal IS today's Normal deal), so reads COALESCE(band, 'normal'). The band
+     is chosen before the claim, so the UNIQUE (user, game, date) constraint
+     stays untouched — still one attempt per day. */
+  await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS band TEXT`);
   /* #188 — the all-time board groups every finished attempt for one game by
      player. Without this the query is a full scan of a table that only grows;
      the existing indexes are keyed for "today, this game", which is the wrong
@@ -1319,6 +1339,43 @@ async function migrate() {
       username  TEXT,
       game_id   TEXT NOT NULL,
       pinned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+
+  /* game_plays is PUBLIC (Recent goal) — which games this player launched and
+     when, powering the lobby's Recently Played strip. Same exposure class as
+     game_pins: per-user gameplay activity over ids that are already public
+     lobby keys, so a stranger reading every row learns nothing they could not
+     read by watching the lobby. One row per (user, game); each new play
+     bumps played_at and plays. No foreign keys (public-table rule). */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_plays (
+      user_id   TEXT NOT NULL,
+      game_id   TEXT NOT NULL,
+      username  TEXT,
+      plays     INTEGER NOT NULL DEFAULT 1,
+      played_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, game_id)
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS game_plays_recent_idx
+       ON game_plays(user_id, played_at DESC)`
+  );
+
+  // game_favorites is PUBLIC — one row per (user, game) the player starred.
+  // Same data class as game_pins: a display preference over ids that are
+  // already public (every game id is a deep-link key), so a stranger reading
+  // every row learns nothing the lobby does not show. game_id holds the CARD's
+  // anchor registry id; the client resolves it back through CARD_BY_GAME_ID,
+  // which lets the four merged cards keep both of their ids.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_favorites (
+      user_id       TEXT NOT NULL,
+      username      TEXT,
+      game_id       TEXT NOT NULL,
+      favorited_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (user_id, game_id)
     )
   `);
@@ -2047,6 +2104,7 @@ function shapeAttempt(row) {
     finishedAt: row.finished_at,
     progress: row.progress || null,
     elapsedSecs: row.elapsed_secs != null ? row.elapsed_secs : null,
+    band: row.band || 'normal',
   };
 }
 
@@ -2424,6 +2482,35 @@ async function readPins(userId) {
   return rows.map(r => r.game_id);
 }
 
+/* ---- Recently Played tracking (Recent goal) ------------------------------
+   Every "I played this game" moment funnels through recordGamePlay. Fire-and-
+   forget by design: a tracking failure must never cost a player the score,
+   attempt or rating the surrounding route exists to record, so the caller
+   wraps it (or the helper swallows everything) and moves on. */
+async function recordGamePlay(userId, username, gameId) {
+  try {
+    await pool.query(
+      `INSERT INTO game_plays (user_id, username, game_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, game_id) DO UPDATE SET
+         played_at = now(),
+         plays = game_plays.plays + 1,
+         username = COALESCE(EXCLUDED.username, game_plays.username)`,
+      [userId, username || null, gameId]
+    );
+  } catch (e) { console.warn('[plays] record failed (non-fatal):', e.message); }
+}
+
+// The caller's five most recent plays (most recent first) for the lobby strip.
+async function readRecentPlays(userId, limit) {
+  const { rows } = await pool.query(
+    `SELECT game_id, played_at FROM game_plays
+      WHERE user_id = $1 ORDER BY played_at DESC, game_id ASC LIMIT $2`,
+    [userId, limit]
+  );
+  return rows.map(r => ({ gameId: r.game_id, playedAt: r.played_at }));
+}
+
 // POST /api/pins/:gameId — pin a game to the top of the home grid.
 app.post('/api/pins/:gameId', async (req, res) => {
   const { gameId } = req.params;
@@ -2460,6 +2547,53 @@ app.delete('/api/pins/:gameId', async (req, res) => {
   } catch (err) {
     console.error('[pins] DELETE failed:', err.message);
     res.status(500).json({ error: 'Failed to unpin game' });
+  }
+});
+
+// ---- Favorite games API --------------------------------------------------
+// Same auth-gated, idempotent shape as the pins API above: the favorite
+// belongs to req.user, never to an id the client names, and both routes
+// answer with the player's FULL favorite list so the client replaces its
+// optimistic set with the server's truth. No cap — a list of ids is cheap.
+
+async function readFavorites(userId) {
+  const { rows } = await pool.query(
+    `SELECT game_id FROM game_favorites WHERE user_id = $1 ORDER BY favorited_at ASC, game_id ASC`,
+    [userId]
+  );
+  return rows.map(r => r.game_id);
+}
+
+// PUT /api/favorites/:gameId — star a game. Idempotent: starring an
+// already-starred game is a success with an unchanged list.
+app.put('/api/favorites/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  try {
+    await pool.query(
+      `INSERT INTO game_favorites (user_id, username, game_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, game_id) DO NOTHING`,
+      [req.user.id, req.user.username || null, gameId]
+    );
+    res.json({ favorites: await readFavorites(req.user.id) });
+  } catch (err) {
+    console.error('[favorites] PUT failed:', err.message);
+    res.status(500).json({ error: 'Failed to favorite game' });
+  }
+});
+
+// DELETE /api/favorites/:gameId — unstar. Idempotent: unstarring something
+// never starred is a success with an unchanged list.
+app.delete('/api/favorites/:gameId', async (req, res) => {
+  const { gameId } = req.params;
+  try {
+    await pool.query(`DELETE FROM game_favorites WHERE user_id = $1 AND game_id = $2`,
+      [req.user.id, gameId]);
+    res.json({ favorites: await readFavorites(req.user.id) });
+  } catch (err) {
+    console.error('[favorites] DELETE failed:', err.message);
+    res.status(500).json({ error: 'Failed to unstar game' });
   }
 });
 
@@ -2630,6 +2764,70 @@ app.get('/api/daily', async (req, res) => {
        Deletes only rows belonging to the caller; strict no-op in production. */
     if (IS_STAGING && req.query.demo === 'pinsempty') {
       await pool.query(`DELETE FROM game_pins WHERE user_id = $1`, [req.user.id]);
+    }
+
+    /* Staging-only demo seed (Recent goal): five plays for the current viewer
+       so the Recently Played strip, its most-recent-first ordering and its
+       replay buttons are reachable by navigation alone. game_plays is a NEW
+       table, so staging starts empty and none of that would otherwise render.
+       Staggered timestamps make the ordering visible in a screenshot. Only the
+       viewer's OWN rows are written/read, so nothing the strip concludes is
+       fabricated by the seed itself; delete via demo=recentclear.
+       Strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'recent') {
+      const demoPlays = ['sudoku', 'mancala', 'snake', 'tilematching', 'wordhunt'];
+      for (let i = 0; i < demoPlays.length; i++) {
+        await pool.query(
+          `INSERT INTO game_plays (user_id, username, game_id, played_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoPlays[i],
+           String((i + 1) * 25)]
+        );
+      }
+    }
+
+    /* Staging-only demo seed: stars three games for the current viewer so the
+       Favorites filter chip and its per-card star state are reachable by
+       navigation alone — game_favorites is a NEW table, so staging starts
+       with zero rows and an active chip would otherwise show nothing. The
+       ids mirror the demo=pins mix (a daily, a classic, one half of a merged
+       card). Nothing the app's own logic reads is fabricated here: a favorite
+       is the player's own choice, this fixture IS the player acting (one
+       viewer, one DB, explicitly armed by the demo param), and it only ever
+       controls the chip the viewer opted into. Idempotent; strict no-op in
+       production. */
+    if (IS_STAGING && req.query.demo === 'favorites') {
+      const demoFavorites = ['sudoku', 'mancala', 'snakedaily'];
+      for (let i = 0; i < demoFavorites.length; i++) {
+        await pool.query(
+          `INSERT INTO game_favorites (user_id, username, game_id, favorited_at)
+           VALUES ($1, $2, $3, now() - ($4 || ' minutes')::interval)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username || 'staging-demo-user', demoFavorites[i],
+           String(demoFavorites.length - i)]
+        );
+      }
+    }
+
+    /* Staging-only counterpart to demo=recent (Recent goal): clears the
+       viewer's play history so the no-history home (no strip at all) is
+       reachable deterministically. Same rationale as demo=pinsempty: the
+       proposal-check suite runs as one viewer against one staging DB, so a
+       plain `/` assertion on the hidden state would depend on route order.
+       Deletes only rows belonging to the caller; strict no-op in production. */
+    if (IS_STAGING && req.query.demo === 'recentclear') {
+      await pool.query(`DELETE FROM game_plays WHERE user_id = $1`, [req.user.id]);
+    }
+
+    /* Staging-only counterpart to demo=favorites: clears the viewer's
+       favorites so the empty-chip state is reachable deterministically,
+       exactly as demo=pinsempty does for pins — the check suite runs as one
+       viewer against one staging DB, so the order routes ran in must not
+       decide what the chip shows. Deletes only the caller's rows; strict
+       no-op in production. */
+    if (IS_STAGING && req.query.demo === 'favempty') {
+      await pool.query(`DELETE FROM game_favorites WHERE user_id = $1`, [req.user.id]);
     }
 
     // Staging-only demo seed: gives the current viewer a 10-day consecutive
@@ -2826,6 +3024,33 @@ app.get('/api/daily', async (req, res) => {
             [`staging-demo-lb-${i + 1}`, r.name, g, 1000 - r.time, r.steps, r.time]
           );
         }
+      }
+      /* #331 — Easy and Hard rows on the FEATURED game so the per-band boards
+         are demonstrable. Deliberately DISTINCT users from the Normal rows
+         above: staging carries one DB across every check run, and the same
+         (user, game, date) triple seeded with a different band would be a
+         silent ON CONFLICT no-op — whoever ran first would own the band. */
+      const bandSeed = [
+        { key: 'e', name: 'Staging demo Greta', time: 61, steps: 15 }, // easy board
+        { key: 'e', name: 'Staging demo Hans',  time: 92, steps: 24 },
+        { key: 'e', name: 'Staging demo Ivo',   time: 133, steps: 33 },
+        { key: 'h', name: 'Staging demo Jana',  time: 79, steps: 20 }, // hard board
+        { key: 'h', name: 'Staging demo Kai',   time: 118, steps: 28 },
+      ];
+      for (const r of bandSeed) {
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, band, score, steps, time_secs, finished_at)
+           VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, $5, $6, $7, now())
+           ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+             SET band = EXCLUDED.band,
+                 score = EXCLUDED.score,
+                 steps = EXCLUDED.steps,
+                 time_secs = EXCLUDED.time_secs,
+                 finished_at = EXCLUDED.finished_at`,
+          [`staging-demo-lb-${r.key}${r.name.slice(-1)}`, r.name, featuredForLb.gameId,
+           r.key === 'e' ? 'easy' : 'hard', 1000 - r.time, r.steps, r.time]
+        );
       }
     }
 
@@ -3656,6 +3881,79 @@ app.get('/api/daily', async (req, res) => {
       }
     }
 
+    if (IS_STAGING && req.query.demo === 'myscores') {
+      /* Seeds the VIEWER's own all-time figures — /api/my/scores is
+         caller-keyed, so this fixture must attribute rows to req.user (a
+         fixture seeding fake users would show nothing on their profile).
+
+         Staging carries ONE database across every check run and never
+         resets, so this fixture has to ASSERT its state, not add to it —
+         the same rule demo=storybadges and demo=modes follow. demo=streak
+         and demo=badges already finished this viewer's past-date
+         daily_attempts, and demo=ladder wrote a rating row; with plain
+         ON CONFLICT DO NOTHING those earlier rows win, /api/my/scores
+         SUMS them (sudoku 4,820 rather than 320), and the merged Snake
+         card prefers that pts over its classic best — so the figures this
+         fixture names never render. Clear the viewer's rows for the games
+         it names first, including the card-union daily ids that would
+         otherwise mask a seeded best (snakedaily over snake, minefinder
+         over minesweeper). */
+      await pool.query(
+        `DELETE FROM daily_attempts
+          WHERE user_id = $1
+            AND (game_id = 'snakedaily'
+                 OR (game_id IN ('sudoku', '2048', 'wordsprint', 'minefinder')
+                     AND attempt_date < (now() AT TIME ZONE 'utc')::date))`,
+        [req.user.id]
+      );
+      await pool.query(
+        `DELETE FROM classic_scores
+          WHERE user_id = $1 AND game_id IN ('minesweeper', '2048', 'chutes-ladders')`,
+        [req.user.id]
+      );
+      await pool.query(`DELETE FROM snake_scores WHERE user_id = $1`, [req.user.id]);
+      await pool.query(
+        `DELETE FROM game_ratings WHERE user_id = $1 AND game_id = 'checkers'`,
+        [req.user.id]
+      );
+      const msSeed = [
+        ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
+      ];
+      for (const [gid, daysAgo, score] of msSeed) {
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, score, steps, time_secs, started_at, finished_at)
+           VALUES ($1, $2, $3, ((now() AT TIME ZONE 'utc')::date - $4::int), $5, 42, 95,
+                   now() - ($4::int * '1 day'::interval), now() - ($4::int * '1 day'::interval))
+           ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+          [req.user.id, req.user.username, gid, daysAgo, score]
+        );
+      }
+      const msClassic = [
+        ['minesweeper', 950], ['2048', 18432], ['chutes-ladders', 5],
+      ];
+      for (const [gid, score] of msClassic) {
+        await pool.query(
+          `INSERT INTO classic_scores (user_id, username, game_id, best_score, games_played)
+           VALUES ($1, $2, $3, $4, 3)
+           ON CONFLICT (user_id, game_id) DO NOTHING`,
+          [req.user.id, req.user.username, gid, score]
+        );
+      }
+      await pool.query(
+        `INSERT INTO snake_scores (user_id, username, best_score, best_length, best_time_secs, games_played)
+         VALUES ($1, $2, 350, 42, 118, 3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [req.user.id, req.user.username]
+      );
+      await pool.query(
+        `INSERT INTO game_ratings (user_id, username, game_id, elo, win_streak, best_streak, wins, losses, draws)
+         VALUES ($1, $2, 'checkers', 1046, 2, 3, 4, 2, 0)
+         ON CONFLICT (user_id, game_id) DO NOTHING`,
+        [req.user.id, req.user.username]
+      );
+    }
+
     const { rows } = await pool.query(
       `SELECT * FROM daily_attempts
        WHERE user_id = $1 AND attempt_date = (now() AT TIME ZONE 'utc')::date`,
@@ -3716,6 +4014,20 @@ app.get('/api/daily', async (req, res) => {
       pins = pinRows.map(r => r.game_id);
     } catch (e) { console.warn('[daily] pins query failed (non-fatal):', e.message); }
 
+    // Recently Played (Recent goal) — this player's five most recent launches
+    // for the lobby strip. Non-fatal for the same reason as pins.
+    let recentPlays = [];
+    try { recentPlays = await readRecentPlays(req.user.id, 5); }
+    catch (e) { console.warn('[daily] recentPlays query failed (non-fatal):', e.message); }
+
+    // Favorited games — the card anchor ids this player starred, oldest
+    // first. Non-fatal: a lobby without its Favorites filter is still a
+    // lobby; the client just falls back to no stars and an empty chip view.
+    let favorites = [];
+    try {
+      favorites = await readFavorites(req.user.id);
+    } catch (e) { console.warn('[daily] favorites query failed (non-fatal):', e.message); }
+
     res.json({
       // Surface the signed-in account so the UI can confirm login +
       // that persistent data is active. Always present here (route is
@@ -3746,6 +4058,10 @@ app.get('/api/daily', async (req, res) => {
       // Games pinned to the top of the home grid (#232), oldest pin first.
       pins,
       pinLimit: PIN_LIMIT,
+      // Most recent launches for the lobby's Recently Played strip (Recent goal).
+      recentPlays,
+      // Games starred as favorites, oldest star first.
+      favorites,
     });
   } catch (err) {
     console.error('[daily] GET failed:', err.message);
@@ -3759,6 +4075,11 @@ app.get('/api/daily', async (req, res) => {
 app.post('/api/daily/:gameId/start', async (req, res) => {
   const { gameId } = req.params;
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // The band is chosen on the pre-game screen and sent on the claim. It does
+  // not gate anything (same code path either way) — it only picks which seeded
+  // deal the client derives and what the board is ranked against. Absent =
+  // 'normal' (the pre-band deal, unchanged).
+  const band = isDailyBand(req.body && req.body.band) ? req.body.band : 'normal';
   try {
     // Issue (or read) today's board seed alongside the claim, so a client that
     // sat on the lobby across the UTC reset still mounts the new day's board.
@@ -3766,11 +4087,11 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
     try { seed = await ensureDailySeed(gameId); }
     catch (e) { console.warn('[daily] start seed issue failed (client falls back):', e.message); }
     const { rows } = await pool.query(
-      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date)
-       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date)
+      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date, band)
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4)
        ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
        RETURNING *`,
-      [req.user.id, req.user.username || null, gameId]
+      [req.user.id, req.user.username || null, gameId, band]
     );
     if (rows.length === 0) {
       // Already used today — return the existing attempt so the client can
@@ -3789,6 +4110,8 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
         seed,
       });
     }
+    // Recently Played tracking (Recent goal): a claimed attempt is a play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     res.json({ attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), seed });
   } catch (err) {
     console.error('[daily] start failed:', err.message);
@@ -3930,6 +4253,10 @@ async function settleDailySession({ user, gameId, score, steps, timeSecs, moves,
 // Returns the finish response payload, or null when there is no claimed,
 // unfinished attempt today (callers map that to 409). Throws on DB errors.
 async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, moves, replay, progress }) {
+  // Recently Played tracking (Recent goal): this finish WAS a play. Fire-and-
+  // forget via the helper's own catch, so a tracking failure never delays the
+  // badges, streak or settlement the rest of this function computes.
+  recordGamePlay(user.id, user.username, gameId);
 
   // Read the player's previous best for this game BEFORE today's finish is
   // committed, so it naturally excludes the in-flight attempt (its
@@ -4210,6 +4537,9 @@ app.post('/api/daily/:gameId/commit', async (req, res) => {
   const steps = Number.isFinite(req.body.steps) ? Math.round(req.body.steps) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (!(score > 0)) return res.status(400).json({ error: 'Nothing to commit' });
+  // #331 — the band the anonymous run was played on (carried in the pending
+  // run); it lands on the same deal's board it was played against.
+  const band = isDailyBand(req.body.band) ? req.body.band : 'normal';
   try {
     const todaySeed = await ensureDailySeed(gameId);
     if (Number(req.body.seed) !== todaySeed) {
@@ -4218,11 +4548,11 @@ app.post('/api/daily/:gameId/commit', async (req, res) => {
       });
     }
     const { rows: ins } = await pool.query(
-      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date)
-       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date)
+      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date, band)
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4)
        ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
        RETURNING *`,
-      [req.user.id, req.user.username || null, gameId]
+      [req.user.id, req.user.username || null, gameId, band]
     );
     if (ins.length === 0) {
       const { rows: existing } = await pool.query(
@@ -4262,6 +4592,9 @@ app.get('/api/public/daily/:gameId/rank-preview', async (req, res) => {
   // Score-ranked boards (Word Sprint) preview against score; the rest against
   // time-then-steps — mirrors the per-game leaderboard's tieBreak dispatch.
   const scoreRanked = (GAME_REGISTRY[gameId] && GAME_REGISTRY[gameId].manifest || {}).tieBreak === 'score-then-time';
+  // #331 — ?band= previews against one deal's board (a guest who played Easy is
+  // ranked against Easy). Defaults to normal, same as the leaderboard.
+  const band = isDailyBand(req.query.band) ? req.query.band : 'normal';
   try {
     const { rows } = await pool.query(
       scoreRanked
@@ -4270,16 +4603,18 @@ app.get('/api/public/daily/:gameId/rank-preview', async (req, res) => {
              FROM daily_attempts
             WHERE game_id = $1
               AND attempt_date = (now() AT TIME ZONE 'utc')::date
-              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
+              AND COALESCE(band, 'normal') = $3`
         : `SELECT COUNT(*)::int AS total,
                   COUNT(*) FILTER (WHERE time_secs < $2 OR (time_secs = $2 AND steps <= $3))::int AS ahead
              FROM daily_attempts
             WHERE game_id = $1
               AND attempt_date = (now() AT TIME ZONE 'utc')::date
-              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
+              AND COALESCE(band, 'normal') = $4`,
       scoreRanked
-        ? [gameId, Number.isFinite(sc) ? sc : 0]
-        : [gameId, t, Number.isFinite(s) ? s : 2147483647]
+        ? [gameId, Number.isFinite(sc) ? sc : 0, band]
+        : [gameId, t, Number.isFinite(s) ? s : 2147483647, band]
     );
     res.json({
       rank: rows[0].ahead + 1,
@@ -4391,6 +4726,8 @@ app.post('/api/story/:gameId/clear', async (req, res) => {
 
   try {
     const award = storyBandAward(gameId, band);
+    // Recently Played tracking (Recent goal): a band clear is a play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     const claim = await pool.query(
       `INSERT INTO game_progress
          (user_id, game_id, band, awarded_points, best_score, best_time_secs, best_steps, plays)
@@ -4495,6 +4832,8 @@ app.post('/api/arcade/:gameId/start', async (req, res) => {
   if (!isArcadeBand(band)) return res.status(400).json({ error: 'Unknown band' });
   const seed = Math.max(0, Math.min(4294967295, Number(req.body && req.body.seed) || 0));
   try {
+    // Recently Played tracking (Recent goal): claiming the run is the play.
+    recordGamePlay(req.user.id, req.user.username, gameId);
     const { rows } = await pool.query(
       `INSERT INTO arcade_runs (user_id, username, game_id, band, seed, score, started_at)
        VALUES ($1, $2, $3, $4, $5, 0, now()) RETURNING id`,
@@ -4754,6 +5093,12 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   const orderBy = tieBreak === 'score-then-time'
     ? 'score DESC, time_secs ASC, finished_at ASC'
     : 'time_secs ASC, steps ASC, finished_at ASC';
+  /* #331 — ?band=easy|normal|hard filters the board to one deal. Default is
+     'normal', which is also what every pre-band row COALESCEs to, so callers
+     that send no band param see exactly the board they always saw. (Easy/Hard
+     are separate deals — same day, different seed — so their finishes rank
+     against the same board they were played on, at their own multiplier.) */
+  const band = isDailyBand(req.query.band) ? req.query.band : 'normal';
   try {
     const { rows } = await pool.query(
       `SELECT user_id, username, score, steps, time_secs,
@@ -4765,10 +5110,11 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
           AND attempt_date = (now() AT TIME ZONE 'utc')::date
           AND finished_at IS NOT NULL
           AND score IS NOT NULL AND score > 0
+          AND COALESCE(band, 'normal') = $3
           AND ($2::text IS NULL
                OR user_id = $2
                OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))`,
-      [gameId, friendsScope ? req.user.id : null]
+      [gameId, friendsScope ? req.user.id : null, band]
     );
     const total = rows.length;
     // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
@@ -4784,7 +5130,7 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
     const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
     const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
     const me = mineRow ? shape(mineRow) : null;
-    res.json({ entries, me, total });
+    res.json({ entries, me, total, band });
   } catch (err) {
     console.error('[daily] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });
@@ -4905,6 +5251,8 @@ app.get('/api/daily/leaderboard/today', async (req, res) => {
 // Create a new room. Retries up to 3 times on ID collision.
 app.post('/api/mancala/rooms', async (req, res) => {
   const initPits = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
+  // Recently Played tracking (Recent goal): hosting a room is playing it.
+  recordGamePlay(req.user.id, req.user.username, 'mancala');
   let roomId = generateRoomId();
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -4926,6 +5274,8 @@ app.post('/api/mancala/rooms', async (req, res) => {
 // Join an existing waiting room as player 2.
 app.post('/api/mancala/rooms/:roomId/join', async (req, res) => {
   const { roomId } = req.params;
+  // Recently Played tracking (Recent goal): sitting down in the room is a play.
+  recordGamePlay(req.user.id, req.user.username, 'mancala');
   try {
     /* #200 — RECOGNISE A PLAYER WHO IS ALREADY IN THIS ROOM, before trying to
        seat them as a newcomer.
@@ -5407,6 +5757,8 @@ async function expireStaleMancalaRoom(r) {
 app.post('/api/classic/:gameId/rooms', async (req, res) => {
   const { gameId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // Recently Played tracking (Recent goal): hosting a room is playing it.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   const rules = boardRules.getRules(gameId);
   const seatCap = rules && rules.maxPlayers ? rules.maxPlayers : 2;
   const wanted = Number((req.body || {}).players) || 2;
@@ -5445,6 +5797,8 @@ app.post('/api/classic/:gameId/rooms', async (req, res) => {
 app.post('/api/classic/:gameId/rooms/:roomId/join', async (req, res) => {
   const { gameId, roomId } = req.params;
   if (!ALL_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // Recently Played tracking (Recent goal): sitting down in the room is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { rows: cur } = await pool.query(
@@ -5638,6 +5992,8 @@ app.post('/api/classic/:gameId/rooms/:roomId/score', async (req, res) => {
   if (!CLASSIC_RACE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Race not supported for this game' });
   const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
   if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): crossing the finish line is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { rows } = await pool.query('SELECT * FROM classic_rooms WHERE id = $1 AND game_id = $2', [roomId, gameId]);
@@ -5715,6 +6071,8 @@ app.post('/api/classic/:gameId/score', async (req, res) => {
   if (!CLASSIC_SCORE_GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
   const score = Number.isFinite(req.body.score) ? Math.round(req.body.score) : null;
   if (score === null || score < 0) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted solo run is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   const extra = (req.body.extra && typeof req.body.extra === 'object' && !Array.isArray(req.body.extra))
     ? req.body.extra : null;
   try {
@@ -5868,6 +6226,97 @@ app.get('/api/ladder/:gameId', async (req, res) => {
   }
 });
 
+// ---- The caller's own all-time scores, every game -------------------------
+// One auth-gated read covering every figure the app records per game:
+//   pts    — all-time daily points (daily_attempts, the exact filter the
+//            all-time leaderboard ranks on, so the two agree)
+//   best   — the game's own classic/PB-table best (classic_scores plus the
+//            per-game snake/breakout/zuma/mancala/tilematch/match3 tables)
+//   record — head-to-head wins/losses/draws (game_ratings)
+// The two score systems never mix: a daily's score is multiplied points, a
+// classic's best_score is the game's own raw score, so they stay separate
+// fields and the client labels them differently ("+N pts" / "Best N").
+// Registered above the app.get('*') catch-all; NOT in PUBLIC_API_GET — it is
+// caller-keyed (req.user.id) and deliberately exposes no other user.
+app.get('/api/my/scores', async (req, res) => {
+  const uid = req.user.id;
+  try {
+    const scores = {};
+    const ensure = (gid) => (scores[gid] || (scores[gid] = {}));
+    // All-time daily points, grouped per game. Losses (score 0) are excluded,
+    // like every leaderboard.
+    const daily = await pool.query(
+      `SELECT game_id, SUM(score)::int AS pts
+         FROM daily_attempts
+        WHERE user_id = $1
+          AND finished_at IS NOT NULL
+          AND score IS NOT NULL AND score > 0
+        GROUP BY game_id`,
+      [uid]
+    );
+    for (const r of daily.rows) {
+      if (r.pts == null) continue;
+      ensure(r.game_id).pts = Number(r.pts);
+    }
+    // Classic bests — the GREATEST-upserted per-game table.
+    const classic = await pool.query(
+      `SELECT game_id, MAX(best_score)::int AS best
+         FROM classic_scores
+        WHERE user_id = $1
+        GROUP BY game_id`,
+      [uid]
+    );
+    for (const r of classic.rows) {
+      if (r.best == null) continue;
+      ensure(r.game_id).best = Number(r.best);
+    }
+    // Per-game PB tables: snake/bounce/zuma/tilematch hold one row per user,
+    // mancala one per difficulty and match3 one per puzzle — MAX across them.
+    // Each branch is a bare aggregate, so zero rows yield one NULL row that
+    // the `best IS NOT NULL` filter drops.
+    const pb = await pool.query(
+      `SELECT 'snake' AS game_id, MAX(best_score)::int AS best
+         FROM snake_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'bounce', MAX(best_score)::int
+         FROM breakout_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'zuma', MAX(best_score)::int
+         FROM zuma_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'mancala', MAX(best_score)::int
+         FROM mancala_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'tilematching', MAX(best_session_score)::int
+         FROM tilematch_scores WHERE user_id = $1
+       UNION ALL
+       SELECT 'match3', MAX(best_score)::int
+         FROM match3_scores WHERE user_id = $1`,
+      [uid]
+    );
+    for (const r of pb.rows) {
+      if (r.best == null) continue;
+      ensure(r.game_id).best = Number(r.best);
+    }
+    // Head-to-head records. Unrated seats (local modes, 3–4P ludo) never write
+    // a row, so absence is the correct answer for them.
+    const ratings = await pool.query(
+      `SELECT game_id, wins, losses, draws
+         FROM game_ratings
+        WHERE user_id = $1`,
+      [uid]
+    );
+    for (const r of ratings.rows) {
+      if (!H2H_GAME_IDS.has(r.game_id)) continue;
+      ensure(r.game_id).record = { wins: r.wins, losses: r.losses, draws: r.draws };
+    }
+    res.json({ scores });
+  } catch (err) {
+    console.error('[my-scores] load failed:', err.message);
+    res.status(500).json({ error: 'Failed to load scores' });
+  }
+});
+
 // ---- Mancala ZK leaderboard API ------------------------------------------
 
 const MNC_SESSION_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -5929,6 +6378,8 @@ app.post('/api/mancala/score/verify', async (req, res) => {
   }
 
   try {
+    // Recently Played tracking (Recent goal): a settled solo run is a play.
+    recordGamePlay(req.user.id, req.user.username, 'mancala');
     const { rows } = await pool.query(
       `SELECT * FROM mancala_sessions WHERE id = $1`,
       [sessionId]
@@ -6192,6 +6643,8 @@ app.post('/api/snake/score', async (req, res) => {
   const length = Number.isFinite(req.body.length) ? Math.round(req.body.length) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'snake');
   try {
     // Get previous best before updating
     const { rows: prevRows } = await pool.query(
@@ -6317,6 +6770,8 @@ app.post('/api/bounce/score', async (req, res) => {
   const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'bounce');
   try {
     // Get previous best before updating
     const { rows: prevRows } = await pool.query(
@@ -6438,6 +6893,8 @@ app.post('/api/zuma/score', async (req, res) => {
   const level = Number.isFinite(req.body.level) ? Math.round(req.body.level) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (score === null) return res.status(400).json({ error: 'score is required' });
+  // Recently Played tracking (Recent goal): a submitted run is a play.
+  recordGamePlay(req.user.id, req.user.username, 'zuma');
   try {
     const { rows: prevRows } = await pool.query(
       `SELECT best_score FROM zuma_scores WHERE user_id = $1`,
@@ -6779,6 +7236,8 @@ app.post('/api/tilematch/scores/submit', async (req, res) => {
   const highestLevel  = Number.isFinite(req.body.highestLevel)  ? Math.round(req.body.highestLevel)  : 0;
   const totalCleared  = Number.isFinite(req.body.totalCleared)  ? Math.round(req.body.totalCleared)  : 0;
   const sessionScore  = Number.isFinite(req.body.sessionScore)  ? Math.round(req.body.sessionScore)  : 0;
+  // Recently Played tracking (Recent goal): a submitted session is a play.
+  recordGamePlay(req.user.id, req.user.username, 'tilematching');
   try {
     await pool.query(
       `INSERT INTO tilematch_scores
@@ -6894,6 +7353,8 @@ app.post('/api/dapp/sessions/start', async (req, res) => {
   if (!dapp.getEngine(gameId)) return res.status(400).json({ error: 'Game not yet supported by DApp Mode' });
   let seed = Number.isFinite(req.body.seed) ? Math.round(req.body.seed) : null;
   if (seed === null) seed = Math.floor(Math.random() * 0x7fffffff);
+  // Recently Played tracking (Recent goal): claiming the session is a play.
+  recordGamePlay(req.user.id, req.user.username, gameId);
   try {
     const id = newSessionId();
     await pool.query(
@@ -7176,6 +7637,8 @@ app.post('/api/match3/start/:puzzleId', async (req, res) => {
   const puzzle = MATCH3_PUZZLES.find(p => p.id === puzzleId);
   if (!puzzle) return res.status(400).json({ error: 'Unknown puzzle' });
 
+  // Recently Played tracking (Recent goal): opening a puzzle is the play.
+  recordGamePlay(req.user.id, req.user.username, 'match3');
   try {
     const { rows: session } = await pool.query(
       'SELECT * FROM match3_session WHERE user_id = $1',

@@ -123,6 +123,46 @@ const PLAY_MODES_BY_ID = {
 const playModesFor = (gameId) => PLAY_MODES_BY_ID[gameId] || [];
 const supportsMode = (gameId, mode) => playModesFor(gameId).indexOf(mode) !== -1;
 
+/* Daily difficulty bands (#331). Every daily is playable on Easy, Normal or
+   Hard: the band is picked on the pre-game screen, rides the /start claim, is
+   stored on the attempt row, and scales what a win pays
+   (DAILY_BAND_MULT in 05-core-lib: easy 0.8x, normal 1x, hard 1.25x — Hard is
+   the better deal per run but earns less per minute, so farming Easy is never
+   the optimal strategy, mirroring the arcade's ARCADE_BAND_MULT rationale).
+   Normal is byte-identical to the pre-band deal, so every seeded board and
+   check keeps passing. Each band is its own seeded deal from the same day
+   anchor and ranks on its own board (leaderboard ?band=).
+
+   DAILY_BAND_NOTES is the per-game copy shown beside the picker: what changes
+   on Easy and on Hard. Every id declaring a daily mode must have an entry and
+   vice versa, which scripts/check-registry.js enforces — a picker row with no
+   idea what its band does is exactly the drift rule 5 exists to catch. */
+const DAILY_BAND_NOTES = {
+  sudoku:            { easy: 'Extra givens: the gentlest dig, in either size.', hard: 'Fewest givens: the toughest dig, in either size.' },
+  sudokumini:        { easy: 'Extra givens: the gentlest 6x6 dig.', hard: 'Fewest givens: the toughest 6x6 dig.' },
+  wordhunt:          { easy: 'The smallest 8x8 grid, everyday words.', hard: 'The full 15x15 grid, rarer words.' },
+  cryptowordle:      { easy: 'Shorter words, one extra guess each round.', hard: 'Longer words, one guess fewer each round.' },
+  klondike:          { easy: 'A friendlier rated deal: more cards already in place.', hard: 'The hardest rated deal in the corpus.' },
+  spider:            { easy: 'A friendlier rated deal: more cards already in place.', hard: 'The hardest rated deal in the corpus.' },
+  mahjongsol:        { easy: 'The gentlest layout (Courtyard).', hard: 'The deepest layout in the set.' },
+  anagrams:          { easy: 'The shortest words, the gentlest band.', hard: 'The longest words in the pool.' },
+  nonogram:          { easy: 'Small, sparse grids.', hard: 'The largest, densest grids.' },
+  cratepush:         { easy: 'Rooms with the fewest pushes.', hard: 'The longest rooms in the corpus.' },
+  dropstack:         { easy: 'Slower gravity, friendlier pieces.', hard: 'Faster gravity, more awkward pieces.' },
+  wordsprint:        { easy: 'Two full minutes on the clock.', hard: 'A 60-second sprint.' },
+  tilematchingdaily: { easy: 'The gentlest layout (Courtyard).', hard: 'The tightest layout in the set.' },
+  minefinder:        { easy: 'The smallest field, fewest mines.', hard: 'The largest field, most mines.' },
+  snakedaily:        { easy: 'The slowest snake speed.', hard: 'Full-speed snake.' },
+  bouncedaily:       { easy: 'Four balls, a sparser wall.', hard: 'Two balls, a denser wall.' },
+  '2048':            { easy: 'Almost every spawn is a 2.', hard: 'Nearly a third of spawns are 4s.' },
+  blockblast:        { easy: 'A gentler piece pool.', hard: 'The most awkward pieces.' },
+  diamondrush:       { easy: 'A gentle band: easier digs, more moves.', hard: 'The hardest band in the ladder.' },
+  zuma:              { easy: 'The gentlest path.', hard: 'The hardest path in the ladder.' },
+  hashrush:          { easy: 'Slower stream, fewer hazards. Same 90-second shift.', hard: 'Fast stream, heavy hazard rate. Same 90-second shift.' },
+  match3:            { easy: 'The simplest of the authored puzzles.', hard: 'The most demanding authored puzzle.' },
+  'knights-tour':    { easy: 'The openest board: fewest blocked squares.', hard: 'The most blocked board.' },
+};
+
 /* The mode a game opens in when nobody said which — a bare `?game=` link, a
    resumed attempt, a practice replay.
 
@@ -254,12 +294,14 @@ const cardDailyId = (card) => {
   return d ? d.gameId : null;
 };
 
-/* The registry id a pin (#232) is stored under: the card's ANCHOR id. Cards
-   are a client-side composition and can be recomposed; registry ids never
-   move, so the durable thing to write to the database is one of the ids the
-   card speaks for. Reads come back through CARD_BY_GAME_ID, which already maps
-   either half of a merged pair onto the one card. */
-const cardPinId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
+/* The registry id a PER-CARD, PER-USER control stores under: the card's
+   ANCHOR id. Cards are a client-side composition and can be recomposed;
+   registry ids never move, so the durable thing to write to the database is
+   one of the ids the card speaks for. Reads come back through
+   CARD_BY_GAME_ID, which already maps either half of a merged pair onto the
+   one card. Two controls share this: the pin (#232) and the favorite star. */
+const cardAnchorId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
+const cardPinId = cardAnchorId;
 
 /* Mirrors PIN_LIMIT in server.js. Used ONLY to grey out the control once the
    player is at the cap — the server refuses the 9th pin either way, so the two
@@ -272,7 +314,34 @@ const PIN_LIMIT = 8;
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled }) {
+/* The card's all-time figure (myScores from /api/my/scores), in the
+   pts -> best -> record priority, read across every registry id the card
+   speaks for (a merged pair carries two: Snake / Daily Snake and friends).
+   Returns null when nothing is recorded so the state line is unchanged —
+   a signed-out visitor or a game never played renders exactly as before. */
+const cardMyScoreBit = (card, myScores) => {
+  if (!myScores) return null;
+  const ids = new Set(card.modes.map(m => m.gameId));
+  if (card.gameId) ids.add(card.gameId);
+  let pts = 0, hasPts = false, best = 0, hasBest = false, rec = null;
+  for (const id of ids) {
+    const s = myScores[id];
+    if (!s) continue;
+    if (Number.isFinite(s.pts) && s.pts > 0) { hasPts = true; pts += s.pts; }
+    if (Number.isFinite(s.best) && s.best > 0) { hasBest = true; best = Math.max(best, s.best); }
+    if (s.record && (s.record.wins + s.record.losses + s.record.draws) > 0) rec = s.record;
+  }
+  if (hasPts) return `+${pts.toLocaleString()} pts`;
+  if (hasBest) return `Best ${best.toLocaleString()}`;
+  if (rec) {
+    const parts = [`${rec.wins}W`, `${rec.losses}L`];
+    if (rec.draws > 0) parts.push(`${rec.draws}D`);
+    return parts.join(' · ');
+  }
+  return null;
+};
+
+function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onPlay, pinned, onTogglePin, pinDisabled, streak, favorited, onToggleFavorite }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -286,12 +355,20 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
   // instead of spending its width on buttons that repeat the mode labels.
   const bits = [];
   if (dailyId) bits.push(finished ? 'Daily ✓' : inProgress ? 'Daily ▶' : 'Daily · new');
+  // #313 — a signed-in player's current streak rides on every card that offers
+  // a daily (the merged cards included: cardDailyId covers them). Zero stays
+  // off the card: a 0-day streak is not information the card needs, and the
+  // nav stat still shows it.
   const storyMode = card.modes.find(m => m.mode === 'story');
   if (storyMode) {
     const p = (storyProgress && storyProgress[storyMode.gameId]) || null;
     if (p && p.total) bits.push(`Story ${p.cleared}/${p.total}`);
     else bits.push('Story');
   }
+  // All-time figure LAST, so any assertion on the line's leading segments
+  // ("Daily ✓", "Story 3/10") keeps passing when it appears.
+  const scoreBit = cardMyScoreBit(card, myScores);
+  if (scoreBit) bits.push(scoreBit);
 
   /* EVERY CARD ENDS IN A BUTTON. A card with one way to play used to be one
      big tap target instead, which made the grid inconsistent to read and to
@@ -315,6 +392,15 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
           {...tapProps(() => { onTogglePin(cardPinId(card), !pinned); }, { disabled: !pinned && pinDisabled })}
         >📌</button>
       )}
+      {onToggleFavorite && (
+        <button
+          className={'card-fav tappable' + (favorited ? ' on' : '')}
+          aria-pressed={favorited ? 'true' : 'false'}
+          aria-label={favorited ? `Remove ${card.name} from favorites` : `Add ${card.name} to favorites`}
+          title={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          {...tapProps(() => { onToggleFavorite(cardAnchorId(card), !favorited); })}
+        >{favorited ? '★' : '☆'}</button>
+      )}
       {dailyId && (
         <span className={'card-daily-badge' + (finished ? ' done' : inProgress ? ' resume' : ' fresh')}>
           {finished ? '✓ PLAYED' : inProgress ? '▶ RESUME' : 'NEW TODAY'}
@@ -323,9 +409,21 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
       <div className="card-icon">{card.icon}</div>
       <div className="card-name">{card.name}</div>
       <div className="card-desc">{card.desc}</div>
-      <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
-        {card.tag}
-      </span>
+      {/* #313 — the state footer. The tag and the streak pill share one row;
+          without the wrapper the pill (a flex item like the tag) drops to
+          its own line and pushes the buttons down. */}
+      <div className="card-footer">
+        <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
+          {card.tag}
+        </span>
+        {dailyId && streak > 0 && (
+          <span className="card-streak mono" data-streak={streak} title={`${streak}-day streak`}>
+            <span className="cs-flame" aria-hidden="true">🔥</span>
+            <span>{streak}</span>
+            <span className="cs-days">d</span>
+          </span>
+        )}
+      </div>
       {bits.length > 0 && <div className="card-state mono">{bits.join(' · ')}</div>}
       {dailyId && bestTime != null && (
         <div className="card-best mono">

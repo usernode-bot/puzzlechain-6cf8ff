@@ -81,6 +81,17 @@ const HR_ARCADE = {
   normal: { speed: 150, tntRate: 0.30, spawnEvery: 0.72, lives: 5 },
   hard:   { speed: 190, tntRate: 0.38, spawnEvery: 0.55, lives: 4 },
 };
+/* #331 — the daily's band dials. Normal IS the pre-band daily config
+   byte-for-byte (speed 150 / tnt 0.30 / spawn 0.70); Easy/Hard borrow the
+   arcade bands' stream dials but keep the daily's own lives and 90-second
+   limit, so the shape of a daily run never changes — only how hard the
+   stream is. The level target derives itself through hrTargetFor, so there is
+   no second table to keep in step. */
+const HR_DAILY = {
+  easy:   { speed: 130, tntRate: 0.24, spawnEvery: 0.95 },
+  normal: { speed: HR_START_SPEED, tntRate: 0.30, spawnEvery: 0.70 },
+  hard:   { speed: 190, tntRate: 0.38, spawnEvery: 0.55 },
+};
 
 /* THE SPAWN SCHEDULE IS A FUNCTION OF ELAPSED TIME, NOT OF FRAMES.
 
@@ -237,7 +248,8 @@ function hrModeConfig(playMode, band) {
     return { ...c, limit: 0, label: 'Arcade' };
   }
   if (playMode === 'daily') {
-    return { speed: HR_START_SPEED, tntRate: 0.30, spawnEvery: 0.70,
+    const d = HR_DAILY[(band === 'easy' || band === 'hard') ? band : 'normal'];
+    return { speed: d.speed, tntRate: d.tntRate, spawnEvery: d.spawnEvery,
              lives: HR_LIVES, limit: HR_DAILY_SECS, label: "Today's shift" };
   }
   return { speed: HR_START_SPEED, tntRate: 0.30, spawnEvery: 0.85,
@@ -522,7 +534,7 @@ function HashRushGame({ onWin, onLose, onStepChange, resetKey, game, onBack, men
       }
       // The floor. A hash that crosses it is lost, so it has to be a line you
       // can see coming rather than the edge of the box.
-      ctx.fillStyle = 'rgba(99,102,241,0.9)';
+      ctx.fillStyle = PAL.accent;
       ctx.fillRect(0, H - 5, W, 5);
 
       // objects

@@ -295,6 +295,9 @@ function zumaCheckMatches(chain, idx) {
 
 function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offset }) {
   const { useState, useEffect, useRef } = React;
+  /* #331 — the daily's band. Story/arcade carry numeric bands that can never
+     equal these strings, so the gate is safe across modes. */
+  const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : null;
   /* One level, chosen by mode. Story plays exactly its band and gets a track
      that is STABLE for that rung; the daily gives everyone the same mid-ladder
      track for the day; arcade maps its three difficulties onto the same ladder
@@ -311,9 +314,12 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
       const i = Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band));
       rung = Math.round((i / 2) * (ZUMA_STORY_BANDS - 1));
     } else {
-      // Daily: a fixed mid-ladder rung, so the day is about the track and the
-      // chain rather than about which difficulty you happened to draw.
-      rung = Math.floor((ZUMA_STORY_BANDS - 1) / 2);
+      // Daily: Normal keeps the fixed mid-ladder rung, so the day is about the
+      // track and the chain rather than about which difficulty you happened to
+      // draw. #331 — Easy/Hard take the ladder's own ends (gentlest/hardest).
+      rung = dailyBand === 'easy' ? 0
+        : dailyBand === 'hard' ? ZUMA_STORY_BANDS - 1
+        : Math.floor((ZUMA_STORY_BANDS - 1) / 2);
     }
     modeLevels.current = [zumaLevelForBand(rung, ZUMA_STORY_BANDS, rng)];
   }
@@ -326,7 +332,13 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
   const playRng = useRef(null);
   if (playMode && !playRng.current) {
     const { seed } = modeSeed(playMode, 'zuma', band, offset);
-    playRng.current = mulberry32(((seed == null ? dailyRng(offset, 'zuma')() * 4294967295 : seed) ^ 0x9e3779b9) >>> 0);
+    /* modeSeed's daily branch hands back seed null (a non-null seed reads as
+       "arcade board" downstream), so the play stream derives its own. Easy/
+       Hard hash their own mixed deal; Normal keeps the pre-band derivation
+       byte-for-byte. */
+    const playSeed = dailyBand ? dailySeedFor(offset, 'zuma', dailyBand)
+      : (seed == null ? dailyRng(offset, 'zuma')() * 4294967295 : seed);
+    playRng.current = mulberry32((playSeed ^ 0x9e3779b9) >>> 0);
   }
   const prand = () => (playRng.current ? playRng.current() : Math.random());
   const [activeTab, setActiveTab] = useState('game');
@@ -963,7 +975,7 @@ function ZumaGame({ onWin, onLose, onStepChange, resetKey, playMode, band, offse
           );
         })()
       ),
-      React.createElement('div', { className: 't2048-bottom-nav' },
+      React.createElement('div', { className: 't2048-bottom-nav safe-bottom' },
         ['game', 'leaderboard'].map(tab =>
           React.createElement('button', {
             key: tab,
@@ -1148,8 +1160,18 @@ function Match3Game({ onWin, onLose, onStepChange, offset, savedProgress, onSave
     ? Math.max(1, Math.min(M3_CAMPAIGN_PUZZLES, Math.round(
         ((Math.max(0, Math.min(M3_STORY_BANDS - 1, band || 0)) + 1) / M3_STORY_BANDS) * M3_CAMPAIGN_PUZZLES)))
     : null;
+  /* #331 — the daily's Easy/Hard pick from the authored tier ranges of the
+   MATCH3_PUZZLES table below (ids 1–10 are its Easy tier, 31–50 its Hard), so
+   the board is genuinely easier/harder rather than a re-roll. Normal keeps the
+   whole-campaign rotation. The bounds mirror the table's `difficulty` column —
+   keep them in step if that table changes shape. */
+  const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : null;
   const dailyPuzzle = playMode === 'daily'
-    ? 1 + (utcDayNum(offset) % 50)
+    ? dailyBand === 'easy'
+      ? 1 + (utcDayNum(offset) % 10)
+      : dailyBand === 'hard'
+        ? 31 + (utcDayNum(offset) % 20)
+        : 1 + (utcDayNum(offset) % 50)
     : null;
   const arcadePuzzle = playMode === 'arcade'
     ? [12, 28, 46][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))] || 28

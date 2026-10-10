@@ -148,6 +148,53 @@ function useScrollLock(active) {
   }, [active]);
 }
 
+/* ---- Safe-area insets (platform-forwarded) ----
+   Inside the platform's app frame env(safe-area-inset-*) is always 0px — a
+   cross-origin iframe is never the top-level document — so the hosted bridge
+   forwards the rectangle that applies to this frame instead, as
+   --un-safe-inset-* on <html> plus window.usernode.safeAreaInsets and a
+   window 'usernode:safe-area-changed' event. CSS reads the forwarded value
+   through the var(--pc-safe-*) tokens in 01-styles.jsx; this hook is the JS
+   spelling of the same numbers, for layout computed in a component rather
+   than in CSS.
+
+   It reports live values: the shell pushes a new object on rotation, on
+   keyboard/toolbar moves and whenever the frame's rect shifts, and a layout
+   effect must follow those, not a snapshot from mount. All four values are 0
+   on desktop and on an un-notched phone, so a caller that only ever adds
+   them is a no-op in the common case. */
+function unSafeInsets() {
+  try {
+    const u = window.usernode;
+    const v = u && u.safeAreaInsets;
+    if (!v) return { top: 0, right: 0, bottom: 0, left: 0 };
+    return {
+      top: +v.top || 0, right: +v.right || 0,
+      bottom: +v.bottom || 0, left: +v.left || 0,
+    };
+  } catch (_) {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+}
+
+// Live subscription: returns the current insets and updates when the shell
+// reports a change. The hook is inert when the bridge is absent (standalone,
+// or a proposal check's headless browser), so callers keep working there.
+function useSafeAreaInsets() {
+  const [insets, setInsets] = useState(unSafeInsets);
+  useEffect(() => {
+    const on = () => setInsets(unSafeInsets());
+    on();
+    window.addEventListener('usernode:safe-area-changed', on);
+    window.addEventListener('orientationchange', on);
+    return () => {
+      window.removeEventListener('usernode:safe-area-changed', on);
+      window.removeEventListener('orientationchange', on);
+    };
+  }, []);
+  return insets;
+}
+
 /* PHASE 2 — the shared tap primitive.
    Spread onto any tappable board element. Two jobs:
      1. Press feedback on finger-DOWN (`data-pressed`), not on the browser's
@@ -713,6 +760,29 @@ function runClientSelfTests(styleReady) {
     for (let i = 1; i < idx.length; i++) {
       if (idx[i] <= idx[i - 1]) throw new Error('pinned half is not in registry order');
     }
+    return true;
+  });
+
+  /* Favorites (#308): the chip's filter is the same id → card-key resolution
+     the pin partition uses, so a star on one half of a merged pair must
+     surface that one card, every star must resolve, and an unknown id must
+     never drop the count below the cards that DID resolve. One filter that
+     reads exactly what the chip's view reads. */
+  check('favorite-card-resolution', () => {
+    const favSet = new Set();
+    const stored = ['snakedaily', 'sudoku', 'mancala', 'not-a-real-id'];
+    for (const id of stored) {
+      const c = CARD_BY_GAME_ID[id];
+      if (c) favSet.add(c.key);
+    }
+    // The unknown id resolves to nothing; the three real ones resolve to
+    // exactly three cards.
+    if (favSet.size !== 3) throw new Error('3 resolvable ids resolved to ' + favSet.size + ' cards');
+    // Snake's stored anchor id (snakedaily) must surface the merged Snake card.
+    const snake = CARD_BY_GAME_ID['snakedaily'];
+    if (!snake || !favSet.has(snake.key)) throw new Error('snake favorite did not resolve to its card');
+    const filtered = GAME_CARDS.filter(c => favSet.has(c.key));
+    if (filtered.length !== 3) throw new Error('the Favorites filter shows ' + filtered.length + ' of 3 starred cards');
     return true;
   });
 
@@ -2049,6 +2119,39 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #331 — the daily's Easy/Hard mix the day anchor per (game, band), but
+     Normal must hash to EXACTLY the pre-band seed: every existing daily board,
+     resume record and tier-A replay is keyed to it, so a divergent Normal
+     stream would silently deal every existing player a different board. The
+     games list spans both seed shapes (server-issued and legacy-derived) and
+     offsets vary so no single lucky pair can pass. */
+  check('daily-band-normal-unchanged', () => {
+    if (typeof dailyRng !== 'function') return true;
+    const games = ['sudoku', 'wordsearch', 'cryptowordle', 'tilematchingdaily',
+      'klondike', 'cratepush', 'zuma', 'snakedaily', 'bouncedaily', '2048', 'wordsprint'];
+    for (const g of games) {
+      for (let off = 0; off < 5; off++) {
+        const base = dailyRng(off, g);
+        const normal = dailyRng(off, g, 'normal');
+        const normalNull = dailyRng(off, g, null);
+        for (let i = 0; i < 4; i++) {
+          const b = base(), n = normal(), nn = normalNull();
+          if (b !== n || b !== nn) {
+            throw new Error("dailyRng(" + off + ", '" + g + "') diverges from its " +
+              'Normal-band stream — Normal must stay byte-identical to the pre-band seed');
+          }
+        }
+        // And Easy/Hard must be three DIFFERENT boards off the same anchor —
+        // fresh rngs each, so the comparison is first-draw to first-draw.
+        const a = dailyRng(off, g)(), e = dailyRng(off, g, 'easy')(), h = dailyRng(off, g, 'hard')();
+        if (!(a !== e && a !== h && e !== h)) {
+          throw new Error("bands of '" + g + "' on offset " + off + ' share a stream');
+        }
+      }
+    }
+    return true;
+  });
+
   /* #210, the CSS half, measured. `.tm-wrap` sits in `.cg-stage`, which is
      `align-items: center`, so without a definite width it took its
      fit-content width — the canvas's own CSS width, which useCanvasBoard
@@ -2077,6 +2180,64 @@ function runClientSelfTests(styleReady) {
     if (bw >= 40 && cw < bw - 4) {
       throw new Error('the Tile Match canvas is ' + Math.round(cw) + 'px in a '
         + Math.round(bw) + 'px frame');
+    }
+    return true;
+  });
+
+  /* Safe-area audit, the static half. Inside the platform frame every bare
+     env(safe-area-inset-*) resolves to 0px, so a rule that reads it directly
+     is dead chrome: bottom bars sit under the home indicator and overlays run
+     under the notch. The platform forwards the real values on <html> as
+     --un-safe-inset-*, so each app rule must reach it through the
+     var(--un-safe-inset-…, env(…)) form. The one legal bare env() is an app
+     rule's OWN fallback inside that var(); reading it any other way is the
+     regression this check exists to catch. */
+  check('safe-area-env-wrapped', () => {
+    const bad = [];
+    const re = /env\(\s*safe-area-inset-[a-z]+\s*[,)]/g;
+    let m;
+    while ((m = re.exec(css))) {
+      // Allow only the forwarded form: the env() must sit inside a var()
+      // whose first argument is --un-safe-inset-*.
+      const before = css.slice(Math.max(0, m.index - 40), m.index);
+      if (/var\(\s*--un-safe-inset-[a-z]+\s*,\s*$/.test(before)) continue;
+      bad.push(css.slice(Math.max(0, m.index - 50), m.index + m[0].length)
+        .split('\n').pop().trim());
+    }
+    if (bad.length) {
+      throw new Error('bare env(safe-area-inset-*) is inert inside the app '
+        + 'frame — reach it through var(--un-safe-inset-…, env(…)): '
+        + bad.join(' | '));
+    }
+    return true;
+  });
+
+  /* Safe-area audit, the measured half. The tokens must actually RESOLVE: a
+     typo in the fallback chain leaves them as an invalid value, which makes
+     every calc() that mentions them collapse to 0 and silently drops the
+     inset rather than failing. Read the computed values on a probe element
+     that sets padding-bottom from the token, and require a length, not the
+     empty string an unresolved var() computes to. */
+  checkStyled('safe-tokens-resolve', () => {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;'
+      + 'padding-bottom:calc(1px + var(--pc-safe-bottom));'
+      + 'padding-top:calc(1px + var(--pc-safe-top));';
+    document.body.appendChild(probe);
+    try {
+      const cs = getComputedStyle(probe);
+      const pb = parseFloat(cs.paddingBottom);
+      const pt = parseFloat(cs.paddingTop);
+      if (!Number.isFinite(pb) || !Number.isFinite(pt)) {
+        throw new Error('--pc-safe-bottom / --pc-safe-top did not resolve '
+          + '(padding-bottom=' + cs.paddingBottom + ', padding-top=' + cs.paddingTop + ')');
+      }
+      if (pb < 1 || pt < 1) {
+        throw new Error('the safe-area token calc collapsed below its fixed term: '
+          + 'padding-bottom=' + pb + ', padding-top=' + pt);
+      }
+    } finally {
+      probe.remove();
     }
     return true;
   });

@@ -2,7 +2,25 @@
    Social Components — Profile & Friends
    ============================================================ */
 
-function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOpenSettings }) {
+/* All-time figures per game (myScores from /api/my/scores), in registry
+   order, games with nothing recorded dropped. Read-only: the rows carry no
+   tap target, so no TAPPABLE_CLASSES entry and no press feedback. */
+const profileScoreRows = (myScores) => {
+  if (!myScores) return [];
+  const rows = [];
+  for (const g of GAMES) {
+    const s = myScores[g.id];
+    if (!s) continue;
+    const hasPts = Number.isFinite(s.pts) && s.pts > 0;
+    const hasBest = Number.isFinite(s.best) && s.best > 0;
+    const recTot = s.record ? (s.record.wins + s.record.losses + s.record.draws) : 0;
+    if (!hasPts && !hasBest && recTot <= 0) continue;
+    rows.push({ game: g, s, hasPts, hasBest, hasRec: recTot > 0 });
+  }
+  return rows;
+};
+
+function ProfileScreen({ userId, user: loggedInUser, myScores, onBack, onOpenFriends, onOpenSettings }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -107,6 +125,61 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
             <div style={{ fontSize: '1.4rem', fontWeight: 700, color: C.accent, fontFamily: "'JetBrains Mono', monospace" }}>{profile.stats.gamesPlayed}</div>
           </div>
         </div>
+
+        {/* All-time scores — every game the viewer has any recorded figure
+            for, in registry order. Own profile only: /api/my/scores is
+            caller-keyed, so there is nothing to show for anyone else. */}
+        {isOwnProfile && (() => {
+          const scoreRows = profileScoreRows(myScores);
+          return (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '0.6rem' }}>
+                All-time scores
+              </div>
+              {scoreRows.length === 0 ? (
+                <div style={{ fontSize: '0.85rem', color: C.muted }}>
+                  No scores yet. Play a game!
+                </div>
+              ) : (
+                <div>
+                  {scoreRows.map((row, i) => {
+                    const { s } = row;
+                    const recFigure = s.record
+                      ? `${s.record.wins}W · ${s.record.losses}L${s.record.draws > 0 ? ` · ${s.record.draws}D` : ''}`
+                      : null;
+                    const recordOnly = row.hasRec && !row.hasPts && !row.hasBest;
+                    return (
+                      <div
+                        key={row.game.id}
+                        className="prr"
+                        style={{ borderBottom: i < scoreRows.length - 1 ? `1px solid ${C.border}` : 'none' }}
+                      >
+                        <span className="prr-icon">{row.game.icon}</span>
+                        <span className="prr-name">{row.game.name}</span>
+                        <span className="prr-meta mono">
+                          {recordOnly ? (
+                            <span className="prr-score" style={{ color: C.emerald }}>{recFigure}</span>
+                          ) : (
+                            <React.Fragment>
+                              <span className="prr-score" style={{ color: C.gold }}>
+                                {row.hasPts ? `+${s.pts.toLocaleString()} pts` : `Best ${s.best.toLocaleString()}`}
+                              </span>
+                              {row.hasPts && row.hasBest && (
+                                <span className="prr-date" style={{ color: C.muted }}>
+                                  {` · Best ${s.best.toLocaleString()}`}
+                                </span>
+                              )}
+                            </React.Fragment>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Recent games — the player's last 10 finished daily runs. */}
         <div style={{ marginBottom: '1.5rem' }}>

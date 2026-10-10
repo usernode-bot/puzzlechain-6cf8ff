@@ -12,6 +12,42 @@ ${paletteVars('light')}
 ${paletteVars('dark')}
 }
 
+/* The hosted native kit's accent follows ours in both themes, so kit
+   switches, action sheets, toasts and pull-to-refresh match the teal.
+   Overridden here, never by forking kit CSS. */
+:root, :root[data-theme="dark"] {
+  --un-accent: var(--c-accent);
+  --un-accent-contrast: #fff;
+  /* The toast surface is dark in both themes, so its action label is a
+     light teal in both. */
+  --un-toast-action: #5EEAD4;
+}
+
+/* ---- Safe-area insets (platform-forwarded) ----
+   Inside the platform's app frame env(safe-area-inset-*) is always 0px: a
+   cross-origin iframe is never the top-level document, so the browser hides
+   the notch and the home indicator from it. The hosted bridge forwards the
+   rectangle that actually applies to this frame instead, as
+   --un-safe-inset-top/right/bottom/left on <html> (px), and leaves them
+   unset when the app is opened standalone — where bare env() is the right
+   answer. Reading them through the var(--pc-safe-*) tokens below is what
+   makes every rule in this file correct in both hosts; a bare env() in an
+   app rule is inert in-frame, which is the bug the audit fixed.
+
+   On a desktop or an un-notched phone every forwarded value is 0, so each
+   calc() below collapses to exactly the spacing it had before — the change
+   is a no-op in the common case, not a restyle. */
+:root {
+  --pc-safe-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px));
+  --pc-safe-right: var(--un-safe-inset-right, env(safe-area-inset-right, 0px));
+  --pc-safe-bottom: var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --pc-safe-left: var(--un-safe-inset-left, env(safe-area-inset-left, 0px));
+}
+
+/* A padded box that must also reach the screen edge (a sticky or fixed
+   bottom strip): same idea, but the caller already owns its own padding
+   and only the inset is added, so the surface still touches the edge. */
+.safe-bottom { padding-bottom: calc(var(--pc-pad-b, 0px) + var(--pc-safe-bottom)); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
@@ -29,9 +65,20 @@ body {
 
 .mono { font-family: 'JetBrains Mono', monospace; }
 
-#root { min-height: 100vh; }
+#root { min-height: 100vh; min-height: 100dvh; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex; flex-direction: column;
+  /* The bottom inset lifts every scrolling screen clear of the home
+     indicator; each screen supplies its own horizontal gutter, so only the
+     bottom is added here. A fit shell (.app-fit) is pinned to one viewport,
+     so its own chrome carries the bottom inset instead and this resets to 0
+     or the box would overflow by the inset. */
+  padding-bottom: var(--pc-safe-bottom);
+}
+.app.app-fit { padding-bottom: 0; }
 
 /* ---- Nav bar ---- */
 /* #223 — the bar was 78px tall at 390px wide, and it is sticky, so it cost
@@ -50,7 +97,7 @@ body {
   align-items: center;
   justify-content: space-between;
   position: sticky;
-  top: 0;
+  top: var(--pc-safe-top);
   z-index: 10;
 }
 .nav-brand {
@@ -293,7 +340,9 @@ body {
   min-width: 0;
   max-width: 620px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem;
+  /* A profile or friends page is a normal scrolling screen: its own gutters
+     grow by the forwarded x insets so content clears a landscape notch. */
+  padding: 1.5rem calc(1.25rem + var(--pc-safe-right)) 1.5rem calc(1.25rem + var(--pc-safe-left));
 }
 /* A username is user-supplied and can be one long unbreakable token, which is
    what made min-content exceed the viewport in the first place. Let it wrap
@@ -365,7 +414,9 @@ body {
   .account-chip { padding: 0.25rem; }
   .nav-right { gap: 0.6rem; }
   .nav-stats { gap: 0.8rem; }
-  .lobby { padding: 1rem 0.75rem; }
+  /* The phones are where the forwarded insets actually apply, so the gutter
+     grows by them here rather than being replaced by a bare shorthand. */
+  .lobby { padding: 1rem calc(0.75rem + var(--pc-safe-right)) 1rem calc(0.75rem + var(--pc-safe-left)); }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
   /* The Friends chip moves into the profile's Connections section
@@ -400,7 +451,7 @@ body {
 }
 
 /* ---- Lobby ---- */
-.lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem 1.25rem; width: 100%; }
+.lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem calc(1.25rem + var(--pc-safe-right)) 1.75rem calc(1.25rem + var(--pc-safe-left)); width: 100%; }
 .lobby-head { margin-bottom: 1.5rem; }
 .lobby-head h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
 .lobby-head p { color: ${C.muted}; margin-top: 0.25rem; font-size: 0.92rem; }
@@ -542,7 +593,7 @@ body {
 }
 
 /* ---- Game screen ---- */
-.game-wrap { max-width: 620px; margin: 0 auto; padding: 1.5rem 1.25rem; width: 100%; }
+.game-wrap { max-width: 620px; margin: 0 auto; padding: 1.5rem calc(1.25rem + var(--pc-safe-right)) 1.5rem calc(1.25rem + var(--pc-safe-left)); width: 100%; }
 
 /* Fit-to-viewport layout mode (slice 1). A daily game that opts in renders
    header + board + controls inside one non-scrolling column: the board region
@@ -561,7 +612,11 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0.7rem 0.9rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  /* A fit shell is pinned to one viewport (.app-fit), so .app adds no bottom
+     padding and this wrap must carry the inset itself or its footer sits
+     under the home indicator. The x insets keep a landscape notch off the
+     board. */
+  padding: 0.7rem calc(0.9rem + var(--pc-safe-right)) calc(0.7rem + var(--pc-safe-bottom)) calc(0.9rem + var(--pc-safe-left));
   gap: 0.45rem;
 }
 .game-wrap.fit .game-head { flex: 0 0 auto; margin-bottom: 0; }
@@ -760,7 +815,9 @@ ${emitTapHighlightRules()}
 .result-minibar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 0.85rem 1.1rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  /* The bar reaches the screen edge; only its CONTENT is lifted clear of the
+     home indicator by the forwarded bottom inset. */
+  padding: 0.85rem 1.1rem calc(0.85rem + var(--pc-safe-bottom));
   background: ${C.card}; border: none; border-top: 1px solid ${C.border};
   box-shadow: 0 -6px 22px rgba(63,51,24,0.14);
   font-family: inherit; font-size: 0.92rem; font-weight: 600; color: ${C.text};
@@ -863,8 +920,12 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  /* A centred card: every gutter grows by the forwarded inset so it cannot
+     run under the notch or the home indicator. */
+  padding: calc(1.25rem + var(--pc-safe-top)) calc(1.25rem + var(--pc-safe-right))
+           calc(1.25rem + var(--pc-safe-bottom)) calc(1.25rem + var(--pc-safe-left));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .win-card {
   background: ${C.card};
@@ -875,8 +936,8 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   width: 100%;
   box-shadow: 0 20px 50px var(--c-shadow-lg);
-  max-height: calc(100vh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  max-height: calc(100dvh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100vh - 2.5rem - var(--pc-safe-top) - var(--pc-safe-bottom));
+  max-height: calc(100dvh - 2.5rem - var(--pc-safe-top) - var(--pc-safe-bottom));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -1125,10 +1186,15 @@ ${emitTapHighlightRules()}
   position: fixed; inset: 0; z-index: 70;
   background: var(--c-scrim);
   display: flex; align-items: center; justify-content: center;
-  padding: 1rem;
+  /* A centred panel: demote it into the safe frame, and cap it so it never
+     runs under the notch or the home indicator. */
+  padding: calc(1rem + var(--pc-safe-top)) calc(1rem + var(--pc-safe-right))
+           calc(1rem + var(--pc-safe-bottom)) calc(1rem + var(--pc-safe-left));
 }
 .gb-sheet {
-  width: 100%; max-width: 420px; max-height: 82dvh; overflow-y: auto;
+  width: 100%; max-width: 420px;
+  max-height: calc(82dvh - var(--pc-safe-top) - var(--pc-safe-bottom));
+  overflow-y: auto;
   background: ${C.surface}; border: 1px solid ${C.border};
   border-radius: 18px; padding: 0.9rem 1rem 1rem;
   box-shadow: 0 20px 50px var(--c-shadow-lg);
@@ -1194,11 +1260,14 @@ ${emitTapHighlightRules()}
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 220;
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(1rem + var(--pc-safe-top)) calc(1rem + var(--pc-safe-right))
+           calc(1rem + var(--pc-safe-bottom)) calc(1rem + var(--pc-safe-left));
 }
 .howto-card {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
-  padding: 1.4rem 1.3rem; width: min(95vw, 420px); max-height: 85dvh;
+  padding: 1.4rem 1.3rem; width: min(95vw, 420px);
+  max-height: calc(85dvh - var(--pc-safe-top) - var(--pc-safe-bottom));
   overflow-y: auto;
 }
 .howto-head {
@@ -2645,9 +2714,19 @@ ${emitTapHighlightRules()}
   overflow: hidden;
   overscroll-behavior: none;
   z-index: 40;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* The classic shell is the fixed layout root for every classic game, so it
+     pads all four sides; the forwarded x insets matter in landscape on a
+     notched phone or the top bar's left edge clips. Bare env() is inert
+     in-frame, so these are the platform tokens. */
+  padding-top: var(--pc-safe-top);
+  padding-right: var(--pc-safe-right);
+  padding-bottom: var(--pc-safe-bottom);
+  padding-left: var(--pc-safe-left);
   --cg-chrome: 3.6rem;
-  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem), 560px);
+  /* The stage is inside the padded box, so it is already short by all four
+     insets; the 100dvh cap must lose them too or the stage overflows by
+     exactly the padding on a notched phone. */
+  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem - var(--pc-safe-top) - var(--pc-safe-bottom)), 560px);
 }
 .cg-topbar {
   flex: 0 0 auto;
@@ -2702,6 +2781,13 @@ ${emitTapHighlightRules()}
   overflow: hidden;
 }
 .cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
+/* .cg-scroll is the classic stage's content scroller. Its padding is hidden
+   by .cg-shell, so oversized content would otherwise be clipped top and
+   bottom; scroll-padding-block restores the reach. */
+.cg-stage.cg-scroll {
+  scroll-padding-top: var(--pc-safe-top);
+  scroll-padding-bottom: var(--pc-safe-bottom);
+}
 
 /* Bottom sheet */
 .cg-sheet-backdrop {
@@ -2723,9 +2809,12 @@ ${emitTapHighlightRules()}
   background: ${C.surface};
   border-top: 1px solid ${C.border};
   border-radius: 18px 18px 0 0;
-  padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  /* Bottom sheet: the forwarded inset lifts the panel clear of the home
+     indicator and the scroller gets the same reach below. */
+  padding: 0.5rem 1rem calc(1rem + var(--pc-safe-bottom));
   max-height: 82dvh;
   overflow-y: auto;
+  scroll-padding-bottom: var(--pc-safe-bottom);
   transform: translateY(110%);
   transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -2828,6 +2917,9 @@ ${emitTapHighlightRules()}
 /* ---- Global Settings sheet ---- */
 .settings-panel { height: min(58vh, 460px); }
 .settings-list { padding: 0.9rem 1.1rem 1.4rem; }
+/* The settings list is the sheet's scroller: its content needs the same
+   reach as the sheet's own bottom padding above. */
+.settings-list { scroll-padding-bottom: var(--pc-safe-bottom); }
 .settings-list h4 {
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -2872,7 +2964,11 @@ ${emitTapHighlightRules()}
   transition: transform 0.15s ease;
 }
 .cg-toggle.on::after { transform: translateX(1.3rem); }
-.cg-sheet-list { max-height: 50dvh; overflow-y: auto; }
+.cg-sheet-list {
+  max-height: calc(50dvh - var(--pc-safe-bottom));
+  overflow-y: auto;
+  scroll-padding-bottom: var(--pc-safe-bottom);
+}
 .cg-sheet-row {
   display: flex;
   justify-content: space-between;
@@ -3129,8 +3225,10 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 55;
-  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  padding: calc(1.25rem + var(--pc-safe-top)) calc(1.25rem + var(--pc-safe-right))
+           calc(1.25rem + var(--pc-safe-bottom)) calc(1.25rem + var(--pc-safe-left));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .adv-card {
   background: ${C.card};
@@ -3560,7 +3658,7 @@ ${emitTapHighlightRules()}
    because it floats over a live board — a marker must never eat a tap. */
 .practice-ribbon.pinned {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(0.6rem + var(--pc-safe-bottom));
   z-index: 60; pointer-events: none;
   background: ${C.card}; border: 1px solid ${C.violet};
   box-shadow: var(--c-shadow-md);
@@ -3904,6 +4002,46 @@ ${emitTapHighlightRules()}
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
 .inprog-card .ip-sub.turn { color: ${C.emerald}; font-weight: 700; }
 .inprog-card .ip-sub.expiring { color: ${C.rose}; font-weight: 600; }
+/* Recently Played tiles (Recent goal) reuse the inprog-card look, but as real
+   buttons: strip the browser chrome back to the shared card surface. */
+.recent-card {
+  font-family: inherit; text-align: left; color: ${C.text};
+  background: ${C.card}; border: 1px solid ${C.border};
+}
+.recent-card:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
+
+/* Daily checklist (#295): a horizontal scroller of one chip per daily game.
+   Scrollbar is hidden on purpose — the cut-off chip at the right edge is the
+   affordance — and snap keeps a partial chip from landing half-read. States
+   follow the daily badge palette: emerald done, gold resume, plain todo. */
+.dl-wrap { margin-bottom: 0.4rem; }
+.dl-row {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px;
+  scrollbar-width: none; -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.dl-row::-webkit-scrollbar { display: none; }
+.dl-check {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
+  padding: 6px 13px 6px 7px; font-family: inherit; font-size: 13px;
+  color: ${C.text}; cursor: pointer; scroll-snap-align: start;
+  white-space: nowrap;
+}
+.dl-check:hover { border-color: ${C.accent}; }
+.dl-mark {
+  width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+  border: 1.5px solid ${C.border};
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; font-weight: 700; color: white;
+}
+.dl-icon { font-size: 15px; line-height: 1; }
+.dl-name { font-weight: 600; }
+.dl-check.done { border-color: ${ca('emerald','4d')}; }
+.dl-check.done .dl-mark { background: ${C.emerald}; border-color: ${C.emerald}; }
+.dl-check.done .dl-name { color: ${C.muted}; }
+.dl-check.resume .dl-mark { border-color: ${C.gold}; color: ${C.gold}; }
 
 .chat-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;
@@ -3913,6 +4051,10 @@ ${emitTapHighlightRules()}
   background: ${C.surface}; border: 1px solid ${C.border}; border-bottom: none;
   border-radius: 18px 18px 0 0; width: 100%; max-width: 560px;
   height: min(72vh, 640px); display: flex; flex-direction: column;
+  /* Bottom sheet: the inset lifts the whole panel (and the input row at its
+     foot) clear of the home indicator. The input row adds the keyboard
+     inset on top, from --un-kb-inset, which the native kit maintains. */
+  padding-bottom: var(--pc-safe-bottom);
 }
 .chat-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -3938,7 +4080,11 @@ ${emitTapHighlightRules()}
 .chat-report:hover { opacity: 1; }
 .chat-body { font-size: 13.5px; line-height: 1.45; word-break: break-word; }
 .chat-notice { color: ${C.gold}; font-size: 12px; text-align: center; padding: 4px 0; }
-.chat-input-row { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid ${C.border}; }
+.chat-input-row {
+  display: flex; gap: 8px; border-top: 1px solid ${C.border};
+  padding: 10px 14px 14px;
+  padding-bottom: calc(14px + var(--un-kb-inset, 0px));
+}
 .chat-input {
   flex: 1; background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
   border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 13.5px; outline: none;
@@ -4017,7 +4163,7 @@ ${emitTapHighlightRules()}
   padding: 0.35rem 0.95rem; font-family: inherit; font-size: 0.82rem; font-weight: 600;
   color: ${C.muted}; cursor: pointer; touch-action: manipulation;
 }
-.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: rgba(45,95,174,.10); }
+.home-chip.on { border-color: ${C.accent}; color: ${C.accent}; background: ${ca('accent','1a')}; }
 /* The pin control (#232). It sits in the card's top-right corner, which the
    daily badge already used, so the badge's right offset below clears it
    unconditionally rather than only on cards that render a pin, so a daily and
@@ -4036,6 +4182,23 @@ ${emitTapHighlightRules()}
 .card-pin[data-pressed] { transform: scale(0.86); }
 .card-pin.on[data-pressed] { transform: rotate(-20deg) scale(0.86); }
 .card-pin[disabled] { opacity: 0.18; cursor: default; }
+
+/* The favorite star. Same 44px touch square and corner placement as .card-pin,
+   but stacked BELOW it so the two controls never collide, and clear of the
+   daily badge (which .card-pin already pushed left). The unfilled star is a
+   bare outline at the pin's resting opacity; the filled one is unfiltered and
+   fully opaque, which is the whole "filled vs empty" read. */
+.card-fav {
+  position: absolute; top: 2.7rem; right: 0.15rem; z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; opacity: 0.32;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.card-fav:hover { opacity: 0.6; }
+.card-fav.on { opacity: 1; }
+.card-fav.on { color: ${C.gold}; }
+.card-fav[data-pressed] { transform: scale(0.86); }
 
 /* The Pinned section's heading and the two lines that explain it. */
 .home-pinned-title { display: flex; align-items: baseline; gap: 0.5rem; }
@@ -4062,6 +4225,10 @@ ${emitTapHighlightRules()}
 .home-pin-empty {
   color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
 }
+/* The Favorites chip's empty state. Same register as .home-pin-empty above. */
+.home-fav-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
 
 .card-daily-badge {
   position: absolute; top: 0.65rem; right: 2.7rem; z-index: 1;
@@ -4069,9 +4236,37 @@ ${emitTapHighlightRules()}
   letter-spacing: 0.07em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px; border: 1px solid transparent;
 }
-.card-daily-badge.fresh  { background: rgba(45,95,174,.14); color: ${C.accent};  border-color: rgba(45,95,174,.30); }
+.card-daily-badge.fresh  { background: ${ca('accent','24')}; color: ${C.accent};  border-color: ${ca('accent','4d')}; }
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
+
+/* #313 — the per-card streak pill. It sits in the state footer beside the tag,
+   reads the same brass the nav streak stat uses (gold is this app's reserved
+   streak colour), and is deliberately a pill not a badge: it is status, not
+   state, so it stays visible on played, resumed and fresh cards alike. */
+.card-streak {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.62rem; font-weight: 600; letter-spacing: 0.02em;
+  color: ${C.gold};
+  background: ${ca('gold', '14')};
+  border: 1px solid ${ca('gold', '55')};
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.card-streak .cs-flame { font-size: 0.7rem; line-height: 1; }
+.card-streak .cs-days { color: ${C.gold}; opacity: 0.75; }
+
+/* The footer row that carries the tag and (when the card has a daily) the
+   streak pill. align-items: baseline keeps the two pill shapes on one line
+   whatever the flame glyph does to the pill's inner baseline. */
+.card-footer {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem;
+  /* Carries the tag row's old margin-top: auto, so the leftover space of a
+     stretched tile still becomes even padding above the footer. */
+  margin-top: auto;
+}
+.card-footer > .tag { margin-top: 0; }
 
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,

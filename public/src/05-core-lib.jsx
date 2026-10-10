@@ -81,14 +81,35 @@ function clearPendingRun(gameId) {
   } catch {}
 }
 
-// A fresh seeded RNG for (today, gameId). Everyone on the same UTC day gets the
-// identical board for each game — the precondition for a fair leaderboard.
-// Prefers the server-issued seed; mulberry32 stays the downstream generator
-// either way, so game code is untouched by the server-seed flip.
-function dailyRng(offset, gameId) {
+/* Daily difficulty bands (#331). The daily's band is chosen on the pre-game
+   screen and stored on the attempt row; Easy/Hard deal a different board from
+   the same day's anchor, Normal is byte-identical to the pre-band deal so
+   every existing seeded board and check keeps passing. DAILY_BAND_MULT scales
+   what a win pays (mirrored as a doc constant next to ARCADE_BAND_MULT in
+   server.js — the server stores the client's final score as-is, exactly as it
+   does for the streak multiplier). */
+const DAILY_BANDS = ['easy', 'normal', 'hard'];
+const DAILY_BAND_MULT = { easy: 0.8, normal: 1.0, hard: 1.25 };
+const isDailyBand = (b) => DAILY_BANDS.indexOf(b) !== -1;
+
+// The day's numeric anchor for (game, band). Prefers the server-issued seed;
+// falls back to the legacy UTC-day derivation. Easy/Hard mix the anchor with
+// the game id and the band, so one seed row still anchors all three boards and
+// Normal (band undefined/null/'normal') hashes to exactly the pre-band seed.
+function dailySeedFor(offset, gameId, band) {
   const srv = serverDailySeed(gameId);
-  const seed = srv != null ? srv : ((utcDayNum(offset) + hashStr(gameId)) >>> 0);
-  return mulberry32(seed >>> 0);
+  const base = srv != null ? srv : ((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+  const mixed = (band === 'easy' || band === 'hard')
+    ? hashStr(gameId + ':daily:' + band) : 0;
+  return (base + mixed) >>> 0;
+}
+
+// A fresh seeded RNG for (today, gameId, band). Everyone on the same UTC day
+// gets the identical board for each game — the precondition for a fair
+// leaderboard. Prefers the server-issued seed; mulberry32 stays the downstream
+// generator either way, so game code is untouched by the server-seed flip.
+function dailyRng(offset, gameId, band) {
+  return mulberry32(dailySeedFor(offset, gameId, band));
 }
 
 /* ============================================================
@@ -343,9 +364,45 @@ function modeSeed(playMode, gameId, band, offset) {
     const s = _arcadeRunSeed != null ? _arcadeRunSeed : beginArcadeRun();
     return { rng: mulberry32(s), seed: s };
   }
-  return { rng: dailyRng(offset, gameId), seed: null };
+  // The daily branch takes the band (string, or null) so Easy/Hard get their
+  // own mixed deal; Normal hashes to the pre-band seed (dailySeedFor). seed
+  // stays null on purpose: some play-rngs (Zuma's) treat a non-null seed as
+  // "arcade board", and the dailies want an rng, not a stored seed.
+  return { rng: dailyRng(offset, gameId, band), seed: null };
 }
 
+
+/* #185 — the one-line "what changes on this rung" note. Every story ladder
+   ramps the same way (the rungs are a difficulty ladder by construction), so
+   this is a position-on-the-ladder sentence rather than a per-game table: one
+   source, shared by the pre-game band picker and the auto-advance banner, so
+   the two can never describe the same rung differently. `band` is 0-based. */
+function storyBandNote(band, total) {
+  const n = Number(total) || 0;
+  const i = Number(band) || 0;
+  if (n <= 1) return 'One band — clear it to finish the ladder.';
+  if (i <= 0) return 'The gentlest rung — a warm-up for the ladder.';
+  if (i >= n - 1) return 'The final rung — the hardest this ladder gets.';
+  const frac = i / (n - 1);
+  if (frac < 0.34) return 'A step up: a little bigger, a little tighter.';
+  if (frac < 0.67) return 'Mid-ladder: less room for a wasted move.';
+  return 'Near the top: tight margins, no easy openings.';
+}
+
+/* What a whole ladder pays, for the completion card. Mirrors
+   STORY_TOTAL_POINTS / storyBandAward in server.js — the server is still the
+   only thing that AWARDS anything; this recomputes the same sum so the card
+   can name it without a round-trip. Keep the constant and the formula in step
+   with server.js if the ladder is ever rebalanced. */
+const STORY_TOTAL_POINTS = 2000;
+function storyLadderTotal(total) {
+  const n = Number(total) || 0;
+  if (n <= 0) return 0;
+  const denom = (n * (n + 1)) / 2;
+  let sum = 0;
+  for (let b = 0; b < n; b++) sum += Math.round(STORY_TOTAL_POINTS * ((b + 1) / denom));
+  return sum;
+}
 
 // Periodically persist a game's in-progress state so a resumed attempt picks up
 // the exact board, step count, and accumulated timer. `getState()` returns

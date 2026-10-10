@@ -273,17 +273,23 @@ function klDrawSlot(ctx, ly, x, y, label) {
 function KlondikeGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   /* #176 — story and arcade deal from a RATED seed: one that an offline solver
-     confirmed is winnable, in the difficulty band that was asked for. The
-     daily is untouched (it deals from today's server seed like every other
-     daily), and if the corpus has not loaded the mode falls back to an
-     ordinary seeded deal — you lose the guarantee, not the game. */
+     confirmed is winnable, in the difficulty band that was asked for. #331 —
+     the daily's Easy/Hard do the same, at the corpus ladder's own ends (the
+     klondike corpus is rated into six effort bands), each seeded from its own
+     mixed deal so the rated pick differs from Normal's. Normal is untouched
+     (today's server seed like every other daily), and if the corpus has not
+     loaded the mode falls back to an ordinary seeded deal — you lose the
+     guarantee, not the game. */
+  const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : null;
   const kdBand = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
       ? [0, 2, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      : dailyBand === 'easy' ? 0
+      : dailyBand === 'hard' ? 5
       : null;
   const kdSeeded = useRef(null);
   if (kdSeeded.current === null && kdBand !== null) {
-    const { rng } = modeSeed(playMode, 'klondike', kdBand, offset);
+    const { rng } = modeSeed(playMode, 'klondike', playMode === 'daily' ? (dailyBand || kdBand) : kdBand, offset);
     const rated = corpusSeed('klondike', kdBand, rng);
     kdSeeded.current = rated != null ? mulberry32(rated >>> 0) : rng;
   }
@@ -842,10 +848,16 @@ function SpiderGame({ onWin, onLose, onStepChange, offset, savedProgress, onSave
   const spBand = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
       ? [0, 2, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      /* #331 — the daily's Easy/Hard draw from the corpus ladder's own ends,
+         each seeded from its own mixed deal. Normal stays today's server
+         seed. */
+      : (playMode === 'daily' && (band === 'easy' || band === 'hard'))
+        ? (band === 'easy' ? 0 : 5)
       : null;
   const spSeeded = useRef(null);
   if (spSeeded.current === null && spBand !== null) {
-    const { rng } = modeSeed(playMode, 'spider', spBand, offset);
+    const { rng } = modeSeed(playMode, 'spider',
+      playMode === 'daily' ? (band === 'easy' || band === 'hard' ? band : spBand) : spBand, offset);
     const rated = corpusSeed('spider', spBand, rng);
     spSeeded.current = rated != null ? mulberry32(rated >>> 0) : rng;
   }
@@ -1352,11 +1364,19 @@ function MahjongSolitaireGame({ onWin, onLose, onStepChange, offset, savedProgre
     ? Math.min(MJ_LAYOUTS.length - 1, Math.max(0, band || 0))
     : playMode === 'arcade'
       ? Math.round((Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band)) / 2) * (MJ_LAYOUTS.length - 1))
+      /* #331 — the daily's Easy/Hard take the measured ladder's own ends
+         (gentlest/hardest layout); Normal keeps the day's silhouette. */
+      : (playMode === 'daily' && (band === 'easy' || band === 'hard'))
+        ? (band === 'easy' ? 0 : MJ_LAYOUTS.length - 1)
       : null;
   const seedBase = useRef(null);
   if (seedBase.current == null) {
     if (playMode === 'story' || playMode === 'arcade') {
       seedBase.current = modeSeed(playMode, 'mahjongsol', bandIdx, offset).seed >>> 0;
+    } else if (playMode === 'daily' && (band === 'easy' || band === 'hard')) {
+      // Easy/Hard seed their own deal off the band-mixed rng (modeSeed's daily
+      // branch returns seed null, so draw straight from the rng).
+      seedBase.current = (dailyRng(offset, 'mahjongsol', band)() * 4294967296) >>> 0;
     } else {
       const srv = serverDailySeed('mahjongsol');
       seedBase.current = srv != null ? srv : ((utcDayNum(offset) + hashStr('mahjongsol')) >>> 0);
@@ -2030,12 +2050,17 @@ function NonogramGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const bandIdx = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
       ? [0, 2, 4][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      /* #331 — the daily's Easy/Hard take NG_BANDS' own ends (the 5×5 and the
+         sparse 15×15); Normal keeps the daily's 8×8 shape. */
+      : (playMode === 'daily' && (band === 'easy' || band === 'hard'))
+        ? (band === 'easy' ? 0 : NG_BANDS.length - 1)
       : 1;
   const built = useRef(null);
   if (!built.current) {
     const { rng } = playMode === 'story' || playMode === 'arcade'
       ? modeSeed(playMode, 'nonogram', bandIdx, offset)
-      : { rng: dailyRng(offset, 'nonogram') };
+      : { rng: dailyRng(offset, 'nonogram',
+          playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : undefined) };
     built.current = ngBuildForBand(rng, bandIdx);
   }
   const NG_ROWS = built.current.rows, NG_COLS = built.current.cols;
@@ -2472,6 +2497,43 @@ function mfFlood(startIdx, counts, cols = 9, rows = 9) {
 const MF_NUM_COLORS = [null, 'accent', 'emerald', 'rose', 'violet', 'gold', '#06b6d4', '#be123c', 'muted'];
 const MF_GAP = 3;
 
+/* #294 — dark-mode tiles for BOTH mine games. They used to be PAL.card
+   (#181D29) for a covered cell and PAL.surface (#12161F) for an uncovered
+   one: a 1.07:1 difference with the same hairline on both, so on a dark
+   screen an empty uncovered cell and a covered one looked the same. Like the
+   light board's MS_LIGHT greys these are board art, pinned here rather than
+   added as palette tokens. A covered cell is a raised slate key (1.9:1 against
+   an uncovered cell, with a lit top edge and a dark lip along the bottom). An
+   uncovered cell is a flat dark well with a faint outline. The digits sit on
+   the darker well, so each one has slightly more contrast than before. Light
+   mode does not use these. */
+const MINE_DARK_TILES = {
+  hidden:     '#3A4458', // raised face
+  hiddenHi:   '#56627A', // lit top edge
+  hiddenLip:  '#1A202B', // bottom lip / outline
+  revealed:   '#0E121A', // recessed well
+  revealedLn: '#222A37', // well outline
+};
+
+/* Draw one covered cell in dark mode: lip, face, then the lit top edge.
+   Shared by Mine Finder and Mine Finder Classic. */
+function mineDrawDarkHidden(ctx, x, y, cell, radius) {
+  const T = MINE_DARK_TILES;
+  const lip = Math.max(2, Math.round(cell * 0.08));
+  klRR(ctx, x, y, cell, cell, radius);
+  ctx.fillStyle = T.hiddenLip;
+  ctx.fill();
+  klRR(ctx, x, y, cell, cell - lip, radius);
+  ctx.fillStyle = T.hidden;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = T.hiddenHi;
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y + 0.5);
+  ctx.lineTo(x + cell - radius, y + 0.5);
+  ctx.stroke();
+}
+
 /* ============================================================
    Mine Finder — no-guess generation (#176)
    ============================================================
@@ -2698,12 +2760,17 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
   const bandIdx = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
       ? [0, 2, 4][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      /* #331 — the daily's Easy/Hard take MF_BANDS' own ends (7×7/6 and
+         13×13/38); Normal keeps the 9×9 / 10-mine shape. */
+      : (playMode === 'daily' && (band === 'easy' || band === 'hard'))
+        ? (band === 'easy' ? 0 : MF_BANDS.length - 1)
       : 1;
   const board = useRef(null);
   if (!board.current) {
     const { rng } = playMode === 'story' || playMode === 'arcade'
       ? modeSeed(playMode, 'minefinder', bandIdx, offset)
-      : { rng: dailyRng(offset, 'minefinder') };
+      : { rng: dailyRng(offset, 'minefinder',
+          playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : undefined) };
     board.current = mfBuildForBand(rng, bandIdx);
   }
   const { mines, counts, start, cols: MF_COLS, rows: MF_ROWS } = board.current;
@@ -2898,6 +2965,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const radius = Math.max(3, Math.round(cell * 0.16));
+      const dark = themeState.resolved === 'dark';
       for (let i = 0; i < MF_COLS * MF_ROWS; i++) {
         const r = Math.floor(i / MF_COLS), c = i % MF_COLS;
         const x = c * cellStep, y = r * cellStep;
@@ -2906,19 +2974,28 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
 
         // PAL, not C — see the canvas-colour note on guardCanvasCtx.
         let fill = PAL.card, stroke = PAL.border;
-        if (isRev) { fill = PAL.surface; stroke = PAL.border; }
-        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; }
-        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; }
-        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; }
+        if (isRev) {
+          fill = dark ? MINE_DARK_TILES.revealed : PAL.surface;
+          stroke = dark ? MINE_DARK_TILES.revealedLn : PAL.border;
+        }
+        let special = false;
+        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; special = true; }
+        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; special = true; }
+        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; special = true; }
 
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
-        else ctx.rect(x, y, cell, cell);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = stroke;
-        ctx.stroke();
+        if (dark && !isRev && !special) {
+          // #294 — a covered cell is a raised key in dark mode.
+          mineDrawDarkHidden(ctx, x, y, cell, radius);
+        } else {
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
+          else ctx.rect(x, y, cell, cell);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = stroke;
+          ctx.stroke();
+        }
 
         const cx = x + cell / 2, cy = y + cell / 2;
         if (isRev && isMine) {
@@ -3039,12 +3116,17 @@ function AnagramsGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   const anBand = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
       ? [0, 2, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      /* #331 — the daily's Easy/Hard take AN_BANDS' own ends (shortest and
+         longest word ladders); Normal keeps the mid band. */
+      : (playMode === 'daily' && (band === 'easy' || band === 'hard'))
+        ? (band === 'easy' ? 0 : AN_BANDS.length - 1)
       : 2;
   const deal = useRef(null);
   if (!deal.current) {
     const { rng } = playMode === 'story' || playMode === 'arcade'
       ? modeSeed(playMode, 'anagrams', anBand, offset)
-      : { rng: dailyRng(offset, 'anagrams') };
+      : { rng: dailyRng(offset, 'anagrams',
+          playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : undefined) };
     const words = anPickWords(rng, anBand);
     deal.current = { words, tiles: words.map((w) => anScramble(w, rng)) };
   }
@@ -3376,6 +3458,9 @@ const CP_WEEK = [
 
 function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
+  /* #331 — the daily's Easy/Hard jump to the corpus ladder's own ends
+     (gentlest / hardest room); Normal keeps the weekday window. */
+  const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : null;
   const picked = useRef(null);
   if (picked.current == null) {
     const { rng } = modeSeed(playMode, 'cratepush', band, offset);
@@ -3384,6 +3469,8 @@ function CratePushGame({ onWin, onStepChange, offset, savedProgress, onSaveProgr
        Tuesday. */
     let want = 0;
     if (playMode === 'story') want = Math.max(0, band || 0);
+    else if (dailyBand === 'easy') want = 0;
+    else if (dailyBand === 'hard') want = 7;
     else {
       const w = CP_WEEK[new Date(Date.now() + (offset || 0)).getUTCDay()];
       want = w.from + Math.floor(rng() * (w.to - w.from));
@@ -3697,6 +3784,15 @@ function dsLevelFor(lines) { return 1 + Math.floor(lines / DS_LINES_PER_LEVEL); 
 // so the top levels stay playable rather than impossible.
 function dsGravityMs(level) { return Math.max(80, Math.round(1000 * Math.pow(0.85, level - 1))); }
 
+/* #331 — Drop Stack's bands. Arcade's Easy/Normal/Hard picker was decorative
+   (every band dealt the same bag at the same gravity), and the daily had no
+   band at all. Gravity is the one dial that changes how a fixed bag FEELS
+   without changing the bag itself — the sequence stays the fair 7-bag for
+   everyone — so a band is a multiplier on the level gravity: Easy falls ~35%
+   slower, Hard ~25% faster (floored so the top levels can't go silly).
+   Normal stays 1.0, byte-identical to the pre-band game in both modes. */
+const DS_BANDS = { easy: 1.35, normal: 1.0, hard: 0.75 };
+
 function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onSaveProgress, playMode, band }) {
   const dayNum = useRef(utcDayNum(offset)).current;
   /* #176 — the daily is a FIXED 200-piece bag you either clear or top out of;
@@ -3704,6 +3800,8 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
      which is why this was one of the cheapest modes in the plan: the piece
      generator never cared how long the sequence was. */
   const isArcade = playMode === 'arcade';
+  const dsBandMult = (playMode === 'arcade' || playMode === 'daily')
+    && (band === 'easy' || band === 'hard') ? DS_BANDS[band] : 1.0;
   const seedRef = useRef(null);
   const seq = useRef(null);
   if (!seq.current) {
@@ -3867,7 +3965,7 @@ function DropStackGame({ onWin, onLose, onStepChange, offset, savedProgress, onS
       const cur = liveRef.current;
       if (cur.done || cur.pieceIdx >= bagLen) return;
       acc += dt;
-      const interval = dsGravityMs(dsLevelFor(cur.lines));
+      const interval = Math.max(40, Math.round(dsGravityMs(dsLevelFor(cur.lines)) * dsBandMult));
       while (acc >= interval) {
         acc -= interval;
         const y = Math.floor(fallYRef.current);

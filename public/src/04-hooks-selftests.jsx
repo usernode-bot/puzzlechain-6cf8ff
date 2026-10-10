@@ -1918,6 +1918,57 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #335 — buildGameLink is the one emitter of game deep links (the pre-game
+     Copy-link button and buildShareCard both delegate to it), so its output
+     IS the URL contract. Assert the representative shapes: a bare link for
+     daily-only entries, story's 1-based level, arcade's band id, both halves
+     of a merged pair emitting their own ids, and a mode the game does not
+     declare falling back to the bare link the deep-link effect would accept. */
+  check('game-link-builder', () => {
+    const tail = (url) => url.slice(url.indexOf('/?game='));
+    // A daily-only registry entry emits the bare link — pmode=daily is
+    // redundant (defaultPlayMode opens a daily entry on its daily).
+    const daily = buildGameLink('snakedaily');
+    if (tail(daily) !== '/?game=snakedaily' || daily.indexOf('pmode=') !== -1) {
+      throw new Error('daily-only entry should emit a bare link, got: ' + daily);
+    }
+    // Story carries a 1-based level; arcade carries the band id. Both use the
+    // canonical ?level= spelling.
+    const story = buildGameLink('sudoku', { pmode: 'story', band: 4 });
+    if (tail(story) !== '/?game=sudoku&pmode=story&level=4') {
+      throw new Error('story link wrong, got: ' + story);
+    }
+    const arcade = buildGameLink('snake', { pmode: 'arcade', band: 'hard' });
+    if (tail(arcade) !== '/?game=snake&pmode=arcade&level=hard') {
+      throw new Error('arcade link wrong, got: ' + arcade);
+    }
+    // Both halves of a merged pair emit their OWN id, so each mode's link
+    // resolves to the registry entry that actually serves it.
+    if (tail(buildGameLink('tilematchingdaily')) !== '/?game=tilematchingdaily') {
+      throw new Error('merged daily half wrong');
+    }
+    if (tail(buildGameLink('tilematching', { pmode: 'story', band: 2 })) !== '/?game=tilematching&pmode=story&level=2') {
+      throw new Error('merged story half wrong');
+    }
+    // A mode the game does not declare is dropped, not emitted — the
+    // deep-link effect would refuse it (Nonogram has no arcade).
+    const unsupported = buildGameLink('nonogram', { pmode: 'arcade', band: 'hard' });
+    if (tail(unsupported) !== '/?game=nonogram') {
+      throw new Error('unsupported mode should fall back to the bare link, got: ' + unsupported);
+    }
+    // A mode with no band chosen still selects the mode (the pre-game picker
+    // supplies the level afterwards).
+    const modeOnly = buildGameLink('sudoku', { pmode: 'story' });
+    if (tail(modeOnly) !== '/?game=sudoku&pmode=story') {
+      throw new Error('mode without band wrong, got: ' + modeOnly);
+    }
+    // The iframe token must never ride shared text.
+    for (const url of [daily, story, arcade, unsupported]) {
+      if (url.indexOf('token=') !== -1) throw new Error('link carries ?token=');
+    }
+    return true;
+  });
+
   /* Phase 2 (#163) — a tappable class that isn't covered pays the browser's
      double-tap delay on every tap. The probe list is TAPPABLE_CLASSES itself,
      the same array the CSS is generated from, so the test and the stylesheet

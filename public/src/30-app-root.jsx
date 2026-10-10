@@ -1252,7 +1252,11 @@ function App() {
   // game's own spoiler-free result line, then rank + the playable no-login
   // challenge link. `rank` is optional — the card reads fine while it's still
   // being fetched (or for guests before the rank preview lands).
-  const buildShareCard = (gameId, resultLine, rank) => {
+  // #335 — `linkOpts` is optional too: when the result came from a story rung
+  // or an arcade band, the trailing link names that level/difficulty instead
+  // of the bare game (story/arcade cards previously carried no link at all).
+  // The link itself is emitted by buildGameLink, the one URL emitter.
+  const buildShareCard = (gameId, resultLine, rank, linkOpts) => {
     const d = new Date(Date.now() + offset);
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
     const lines = [`Game Corner No. ${utcDayNum(offset) - 20000} · ${dateStr}`];
@@ -1261,7 +1265,7 @@ function App() {
     if (resultLine) lines.push(resultLine.replace(/^Game Corner /, ''));
     lines.push(
       (Number.isFinite(rank) ? `#${rank} on today's board · ` : '') +
-      `Play the same deal (no login): ${window.location.origin}/?game=${gameId}`
+      `Play the same deal (no login): ${buildGameLink(gameId, linkOpts)}`
     );
     return lines.join('\n');
   };
@@ -1521,7 +1525,13 @@ function App() {
       const storyBadge = storyAch ? achievementBadgeFor(storyAch) : null;
       const winPayload = {
         score, bonus: 0, finalScore: score, steps, timeSecs,
-        multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
+        multiplier: 1, effectiveStreak: 0,
+        // #335 — the result card's link names the rung just played, so
+        // "just cleared level 4" hands the recipient level 4. 1-based in the
+        // URL, like every story deep link.
+        share: meta && meta.share
+          ? buildShareCard(currentGame.id, meta.share, null, { pmode: 'story', band: bandIdx + 1 })
+          : undefined,
         modeLabel: 'Story', bandIndex: bandIdx, bandTotal: total,
         ladderComplete: !!(res && res.ladderComplete),
         storyBadge,
@@ -1560,7 +1570,12 @@ function App() {
       if (ok && body && body.awarded) setTotalScore(t => t + body.awarded);
       setWinData({
         score, bonus: 0, finalScore: score, steps, timeSecs,
-        multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
+        multiplier: 1, effectiveStreak: 0,
+        // #335 — the link names the band just played (same rationale as the
+        // story branch above).
+        share: meta && meta.share
+          ? buildShareCard(currentGame.id, meta.share, null, { pmode: 'arcade', band })
+          : undefined,
         modeLabel: 'Arcade', arcadeBand: band,
         arcadeRank: ok && body ? body.rank : null,
         arcadePrevBest: ok && body ? body.previousBest : null,

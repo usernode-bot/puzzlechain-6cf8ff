@@ -441,6 +441,32 @@ function copyText(text) {
   catch { return Promise.resolve(); }
 }
 
+/* #335 — the ONE emitter of game deep links. The pre-game screen's Copy-link
+   button and buildShareCard both delegate here, so the URL contract (game,
+   pmode, level) lives in exactly one place. `opts.band` is the URL value
+   verbatim: a 1-based story level number, or an arcade band id
+   (easy|normal|hard). Emitted links use ?level=, the canonical spelling;
+   ?band= stays accepted for everything already in the wild (every merged
+   dapp.json check uses it). A mode the game does not declare — and `daily`,
+   which is redundant (defaultPlayMode opens a daily entry on its daily) — is
+   dropped rather than emitted, so the link never names something the
+   deep-link effect would refuse. Deliberately never carries ?token=: that is
+   the iframe's own credential and must not ride shared text.
+   `supportsMode`/`isPlayMode` live later in the concatenation (29-cards.jsx);
+   that is fine — ORDER only matters for evaluation-time reads, and this is
+   only ever called at runtime. */
+function buildGameLink(gameId, opts) {
+  const o = opts || {};
+  let url = window.location.origin + '/?game=' + encodeURIComponent(gameId);
+  if (o.pmode && o.pmode !== 'daily' && isPlayMode(o.pmode) && supportsMode(gameId, o.pmode)) {
+    url += '&pmode=' + o.pmode;
+    if (o.band !== undefined && o.band !== null && o.band !== '') {
+      url += '&level=' + encodeURIComponent(o.band);
+    }
+  }
+  return url;
+}
+
 // Coarse relative time for history rows — "3d", "2h", "just now". Deliberately
 // coarse: a run list wants scannable ages, not timestamps.
 function cgAgo(when) {
@@ -577,6 +603,14 @@ const STREAK_TIERS = [
    entry id in localStorage, like the how-to first-open state).
    ============================================================ */
 const CHANGELOG = [
+  {
+    id: 'w2026-10-08',
+    weekOf: 'Week of October 5, 2026',
+    items: [
+      'Every pre-game screen has a Copy link button now — hand someone a link straight to a game, its play mode and the exact level or difficulty you picked.',
+      'Shared result links from Story and Arcade wins point at the level just played, not just the game.',
+    ],
+  },
   {
     id: 'w2026-08-17',
     weekOf: 'Week of August 17, 2026',

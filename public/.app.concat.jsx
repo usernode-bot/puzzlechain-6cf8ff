@@ -157,6 +157,7 @@ const TAPPABLE_CLASSES = [
   'tappable',
   'mf-canvas', 'board-canvas',
   'card-pin',
+  'dl-check',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors
@@ -1367,11 +1368,17 @@ ${emitTapHighlightRules()}
    They are a pair of real buttons on their own row now, each filling half the
    width with a 44px target — visible without competing with Play, which keeps
    the filled accent treatment to itself. */
+/* #335 — the row now carries four actions (How to play / Game chat /
+   Leaderboards / Copy link), so it is a two-column grid: the signed-in
+   pre-game settles two-by-two instead of squeezing four labels into one
+   line. The opponent screen reuses these classes with two buttons, which a
+   2-col grid lays out exactly as the old flex row did. */
 .pregame-actions {
-  display: flex; gap: 0.5rem; margin-top: 0.8rem;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;
+  margin-top: 0.8rem;
 }
 .pregame-howto-btn {
-  flex: 1 1 0; min-width: 0; min-height: 44px;
+  min-width: 0; min-height: 44px;
   display: flex; align-items: center; justify-content: center; gap: 0.35rem;
   background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px;
   color: ${C.text}; font-family: inherit; font-size: 0.85rem; font-weight: 600;
@@ -4109,6 +4116,39 @@ ${emitTapHighlightRules()}
 }
 .recent-card:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
 
+/* Daily checklist (#295): a horizontal scroller of one chip per daily game.
+   Scrollbar is hidden on purpose — the cut-off chip at the right edge is the
+   affordance — and snap keeps a partial chip from landing half-read. States
+   follow the daily badge palette: emerald done, gold resume, plain todo. */
+.dl-wrap { margin-bottom: 0.4rem; }
+.dl-row {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px;
+  scrollbar-width: none; -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.dl-row::-webkit-scrollbar { display: none; }
+.dl-check {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
+  padding: 6px 13px 6px 7px; font-family: inherit; font-size: 13px;
+  color: ${C.text}; cursor: pointer; scroll-snap-align: start;
+  white-space: nowrap;
+}
+.dl-check:hover { border-color: ${C.accent}; }
+.dl-mark {
+  width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+  border: 1.5px solid ${C.border};
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; font-weight: 700; color: white;
+}
+.dl-icon { font-size: 15px; line-height: 1; }
+.dl-name { font-weight: 600; }
+.dl-check.done { border-color: ${ca('emerald','4d')}; }
+.dl-check.done .dl-mark { background: ${C.emerald}; border-color: ${C.emerald}; }
+.dl-check.done .dl-name { color: ${C.muted}; }
+.dl-check.resume .dl-mark { border-color: ${C.gold}; color: ${C.gold}; }
+
 .chat-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 240;
   display: flex; align-items: flex-end; justify-content: center;
@@ -4297,6 +4337,34 @@ ${emitTapHighlightRules()}
 .card-daily-badge.fresh  { background: ${ca('accent','24')}; color: ${C.accent};  border-color: ${ca('accent','4d')}; }
 .card-daily-badge.resume { background: rgba(201,162,39,.16); color: #8A6F14;     border-color: rgba(201,162,39,.35); }
 .card-daily-badge.done   { background: rgba(30,143,99,.14);  color: ${C.emerald}; border-color: rgba(30,143,99,.30); }
+
+/* #313 — the per-card streak pill. It sits in the state footer beside the tag,
+   reads the same brass the nav streak stat uses (gold is this app's reserved
+   streak colour), and is deliberately a pill not a badge: it is status, not
+   state, so it stays visible on played, resumed and fresh cards alike. */
+.card-streak {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.62rem; font-weight: 600; letter-spacing: 0.02em;
+  color: ${C.gold};
+  background: ${ca('gold', '14')};
+  border: 1px solid ${ca('gold', '55')};
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.card-streak .cs-flame { font-size: 0.7rem; line-height: 1; }
+.card-streak .cs-days { color: ${C.gold}; opacity: 0.75; }
+
+/* The footer row that carries the tag and (when the card has a daily) the
+   streak pill. align-items: baseline keeps the two pill shapes on one line
+   whatever the flame glyph does to the pill's inner baseline. */
+.card-footer {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem;
+  /* Carries the tag row's old margin-top: auto, so the leftover space of a
+     stretched tile still becomes even padding above the footer. */
+  margin-top: auto;
+}
+.card-footer > .tag { margin-top: 0; }
 
 /* Card-weight white surfaces: soft warm shadow at rest, lift on hover. */
 .card, .gotd-hero, .inprog-card, .pregame-card, .win-card, .locked-card,
@@ -7973,6 +8041,57 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #335 — buildGameLink is the one emitter of game deep links (the pre-game
+     Copy-link button and buildShareCard both delegate to it), so its output
+     IS the URL contract. Assert the representative shapes: a bare link for
+     daily-only entries, story's 1-based level, arcade's band id, both halves
+     of a merged pair emitting their own ids, and a mode the game does not
+     declare falling back to the bare link the deep-link effect would accept. */
+  check('game-link-builder', () => {
+    const tail = (url) => url.slice(url.indexOf('/?game='));
+    // A daily-only registry entry emits the bare link — pmode=daily is
+    // redundant (defaultPlayMode opens a daily entry on its daily).
+    const daily = buildGameLink('snakedaily');
+    if (tail(daily) !== '/?game=snakedaily' || daily.indexOf('pmode=') !== -1) {
+      throw new Error('daily-only entry should emit a bare link, got: ' + daily);
+    }
+    // Story carries a 1-based level; arcade carries the band id. Both use the
+    // canonical ?level= spelling.
+    const story = buildGameLink('sudoku', { pmode: 'story', band: 4 });
+    if (tail(story) !== '/?game=sudoku&pmode=story&level=4') {
+      throw new Error('story link wrong, got: ' + story);
+    }
+    const arcade = buildGameLink('snake', { pmode: 'arcade', band: 'hard' });
+    if (tail(arcade) !== '/?game=snake&pmode=arcade&level=hard') {
+      throw new Error('arcade link wrong, got: ' + arcade);
+    }
+    // Both halves of a merged pair emit their OWN id, so each mode's link
+    // resolves to the registry entry that actually serves it.
+    if (tail(buildGameLink('tilematchingdaily')) !== '/?game=tilematchingdaily') {
+      throw new Error('merged daily half wrong');
+    }
+    if (tail(buildGameLink('tilematching', { pmode: 'story', band: 2 })) !== '/?game=tilematching&pmode=story&level=2') {
+      throw new Error('merged story half wrong');
+    }
+    // A mode the game does not declare is dropped, not emitted — the
+    // deep-link effect would refuse it (Nonogram has no arcade).
+    const unsupported = buildGameLink('nonogram', { pmode: 'arcade', band: 'hard' });
+    if (tail(unsupported) !== '/?game=nonogram') {
+      throw new Error('unsupported mode should fall back to the bare link, got: ' + unsupported);
+    }
+    // A mode with no band chosen still selects the mode (the pre-game picker
+    // supplies the level afterwards).
+    const modeOnly = buildGameLink('sudoku', { pmode: 'story' });
+    if (tail(modeOnly) !== '/?game=sudoku&pmode=story') {
+      throw new Error('mode without band wrong, got: ' + modeOnly);
+    }
+    // The iframe token must never ride shared text.
+    for (const url of [daily, story, arcade, unsupported]) {
+      if (url.indexOf('token=') !== -1) throw new Error('link carries ?token=');
+    }
+    return true;
+  });
+
   /* Phase 2 (#163) — a tappable class that isn't covered pays the browser's
      double-tap delay on every tap. The probe list is TAPPABLE_CLASSES itself,
      the same array the CSS is generated from, so the test and the stylesheet
@@ -9016,6 +9135,32 @@ function copyText(text) {
   catch { return Promise.resolve(); }
 }
 
+/* #335 — the ONE emitter of game deep links. The pre-game screen's Copy-link
+   button and buildShareCard both delegate here, so the URL contract (game,
+   pmode, level) lives in exactly one place. `opts.band` is the URL value
+   verbatim: a 1-based story level number, or an arcade band id
+   (easy|normal|hard). Emitted links use ?level=, the canonical spelling;
+   ?band= stays accepted for everything already in the wild (every merged
+   dapp.json check uses it). A mode the game does not declare — and `daily`,
+   which is redundant (defaultPlayMode opens a daily entry on its daily) — is
+   dropped rather than emitted, so the link never names something the
+   deep-link effect would refuse. Deliberately never carries ?token=: that is
+   the iframe's own credential and must not ride shared text.
+   `supportsMode`/`isPlayMode` live later in the concatenation (29-cards.jsx);
+   that is fine — ORDER only matters for evaluation-time reads, and this is
+   only ever called at runtime. */
+function buildGameLink(gameId, opts) {
+  const o = opts || {};
+  let url = window.location.origin + '/?game=' + encodeURIComponent(gameId);
+  if (o.pmode && o.pmode !== 'daily' && isPlayMode(o.pmode) && supportsMode(gameId, o.pmode)) {
+    url += '&pmode=' + o.pmode;
+    if (o.band !== undefined && o.band !== null && o.band !== '') {
+      url += '&level=' + encodeURIComponent(o.band);
+    }
+  }
+  return url;
+}
+
 // Coarse relative time for history rows — "3d", "2h", "just now". Deliberately
 // coarse: a run list wants scannable ages, not timestamps.
 function cgAgo(when) {
@@ -9152,6 +9297,14 @@ const STREAK_TIERS = [
    entry id in localStorage, like the how-to first-open state).
    ============================================================ */
 const CHANGELOG = [
+  {
+    id: 'w2026-10-08',
+    weekOf: 'Week of October 5, 2026',
+    items: [
+      'Every pre-game screen has a Copy link button now — hand someone a link straight to a game, its play mode and the exact level or difficulty you picked.',
+      'Shared result links from Story and Arcade wins point at the level just played, not just the game.',
+    ],
+  },
   {
     id: 'w2026-08-17',
     weekOf: 'Week of August 17, 2026',
@@ -10961,6 +11114,54 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
   );
 }
 
+// Daily checklist (#295): one chip per daily game, in a horizontal scroller,
+// so a player can sweep every deal without hunting the grid. The checked
+// state reads the SAME source the cards' "✓ PLAYED" badge reads —
+// cardDailyId + attempts[id].finishedAt from /api/daily — so it cannot
+// disagree with the grid and needs no second fetch. In-progress shows ▶,
+// unplayed shows an empty circle. A tap launches the chip's daily id through
+// the normal launch path (finished → locked screen, else pre-game), exactly
+// like the card's own Daily button.
+function DailyChecklist({ attempts, loading, onPlay }) {
+  const cards = GAME_CARDS.filter((c) => cardDailyId(c));
+  if (!cards.length) return null;
+  const stateOf = (c) => {
+    const id = cardDailyId(c);
+    const a = id ? attempts[id] : null;
+    if (a && a.finishedAt) return 'done';
+    if (a) return 'resume';
+    return 'todo';
+  };
+  const done = cards.filter((c) => stateOf(c) === 'done').length;
+  return (
+    <div className="dl-wrap">
+      <div className="home-section-title">
+        Daily checklist
+        <span className="home-pin-count mono">{done}/{cards.length}</span>
+      </div>
+      <div className="dl-row" role="list" aria-label="Daily challenges to play today">
+        {cards.map((c) => {
+          const s = stateOf(c);
+          const id = cardDailyId(c);
+          return (
+            <button
+              key={c.key}
+              role="listitem"
+              className={'dl-check tappable ' + s}
+              aria-label={`${c.name} daily — ${s === 'done' ? 'played today' : s === 'resume' ? 'in progress' : 'not played yet'}`}
+              {...tapProps(() => { if (!loading) onPlay(id); })}
+            >
+              <span className="dl-mark" aria-hidden="true">{s === 'done' ? '✓' : s === 'resume' ? '▶' : ''}</span>
+              <span className="dl-icon" aria-hidden="true">{c.icon}</span>
+              <span className="dl-name">{c.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* Recently Played (Recent goal): the viewer's last five plays as one tappable
    tile each, mirroring InProgressRow's strip shape so the lobby keeps a single
    rhythm. Renders nothing at all when there is no history (the server only
@@ -11386,6 +11587,29 @@ function GameBoards({ game, onClose }) {
   );
 }
 
+/* #335 — copy a link to exactly what this screen is showing: the game in its
+   play mode with the chosen level or difficulty. Whoever opens it lands on
+   the same pre-game screen with the same choice pre-made and still presses
+   Play themselves — the link never claims a run on arrival. Same copied
+   feedback as the result card's Share button; degrades to a no-op where the
+   clipboard is unavailable (the label still flips, like ShareButton's). */
+function CopyLinkButton({ gameId, pmode, band }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await copyText(buildGameLink(gameId, { pmode, band }));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      className="pregame-howto-btn pregame-copylink-btn"
+      onClick={copy}
+    >
+      {copied ? '✓ Copied!' : '🔗 Copy link'}
+    </button>
+  );
+}
+
 function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
                          playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest,
                          onReplayRun }) {
@@ -11544,6 +11768,15 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
             are before you play, which is when "where do I stand" is a reason
             to press Play. */}
         <button className="pregame-howto-btn" onClick={() => setBoardsOpen(true)}>🏆 Leaderboards</button>
+        {/* #335 — the link mirrors the choice on screen: story's level (1-based
+            in the URL), arcade's band id, or a bare game link for the daily
+            and for modeless classics. Head-to-head games never reach this
+            screen, so nothing here needs an opponent in the link. */}
+        <CopyLinkButton
+          gameId={game.id}
+          pmode={mode}
+          band={isStory ? storyBand + 1 : isArcade ? arcadeBandId : undefined}
+        />
       </div>
       {boardsOpen && <GameBoards game={game} onClose={() => setBoardsOpen(false)} />}
     </div>
@@ -13485,15 +13718,21 @@ function MsBoardCanvas({ theme, revealed, flagged, mineSet, adjacency, gameOverM
         const adjVal = adjacency ? adjacency[i] : 0;
 
         let fill = light ? MS_LIGHT.hidden : PAL.card;
-        if (isRev) fill = light ? MS_LIGHT.revealed : PAL.surface;
+        if (isRev) fill = light ? MS_LIGHT.revealed : MINE_DARK_TILES.revealed;
         if (isMineVisible) fill = light ? MS_LIGHT.mineDead : 'rgba(205,75,58,.25)';
         if (isExploded) fill = light ? MS_LIGHT.exploded : 'rgba(205,75,58,.60)';
-        klRR(ctx, x, y, cell, cell, radius);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = light ? MS_LIGHT.grid : PAL.border;
-        ctx.stroke();
+        if (!light && !isRev && !isMineVisible && !isExploded) {
+          // #294 — a covered cell is a raised key in dark mode.
+          mineDrawDarkHidden(ctx, x, y, cell, radius);
+        } else {
+          klRR(ctx, x, y, cell, cell, radius);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = light ? MS_LIGHT.grid
+            : (isRev && !isExploded ? MINE_DARK_TILES.revealedLn : PAL.border);
+          ctx.stroke();
+        }
 
         const cx = x + cell / 2, cy = y + cell / 2;
         if (isExploded) {
@@ -20135,7 +20374,25 @@ function BounceGame({ onWin, onLose, onStepChange, resetKey, playMode, band, off
    Social Components — Profile & Friends
    ============================================================ */
 
-function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOpenSettings }) {
+/* All-time figures per game (myScores from /api/my/scores), in registry
+   order, games with nothing recorded dropped. Read-only: the rows carry no
+   tap target, so no TAPPABLE_CLASSES entry and no press feedback. */
+const profileScoreRows = (myScores) => {
+  if (!myScores) return [];
+  const rows = [];
+  for (const g of GAMES) {
+    const s = myScores[g.id];
+    if (!s) continue;
+    const hasPts = Number.isFinite(s.pts) && s.pts > 0;
+    const hasBest = Number.isFinite(s.best) && s.best > 0;
+    const recTot = s.record ? (s.record.wins + s.record.losses + s.record.draws) : 0;
+    if (!hasPts && !hasBest && recTot <= 0) continue;
+    rows.push({ game: g, s, hasPts, hasBest, hasRec: recTot > 0 });
+  }
+  return rows;
+};
+
+function ProfileScreen({ userId, user: loggedInUser, myScores, onBack, onOpenFriends, onOpenSettings }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -20240,6 +20497,61 @@ function ProfileScreen({ userId, user: loggedInUser, onBack, onOpenFriends, onOp
             <div style={{ fontSize: '1.4rem', fontWeight: 700, color: C.accent, fontFamily: "'JetBrains Mono', monospace" }}>{profile.stats.gamesPlayed}</div>
           </div>
         </div>
+
+        {/* All-time scores — every game the viewer has any recorded figure
+            for, in registry order. Own profile only: /api/my/scores is
+            caller-keyed, so there is nothing to show for anyone else. */}
+        {isOwnProfile && (() => {
+          const scoreRows = profileScoreRows(myScores);
+          return (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '0.6rem' }}>
+                All-time scores
+              </div>
+              {scoreRows.length === 0 ? (
+                <div style={{ fontSize: '0.85rem', color: C.muted }}>
+                  No scores yet. Play a game!
+                </div>
+              ) : (
+                <div>
+                  {scoreRows.map((row, i) => {
+                    const { s } = row;
+                    const recFigure = s.record
+                      ? `${s.record.wins}W · ${s.record.losses}L${s.record.draws > 0 ? ` · ${s.record.draws}D` : ''}`
+                      : null;
+                    const recordOnly = row.hasRec && !row.hasPts && !row.hasBest;
+                    return (
+                      <div
+                        key={row.game.id}
+                        className="prr"
+                        style={{ borderBottom: i < scoreRows.length - 1 ? `1px solid ${C.border}` : 'none' }}
+                      >
+                        <span className="prr-icon">{row.game.icon}</span>
+                        <span className="prr-name">{row.game.name}</span>
+                        <span className="prr-meta mono">
+                          {recordOnly ? (
+                            <span className="prr-score" style={{ color: C.emerald }}>{recFigure}</span>
+                          ) : (
+                            <React.Fragment>
+                              <span className="prr-score" style={{ color: C.gold }}>
+                                {row.hasPts ? `+${s.pts.toLocaleString()} pts` : `Best ${s.best.toLocaleString()}`}
+                              </span>
+                              {row.hasPts && row.hasBest && (
+                                <span className="prr-date" style={{ color: C.muted }}>
+                                  {` · Best ${s.best.toLocaleString()}`}
+                                </span>
+                              )}
+                            </React.Fragment>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Recent games — the player's last 10 finished daily runs. */}
         <div style={{ marginBottom: '1.5rem' }}>
@@ -27456,6 +27768,43 @@ function mfFlood(startIdx, counts, cols = 9, rows = 9) {
 const MF_NUM_COLORS = [null, 'accent', 'emerald', 'rose', 'violet', 'gold', '#06b6d4', '#be123c', 'muted'];
 const MF_GAP = 3;
 
+/* #294 — dark-mode tiles for BOTH mine games. They used to be PAL.card
+   (#181D29) for a covered cell and PAL.surface (#12161F) for an uncovered
+   one: a 1.07:1 difference with the same hairline on both, so on a dark
+   screen an empty uncovered cell and a covered one looked the same. Like the
+   light board's MS_LIGHT greys these are board art, pinned here rather than
+   added as palette tokens. A covered cell is a raised slate key (1.9:1 against
+   an uncovered cell, with a lit top edge and a dark lip along the bottom). An
+   uncovered cell is a flat dark well with a faint outline. The digits sit on
+   the darker well, so each one has slightly more contrast than before. Light
+   mode does not use these. */
+const MINE_DARK_TILES = {
+  hidden:     '#3A4458', // raised face
+  hiddenHi:   '#56627A', // lit top edge
+  hiddenLip:  '#1A202B', // bottom lip / outline
+  revealed:   '#0E121A', // recessed well
+  revealedLn: '#222A37', // well outline
+};
+
+/* Draw one covered cell in dark mode: lip, face, then the lit top edge.
+   Shared by Mine Finder and Mine Finder Classic. */
+function mineDrawDarkHidden(ctx, x, y, cell, radius) {
+  const T = MINE_DARK_TILES;
+  const lip = Math.max(2, Math.round(cell * 0.08));
+  klRR(ctx, x, y, cell, cell, radius);
+  ctx.fillStyle = T.hiddenLip;
+  ctx.fill();
+  klRR(ctx, x, y, cell, cell - lip, radius);
+  ctx.fillStyle = T.hidden;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = T.hiddenHi;
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y + 0.5);
+  ctx.lineTo(x + cell - radius, y + 0.5);
+  ctx.stroke();
+}
+
 /* ============================================================
    Mine Finder — no-guess generation (#176)
    ============================================================
@@ -27882,6 +28231,7 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const radius = Math.max(3, Math.round(cell * 0.16));
+      const dark = themeState.resolved === 'dark';
       for (let i = 0; i < MF_COLS * MF_ROWS; i++) {
         const r = Math.floor(i / MF_COLS), c = i % MF_COLS;
         const x = c * cellStep, y = r * cellStep;
@@ -27890,19 +28240,28 @@ function MineFinderGame({ onWin, onLose, onStepChange, offset, savedProgress, on
 
         // PAL, not C — see the canvas-colour note on guardCanvasCtx.
         let fill = PAL.card, stroke = PAL.border;
-        if (isRev) { fill = PAL.surface; stroke = PAL.border; }
-        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; }
-        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; }
-        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; }
+        if (isRev) {
+          fill = dark ? MINE_DARK_TILES.revealed : PAL.surface;
+          stroke = dark ? MINE_DARK_TILES.revealedLn : PAL.border;
+        }
+        let special = false;
+        if (isRev && isMine) { fill = 'rgba(205,75,58,.20)'; stroke = PAL.rose; special = true; }
+        if (i === boom) { fill = 'rgba(205,75,58,.55)'; stroke = PAL.rose; special = true; }
+        if (i === pulse) { fill = 'rgba(201,162,39,.30)'; stroke = PAL.gold; special = true; }
 
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
-        else ctx.rect(x, y, cell, cell);
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = stroke;
-        ctx.stroke();
+        if (dark && !isRev && !special) {
+          // #294 — a covered cell is a raised key in dark mode.
+          mineDrawDarkHidden(ctx, x, y, cell, radius);
+        } else {
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x, y, cell, cell, radius);
+          else ctx.rect(x, y, cell, cell);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = stroke;
+          ctx.stroke();
+        }
 
         const cx = x + cell / 2, cy = y + cell / 2;
         if (isRev && isMine) {
@@ -33483,7 +33842,34 @@ const PIN_LIMIT = 8;
    One button per mode, or a single tap target when a card has no play modes
    (the head-to-head games, whose axis is the opponent picker inside the game).
    ============================================================ */
-function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinned, onTogglePin, pinDisabled, favorited, onToggleFavorite }) {
+/* The card's all-time figure (myScores from /api/my/scores), in the
+   pts -> best -> record priority, read across every registry id the card
+   speaks for (a merged pair carries two: Snake / Daily Snake and friends).
+   Returns null when nothing is recorded so the state line is unchanged —
+   a signed-out visitor or a game never played renders exactly as before. */
+const cardMyScoreBit = (card, myScores) => {
+  if (!myScores) return null;
+  const ids = new Set(card.modes.map(m => m.gameId));
+  if (card.gameId) ids.add(card.gameId);
+  let pts = 0, hasPts = false, best = 0, hasBest = false, rec = null;
+  for (const id of ids) {
+    const s = myScores[id];
+    if (!s) continue;
+    if (Number.isFinite(s.pts) && s.pts > 0) { hasPts = true; pts += s.pts; }
+    if (Number.isFinite(s.best) && s.best > 0) { hasBest = true; best = Math.max(best, s.best); }
+    if (s.record && (s.record.wins + s.record.losses + s.record.draws) > 0) rec = s.record;
+  }
+  if (hasPts) return `+${pts.toLocaleString()} pts`;
+  if (hasBest) return `Best ${best.toLocaleString()}`;
+  if (rec) {
+    const parts = [`${rec.wins}W`, `${rec.losses}L`];
+    if (rec.draws > 0) parts.push(`${rec.draws}D`);
+    return parts.join(' · ');
+  }
+  return null;
+};
+
+function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onPlay, pinned, onTogglePin, pinDisabled, streak, favorited, onToggleFavorite }) {
   const dailyId = cardDailyId(card);
   const attempt = dailyId ? attempts[dailyId] : null;
   const finished = !!(attempt && attempt.finishedAt);
@@ -33493,12 +33879,20 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
   // instead of spending its width on buttons that repeat the mode labels.
   const bits = [];
   if (dailyId) bits.push(finished ? 'Daily ✓' : inProgress ? 'Daily ▶' : 'Daily · new');
+  // #313 — a signed-in player's current streak rides on every card that offers
+  // a daily (the merged cards included: cardDailyId covers them). Zero stays
+  // off the card: a 0-day streak is not information the card needs, and the
+  // nav stat still shows it.
   const storyMode = card.modes.find(m => m.mode === 'story');
   if (storyMode) {
     const p = (storyProgress && storyProgress[storyMode.gameId]) || null;
     if (p && p.total) bits.push(`Story ${p.cleared}/${p.total}`);
     else bits.push('Story');
   }
+  // All-time figure LAST, so any assertion on the line's leading segments
+  // ("Daily ✓", "Story 3/10") keeps passing when it appears.
+  const scoreBit = cardMyScoreBit(card, myScores);
+  if (scoreBit) bits.push(scoreBit);
 
   /* EVERY CARD ENDS IN A BUTTON. A card with one way to play used to be one
      big tap target instead, which made the grid inconsistent to read and to
@@ -33539,9 +33933,21 @@ function GameCard({ card, attempts, bests, storyProgress, loading, onPlay, pinne
       <div className="card-icon">{card.icon}</div>
       <div className="card-name">{card.name}</div>
       <div className="card-desc">{card.desc}</div>
-      <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
-        {card.tag}
-      </span>
+      {/* #313 — the state footer. The tag and the streak pill share one row;
+          without the wrapper the pill (a flex item like the tag) drops to
+          its own line and pushes the buttons down. */}
+      <div className="card-footer">
+        <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
+          {card.tag}
+        </span>
+        {dailyId && streak > 0 && (
+          <span className="card-streak mono" data-streak={streak} title={`${streak}-day streak`}>
+            <span className="cs-flame" aria-hidden="true">🔥</span>
+            <span>{streak}</span>
+            <span className="cs-days">d</span>
+          </span>
+        )}
+      </div>
       {bits.length > 0 && <div className="card-state mono">{bits.join(' · ')}</div>}
       <div className={'card-modes n' + singleModes.length}>
         {singleModes.map(m => {
@@ -33797,6 +34203,10 @@ function App() {
   // (from /api/daily), and the game whose How-to-Play modal is open (null =
   // closed). The modal renders above every screen/shell.
   const [bests, setBests] = useState({});
+  // All-time per-game figures (/api/my/scores): pts (daily points), best
+  // (classic/PB-table best), record (head-to-head W/L/D). Consumed by the
+  // home cards' state line and the profile's "All-time scores" section.
+  const [myScores, setMyScores] = useState({});
   const [howToGame, setHowToGame] = useState(null);
   // Social: profile viewing and friends list
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -34086,6 +34496,13 @@ function App() {
       api('/api/story').then(r => {
         if (r.ok && r.body && r.body.progress) setStoryProgress(r.body.progress);
       }).catch(() => {});
+      // The caller's all-time per-game figures (pts / best / W-L record),
+      // rendered on the home cards' state line and the profile's
+      // "All-time scores" section. Fire-and-forget like /api/story: failure
+      // degrades to today's behaviour (no score segments, no section).
+      api('/api/my/scores').then(r => {
+        if (r.ok && r.body && r.body.scores) setMyScores(r.body.scores);
+      }).catch(() => {});
       setFeatured(body.featured || null);
       setOffset(new Date(body.serverNowUtc).getTime() - Date.now());
       const sum = Object.values(body.attempts || {})
@@ -34111,6 +34528,7 @@ function App() {
       setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [], stories: [] });
+      setMyScores({});
       setPins([]);
       setRecentPlays([]);
       setFavorites([]);
@@ -34810,7 +35228,11 @@ function App() {
   // game's own spoiler-free result line, then rank + the playable no-login
   // challenge link. `rank` is optional — the card reads fine while it's still
   // being fetched (or for guests before the rank preview lands).
-  const buildShareCard = (gameId, resultLine, rank) => {
+  // #335 — `linkOpts` is optional too: when the result came from a story rung
+  // or an arcade band, the trailing link names that level/difficulty instead
+  // of the bare game (story/arcade cards previously carried no link at all).
+  // The link itself is emitted by buildGameLink, the one URL emitter.
+  const buildShareCard = (gameId, resultLine, rank, linkOpts) => {
     const d = new Date(Date.now() + offset);
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
     const lines = [`Game Corner No. ${utcDayNum(offset) - 20000} · ${dateStr}`];
@@ -34819,7 +35241,7 @@ function App() {
     if (resultLine) lines.push(resultLine.replace(/^Game Corner /, ''));
     lines.push(
       (Number.isFinite(rank) ? `#${rank} on today's board · ` : '') +
-      `Play the same deal (no login): ${window.location.origin}/?game=${gameId}`
+      `Play the same deal (no login): ${buildGameLink(gameId, linkOpts)}`
     );
     return lines.join('\n');
   };
@@ -35079,7 +35501,13 @@ function App() {
       const storyBadge = storyAch ? achievementBadgeFor(storyAch) : null;
       const winPayload = {
         score, bonus: 0, finalScore: score, steps, timeSecs,
-        multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
+        multiplier: 1, effectiveStreak: 0,
+        // #335 — the result card's link names the rung just played, so
+        // "just cleared level 4" hands the recipient level 4. 1-based in the
+        // URL, like every story deep link.
+        share: meta && meta.share
+          ? buildShareCard(currentGame.id, meta.share, null, { pmode: 'story', band: bandIdx + 1 })
+          : undefined,
         modeLabel: 'Story', bandIndex: bandIdx, bandTotal: total,
         ladderComplete: !!(res && res.ladderComplete),
         storyBadge,
@@ -35118,7 +35546,12 @@ function App() {
       if (ok && body && body.awarded) setTotalScore(t => t + body.awarded);
       setWinData({
         score, bonus: 0, finalScore: score, steps, timeSecs,
-        multiplier: 1, effectiveStreak: 0, share: meta && meta.share,
+        multiplier: 1, effectiveStreak: 0,
+        // #335 — the link names the band just played (same rationale as the
+        // story branch above).
+        share: meta && meta.share
+          ? buildShareCard(currentGame.id, meta.share, null, { pmode: 'arcade', band })
+          : undefined,
         modeLabel: 'Arcade', arcadeBand: band,
         arcadeRank: ok && body ? body.rank : null,
         arcadePrevBest: ok && body ? body.previousBest : null,
@@ -36078,6 +36511,7 @@ function App() {
         <ProfileScreen
           userId={selectedUserId}
           user={user}
+          myScores={myScores}
           onBack={() => goBack()}
           onOpenFriends={() => setScreen('friends')}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -36153,6 +36587,25 @@ function App() {
                     new Date(nextResetUtc).getTime() - (Date.now() + offset))}
                 </p>
               ) : null}
+              {/* #295 — the day's dailies as a checkable horizontal strip,
+                  directly under the featured hero. It reads the same
+                  `attempts` map the grid's badges read and launches through
+                  launchGame like a card button, so it needs no state of its
+                  own. Hidden while attempts load — an all-unchecked strip
+                  that fills in a beat later reads as a glitch. Signed-out
+                  visitors still get it: the chips sit unchecked and a tap
+                  lands on the pre-game screen's sign-in CTA, same as the
+                  grid's cards do. */}
+              {!loading && (
+                <DailyChecklist
+                  attempts={attempts}
+                  loading={loading}
+                  onPlay={(gameId) => {
+                    const g = GAMES.find((x) => x.id === gameId);
+                    if (g) launchGame(g, 'daily');
+                  }}
+                />
+              )}
               {authOk && (
                 <InProgressRow
                   items={inProgressItems}
@@ -36289,6 +36742,10 @@ function App() {
                   attempts: attempts,
                   bests: bests,
                   storyProgress: storyProgress,
+                  myScores: myScores,
+                  // #313 — every daily card shows the player's current streak;
+                  // the same state the nav stat and pre-game panel read.
+                  streak: authOk ? streak : 0,
                   loading: loading,
                   onPlay: playCardMode,
                   pinned: pinnedSet.has(c.key),

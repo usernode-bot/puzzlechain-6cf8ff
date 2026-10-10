@@ -1173,11 +1173,17 @@ ${emitTapHighlightRules()}
    They are a pair of real buttons on their own row now, each filling half the
    width with a 44px target — visible without competing with Play, which keeps
    the filled accent treatment to itself. */
+/* #335 — the row now carries four actions (How to play / Game chat /
+   Leaderboards / Copy link), so it is a two-column grid: the signed-in
+   pre-game settles two-by-two instead of squeezing four labels into one
+   line. The opponent screen reuses these classes with two buttons, which a
+   2-col grid lays out exactly as the old flex row did. */
 .pregame-actions {
-  display: flex; gap: 0.5rem; margin-top: 0.8rem;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;
+  margin-top: 0.8rem;
 }
 .pregame-howto-btn {
-  flex: 1 1 0; min-width: 0; min-height: 44px;
+  min-width: 0; min-height: 44px;
   display: flex; align-items: center; justify-content: center; gap: 0.35rem;
   background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px;
   color: ${C.text}; font-family: inherit; font-size: 0.85rem; font-weight: 600;

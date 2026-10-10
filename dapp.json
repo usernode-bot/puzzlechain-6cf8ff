@@ -340,6 +340,11 @@
       "expectSelector": ".pregame-actions .pregame-howto-btn"
     },
     {
+      "name": "Copy link sits in the pre-game actions row",
+      "path": "/?game=sudoku&pmode=story&band=2",
+      "expectSelector": ".pregame-actions .pregame-copylink-btn"
+    },
+    {
       "name": "Snakes & Ladders mode select offers Versus Bot",
       "path": "/?game=chutes-ladders",
       "expectText": "Versus Bot"

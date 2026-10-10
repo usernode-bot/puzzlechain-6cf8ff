@@ -980,6 +980,29 @@ function GameBoards({ game, onClose }) {
   );
 }
 
+/* #335 — copy a link to exactly what this screen is showing: the game in its
+   play mode with the chosen level or difficulty. Whoever opens it lands on
+   the same pre-game screen with the same choice pre-made and still presses
+   Play themselves — the link never claims a run on arrival. Same copied
+   feedback as the result card's Share button; degrades to a no-op where the
+   clipboard is unavailable (the label still flips, like ShareButton's). */
+function CopyLinkButton({ gameId, pmode, band }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await copyText(buildGameLink(gameId, { pmode, band }));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      className="pregame-howto-btn pregame-copylink-btn"
+      onClick={copy}
+    >
+      {copied ? '✓ Copied!' : '🔗 Copy link'}
+    </button>
+  );
+}
+
 function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
                          playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest,
                          onReplayRun }) {
@@ -1138,6 +1161,15 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
             are before you play, which is when "where do I stand" is a reason
             to press Play. */}
         <button className="pregame-howto-btn" onClick={() => setBoardsOpen(true)}>🏆 Leaderboards</button>
+        {/* #335 — the link mirrors the choice on screen: story's level (1-based
+            in the URL), arcade's band id, or a bare game link for the daily
+            and for modeless classics. Head-to-head games never reach this
+            screen, so nothing here needs an opponent in the link. */}
+        <CopyLinkButton
+          gameId={game.id}
+          pmode={mode}
+          band={isStory ? storyBand + 1 : isArcade ? arcadeBandId : undefined}
+        />
       </div>
       {boardsOpen && <GameBoards game={game} onClose={() => setBoardsOpen(false)} />}
     </div>

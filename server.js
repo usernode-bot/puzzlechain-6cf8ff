@@ -3840,6 +3840,25 @@ app.get('/api/daily', async (req, res) => {
          Past UTC dates only, so it never collides with demo=locked /
          demo=streak, which finish today's rows; every insert is
          DO NOTHING, so re-runs and other fixtures' rows are preserved. */
+      /* ASSERT the state, don't add to it. /api/my/scores SUMS every finished
+         daily row, and staging shares one DB and one viewer across all checks:
+         demo=locked finishes today's sudoku at 980 and demo=streak/badges drop
+         900-point rows on featured games, so DO NOTHING inserts left sudoku at
+         320 + 980 + ... and 2048 above 800. The same goes for the snake card,
+         which reads "Best 350" only while neither of its ids holds daily
+         points (pts outranks best). Clear the viewer's rows for the games this
+         fixture claims first; the other fixtures re-assert theirs on their own
+         routes. */
+      await pool.query(
+        `DELETE FROM daily_attempts
+          WHERE user_id = $1 AND game_id = ANY($2::text[])`,
+        [req.user.id, ['sudoku', '2048', 'wordsprint', 'snake', 'snakedaily']]
+      );
+      await pool.query(
+        `DELETE FROM classic_scores
+          WHERE user_id = $1 AND game_id = ANY($2::text[])`,
+        [req.user.id, ['snake', 'snakedaily']]
+      );
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];
@@ -3867,7 +3886,7 @@ app.get('/api/daily', async (req, res) => {
       await pool.query(
         `INSERT INTO snake_scores (user_id, username, best_score, best_length, best_time_secs, games_played)
          VALUES ($1, $2, 350, 42, 118, 3)
-         ON CONFLICT (user_id) DO NOTHING`,
+         ON CONFLICT (user_id) DO UPDATE SET best_score = 350`,
         [req.user.id, req.user.username]
       );
       await pool.query(

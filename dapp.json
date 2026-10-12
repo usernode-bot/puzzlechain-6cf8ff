@@ -1898,6 +1898,11 @@
       "expectText": "Best 350"
     },
     {
+      "name": "A long chapter pages instead of scrolling",
+      "path": "/?game=dracula&play=1",
+      "expectSelector": ".drac-card .tp-more"
+    },
+    {
       "name": "Classic shell is inset from the safe area (fixed top bar)",
       "path": "/?game=snake&sheet=leaderboard",
       "expectSelector": ".cg-shell .cg-topbar",

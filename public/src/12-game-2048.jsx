@@ -667,7 +667,7 @@ function T2048Solo({ onWin, onLose, onStepChange, resetKey, onRaceEnd, playMode,
       )}
 
       {!raceMode && (
-        <div className="t2048-bottom-nav">
+        <div className="t2048-bottom-nav safe-bottom">
           {['game', 'leaderboard', 'history', 'stats'].map(tab => (
             <button
               key={tab}

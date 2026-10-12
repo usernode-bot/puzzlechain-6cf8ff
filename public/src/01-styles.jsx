@@ -23,6 +23,31 @@ ${paletteVars('dark')}
   --un-toast-action: #5EEAD4;
 }
 
+/* ---- Safe-area insets (platform-forwarded) ----
+   Inside the platform's app frame env(safe-area-inset-*) is always 0px: a
+   cross-origin iframe is never the top-level document, so the browser hides
+   the notch and the home indicator from it. The hosted bridge forwards the
+   rectangle that actually applies to this frame instead, as
+   --un-safe-inset-top/right/bottom/left on <html> (px), and leaves them
+   unset when the app is opened standalone — where bare env() is the right
+   answer. Reading them through the var(--pc-safe-*) tokens below is what
+   makes every rule in this file correct in both hosts; a bare env() in an
+   app rule is inert in-frame, which is the bug the audit fixed.
+
+   On a desktop or an un-notched phone every forwarded value is 0, so each
+   calc() below collapses to exactly the spacing it had before — the change
+   is a no-op in the common case, not a restyle. */
+:root {
+  --pc-safe-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px));
+  --pc-safe-right: var(--un-safe-inset-right, env(safe-area-inset-right, 0px));
+  --pc-safe-bottom: var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --pc-safe-left: var(--un-safe-inset-left, env(safe-area-inset-left, 0px));
+}
+
+/* A padded box that must also reach the screen edge (a sticky or fixed
+   bottom strip): same idea, but the caller already owns its own padding
+   and only the inset is added, so the surface still touches the edge. */
+.safe-bottom { padding-bottom: calc(var(--pc-pad-b, 0px) + var(--pc-safe-bottom)); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
@@ -40,9 +65,20 @@ body {
 
 .mono { font-family: 'JetBrains Mono', monospace; }
 
-#root { min-height: 100vh; }
+#root { min-height: 100vh; min-height: 100dvh; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex; flex-direction: column;
+  /* The bottom inset lifts every scrolling screen clear of the home
+     indicator; each screen supplies its own horizontal gutter, so only the
+     bottom is added here. A fit shell (.app-fit) is pinned to one viewport,
+     so its own chrome carries the bottom inset instead and this resets to 0
+     or the box would overflow by the inset. */
+  padding-bottom: var(--pc-safe-bottom);
+}
+.app.app-fit { padding-bottom: 0; }
 
 /* ---- Nav bar ---- */
 /* #223 — the bar was 78px tall at 390px wide, and it is sticky, so it cost
@@ -61,7 +97,7 @@ body {
   align-items: center;
   justify-content: space-between;
   position: sticky;
-  top: 0;
+  top: var(--pc-safe-top);
   z-index: 10;
 }
 .nav-brand {
@@ -304,7 +340,9 @@ body {
   min-width: 0;
   max-width: 620px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem;
+  /* A profile or friends page is a normal scrolling screen: its own gutters
+     grow by the forwarded x insets so content clears a landscape notch. */
+  padding: 1.5rem calc(1.25rem + var(--pc-safe-right)) 1.5rem calc(1.25rem + var(--pc-safe-left));
 }
 /* A username is user-supplied and can be one long unbreakable token, which is
    what made min-content exceed the viewport in the first place. Let it wrap
@@ -376,7 +414,9 @@ body {
   .account-chip { padding: 0.25rem; }
   .nav-right { gap: 0.6rem; }
   .nav-stats { gap: 0.8rem; }
-  .lobby { padding: 1rem 0.75rem; }
+  /* The phones are where the forwarded insets actually apply, so the gutter
+     grows by them here rather than being replaced by a bare shorthand. */
+  .lobby { padding: 1rem calc(0.75rem + var(--pc-safe-right)) 1rem calc(0.75rem + var(--pc-safe-left)); }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
   /* The Friends chip moves into the profile's Connections section
@@ -411,7 +451,7 @@ body {
 }
 
 /* ---- Lobby ---- */
-.lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem 1.25rem; width: 100%; }
+.lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem calc(1.25rem + var(--pc-safe-right)) 1.75rem calc(1.25rem + var(--pc-safe-left)); width: 100%; }
 .lobby-head { margin-bottom: 1.5rem; }
 .lobby-head h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
 .lobby-head p { color: ${C.muted}; margin-top: 0.25rem; font-size: 0.92rem; }
@@ -553,7 +593,7 @@ body {
 }
 
 /* ---- Game screen ---- */
-.game-wrap { max-width: 620px; margin: 0 auto; padding: 1.5rem 1.25rem; width: 100%; }
+.game-wrap { max-width: 620px; margin: 0 auto; padding: 1.5rem calc(1.25rem + var(--pc-safe-right)) 1.5rem calc(1.25rem + var(--pc-safe-left)); width: 100%; }
 
 /* Fit-to-viewport layout mode (slice 1). A daily game that opts in renders
    header + board + controls inside one non-scrolling column: the board region
@@ -572,7 +612,11 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0.7rem 0.9rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  /* A fit shell is pinned to one viewport (.app-fit), so .app adds no bottom
+     padding and this wrap must carry the inset itself or its footer sits
+     under the home indicator. The x insets keep a landscape notch off the
+     board. */
+  padding: 0.7rem calc(0.9rem + var(--pc-safe-right)) calc(0.7rem + var(--pc-safe-bottom)) calc(0.9rem + var(--pc-safe-left));
   gap: 0.45rem;
 }
 .game-wrap.fit .game-head { flex: 0 0 auto; margin-bottom: 0; }
@@ -771,7 +815,9 @@ ${emitTapHighlightRules()}
 .result-minibar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 0.85rem 1.1rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  /* The bar reaches the screen edge; only its CONTENT is lifted clear of the
+     home indicator by the forwarded bottom inset. */
+  padding: 0.85rem 1.1rem calc(0.85rem + var(--pc-safe-bottom));
   background: ${C.card}; border: none; border-top: 1px solid ${C.border};
   box-shadow: 0 -6px 22px rgba(63,51,24,0.14);
   font-family: inherit; font-size: 0.92rem; font-weight: 600; color: ${C.text};
@@ -874,8 +920,12 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  /* A centred card: every gutter grows by the forwarded inset so it cannot
+     run under the notch or the home indicator. */
+  padding: calc(1.25rem + var(--pc-safe-top)) calc(1.25rem + var(--pc-safe-right))
+           calc(1.25rem + var(--pc-safe-bottom)) calc(1.25rem + var(--pc-safe-left));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .win-card {
   background: ${C.card};
@@ -886,8 +936,8 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   width: 100%;
   box-shadow: 0 20px 50px var(--c-shadow-lg);
-  max-height: calc(100vh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  max-height: calc(100dvh - 2.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100vh - 2.5rem - var(--pc-safe-top) - var(--pc-safe-bottom));
+  max-height: calc(100dvh - 2.5rem - var(--pc-safe-top) - var(--pc-safe-bottom));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -1136,10 +1186,15 @@ ${emitTapHighlightRules()}
   position: fixed; inset: 0; z-index: 70;
   background: var(--c-scrim);
   display: flex; align-items: center; justify-content: center;
-  padding: 1rem;
+  /* A centred panel: demote it into the safe frame, and cap it so it never
+     runs under the notch or the home indicator. */
+  padding: calc(1rem + var(--pc-safe-top)) calc(1rem + var(--pc-safe-right))
+           calc(1rem + var(--pc-safe-bottom)) calc(1rem + var(--pc-safe-left));
 }
 .gb-sheet {
-  width: 100%; max-width: 420px; max-height: 82dvh; overflow-y: auto;
+  width: 100%; max-width: 420px;
+  max-height: calc(82dvh - var(--pc-safe-top) - var(--pc-safe-bottom));
+  overflow-y: auto;
   background: ${C.surface}; border: 1px solid ${C.border};
   border-radius: 18px; padding: 0.9rem 1rem 1rem;
   box-shadow: 0 20px 50px var(--c-shadow-lg);
@@ -1205,11 +1260,14 @@ ${emitTapHighlightRules()}
 /* ---- How-to-Play modal (shell-owned chrome, phase 3) ---- */
 .howto-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 220;
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(1rem + var(--pc-safe-top)) calc(1rem + var(--pc-safe-right))
+           calc(1rem + var(--pc-safe-bottom)) calc(1rem + var(--pc-safe-left));
 }
 .howto-card {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
-  padding: 1.4rem 1.3rem; width: min(95vw, 420px); max-height: 85dvh;
+  padding: 1.4rem 1.3rem; width: min(95vw, 420px);
+  max-height: calc(85dvh - var(--pc-safe-top) - var(--pc-safe-bottom));
   overflow-y: auto;
 }
 .howto-head {
@@ -2648,9 +2706,19 @@ ${emitTapHighlightRules()}
   overflow: hidden;
   overscroll-behavior: none;
   z-index: 40;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* The classic shell is the fixed layout root for every classic game, so it
+     pads all four sides; the forwarded x insets matter in landscape on a
+     notched phone or the top bar's left edge clips. Bare env() is inert
+     in-frame, so these are the platform tokens. */
+  padding-top: var(--pc-safe-top);
+  padding-right: var(--pc-safe-right);
+  padding-bottom: var(--pc-safe-bottom);
+  padding-left: var(--pc-safe-left);
   --cg-chrome: 3.6rem;
-  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem), 560px);
+  /* The stage is inside the padded box, so it is already short by all four
+     insets; the 100dvh cap must lose them too or the stage overflows by
+     exactly the padding on a notched phone. */
+  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem - var(--pc-safe-top) - var(--pc-safe-bottom)), 560px);
 }
 .cg-topbar {
   flex: 0 0 auto;
@@ -2705,6 +2773,13 @@ ${emitTapHighlightRules()}
   overflow: hidden;
 }
 .cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
+/* .cg-scroll is the classic stage's content scroller. Its padding is hidden
+   by .cg-shell, so oversized content would otherwise be clipped top and
+   bottom; scroll-padding-block restores the reach. */
+.cg-stage.cg-scroll {
+  scroll-padding-top: var(--pc-safe-top);
+  scroll-padding-bottom: var(--pc-safe-bottom);
+}
 
 /* Bottom sheet */
 .cg-sheet-backdrop {
@@ -2726,9 +2801,12 @@ ${emitTapHighlightRules()}
   background: ${C.surface};
   border-top: 1px solid ${C.border};
   border-radius: 18px 18px 0 0;
-  padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  /* Bottom sheet: the forwarded inset lifts the panel clear of the home
+     indicator and the scroller gets the same reach below. */
+  padding: 0.5rem 1rem calc(1rem + var(--pc-safe-bottom));
   max-height: 82dvh;
   overflow-y: auto;
+  scroll-padding-bottom: var(--pc-safe-bottom);
   transform: translateY(110%);
   transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -2831,6 +2909,9 @@ ${emitTapHighlightRules()}
 /* ---- Global Settings sheet ---- */
 .settings-panel { height: min(58vh, 460px); }
 .settings-list { padding: 0.9rem 1.1rem 1.4rem; }
+/* The settings list is the sheet's scroller: its content needs the same
+   reach as the sheet's own bottom padding above. */
+.settings-list { scroll-padding-bottom: var(--pc-safe-bottom); }
 .settings-list h4 {
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -2875,7 +2956,11 @@ ${emitTapHighlightRules()}
   transition: transform 0.15s ease;
 }
 .cg-toggle.on::after { transform: translateX(1.3rem); }
-.cg-sheet-list { max-height: 50dvh; overflow-y: auto; }
+.cg-sheet-list {
+  max-height: calc(50dvh - var(--pc-safe-bottom));
+  overflow-y: auto;
+  scroll-padding-bottom: var(--pc-safe-bottom);
+}
 .cg-sheet-row {
   display: flex;
   justify-content: space-between;
@@ -3132,8 +3217,10 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 55;
-  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  padding: calc(1.25rem + var(--pc-safe-top)) calc(1.25rem + var(--pc-safe-right))
+           calc(1.25rem + var(--pc-safe-bottom)) calc(1.25rem + var(--pc-safe-left));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .adv-card {
   background: ${C.card};
@@ -3563,7 +3650,7 @@ ${emitTapHighlightRules()}
    because it floats over a live board — a marker must never eat a tap. */
 .practice-ribbon.pinned {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(0.6rem + var(--pc-safe-bottom));
   z-index: 60; pointer-events: none;
   background: ${C.card}; border: 1px solid ${C.violet};
   box-shadow: var(--c-shadow-md);
@@ -3956,6 +4043,10 @@ ${emitTapHighlightRules()}
   background: ${C.surface}; border: 1px solid ${C.border}; border-bottom: none;
   border-radius: 18px 18px 0 0; width: 100%; max-width: 560px;
   height: min(72vh, 640px); display: flex; flex-direction: column;
+  /* Bottom sheet: the inset lifts the whole panel (and the input row at its
+     foot) clear of the home indicator. The input row adds the keyboard
+     inset on top, from --un-kb-inset, which the native kit maintains. */
+  padding-bottom: var(--pc-safe-bottom);
 }
 .chat-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -3981,7 +4072,11 @@ ${emitTapHighlightRules()}
 .chat-report:hover { opacity: 1; }
 .chat-body { font-size: 13.5px; line-height: 1.45; word-break: break-word; }
 .chat-notice { color: ${C.gold}; font-size: 12px; text-align: center; padding: 4px 0; }
-.chat-input-row { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid ${C.border}; }
+.chat-input-row {
+  display: flex; gap: 8px; border-top: 1px solid ${C.border};
+  padding: 10px 14px 14px;
+  padding-bottom: calc(14px + var(--un-kb-inset, 0px));
+}
 .chat-input {
   flex: 1; background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
   border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 13.5px; outline: none;

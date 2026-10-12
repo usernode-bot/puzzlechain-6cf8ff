@@ -3915,6 +3915,11 @@ app.get('/api/daily', async (req, res) => {
       );
       await pool.query(`DELETE FROM snake_scores WHERE user_id = $1`, [req.user.id]);
       await pool.query(`DELETE FROM classic_scores WHERE user_id = $1`, [req.user.id]);
+      await pool.query(
+        `DELETE FROM game_ratings WHERE user_id = $1 AND game_id = 'checkers'`,
+        [req.user.id]
+      );
+
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];

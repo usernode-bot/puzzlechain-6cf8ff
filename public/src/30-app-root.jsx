@@ -172,7 +172,9 @@ function App() {
   // also what keeps the existing "/?tab=classic" proposal checks meaningful.
   const [homeFilter, setHomeFilter] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'daily' || t === 'classic' || t === 'favorites' ? t : 'all';
+    if (t === 'daily' || t === 'classic' || t === 'favorites') return t;
+    if (GENRE_CHIPS.some(g => g.id === t)) return t;
+    return 'all';
   });
   /* ?favview=1 preselects the Favorites chip. Deliberately separate from
      ?tab=favorites: ?tab= is a REAL chip a player can reach by tapping, and
@@ -2791,6 +2793,9 @@ function App() {
                   const hasDaily = c.modes.some(m => m.mode === 'daily');
                   if (homeFilter === 'daily') return hasDaily;
                   if (homeFilter === 'favorites') return favoriteSet.has(c.key);
+                  // Genre chips (Word/Card/…). Must come BEFORE the classic
+                  // fallthrough, which used to catch any unknown filter id.
+                  if (GENRE_IDS.has(homeFilter)) return cardGenre(c) === homeFilter;
                   return !hasDaily || c.modes.some(m => m.mode !== 'daily');
                 });
                 /* One launcher for every card button. `mode` is null for the
@@ -2865,6 +2870,7 @@ function App() {
                         { id: 'all', label: 'All' },
                         { id: 'daily', label: 'Daily' },
                         { id: 'classic', label: 'Classic' },
+                        ...GENRE_CHIPS,
                         // Only rendered signed in: a signed-out visitor cannot
                         // star anything, so a chip that always answered "no
                         // games" would be dead UI. Appears the moment the

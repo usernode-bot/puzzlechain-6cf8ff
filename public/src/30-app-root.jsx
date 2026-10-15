@@ -207,6 +207,19 @@ function App() {
     const t = new URLSearchParams(window.location.search).get('tab');
     return t === 'daily' || t === 'classic' || t === 'favorites' ? t : 'all';
   });
+  /* #350 — the All Games search field's text. Deliberately NOT part of
+     navState, for the same reason recorded for the pins and favorites above:
+     it changes what the home grid shows, not where you are, and it must not
+     disturb the nav-state-primitives barrier. Ephemeral like the Friends
+     screen's search box: App state keeps it across in-app navigation, a
+     reload clears it. The ?gamesearch= initializer seeds it for a deep link
+     (a navigation-driven proposal check cannot type into a field, so the
+     filtered grid and its no-match line need a URL) — the same mechanism
+     ?tab= uses for the chips. */
+  const [homeSearch, setHomeSearch] = useState(() => {
+    const s = new URLSearchParams(window.location.search).get('gamesearch');
+    return s ? s : '';
+  });
   /* ?favview=1 preselects the Favorites chip. Deliberately separate from
      ?tab=favorites: ?tab= is a REAL chip a player can reach by tapping, and
      its deep link already exists for the daily/classic chips — but it is also
@@ -2829,8 +2842,17 @@ function App() {
                   const c = CARD_BY_GAME_ID[id];
                   if (c) pinnedSet.add(c.key);
                 }
-                const pinnedCards = ordered.filter(c => pinnedSet.has(c.key));
-                const restCards = ordered.filter(c => !pinnedSet.has(c.key));
+                /* #350 — the search is a SECOND filter on the already-chip-
+                   filtered list, applied before the pin partition so the two
+                   filters AND together: a card must pass both to appear, and a
+                   pinned card that fails the search is absent from both
+                   sections, exactly as one that fails a chip already is (the
+                   #232 rule — the partition stays lossless). The Daily chip's
+                   done/todo split below derives from restCards, so it narrows
+                   with the search for free. */
+                const searched = ordered.filter(c => homeSearchMatch(c, homeSearch));
+                const pinnedCards = searched.filter(c => pinnedSet.has(c.key));
+                const restCards = searched.filter(c => !pinnedSet.has(c.key));
                 const atPinCap = pins.length >= PIN_LIMIT;
                 const cardProps = (c) => ({
                   key: c.key,
@@ -2870,6 +2892,20 @@ function App() {
                     )}
                     {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
                     <div className="home-section-title">All Games</div>
+                    {/* #350 — type-to-filter above the chips, so the two
+                        narrowing controls read as one row. It ANDs with the
+                        active chip below and with the Pinned section above:
+                        everything this list shows obeys it. Not in
+                        TAPPABLE_CLASSES — a text input keeps native
+                        long-press selection. */}
+                    <input
+                      type="text"
+                      className="home-search-input"
+                      placeholder="Search games"
+                      aria-label="Search games"
+                      value={homeSearch}
+                      onChange={(e) => setHomeSearch(e.target.value)}
+                    />
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },
@@ -2905,6 +2941,17 @@ function App() {
                       </div>
                     )}
                     {(() => {
+                      /* #350 — the search's own empty state: the chip DID have
+                         candidates and none survive the search. A chip that is
+                         empty on its own (Favorites at 0 stars) keeps its own
+                         line above, which explains a different absence. */
+                      if (homeSearch.trim() && searched.length === 0 && ordered.length > 0) {
+                        return (
+                          <div className="home-search-empty">
+                            No games match "{homeSearch.trim()}".
+                          </div>
+                        );
+                      }
                       /* #226 — under the Daily chip, split the grid into what
                          is still open today and what is already done. The card
                          already knows: cardDailyId + attempts[id].finishedAt is

@@ -539,7 +539,14 @@ body {
 }
 .card.done:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
 
-.card-icon { font-size: 1.9rem; line-height: 1; margin-bottom: 0.6rem; flex: 0 0 auto; }
+/* Card icon on a rounded tile in the game's tint, so the grid scans by game
+   art first and text second (Poki/CrazyGames picture-first tiles). */
+.card-icon {
+  width: 48px; height: 48px; border-radius: 13px;
+  background: var(--accent-tint, var(--c-well));
+  display: grid; place-items: center;
+  font-size: 1.65rem; line-height: 1; margin-bottom: 0.65rem; flex: 0 0 auto;
+}
 /* #167 — clamped, so a long name or blurb can never grow its own tile (and,
    with grid-auto-rows: 1fr, can never grow the whole wall). The desc keeps a
    two-line floor as well as its new two-line ceiling, so short and long blurbs
@@ -1581,7 +1588,7 @@ ${emitTapHighlightRules()}
      decoration. .card-mode-btn's min-height stays 44px — only its horizontal
      padding gives way. */
   .grid > .card { padding: 0.75rem; border-radius: 12px; }
-  .grid > .card .card-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .grid > .card .card-icon { width: 38px; height: 38px; border-radius: 11px; font-size: 1.35rem; margin-bottom: 0.45rem; }
   .grid > .card .card-name { font-size: 0.95rem; }
   .grid > .card .card-desc {
     font-size: 0.75rem;
@@ -3914,20 +3921,28 @@ ${emitTapHighlightRules()}
 
 /* ---- Phase 7: GotD hero, home reorg, chat ---- */
 .gotd-hero {
-  border: 1px solid ${C.border}; border-top: 3px solid var(--accent, ${C.accent});
+  border: 1px solid var(--accent-line, ${C.border}); border-top: 3px solid var(--accent, ${C.accent});
   background: linear-gradient(160deg, ${C.card}, ${C.surface});
-  border-radius: 16px; padding: 16px 18px; margin-bottom: 1.4rem;
+  border-radius: 18px; padding: 18px 20px; margin-bottom: 1.4rem;
 }
 .gotd-label { color: var(--accent, ${C.accent}); font-size: 11px; letter-spacing: 0.12em; margin-bottom: 10px; }
 .gotd-main { display: flex; align-items: center; gap: 14px; cursor: pointer; }
-.gotd-icon { font-size: 44px; line-height: 1; }
+/* The hero icon sits on a rounded tile in the game's own tint (NYT-Games
+   style), not as a bare emoji. --accent-tint is set inline on the hero. */
+.gotd-icon {
+  width: 72px; height: 72px; border-radius: 18px;
+  background: var(--accent-tint, var(--c-well));
+  display: grid; place-items: center;
+  font-size: 42px; line-height: 1; flex: 0 0 auto;
+}
 .gotd-info { flex: 1; min-width: 0; }
 .gotd-name { font-size: 20px; font-weight: 700; }
 .gotd-desc { color: ${C.muted}; font-size: 13px; margin-top: 2px; }
 .gotd-meta { color: ${C.muted}; font-size: 11.5px; margin-top: 6px; }
-.gotd-play { padding: 10px 18px; white-space: nowrap; flex-shrink: 0; width: auto; margin: 0; }
+.gotd-play { padding: 12px 24px; min-height: 48px; font-size: 1rem; white-space: nowrap; flex-shrink: 0; width: auto; margin: 0; }
 @media (max-width: 560px) {
   .gotd-main { flex-wrap: wrap; }
+  .gotd-icon { width: 56px; height: 56px; border-radius: 16px; font-size: 32px; }
   .gotd-play { width: 100%; margin-top: 4px; }
 }
 .gotd-play:disabled { opacity: 0.75; }
@@ -3983,9 +3998,14 @@ ${emitTapHighlightRules()}
 .wn-items li { font-size: 13px; line-height: 1.5; color: ${C.text}; }
 
 .home-section-title {
-  font-size: 15px; font-weight: 700; margin: 1.4rem 0 0.7rem;
+  font-size: 1.05rem; font-weight: 700; margin: 1.6rem 0 0.75rem;
   color: ${C.text};
+  border-bottom: 1px solid ${C.border}; padding-bottom: 0.35rem;
+  display: flex; align-items: baseline; gap: 0.5rem;
 }
+/* The count in a section header sits at the right edge (Poki/CrazyGames
+   column-rule style). Headers without a count keep just the title. */
+.home-section-title .home-pin-count { margin-left: auto; }
 .home-back-btn {
   background: none; border: none; color: ${C.accent}; font-family: inherit;
   font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 0.8rem;
@@ -3998,7 +4018,12 @@ ${emitTapHighlightRules()}
   padding: 10px 14px; min-width: 150px; cursor: pointer; flex-shrink: 0;
 }
 .inprog-card:hover { border-color: ${C.accent}; }
-.inprog-card .ip-icon { font-size: 22px; }
+.inprog-card .ip-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--accent-tint, var(--c-well));
+  display: grid; place-items: center;
+  font-size: 20px; line-height: 1;
+}
 .inprog-card .ip-name { font-weight: 600; font-size: 13.5px; margin-top: 4px; white-space: nowrap; }
 .inprog-card .ip-sub { font-size: 11.5px; color: ${C.muted}; margin-top: 3px; }
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
@@ -4148,11 +4173,8 @@ ${emitTapHighlightRules()}
 }
 .lobby-head.masthead p { font-style: italic; font-family: 'Fraunces', Georgia, serif; }
 
-/* Section headers as newspaper column rules. */
-.home-section-title {
-  font-size: 1.05rem; font-weight: 700;
-  border-bottom: 1px solid ${C.border}; padding-bottom: 0.35rem;
-}
+/* Section headers as newspaper column rules. The base rule lives in the
+   Phase 7 block above (one declaration; the count rides at the right edge). */
 
 /* Merged all-games grid (slice 2): the reset note, the filter chips and the
    per-card daily indicator that replaces the two section headings. */
@@ -4277,8 +4299,9 @@ ${emitTapHighlightRules()}
 }
 .win-card, .howto-card { box-shadow: 0 20px 50px var(--c-shadow-lg); }
 
-/* GotD hero reads as the front-page lead story. */
-.gotd-hero { background: ${C.card}; }
+/* GotD hero reads as the front-page lead story: washed in the featured
+   game's colour over the card surface (--accent-wash is set inline). */
+.gotd-hero { background: linear-gradient(var(--accent-wash, transparent), var(--accent-wash, transparent)), ${C.card}; }
 .gotd-label {
   font-family: 'JetBrains Mono', monospace; font-weight: 600;
   text-transform: uppercase;

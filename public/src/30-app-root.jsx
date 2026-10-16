@@ -2869,7 +2869,13 @@ function App() {
                       </React.Fragment>
                     )}
                     {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
-                    <div className="home-section-title">All Games</div>
+                    <div className="home-section-title home-all-title">
+                      All Games
+                      {/* Poki/CrazyGames-style header: the count of what the
+                          selected chip shows sits at the right edge (pinned
+                          cards included — they match the same filter). */}
+                      <span className="home-pin-count">{ordered.length}</span>
+                    </div>
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },

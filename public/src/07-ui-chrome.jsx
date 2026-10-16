@@ -456,7 +456,15 @@ function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay
   const finished = !!(attempt && attempt.finishedAt);
   const inProgress = !!attempt && !finished;
   return (
-    <div className="gotd-hero" style={{ '--accent': game.tagColor }}>
+    <div className="gotd-hero" style={{
+      '--accent': game.tagColor,
+      /* NYT-Games-style colour wash: the panel takes on the featured game's
+         colour (raw hex from GA, so appending an alpha byte is fine here —
+         the never-concat rule is about C.* tokens, which are var() strings). */
+      '--accent-tint': game.tagColor + '24',
+      '--accent-wash': game.tagColor + '12',
+      '--accent-line': game.tagColor + '4d',
+    }}>
       <div className="gotd-label mono">🎯 GAME OF THE DAY</div>
       <div className="gotd-main" onClick={onPlay}>
         <div className="gotd-icon">{game.icon}</div>
@@ -498,7 +506,7 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
         {items.map((it) => {
           if (it.type === 'daily') {
             return (
-              <div key={'d-' + it.game.id} className="inprog-card" onClick={() => onOpenDaily(it.game)}>
+              <div key={'d-' + it.game.id} className="inprog-card" style={{ '--accent-tint': it.game.tagColor + '24' }} onClick={() => onOpenDaily(it.game)}>
                 <div className="ip-icon">{it.game.icon}</div>
                 <div className="ip-name">{it.game.name}</div>
                 <div className="ip-sub resume">▶ Resume run</div>
@@ -511,7 +519,7 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
           // created and left simply vanished from your side of the app.
           if (it.room.waiting) {
             return (
-              <div key={'r-' + it.room.id} className="inprog-card room" onClick={() => onOpenRoom(it.room)}>
+              <div key={'r-' + it.room.id} className="inprog-card room" style={{ '--accent-tint': it.game.tagColor + '24' }} onClick={() => onOpenRoom(it.room)}>
                 <div className="ip-icon">{it.game.icon}</div>
                 <div className="ip-name">{it.game.name}</div>
                 <div className="ip-sub">⏳ Waiting for opponent</div>
@@ -520,7 +528,7 @@ function InProgressRow({ items, onOpenDaily, onOpenRoom }) {
             );
           }
           return (
-            <div key={'r-' + it.room.id} className="inprog-card room" onClick={() => onOpenRoom(it.room)}>
+            <div key={'r-' + it.room.id} className="inprog-card room" style={{ '--accent-tint': it.game.tagColor + '24' }} onClick={() => onOpenRoom(it.room)}>
               <div className="ip-icon">{it.game.icon}</div>
               <div className="ip-name">{it.game.name}</div>
               <div className={'ip-sub' + (it.room.myTurn ? ' turn' : '')}>
@@ -616,6 +624,7 @@ function RecentlyPlayedRow({ items, onOpen, offset }) {
             <button
               key={p.gameId}
               className="inprog-card recent-card"
+              style={{ '--accent-tint': g.tagColor + '24' }}
               aria-label={'Replay ' + g.name}
               {...tapProps(() => onOpen(p.gameId))}
             >

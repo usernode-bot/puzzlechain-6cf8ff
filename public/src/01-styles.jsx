@@ -1597,7 +1597,12 @@ ${emitTapHighlightRules()}
   }
   .grid > .card .card-daily-badge {
     top: 0.45rem;
-    right: 0.45rem;
+    /* The compact phone metrics re-cornered the badge into the pin's 44px
+       hit square (right 0.15rem + 2.75rem wide), putting the 📌 glyph on top
+       of the badge's right end. 3.2rem clears that square by ~5px, the
+       glyph itself by ~34px, and still clears the 38px icon tile at the
+       card's left edge. */
+    right: 3.2rem;
     font-size: 0.5rem;
     padding: 0.18rem 0.35rem;
   }
@@ -3946,6 +3951,29 @@ ${emitTapHighlightRules()}
   .gotd-play { width: 100%; margin-top: 4px; }
 }
 .gotd-play:disabled { opacity: 0.75; }
+/* Review round 1 — loading skeleton: holds the hero's footprint while
+   /api/daily is in flight so the grid doesn't jump when the panel arrives.
+   Fallback is var(--c-well) and not the C.well token: well is DERIVED, so
+   interpolating it here would emit a broken declaration. */
+.gotd-skel { display: flex; align-items: center; gap: 14px; min-height: 150px; }
+.gotd-skel-tile {
+  width: 72px; height: 72px; border-radius: 18px;
+  background: var(--c-well); flex: 0 0 auto;
+}
+.gotd-skel-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.gotd-skel-bar { height: 14px; border-radius: 7px; background: var(--c-well); }
+.gotd-skel-bar.w1 { width: 42%; }
+.gotd-skel-bar.w2 { width: 85%; }
+.gotd-skel-bar.w3 { width: 60%; height: 10px; }
+@media (max-width: 560px) {
+  .gotd-skel-tile { width: 56px; height: 56px; border-radius: 16px; }
+}
+/* Review round 1 — error notice: what a 5xx leaves where the hero would sit,
+   in the same card style (.gotd-hero carries the card chrome). The retry
+   button reuses .primary-btn; only its inline sizing is adjusted. */
+.gotd-err { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gotd-err-line { color: ${C.muted}; font-size: 14px; flex: 1; min-width: 0; }
+.gotd-err-retry { width: auto; flex: 0 0 auto; padding: 9px 18px; min-height: 44px; }
 .gotd-signedout { color: ${C.muted}; font-size: 12.5px; margin-top: 12px; }
 
 /* Phase 8 — anonymous play + "make it count" */
@@ -4318,6 +4346,14 @@ ${emitTapHighlightRules()}
 }
 .gotd-play:hover, .pregame-card .pregame-play:hover {
   background: var(--accent, ${C.accent}); filter: brightness(0.88);
+}
+/* Dark look: the raw game colour is tuned for the light card, where its
+   white label falls below AA (sky measured 3.81:1 — review round 1). The
+   deepened fill (--accent-deep, set inline by GotdHero) restores 4.5:1.
+   Scoped to the hero button; the pre-game screen is untouched. */
+html[data-theme='dark'] .gotd-play,
+html[data-theme='dark'] .gotd-play:hover {
+  background: var(--accent-deep, var(--accent, ${C.accent}));
 }
 .pregame-card { border-top: 3px solid var(--accent, ${C.accent}); }
 

@@ -451,6 +451,20 @@ const INPUT_LABEL = { tap: '👆 Tap', drag: '✋ Drag', swipe: '👉 Swipe', ke
 // carries no leaderboard preview. Clicking anywhere routes through the
 // normal launch flow, so the pre-game / resume / locked machinery is
 // untouched.
+// Review round 1: the raw game colour (GA.*) is tuned against the light card
+// and its white Play label falls below AA in the dark look (sky #3D87C9
+// measured 3.81:1). --accent-deep is the same hex with every channel pulled
+// toward black; at 0.78 every GA colour clears 4.5:1 with white (sky 6.1,
+// amber 4.7, lime 4.9). Raw hex in, raw hex out — no palette key, no var()
+// concatenation.
+function gotdDeepColor(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  return '#' + [1, 3, 5].map((i) =>
+    Math.round(parseInt(m[1].slice(i - 1, i + 1), 16) * 0.78)
+      .toString(16).padStart(2, '0')).join('');
+}
+
 function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay }) {
   const countdown = useCountdown(nextResetUtc, offset, onReset);
   const finished = !!(attempt && attempt.finishedAt);
@@ -464,6 +478,7 @@ function GotdHero({ game, attempt, authOk, nextResetUtc, offset, onReset, onPlay
       '--accent-tint': game.tagColor + '24',
       '--accent-wash': game.tagColor + '12',
       '--accent-line': game.tagColor + '4d',
+      '--accent-deep': gotdDeepColor(game.tagColor),
     }}>
       <div className="gotd-label mono">🎯 GAME OF THE DAY</div>
       <div className="gotd-main" onClick={onPlay}>

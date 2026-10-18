@@ -207,19 +207,6 @@ function App() {
     const t = new URLSearchParams(window.location.search).get('tab');
     return t === 'daily' || t === 'classic' || t === 'favorites' ? t : 'all';
   });
-  /* #350 — the All Games search field's text. Deliberately NOT part of
-     navState, for the same reason recorded for the pins and favorites above:
-     it changes what the home grid shows, not where you are, and it must not
-     disturb the nav-state-primitives barrier. Ephemeral like the Friends
-     screen's search box: App state keeps it across in-app navigation, a
-     reload clears it. The ?gamesearch= initializer seeds it for a deep link
-     (a navigation-driven proposal check cannot type into a field, so the
-     filtered grid and its no-match line need a URL) — the same mechanism
-     ?tab= uses for the chips. */
-  const [homeSearch, setHomeSearch] = useState(() => {
-    const s = new URLSearchParams(window.location.search).get('gamesearch');
-    return s ? s : '';
-  });
   /* ?favview=1 preselects the Favorites chip. Deliberately separate from
      ?tab=favorites: ?tab= is a REAL chip a player can reach by tapping, and
      its deep link already exists for the daily/classic chips — but it is also
@@ -232,6 +219,14 @@ function App() {
       setHomeFilter('favorites');
     }
   }, []);
+  // #350 — home grid search. App-level state like homeFilter, so what you
+  // typed survives going into a game and back and resets on reload.
+  // Deliberately NOT part of navState: typing must not push a history entry
+  // per keystroke. ?gamesearch= only seeds the initial value (the checks can
+  // navigate but cannot type); it is capped so a giant URL cannot bloat state.
+  const [homeSearch, setHomeSearch] = useState(() =>
+    (new URLSearchParams(window.location.search).get('gamesearch') || '').slice(0, 60)
+  );
   // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
   const [featured, setFeatured] = useState(null);
   // The viewer's active online matches (your-turn row), from /api/rooms/mine.
@@ -2981,13 +2976,21 @@ function App() {
                       const todo = restCards.filter(c => !dailyDone(c));
                       return (
                         <React.Fragment>
-                          <div className="home-section-title home-split-title">
-                            Still to play
-                            <span className="home-pin-count">{todo.length}</span>
-                          </div>
-                          {todo.length === 0
-                            ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
-                            : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                          {/* While searching, an empty todo half would read
+                              "Every daily is done" over a list the search just
+                              hid — untrue. The heading and its line step aside
+                              and only Completed today shows. */}
+                          {!(homeSearch.trim() && todo.length === 0) && (
+                            <React.Fragment>
+                              <div className="home-section-title home-split-title">
+                                Still to play
+                                <span className="home-pin-count">{todo.length}</span>
+                              </div>
+                              {todo.length === 0
+                                ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
+                                : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                            </React.Fragment>
+                          )}
                           <div className="home-section-title home-split-title">
                             Completed today
                             <span className="home-pin-count">{done.length}</span>

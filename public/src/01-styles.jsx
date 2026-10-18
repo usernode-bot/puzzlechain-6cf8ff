@@ -4172,6 +4172,7 @@ ${emitTapHighlightRules()}
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
   color: ${C.text}; font-family: inherit; font-size: 16px; outline: none;
 }
+.home-search-input:focus { border-color: ${C.accent}; }
 .home-search-input::placeholder { color: ${C.dim}; }
 /* The search's own empty state. Same register as .home-pin-empty and
    .home-fav-empty above — one muted line, no box, no icon. */

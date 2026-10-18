@@ -305,6 +305,16 @@
       "expectSelector": ".friends-search-input"
     },
     {
+      "name": "Hard chip filters the grid to hard games",
+      "path": "/?tab=hard",
+      "expectSelector": ".card-diff[data-difficulty=\"hard\"]"
+    },
+    {
+      "name": "Friends screen shows your own streak",
+      "path": "/?screen=friends&demo=friends-lb",
+      "expectSelector": ".friends-my-streak"
+    },
+    {
       "name": "What’s-new strip renders on Home",
       "path": "/",
       "expectText": "New this week"

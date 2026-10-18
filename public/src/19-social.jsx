@@ -260,6 +260,7 @@ function ProfileScreen({ userId, user: loggedInUser, myScores, onBack, onOpenFri
 
 function FriendsListScreen({ onSelectUser, onBack }) {
   const [friends, setFriends] = useState([]);
+  const [myStreak, setMyStreak] = useState(null);
   const [loading, setLoading] = useState(true);
   // Search-to-add: query text, debounced results, per-row "just added" state.
   const [query, setQuery] = useState('');
@@ -271,6 +272,9 @@ function FriendsListScreen({ onSelectUser, onBack }) {
     const { ok, body } = await api('/api/social/friends');
     if (ok && body && body.friends) {
       setFriends(body.friends);
+      // #357 — the viewer's own streak, same number the nav stat shows. A
+      // response without it (or a failed call) just hides the row.
+      setMyStreak(body.me && Number.isFinite(body.me.streak) ? body.me.streak : null);
     }
     setLoading(false);
   };
@@ -319,6 +323,18 @@ function FriendsListScreen({ onSelectUser, onBack }) {
       <button className="back-btn" onClick={onBack}>← Back</button>
 
       <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '1.5rem 0 1rem' }}>Friends</h2>
+
+      {/* #357 — your own streak, in a friend-row surface without a button, so
+          the comparison starts with the reader. Hidden when the server sent
+          no figure (signed out, or the call failed). */}
+      {myStreak !== null && (
+        <div className="friends-my-streak">
+          <span className="fms-label">Your streak</span>
+          <span className="mono" style={{ color: C.gold, fontWeight: 700 }}>
+            🔥 {myStreak} {myStreak === 1 ? 'day' : 'days'}
+          </span>
+        </div>
+      )}
 
       <input
         type="text"

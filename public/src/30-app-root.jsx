@@ -205,7 +205,7 @@ function App() {
   // also what keeps the existing "/?tab=classic" proposal checks meaningful.
   const [homeFilter, setHomeFilter] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    return t === 'daily' || t === 'classic' || t === 'favorites' ? t : 'all';
+    return t === 'daily' || t === 'classic' || t === 'favorites' || t === 'easy' || t === 'medium' || t === 'hard' ? t : 'all';
   });
   /* ?favview=1 preselects the Favorites chip. Deliberately separate from
      ?tab=favorites: ?tab= is a REAL chip a player can reach by tapping, and
@@ -2806,6 +2806,12 @@ function App() {
                 const starredCount = favoriteSet.size;
                 const ordered = GAME_CARDS.filter(c => {
                   if (homeFilter === 'all') return true;
+                  // #357 — the difficulty chips filter on the card's anchor
+                  // difficulty (every card carries one; merged cards their
+                  // main game's). One chip at a time, like the others.
+                  if (homeFilter === 'easy' || homeFilter === 'medium' || homeFilter === 'hard') {
+                    return c.difficulty === homeFilter;
+                  }
                   const hasDaily = c.modes.some(m => m.mode === 'daily');
                   if (homeFilter === 'daily') return hasDaily;
                   if (homeFilter === 'favorites') return favoriteSet.has(c.key);
@@ -2900,6 +2906,11 @@ function App() {
                         { id: 'all', label: 'All' },
                         { id: 'daily', label: 'Daily' },
                         { id: 'classic', label: 'Classic' },
+                        // #357 — difficulty chips, after the mode ones. Same
+                        // one-chip-at-a-time row; search still narrows them.
+                        { id: 'easy', label: 'Easy' },
+                        { id: 'medium', label: 'Medium' },
+                        { id: 'hard', label: 'Hard' },
                         // Only rendered signed in: a signed-out visitor cannot
                         // star anything, so a chip that always answered "no
                         // games" would be dead UI. Appears the moment the

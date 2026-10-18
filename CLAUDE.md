@@ -607,8 +607,10 @@ mind when touching the daily flow:
 
 - **Registry manifest metadata.** Both `GAME_REGISTRY` (`server.js`)
   and `GAMES` (`public/src/28-registry.jsx`) now carry a per-game `manifest`:
-  `{ scoreDirection, tieBreak, sessionLength, input, undo }` — the
-  machine-relevant fields **must match by id across the two files**.
+  `{ scoreDirection, tieBreak, sessionLength, input, undo, difficulty }` — the
+  machine-relevant fields **must match by id across the two files** (including
+  `difficulty`, which the home grid's Easy/Medium/Hard chips and each card's
+  difficulty label read, and which `check-registry.js` enforces).
   The client entries additionally carry `howToPlay` card copy
   (`[{ title, body }, …]`), consumed by phase 3's shell-owned chrome
   (see below). `tieBreak` is the symbolic rule

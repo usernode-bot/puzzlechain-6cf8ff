@@ -15,7 +15,7 @@ const GAMES = [
     desc: 'The full 9×9 grid. Every row, column and box holds 1–9 exactly once.',
     tag: 'Logic',
     tagColor: GA.sky,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
     fitShell: true,
     howToPlay: [
       { title: 'Pick a board', body: 'Choose 9×9 Classic (worth double points) or the quick 6×6 Mini. The clock only starts once you pick.' },
@@ -35,7 +35,7 @@ const GAMES = [
     desc: 'The quick 6×6 board — same rules, a fraction of the time.',
     tag: 'Logic',
     tagColor: GA.teal,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'free' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'free' },
     fitShell: true,
     howToPlay: [
       { title: 'Fill the grid', body: 'Tap a cell, then pick a number. Every row, column and 3×2 box must contain 1–6 exactly once.' },
@@ -54,7 +54,7 @@ const GAMES = [
     desc: 'Find every hidden word in the letter grid.',
     tag: 'Word',
     tagColor: GA.violet,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Find the words', body: 'Drag across the letter grid to select a word — horizontally, vertically, or diagonally, forwards or backwards.' },
@@ -73,7 +73,7 @@ const GAMES = [
     desc: 'Decode a daily stack of crypto-vocabulary words — clues unlock as you go, or use a free hint.',
     tag: 'Words',
     tagColor: GA.teal,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' },
     fitShell: true,
     /* #195 — no "View board" step. The result card already reveals the answer
        and the score, so the frozen board behind it repeats what you just read.
@@ -96,7 +96,7 @@ const GAMES = [
     desc: 'Clear the 8×8 grid of mines. Lock In early to bank a risk multiplier.',
     tag: 'Risk',
     tagColor: GA.coral,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Clear the field', body: 'Tap to reveal a cell; numbers tell you how many mines touch it. Switch to Flag mode to mark mines — long-press always does the opposite of the current mode.' },
       { title: 'Clear around a number', body: "Once a number's mines are all flagged, tap the number to open every remaining square around it in one go." },
@@ -116,7 +116,7 @@ const GAMES = [
     desc: 'Classic stone-pit strategy. Outsmart your opponent by capturing more stones.',
     tag: 'Strategy',
     tagColor: GA.amber,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Sow your stones', body: 'Tap one of your pits to scoop its stones and drop them one-by-one counter-clockwise. Landing in your store banks a stone and earns another turn.' },
       { title: 'Capture', body: 'Land your last stone in an empty pit on your side to capture it plus everything opposite. Most stones banked when a side empties wins.' },
@@ -142,7 +142,7 @@ const GAMES = [
     desc: 'Race 2 to 6 players up the board. Climb ladders, dodge snakes, play for a podium place.',
     tag: 'Board',
     tagColor: GA.lime,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Roll and race', body: 'Tap to roll the die and move up the board. Ladders lift you ahead, snakes drop you back, and landing on an occupied square knocks that pawn back 10 squares.' },
       { title: 'The race runs to the end', body: 'Reaching 100 takes an exact roll and wins you a place, not the match. Play carries on for 2nd, 3rd and the rest until one player is left.' },
@@ -213,7 +213,7 @@ const GAMES = [
     desc: 'Slide tiles to merge numbers and reach 2048.',
     tag: 'Numbers',
     tagColor: GA.amber,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'swipe', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'swipe', undo: 'none' },
     howToPlay: [
       { title: 'Slide and merge', body: 'Swipe to slide every tile. Two matching tiles merge into their sum — chase 2048 and beyond.' },
       { title: "Don't jam the board", body: 'A new tile appears after every move. The run ends when no merges are left.' },
@@ -232,7 +232,7 @@ const GAMES = [
     desc: "Move a chess knight to visit all 64 squares exactly once.",
     tag: 'Puzzle',
     tagColor: GA.violet,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'free' },
     howToPlay: [
       { title: 'Tour the board', body: 'Move the knight in its L-shape to squares it has never visited. Visit all 64 exactly once for a full tour.' },
       { title: 'Undo freely', body: 'Stuck? Step back with Undo and try a different route — longer tours score higher.' },
@@ -248,7 +248,7 @@ const GAMES = [
     desc: 'Swipe to steer, eat to grow, and chase a high score without crashing.',
     tag: 'Arcade',
     tagColor: GA.lime,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'swipe', undo: 'none' },
     howToPlay: [
       { title: 'Steer the snake', body: 'Swipe, or tap the side of the board you want to head for. Arrow keys work too. Turns queue, so you can take a corner in one motion.' },
       { title: 'Stay alive', body: 'Hitting a wall or your own tail ends the run. Longer snakes and faster modes score more.' },
@@ -264,7 +264,7 @@ const GAMES = [
     desc: 'Drag blocks onto the grid and clear full lines. How long can you last?',
     tag: 'Puzzle',
     tagColor: GA.sky,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'drag', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'drag', undo: 'none' },
     howToPlay: [
       { title: 'Place the pieces', body: 'Drag each offered block onto the grid anywhere it fits. Fill a full row or column to clear it.' },
       { title: 'Keep space open', body: 'The run ends when no offered piece fits. Multi-line clears and combos score big.' },
@@ -283,7 +283,7 @@ const GAMES = [
     desc: 'Swap gems to line up 3+ and cascade your way to the target score.',
     tag: 'Match',
     tagColor: GA.coral,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Swap to match', body: 'Tap two adjacent gems to swap them. Line up 3 or more of a kind to clear them.' },
       { title: 'Chase cascades', body: 'Cleared gems drop new ones — chains cascade for bonus points. Hit the target score before time runs out.' },
@@ -299,7 +299,7 @@ const GAMES = [
     desc: 'Click tiles off the layered board into your 7-slot bar — match three to clear them.',
     tag: 'Puzzle',
     tagColor: GA.violet,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'booster' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'booster' },
     howToPlay: [
       { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot bar. Three of a kind in the bar clear automatically.' },
       { title: 'Mind the bar', body: 'If the bar fills with no match, the round is lost. Undo, shuffle, and clear-slot boosters are limited — spend them wisely.' },
@@ -315,7 +315,7 @@ const GAMES = [
     desc: "Smash every brick with a bouncing ball. Don't let it fall — climb the leaderboard.",
     tag: 'Arcade',
     tagColor: GA.coral,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'drag', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'drag', undo: 'none' },
     howToPlay: [
       { title: 'Keep it up', body: 'Drag the paddle to keep the ball in play and smash every brick.' },
       { title: 'Clear the wall', body: 'Some bricks take multiple hits. Lose the ball and the run ends — full clears score best.' },
@@ -331,7 +331,7 @@ const GAMES = [
     desc: 'Shoot colored balls to match 3 in a row before the chain reaches the skull.',
     tag: 'Arcade',
     tagColor: GA.teal,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Aim, then fire', body: 'Tap once to aim — a dotted line shows exactly where the marble will land. Tap again to fire it. Three or more of a colour clear.' },
       { title: 'Beat the chain', body: 'Clear the whole chain before it reaches the skull. Gaps and combos multiply your score. With fewer than five marbles left the cannon only deals colours still on the chain, so the end is always finishable.' },
@@ -348,7 +348,7 @@ const GAMES = [
     desc: 'Classic match-3 campaign: progress through 50 puzzles and climb the leaderboard.',
     tag: 'Campaign',
     tagColor: GA.amber,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Swap to match', body: 'Tap two adjacent pieces to swap. Match 3+ to clear them and rack up points.' },
       { title: 'Beat each level', body: 'Every level has a target score under move and time limits. 50 levels — progress saves as you go.' },
@@ -364,7 +364,7 @@ const GAMES = [
     desc: 'Tap to smash falling hashes, stack lightning, leave the TNT alone.',
     tag: 'Arcade',
     tagColor: GA.plum,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Tap to mine', body: 'Swing your hammer at a falling ⛏️ hash to break it — 10 points each. A hash that reaches the floor un-mined costs a life.' },
       { title: 'Stack the lightning', body: 'Tap ⚡ to add 5 seconds of double scoring. Bolts stack, so grabbing a second one while boosted is worth taking.' },
@@ -388,7 +388,7 @@ const GAMES = [
     desc: 'Steer your fighter jet through the gates — thread gaps, dodge storms, chase the score.',
     tag: 'Arcade',
     tagColor: GA.sky,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'drag', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'drag', undo: 'none' },
     howToPlay: [
       { title: 'Steer the jet', body: 'Drag your finger to steer — the jet climbs on its own and the course streams past. Hold an arrow key on a desktop; the jet banks toward wherever you point.' },
       { title: 'Thread the gates', body: 'Fly between the amber posts for 10 points. Consecutive gates build a combo multiplier up to ×5 — clipping a post or missing a gap breaks it.' },
@@ -410,7 +410,7 @@ const GAMES = [
     desc: 'Classic draughts vs a friend online — jump, chain captures, crown your kings.',
     tag: 'Board',
     tagColor: GA.coral,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Move diagonally', body: 'Tap your piece, then a dark square ahead of it. Jump over an adjacent enemy piece to capture it.' },
       { title: 'Chain your jumps', body: 'After a capture, the same piece may keep jumping while captures are available.' },
@@ -432,7 +432,7 @@ const GAMES = [
     desc: 'Flip your way to a majority — outflank your opponent online.',
     tag: 'Board',
     tagColor: GA.teal,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Outflank to flip', body: 'Place a disc so a straight line of enemy discs is trapped between yours — they all flip to your color.' },
       { title: 'Every move must flip', body: 'You can only play cells that flip at least one disc. No legal move? Your turn passes automatically.' },
@@ -454,7 +454,7 @@ const GAMES = [
     desc: 'Drop discs and line up four before your opponent does.',
     tag: 'Board',
     tagColor: GA.sky,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'short', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Drop a disc', body: 'Tap a column — your disc falls to the lowest empty slot.' },
       { title: 'Line up four', body: 'Four of your discs in a row — across, down, or diagonally — wins. A full board with no line is a draw.' },
@@ -475,7 +475,7 @@ const GAMES = [
     desc: 'Five stones in a row on a 15×15 board — pure placement strategy.',
     tag: 'Board',
     tagColor: GA.violet,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Take turns placing stones', body: 'Tap an intersection to line up a stone, slide to adjust, then Place it. Stones never move once placed, so nothing commits until you confirm.' },
       { title: 'Five in a row wins', body: 'First to line up five (or more) stones — across, down, or diagonally — wins the game.' },
@@ -496,7 +496,7 @@ const GAMES = [
     desc: 'Race all four tokens home — roll sixes, capture rivals, play it safe on the stars.',
     tag: 'Board',
     tagColor: GA.lime,
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'long', input: 'tap', undo: 'none' },
     howToPlay: [
       { title: 'Roll, then move', body: 'Roll the die, then pick a token — tap it on the board, or use the list of your legal moves below it. You need a 6 to leave base — and a 6 earns another roll.' },
       { title: 'Capture and stay safe', body: "Land on an opponent's token to send it back to base. Star cells are safe — no captures there." },
@@ -522,7 +522,7 @@ const GAMES = [
     desc: 'A different layered board every day — clear it before the tray jams.',
     tag: 'Puzzle',
     tagColor: GA.teal,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'booster' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'booster' },
     fitShell: true,
     howToPlay: [
       { title: 'Pick free tiles', body: 'Tap any uncovered tile to move it into your 7-slot tray. Three of a kind clear automatically. The board shape changes every day and gets harder toward the weekend.' },
@@ -545,7 +545,7 @@ const GAMES = [
     desc: 'The classic patience deal — everyone plays the same shuffle today.',
     tag: 'Cards',
     tagColor: GA.sky,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Build down, alternate colors', body: 'Drag a card (or tap it, then its destination). Tableau piles build downward in alternating colors; only a King moves to an empty column — empty columns show a faint K. An illegal move tells you why.' },
@@ -565,7 +565,7 @@ const GAMES = [
     desc: 'One-suit spider: build eight King-to-Ace runs to clear the board.',
     tag: 'Cards',
     tagColor: GA.violet,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long', input: 'tap', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Move descending runs', body: 'Drag a face-up card (or tap it, then its destination) to move it and the run below onto a column whose top card is one rank higher, or any empty column.' },
@@ -585,7 +585,7 @@ const GAMES = [
     desc: 'Clear the layered tile pyramid by pairing free matching tiles.',
     tag: 'Tiles',
     tagColor: GA.teal,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'booster' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'booster' },
     fitShell: true,
     howToPlay: [
       { title: 'Pair free tiles', body: 'A tile is free when nothing rests on top of it and its left or right side is open. Tap two matching free tiles to clear them — a blocked tile shakes to say so.' },
@@ -605,7 +605,7 @@ const GAMES = [
     desc: 'Fill the grid so every row and column matches its number clues.',
     tag: 'Logic',
     tagColor: GA.plum,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
     fitShell: true,
     howToPlay: [
       { title: 'Read the clues', body: 'Each number is a run of filled cells in that row or column, in order, with at least one gap between runs.' },
@@ -625,7 +625,7 @@ const GAMES = [
     desc: 'Sweep the daily minefield — one wrong tap ends the day.',
     tag: 'Risk',
     tagColor: GA.coral,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Count the numbers', body: 'Each number counts the mines touching that cell. A safe opening area is revealed for you — work outward from it.' },
@@ -645,7 +645,7 @@ const GAMES = [
     desc: 'Unscramble five words back-to-back against the clock.',
     tag: 'Word',
     tagColor: GA.amber,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'tap', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Rebuild the word', body: 'Tap the scrambled letters in order to build your answer; tap a slot (or ⌫) to take a letter back.' },
@@ -664,7 +664,7 @@ const GAMES = [
     desc: 'Push every crate onto a goal pad in today\'s warehouse.',
     tag: 'Puzzle',
     tagColor: GA.lime,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap', undo: 'free' },
     fitShell: true,
     howToPlay: [
       { title: 'Push, never pull', body: 'Move with the arrows (or arrow keys). Walking into a crate pushes it one cell — you can\'t pull, and you can\'t push two at once.' },
@@ -683,7 +683,7 @@ const GAMES = [
     desc: 'Survive today\'s falling-block sequence — the speed climbs as you clear.',
     tag: 'Puzzle',
     tagColor: GA.violet,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag', undo: 'none' },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Pieces fall on their own', body: 'Gravity is on from the first piece. Drag your finger across the well to slide it, tap to rotate, and swipe down (or hit ⬇ Drop) to slam it home. Arrow keys work on a desktop.' },
@@ -703,7 +703,7 @@ const GAMES = [
     desc: 'Trace neighboring letters and find every word you can in 90 seconds.',
     tag: 'Word',
     tagColor: GA.sky,
-    manifest: { scoreDirection: 'higher', tieBreak: 'score-then-time', sessionLength: 'short', input: 'tap', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'score-then-time', sessionLength: 'short', input: 'tap', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Trace a word', body: 'Tap letters that touch — sideways or diagonally — to spell a word. Tap the last letter again (or Submit) to bank it.' },
@@ -722,7 +722,7 @@ const GAMES = [
     desc: "Today's apple trail — eat 20 apples without crashing. One run per day.",
     tag: 'Arcade',
     tagColor: GA.lime,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'swipe', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'swipe', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Steer the snake', body: 'Swipe, or tap the side of the board you want to head for. Arrow keys work too. Turns queue, so you can take a corner in one motion. The apples appear in the same order for everyone today.' },
@@ -741,7 +741,7 @@ const GAMES = [
     desc: "Today's brick wall, three balls — clear it faster than everyone else.",
     tag: 'Arcade',
     tagColor: GA.coral,
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag', undo: 'none' },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag', undo: 'none' },
     fitShell: true,
     howToPlay: [
       { title: 'Keep it up', body: 'Drag to move the paddle; tap to launch. Everyone plays the exact same wall today.' },

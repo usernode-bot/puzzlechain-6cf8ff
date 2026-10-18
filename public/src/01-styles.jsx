@@ -348,6 +348,21 @@ body {
    what made min-content exceed the viewport in the first place. Let it wrap
    rather than push the page wide, and let its column shrink. */
 .profile-id { min-width: 0; }
+
+/* #357 — the Friends screen's "Your streak" row. Same card surface, border
+   and padding a friend row has (the rows carry theirs inline), without a
+   button: it reports, it does not navigate. */
+.friends-my-streak {
+  background: ${C.card};
+  border: 1px solid ${C.border};
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.friends-my-streak .fms-label { font-weight: 600; font-size: 1rem; }
 /* Recent-games row. The date and the score are fixed-width monospace and do
    not shrink, so on a narrow card they left the game name almost nothing —
    "Daily Cipher" truncating to "Dail…". Below 460px the meta pair drops to
@@ -4272,6 +4287,17 @@ ${emitTapHighlightRules()}
 }
 .card-streak .cs-flame { font-size: 0.7rem; line-height: 1; }
 .card-streak .cs-days { color: ${C.gold}; opacity: 0.75; }
+
+/* #357 — the per-card difficulty label. Same small pill shape as the streak
+   pill, deliberately muted (plain text on a border, no colour of its own) so
+   it does not compete with the tag or the streak's gold. */
+.card-diff {
+  font-size: 0.62rem; font-weight: 600; letter-spacing: 0.02em;
+  color: ${C.muted};
+  border: 1px solid ${C.border};
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+}
 
 /* The footer row that carries the tag and (when the card has a daily) the
    streak pill. align-items: baseline keeps the two pill shapes on one line

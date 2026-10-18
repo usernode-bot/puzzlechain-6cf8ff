@@ -272,6 +272,7 @@ function buildGameCards(games) {
       tag: g.tag,
       tagColor: g.tagColor,
       desc: g.desc,
+      difficulty: g.manifest.difficulty,
       modes,          // [] for the head-to-head games — one Play button, below
       gameId: g.id,   // set only for unmerged cards; the single button's target
       // Caption under that one button. DERIVED from the registry's opponent
@@ -303,6 +304,16 @@ const cardDailyId = (card) => {
    one card. Two controls share this: the pin (#232) and the favorite star. */
 const cardAnchorId = (card) => card.gameId || (card.modes[0] && card.modes[0].gameId) || null;
 const cardPinId = cardAnchorId;
+
+/* #357 — the difficulty a card's filter chip and label show. Merged cards are
+   literals that buildGameCards skipped, so they resolve through their ANCHOR
+   id (Tile Match → tilematchingdaily, etc.): the main game's difficulty is
+   what the card speaks for. */
+for (const c of GAME_CARDS) {
+  if (c.difficulty) continue;
+  const g = GAMES.find(x => x.id === cardAnchorId(c));
+  c.difficulty = (g && g.manifest && g.manifest.difficulty) || null;
+}
 
 /* Mirrors PIN_LIMIT in server.js. Used ONLY to grey out the control once the
    player is at the cap — the server refuses the 9th pin either way, so the two
@@ -413,6 +424,13 @@ function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onP
         <span className="tag mono" style={{ background: card.tagColor + '22', color: card.tagColor }}>
           {card.tag}
         </span>
+        {/* #357 — the game's difficulty, beside the tag. Muted pill: it is a
+            fact for the at-a-glance scan, not an emphasis. */}
+        {card.difficulty && (
+          <span className="card-diff mono" data-difficulty={card.difficulty}>
+            {card.difficulty[0].toUpperCase() + card.difficulty.slice(1)}
+          </span>
+        )}
         {dailyId && streak > 0 && (
           <span className="card-streak mono" data-streak={streak} title={`${streak}-day streak`}>
             <span className="cs-flame" aria-hidden="true">🔥</span>

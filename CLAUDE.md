@@ -571,6 +571,21 @@ the current day count. The `demo=streak`/`demo=badges` fixtures seed
 prior days via `seedFeaturedStreakDays` (featured-game attempts + their
 `daily_featured` rows) so they hold under the new rule.
 
+The **all-time best daily streak** (#362) lives in
+`user_stats_snapshot.best_daily_streak` — a lazily backfilled high-water
+mark, not a recomputed value. NULL means "not backfilled yet": the first
+`GET /api/daily` after the migration runs `computeBestStreak` (same
+counted-day rule as `computeStreak`, shared `STREAK_DAYS_WHERE`, no
+60-day cap, longest consecutive run) once and stores it, so a player
+with history gets a real best straight away and one with none stores 0.
+`finalizeDailyAttempt` bumps it with `bumpBestStreak` (GREATEST upsert,
+so racing finishes are order-independent) on every finish; it only ever
+rises. It is returned as `bestStreak` from `/api/daily` and `/finish`
+and shown beside the current streak in the card's gold pill (#313's
+`card-streak`), with `cardProps` passing `Math.max(bestStreak, streak)`
+so an optimistic bump never under-shoots it. Streak rules themselves
+are untouched.
+
 The streak multiplies points via **tiers**, defined once in
 `STREAK_TIERS` (`public/src/05-core-lib.jsx`) and applied client-side in
 `streakMultiplier(streak)`:

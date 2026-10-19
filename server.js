@@ -1130,6 +1130,13 @@ async function migrate() {
       ADD COLUMN IF NOT EXISTS streak_freezes INTEGER NOT NULL DEFAULT 0
   `);
 
+  // All-time best daily streak (#362, idempotent). Nullable: NULL means the
+  // best has not been backfilled from past daily_attempts history yet.
+  await pool.query(`
+    ALTER TABLE user_stats_snapshot
+      ADD COLUMN IF NOT EXISTS best_daily_streak INTEGER
+  `);
+
   // user_achievements is PUBLIC: recent milestones and notable events.
   // One row per achievement. Indexed for efficient friend-feed queries.
   await pool.query(`
@@ -2038,24 +2045,28 @@ function prevUtcDayN(iso, n) {
 // missed). Strict reset: ANY missed UTC day resets the streak to 0 — the
 // former streak_freeze grace is disabled (column kept dormant). Computed from
 // the existing daily_attempts rows.
-async function computeStreak(userId) {
-  // GotD-participation semantics (spec §6.3): from GOTD_STREAK_CUTOVER on, a
-  // day counts toward the streak only when that day's FEATURED game (the
-  // daily_featured row — written on the first request of every day that has
-  // any player traffic) has a finished attempt. Days before the cutover keep
-  // the legacy any-daily rule, grandfathering every previously earned day so
-  // the changeover resets nobody.
-  const { rows } = await pool.query(
-    `SELECT DISTINCT attempt_date::text AS d
-       FROM daily_attempts a
-      WHERE a.user_id = $1 AND a.finished_at IS NOT NULL
+// The counted-day condition shared by computeStreak and computeBestStreak
+// (#362) so the two streak rules stay one rule. GotD-participation semantics
+// (spec §6.3): from GOTD_STREAK_CUTOVER on, a day counts toward the streak
+// only when that day's FEATURED game (the daily_featured row — written on the
+// first request of every day that has any player traffic) has a finished
+// attempt. Days before the cutover keep the legacy any-daily rule,
+// grandfathering every previously earned day so the changeover resets nobody.
+// Bind params: $1 = user id, $2 = cutover date.
+const STREAK_DAYS_WHERE = `a.user_id = $1 AND a.finished_at IS NOT NULL
         AND (
           a.attempt_date < $2::date
           OR EXISTS (
             SELECT 1 FROM daily_featured f
              WHERE f.seed_date = a.attempt_date AND f.game_id = a.game_id
           )
-        )
+        )`;
+
+async function computeStreak(userId) {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT attempt_date::text AS d
+       FROM daily_attempts a
+      WHERE ${STREAK_DAYS_WHERE}
       ORDER BY d DESC
       LIMIT 60`,
     [userId, GOTD_STREAK_CUTOVER]
@@ -2080,6 +2091,45 @@ async function computeStreak(userId) {
     cursor = prevUtcDay(cursor);
   }
   return streak;
+}
+
+// All-time longest counted-day run for a user (#362): the same counted-day
+// rule as computeStreak (shared WHERE above) but without its LIMIT and
+// without the "ending today or yesterday" anchor — it walks the counted days
+// ascending via prevUtcDay and returns the longest consecutive run. This is
+// what lazily backfills an existing player's best on first read.
+async function computeBestStreak(userId) {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT attempt_date::text AS d
+       FROM daily_attempts a
+      WHERE ${STREAK_DAYS_WHERE}
+      ORDER BY d ASC`,
+    [userId, GOTD_STREAK_CUTOVER]
+  );
+  let best = 0;
+  let run = 0;
+  let prev = null;
+  for (const r of rows) {
+    run = prev && prevUtcDay(r.d) === prev ? run + 1 : 1;
+    if (run > best) best = run;
+    prev = r.d;
+  }
+  return best;
+}
+
+// High-water-mark writer for the all-time best daily streak (#362). GREATEST
+// makes two racing finishes order-independent: the stored value only ever
+// rises. Returns the stored value.
+async function bumpBestStreak(userId, username, n) {
+  const { rows } = await pool.query(
+    `INSERT INTO user_stats_snapshot (user_id, username, best_daily_streak)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id) DO UPDATE SET
+       best_daily_streak = GREATEST(COALESCE(user_stats_snapshot.best_daily_streak, 0), EXCLUDED.best_daily_streak)
+     RETURNING best_daily_streak`,
+    [userId, username || null, n]
+  );
+  return rows[0] ? rows[0].best_daily_streak : n;
 }
 
 // The set of streak-milestone day thresholds a user has ever reached, as a
@@ -4008,6 +4058,26 @@ app.get('/api/daily', async (req, res) => {
     for (const row of rows) attempts[row.game_id] = shapeAttempt(row);
 
     const streak = await computeStreak(req.user.id);
+    // All-time best daily streak (#362): lazily backfilled once from past
+    // daily_attempts history when the snapshot row has no value yet, so
+    // existing players get a real best straight away. max(stored, streak)
+    // keeps a demo fixture that seeds days after the backfill reading right.
+    // Non-fatal: on failure the client just shows the current streak as best.
+    let bestStreak = streak;
+    try {
+      const { rows: snapRows } = await pool.query(
+        `SELECT best_daily_streak FROM user_stats_snapshot WHERE user_id = $1`,
+        [req.user.id]
+      );
+      let stored = snapRows.length > 0 ? snapRows[0].best_daily_streak : null;
+      if (stored == null) {
+        // One-time lazy backfill (also covers the "no snapshot row yet" case).
+        stored = await bumpBestStreak(req.user.id, req.user.username, await computeBestStreak(req.user.id));
+      }
+      bestStreak = Math.max(stored, streak);
+    } catch (e) {
+      console.warn('[daily] best streak read failed (non-fatal):', e.message);
+    }
     const badges = await earnedStreakBadges(req.user.id);
     const achievements = await earnedAchievementBadges(req.user.id);
     // Server-issued daily seeds (phase 2): today's per-game board seeds. The
@@ -4085,6 +4155,8 @@ app.get('/api/daily', async (req, res) => {
       serverNowUtc: new Date().toISOString(),
       nextResetUtc: nextResetUtc(),
       streak,
+      // All-time best daily streak (#362), never below the current streak.
+      bestStreak,
       // Permanent streak-milestone badges (day thresholds) this user has ever
       // earned — kept even after a streak resets, so the lobby/profile can show
       // a player's collected badges independent of the current streak.
@@ -4369,6 +4441,17 @@ async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, move
   // reconcile its optimistic value without a full reload.
   const streak = await computeStreak(user.id);
 
+  // All-time best daily streak (#362): bump the high-water mark to today's
+  // streak, so a win that pushes the current streak past the best moves the
+  // best up with it at once. Best-effort — on failure the client falls back
+  // to the current streak.
+  let bestStreak = streak;
+  try {
+    bestStreak = await bumpBestStreak(user.id, user.username, streak);
+  } catch (e) {
+    console.warn('[daily] best streak bump failed (non-fatal):', e.message);
+  }
+
   // Newly-awarded achievements THIS finish, so the client can pop a one-time
   // celebration. Both the streak-milestone block and the non-streak award()
   // helper push into it via their RETURNING clauses.
@@ -4530,7 +4613,7 @@ async function finalizeDailyAttempt(user, gameId, { score, steps, timeSecs, move
     }
   }
 
-  return { attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, solveCount: lifetimeSolves, dapp: dappSession, newAchievements };
+  return { attempt: shapeAttempt(rows[0]), nextResetUtc: nextResetUtc(), streak, bestStreak, solveCount: lifetimeSolves, dapp: dappSession, newAchievements };
 }
 
 app.post('/api/daily/:gameId/finish', async (req, res) => {

@@ -494,10 +494,28 @@ async function seedFeaturedStreakDays(userId, username, nDays) {
       `INSERT INTO daily_attempts
          (user_id, username, game_id, attempt_date, score, steps, time_secs, finished_at)
        VALUES ($1, $2, $3, ((now() AT TIME ZONE 'utc')::date - $4::int), 900, 20, 120, now())
-       ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING`,
+       ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE SET
+         score = EXCLUDED.score, steps = EXCLUDED.steps,
+         time_secs = EXCLUDED.time_secs, finished_at = EXCLUDED.finished_at`,
       [userId, username, gid, i]
     );
   }
+  // The fixture must ASSERT the streak it claims, not add to it (same rule as
+  // demo=storybadges / demo=modes). Staging carries one database across every
+  // check run and never resets, and the runner account accumulates counted
+  // days from the OTHER streak fixture (demo=badges seeds 60) and from earlier
+  // suites — days that bridge straight into this window. Without the trim,
+  // whichever of the two seeded deeper owns the account and the streak route
+  // reports 60 where a check expects 10 (or 10 where badges expects 60),
+  // depending purely on run order. Deleting this viewer's finished attempts
+  // older than the claim makes the streak exactly nDays; a later run of the
+  // other fixture re-inserts its own window, so both stay order-independent.
+  await pool.query(
+    `DELETE FROM daily_attempts
+      WHERE user_id = $1 AND finished_at IS NOT NULL
+        AND attempt_date < ((now() AT TIME ZONE 'utc')::date - $2::int)`,
+    [userId, nDays]
+  );
 }
 
 let dailyFeaturedCache = { date: null, featured: null };

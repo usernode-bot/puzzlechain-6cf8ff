@@ -1525,6 +1525,17 @@ reasons nothing in its own proposal could explain. Both now delete the bands
 above the depth they are claiming before inserting. Any new fixture that seeds
 a COUNT of something owes the same treatment.
 
+**The streak fixtures COUNT too, and they disagree.** `demo=streak` wants a
+10-day streak; `demo=badges` wants 60. Both write through
+`seedFeaturedStreakDays`, which now asserts its claim: days 1..n are
+force-finished (DO UPDATE, the demo=resume idiom) and the viewer's finished
+attempts OLDER than n days are deleted, so the streak is exactly n regardless
+of which fixture or earlier suite seeded deeper. The runner account on the
+shared staging DB carried badges' 60 days across suites, and the streak-pill
+checks (`data-streak='10'`, #313 and #362) failed whenever a badges run landed
+before their route. Either fixture re-seeds its own window on its next run, so
+the two stay order-independent.
+
 **"Today is left open" has to be MADE true, not assumed.** `demo=streak` and
 `demo=badges` both promise a long streak with today still playable, and neither
 finishes today — but `demo=locked` deliberately does, on the same viewer. So

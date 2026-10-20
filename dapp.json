@@ -28,6 +28,21 @@
       "expectText": "Game Corner"
     },
     {
+      "name": "Home shows the games search field",
+      "path": "/",
+      "expectSelector": ".home-search-input[placeholder=\"Search games\"] + .home-filter-chips"
+    },
+    {
+      "name": "Searching narrows the grid to the matching game",
+      "path": "/?gamesearch=sudoku",
+      "expectSelector": ".grid .card[aria-label=\"Sudoku\"]"
+    },
+    {
+      "name": "Search with no match shows the empty line",
+      "path": "/?gamesearch=zzqxw",
+      "expectText": "No games match"
+    },
+    {
       "name": "Nav wordmark sits on one line in the compact header",
       "path": "/",
       "expectSelector": ".nav .nav-brand .brandword"
@@ -1010,6 +1025,11 @@
       "expectSelector": ".win-card .we-v"
     },
     {
+      "name": "The win card carries a Share button",
+      "path": "/?game=sudoku&result=win",
+      "expectSelector": ".win-card button.tappable[data-share-btn=\"1\"]"
+    },
+    {
       "name": "Home is the bottom of the back stack",
       "path": "/",
       "expectSelector": ".app[data-nav-depth=\"0\"]"
@@ -1901,6 +1921,39 @@
       "name": "A long chapter pages instead of scrolling",
       "path": "/?game=dracula&play=1",
       "expectSelector": ".drac-card .tp-more"
+    },
+    {
+      "id": "jetrun.board",
+      "name": "Jet Run opens on the flying brief",
+      "path": "/?game=jetrun",
+      "expectText": "Start flying",
+      "visual": true,
+      "impact": [
+        "public/src/32-game-jetrun.jsx",
+        "public/src/01-styles.jsx",
+        "public/src/28-registry.jsx",
+        "public/src/29-cards.jsx"
+      ]
+    },
+    {
+      "name": "A bounded Jet Run course names the score it wants",
+      "path": "/?game=jetrun&pmode=story&band=1&play=1",
+      "expectSelector": ".jr-wrap[data-jr-target]:not([data-jr-target=\"0\"])"
+    },
+    {
+      "name": "An endless Jet Run run sets no target",
+      "path": "/?game=jetrun&pmode=arcade&band=hard&play=1",
+      "expectSelector": ".jr-wrap[data-jr-target=\"0\"]"
+    },
+    {
+      "name": "A finished Jet Run flight draws no end panel of its own",
+      "path": "/?game=jetrun&play=1&jrdead=1",
+      "expectSelector": ".jr-wrap[data-jr-phase=\"dead\"]:not(:has(.jr-overlay))"
+    },
+    {
+      "name": "Story picker opens Jet Run's ladder",
+      "path": "/?game=jetrun&pmode=story&demo=modes",
+      "expectSelector": ".pregame-band"
     },
     {
       "name": "Classic shell is inset from the safe area (fixed top bar)",

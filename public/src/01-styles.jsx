@@ -3792,6 +3792,16 @@ ${emitTapHighlightRules()}
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
 
+/* Jet Run (request #326) — the same self-shell canvas stage Hash Rush runs.
+   The dark gradient backdrop is intrinsic arcade art, not chrome: the sky the
+   jet flies through is drawn over it, and the rest of the palette applies to
+   the chrome around it. No animation here, so no reduced-motion addition. */
+.jr-wrap { position: relative; width: 100%; height: 62vh; max-height: 560px; border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, #0c1020, #131a30); border: 1px solid ${C.border}; }
+.jr-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.jr-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,10,18,0.6); text-align: center; padding: 1rem; }
+.jr-overlay-title { font-size: 1.6rem; font-weight: 800; }
+.jr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
+
 /* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
 .p6-banner {
@@ -4149,6 +4159,26 @@ ${emitTapHighlightRules()}
 .home-daily-note {
   color: ${C.muted}; font-size: 0.82rem; margin: 0.5rem 0 0.6rem;
 }
+/* #350 — the All Games search field, above the chips. The Friends screen's
+   search input graduated into a class so the two copies of the same control
+   cannot drift (19-social.jsx styles it inline). Tokens only, so it re-themes
+   for free. It is a TEXT INPUT, so it is deliberately NOT in
+   TAPPABLE_CLASSES: native long-press selection must keep working, and no
+   touch-action/tap-highlight rule should be generated for it. font-size is a
+   full 16px on purpose — under that, focusing the field auto-zooms the page
+   on iOS, and this is exactly the control a phone user will focus. */
+.home-search-input {
+  display: block; width: 100%; padding: 0.7rem 0.9rem; margin: 0 0 0.7rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  color: ${C.text}; font-family: inherit; font-size: 16px; outline: none;
+}
+.home-search-input:focus { border-color: ${C.accent}; }
+.home-search-input::placeholder { color: ${C.dim}; }
+/* The search's own empty state. Same register as .home-pin-empty and
+   .home-fav-empty above — one muted line, no box, no icon. */
+.home-search-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
+}
 .home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
 .home-chip {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 999px;
@@ -4418,4 +4448,31 @@ ${emitTapHighlightRules()}
 .tp-more:hover { color: ${C.text}; background: var(--c-well); }
 .tp-more[data-pressed] { background: var(--c-well-strong); }
 .tp-end { text-align: center; font-size: 0.8rem; color: ${C.muted}; padding: 0.4rem 0; }
+
+/* #323 — games deserve more of a desktop window. Same rules as above, with
+   the caps raised at >= 900px wide; the min-height clause keeps this block
+   from overlapping the landscape/short-window --cg-board override, which
+   still wins on a phone held sideways. Boards and canvases already size
+   from their measured box (aspect-ratio DOM boards, useFitBox), so raising
+   the caps is all that is needed; phones and tablets are unchanged, and the
+   lobby grid, profile and friends screens keep their width on purpose.
+   Daily Cipher is left out: its grid and keyboard sizes are fixed in the
+   game's own drawing code, so a wider box would only add empty space. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .game-wrap { max-width: 880px; }
+  .kl-game, .sp-game { max-width: 880px; }
+  .cg-shell { --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem - var(--pc-safe-top) - var(--pc-safe-bottom)), 760px); }
+  .sudoku { max-width: 540px; }
+  .wordsearch { max-width: 620px; }
+  .wspr-grid { max-width: 480px; }
+  .dsnk-board { max-width: 520px; }
+  .tm-wrap.fit-col { max-width: 760px; }
+  .ms-boardbox { width: min(92vw, 540px, var(--cg-board, 540px)); }
+  .kt-boardbox { width: min(92vw, 680px, var(--cg-board, 680px)); }
+  /* --brg-cap is set inline by BrgBoardBox, so scale it rather than override it. */
+  .brg-canvas-box { width: min(92vw, calc(var(--brg-cap, 380px) * 1.4), var(--cg-board, 532px)); }
+  .cg-stage .ms-boardbox, .cg-stage .t2048-board-wrap { max-width: min(540px, var(--cg-board)) !important; }
+  .cg-stage .mnc-board { max-width: min(680px, var(--cg-board)) !important; }
+  .cg-stage .cnl-board-wrap { max-width: min(680px, var(--cg-board)) !important; }
+}
 `;

@@ -41,6 +41,39 @@ function WinEarned({ value }) {
   return <span className="we-v" data-win-earned={n}>+{shown}</span>;
 }
 
+/* Copy-to-clipboard Share button for the win/loss result cards. Declared at
+   MODULE scope on purpose, and this is the whole of issue #340: defined
+   inside App it got a new function identity on every App render, and React
+   treats a changed component type as an unmount-plus-remount — so the button
+   was rebuilt (local state wiped) on every timer tick and every state update
+   behind the card. Measured on the open win card: seven distinct DOM elements
+   in four seconds. A player who tapped Share saw "Copied!" flash for a few
+   hundred milliseconds and revert, or saw nothing at all when the copy
+   resolved after the remount had orphaned the setState — a dead button.
+   Module scope keeps the identity stable so the feedback survives re-renders.
+   The copy itself goes through copyText (clipboard API, then an execCommand
+   fallback) and says so when neither path worked, instead of failing silently. */
+function ShareButton({ text }) {
+  const [copied, setCopied] = useState(null); // null | 'ok' | 'fail'
+  if (!text) return null;
+  const copy = () => {
+    copyText(text).then((ok) => {
+      setCopied(ok ? 'ok' : 'fail');
+      setTimeout(() => setCopied(null), ok ? 1500 : 2600);
+    });
+  };
+  return (
+    <button
+      className="primary-btn tappable"
+      data-share-btn="1"
+      style={{ background: C.violet, marginBottom: '0.6rem' }}
+      {...tapProps(copy)}
+    >
+      {copied === 'ok' ? 'Copied!' : copied === 'fail' ? "Couldn't copy. Try again." : 'Share result'}
+    </button>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => {
     // Support ?screen=friends / ?screen=session deep links for testing.
@@ -186,6 +219,14 @@ function App() {
       setHomeFilter('favorites');
     }
   }, []);
+  // #350 — home grid search. App-level state like homeFilter, so what you
+  // typed survives going into a game and back and resets on reload.
+  // Deliberately NOT part of navState: typing must not push a history entry
+  // per keystroke. ?gamesearch= only seeds the initial value (the checks can
+  // navigate but cannot type); it is capped so a giant URL cannot bloat state.
+  const [homeSearch, setHomeSearch] = useState(() =>
+    (new URLSearchParams(window.location.search).get('gamesearch') || '').slice(0, 60)
+  );
   // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
   const [featured, setFeatured] = useState(null);
   // The viewer's active online matches (your-turn row), from /api/rooms/mine.
@@ -2164,29 +2205,6 @@ function App() {
     onSaveGame: handleSaveGame,
   } : null;
 
-  // Copy-to-clipboard Share button for the win/loss overlays. Flips its label
-  // to "Copied!" briefly; degrades to a no-op where clipboard is unavailable.
-  function ShareButton({ text }) {
-    const [copied, setCopied] = useState(false);
-    if (!text) return null;
-    const copy = async () => {
-      try {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      } catch {}
-    };
-    return (
-      <button
-        className="primary-btn"
-        style={{ background: C.violet, marginBottom: '0.6rem' }}
-        onClick={copy}
-      >
-        {copied ? 'Copied!' : 'Share result'}
-      </button>
-    );
-  }
-
   const fmtTime = s =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -2819,8 +2837,17 @@ function App() {
                   const c = CARD_BY_GAME_ID[id];
                   if (c) pinnedSet.add(c.key);
                 }
-                const pinnedCards = ordered.filter(c => pinnedSet.has(c.key));
-                const restCards = ordered.filter(c => !pinnedSet.has(c.key));
+                /* #350 — the search is a SECOND filter on the already-chip-
+                   filtered list, applied before the pin partition so the two
+                   filters AND together: a card must pass both to appear, and a
+                   pinned card that fails the search is absent from both
+                   sections, exactly as one that fails a chip already is (the
+                   #232 rule — the partition stays lossless). The Daily chip's
+                   done/todo split below derives from restCards, so it narrows
+                   with the search for free. */
+                const searched = ordered.filter(c => homeSearchMatch(c, homeSearch));
+                const pinnedCards = searched.filter(c => pinnedSet.has(c.key));
+                const restCards = searched.filter(c => !pinnedSet.has(c.key));
                 const atPinCap = pins.length >= PIN_LIMIT;
                 const cardProps = (c) => ({
                   key: c.key,
@@ -2860,6 +2887,20 @@ function App() {
                     )}
                     {pinNotice && <div className="home-pin-full">{pinNotice}</div>}
                     <div className="home-section-title">All Games</div>
+                    {/* #350 — type-to-filter above the chips, so the two
+                        narrowing controls read as one row. It ANDs with the
+                        active chip below and with the Pinned section above:
+                        everything this list shows obeys it. Not in
+                        TAPPABLE_CLASSES — a text input keeps native
+                        long-press selection. */}
+                    <input
+                      type="text"
+                      className="home-search-input"
+                      placeholder="Search games"
+                      aria-label="Search games"
+                      value={homeSearch}
+                      onChange={(e) => setHomeSearch(e.target.value)}
+                    />
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },
@@ -2895,6 +2936,17 @@ function App() {
                       </div>
                     )}
                     {(() => {
+                      /* #350 — the search's own empty state: the chip DID have
+                         candidates and none survive the search. A chip that is
+                         empty on its own (Favorites at 0 stars) keeps its own
+                         line above, which explains a different absence. */
+                      if (homeSearch.trim() && searched.length === 0 && ordered.length > 0) {
+                        return (
+                          <div className="home-search-empty">
+                            No games match "{homeSearch.trim()}".
+                          </div>
+                        );
+                      }
                       /* #226 — under the Daily chip, split the grid into what
                          is still open today and what is already done. The card
                          already knows: cardDailyId + attempts[id].finishedAt is
@@ -2924,13 +2976,21 @@ function App() {
                       const todo = restCards.filter(c => !dailyDone(c));
                       return (
                         <React.Fragment>
-                          <div className="home-section-title home-split-title">
-                            Still to play
-                            <span className="home-pin-count">{todo.length}</span>
-                          </div>
-                          {todo.length === 0
-                            ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
-                            : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                          {/* While searching, an empty todo half would read
+                              "Every daily is done" over a list the search just
+                              hid — untrue. The heading and its line step aside
+                              and only Completed today shows. */}
+                          {!(homeSearch.trim() && todo.length === 0) && (
+                            <React.Fragment>
+                              <div className="home-section-title home-split-title">
+                                Still to play
+                                <span className="home-pin-count">{todo.length}</span>
+                              </div>
+                              {todo.length === 0
+                                ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
+                                : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                            </React.Fragment>
+                          )}
                           <div className="home-section-title home-split-title">
                             Completed today
                             <span className="home-pin-count">{done.length}</span>

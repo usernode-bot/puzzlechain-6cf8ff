@@ -107,6 +107,7 @@ const PLAY_MODES_BY_ID = {
   diamondrush:       ['daily', 'story', 'arcade'],
   zuma:              ['daily', 'story', 'arcade'],
   hashrush:          ['daily', 'story', 'arcade'],
+  jetrun:            ['daily', 'story', 'arcade'],
   match3:            ['daily', 'story', 'arcade'],
   'knights-tour':    ['daily', 'story', 'arcade'],
 
@@ -315,6 +316,16 @@ for (const c of GAME_CARDS) if (c.gameId && !CARD_BY_GAME_ID[c.gameId]) CARD_BY_
 const cardDailyId = (card) => {
   const d = card.modes.find(m => m.mode === 'daily');
   return d ? d.gameId : null;
+};
+
+// #350 — the All Games search field's predicate: a case-insensitive match on
+// the card's DISPLAY name (the same string .card-name renders), so the four
+// merged cards answer to their one shared title. A query that is empty after
+// trimming passes everything — a stray space must not blank the grid.
+const homeSearchMatch = (card, query) => {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return true;
+  return card.name.toLowerCase().includes(q);
 };
 
 /* The registry id a PER-CARD, PER-USER control stores under: the card's

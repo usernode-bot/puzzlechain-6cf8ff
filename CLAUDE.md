@@ -127,6 +127,22 @@ is for. The practice ribbon is rendered **once, pinned, at the game-screen
 level** so it appears over all three shells; it used to live inside the
 daily shell, which is why replaying 2048 showed no marker at all.
 
+### Practice has TWO seeds (#367)
+
+`practiceMode` replays come in two flavours. "🎲 Play again for fun" and
+`?practice=1` replay **today's** board with no seed open. The pre-game
+screen's "🎲 Practice run (not scored)" button and `?practice=random`
+open a **random** practice seed instead: `beginPracticeRun()` /
+`endPracticeRun()` in `05-core-lib.jsx` (module-scope, same shape as
+`beginArcadeRun`), and while one is open `serverDailySeed` returns it —
+so every daily generator deals a random board, the direct readers (Tile
+Match, Mahjong) included, and Daily Cipher's `cwRoundsForMode` draws a
+random block. The shell must close the seed on every non-practice entry
+point (`startRun`, `launchGame`, `backToLobby`, `openOpponentScreen`,
+`replayArcadeRun`) plus a `useEffect` keyed on `practiceMode`; `?practice=random`
+sets `data-practice="random"` on the pinned ribbon and navState carries
+`practiceSeed` so back/forward re-opens the same random board.
+
 ### A parameterised board and a canvas renderer
 
 #176 made several boards VARY in size or length — Word Search runs 8×8 to 15×15,

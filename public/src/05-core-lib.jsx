@@ -47,7 +47,30 @@ let SERVER_DAILY_SEEDS = {};
 // (hint counters, autosave) consult it so a guest run never fires requests
 // that can only 401.
 let GUEST_MODE = false;
+/* #367 — a PRACTICE run's seed ("🎲 Practice run" on the pre-game screen /
+   ?practice=random). The same shell-opens-runs-the-generators-read shape as
+   beginArcadeRun below: exactly one run is live at a time, so a module-scope
+   value lets every daily generator pick it up without any game component
+   learning about seeds. While a practice seed is OPEN, serverDailySeed returns
+   it, so every generator deals a random board instead of today's — including
+   the direct readers (Tile Match, Mahjong) that skip dailySeedFor. Band mixing
+   in dailySeedFor still applies on top. "Play again for fun" / ?practice=1
+   keep TODAY's board by leaving the seed closed; the shell (App) must close it
+   on every non-practice entry point. */
+let _practiceRunSeed = null;
+function beginPracticeRun(seed) {
+  _practiceRunSeed = Number.isFinite(seed)
+    ? (seed >>> 0)
+    // Math.random is correct here for the same reason it is in beginArcadeRun:
+    // a practice board is SUPPOSED to differ per run — that is the feature.
+    : (Math.floor(Math.random() * 4294967295) >>> 0);
+  return _practiceRunSeed;
+}
+function practiceRunSeed() { return _practiceRunSeed; }
+function endPracticeRun() { _practiceRunSeed = null; }
+
 function serverDailySeed(gameId) {
+  if (_practiceRunSeed != null) return _practiceRunSeed; // #367 practice run
   const s = SERVER_DAILY_SEEDS[gameId];
   return Number.isFinite(s) ? s : null;
 }

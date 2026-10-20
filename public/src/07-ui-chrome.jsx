@@ -1055,7 +1055,7 @@ function GameBoards({ game, onClose }) {
 
 function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offset, onReset, onPlay, onHowTo, onChat,
                          playMode, storyProgress, storyBand, onStoryBand, arcadeBandId, onArcadeBand, arcadeBest,
-                         onReplayRun, dailyBandId, onDailyBand }) {
+                         onReplayRun, dailyBandId, onDailyBand, onPractice }) {
   /* `?boards=1` opens the panel at mount. The boards are behind a tap, and a
      screen behind a tap is invisible to proposal checks and to the before/after
      screenshots alike — the same reason ?sheet= exists for the classic shell. */
@@ -1226,6 +1226,18 @@ function PreGameScreen({ game, attempt, best, streak, authOk, nextResetUtc, offs
       <button className="primary-btn pregame-play" onClick={onPlay}>
         {resuming ? '▶ Resume' : !authOk && game.daily ? 'Play as guest' : 'Play'}
       </button>
+      {/* #367 — the pre-game screen's ONE primary job is still starting today's
+          daily; Play stays the only filled button. Practice run is the
+          secondary, outlined escape hatch for warm-up: a RANDOM board that
+          uses no attempt, styled exactly like the result card's "Play again
+          for fun". Guests see it too — practice never needs an account — and
+          it shows while resuming, since practising touches nothing the saved
+          run keeps. */}
+      {isDaily && onPractice && (
+        <button className="primary-btn review-btn pregame-practice tappable" {...tapProps(() => onPractice(activeBand))}>
+          🎲 Practice run <span className="practice-note">(not scored)</span>
+        </button>
+      )}
       {game.daily && !authOk && (
         <div className="pregame-signedout">
           Playing as a guest — finish today's board and sign in before midnight UTC

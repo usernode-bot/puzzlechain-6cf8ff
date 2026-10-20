@@ -1125,6 +1125,16 @@
       "expectSelector": ".practice-ribbon"
     },
     {
+      "name": "Pre-game offers a practice run that is not scored",
+      "path": "/?game=wordhunt",
+      "expectSelector": ".pregame-practice"
+    },
+    {
+      "name": "Random practice run mounts unscored on a random board",
+      "path": "/?game=nonogram&practice=random",
+      "expectSelector": ".practice-ribbon.pinned[data-practice=\"random\"]"
+    },
+    {
       "name": "Offline result copy reassures instead of saying locked",
       "path": "/?game=cratepush&practice=1&syncfail=1",
       "expectSelector": ".cp-game"

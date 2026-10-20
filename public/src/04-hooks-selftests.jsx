@@ -928,6 +928,35 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  // #367 — a practice seed must be OPEN exactly while a practice run is live.
+  // While it is open, serverDailySeed returns it (so every generator deals a
+  // random board, direct readers included) and the derived daily seed moves;
+  // closed again, the day's real board comes back byte-identical.
+  check('practice-seed-scoped', () => {
+    /* A ?practice=random boot opens the seed before these scheduled tests run.
+       The live run owns the seed then — skip rather than fight it; the check
+       still runs on every ordinary boot. */
+    if (practiceRunSeed() != null) return true;
+    const before = dailySeedFor(0, 'sudoku');
+    try {
+      beginPracticeRun(12345);
+      if (serverDailySeed('sudoku') !== 12345) {
+        throw new Error('open practice seed did not replace the daily seed');
+      }
+      if (dailySeedFor(0, 'sudoku') === before) {
+        throw new Error('dailySeedFor did not move while a practice seed was open');
+      }
+    } finally {
+      endPracticeRun(); // the seed must stay closed whatever the result
+    }
+    if (practiceRunSeed() !== null) throw new Error('practice seed did not close');
+    if (serverDailySeed('sudoku') === 12345) throw new Error('practice seed leaked');
+    if (dailySeedFor(0, 'sudoku') !== before) {
+      throw new Error('daily seed did not return after the practice run closed');
+    }
+    return true;
+  });
+
   // Phase 8 (#121) — every Mahjong layout must have the same slot count, or a
   // resumed board hydrates against the wrong shape.
   check('mahjong-layouts', () => {

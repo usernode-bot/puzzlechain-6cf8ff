@@ -158,6 +158,8 @@ const TAPPABLE_CLASSES = [
   'mf-canvas', 'board-canvas',
   'card-pin',
   'dl-check',
+  // #367 — the pre-game screen's "🎲 Practice run" button.
+  'pregame-practice',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors

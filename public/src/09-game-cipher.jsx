@@ -420,6 +420,24 @@ function cwBlockAt(themeIdx, slot) {
    each time. */
 function cwRoundsForMode(playMode, band, offset) {
   if (playMode !== 'story' && playMode !== 'arcade') {
+    // #367 — a practice run draws a RANDOM block, never today's words (the
+    // daily's words come from the day number, which no seed reaches). Same
+    // draw the arcade branch makes, including its Easy/Hard shortest/longest
+    // steering. With no practice seed open nothing changes.
+    if (practiceRunSeed() != null) {
+      const rng = mulberry32(practiceRunSeed());
+      const pb = cwDailyBandFor(band);
+      if (pb) {
+        let best = null, bestAvg = -1;
+        for (let k = 0; k < 6; k++) {
+          const blk = cwBlockAt(Math.floor(rng() * CW_THEMES.length), Math.floor(rng() * 1e6));
+          const avg = blk.words.reduce((a, w) => a + w.length, 0) / blk.words.length;
+          if (bestAvg < 0 || (pb === 'easy' ? avg < bestAvg : avg > bestAvg)) { best = blk; bestAvg = avg; }
+        }
+        return best;
+      }
+      return cwBlockAt(Math.floor(rng() * CW_THEMES.length), Math.floor(rng() * 1e6));
+    }
     // #331 — the daily's difficulty band: same theme, a different block of
     // the SAME partition, steered by average word length. The rotation, the
     // theme and the un-banded block are all untouched.

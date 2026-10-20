@@ -3991,8 +3991,8 @@ app.get('/api/daily', async (req, res) => {
       /* Seeds the VIEWER's own all-time figures — /api/my/scores is
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
-         Past UTC dates only, so it never collides with demo=locked /
-         demo=streak, which finish today's rows.
+         The seeded attempts sit on PAST UTC dates, but the games it names
+         are cleared for EVERY date, today included.
 
          Staging carries ONE database across every check run and never
          resets, so this fixture has to ASSERT its state, not add to it —
@@ -4005,13 +4005,20 @@ app.get('/api/daily', async (req, res) => {
          fixture names never render. Clear the viewer's rows for the games
          it names first, including the card-union daily ids that would
          otherwise mask a seeded best (snakedaily over snake, minefinder
-         over minesweeper). */
+         over minesweeper).
+
+         TODAY cannot be left out of that clear. demo=locked finishes
+         TODAY's sudoku with 980 points on the same viewer, and the checks
+         are not run in one guaranteed order against that one database: if
+         demo=locked has run and a demo=streak request has not followed it
+         (its openTodayForDemo is what clears today), the Sudoku card's
+         all-time line reads "+1,300 pts" where the check names "+320 pts".
+         A fixture that NAMES a figure has to be able to say it whatever ran
+         before it, so today's rows for these games go too. */
       await pool.query(
         `DELETE FROM daily_attempts
           WHERE user_id = $1
-            AND (game_id = 'snakedaily'
-                 OR (game_id IN ('sudoku', '2048', 'wordsprint', 'minefinder')
-                     AND attempt_date < (now() AT TIME ZONE 'utc')::date))`,
+            AND game_id IN ('snakedaily', 'sudoku', '2048', 'wordsprint', 'minefinder')`,
         [req.user.id]
       );
       await pool.query(

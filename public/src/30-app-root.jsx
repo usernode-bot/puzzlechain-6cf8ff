@@ -225,6 +225,14 @@ function App() {
       setHomeFilter('favorites');
     }
   }, []);
+  // #350 — home grid search. App-level state like homeFilter, so what you
+  // typed survives going into a game and back and resets on reload.
+  // Deliberately NOT part of navState: typing must not push a history entry
+  // per keystroke. ?gamesearch= only seeds the initial value (the checks can
+  // navigate but cannot type); it is capped so a giant URL cannot bloat state.
+  const [homeSearch, setHomeSearch] = useState(() =>
+    (new URLSearchParams(window.location.search).get('gamesearch') || '').slice(0, 60)
+  );
   // Game of the Day (phase 7): { date, gameId, seed } from daily_featured.
   const [featured, setFeatured] = useState(null);
   // The viewer's active online matches (your-turn row), from /api/rooms/mine.
@@ -2871,8 +2879,17 @@ function App() {
                   const c = CARD_BY_GAME_ID[id];
                   if (c) pinnedSet.add(c.key);
                 }
-                const pinnedCards = ordered.filter(c => pinnedSet.has(c.key));
-                const restCards = ordered.filter(c => !pinnedSet.has(c.key));
+                /* #350 — the search is a SECOND filter on the already-chip-
+                   filtered list, applied before the pin partition so the two
+                   filters AND together: a card must pass both to appear, and a
+                   pinned card that fails the search is absent from both
+                   sections, exactly as one that fails a chip already is (the
+                   #232 rule — the partition stays lossless). The Daily chip's
+                   done/todo split below derives from restCards, so it narrows
+                   with the search for free. */
+                const searched = ordered.filter(c => homeSearchMatch(c, homeSearch));
+                const pinnedCards = searched.filter(c => pinnedSet.has(c.key));
+                const restCards = searched.filter(c => !pinnedSet.has(c.key));
                 const atPinCap = pins.length >= PIN_LIMIT;
                 const cardProps = (c) => ({
                   key: c.key,
@@ -2918,6 +2935,20 @@ function App() {
                           cards included — they match the same filter). */}
                       <span className="home-pin-count">{ordered.length}</span>
                     </div>
+                    {/* #350 — type-to-filter above the chips, so the two
+                        narrowing controls read as one row. It ANDs with the
+                        active chip below and with the Pinned section above:
+                        everything this list shows obeys it. Not in
+                        TAPPABLE_CLASSES — a text input keeps native
+                        long-press selection. */}
+                    <input
+                      type="text"
+                      className="home-search-input"
+                      placeholder="Search games"
+                      aria-label="Search games"
+                      value={homeSearch}
+                      onChange={(e) => setHomeSearch(e.target.value)}
+                    />
                     <div className="home-filter-chips" role="tablist" aria-label="Filter games">
                       {[
                         { id: 'all', label: 'All' },
@@ -2957,6 +2988,17 @@ function App() {
                       </div>
                     )}
                     {(() => {
+                      /* #350 — the search's own empty state: the chip DID have
+                         candidates and none survive the search. A chip that is
+                         empty on its own (Favorites at 0 stars) keeps its own
+                         line above, which explains a different absence. */
+                      if (homeSearch.trim() && searched.length === 0 && ordered.length > 0) {
+                        return (
+                          <div className="home-search-empty">
+                            No games match "{homeSearch.trim()}".
+                          </div>
+                        );
+                      }
                       /* #226 — under the Daily chip, split the grid into what
                          is still open today and what is already done. The card
                          already knows: cardDailyId + attempts[id].finishedAt is
@@ -2986,13 +3028,21 @@ function App() {
                       const todo = restCards.filter(c => !dailyDone(c));
                       return (
                         <React.Fragment>
-                          <div className="home-section-title home-split-title">
-                            Still to play
-                            <span className="home-pin-count">{todo.length}</span>
-                          </div>
-                          {todo.length === 0
-                            ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
-                            : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                          {/* While searching, an empty todo half would read
+                              "Every daily is done" over a list the search just
+                              hid — untrue. The heading and its line step aside
+                              and only Completed today shows. */}
+                          {!(homeSearch.trim() && todo.length === 0) && (
+                            <React.Fragment>
+                              <div className="home-section-title home-split-title">
+                                Still to play
+                                <span className="home-pin-count">{todo.length}</span>
+                              </div>
+                              {todo.length === 0
+                                ? <div className="home-split-empty">Every daily is done for today — come back after the reset.</div>
+                                : <div className="grid">{todo.map(c => <GameCard {...cardProps(c)} />)}</div>}
+                            </React.Fragment>
+                          )}
                           <div className="home-section-title home-split-title">
                             Completed today
                             <span className="home-pin-count">{done.length}</span>

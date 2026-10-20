@@ -111,6 +111,10 @@ const PLAY_MODES_BY_ID = {
   match3:            ['daily', 'story', 'arcade'],
   'knights-tour':    ['daily', 'story', 'arcade'],
 
+  // Escape from Dracula is a linear narrative reader: no daily deal, no
+  // difficulty ladder, no endless run. It offers no play modes on purpose.
+  dracula:           [],
+
   // Head-to-head: opponent is the axis, so no play modes.
   mancala:           [],
   'chutes-ladders':  [],
@@ -388,7 +392,7 @@ function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onP
     : [{ mode: null, gameId: card.gameId, caption: card.playCaption, label: 'Play' }];
 
   return (
-    <div className="card paired" style={{ '--accent': card.tagColor }} role="group" aria-label={card.name}>
+    <div className="card paired" style={{ '--accent': card.tagColor, '--accent-tint': card.tagColor + '24' }} role="group" aria-label={card.name}>
       {onTogglePin && (
         <button
           className={'card-pin tappable' + (pinned ? ' on' : '')}

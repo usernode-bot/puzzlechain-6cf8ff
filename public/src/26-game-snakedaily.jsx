@@ -7,8 +7,18 @@
    ============================================================ */
 const DSNK_N = 13;
 const DSNK_TARGET = 20;
+/* #331 — the daily gains Easy/Hard as speed dials: where the ramp starts, how
+   hard it bites, and where it floors. The apple count and the sequence shape
+   are the daily's contract and stay fixed; Normal keeps the pre-band numbers
+   (205 / 5 / 115) byte-for-byte. */
+const DSNK_BANDS = {
+  easy:   { base: 235, accel: 3.5, floor: 135 },
+  normal: { base: 205, accel: 5,   floor: 115 },
+  hard:   { base: 175, accel: 7,   floor: 95 },
+};
 
-function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
+function DailySnakeGame({ onWin, onLose, onStepChange, offset, band }) {
+  const dailyBand = (band === 'easy' || band === 'hard') ? band : null;
   const [tick, render] = useState(0);
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
@@ -23,7 +33,7 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
   // occupied by the snake is skipped (deterministically) to the next entry.
   const foodSeq = useRef(null);
   if (!foodSeq.current) {
-    const rng = dailyRng(offset, 'snakedaily');
+    const rng = dailyRng(offset, 'snakedaily', dailyBand); // null → pre-band seed
     foodSeq.current = Array.from({ length: 600 }, () => Math.floor(rng() * DSNK_N * DSNK_N));
   }
 
@@ -92,7 +102,8 @@ function DailySnakeGame({ onWin, onLose, onStepChange, offset }) {
     let raf, last = 0, alive = true;
     const loop = (ts) => {
       if (!alive) return;
-      const speed = Math.max(115, 205 - st.current.eaten * 5);
+      const dsnkSpeed = DSNK_BANDS[dailyBand || 'normal'];
+      const speed = Math.max(dsnkSpeed.floor, dsnkSpeed.base - st.current.eaten * dsnkSpeed.accel);
       if (ts - last >= speed) { last = ts; step(); }
       raf = requestAnimationFrame(loop);
     };

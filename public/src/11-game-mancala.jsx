@@ -706,7 +706,7 @@ function MancalaLocalGame({ onWin, onStepChange, resetKey }) {
         </div>
       )}
 
-      <div className="mnc-bottom-nav">
+      <div className="mnc-bottom-nav safe-bottom">
         {['game', 'history', 'stats'].map(tab => (
           <button
             key={tab}

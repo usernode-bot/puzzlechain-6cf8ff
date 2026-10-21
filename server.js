@@ -121,6 +121,8 @@ let migrationsReady = false;
 //   undo           — undo policy: 'none' | 'free' (unlimited take-backs) |
 //                    'booster' (limited, counted uses).
 const GAME_REGISTRY = {
+  dracula:           { name: 'Escape from Dracula', category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   sudoku:            { name: 'Sudoku',            category: 'daily',   tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   sudokumini:        { name: 'Sudoku Mini',        category: 'daily',   tier: 'A',
@@ -155,6 +157,13 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+  // Request #326 ("aerial combat with F-16s") lands here as Jet Run: the
+  // platform's content rules ban combat and weapons as game mechanics, so the
+  // jet threads gates, dodges storm clouds and collects fuel stars — nothing
+  // is shot at. Tier B: no lib/dapp.js engine, finishes settle through the
+  // snapshot + timing heuristics like the other self-shell games without one.
+  jetrun:            { name: 'Jet Run',           category: 'classic', dailyMode: true, tier: 'B',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
@@ -237,7 +246,7 @@ const PIN_LIMIT = 8;
 
 // Classic games that persist a single global best score via the generic
 // /api/classic/:gameId/score + /leaderboard endpoints (classic_scores table).
-const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders']);
+const CLASSIC_SCORE_GAME_IDS = new Set(['minesweeper', '2048', 'knights-tour', 'blockblast', 'hashrush', 'diamondrush', 'chutes-ladders', 'jetrun']);
 
 /* ============================================================
    Play modes (#176) — story levels and arcade bands
@@ -273,6 +282,7 @@ const STORY_BANDS = {
   nonogram: 6, cratepush: 8, minefinder: 6,
   tilematching: 10, bounce: 6, diamondrush: 8, zuma: 6,
   hashrush: 6, match3: 6, 'knights-tour': 6,
+  jetrun: 6,
 };
 const storyBandCount = (gameId) => STORY_BANDS[gameId] || 0;
 
@@ -293,6 +303,20 @@ function storyBandAward(gameId, band) {
 const ARCADE_BANDS = ['easy', 'normal', 'hard'];
 const ARCADE_BAND_MULT = { easy: 0.6, normal: 1.0, hard: 1.6 };
 const isArcadeBand = (b) => ARCADE_BANDS.indexOf(b) !== -1;
+
+/* Daily difficulty bands (#331) — Easy/Normal/Hard, chosen on the pre-game
+   screen and stored on the attempt row. Easy/Hard deal a different seeded
+   board from the same day's anchor (the client's dailySeedFor mixes the band
+   into the seed); the leaderboard filters by band so a win is ranked against
+   the same deal it was played on. DAILY_BAND_MULT scales what a win pays —
+   mirrored from the client's DAILY_BAND_MULT, which the client applies to the
+   final score it posts (the same client-authoritative trust model as the
+   streak multiplier); this constant documents the contract. Normal must stay
+   byte-identical to the pre-band deal, so every existing seeded board and
+   check keeps passing. */
+const DAILY_BANDS = ['easy', 'normal', 'hard'];
+const DAILY_BAND_MULT = { easy: 0.8, normal: 1.0, hard: 1.25 };
+const isDailyBand = (b) => DAILY_BANDS.indexOf(b) !== -1;
 
 /* Rank thresholds pay ONCE each, ever, per (user, game, band). Paying for rank
    POSITION instead would let a player drift up as other scores decay, or
@@ -832,6 +856,12 @@ async function migrate() {
   // re-derived from the deterministic daily seed, so only player moves live here.
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS progress JSONB`);
   await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS elapsed_secs INTEGER`);
+  /* #331 — the difficulty band the attempt was played on. Nullable: rows
+     written before the bands existed are Normal by construction (the pre-band
+     deal IS today's Normal deal), so reads COALESCE(band, 'normal'). The band
+     is chosen before the claim, so the UNIQUE (user, game, date) constraint
+     stays untouched — still one attempt per day. */
+  await pool.query(`ALTER TABLE daily_attempts ADD COLUMN IF NOT EXISTS band TEXT`);
   /* #188 — the all-time board groups every finished attempt for one game by
      player. Without this the query is a full scan of a table that only grows;
      the existing indexes are keyed for "today, this game", which is the wrong
@@ -2084,6 +2114,7 @@ function shapeAttempt(row) {
     finishedAt: row.finished_at,
     progress: row.progress || null,
     elapsedSecs: row.elapsed_secs != null ? row.elapsed_secs : null,
+    band: row.band || 'normal',
   };
 }
 
@@ -3004,6 +3035,33 @@ app.get('/api/daily', async (req, res) => {
           );
         }
       }
+      /* #331 — Easy and Hard rows on the FEATURED game so the per-band boards
+         are demonstrable. Deliberately DISTINCT users from the Normal rows
+         above: staging carries one DB across every check run, and the same
+         (user, game, date) triple seeded with a different band would be a
+         silent ON CONFLICT no-op — whoever ran first would own the band. */
+      const bandSeed = [
+        { key: 'e', name: 'Staging demo Greta', time: 61, steps: 15 }, // easy board
+        { key: 'e', name: 'Staging demo Hans',  time: 92, steps: 24 },
+        { key: 'e', name: 'Staging demo Ivo',   time: 133, steps: 33 },
+        { key: 'h', name: 'Staging demo Jana',  time: 79, steps: 20 }, // hard board
+        { key: 'h', name: 'Staging demo Kai',   time: 118, steps: 28 },
+      ];
+      for (const r of bandSeed) {
+        await pool.query(
+          `INSERT INTO daily_attempts
+             (user_id, username, game_id, attempt_date, band, score, steps, time_secs, finished_at)
+           VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4, $5, $6, $7, now())
+           ON CONFLICT (user_id, game_id, attempt_date) DO UPDATE
+             SET band = EXCLUDED.band,
+                 score = EXCLUDED.score,
+                 steps = EXCLUDED.steps,
+                 time_secs = EXCLUDED.time_secs,
+                 finished_at = EXCLUDED.finished_at`,
+          [`staging-demo-lb-${r.key}${r.name.slice(-1)}`, r.name, featuredForLb.gameId,
+           r.key === 'e' ? 'easy' : 'hard', 1000 - r.time, r.steps, r.time]
+        );
+      }
     }
 
     // Staging-only demo seed: give the current viewer a CLAIMED, UNFINISHED
@@ -3641,6 +3699,10 @@ app.get('/api/daily', async (req, res) => {
         { gameId: 'sudoku', cleared: 3 },
         { gameId: 'zuma',   cleared: 6 },
         { gameId: 'spider', cleared: 3 },
+        // Jet Run's ladder half-walked too (request #326): 2 of 6, so the new
+        // game shows ticks AND an open rung AND locked ones the same way the
+        // classics above do.
+        { gameId: 'jetrun', cleared: 2 },
       ];
       for (const w of walked) {
         // Same rule as demo=storybadges: this fixture says sudoku is HALF
@@ -3683,6 +3745,32 @@ app.get('/api/daily', async (req, res) => {
         `INSERT INTO arcade_bests
            (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
          VALUES ($1, $2, '2048', 'normal', 11200, 210, 268, 4, now())
+         ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+        [req.user.id, req.user.username || null]
+      );
+      // Rivals on Jet Run's Normal board too (request #326), same shape as the
+      // 2048 block above but with its own fake users and a modest viewer row
+      // outside the top 3. Same ON CONFLICT DO NOTHING idempotence.
+      const jrRivals = [
+        { name: 'Staging flyer Ada',  score: 480 },
+        { name: 'Staging flyer Borg', score: 420 },
+        { name: 'Staging flyer Cleo', score: 360 },
+        { name: 'Staging flyer Dax',  score: 300 },
+        { name: 'Staging flyer Evy',  score: 240 },
+      ];
+      for (let i = 0; i < jrRivals.length; i++) {
+        await pool.query(
+          `INSERT INTO arcade_bests
+             (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
+           VALUES ($1, $2, 'jetrun', 'normal', $3, 150, 60, 3, now())
+           ON CONFLICT (user_id, game_id, band) DO NOTHING`,
+          [`staging-jet-${i + 1}`, jrRivals[i].name, jrRivals[i].score]
+        );
+      }
+      await pool.query(
+        `INSERT INTO arcade_bests
+           (user_id, username, game_id, band, best_score, best_time_secs, best_steps, runs, updated_at)
+         VALUES ($1, $2, 'jetrun', 'normal', 180, 140, 45, 2, now())
          ON CONFLICT (user_id, game_id, band) DO NOTHING`,
         [req.user.id, req.user.username || null]
       );
@@ -3837,28 +3925,55 @@ app.get('/api/daily', async (req, res) => {
       /* Seeds the VIEWER's own all-time figures — /api/my/scores is
          caller-keyed, so this fixture must attribute rows to req.user (a
          fixture seeding fake users would show nothing on their profile).
+         This fixture is the caller's SOLE declaration of their all-time
+         figures, so it ASSERTS its state: the deletes below clear whatever an
+         earlier route in the same suite left behind, because the shared
+         staging DB and viewer made which tests ran first decide what these
+         four checks saw. CLAUDE.md: a fixture that seeds a COUNT must clear
+         what would otherwise survive — ON CONFLICT DO NOTHING alone keeps
+         the first writer's rows.
+           • daily_attempts: /api/my/scores SUMS every finished day, so the
+             long-streak fixtures (demo=streak / demo=badges seed 900 on each
+             of 60 prior days) added thousands to a game's total.
+           • snake_scores / classic_scores: read MAX across rows, so another
+             demo's owned row outranked this fixture's 350 / 950.
+           • snakedaily: the Snake card MERGES the classic arcade id and the
+             daily id, and the state line prefers daily points over best, so
+             the demo=dualmode finished run (610 pts, today) outranked the
+             arcade best. This is the "card WITHOUT a daily" assertion, so its
+             daily row must go — today's OTHER rows (locked sudoku, homegrid
+             klondike/spider, dualmode bouncedaily, the profile's recent list
+             and the lobby's PLAYED indicator) are deliberately left alone.
+
          Past UTC dates only, so it never collides with demo=locked /
-         demo=streak, which finish today's rows; every insert is
-         DO NOTHING, so re-runs and other fixtures' rows are preserved. */
-      /* ASSERT the state, don't add to it. /api/my/scores SUMS every finished
-         daily row, and staging shares one DB and one viewer across all checks:
-         demo=locked finishes today's sudoku at 980 and demo=streak/badges drop
-         900-point rows on featured games, so DO NOTHING inserts left sudoku at
-         320 + 980 + ... and 2048 above 800. The same goes for the snake card,
-         which reads "Best 350" only while neither of its ids holds daily
-         points (pts outranks best). Clear the viewer's rows for the games this
-         fixture claims first; the other fixtures re-assert theirs on their own
-         routes. */
+         demo=streak, which finish today's rows.
+
+         Staging carries ONE database across every check run and never
+         resets, so this fixture has to ASSERT its state, not add to it —
+         the same rule demo=storybadges and demo=modes follow. demo=streak
+         and demo=badges already finished this viewer's past-date
+         daily_attempts, and demo=ladder wrote a rating row; with plain
+         ON CONFLICT DO NOTHING those earlier rows win, /api/my/scores
+         SUMS them (sudoku 4,820 rather than 320), and the merged Snake
+         card prefers that pts over its classic best — so the figures this
+         fixture names never render. Clear the viewer's rows for the games
+         it names first, including the card-union daily ids that would
+         otherwise mask a seeded best (snakedaily over snake, minefinder
+         over minesweeper). */
       await pool.query(
         `DELETE FROM daily_attempts
-          WHERE user_id = $1 AND game_id = ANY($2::text[])`,
-        [req.user.id, ['sudoku', '2048', 'wordsprint', 'snake', 'snakedaily']]
+          WHERE user_id = $1
+            AND (attempt_date < (now() AT TIME ZONE 'utc')::date
+                 OR game_id = 'snakedaily')`,
+        [req.user.id]
       );
+      await pool.query(`DELETE FROM snake_scores WHERE user_id = $1`, [req.user.id]);
+      await pool.query(`DELETE FROM classic_scores WHERE user_id = $1`, [req.user.id]);
       await pool.query(
-        `DELETE FROM classic_scores
-          WHERE user_id = $1 AND game_id = ANY($2::text[])`,
-        [req.user.id, ['snake', 'snakedaily']]
+        `DELETE FROM game_ratings WHERE user_id = $1 AND game_id = 'checkers'`,
+        [req.user.id]
       );
+
       const msSeed = [
         ['sudoku', 3, 320], ['2048', 2, 800], ['wordsprint', 1, 140],
       ];
@@ -3883,16 +3998,21 @@ app.get('/api/daily', async (req, res) => {
           [req.user.id, req.user.username, gid, score]
         );
       }
+      // snake_scores and game_ratings are single rows per user (per game),
+      // so UPSERT the asserted values: a re-run must CORRECT them, not
+      // no-op behind whatever a previous run or fixture left there.
       await pool.query(
         `INSERT INTO snake_scores (user_id, username, best_score, best_length, best_time_secs, games_played)
          VALUES ($1, $2, 350, 42, 118, 3)
-         ON CONFLICT (user_id) DO UPDATE SET best_score = 350`,
+         ON CONFLICT (user_id) DO UPDATE SET
+           best_score = 350, best_length = 42, best_time_secs = 118, games_played = 3`,
         [req.user.id, req.user.username]
       );
       await pool.query(
         `INSERT INTO game_ratings (user_id, username, game_id, elo, win_streak, best_streak, wins, losses, draws)
          VALUES ($1, $2, 'checkers', 1046, 2, 3, 4, 2, 0)
-         ON CONFLICT (user_id, game_id) DO NOTHING`,
+         ON CONFLICT (user_id, game_id) DO UPDATE SET
+           elo = 1046, win_streak = 2, best_streak = 3, wins = 4, losses = 2, draws = 0`,
         [req.user.id, req.user.username]
       );
     }
@@ -4018,6 +4138,11 @@ app.get('/api/daily', async (req, res) => {
 app.post('/api/daily/:gameId/start', async (req, res) => {
   const { gameId } = req.params;
   if (!GAME_IDS.has(gameId)) return res.status(400).json({ error: 'Unknown game' });
+  // The band is chosen on the pre-game screen and sent on the claim. It does
+  // not gate anything (same code path either way) — it only picks which seeded
+  // deal the client derives and what the board is ranked against. Absent =
+  // 'normal' (the pre-band deal, unchanged).
+  const band = isDailyBand(req.body && req.body.band) ? req.body.band : 'normal';
   try {
     // Issue (or read) today's board seed alongside the claim, so a client that
     // sat on the lobby across the UTC reset still mounts the new day's board.
@@ -4025,11 +4150,11 @@ app.post('/api/daily/:gameId/start', async (req, res) => {
     try { seed = await ensureDailySeed(gameId); }
     catch (e) { console.warn('[daily] start seed issue failed (client falls back):', e.message); }
     const { rows } = await pool.query(
-      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date)
-       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date)
+      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date, band)
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4)
        ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
        RETURNING *`,
-      [req.user.id, req.user.username || null, gameId]
+      [req.user.id, req.user.username || null, gameId, band]
     );
     if (rows.length === 0) {
       // Already used today — return the existing attempt so the client can
@@ -4475,6 +4600,9 @@ app.post('/api/daily/:gameId/commit', async (req, res) => {
   const steps = Number.isFinite(req.body.steps) ? Math.round(req.body.steps) : null;
   const timeSecs = Number.isFinite(req.body.timeSecs) ? Math.round(req.body.timeSecs) : null;
   if (!(score > 0)) return res.status(400).json({ error: 'Nothing to commit' });
+  // #331 — the band the anonymous run was played on (carried in the pending
+  // run); it lands on the same deal's board it was played against.
+  const band = isDailyBand(req.body.band) ? req.body.band : 'normal';
   try {
     const todaySeed = await ensureDailySeed(gameId);
     if (Number(req.body.seed) !== todaySeed) {
@@ -4483,11 +4611,11 @@ app.post('/api/daily/:gameId/commit', async (req, res) => {
       });
     }
     const { rows: ins } = await pool.query(
-      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date)
-       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date)
+      `INSERT INTO daily_attempts (user_id, username, game_id, attempt_date, band)
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'utc')::date, $4)
        ON CONFLICT (user_id, game_id, attempt_date) DO NOTHING
        RETURNING *`,
-      [req.user.id, req.user.username || null, gameId]
+      [req.user.id, req.user.username || null, gameId, band]
     );
     if (ins.length === 0) {
       const { rows: existing } = await pool.query(
@@ -4527,6 +4655,9 @@ app.get('/api/public/daily/:gameId/rank-preview', async (req, res) => {
   // Score-ranked boards (Word Sprint) preview against score; the rest against
   // time-then-steps — mirrors the per-game leaderboard's tieBreak dispatch.
   const scoreRanked = (GAME_REGISTRY[gameId] && GAME_REGISTRY[gameId].manifest || {}).tieBreak === 'score-then-time';
+  // #331 — ?band= previews against one deal's board (a guest who played Easy is
+  // ranked against Easy). Defaults to normal, same as the leaderboard.
+  const band = isDailyBand(req.query.band) ? req.query.band : 'normal';
   try {
     const { rows } = await pool.query(
       scoreRanked
@@ -4535,16 +4666,18 @@ app.get('/api/public/daily/:gameId/rank-preview', async (req, res) => {
              FROM daily_attempts
             WHERE game_id = $1
               AND attempt_date = (now() AT TIME ZONE 'utc')::date
-              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
+              AND COALESCE(band, 'normal') = $3`
         : `SELECT COUNT(*)::int AS total,
                   COUNT(*) FILTER (WHERE time_secs < $2 OR (time_secs = $2 AND steps <= $3))::int AS ahead
              FROM daily_attempts
             WHERE game_id = $1
               AND attempt_date = (now() AT TIME ZONE 'utc')::date
-              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0`,
+              AND finished_at IS NOT NULL AND score IS NOT NULL AND score > 0
+              AND COALESCE(band, 'normal') = $4`,
       scoreRanked
-        ? [gameId, Number.isFinite(sc) ? sc : 0]
-        : [gameId, t, Number.isFinite(s) ? s : 2147483647]
+        ? [gameId, Number.isFinite(sc) ? sc : 0, band]
+        : [gameId, t, Number.isFinite(s) ? s : 2147483647, band]
     );
     res.json({
       rank: rows[0].ahead + 1,
@@ -5023,6 +5156,12 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
   const orderBy = tieBreak === 'score-then-time'
     ? 'score DESC, time_secs ASC, finished_at ASC'
     : 'time_secs ASC, steps ASC, finished_at ASC';
+  /* #331 — ?band=easy|normal|hard filters the board to one deal. Default is
+     'normal', which is also what every pre-band row COALESCEs to, so callers
+     that send no band param see exactly the board they always saw. (Easy/Hard
+     are separate deals — same day, different seed — so their finishes rank
+     against the same board they were played on, at their own multiplier.) */
+  const band = isDailyBand(req.query.band) ? req.query.band : 'normal';
   try {
     const { rows } = await pool.query(
       `SELECT user_id, username, score, steps, time_secs,
@@ -5034,10 +5173,11 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
           AND attempt_date = (now() AT TIME ZONE 'utc')::date
           AND finished_at IS NOT NULL
           AND score IS NOT NULL AND score > 0
+          AND COALESCE(band, 'normal') = $3
           AND ($2::text IS NULL
                OR user_id = $2
                OR user_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $2))`,
-      [gameId, friendsScope ? req.user.id : null]
+      [gameId, friendsScope ? req.user.id : null, band]
     );
     const total = rows.length;
     // Public via PUBLIC_API_GET — req.user may be null (anonymous browse).
@@ -5053,7 +5193,7 @@ app.get('/api/daily/:gameId/leaderboard', async (req, res) => {
     const entries = rows.slice(0, LEADERBOARD_LIMIT).map(shape);
     const mineRow = uid != null ? rows.find((r) => r.user_id === uid) : null;
     const me = mineRow ? shape(mineRow) : null;
-    res.json({ entries, me, total });
+    res.json({ entries, me, total, band });
   } catch (err) {
     console.error('[daily] leaderboard failed:', err.message);
     res.status(500).json({ error: 'Failed to load leaderboard' });

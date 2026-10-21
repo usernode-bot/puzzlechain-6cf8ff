@@ -81,14 +81,35 @@ function clearPendingRun(gameId) {
   } catch {}
 }
 
-// A fresh seeded RNG for (today, gameId). Everyone on the same UTC day gets the
-// identical board for each game — the precondition for a fair leaderboard.
-// Prefers the server-issued seed; mulberry32 stays the downstream generator
-// either way, so game code is untouched by the server-seed flip.
-function dailyRng(offset, gameId) {
+/* Daily difficulty bands (#331). The daily's band is chosen on the pre-game
+   screen and stored on the attempt row; Easy/Hard deal a different board from
+   the same day's anchor, Normal is byte-identical to the pre-band deal so
+   every existing seeded board and check keeps passing. DAILY_BAND_MULT scales
+   what a win pays (mirrored as a doc constant next to ARCADE_BAND_MULT in
+   server.js — the server stores the client's final score as-is, exactly as it
+   does for the streak multiplier). */
+const DAILY_BANDS = ['easy', 'normal', 'hard'];
+const DAILY_BAND_MULT = { easy: 0.8, normal: 1.0, hard: 1.25 };
+const isDailyBand = (b) => DAILY_BANDS.indexOf(b) !== -1;
+
+// The day's numeric anchor for (game, band). Prefers the server-issued seed;
+// falls back to the legacy UTC-day derivation. Easy/Hard mix the anchor with
+// the game id and the band, so one seed row still anchors all three boards and
+// Normal (band undefined/null/'normal') hashes to exactly the pre-band seed.
+function dailySeedFor(offset, gameId, band) {
   const srv = serverDailySeed(gameId);
-  const seed = srv != null ? srv : ((utcDayNum(offset) + hashStr(gameId)) >>> 0);
-  return mulberry32(seed >>> 0);
+  const base = srv != null ? srv : ((utcDayNum(offset) + hashStr(gameId)) >>> 0);
+  const mixed = (band === 'easy' || band === 'hard')
+    ? hashStr(gameId + ':daily:' + band) : 0;
+  return (base + mixed) >>> 0;
+}
+
+// A fresh seeded RNG for (today, gameId, band). Everyone on the same UTC day
+// gets the identical board for each game — the precondition for a fair
+// leaderboard. Prefers the server-issued seed; mulberry32 stays the downstream
+// generator either way, so game code is untouched by the server-seed flip.
+function dailyRng(offset, gameId, band) {
+  return mulberry32(dailySeedFor(offset, gameId, band));
 }
 
 /* ============================================================
@@ -343,7 +364,11 @@ function modeSeed(playMode, gameId, band, offset) {
     const s = _arcadeRunSeed != null ? _arcadeRunSeed : beginArcadeRun();
     return { rng: mulberry32(s), seed: s };
   }
-  return { rng: dailyRng(offset, gameId), seed: null };
+  // The daily branch takes the band (string, or null) so Easy/Hard get their
+  // own mixed deal; Normal hashes to the pre-band seed (dailySeedFor). seed
+  // stays null on purpose: some play-rngs (Zuma's) treat a non-null seed as
+  // "arcade board", and the dailies want an rng, not a stored seed.
+  return { rng: dailyRng(offset, gameId, band), seed: null };
 }
 
 
@@ -433,12 +458,39 @@ function saveHistory(key, entry, max) {
 // and forward it on every API call via the x-usernode-token header.
 const USERNODE_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
 
-/* Copy a line to the clipboard, degrading to a no-op where it is unavailable
-   (an insecure origin, or a browser that withholds it). Every caller shows its
-   own "copied" feedback, so a silent failure only costs the confirmation. */
+/* Copy a line to the clipboard. Returns a Promise<boolean> so a caller can
+   tell a real success from a silent failure — the async clipboard API can be
+   absent (older WebViews), reject (permission withheld) in a cross-origin
+   frame, and callers that show "Copied!" unconditionally were lying when it
+   did. The fallback is the legacy path — a selected hidden textarea plus
+   execCommand('copy') — which works inside a user gesture where the async API
+   does not. Returns false when neither path copies. */
+function copyViaExecCommand(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    // Off-screen but rendered: display:none defeats execCommand('copy').
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
+}
 function copyText(text) {
-  try { return navigator.clipboard.writeText(text).catch(() => {}); }
-  catch { return Promise.resolve(); }
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      return navigator.clipboard.writeText(text)
+        .then(() => true)
+        .catch(() => copyViaExecCommand(text));
+    }
+  } catch {}
+  return Promise.resolve(copyViaExecCommand(text));
 }
 
 // Coarse relative time for history rows — "3d", "2h", "just now". Deliberately
@@ -577,6 +629,13 @@ const STREAK_TIERS = [
    entry id in localStorage, like the how-to first-open state).
    ============================================================ */
 const CHANGELOG = [
+  {
+    id: 'w2026-10-05',
+    weekOf: 'Week of October 5, 2026',
+    items: [
+      'New game: Jet Run — steer a fighter jet through the gates, dodge the storm clouds and grab the fuel stars, with Daily, Story and Arcade modes.',
+    ],
+  },
   {
     id: 'w2026-08-17',
     weekOf: 'Week of August 17, 2026',

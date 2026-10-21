@@ -107,8 +107,13 @@ const PLAY_MODES_BY_ID = {
   diamondrush:       ['daily', 'story', 'arcade'],
   zuma:              ['daily', 'story', 'arcade'],
   hashrush:          ['daily', 'story', 'arcade'],
+  jetrun:            ['daily', 'story', 'arcade'],
   match3:            ['daily', 'story', 'arcade'],
   'knights-tour':    ['daily', 'story', 'arcade'],
+
+  // Escape from Dracula is a linear narrative reader: no daily deal, no
+  // difficulty ladder, no endless run. It offers no play modes on purpose.
+  dracula:           [],
 
   // Head-to-head: opponent is the axis, so no play modes.
   mancala:           [],
@@ -122,6 +127,46 @@ const PLAY_MODES_BY_ID = {
 
 const playModesFor = (gameId) => PLAY_MODES_BY_ID[gameId] || [];
 const supportsMode = (gameId, mode) => playModesFor(gameId).indexOf(mode) !== -1;
+
+/* Daily difficulty bands (#331). Every daily is playable on Easy, Normal or
+   Hard: the band is picked on the pre-game screen, rides the /start claim, is
+   stored on the attempt row, and scales what a win pays
+   (DAILY_BAND_MULT in 05-core-lib: easy 0.8x, normal 1x, hard 1.25x — Hard is
+   the better deal per run but earns less per minute, so farming Easy is never
+   the optimal strategy, mirroring the arcade's ARCADE_BAND_MULT rationale).
+   Normal is byte-identical to the pre-band deal, so every seeded board and
+   check keeps passing. Each band is its own seeded deal from the same day
+   anchor and ranks on its own board (leaderboard ?band=).
+
+   DAILY_BAND_NOTES is the per-game copy shown beside the picker: what changes
+   on Easy and on Hard. Every id declaring a daily mode must have an entry and
+   vice versa, which scripts/check-registry.js enforces — a picker row with no
+   idea what its band does is exactly the drift rule 5 exists to catch. */
+const DAILY_BAND_NOTES = {
+  sudoku:            { easy: 'Extra givens: the gentlest dig, in either size.', hard: 'Fewest givens: the toughest dig, in either size.' },
+  sudokumini:        { easy: 'Extra givens: the gentlest 6x6 dig.', hard: 'Fewest givens: the toughest 6x6 dig.' },
+  wordhunt:          { easy: 'The smallest 8x8 grid, everyday words.', hard: 'The full 15x15 grid, rarer words.' },
+  cryptowordle:      { easy: 'Shorter words, one extra guess each round.', hard: 'Longer words, one guess fewer each round.' },
+  klondike:          { easy: 'A friendlier rated deal: more cards already in place.', hard: 'The hardest rated deal in the corpus.' },
+  spider:            { easy: 'A friendlier rated deal: more cards already in place.', hard: 'The hardest rated deal in the corpus.' },
+  mahjongsol:        { easy: 'The gentlest layout (Courtyard).', hard: 'The deepest layout in the set.' },
+  anagrams:          { easy: 'The shortest words, the gentlest band.', hard: 'The longest words in the pool.' },
+  nonogram:          { easy: 'Small, sparse grids.', hard: 'The largest, densest grids.' },
+  cratepush:         { easy: 'Rooms with the fewest pushes.', hard: 'The longest rooms in the corpus.' },
+  dropstack:         { easy: 'Slower gravity, friendlier pieces.', hard: 'Faster gravity, more awkward pieces.' },
+  wordsprint:        { easy: 'Two full minutes on the clock.', hard: 'A 60-second sprint.' },
+  tilematchingdaily: { easy: 'The gentlest layout (Courtyard).', hard: 'The tightest layout in the set.' },
+  minefinder:        { easy: 'The smallest field, fewest mines.', hard: 'The largest field, most mines.' },
+  snakedaily:        { easy: 'The slowest snake speed.', hard: 'Full-speed snake.' },
+  bouncedaily:       { easy: 'Four balls, a sparser wall.', hard: 'Two balls, a denser wall.' },
+  '2048':            { easy: 'Almost every spawn is a 2.', hard: 'Nearly a third of spawns are 4s.' },
+  blockblast:        { easy: 'A gentler piece pool.', hard: 'The most awkward pieces.' },
+  diamondrush:       { easy: 'A gentle band: easier digs, more moves.', hard: 'The hardest band in the ladder.' },
+  zuma:              { easy: 'The gentlest path.', hard: 'The hardest path in the ladder.' },
+  hashrush:          { easy: 'Slower stream, fewer hazards. Same 90-second shift.', hard: 'Fast stream, heavy hazard rate. Same 90-second shift.' },
+  match3:            { easy: 'The simplest of the authored puzzles.', hard: 'The most demanding authored puzzle.' },
+  'knights-tour':    { easy: 'The openest board: fewest blocked squares.', hard: 'The most blocked board.' },
+};
 
 /* The mode a game opens in when nobody said which — a bare `?game=` link, a
    resumed attempt, a practice replay.
@@ -254,6 +299,16 @@ const cardDailyId = (card) => {
   return d ? d.gameId : null;
 };
 
+// #350 — the All Games search field's predicate: a case-insensitive match on
+// the card's DISPLAY name (the same string .card-name renders), so the four
+// merged cards answer to their one shared title. A query that is empty after
+// trimming passes everything — a stray space must not blank the grid.
+const homeSearchMatch = (card, query) => {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return true;
+  return card.name.toLowerCase().includes(q);
+};
+
 /* The registry id a PER-CARD, PER-USER control stores under: the card's
    ANCHOR id. Cards are a client-side composition and can be recomposed;
    registry ids never move, so the durable thing to write to the database is
@@ -337,7 +392,7 @@ function GameCard({ card, attempts, bests, storyProgress, myScores, loading, onP
     : [{ mode: null, gameId: card.gameId, caption: card.playCaption, label: 'Play' }];
 
   return (
-    <div className="card paired" style={{ '--accent': card.tagColor }} role="group" aria-label={card.name}>
+    <div className="card paired" style={{ '--accent': card.tagColor, '--accent-tint': card.tagColor + '24' }} role="group" aria-label={card.name}>
       {onTogglePin && (
         <button
           className={'card-pin tappable' + (pinned ? ' on' : '')}

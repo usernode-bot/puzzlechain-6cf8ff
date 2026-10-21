@@ -183,10 +183,17 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
   /* #176 — the daily now walks the theme partition (no repeat for 40 days,
      where the old uniform draw over seven sets could repeat tomorrow) at the
      middle band. Story climbs the band ladder; arcade rolls a fresh grid at
-     one of three points on it. */
+     one of three points on it.
+     #331 — the daily's difficulty band rides the band-mixed seed: Easy is
+     the smallest grid, Hard the full 15×15 (WS_BANDS 0 and 5); Normal stays
+     at the middle rung and the un-mixed seed. */
+  const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard')
+    ? band : null;
   const wsBandIdx = playMode === 'story' ? Math.max(0, band || 0)
     : playMode === 'arcade'
       ? [1, 3, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+      : dailyBand === 'easy' ? 0
+      : dailyBand === 'hard' ? WS_BANDS.length - 1
       : 2;
   const wsSpec = WS_BANDS[Math.min(WS_BANDS.length - 1, wsBandIdx)];
   const board = useRef(null);
@@ -196,7 +203,7 @@ function WordHuntGame({ onWin, onStepChange, offset, savedProgress, onSaveProgre
       board.current = generateWordSearch(rng, wsSpec);
     } else {
       board.current = generateWordSearch(
-        dailyRng(offset, 'wordhunt'), wsSpec, WS_THEME_ORDER[
+        dailyRng(offset, 'wordhunt', dailyBand || undefined), wsSpec, WS_THEME_ORDER[
           ((utcDayNum(offset) % WS_THEME_ORDER.length) + WS_THEME_ORDER.length) % WS_THEME_ORDER.length
         ]);
     }

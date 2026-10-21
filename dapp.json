@@ -28,6 +28,21 @@
       "expectText": "Game Corner"
     },
     {
+      "name": "Home shows the games search field",
+      "path": "/",
+      "expectSelector": ".home-search-input[placeholder=\"Search games\"] + .home-filter-chips"
+    },
+    {
+      "name": "Searching narrows the grid to the matching game",
+      "path": "/?gamesearch=sudoku",
+      "expectSelector": ".grid .card[aria-label=\"Sudoku\"]"
+    },
+    {
+      "name": "Search with no match shows the empty line",
+      "path": "/?gamesearch=zzqxw",
+      "expectText": "No games match"
+    },
+    {
       "name": "Nav wordmark sits on one line in the compact header",
       "path": "/",
       "expectSelector": ".nav .nav-brand .brandword"
@@ -516,6 +531,16 @@
       "expectText": "GAME OF THE DAY"
     },
     {
+      "name": "All Games header shows how many games the chip shows",
+      "path": "/",
+      "expectSelector": ".home-all-title .home-pin-count"
+    },
+    {
+      "name": "Game of the Day icon tile renders in dark mode",
+      "path": "/?theme=dark",
+      "expectSelector": "html[data-theme=\"dark\"] .gotd-hero .gotd-icon"
+    },
+    {
       "name": "Home shows the merged all-games grid",
       "path": "/",
       "expectText": "All Games"
@@ -629,6 +654,16 @@
       "name": "Nav carries a settings gear",
       "path": "/",
       "expectSelector": ".nav-settings-btn"
+    },
+    {
+      "name": "Nav carries a dark-mode toggle in light theme",
+      "path": "/?theme=light",
+      "expectSelector": "html[data-theme=\"light\"] .nav-theme-btn[data-theme-next=\"dark\"]"
+    },
+    {
+      "name": "Nav toggle offers light while dark",
+      "path": "/?theme=dark",
+      "expectSelector": "html[data-theme=\"dark\"] .nav-theme-btn[data-theme-next=\"light\"]"
     },
     {
       "name": "Dark theme renders the daily lobby",
@@ -1008,6 +1043,11 @@
       "name": "A classic win gets the same one-number card",
       "path": "/?game=2048&result=win",
       "expectSelector": ".win-card .we-v"
+    },
+    {
+      "name": "The win card carries a Share button",
+      "path": "/?game=sudoku&result=win",
+      "expectSelector": ".win-card button.tappable[data-share-btn=\"1\"]"
     },
     {
       "name": "Home is the bottom of the back stack",
@@ -1896,6 +1936,92 @@
       "name": "Card without a daily still shows its all-time best",
       "path": "/?demo=myscores",
       "expectText": "Best 350"
+    },
+    {
+      "name": "A long chapter pages instead of scrolling",
+      "path": "/?game=dracula&play=1",
+      "expectSelector": ".drac-card .tp-more"
+    },
+    {
+      "id": "jetrun.board",
+      "name": "Jet Run opens on the flying brief",
+      "path": "/?game=jetrun",
+      "expectText": "Start flying",
+      "visual": true,
+      "impact": [
+        "public/src/32-game-jetrun.jsx",
+        "public/src/01-styles.jsx",
+        "public/src/28-registry.jsx",
+        "public/src/29-cards.jsx"
+      ]
+    },
+    {
+      "name": "A bounded Jet Run course names the score it wants",
+      "path": "/?game=jetrun&pmode=story&band=1&play=1",
+      "expectSelector": ".jr-wrap[data-jr-target]:not([data-jr-target=\"0\"])"
+    },
+    {
+      "name": "An endless Jet Run run sets no target",
+      "path": "/?game=jetrun&pmode=arcade&band=hard&play=1",
+      "expectSelector": ".jr-wrap[data-jr-target=\"0\"]"
+    },
+    {
+      "name": "A finished Jet Run flight draws no end panel of its own",
+      "path": "/?game=jetrun&play=1&jrdead=1",
+      "expectSelector": ".jr-wrap[data-jr-phase=\"dead\"]:not(:has(.jr-overlay))"
+    },
+    {
+      "name": "Story picker opens Jet Run's ladder",
+      "path": "/?game=jetrun&pmode=story&demo=modes",
+      "expectSelector": ".pregame-band"
+    },
+    {
+      "name": "Classic shell is inset from the safe area (fixed top bar)",
+      "path": "/?game=snake&sheet=leaderboard",
+      "expectSelector": ".cg-shell .cg-topbar",
+      "visual": true,
+      "id": "safe-area.classic-shell",
+      "impact": [
+        "public/src/01-styles.jsx",
+        "public/index.html"
+      ]
+    },
+    {
+      "name": "Classic menu sheet clears the home indicator",
+      "path": "/?game=snake&sheet=leaderboard",
+      "expectSelector": ".cg-sheet.open"
+    },
+    {
+      "name": "Results card clears the safe area top and bottom",
+      "path": "/?game=2048&result=win",
+      "expectSelector": ".win-overlay .win-card"
+    },
+    {
+      "name": "The fixed results minibar clears the home indicator",
+      "path": "/?game=snake&result=1&snake=normal&review=1",
+      "expectSelector": ".result-minibar"
+    },
+    {
+      "name": "Pre-game daily difficulty picker renders",
+      "path": "/?game=wordsprint",
+      "expectSelector": ".pregame-bands",
+      "expectText": "Difficulty"
+    },
+    {
+      "name": "Pre-game daily picker shows the Hard band note",
+      "path": "/?game=zuma&pmode=daily&band=hard",
+      "expectText": "The hardest path in the ladder"
+    },
+    {
+      "name": "Minesweeper arcade Hard deals the 10 by 10 board",
+      "path": "/?game=minesweeper&pmode=arcade&band=hard&play=1",
+      "expectSelector": "canvas[aria-label*=\"10 by 10 board\"]"
+    },
+    {
+      "name": "Daily leaderboards carry Easy/Normal/Hard band tabs",
+      "path": "/?game=sudoku&boards=1&demo=streak",
+      "expectSelector": ".lb-band-tabs",
+      "expectText": "Hard"
     }
   ],
   "visibility": {

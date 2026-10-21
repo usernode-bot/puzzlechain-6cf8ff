@@ -27,6 +27,26 @@ function cgSetPref(key, val) {
   try { localStorage.setItem(PREF_KEYS[key] || CG_MOTION_KEY, val ? '1' : '0'); } catch {}
   if (key === 'motion') applyMotionPref();
 }
+
+/* #331 — the remembered daily difficulty. A string, not a boolean, so it gets
+   its own key and writer: cgSetPref writes '1'/'0' and would corrupt it. The
+   pre-game screen seeds its band picker from this, and picking a band there
+   updates it, so "Hard every morning" is one choice, not one per game. Only
+   the remembered value lives here (05-core-lib declares the band list, and
+   this file evaluates first); validation is inline for the same reason. */
+const CG_DAILYBAND_KEY = 'puzzlechain_cg_dailyband';
+function cgDailyBandPref() {
+  try {
+    const v = localStorage.getItem(CG_DAILYBAND_KEY);
+    return (v === 'easy' || v === 'hard') ? v : 'normal';
+  } catch { return 'normal'; }
+}
+function cgSetDailyBandPref(band) {
+  try {
+    localStorage.setItem(CG_DAILYBAND_KEY,
+      (band === 'easy' || band === 'hard') ? band : 'normal');
+  } catch {}
+}
 /* `?devkbd=1|0` — the pref is a device setting, so the only way a proposal
    check or a screenshot could otherwise reach the other mode is by opening
    Settings and tapping, which navigation cannot do. Applied at boot, before

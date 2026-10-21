@@ -105,13 +105,25 @@
        small block. -->
   <style>
     html, body { margin: 0; }
+    /* Same forwarded-inset tokens the app uses (see 01-styles.jsx): the bridge
+       publishes --un-safe-inset-* on <html> and leaves them unset standalone,
+       where the env() fallback is correct. The boot shell must not sit under
+       the home indicator either. */
+    :root {
+      --pc-safe-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px));
+      --pc-safe-right: var(--un-safe-inset-right, env(safe-area-inset-right, 0px));
+      --pc-safe-bottom: var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px));
+      --pc-safe-left: var(--un-safe-inset-left, env(safe-area-inset-left, 0px));
+    }
     body {
       background: #FAF6EE; color: #1F2B47;
       font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
     }
     #boot-loader {
       position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem;
+      align-items: center; justify-content: center; gap: 1rem;
+      padding: calc(1.5rem + var(--pc-safe-top)) calc(1.5rem + var(--pc-safe-right))
+               calc(1.5rem + var(--pc-safe-bottom)) calc(1.5rem + var(--pc-safe-left));
     }
     #boot-loader .pc-spinner {
       width: 38px; height: 38px; border-radius: 50%;
@@ -122,7 +134,10 @@
     @keyframes pc-spin { to { transform: rotate(360deg); } }
     .pc-boot-error {
       position: fixed; inset: 0; display: flex; align-items: center;
-      justify-content: center; padding: 1.5rem; box-sizing: border-box;
+      justify-content: center; box-sizing: border-box;
+      padding: calc(1.5rem + var(--pc-safe-top)) calc(1.5rem + var(--pc-safe-right))
+               calc(1.5rem + var(--pc-safe-bottom)) calc(1.5rem + var(--pc-safe-left));
+      overflow-y: auto;
     }
     .pc-boot-error .card {
       max-width: 26rem; width: 100%; box-sizing: border-box; text-align: center;

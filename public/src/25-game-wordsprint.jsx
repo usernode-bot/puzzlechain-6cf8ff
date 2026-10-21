@@ -255,8 +255,17 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
      thing missing. Arcade also widens the clock by band, since 90 seconds is
      the daily's fixed contract rather than a property of the game. */
   const isArcade = playMode === 'arcade';
+  /* #331 — the daily gains Easy/Hard: the clock widens or tightens (arcade's
+     own ladder already does exactly this) and each level deals its own grid
+     from the same day anchor. Normal keeps the fixed 90s and the un-mixed
+     seed byte-for-byte. */
+  const dailyBand = !isArcade && (band === 'easy' || band === 'hard') ? band : null;
   const bandIdx = isArcade ? Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band)) : 1;
-  const secsForRun = isArcade ? [120, 90, 60][bandIdx] : WSPR_SECS;
+  const secsForRun = isArcade
+    ? [120, 90, 60][bandIdx]
+    : dailyBand === 'easy' ? 120
+    : dailyBand === 'hard' ? 60
+    : WSPR_SECS;
   const seedRef = useRef(null);
   const letters = useRef(null);
   if (!letters.current) {
@@ -265,7 +274,8 @@ function WordSprintGame({ onWin, onStepChange, offset, savedProgress, onSaveProg
       seedRef.current = seed;
       letters.current = wsprGrid(rng);
     } else {
-      letters.current = wsprGrid(dailyRng(offset, 'wordsprint'));
+      // dailyRng treats null/'normal'/undefined alike, so Normal is untouched.
+      letters.current = wsprGrid(dailyRng(offset, 'wordsprint', dailyBand));
     }
   }
   const L = letters.current;

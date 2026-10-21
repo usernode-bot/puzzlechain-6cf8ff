@@ -35,6 +35,31 @@ ${paletteVars('dark')}
   --un-toast-action: #5EEAD4;
 }
 
+/* ---- Safe-area insets (platform-forwarded) ----
+   Inside the platform's app frame env(safe-area-inset-*) is always 0px: a
+   cross-origin iframe is never the top-level document, so the browser hides
+   the notch and the home indicator from it. The hosted bridge forwards the
+   rectangle that actually applies to this frame instead, as
+   --un-safe-inset-top/right/bottom/left on <html> (px), and leaves them
+   unset when the app is opened standalone — where bare env() is the right
+   answer. Reading them through the var(--pc-safe-*) tokens below is what
+   makes every rule in this file correct in both hosts; a bare env() in an
+   app rule is inert in-frame, which is the bug the audit fixed.
+
+   On a desktop or an un-notched phone every forwarded value is 0, so each
+   calc() below collapses to exactly the spacing it had before — the change
+   is a no-op in the common case, not a restyle. */
+:root {
+  --pc-safe-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px));
+  --pc-safe-right: var(--un-safe-inset-right, env(safe-area-inset-right, 0px));
+  --pc-safe-bottom: var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --pc-safe-left: var(--un-safe-inset-left, env(safe-area-inset-left, 0px));
+}
+
+/* A padded box that must also reach the screen edge (a sticky or fixed
+   bottom strip): same idea, but the caller already owns its own padding
+   and only the inset is added, so the surface still touches the edge. */
+.safe-bottom { padding-bottom: calc(var(--pc-pad-b, 0px) + var(--pc-safe-bottom)); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
@@ -52,12 +77,20 @@ body {
 
 .mono { font-family: 'JetBrains Mono', monospace; }
 
-#root { min-height: 100vh; }
+#root { min-height: 100vh; min-height: 100dvh; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; }
-/* Page-scrolling screens end clear of the home indicator. The fitted shell
-   (.app-fit) already pads its own bottom, so it is excluded. */
-.app:not(.app-fit) { padding-bottom: var(--safe-bottom); }
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex; flex-direction: column;
+  /* The bottom inset lifts every scrolling screen clear of the home
+     indicator; each screen supplies its own horizontal gutter, so only the
+     bottom is added here. A fit shell (.app-fit) is pinned to one viewport,
+     so its own chrome carries the bottom inset instead and this resets to 0
+     or the box would overflow by the inset. */
+  padding-bottom: var(--pc-safe-bottom);
+}
+.app.app-fit { padding-bottom: 0; }
 
 /* ---- Nav bar ---- */
 /* #223 — the bar was 78px tall at 390px wide, and it is sticky, so it cost
@@ -76,7 +109,7 @@ body {
   align-items: center;
   justify-content: space-between;
   position: sticky;
-  top: 0;
+  top: var(--pc-safe-top);
   z-index: 10;
 }
 .nav-brand {
@@ -319,7 +352,9 @@ body {
   min-width: 0;
   max-width: 620px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem;
+  /* A profile or friends page is a normal scrolling screen: its own gutters
+     grow by the forwarded x insets so content clears a landscape notch. */
+  padding: 1.5rem calc(1.25rem + var(--pc-safe-right)) 1.5rem calc(1.25rem + var(--pc-safe-left));
 }
 /* A username is user-supplied and can be one long unbreakable token, which is
    what made min-content exceed the viewport in the first place. Let it wrap
@@ -391,7 +426,9 @@ body {
   .account-chip { padding: 0.25rem; }
   .nav-right { gap: 0.6rem; }
   .nav-stats { gap: 0.8rem; }
-  .lobby { padding: 1rem 0.75rem; }
+  /* The phones are where the forwarded insets actually apply, so the gutter
+     grows by them here rather than being replaced by a bare shorthand. */
+  .lobby { padding: 1rem calc(0.75rem + var(--pc-safe-right)) 1rem calc(0.75rem + var(--pc-safe-left)); }
   .lobby-head h1 { font-size: 1.3rem; }
   .lobby-head p { font-size: 0.85rem; }
   /* The Friends chip moves into the profile's Connections section
@@ -426,7 +463,7 @@ body {
 }
 
 /* ---- Lobby ---- */
-.lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem 1.25rem; width: 100%; }
+.lobby { max-width: 920px; margin: 0 auto; padding: 1.75rem calc(1.25rem + var(--pc-safe-right)) 1.75rem calc(1.25rem + var(--pc-safe-left)); width: 100%; }
 .lobby-head { margin-bottom: 1.5rem; }
 .lobby-head h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
 .lobby-head p { color: ${C.muted}; margin-top: 0.25rem; font-size: 0.92rem; }
@@ -514,7 +551,14 @@ body {
 }
 .card.done:hover { transform: none; border-color: ${C.border}; box-shadow: none; }
 
-.card-icon { font-size: 1.9rem; line-height: 1; margin-bottom: 0.6rem; flex: 0 0 auto; }
+/* Card icon on a rounded tile in the game's tint, so the grid scans by game
+   art first and text second (Poki/CrazyGames picture-first tiles). */
+.card-icon {
+  width: 48px; height: 48px; border-radius: 13px;
+  background: var(--accent-tint, var(--c-well));
+  display: grid; place-items: center;
+  font-size: 1.65rem; line-height: 1; margin-bottom: 0.65rem; flex: 0 0 auto;
+}
 /* #167 — clamped, so a long name or blurb can never grow its own tile (and,
    with grid-auto-rows: 1fr, can never grow the whole wall). The desc keeps a
    two-line floor as well as its new two-line ceiling, so short and long blurbs
@@ -568,7 +612,7 @@ body {
 }
 
 /* ---- Game screen ---- */
-.game-wrap { max-width: 620px; margin: 0 auto; padding: 1.5rem 1.25rem; width: 100%; }
+.game-wrap { max-width: 620px; margin: 0 auto; padding: 1.5rem calc(1.25rem + var(--pc-safe-right)) 1.5rem calc(1.25rem + var(--pc-safe-left)); width: 100%; }
 
 /* Fit-to-viewport layout mode (slice 1). A daily game that opts in renders
    header + board + controls inside one non-scrolling column: the board region
@@ -587,7 +631,11 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0.7rem 0.9rem calc(0.7rem + var(--safe-bottom));
+  /* A fit shell is pinned to one viewport (.app-fit), so .app adds no bottom
+     padding and this wrap must carry the inset itself or its footer sits
+     under the home indicator. The x insets keep a landscape notch off the
+     board. */
+  padding: 0.7rem calc(0.9rem + var(--pc-safe-right)) calc(0.7rem + var(--pc-safe-bottom)) calc(0.9rem + var(--pc-safe-left));
   gap: 0.45rem;
 }
 .game-wrap.fit .game-head { flex: 0 0 auto; margin-bottom: 0; }
@@ -786,7 +834,9 @@ ${emitTapHighlightRules()}
 .result-minibar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 0.85rem calc(1.1rem + var(--safe-right)) calc(0.85rem + var(--safe-bottom)) calc(1.1rem + var(--safe-left));
+  /* The bar reaches the screen edge; only its CONTENT is lifted clear of the
+     home indicator by the forwarded bottom inset. */
+  padding: 0.85rem 1.1rem calc(0.85rem + var(--pc-safe-bottom));
   background: ${C.card}; border: none; border-top: 1px solid ${C.border};
   box-shadow: 0 -6px 22px rgba(63,51,24,0.14);
   font-family: inherit; font-size: 0.92rem; font-weight: 600; color: ${C.text};
@@ -889,8 +939,12 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: calc(1.25rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) calc(1.25rem + var(--safe-bottom)) calc(1.25rem + var(--safe-left));
+  /* A centred card: every gutter grows by the forwarded inset so it cannot
+     run under the notch or the home indicator. */
+  padding: calc(1.25rem + var(--pc-safe-top)) calc(1.25rem + var(--pc-safe-right))
+           calc(1.25rem + var(--pc-safe-bottom)) calc(1.25rem + var(--pc-safe-left));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .win-card {
   background: ${C.card};
@@ -901,8 +955,8 @@ ${emitTapHighlightRules()}
   max-width: 360px;
   width: 100%;
   box-shadow: 0 20px 50px var(--c-shadow-lg);
-  max-height: calc(100vh - 2.5rem - var(--safe-top) - var(--safe-bottom));
-  max-height: calc(100dvh - 2.5rem - var(--safe-top) - var(--safe-bottom));
+  max-height: calc(100vh - 2.5rem - var(--pc-safe-top) - var(--pc-safe-bottom));
+  max-height: calc(100dvh - 2.5rem - var(--pc-safe-top) - var(--pc-safe-bottom));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -1151,10 +1205,15 @@ ${emitTapHighlightRules()}
   position: fixed; inset: 0; z-index: 70;
   background: var(--c-scrim);
   display: flex; align-items: center; justify-content: center;
-  padding: calc(1rem + var(--safe-top)) calc(1rem + var(--safe-right)) calc(1rem + var(--safe-bottom)) calc(1rem + var(--safe-left));
+  /* A centred panel: demote it into the safe frame, and cap it so it never
+     runs under the notch or the home indicator. */
+  padding: calc(1rem + var(--pc-safe-top)) calc(1rem + var(--pc-safe-right))
+           calc(1rem + var(--pc-safe-bottom)) calc(1rem + var(--pc-safe-left));
 }
 .gb-sheet {
-  width: 100%; max-width: 420px; max-height: 82dvh; overflow-y: auto;
+  width: 100%; max-width: 420px;
+  max-height: calc(82dvh - var(--pc-safe-top) - var(--pc-safe-bottom));
+  overflow-y: auto;
   background: ${C.surface}; border: 1px solid ${C.border};
   border-radius: 18px; padding: 0.9rem 1rem 1rem;
   box-shadow: 0 20px 50px var(--c-shadow-lg);
@@ -1221,11 +1280,13 @@ ${emitTapHighlightRules()}
 .howto-overlay {
   position: fixed; inset: 0; background: var(--c-scrim); z-index: 220;
   display: flex; align-items: center; justify-content: center;
-  padding: calc(1rem + var(--safe-top)) calc(1rem + var(--safe-right)) calc(1rem + var(--safe-bottom)) calc(1rem + var(--safe-left));
+  padding: calc(1rem + var(--pc-safe-top)) calc(1rem + var(--pc-safe-right))
+           calc(1rem + var(--pc-safe-bottom)) calc(1rem + var(--pc-safe-left));
 }
 .howto-card {
   background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
-  padding: 1.4rem 1.3rem; width: min(95vw, 420px); max-height: 85dvh;
+  padding: 1.4rem 1.3rem; width: min(95vw, 420px);
+  max-height: calc(85dvh - var(--pc-safe-top) - var(--pc-safe-bottom));
   overflow-y: auto;
 }
 .howto-head {
@@ -1539,7 +1600,7 @@ ${emitTapHighlightRules()}
      decoration. .card-mode-btn's min-height stays 44px — only its horizontal
      padding gives way. */
   .grid > .card { padding: 0.75rem; border-radius: 12px; }
-  .grid > .card .card-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .grid > .card .card-icon { width: 38px; height: 38px; border-radius: 11px; font-size: 1.35rem; margin-bottom: 0.45rem; }
   .grid > .card .card-name { font-size: 0.95rem; }
   .grid > .card .card-desc {
     font-size: 0.75rem;
@@ -1548,7 +1609,12 @@ ${emitTapHighlightRules()}
   }
   .grid > .card .card-daily-badge {
     top: 0.45rem;
-    right: 0.45rem;
+    /* The compact phone metrics re-cornered the badge into the pin's 44px
+       hit square (right 0.15rem + 2.75rem wide), putting the 📌 glyph on top
+       of the badge's right end. 3.2rem clears that square by ~5px, the
+       glyph itself by ~34px, and still clears the 38px icon tile at the
+       card's left edge. */
+    right: 3.2rem;
     font-size: 0.5rem;
     padding: 0.18rem 0.35rem;
   }
@@ -2664,9 +2730,19 @@ ${emitTapHighlightRules()}
   overflow: hidden;
   overscroll-behavior: none;
   z-index: 40;
-  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  /* The classic shell is the fixed layout root for every classic game, so it
+     pads all four sides; the forwarded x insets matter in landscape on a
+     notched phone or the top bar's left edge clips. Bare env() is inert
+     in-frame, so these are the platform tokens. */
+  padding-top: var(--pc-safe-top);
+  padding-right: var(--pc-safe-right);
+  padding-bottom: var(--pc-safe-bottom);
+  padding-left: var(--pc-safe-left);
   --cg-chrome: 3.6rem;
-  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem), 560px);
+  /* The stage is inside the padded box, so it is already short by all four
+     insets; the 100dvh cap must lose them too or the stage overflows by
+     exactly the padding on a notched phone. */
+  --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem - var(--pc-safe-top) - var(--pc-safe-bottom)), 560px);
 }
 .cg-topbar {
   flex: 0 0 auto;
@@ -2720,7 +2796,14 @@ ${emitTapHighlightRules()}
   padding: clamp(0.5rem, 2vh, 1rem) 0.6rem;
   overflow: hidden;
 }
-.cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; scroll-padding-bottom: var(--safe-bottom); }
+.cg-stage.cg-scroll { overflow-y: auto; justify-content: flex-start; }
+/* .cg-scroll is the classic stage's content scroller. Its padding is hidden
+   by .cg-shell, so oversized content would otherwise be clipped top and
+   bottom; scroll-padding-block restores the reach. */
+.cg-stage.cg-scroll {
+  scroll-padding-top: var(--pc-safe-top);
+  scroll-padding-bottom: var(--pc-safe-bottom);
+}
 
 /* Bottom sheet */
 .cg-sheet-backdrop {
@@ -2742,9 +2825,12 @@ ${emitTapHighlightRules()}
   background: ${C.surface};
   border-top: 1px solid ${C.border};
   border-radius: 18px 18px 0 0;
-  padding: 0.5rem 1rem calc(1rem + var(--safe-bottom));
+  /* Bottom sheet: the forwarded inset lifts the panel clear of the home
+     indicator and the scroller gets the same reach below. */
+  padding: 0.5rem 1rem calc(1rem + var(--pc-safe-bottom));
   max-height: 82dvh;
   overflow-y: auto;
+  scroll-padding-bottom: var(--pc-safe-bottom);
   transform: translateY(110%);
   transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -2847,6 +2933,9 @@ ${emitTapHighlightRules()}
 /* ---- Global Settings sheet ---- */
 .settings-panel { height: min(58vh, 460px); }
 .settings-list { padding: 0.9rem 1.1rem 1.4rem; }
+/* The settings list is the sheet's scroller: its content needs the same
+   reach as the sheet's own bottom padding above. */
+.settings-list { scroll-padding-bottom: var(--pc-safe-bottom); }
 .settings-list h4 {
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -2855,8 +2944,10 @@ ${emitTapHighlightRules()}
   margin-bottom: 0.5rem;
 }
 /* Icon-only nav gear. Deliberately NOT in the mobile-hide rule that hides
-   .nav-friends-btn — the theme control must stay reachable on phones. */
-.nav-settings-btn {
+   .nav-friends-btn — the theme control must stay reachable on phones. The
+   theme toggle shares the gear's look on purpose: same outline, size and
+   muted icon colour, so the pair reads as one control group. */
+.nav-settings-btn, .nav-theme-btn {
   background: transparent;
   border: 1px solid ${C.border};
   color: ${C.muted};
@@ -2866,7 +2957,8 @@ ${emitTapHighlightRules()}
   line-height: 1;
   cursor: pointer;
 }
-.nav-settings-btn:hover { color: ${C.text}; border-color: ${C.accent}; }
+.nav-settings-btn:hover, .nav-theme-btn:hover { color: ${C.text}; border-color: ${C.accent}; }
+.nav-theme-btn[data-pressed] { border-color: ${C.accent}; color: ${C.text}; }
 .cg-toggle {
   width: 2.8rem;
   height: 1.5rem;
@@ -2891,7 +2983,11 @@ ${emitTapHighlightRules()}
   transition: transform 0.15s ease;
 }
 .cg-toggle.on::after { transform: translateX(1.3rem); }
-.cg-sheet-list { max-height: 50dvh; overflow-y: auto; }
+.cg-sheet-list {
+  max-height: calc(50dvh - var(--pc-safe-bottom));
+  overflow-y: auto;
+  scroll-padding-bottom: var(--pc-safe-bottom);
+}
 .cg-sheet-row {
   display: flex;
   justify-content: space-between;
@@ -3148,8 +3244,10 @@ ${emitTapHighlightRules()}
   align-items: center;
   justify-content: center;
   z-index: 55;
-  padding: calc(1.25rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) calc(1.25rem + var(--safe-bottom)) calc(1.25rem + var(--safe-left));
+  padding: calc(1.25rem + var(--pc-safe-top)) calc(1.25rem + var(--pc-safe-right))
+           calc(1.25rem + var(--pc-safe-bottom)) calc(1.25rem + var(--pc-safe-left));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .adv-card {
   background: ${C.card};
@@ -3579,7 +3677,7 @@ ${emitTapHighlightRules()}
    because it floats over a live board — a marker must never eat a tap. */
 .practice-ribbon.pinned {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(0.6rem + var(--safe-bottom));
+  bottom: calc(0.6rem + var(--pc-safe-bottom));
   z-index: 60; pointer-events: none;
   background: ${C.card}; border: 1px solid ${C.violet};
   box-shadow: var(--c-shadow-md);
@@ -3721,6 +3819,16 @@ ${emitTapHighlightRules()}
 .hr-overlay-title { font-size: 1.6rem; font-weight: 800; }
 .hr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
 
+/* Jet Run (request #326) — the same self-shell canvas stage Hash Rush runs.
+   The dark gradient backdrop is intrinsic arcade art, not chrome: the sky the
+   jet flies through is drawn over it, and the rest of the palette applies to
+   the chrome around it. No animation here, so no reduced-motion addition. */
+.jr-wrap { position: relative; width: 100%; height: 62vh; max-height: 560px; border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, #0c1020, #131a30); border: 1px solid ${C.border}; }
+.jr-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.jr-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,10,18,0.6); text-align: center; padding: 1rem; }
+.jr-overlay-title { font-size: 1.6rem; font-weight: 800; }
+.jr-overlay-sub { font-size: 0.85rem; color: ${C.muted}; }
+
 /* ---- Phase 6: shared card/tile engine + Lane A dailies ---- */
 .p6-hint { color: ${C.muted}; font-size: 12px; text-align: center; margin-top: 14px; line-height: 1.5; }
 .p6-banner {
@@ -3833,23 +3941,54 @@ ${emitTapHighlightRules()}
 
 /* ---- Phase 7: GotD hero, home reorg, chat ---- */
 .gotd-hero {
-  border: 1px solid ${C.border}; border-top: 3px solid var(--accent, ${C.accent});
+  border: 1px solid var(--accent-line, ${C.border}); border-top: 3px solid var(--accent, ${C.accent});
   background: linear-gradient(160deg, ${C.card}, ${C.surface});
-  border-radius: 16px; padding: 16px 18px; margin-bottom: 1.4rem;
+  border-radius: 18px; padding: 18px 20px; margin-bottom: 1.4rem;
 }
 .gotd-label { color: var(--accent, ${C.accent}); font-size: 11px; letter-spacing: 0.12em; margin-bottom: 10px; }
 .gotd-main { display: flex; align-items: center; gap: 14px; cursor: pointer; }
-.gotd-icon { font-size: 44px; line-height: 1; }
+/* The hero icon sits on a rounded tile in the game's own tint (NYT-Games
+   style), not as a bare emoji. --accent-tint is set inline on the hero. */
+.gotd-icon {
+  width: 72px; height: 72px; border-radius: 18px;
+  background: var(--accent-tint, var(--c-well));
+  display: grid; place-items: center;
+  font-size: 42px; line-height: 1; flex: 0 0 auto;
+}
 .gotd-info { flex: 1; min-width: 0; }
 .gotd-name { font-size: 20px; font-weight: 700; }
 .gotd-desc { color: ${C.muted}; font-size: 13px; margin-top: 2px; }
 .gotd-meta { color: ${C.muted}; font-size: 11.5px; margin-top: 6px; }
-.gotd-play { padding: 10px 18px; white-space: nowrap; flex-shrink: 0; width: auto; margin: 0; }
+.gotd-play { padding: 12px 24px; min-height: 48px; font-size: 1rem; white-space: nowrap; flex-shrink: 0; width: auto; margin: 0; }
 @media (max-width: 560px) {
   .gotd-main { flex-wrap: wrap; }
+  .gotd-icon { width: 56px; height: 56px; border-radius: 16px; font-size: 32px; }
   .gotd-play { width: 100%; margin-top: 4px; }
 }
 .gotd-play:disabled { opacity: 0.75; }
+/* Review round 1 — loading skeleton: holds the hero's footprint while
+   /api/daily is in flight so the grid doesn't jump when the panel arrives.
+   Fallback is var(--c-well) and not the C.well token: well is DERIVED, so
+   interpolating it here would emit a broken declaration. */
+.gotd-skel { display: flex; align-items: center; gap: 14px; min-height: 150px; }
+.gotd-skel-tile {
+  width: 72px; height: 72px; border-radius: 18px;
+  background: var(--c-well); flex: 0 0 auto;
+}
+.gotd-skel-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.gotd-skel-bar { height: 14px; border-radius: 7px; background: var(--c-well); }
+.gotd-skel-bar.w1 { width: 42%; }
+.gotd-skel-bar.w2 { width: 85%; }
+.gotd-skel-bar.w3 { width: 60%; height: 10px; }
+@media (max-width: 560px) {
+  .gotd-skel-tile { width: 56px; height: 56px; border-radius: 16px; }
+}
+/* Review round 1 — error notice: what a 5xx leaves where the hero would sit,
+   in the same card style (.gotd-hero carries the card chrome). The retry
+   button reuses .primary-btn; only its inline sizing is adjusted. */
+.gotd-err { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gotd-err-line { color: ${C.muted}; font-size: 14px; flex: 1; min-width: 0; }
+.gotd-err-retry { width: auto; flex: 0 0 auto; padding: 9px 18px; min-height: 44px; }
 .gotd-signedout { color: ${C.muted}; font-size: 12.5px; margin-top: 12px; }
 
 /* Phase 8 — anonymous play + "make it count" */
@@ -3902,9 +4041,14 @@ ${emitTapHighlightRules()}
 .wn-items li { font-size: 13px; line-height: 1.5; color: ${C.text}; }
 
 .home-section-title {
-  font-size: 15px; font-weight: 700; margin: 1.4rem 0 0.7rem;
+  font-size: 1.05rem; font-weight: 700; margin: 1.6rem 0 0.75rem;
   color: ${C.text};
+  border-bottom: 1px solid ${C.border}; padding-bottom: 0.35rem;
+  display: flex; align-items: baseline; gap: 0.5rem;
 }
+/* The count in a section header sits at the right edge (Poki/CrazyGames
+   column-rule style). Headers without a count keep just the title. */
+.home-section-title .home-pin-count { margin-left: auto; }
 .home-back-btn {
   background: none; border: none; color: ${C.accent}; font-family: inherit;
   font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 0.8rem;
@@ -3917,7 +4061,12 @@ ${emitTapHighlightRules()}
   padding: 10px 14px; min-width: 150px; cursor: pointer; flex-shrink: 0;
 }
 .inprog-card:hover { border-color: ${C.accent}; }
-.inprog-card .ip-icon { font-size: 22px; }
+.inprog-card .ip-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--accent-tint, var(--c-well));
+  display: grid; place-items: center;
+  font-size: 20px; line-height: 1;
+}
 .inprog-card .ip-name { font-weight: 600; font-size: 13.5px; margin-top: 4px; white-space: nowrap; }
 .inprog-card .ip-sub { font-size: 11.5px; color: ${C.muted}; margin-top: 3px; }
 .inprog-card .ip-sub.resume { color: ${C.gold}; }
@@ -3972,7 +4121,10 @@ ${emitTapHighlightRules()}
   background: ${C.surface}; border: 1px solid ${C.border}; border-bottom: none;
   border-radius: 18px 18px 0 0; width: 100%; max-width: 560px;
   height: min(72vh, 640px); display: flex; flex-direction: column;
-  padding-bottom: var(--safe-bottom);
+  /* Bottom sheet: the inset lifts the whole panel (and the input row at its
+     foot) clear of the home indicator. The input row adds the keyboard
+     inset on top, from --un-kb-inset, which the native kit maintains. */
+  padding-bottom: var(--pc-safe-bottom);
 }
 .chat-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -3998,7 +4150,11 @@ ${emitTapHighlightRules()}
 .chat-report:hover { opacity: 1; }
 .chat-body { font-size: 13.5px; line-height: 1.45; word-break: break-word; }
 .chat-notice { color: ${C.gold}; font-size: 12px; text-align: center; padding: 4px 0; }
-.chat-input-row { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid ${C.border}; }
+.chat-input-row {
+  display: flex; gap: 8px; border-top: 1px solid ${C.border};
+  padding: 10px 14px 14px;
+  padding-bottom: calc(14px + var(--un-kb-inset, 0px));
+}
 .chat-input {
   flex: 1; background: ${C.card}; border: 1px solid ${C.border}; color: ${C.text};
   border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 13.5px; outline: none;
@@ -4060,16 +4216,33 @@ ${emitTapHighlightRules()}
 }
 .lobby-head.masthead p { font-style: italic; font-family: 'Fraunces', Georgia, serif; }
 
-/* Section headers as newspaper column rules. */
-.home-section-title {
-  font-size: 1.05rem; font-weight: 700;
-  border-bottom: 1px solid ${C.border}; padding-bottom: 0.35rem;
-}
+/* Section headers as newspaper column rules. The base rule lives in the
+   Phase 7 block above (one declaration; the count rides at the right edge). */
 
 /* Merged all-games grid (slice 2): the reset note, the filter chips and the
    per-card daily indicator that replaces the two section headings. */
 .home-daily-note {
   color: ${C.muted}; font-size: 0.82rem; margin: 0.5rem 0 0.6rem;
+}
+/* #350 — the All Games search field, above the chips. The Friends screen's
+   search input graduated into a class so the two copies of the same control
+   cannot drift (19-social.jsx styles it inline). Tokens only, so it re-themes
+   for free. It is a TEXT INPUT, so it is deliberately NOT in
+   TAPPABLE_CLASSES: native long-press selection must keep working, and no
+   touch-action/tap-highlight rule should be generated for it. font-size is a
+   full 16px on purpose — under that, focusing the field auto-zooms the page
+   on iOS, and this is exactly the control a phone user will focus. */
+.home-search-input {
+  display: block; width: 100%; padding: 0.7rem 0.9rem; margin: 0 0 0.7rem;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 10px;
+  color: ${C.text}; font-family: inherit; font-size: 16px; outline: none;
+}
+.home-search-input:focus { border-color: ${C.accent}; }
+.home-search-input::placeholder { color: ${C.dim}; }
+/* The search's own empty state. Same register as .home-pin-empty and
+   .home-fav-empty above — one muted line, no box, no icon. */
+.home-search-empty {
+  color: ${C.muted}; font-size: 0.78rem; margin: -0.35rem 0 0.7rem;
 }
 .home-filter-chips { display: flex; gap: 0.45rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
 .home-chip {
@@ -4189,8 +4362,9 @@ ${emitTapHighlightRules()}
 }
 .win-card, .howto-card { box-shadow: 0 20px 50px var(--c-shadow-lg); }
 
-/* GotD hero reads as the front-page lead story. */
-.gotd-hero { background: ${C.card}; }
+/* GotD hero reads as the front-page lead story: washed in the featured
+   game's colour over the card surface (--accent-wash is set inline). */
+.gotd-hero { background: linear-gradient(var(--accent-wash, transparent), var(--accent-wash, transparent)), ${C.card}; }
 .gotd-label {
   font-family: 'JetBrains Mono', monospace; font-weight: 600;
   text-transform: uppercase;
@@ -4207,6 +4381,14 @@ ${emitTapHighlightRules()}
 }
 .gotd-play:hover, .pregame-card .pregame-play:hover {
   background: var(--accent, ${C.accent}); filter: brightness(0.88);
+}
+/* Dark look: the raw game colour is tuned for the light card, where its
+   white label falls below AA (sky measured 3.81:1 — review round 1). The
+   deepened fill (--accent-deep, set inline by GotdHero) restores 4.5:1.
+   Scoped to the hero button; the pre-game screen is untouched. */
+html[data-theme='dark'] .gotd-play,
+html[data-theme='dark'] .gotd-play:hover {
+  background: var(--accent-deep, var(--accent, ${C.accent}));
 }
 .pregame-card { border-top: 3px solid var(--accent, ${C.accent}); }
 
@@ -4290,5 +4472,81 @@ ${emitTapHighlightRules()}
   margin-left: .4rem; font-size: .68rem; font-weight: 700; vertical-align: middle;
   padding: .1rem .4rem; border-radius: 999px;
   background: ${ca('gold', '33')}; color: ${C.gold}; border: 1px solid ${ca('gold', '55')};
+}
+
+/* ============================================================
+   Escape from Dracula — the paged reader (TextPager)
+   ============================================================
+   A chapter longer than the page is a measured layout, not a scroll and not a
+   line-clamp: .tp-page is the box the pager measures (useFitBox), the prose is
+   chunked to it, and only one page is in the DOM at a time. The card is the
+   howto-card look, sized to the viewport so the measured box is real at any
+   phone height. */
+.drac-card {
+  width: 100%; max-width: min(560px, 100%);
+  height: 100%; min-height: 0; max-height: 680px;
+  display: flex; flex-direction: column;
+  background: ${C.card}; border: 1px solid ${C.border}; border-radius: 16px;
+  overflow: hidden;
+}
+.drac-head { flex: 0 0 auto; padding: 1rem 1.3rem 0; }
+.drac-kicker {
+  font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: ${C.muted};
+}
+.drac-title { margin: 0.15rem 0 0; font-size: 1.15rem; font-weight: 700; }
+
+.tp-root { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+/* THE MEASURED BOX. overflow:hidden is the "nothing scrolls off screen" rule
+   made structural: even if a block overshoots by a pixel, it cannot scroll. */
+.tp-page {
+  flex: 1 1 auto; min-height: 0; overflow: hidden;
+  padding: 0.85rem 1.3rem 0;
+  font-size: 0.94rem; line-height: 1.55; color: ${C.text};
+  outline: none;
+}
+.tp-page.tp-tappable { cursor: pointer; }
+.tp-page:focus-visible { box-shadow: inset 0 0 0 2px ${C.accent}; border-radius: 12px; }
+.tp-page > .tp-text:first-child { margin-top: 0; }
+.tp-text { margin: 0.7rem 0 0; }
+.tp-foot { flex: 0 0 auto; padding: 0.4rem 1.3rem 1rem; }
+.tp-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.4rem; }
+.tp-dots i { width: 6px; height: 6px; border-radius: 50%; background: ${C.border}; display: block; }
+.tp-dots i.on { background: ${C.accent}; }
+/* The quiet reveal control, the same register as the result card's .win-more. */
+.tp-more {
+  width: 100%; margin: 0; background: none; border: none;
+  color: ${C.muted}; font-family: inherit; font-size: 0.86rem; font-weight: 600;
+  padding: 0.55rem; border-radius: 10px; text-align: center; cursor: pointer;
+}
+.tp-more:hover { color: ${C.text}; background: var(--c-well); }
+.tp-more[data-pressed] { background: var(--c-well-strong); }
+.tp-end { text-align: center; font-size: 0.8rem; color: ${C.muted}; padding: 0.4rem 0; }
+
+/* #323 — games deserve more of a desktop window. Same rules as above, with
+   the caps raised at >= 900px wide; the min-height clause keeps this block
+   from overlapping the landscape/short-window --cg-board override, which
+   still wins on a phone held sideways. Boards and canvases already size
+   from their measured box (aspect-ratio DOM boards, useFitBox), so raising
+   the caps is all that is needed; phones and tablets are unchanged, and the
+   lobby grid, profile and friends screens keep their width on purpose.
+   Daily Cipher is left out: its grid and keyboard sizes are fixed in the
+   game's own drawing code, so a wider box would only add empty space. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .game-wrap { max-width: 880px; }
+  .kl-game, .sp-game { max-width: 880px; }
+  .cg-shell { --cg-board: min(94vw, calc(100dvh - var(--cg-chrome) - 5.5rem - var(--pc-safe-top) - var(--pc-safe-bottom)), 760px); }
+  .sudoku { max-width: 540px; }
+  .wordsearch { max-width: 620px; }
+  .wspr-grid { max-width: 480px; }
+  .dsnk-board { max-width: 520px; }
+  .tm-wrap.fit-col { max-width: 760px; }
+  .ms-boardbox { width: min(92vw, 540px, var(--cg-board, 540px)); }
+  .kt-boardbox { width: min(92vw, 680px, var(--cg-board, 680px)); }
+  /* --brg-cap is set inline by BrgBoardBox, so scale it rather than override it. */
+  .brg-canvas-box { width: min(92vw, calc(var(--brg-cap, 380px) * 1.4), var(--cg-board, 532px)); }
+  .cg-stage .ms-boardbox, .cg-stage .t2048-board-wrap { max-width: min(540px, var(--cg-board)) !important; }
+  .cg-stage .mnc-board { max-width: min(680px, var(--cg-board)) !important; }
+  .cg-stage .cnl-board-wrap { max-width: min(680px, var(--cg-board)) !important; }
 }
 `;

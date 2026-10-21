@@ -260,11 +260,18 @@ function KnightsTourGame({ onWin, onStepChange, resetKey, playMode, band, offset
   const boardRef = useRef(null);
   if (!boardRef.current) {
     if (playMode === 'story' || playMode === 'arcade' || playMode === 'daily') {
+      /* #331 — the daily gains Easy/Hard: the 5×5 and the blocked 8×8 rungs of
+         KT_BANDS. Normal keeps the classic 8×8 (bandIdx 3) byte-for-byte. The
+         RNG takes the STRING band so Easy/Hard get their own deal; the numeric
+         index (or story/arcade's own) still sizes the board. */
+      const dailyBand = playMode === 'daily' && (band === 'easy' || band === 'hard') ? band : null;
       const bandIdx = playMode === 'story' ? (band || 0)
         : playMode === 'arcade'
           ? [1, 3, 5][Math.max(0, ARCADE_BANDS.findIndex(b => b.id === band))]
+          : dailyBand === 'easy' ? 0
+          : dailyBand === 'hard' ? KT_BANDS.length - 1
           : 3; // the daily is the classic 8×8, seeded start
-      const { rng } = modeSeed(playMode, 'knights-tour', bandIdx, offset);
+      const { rng } = modeSeed(playMode, 'knights-tour', playMode === 'daily' ? (dailyBand || bandIdx) : bandIdx, offset);
       boardRef.current = ktBuildBoard(rng, bandIdx);
     } else {
       boardRef.current = { size: 8, start: null, blocked: new Set(), total: 64 };
@@ -449,7 +456,7 @@ function KnightsTourGame({ onWin, onStepChange, resetKey, playMode, band, offset
         </div>
       )}
 
-      <div className="kt-bottom-nav">
+      <div className="kt-bottom-nav safe-bottom">
         {['game', 'leaderboard', 'history'].map(tab => (
           <button
             key={tab}

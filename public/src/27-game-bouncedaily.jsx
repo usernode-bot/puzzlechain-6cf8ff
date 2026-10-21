@@ -6,6 +6,16 @@
 const DBNC_W = 320, DBNC_H = 430, DBNC_COLS = 8, DBNC_ROWS = 6;
 const DBNC_PADDLE_W = 64, DBNC_PADDLE_H = 10, DBNC_PADDLE_Y = DBNC_H - 26, DBNC_BALL_R = 6;
 const DBNC_BALLS = 3;
+/* #331 — the daily gains Easy/Hard as wall-and-supply dials: how many balls
+   you get, how often a cell is a gap (easy leaves more holes, hard builds
+   denser walls) and how the surviving HP mix leans. The wall stays a pure
+   function of the seed either way — thresholds only, no extra draws. Normal
+   keeps the pre-band numbers byte-for-byte. */
+const DBNC_BANDS = {
+  easy:   { balls: 4, gap: 0.24, hp1: 0.75, hp2: 0.95 },
+  normal: { balls: DBNC_BALLS, gap: 0.15, hp1: 0.60, hp2: 0.88 },
+  hard:   { balls: 2, gap: 0.08, hp1: 0.45, hp2: 0.82 },
+};
 
 // Phase 8 (#135) — power-ups are PRE-ASSIGNED to bricks from the daily seed,
 // not rolled when a brick breaks. `spawnPowerup` uses Math.random()/Date.now(),
@@ -16,14 +26,15 @@ const DBNC_PU_RATE = 0.1;
 const DBNC_PU_TYPES = POWERUP_TYPES.bounce;
 const DBNC_PU_DUR = POWERUP_DURATION_MS;
 
-function dbncBuildBricks(rng) {
+function dbncBuildBricks(rng, cfg) {
+  const band = cfg || DBNC_BANDS.normal;
   const bricks = [];
   const cellW = DBNC_W / DBNC_COLS, cellH = 20, top = 44;
   for (let r = 0; r < DBNC_ROWS; r++) {
     for (let c = 0; c < DBNC_COLS; c++) {
       const roll = rng();
-      if (roll < 0.15) continue; // gap
-      const hp = roll < 0.6 ? 1 : roll < 0.88 ? 2 : 3;
+      if (roll < band.gap) continue; // gap
+      const hp = roll < band.hp1 ? 1 : roll < band.hp2 ? 2 : 3;
       // Two extra draws per surviving brick — order is fixed by the loop, so
       // the whole wall (bricks AND drops) is a pure function of the seed.
       const carries = rng() < DBNC_PU_RATE;
@@ -48,11 +59,13 @@ function dbncDropPowerup(br) {
   };
 }
 
-function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
+function DailyBounceGame({ onWin, onLose, onStepChange, offset, band }) {
+  const dailyBand = (band === 'easy' || band === 'hard') ? band : null;
+  const dbncCfg = DBNC_BANDS[dailyBand || 'normal'];
   const canvasRef = useRef(null);
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
-  const [balls, setBalls] = useState(DBNC_BALLS);
+  const [balls, setBalls] = useState(dbncCfg.balls);
   const [score, setScore] = useState(0);
   const { secs } = useTimer(started && !done, 0);
   const secsRef = useRef(0); secsRef.current = secs;
@@ -60,10 +73,10 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
   const st = useRef(null);
   if (!st.current) {
     st.current = {
-      bricks: dbncBuildBricks(dailyRng(offset, 'bouncedaily')),
+      bricks: dbncBuildBricks(dailyRng(offset, 'bouncedaily', dailyBand), dbncCfg),
       paddle: DBNC_W / 2,
       ball: { x: DBNC_W / 2, y: DBNC_PADDLE_Y - DBNC_BALL_R - 1, vx: 0, vy: 0 },
-      launched: false, balls: DBNC_BALLS, score: 0, broken: 0, done: false,
+      launched: false, balls: dbncCfg.balls, score: 0, broken: 0, done: false,
       // Phase 8 — falling capsules + timed effects (all seeded, see above).
       drops: [], effects: {}, extraBalls: [], paddleW: DBNC_PADDLE_W,
       lasers: [], laserCooldown: 0, picked: 0,
@@ -374,7 +387,7 @@ function DailyBounceGame({ onWin, onLose, onStepChange, offset }) {
         const out = [
           { id: 'p-time', kind: 'pill', r: pr[0], label: 'Time', value: fmt, gold: true },
           { id: 'p-score', kind: 'pill', r: pr[1], label: 'Score', value: score },
-          { id: 'p-balls', kind: 'pill', r: pr[2], label: 'Balls', value: `${'●'.repeat(Math.max(0, balls))}${'○'.repeat(DBNC_BALLS - Math.max(0, balls))}` },
+          { id: 'p-balls', kind: 'pill', r: pr[2], label: 'Balls', value: `${'●'.repeat(Math.max(0, balls))}${'○'.repeat(Math.max(0, dbncCfg.balls - Math.max(0, balls)))}` },
           { id: 'p-bricks', kind: 'pill', r: pr[3], label: 'Bricks', value: `${s.total - s.bricks.length}/${s.total}` },
         ];
         if (effectLabels.length) {

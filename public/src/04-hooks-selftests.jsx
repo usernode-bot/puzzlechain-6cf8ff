@@ -148,6 +148,53 @@ function useScrollLock(active) {
   }, [active]);
 }
 
+/* ---- Safe-area insets (platform-forwarded) ----
+   Inside the platform's app frame env(safe-area-inset-*) is always 0px — a
+   cross-origin iframe is never the top-level document — so the hosted bridge
+   forwards the rectangle that applies to this frame instead, as
+   --un-safe-inset-* on <html> plus window.usernode.safeAreaInsets and a
+   window 'usernode:safe-area-changed' event. CSS reads the forwarded value
+   through the var(--pc-safe-*) tokens in 01-styles.jsx; this hook is the JS
+   spelling of the same numbers, for layout computed in a component rather
+   than in CSS.
+
+   It reports live values: the shell pushes a new object on rotation, on
+   keyboard/toolbar moves and whenever the frame's rect shifts, and a layout
+   effect must follow those, not a snapshot from mount. All four values are 0
+   on desktop and on an un-notched phone, so a caller that only ever adds
+   them is a no-op in the common case. */
+function unSafeInsets() {
+  try {
+    const u = window.usernode;
+    const v = u && u.safeAreaInsets;
+    if (!v) return { top: 0, right: 0, bottom: 0, left: 0 };
+    return {
+      top: +v.top || 0, right: +v.right || 0,
+      bottom: +v.bottom || 0, left: +v.left || 0,
+    };
+  } catch (_) {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+}
+
+// Live subscription: returns the current insets and updates when the shell
+// reports a change. The hook is inert when the bridge is absent (standalone,
+// or a proposal check's headless browser), so callers keep working there.
+function useSafeAreaInsets() {
+  const [insets, setInsets] = useState(unSafeInsets);
+  useEffect(() => {
+    const on = () => setInsets(unSafeInsets());
+    on();
+    window.addEventListener('usernode:safe-area-changed', on);
+    window.addEventListener('orientationchange', on);
+    return () => {
+      window.removeEventListener('usernode:safe-area-changed', on);
+      window.removeEventListener('orientationchange', on);
+    };
+  }, []);
+  return insets;
+}
+
 /* PHASE 2 — the shared tap primitive.
    Spread onto any tappable board element. Two jobs:
      1. Press feedback on finger-DOWN (`data-pressed`), not on the browser's
@@ -563,6 +610,34 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #340 — the result card's Share button must survive a re-render. ShareButton
+     used to be declared INSIDE App, so every App render (a timer tick, the
+     leaderboard fetch landing) handed React a NEW component type, which
+     unmounts and remounts the subtree: the button's `copied` state was wiped
+     mid-feedback and a tap read as a dead button. Mount it, re-render the way
+     App does, and assert the SAME DOM node is still there — an in-App
+     definition fails this with a different node (and a module-scope name that
+     no longer resolves fails the check outright). */
+  check('share-button-survives-rerender', () => {
+    const host = document.createElement('div');
+    const root = ReactDOM.createRoot(host);
+    let first = null;
+    ReactDOM.flushSync(() => root.render(<ShareButton text="Game Corner test" />));
+    first = host.querySelector('button');
+    if (!first) { root.unmount(); throw new Error('ShareButton rendered no button'); }
+    // The re-render the running app does constantly while the card is open.
+    ReactDOM.flushSync(() => root.render(<ShareButton text="Game Corner test" />));
+    const second = host.querySelector('button');
+    root.unmount();
+    if (first !== second) {
+      throw new Error('ShareButton remounted across a re-render — its copied state would be wiped');
+    }
+    if (!/Share result/.test(second.textContent)) {
+      throw new Error('label read ' + JSON.stringify(second.textContent));
+    }
+    return true;
+  });
+
   /* #208 — a touch DROP must yield coordinates. `e.touches` is a TouchList on
      every TouchEvent and a TouchList is an object, so testing it for existence
      rather than length made `touchend` — whose `touches` is empty by
@@ -739,6 +814,49 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #350 — the All Games search field's predicate: case-insensitive on the
+     card's DISPLAY name, whitespace-trimmed, an empty query passes
+     everything. This is the filter the home render applies between the chip
+     filter and the pin partition, asserted here against GAME_CARDS the same
+     way the favorites/pin checks walk it. */
+  check('home-search-filter', () => {
+    if (!homeSearchMatch(GAME_CARDS[0], '')) {
+      throw new Error('an empty query must match every card');
+    }
+    if (!homeSearchMatch(GAME_CARDS[0], '   ')) {
+      throw new Error('a whitespace-only query must match every card');
+    }
+    // Case-insensitive: every casing finds the same cards ("sud" hits Sudoku
+    // AND Sudoku Mini — both are registry cards, so the exact count is the
+    // registry's business, not this check's).
+    const expected = GAME_CARDS.filter(c => c.name.toLowerCase().includes('sud'));
+    if (!expected.some(c => c.name === 'Sudoku')) {
+      throw new Error('no card name contains "sud" — update this check');
+    }
+    for (const q of ['SUD', 'sud', 'Sud']) {
+      const hits = GAME_CARDS.filter(c => homeSearchMatch(c, q));
+      if (hits.length !== expected.length) {
+        throw new Error('query "' + q + '" found ' + hits.length + ' of ' + expected.length + ' cards');
+      }
+      for (const c of expected) {
+        if (!hits.includes(c)) throw new Error('query "' + q + '" missed ' + c.name);
+      }
+    }
+    // The merged Snake card answers to its one shared display name, and the
+    // query is trimmed before matching. (Snakes & Ladders legitimately
+    // matches too — it contains the substring — so assert inclusion.)
+    const snake = CARD_BY_GAME_ID['snakedaily'];
+    if (!snake) throw new Error('snakedaily resolves to no card');
+    const snakeHits = GAME_CARDS.filter(c => homeSearchMatch(c, ' snake '));
+    if (!snakeHits.includes(snake)) {
+      throw new Error('a padded "snake" query missed the merged Snake card');
+    }
+    if (GAME_CARDS.some(c => homeSearchMatch(c, 'zzz'))) {
+      throw new Error('a query no name contains matched something');
+    }
+    return true;
+  });
+
   // Phase 5 (#143) — 2048 vertical swipes were inverted. A lone tile at the
   // bottom row swiped 'up' must reach row 0, and vice versa.
   check('t2048-up', () => {
@@ -822,24 +940,39 @@ function runClientSelfTests(styleReady) {
 
   /* #193 — the derived clues must help without answering. They are generated
      from the word rather than written, so nothing but this stops a short word
-     from having its whole answer spelled out one clue at a time. */
+     from having its whole answer spelled out one clue at a time. Every word
+     carries exactly TWO derived clues so the per-word clue count is uniform
+     however long the day's words run — the short word's second clue is the
+     repetition status, never a letter. */
   check('cipher-derived-hints', () => {
     const seen = new Set();
     for (const theme of CW_THEMES) {
       for (const entry of theme.words) {
         const w = entry.word;
         const derived = cwDerivedHints(w);
-        if (derived.length < 1) throw new Error(w + ': no derived clue at all');
-        if (derived.length > 2) throw new Error(w + ': ' + derived.length + ' derived clues, expected at most 2');
-        // Never more than half the word given away by structure alone.
-        const revealed = derived.length;
+        if (derived.length !== 2) throw new Error(w + ': ' + derived.length + ' derived clues, expected exactly 2');
+        // Never more than half the word given away by structure alone: count
+        // only the POSITIONAL clues — the short word's repetition-status clue
+        // reveals no letter at all.
+        const revealed = w.length >= 5 ? 2 : 1;
         if (revealed >= w.length - 1) throw new Error(w + ' (len ' + w.length + '): ' + revealed + ' letters revealed leaves nothing to solve');
-        if (w.length < 5 && derived.length !== 1) throw new Error(w + ': a short word must keep its last letter');
         for (const h of derived) {
           if (h.indexOf(w) !== -1) throw new Error(w + ': a clue spells the answer');
         }
         if (derived[0].indexOf('"' + w[0] + '"') === -1) throw new Error(w + ': first-letter clue names the wrong letter');
-        if (derived[1] && derived[1].indexOf('"' + w[w.length - 1] + '"') === -1) throw new Error(w + ': last-letter clue names the wrong letter');
+        if (w.length >= 5) {
+          if (derived[1].indexOf('"' + w[w.length - 1] + '"') === -1) throw new Error(w + ': last-letter clue names the wrong letter');
+        } else {
+          // The short-word clue must state the repetition status, and state
+          // it TRUTHFULLY — a wrong status clue misdirects worse than none.
+          if (derived[1].indexOf('more than once') === -1) throw new Error(w + ': short-word clue is not a repetition-status clue');
+          if (derived[1].indexOf('"') !== -1) throw new Error(w + ': short-word clue must not name a letter');
+          const counts = {};
+          for (const ch of w) counts[ch] = (counts[ch] || 0) + 1;
+          const repeats = Object.keys(counts).some(ch => counts[ch] > 1);
+          const saysNone = derived[1].indexOf('No letter') === 0;
+          if (saysNone === repeats) throw new Error(w + ': repetition clue contradicts the word');
+        }
         seen.add(w);
       }
     }
@@ -1292,6 +1425,92 @@ function runClientSelfTests(styleReady) {
       const a = hrSpawnPlan(cfg, seeded(b), cfg.limit);
       const c = hrSpawnPlan(cfg, seeded(b), cfg.limit);
       if (a.length !== c.length) throw new Error('level ' + (b + 1) + ' spawn plan is not deterministic');
+    }
+    return true;
+  });
+
+  /* #326 — Jet Run's contact rules and its derived course targets. The game
+     has nothing to shoot at, so its hazards are gates, storm clouds and the
+     shields they cost; these are the rules a retune must not quietly undo,
+     mirroring hashrush-strike-rules: one pure pair owns the hit boxes and the
+     costs, and the frame loop and these checks all go through it. */
+  check('jetrun-course-rules', () => {
+    const W = 300;
+    const mk = (type, fx, fw, y) => ({ type, fx, fw, y });
+    // A gate is two posts standing at the edges of its gap; the middle of the
+    // gap is clear, a post is a hazard.
+    const gate = mk('gate', 0.5, 0.30, 100); // gap 90px wide, centred at 150
+    if (dfPickAt([gate], 150, 100, W) !== -1) throw new Error('the middle of a gate gap must be clear');
+    if (dfPickAt([gate], 185, 100, W) !== 0) throw new Error('a gate post must be a hazard');
+    // A storm cloud is a hazard; clear sky is not.
+    const cloud = mk('cloud', 0.5, 0.20, 200);
+    if (dfPickAt([cloud], 150, 200, W) !== 0) throw new Error('a storm cloud must be a hazard');
+    if (dfPickAt([cloud], 150, 140, W) !== -1) throw new Error('clear sky must not be a hazard');
+    // Stars are pickups, never hazards — dfStarAt is the one that sees them.
+    if (dfPickAt([mk('star', 0.5, 0.05, 100)], 150, 100, W) !== -1) throw new Error('a star must not be a hazard');
+    if (dfStarAt([mk('star', 0.5, 0.05, 100)], 150, 100, W) !== 0) throw new Error('a star must be collectable');
+    // Nearest contact wins when two hazards overlap the jet.
+    const near = mk('gate', 0.5, 0.30, 130);
+    if (dfPickAt([gate, near], 185, 120, W) !== 1) throw new Error('the nearest contact must win');
+    if (dfPickAt([near, gate], 185, 120, W) !== 0) throw new Error('the nearest contact must win, order aside');
+    // An already-hit object never bills twice.
+    if (dfPickAt([mk('cloud', 0.5, 0.20, 100)], 150, 100, W) !== 0) throw new Error('precondition');
+    if (dfPickAt([{ type: 'cloud', fx: 0.5, fw: 0.20, y: 100, hit: true }], 150, 100, W) !== -1) throw new Error('a hit cloud must not bill twice');
+    // The gate line: inside the gap is a pass, a post is a clip, outside both
+    // is a miss.
+    if (dfGateVerdict(150, 150, 45) !== 'pass') throw new Error('inside the gap must be a pass');
+    if (dfGateVerdict(150 + 57, 150, 45) !== 'clip') throw new Error('a post must be a clip');
+    if (dfGateVerdict(150 + 100, 150, 45) !== 'miss') throw new Error('clear of both must be a miss');
+    // The combo ladder: 5 gates per step, capped at ×5. And what a contact
+    // costs: a hazard takes a shield AND the combo, a star pays flat.
+    if (dfMultFor(0) !== 1 || dfMultFor(4) !== 1 || dfMultFor(5) !== 2 || dfMultFor(100) !== DF_MAX_MULT) {
+      throw new Error('the combo multiplier ladder is wrong');
+    }
+    const s = { score: 0, shields: 3, combo: 0 };
+    dfApplyHit(s, 'star');
+    if (s.score !== DF_STAR_SCORE || s.shields !== 3) throw new Error('a star must pay flat and never touch the shields');
+    s.combo = 4;
+    dfApplyHit(s, 'cloud');
+    if (s.shields !== 2 || s.combo !== 0) throw new Error('a storm must cost a shield and the combo');
+    dfApplyHit(s, 'pylon');
+    if (s.shields !== 1) throw new Error('a pylon must cost a shield');
+    // A storm is never parked inside a gate's gap — that would be a shield
+    // loss no steering can avoid, which is a tax rather than a puzzle.
+    const plan = dfCoursePlan({ speed: 200, spawnEvery: 0.6, cloudRate: 0.4, starRate: 0.2, gap: 0.26 }, mulberry32(424242), 120);
+    let lastGateFx = null;
+    for (const o of plan) {
+      if (o.type === 'gate') lastGateFx = o.fx;
+      else if (o.type === 'cloud' && lastGateFx != null && Math.abs(o.fx - lastGateFx) < 0.18) {
+        throw new Error('a cloud must not sit on the previous gate\'s gap');
+      }
+    }
+    return true;
+  });
+
+  /* Jet Run's targets are derived the same way Hash Rush's are (dfTargetFor),
+     so the same property checks hold: every rung has a reachable, strictly
+     rising, per-seed-stable target, and its course plan is deterministic. */
+  check('jetrun-level-targets', () => {
+    const seeded = (band) => mulberry32(hashStr('jetrun:story:' + band) >>> 0);
+    let prev = 0;
+    for (let b = 0; b < DF_STORY.length; b++) {
+      const cfg = { ...DF_STORY[b], limit: DF_STORY[b].secs };
+      const target = dfTargetFor(cfg, seeded(b));
+      const model = dfModelRun(cfg, seeded(b), cfg.limit);
+      if (!(target > 0)) throw new Error('level ' + (b + 1) + ' has no target');
+      if (target > model.score) throw new Error('level ' + (b + 1) + ' asks for ' + target + ' and the best the model scores is ' + model.score);
+      if (target <= prev) throw new Error('level ' + (b + 1) + ' asks for ' + target + ', no more than level ' + b + "'s " + prev);
+      prev = target;
+      if (dfModeConfig('story', b).limit !== DF_STORY[b].secs) {
+        throw new Error('level ' + (b + 1) + ' config lost its clock');
+      }
+      // Same seed, same target: two players on one rung must be given the
+      // same goal.
+      if (dfTargetFor(cfg, seeded(b)) !== target) throw new Error('level ' + (b + 1) + ' target is not stable');
+      // And the plan it is derived from must not depend on how it is walked.
+      const a = dfCoursePlan(cfg, seeded(b), cfg.limit);
+      const c = dfCoursePlan(cfg, seeded(b), cfg.limit);
+      if (a.length !== c.length) throw new Error('level ' + (b + 1) + ' course plan is not deterministic');
     }
     return true;
   });
@@ -2084,6 +2303,39 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #331 — the daily's Easy/Hard mix the day anchor per (game, band), but
+     Normal must hash to EXACTLY the pre-band seed: every existing daily board,
+     resume record and tier-A replay is keyed to it, so a divergent Normal
+     stream would silently deal every existing player a different board. The
+     games list spans both seed shapes (server-issued and legacy-derived) and
+     offsets vary so no single lucky pair can pass. */
+  check('daily-band-normal-unchanged', () => {
+    if (typeof dailyRng !== 'function') return true;
+    const games = ['sudoku', 'wordsearch', 'cryptowordle', 'tilematchingdaily',
+      'klondike', 'cratepush', 'zuma', 'snakedaily', 'bouncedaily', '2048', 'wordsprint'];
+    for (const g of games) {
+      for (let off = 0; off < 5; off++) {
+        const base = dailyRng(off, g);
+        const normal = dailyRng(off, g, 'normal');
+        const normalNull = dailyRng(off, g, null);
+        for (let i = 0; i < 4; i++) {
+          const b = base(), n = normal(), nn = normalNull();
+          if (b !== n || b !== nn) {
+            throw new Error("dailyRng(" + off + ", '" + g + "') diverges from its " +
+              'Normal-band stream — Normal must stay byte-identical to the pre-band seed');
+          }
+        }
+        // And Easy/Hard must be three DIFFERENT boards off the same anchor —
+        // fresh rngs each, so the comparison is first-draw to first-draw.
+        const a = dailyRng(off, g)(), e = dailyRng(off, g, 'easy')(), h = dailyRng(off, g, 'hard')();
+        if (!(a !== e && a !== h && e !== h)) {
+          throw new Error("bands of '" + g + "' on offset " + off + ' share a stream');
+        }
+      }
+    }
+    return true;
+  });
+
   /* #210, the CSS half, measured. `.tm-wrap` sits in `.cg-stage`, which is
      `align-items: center`, so without a definite width it took its
      fit-content width — the canvas's own CSS width, which useCanvasBoard
@@ -2112,6 +2364,116 @@ function runClientSelfTests(styleReady) {
     if (bw >= 40 && cw < bw - 4) {
       throw new Error('the Tile Match canvas is ' + Math.round(cw) + 'px in a '
         + Math.round(bw) + 'px frame');
+    }
+    return true;
+  });
+
+  /* Escape from Dracula — the pager's chunking is PURE, so its two load-
+     bearing properties are held here rather than only by eye: every page fits
+     the box it was measured for, and the pages together are the whole text
+     (this is a paged layout, not a truncation). The measure is a fixed
+     10px-per-character stand-in, which makes the expected line count exact. */
+  check('textpager-chunking', () => {
+    const measure = (t) => String(t).length * 10;
+    const paras = [
+      'aaa bbb ccc ddd eee fff ggg hhh iii jjj',
+      'kkk lll mmm',
+      'nnn ooo ppp qqq rrr sss ttt uuu vvv www xxx yyy zzz',
+    ];
+    const maxW = 200, maxLines = 3, lineH = 10;
+    const pages = tpPaginate(measure, paras, maxW, maxLines, lineH, 0);
+    if (!pages.length) throw new Error('produced no pages at all');
+    // 1. Every page fits the measured line budget.
+    pages.forEach((pg, i) => {
+      const lines = pg.reduce((a, b) => a + b.lines, 0);
+      if (lines > maxLines) throw new Error('page ' + i + ' has ' + lines + ' lines, over ' + maxLines);
+      if (!pg.length) throw new Error('page ' + i + ' is empty');
+    });
+    // 2. Lossless AND word-intact: the concatenated pages are the input words.
+    const got = pages.map(pg => pg.map(b => b.text).join(' ')).join(' ').split(/\s+/).filter(Boolean);
+    const want = paras.join(' ').split(/\s+/).filter(Boolean);
+    if (got.length !== want.length || got.some((w, i) => w !== want[i])) {
+      throw new Error('pagination is lossy: ' + got.length + ' words vs ' + want.length);
+    }
+    // 3. Paragraph atomicity: a block never mixes two source paragraphs, and a
+    //    fresh paragraph starts at its own block boundary.
+    pages.forEach(pg => pg.forEach(b => {
+      if (!(b.pi >= 0 && b.pi < paras.length)) throw new Error('block names a bad paragraph');
+    }));
+    return true;
+  });
+
+  /* A one-line text is one page, and a one-page pager offers NO advance — the
+     control would be a press that does nothing. The last page of a multi-page
+     text is the same story: there is nothing after it. */
+  check('textpager-last-page', () => {
+    if (tpCanAdvance(1, 0)) throw new Error('a single page offered an advance');
+    if (tpCanAdvance(3, 2)) throw new Error('the last page offered an advance');
+    if (!tpCanAdvance(3, 0) || !tpCanAdvance(3, 1)) throw new Error('a middle page refused to advance');
+    return true;
+  });
+
+  check('textpager-one-line', () => {
+    const measure = (t) => String(t).length * 10;
+    const pages = tpPaginate(measure, ['one short line'], 400, 5, 10, 0);
+    if (pages.length !== 1) throw new Error('a one-line text made ' + pages.length + ' pages');
+    return true;
+  });
+
+  /* Safe-area audit, the static half. Inside the platform frame every bare
+     env(safe-area-inset-*) resolves to 0px, so a rule that reads it directly
+     is dead chrome: bottom bars sit under the home indicator and overlays run
+     under the notch. The platform forwards the real values on <html> as
+     --un-safe-inset-*, so each app rule must reach it through the
+     var(--un-safe-inset-…, env(…)) form. The one legal bare env() is an app
+     rule's OWN fallback inside that var(); reading it any other way is the
+     regression this check exists to catch. */
+  check('safe-area-env-wrapped', () => {
+    const bad = [];
+    const re = /env\(\s*safe-area-inset-[a-z]+\s*[,)]/g;
+    let m;
+    while ((m = re.exec(css))) {
+      // Allow only the forwarded form: the env() must sit inside a var()
+      // whose first argument is --un-safe-inset-*.
+      const before = css.slice(Math.max(0, m.index - 40), m.index);
+      if (/var\(\s*--un-safe-inset-[a-z]+\s*,\s*$/.test(before)) continue;
+      bad.push(css.slice(Math.max(0, m.index - 50), m.index + m[0].length)
+        .split('\n').pop().trim());
+    }
+    if (bad.length) {
+      throw new Error('bare env(safe-area-inset-*) is inert inside the app '
+        + 'frame — reach it through var(--un-safe-inset-…, env(…)): '
+        + bad.join(' | '));
+    }
+    return true;
+  });
+
+  /* Safe-area audit, the measured half. The tokens must actually RESOLVE: a
+     typo in the fallback chain leaves them as an invalid value, which makes
+     every calc() that mentions them collapse to 0 and silently drops the
+     inset rather than failing. Read the computed values on a probe element
+     that sets padding-bottom from the token, and require a length, not the
+     empty string an unresolved var() computes to. */
+  checkStyled('safe-tokens-resolve', () => {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;'
+      + 'padding-bottom:calc(1px + var(--pc-safe-bottom));'
+      + 'padding-top:calc(1px + var(--pc-safe-top));';
+    document.body.appendChild(probe);
+    try {
+      const cs = getComputedStyle(probe);
+      const pb = parseFloat(cs.paddingBottom);
+      const pt = parseFloat(cs.paddingTop);
+      if (!Number.isFinite(pb) || !Number.isFinite(pt)) {
+        throw new Error('--pc-safe-bottom / --pc-safe-top did not resolve '
+          + '(padding-bottom=' + cs.paddingBottom + ', padding-top=' + cs.paddingTop + ')');
+      }
+      if (pb < 1 || pt < 1) {
+        throw new Error('the safe-area token calc collapsed below its fixed term: '
+          + 'padding-bottom=' + pb + ', padding-top=' + pt);
+      }
+    } finally {
+      probe.remove();
     }
     return true;
   });

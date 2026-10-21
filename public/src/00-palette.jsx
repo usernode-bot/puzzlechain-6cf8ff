@@ -159,6 +159,7 @@ const TAPPABLE_CLASSES = [
   'card-pin',
   'dl-check',
   'pregame-practice',
+  'nav-theme-btn',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors

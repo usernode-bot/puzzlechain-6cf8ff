@@ -649,7 +649,7 @@ function ClassicShell({ game, onExit, onNewGame, sheetSections, children, menuCo
         {sections.length > 1 && (
           <div className="cg-sheet-tabs">
             {sections.map(s => (
-              <button key={s.id} className={'cg-sheet-tab' + (active === s.id ? ' active' : '')} onClick={() => setActive(s.id)}>{s.label}</button>
+              <button key={s.id} className={'cg-sheet-tab' + (active === s.id ? ' active' : '')} onClick={() => open(s.id)}>{s.label}</button>
             ))}
           </div>
         )}

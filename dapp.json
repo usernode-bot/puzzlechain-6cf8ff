@@ -1392,6 +1392,12 @@
       "expectSelector": ".cg-sheet.open"
     },
     {
+      "name": "Game menu Settings tab opens the settings panel in the sheet",
+      "path": "/?game=snake&sheet=settings",
+      "expectSelector": ".cg-sheet.open",
+      "expectText": "Reduced motion"
+    },
+    {
       "name": "Merged cards offer two play buttons",
       "path": "/",
       "expectSelector": ".card.paired .card-modes"

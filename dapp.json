@@ -1212,6 +1212,21 @@
       "expectText": "Another run"
     },
     {
+      "name": "An arcade win offers a one-tap run as the main action",
+      "path": "/?game=zuma&result=win&pmode=arcade",
+      "expectSelector": ".win-card .play-again-btn[data-restart=\"arcade\"]"
+    },
+    {
+      "name": "A story win offers to play the level again",
+      "path": "/?game=zuma&result=win&pmode=story",
+      "expectSelector": ".win-card [data-restart=\"story\"]"
+    },
+    {
+      "name": "A lost arcade run restarts in one tap",
+      "path": "/?game=zuma&result=1&pmode=arcade",
+      "expectSelector": ".win-card .play-again-btn[data-restart=\"arcade\"]"
+    },
+    {
       "name": "Marble Loop shows the camouflage marble's countdown",
       "path": "/?game=zuma&zcamo=1",
       "expectText": "Camouflage"

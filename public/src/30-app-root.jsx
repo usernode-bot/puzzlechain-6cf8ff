@@ -161,6 +161,10 @@ function App() {
   const [arcadeBest, setArcadeBest] = useState(null);
   const [totalScore, setTotalScore] = useState(0);
   const [streak, setStreak] = useState(0);
+  // All-time best daily streak (#362) — one figure for the player, shown
+  // beside the current streak on every daily card. Never below the current
+  // streak in cardProps, so an optimistic bump never under-shoots it.
+  const [bestStreak, setBestStreak] = useState(0);
   // Permanent earned streak-milestone day thresholds (e.g. [3, 7, 30]) — kept
   // even after a streak resets, so the lobby can show a collected-badges strip.
   const [badges, setBadges] = useState([]);
@@ -575,6 +579,7 @@ function App() {
         if (ok && body && body.attempt) {
           setAttempts((prev) => ({ ...prev, [gid]: body.attempt }));
           if (typeof body.streak === 'number') setStreak(body.streak);
+          if (typeof body.bestStreak === 'number') setBestStreak(body.bestStreak);
           setTotalScore((t) => t + (body.attempt.score || 0));
           setCommitNotice(`✅ Your guest ${game.name} run now counts — you're on today's board!`);
           clearPendingRun(gid);
@@ -616,6 +621,7 @@ function App() {
       setAttempts(body.attempts || {});
       setNextResetUtc(body.nextResetUtc);
       setStreak(typeof body.streak === 'number' ? body.streak : 0);
+          setBestStreak(typeof body.bestStreak === 'number' ? body.bestStreak : 0);
       setSolveCount(Number.isFinite(body.solveCount) ? body.solveCount : 0);
       setBadges(Array.isArray(body.badges) ? body.badges : []);
       setAchievements(body.achievements && Array.isArray(body.achievements.types)
@@ -668,6 +674,7 @@ function App() {
       setAuthOk(false);
       setUser(null);
       setStreak(0);
+      setBestStreak(0);
       setSolveCount(0);
       setBadges([]);
       setAchievements({ types: [], milestones: [], stories: [] });
@@ -1465,6 +1472,7 @@ function App() {
       // Reconcile against the server's authoritative streak + reward + new
       // achievement badges, and clear any prior sync-error flag.
       if (body && typeof body.streak === 'number') setStreak(body.streak);
+      if (body && typeof body.bestStreak === 'number') setBestStreak(body.bestStreak);
       if (body && Number.isFinite(body.solveCount)) setSolveCount(body.solveCount);
       const newAch = (body && Array.isArray(body.newAchievements)) ? body.newAchievements : [];
       if (newAch.length) {
@@ -2967,6 +2975,10 @@ function App() {
                   // #313 — every daily card shows the player's current streak;
                   // the same state the nav stat and pre-game panel read.
                   streak: authOk ? streak : 0,
+                  // #362 — the all-time best rides beside it. max() with the
+                  // live streak so an optimistic bump never shows a best
+                  // below the current streak.
+                  bestStreak: authOk ? Math.max(bestStreak, streak) : 0,
                   loading: loading,
                   onPlay: playCardMode,
                   pinned: pinnedSet.has(c.key),

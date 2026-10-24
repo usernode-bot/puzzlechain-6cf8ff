@@ -840,6 +840,21 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* Genre chips — every card must map to exactly one of the five chips, and
+     every chip must have at least one card. A new game with a new tag that
+     is missing from TAG_GENRE would otherwise sit under NO genre chip and
+     silently vanish from the whole genre filter row. */
+  check('card-genre-coverage', () => {
+    const orphans = GAME_CARDS.filter(c => !cardGenre(c));
+    if (orphans.length) throw new Error('no genre for: ' + orphans.map(c => c.key).join(', '));
+    const counts = {};
+    for (const c of GAME_CARDS) counts[cardGenre(c)] = (counts[cardGenre(c)] || 0) + 1;
+    for (const g of GENRE_CHIPS) {
+      if (!counts[g.id]) throw new Error('genre chip ' + g.id + ' has no cards');
+    }
+    return true;
+  });
+
   /* #350 — the All Games search field's predicate: case-insensitive on the
      card's DISPLAY name, whitespace-trimmed, an empty query passes
      everything. This is the filter the home render applies between the chip

@@ -168,6 +168,27 @@
       "expectText": "Mine Finder Classic"
     },
     {
+      "name": "Genre chips render in the home filter row",
+      "path": "/",
+      "expectSelector": ".home-filter-chips .home-chip",
+      "expectText": "Puzzle"
+    },
+    {
+      "name": "Card chip deep link shows Spider",
+      "path": "/?tab=card",
+      "expectText": "Spider"
+    },
+    {
+      "name": "Word chip deep link shows Word Sprint",
+      "path": "/?tab=word",
+      "expectText": "Word Sprint"
+    },
+    {
+      "name": "Board chip deep link shows Checkers",
+      "path": "/?tab=board",
+      "expectText": "Checkers"
+    },
+    {
       "name": "Mancala card in Classic Games tab",
       "path": "/?tab=classic",
       "expectText": "Mancala"

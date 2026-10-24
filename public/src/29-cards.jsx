@@ -288,6 +288,29 @@ function buildGameCards(games) {
 }
 
 const GAME_CARDS = buildGameCards(GAMES);
+
+/* Genre filter chips for the home grid. The chips come from the tag each
+   card already carries — no second genre field — so a new game with a new
+   tag must be added to TAG_GENRE below, which the card-genre-coverage
+   self-test enforces; a tag missing there leaves its card on NO genre chip. */
+const GENRE_CHIPS = [
+  { id: 'word', label: 'Word' },
+  { id: 'card', label: 'Card' },
+  { id: 'arcade', label: 'Arcade' },
+  { id: 'board', label: 'Board' },
+  { id: 'puzzle', label: 'Puzzle' },
+];
+const TAG_GENRE = {
+  Word: 'word', Words: 'word',
+  Cards: 'card',
+  Arcade: 'arcade',
+  Board: 'board', Strategy: 'board',
+  Puzzle: 'puzzle', Logic: 'puzzle', Numbers: 'puzzle', Risk: 'puzzle',
+  Match: 'puzzle', Campaign: 'puzzle', Tiles: 'puzzle',
+};
+const cardGenre = (card) => TAG_GENRE[card.tag] || null;
+const GENRE_IDS = new Set(GENRE_CHIPS.map(g => g.id));
+
 const CARD_BY_GAME_ID = {};
 for (const c of GAME_CARDS) for (const m of c.modes) CARD_BY_GAME_ID[m.gameId] = c;
 for (const c of GAME_CARDS) if (c.gameId && !CARD_BY_GAME_ID[c.gameId]) CARD_BY_GAME_ID[c.gameId] = c;

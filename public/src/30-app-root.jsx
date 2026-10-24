@@ -1003,6 +1003,12 @@ function App() {
       setStepCount(0);
       setWinData(null);
       setLoseData(null);
+      /* A restart from the results card lands back on the same screen, so the
+         board has to REMOUNT or it would paint the finished run's board again.
+         Bumping the key in this same batch means the remount happens once,
+         after beginArcadeRun rolled the new seed/band, and never as a frame
+         without its card. */
+      if (over && over.restart) setPlayAgainKey(k => k + 1);
       setScreen('game');
       return;
     }
@@ -2158,6 +2164,37 @@ function App() {
     setScreen('game');
   };
 
+  /* #378 — one-tap restart from the results card.
+     Arcade goes through startRun (the same code the pre-game Play button uses)
+     so the new run rolls a fresh seed, claims its own server anchor and counts
+     as a new ranked run. Story goes through startAdvanceBand (the same code
+     "Try this band again" already used), which re-deals the same rung and
+     keeps the ladder in place. A daily, a classic and an online match never
+     reach this: modeLabel is only set for story and arcade. */
+  const restartModeRun = () => {
+    if (!currentGame) return;
+    const game = currentGame;
+    const band = playMode === 'arcade' ? arcadeBandId : storyBand;
+    /* A deliberate restart, so the saved run goes with it — without this an
+       arcade startRun would reopen the finished run's seed and runId from
+       readRunSave instead of rolling a fresh board. */
+    dropLocalRun(game.id, playMode, band);
+    setReviewMode(false);
+    setPracticeMode(false);
+    setArcadeReplaySeed(null);
+    setPracticeResult(null);
+    if (playMode === 'arcade') {
+      startRun(game, { mode: 'arcade', arcadeBand: arcadeBandId, restart: true });
+      return;
+    }
+    if (playMode === 'story') {
+      // Match every other new run: the finish guard comes down so this rung
+      // saves its progress on the device like a first attempt.
+      allowProgressSave(game.id);
+      startAdvanceBand(storyBand);
+    }
+  };
+
   const playAgain = () => {
     /* A deliberate restart, so the local resume record goes with it — without
        this the remount would hydrate straight back into the run that just
@@ -2219,13 +2256,33 @@ function App() {
     if (wantWin) {
       setPracticeMode(false);
       if (game.daily) setPlayMode('daily');
+      /* #378 — `?result=win&pmode=story|arcade` shows the WIN card as a mode
+         run ends, which is where the one-tap restart lives. Same local-only
+         contract as the rest of ?result=: no claim, no finish, no endpoint. */
+      const wantMode = new URLSearchParams(window.location.search).get('pmode');
+      const winMode = wantMode === 'story' && supportsMode(game.id, 'story') ? 'Story'
+        : wantMode === 'arcade' && supportsMode(game.id, 'arcade') ? 'Arcade'
+        : null;
+      if (winMode) setPlayMode(winMode === 'Story' ? 'story' : 'arcade');
       // #331 — `?band=easy|hard` with `?result=win` shows the win card as a
       // band run ends: the caption under the earned score and the Difficulty
       // row in the details. Pure local UI state, like the rest of the demo.
       const rDemo = new URLSearchParams(window.location.search).get('band');
       const rBand = (rDemo === 'easy' || rDemo === 'hard') ? rDemo : 'normal';
       setDailyBand(rBand);
-      setWinData(game.daily
+      setWinData(winMode === 'Story'
+        ? {
+            ...winResultDemo(game), isClassic: false, multiplier: 1, bonus: 0,
+            modeLabel: 'Story', bandIndex: 0,
+            bandTotal: (storyProgress[game.id] || {}).total || 0,
+          }
+        : winMode === 'Arcade'
+        ? {
+            ...winResultDemo(game), isClassic: false, multiplier: 1, bonus: 0,
+            modeLabel: 'Arcade', arcadeBand: arcadeBandId,
+            arcadeVerified: true, arcadeFirstRun: true,
+          }
+        : game.daily
         ? { ...winResultDemo(game), band: rBand }
         : { ...winResultDemo(game), isClassic: true, bestScore: 1180, multiplier: 1, bonus: 0 });
       return;
@@ -2334,11 +2391,16 @@ function App() {
     };
     /* #185 — a story game caches its board in a useRef at mount, so moving the
        band is only visible if the component REMOUNTS. This key is that remount,
-       and it is scoped to story on purpose: every other mode keeps its identity
-       across a re-render exactly as before. playAgainKey rides along so "Try
-       this band again" re-deals the same band. */
+       and it is scoped to story and arcade on purpose: every other mode keeps
+       its identity across a re-render exactly as before. playAgainKey rides
+       along so "Try this band again" and "Another run" re-deal in place — a
+       restart from the results card stays on `screen === 'game'`, so the key
+       is the only thing that can remount the board. */
     const bodyKey = playMode === 'story'
-      ? `story-${currentGame.id}-${storyBand}-${playAgainKey}` : undefined;
+      ? `story-${currentGame.id}-${storyBand}-${playAgainKey}`
+      : playMode === 'arcade'
+        ? `arcade-${currentGame.id}-${arcadeBandId}-${playAgainKey}`
+        : undefined;
     /* ONLY A DAILY RESUMES *INTO THE ATTEMPT ROW*. That row is keyed by
        (user, game, UTC day) and exists only once /start has claimed the day, so
        a story or arcade run saving into it 409s (a console error, which trips
@@ -3676,6 +3738,14 @@ function App() {
                 Play Again
               </button>
             )}
+            {/* #378 — an arcade run restarts in one tap on the same band, so
+                this takes the card's primary slot the way classic Play Again
+                does. It replaces the old pre-game round trip. */}
+            {winData.modeLabel === 'Arcade' && currentGame && (
+              <button className="primary-btn play-again-btn tappable" data-restart="arcade" {...tapProps(restartModeRun)}>
+                🎮 Another run
+              </button>
+            )}
             {boardReviewable && (
               <button className="primary-btn review-btn tappable" {...tapProps(() => setReviewMode(true))}>
                 👁 View board
@@ -3689,15 +3759,23 @@ function App() {
                 🎲 Play again for fun <span className="practice-note">(not scored)</span>
               </button>
             )}
-            {winData.modeLabel && currentGame && (
+            {/* #378 — replay the level you just cleared. Secondary on purpose:
+                a story replay pays nothing, so Back to Lobby stays the one
+                highlighted action. */}
+            {winData.modeLabel === 'Story' && currentGame && (
+              <button className="primary-btn review-btn tappable" data-restart="story" {...tapProps(restartModeRun)}>
+                🔁 Play this level again
+              </button>
+            )}
+            {winData.modeLabel === 'Story' && currentGame && (
               <button className="primary-btn review-btn tappable" {...tapProps(() => launchGame(currentGame, playMode))}>
-                {winData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Back to the levels'}
+                📖 Back to the levels
               </button>
             )}
             {/* One primary action per card. Where Play Again exists it is the
                 primary, so leaving steps down to the quiet style; a daily has
                 no Play Again, so Back to Lobby stays the primary there. */}
-            <button className={'primary-btn tappable' + (winData.isClassic ? ' review-btn' : '')} {...tapProps(() => backToLobby(winData.isClassic ? 'classic' : null))}>Back to Lobby</button>
+            <button className={'primary-btn tappable' + (winData.isClassic || winData.modeLabel === 'Arcade' ? ' review-btn' : '')} {...tapProps(() => backToLobby(winData.isClassic ? 'classic' : null))}>Back to Lobby</button>
             <button className="win-more tappable" aria-expanded={winDetails} {...tapProps(() => setWinDetails(v => !v))}>
               {winDetails ? 'Hide the details ▴' : 'Score, badges & leaderboard ▾'}
             </button>
@@ -3793,7 +3871,7 @@ function App() {
                 move after a loss is another go at THIS band, not the ladder
                 screen. Remounts through the same key the auto-advance uses. */}
             {loseData.modeLabel === 'Story' && currentGame && (
-              <button className="primary-btn review-btn tappable" {...tapProps(() => startAdvanceBand(storyBand))}>
+              <button className="primary-btn review-btn tappable" data-restart="story" {...tapProps(restartModeRun)}>
                 🔁 Try this band again
               </button>
             )}
@@ -3811,7 +3889,13 @@ function App() {
                 This is the shared card, so it fixes the exit for every story
                 and arcade game, not only the one the issue was filed against. */}
             {loseData.modeLabel && currentGame && (
-              <button className="primary-btn play-again-btn tappable" {...tapProps(() => launchGame(currentGame, playMode))}>
+              <button
+                className="primary-btn play-again-btn tappable"
+                data-restart={loseData.modeLabel === 'Arcade' ? 'arcade' : undefined}
+                {...tapProps(loseData.modeLabel === 'Arcade'
+                  ? restartModeRun
+                  : () => launchGame(currentGame, playMode))}
+              >
                 {loseData.modeLabel === 'Arcade' ? '🎮 Another run' : '📖 Continue Story Quest'}
               </button>
             )}

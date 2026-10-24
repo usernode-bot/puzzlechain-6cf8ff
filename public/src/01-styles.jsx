@@ -11,6 +11,18 @@ ${paletteVars('light')}
 :root[data-theme="dark"] {
 ${paletteVars('dark')}
 }
+/* ---- Safe-area tokens (#328) ----
+   The ONE definition. Bare env(safe-area-inset-*) is always 0px inside the
+   platform's cross-origin iframe, so the bridge forwards the real insets as
+   --un-safe-inset-*; env() is the fallback when the app is opened standalone.
+   Every inset below reads these four, never env() directly. Both resolve to
+   0px on desktop and notchless devices, so nothing moves there. */
+:root {
+  --safe-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px));
+  --safe-right: var(--un-safe-inset-right, env(safe-area-inset-right, 0px));
+  --safe-bottom: var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--un-safe-inset-left, env(safe-area-inset-left, 0px));
+}
 
 /* The hosted native kit's accent follows ours in both themes, so kit
    switches, action sheets, toasts and pull-to-refresh match the teal.
@@ -51,7 +63,7 @@ ${paletteVars('dark')}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Painted on <html> too, so overscroll/rubber-band areas match the theme. */
-html { background: ${C.bg}; }
+html { background: ${C.bg}; scroll-padding-top: var(--safe-top); scroll-padding-bottom: var(--safe-bottom); }
 
 body {
   font-family: 'Space Grotesk', system-ui, sans-serif;
@@ -92,7 +104,7 @@ body {
 .nav {
   background: ${C.surface};
   border-bottom: 1px solid ${C.border};
-  padding: 0.45rem 1.25rem;
+  padding: calc(0.45rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) 0.45rem calc(1.25rem + var(--safe-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -807,7 +819,7 @@ ${emitTapHighlightRules()}
    Hash Rush) are frozen behind the results card now too. Their ClassicShell is
    a fixed full-viewport layer, so the fixed minibar would sit on top of the
    bottom of the stage; reserve the same gutter .game-wrap already gets. */
-.game-body.frozen .cg-stage { padding-bottom: 5.5rem; }
+.game-body.frozen .cg-stage { padding-bottom: calc(5.5rem + var(--safe-bottom)); }
 /* PHASE 4 (#134) — the freeze used to kill the whole reviewed subtree, INCLUDING
    the header the shell renders inside it. That is why Back stopped working after
    "View board", and it hit every in-frame classic game's whole topbar (exit, ☰,

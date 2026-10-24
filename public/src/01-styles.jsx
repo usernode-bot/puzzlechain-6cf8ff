@@ -3204,6 +3204,73 @@ ${emitTapHighlightRules()}
 .screen-in { animation: un-screen-in 190ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards; }
 .screen-in-fade { animation: un-screen-fade 150ms linear backwards; }
 
+/* ---- Dots and Boxes (local two-player) ----
+   Player colours are game-art identity colours, hardcoded on purpose (like
+   the card faces and the goban): blue vs orange, the colour-blind-safe pair,
+   constant in both themes. Ownership is doubled by position and the labelled
+   score bar, so the colours are never the only signal. */
+.db-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 4px 0 12px; }
+.db-hud {
+  display: flex; align-items: stretch; gap: 8px;
+  width: 100%; max-width: min(92vw, 420px, var(--cg-board, 360px));
+}
+.db-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 9px; border-radius: 10px; background: var(--c-well);
+  border: 1.5px solid transparent; opacity: 0.6;
+  transition: opacity 160ms, border-color 160ms;
+}
+.db-chip.active { opacity: 1; }
+.db-chip.db-p1 { --db-color: #3D87C9; }
+.db-chip.db-p2 { --db-color: #D97E23; }
+.db-chip.active { border-color: var(--db-color); }
+.db-chip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--db-color); flex: 0 0 auto; }
+.db-chip-name { font-size: 0.78rem; color: ${C.text}; white-space: nowrap; }
+.db-chip-score { font-size: 1.05rem; font-weight: 700; color: var(--db-color); min-width: 1.1em; text-align: right; }
+.db-turn-banner {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 0.82rem; font-weight: 600; color: ${C.text};
+  padding: 6px 4px; border-radius: 10px; background: var(--c-well); text-align: center;
+}
+.db-turn-banner.db-flash[data-db-flash="1"] { --db-color: #3D87C9; --db-soft: rgba(61, 135, 201, 0.18); }
+.db-turn-banner.db-flash[data-db-flash="2"] { --db-color: #D97E23; --db-soft: rgba(217, 126, 35, 0.18); }
+.db-turn-banner.db-flash { background: var(--db-soft); color: var(--db-color); animation: db-flash-pop 450ms; }
+@keyframes db-flash-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.db-board-box { width: 100%; max-width: min(92vw, 420px, var(--cg-board, 360px)); }
+.db-board { display: grid; width: 100%; touch-action: manipulation; }
+/* Press preview: an unclaimed edge lights in the CURRENT player's colour
+   (data-turn drives the pair below) the moment the finger lands. */
+.db-board[data-turn="1"] { --db-turn-color: #3D87C9; --db-turn-soft: rgba(61, 135, 201, 0.22); }
+.db-board[data-turn="2"] { --db-turn-color: #D97E23; --db-turn-soft: rgba(217, 126, 35, 0.22); }
+.db-dotcell { display: flex; align-items: center; justify-content: center; }
+.db-dot { width: 7px; height: 7px; border-radius: 50%; background: ${C.border}; }
+.db-edge {
+  position: relative; border: none; padding: 0; margin: 0;
+  background: transparent; border-radius: 8px; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.db-edge::after { content: ''; position: absolute; border-radius: 4px; }
+.db-h::after { left: 10%; right: 10%; top: 50%; height: 5px; transform: translateY(-50%); }
+.db-v::after { top: 10%; bottom: 10%; left: 50%; width: 5px; transform: translateX(-50%); }
+/* The press preview lives on the button body, the claimed line on ::after,
+   so a tap never reads as a claim. */
+.db-edge[data-pressed] { background: var(--db-turn-soft, transparent); }
+.db-edge:focus-visible { outline: 2px solid var(--db-turn-color, ${C.accent}); outline-offset: -2px; }
+.db-edge.claimed { cursor: default; }
+.db-edge.claimed::after { background: var(--db-color); }
+.db-edge.claimed.db-p1 { --db-color: #3D87C9; }
+.db-edge.claimed.db-p2 { --db-color: #D97E23; }
+.db-box { border-radius: 6px; }
+.db-box.done { background: var(--db-soft); box-shadow: inset 0 0 0 1.5px var(--db-color); }
+.db-box.done.db-p1 { --db-color: #3D87C9; --db-soft: rgba(61, 135, 201, 0.30); }
+.db-box.done.db-p2 { --db-color: #D97E23; --db-soft: rgba(217, 126, 35, 0.30); }
+.db-hint { font-size: 0.75rem; color: ${C.muted}; text-align: center; margin: 0; max-width: min(92vw, 420px); }
+.cg-stage .db-board-box { max-width: min(420px, var(--cg-board, 360px)); }
+
 /* The in-app pref, now that the root carries it (#235). Same list as the OS
    media query below — add new motion to BOTH or a player gets it in one place
    and not the other. */
@@ -3215,6 +3282,7 @@ ${emitTapHighlightRules()}
 :root[data-reduce-motion="1"] .cnl-roll-btn,
 :root[data-reduce-motion="1"] .ng-status.err,
 :root[data-reduce-motion="1"] .ng-status.ok,
+:root[data-reduce-motion="1"] .db-turn-banner.db-flash,
 :root[data-reduce-motion="1"] .win-card .trophy {
   animation: none !important;
   transition: none !important;
@@ -3328,6 +3396,7 @@ ${emitTapHighlightRules()}
     transition: none !important;
   }
   .ng-status.err, .ng-status.ok { animation: none !important; }
+  .db-turn-banner.db-flash { animation: none !important; }
   .win-card .trophy { animation: none !important; }
   /* Keep the colour half of a press (the affordance) and drop the movement. */
   .tappable:active, .tappable[data-pressed] { transform: none !important; }

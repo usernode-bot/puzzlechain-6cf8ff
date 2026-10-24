@@ -2055,6 +2055,32 @@
       "path": "/?game=sudoku&boards=1&demo=streak",
       "expectSelector": ".lb-band-tabs",
       "expectText": "Hard"
+    },
+    {
+      "name": "Dots and Boxes opens on its mode picker",
+      "path": "/?game=dotsboxes",
+      "expectText": "Dots and Boxes"
+    },
+    {
+      "name": "Dots and Boxes mounts the pass-and-play board",
+      "path": "/?game=dotsboxes&mode=2p&play=1",
+      "expectSelector": ".db-board",
+      "expectText": "Player 1's turn"
+    },
+    {
+      "name": "Dots and Boxes mid-game preset shows the right turn and score",
+      "path": "/?game=dotsboxes&mode=2p&play=1&db=mid",
+      "expectText": "Player 2's turn"
+    },
+    {
+      "name": "Dots and Boxes finished preset lands on the winner card",
+      "path": "/?game=dotsboxes&mode=2p&play=1&db=final",
+      "expectText": "Player 1 wins!"
+    },
+    {
+      "name": "Dots and Boxes draw preset announces the draw",
+      "path": "/?game=dotsboxes&mode=2p&play=1&db=draw",
+      "expectText": "Draw"
     }
   ],
   "visibility": {

@@ -123,6 +123,7 @@ const PLAY_MODES_BY_ID = {
   fourinarow:        [],
   gomoku:            [],
   ludo:              [],
+  dotsboxes:         [],
 };
 
 const playModesFor = (gameId) => PLAY_MODES_BY_ID[gameId] || [];

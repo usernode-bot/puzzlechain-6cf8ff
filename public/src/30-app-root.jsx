@@ -1413,9 +1413,10 @@ function App() {
   // game's own spoiler-free result line, then rank + the playable no-login
   // challenge link. `rank` is optional — the card reads fine while it's still
   // being fetched (or for guests before the rank preview lands).
-  // #331 — `band` is the run's difficulty: the "same deal" link carries
-  // `&band=` so the recipient opens the SAME board the sender played, not the
-  // Normal board. Normal is the default and adds nothing.
+  // #331 — `band` is the run's difficulty: the "same deal" link names it
+  // (#335 makes that `&level=` via playLink) so the recipient opens the SAME
+  // board the sender played. A daily link always names it, Normal included,
+  // so the opener does not get whatever difficulty they last picked.
   const buildShareCard = (gameId, resultLine, rank, band) => {
     const d = new Date(Date.now() + offset);
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -1423,10 +1424,9 @@ function App() {
     // Game result lines historically self-prefix the app name; strip it so
     // the card doesn't read "Game Corner … Game Corner …".
     if (resultLine) lines.push(resultLine.replace(/^Game Corner /, ''));
-    const bandQ = (band === 'easy' || band === 'hard') ? `&band=${band}` : '';
     lines.push(
       (Number.isFinite(rank) ? `#${rank} on today's board · ` : '') +
-      `Play the same deal (no login): ${window.location.origin}/?game=${gameId}${bandQ}`
+      `Play the same deal (no login): ${playLink(gameId, 'daily', band)}`
     );
     return lines.join('\n');
   };

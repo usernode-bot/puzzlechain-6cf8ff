@@ -1161,6 +1161,20 @@ ${emitTapHighlightRules()}
   letter-spacing: 0.12em; text-transform: uppercase; color: ${C.muted};
   margin-bottom: 0.4rem;
 }
+/* #335 — the heading and its Copy link share one line. The button is the same
+   small outlined control as an arcade run's Share, because it does the same
+   thing: copy a link, then say so for a moment. */
+.pregame-bands-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; margin-bottom: 0.4rem;
+}
+.pregame-bands-head .pregame-bands-label { margin-bottom: 0; }
+.pregame-link-btn {
+  flex: 0 0 auto; border: 1px solid ${C.border}; background: ${C.card};
+  color: ${C.text}; border-radius: 8px; padding: 0.25rem 0.45rem;
+  font: inherit; font-size: 0.72rem; cursor: pointer;
+}
+.pregame-link-btn[data-pressed] { background: var(--c-well-strong); }
 .pregame-band-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .pregame-band-row.wide { display: grid; grid-template-columns: repeat(3, 1fr); }
 .pregame-band {

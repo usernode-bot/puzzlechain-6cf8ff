@@ -638,6 +638,46 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* #335 — every shared link goes through playLink and is read by the existing
+     ?pmode= deep-link branch. These are that branch's contract: story's
+     ?level= is 1-based (the shell's index is 0-based), a daily always names
+     its band — Normal included, so the opener does not inherit their own last
+     pick — arcade names one only when it is a real band, and free play carries
+     neither a mode nor a level. No link may use ?mode= (the classic opponent
+     pin, which is how the arcade share used to name no mode at all) or the
+     older ?band= spelling. */
+  check('play-link-shape', () => {
+    const shape = (url) => new URL(url).searchParams;
+    const expect = (p, want, what) => {
+      for (const k of Object.keys(want)) {
+        if (p.get(k) !== want[k]) {
+          throw new Error(what + ': ' + k + ' read ' + JSON.stringify(p.get(k)) +
+            ', expected ' + JSON.stringify(want[k]));
+        }
+      }
+    };
+    expect(shape(playLink('sudoku', 'story', 3)),
+      { game: 'sudoku', pmode: 'story', level: '4', play: '1' }, 'story level 4');
+    expect(shape(playLink('sudoku', 'story', 0)),
+      { level: '1' }, 'story index 0 is level 1');
+    expect(shape(playLink('nonogram', 'daily', 'hard')),
+      { game: 'nonogram', pmode: 'daily', level: 'hard', play: '1' }, 'daily hard');
+    expect(shape(playLink('nonogram', 'daily', undefined)),
+      { pmode: 'daily', level: 'normal', play: '1' }, 'daily default names Normal');
+    expect(shape(playLink('dropstack', 'arcade', 'easy')),
+      { game: 'dropstack', pmode: 'arcade', level: 'easy', play: '1' }, 'arcade easy');
+    const unknownArcade = shape(playLink('dropstack', 'arcade', 'nonsense'));
+    if (unknownArcade.has('level')) throw new Error('an unknown arcade band must leave out level');
+    const free = shape(playLink('snake', null));
+    expect(free, { game: 'snake', play: '1' }, 'free play');
+    if (free.has('pmode') || free.has('level')) throw new Error('free play must name no mode or level');
+    for (const mode of ['story', 'daily', 'arcade']) {
+      const q = shape(playLink('sudoku', mode, mode === 'story' ? 2 : 'hard'));
+      if (q.has('mode') || q.has('band')) throw new Error(mode + ' link used ?mode= or ?band=');
+    }
+    return true;
+  });
+
   /* #208 — a touch DROP must yield coordinates. `e.touches` is a TouchList on
      every TouchEvent and a TouchList is an object, so testing it for existence
      rather than length made `touchend` — whose `touches` is empty by

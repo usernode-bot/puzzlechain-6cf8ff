@@ -2055,6 +2055,12 @@
       "path": "/?game=sudoku&boards=1&demo=streak",
       "expectSelector": ".lb-band-tabs",
       "expectText": "Hard"
+    },
+    {
+      "name": "Pre-game level picker offers a copy link",
+      "path": "/?game=sudoku&pmode=story&level=2&demo=modes",
+      "expectSelector": ".pregame-bands-head .pregame-link-btn",
+      "expectText": "Copy link"
     }
   ],
   "visibility": {

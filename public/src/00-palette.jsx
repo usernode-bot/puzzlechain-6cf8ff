@@ -159,6 +159,7 @@ const TAPPABLE_CLASSES = [
   'card-pin',
   'dl-check',
   'pregame-practice',
+  'pregame-link-btn',
   'nav-theme-btn',
 ];
 

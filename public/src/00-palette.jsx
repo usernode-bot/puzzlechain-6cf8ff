@@ -160,6 +160,7 @@ const TAPPABLE_CLASSES = [
   'dl-check',
   'pregame-practice',
   'nav-theme-btn',
+  'db-edge',
 ];
 
 /* The subset that also suppresses the grey iOS tap flash. Descendant selectors

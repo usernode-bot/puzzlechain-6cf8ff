@@ -530,6 +530,38 @@ const GAMES = [
     localSeats: { min: 2, max: 4 },
   },
   {
+    id: 'dotsboxes',
+    name: 'Dots and Boxes',
+    icon: '🪢',
+    category: 'classic',
+    shell: 'classic',
+    desc: 'Claim edges, complete boxes, and go again every time you score. Most boxes wins.',
+    tag: 'Board',
+    tagColor: GA.plum,
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score', sessionLength: 'medium', input: 'tap', undo: 'none' },
+    howToPlay: [
+      { title: 'Claim an edge', body: 'Take turns tapping an empty edge between two dots. You can never claim an edge that is already taken.' },
+      { title: 'Complete a box to go again', body: 'Finish the fourth edge of a box and it fills with your colour, scores you a point, and hands you another turn. Chains can run several boxes deep.' },
+      { title: 'Most boxes wins', body: 'When every edge is claimed the board is full. The player holding the most boxes wins; equal counts are a draw.' },
+    ],
+    component: DotsBoxesGame,
+    // Local two-player pass-and-play ONLY (deliberately unrated, like the
+    // other local modes): the state lives in the game module, the server is
+    // never touched, and there is no bot or online mode to keep parity with.
+    modes: ['2p'],
+    modeSelect: true,
+    // The one mechanical choice the game has: the board size.
+    variantPicker: {
+      label: 'Board size',
+      default: '5x5',
+      options: [
+        { id: '4x4', name: '4 × 4', note: 'A quick game. 16 boxes, a few minutes.' },
+        { id: '5x5', name: '5 × 5', note: '25 boxes, the classic length.' },
+        { id: '6x6', name: '6 × 6', note: '36 boxes. Long chains decide it.' },
+      ],
+    },
+  },
+  {
     id: 'tilematchingdaily',
     name: 'Daily Tile Match Puzzle',
     icon: '🀄',

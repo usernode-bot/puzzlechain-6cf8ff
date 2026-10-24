@@ -1124,6 +1124,75 @@ function runClientSelfTests(styleReady) {
     return true;
   });
 
+  /* Dots and Boxes — the pure rules pair (33-game-dotsboxes.jsx). The turn
+     is the whole game: completing a box awards the point AND the extra turn,
+     so a chain of completions must keep the same player claiming, an
+     already-claimed edge must be a silent no-op (the double-tap guard), and
+     the winner only exists once the board is full. */
+  check('dotsboxes-rules', () => {
+    // A completing claim scores and keeps the turn; an ordinary one flips it.
+    let st = dbNewState(1);
+    st = dbApplyClaim(st, 1, 'h', 0, 0).state;   // no complete -> Player 2
+    if (st.turn !== 2) throw new Error('an ordinary claim must pass the turn on');
+    st = dbApplyClaim(st, 2, 'v', 0, 0).state;   // two of four edges
+    if (st.turn !== 1) throw new Error('a second ordinary claim must pass the turn back');
+    st = dbApplyClaim(st, 1, 'h', 1, 0).state;   // three of four edges
+    const comp = dbApplyClaim(st, 2, 'v', 0, 1); // the fourth completes the box
+    if (comp.illegal) throw new Error('an unclaimed edge must be claimable');
+    if (comp.completed.length !== 1) throw new Error('the fourth edge must complete the box');
+    if (comp.state.scores[1] !== 1) throw new Error('the completing player must score');
+    if (comp.state.turn !== 2) throw new Error('a completing claim must award the extra turn');
+    // Box ownership is the COMPLETER's, not whoever happened to claim one of
+    // its edges first: Player 1 took the top edge above, Player 2 finished the
+    // box from the other three, and the box must render as Player 2's.
+    if (comp.state.owners['0,0'] !== 2) {
+      throw new Error('a box belongs to whoever completed it, not to its first edge');
+    }
+    // Chained extra turns: two boxes sharing an edge, both finished by
+    // Player 1 — the turn must still be Player 1's after the second.
+    st = dbNewState(2);
+    st = dbApplyClaim(st, 1, 'h', 0, 0).state;
+    st = dbApplyClaim(st, 2, 'h', 2, 1).state;
+    st = dbApplyClaim(st, 1, 'h', 0, 1).state;
+    st = dbApplyClaim(st, 2, 'h', 2, 0).state;
+    st = dbApplyClaim(st, 1, 'v', 0, 1).state;
+    st = dbApplyClaim(st, 2, 'v', 2, 0).state;
+    st = dbApplyClaim(st, 1, 'v', 0, 0).state;
+    st = dbApplyClaim(st, 2, 'v', 0, 2).state;
+    const c1 = dbApplyClaim(st, 1, 'h', 1, 0);   // completes box (0,0)
+    if (c1.completed.length !== 1 || c1.state.turn !== 1) throw new Error('the chain must start with an extra turn');
+    const c2 = dbApplyClaim(c1.state, 1, 'h', 1, 1); // completes box (0,1) too
+    if (c2.completed.length !== 1) throw new Error('the second box of the chain must complete');
+    if (c2.state.turn !== 1) throw new Error('a chain of extra turns must keep the same player');
+    if (c2.state.scores[0] !== 2 || c2.state.scores[1] !== 0) throw new Error('both chained boxes must score for Player 1');
+    // Double-tap: a second claim on the same edge is an illegal no-op that
+    // changes nothing — not a second score, not a turn flip.
+    const dbl = dbApplyClaim(c2.state, 1, 'h', 1, 0);
+    if (!dbl.illegal) throw new Error('a claimed edge must report illegal');
+    if (dbl.state.scores[0] !== 2 || dbl.state.turn !== 1) throw new Error('an illegal claim must change nothing');
+    // The winner only exists on a full board; 1-1 is a draw.
+    if (dbWinner(c2.state) !== null) throw new Error('an unfinished board has no winner');
+    const full = dbNewState(1);
+    let f = full;
+    f = dbApplyClaim(f, 1, 'h', 0, 0).state;
+    f = dbApplyClaim(f, 2, 'v', 0, 0).state;
+    f = dbApplyClaim(f, 1, 'h', 1, 0).state;
+    f = dbApplyClaim(f, 2, 'v', 0, 1).state;     // Player 2 completes: 0-1
+    if (!dbIsFull(f) || dbWinner(f) !== 2) throw new Error('a full board must name the leader');
+    const drawn = { n: 1, edges: { 'h:0,0': 1, 'h:1,0': 2, 'v:0,0': 1, 'v:0,1': 2 }, scores: [1, 1], turn: 1 };
+    if (dbWinner(drawn) !== 'draw') throw new Error('equal scores on a full board must be a draw');
+    // The demo presets assert their own state — a drifted move list renders
+    // nothing rather than a board the tests then assert against blindly.
+    for (const which of ['mid', 'chain', 'final', 'draw']) {
+      const d = dbDemoState(which);
+      if (!d) throw new Error('demo preset ' + which + ' must replay to its recorded outcome');
+    }
+    const chain = dbDemoState('chain');
+    const burst = dbApplyClaim(chain.state, 1, 'h', 1, 0);
+    if (burst.completed.length !== 2) throw new Error('the chain preset must set up a two-box completion');
+    return true;
+  });
+
   /* #212 — the aim ray and the supply bot. Both are pure, and both are things
      a player is told: the guide promises where the marble lands, and below
      five marbles the cannon promises every colour it deals can still clear

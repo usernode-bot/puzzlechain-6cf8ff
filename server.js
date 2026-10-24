@@ -212,6 +212,8 @@ const GAME_REGISTRY = {
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   ludo:              { name: 'Ludo',              category: 'classic', tier: 'C',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+  dotsboxes:         { name: 'Dots and Boxes',    category: 'classic', tier: 'C',
+    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
 };
 // Retired games (Texas Hold 'Em, Idle Empire, the PvP staking arena's
 // tilematch_pvp pseudo-game) are deliberately absent: their routes and lobby

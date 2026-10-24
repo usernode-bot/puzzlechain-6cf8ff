@@ -267,6 +267,40 @@ for (const id of bandIds) {
   }
 }
 
+/* 7. Every id carries a difficulty on BOTH sides, and they agree. The home
+      grid's Easy/Medium/Hard chips and each card's difficulty label read the
+      client value; the server row is the mirror kept in step by this check,
+      exactly like the id sets and story counts above. Extracted as a
+      line-pair scan (the 4-space `id:` then its entry's `manifest:` line),
+      the same style as the clientIds scan. */
+const DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+const clientDifficulty = {};
+{
+  let cur = null;
+  for (const line of registry.split('\n')) {
+    const idm = line.match(/^\s{4}id: '([^']+)'/);
+    if (idm) { cur = idm[1]; continue; }
+    const dm = cur && line.match(/^\s{4}manifest: \{.*\bdifficulty: '([a-z]+)'/);
+    if (dm) { clientDifficulty[cur] = dm[1]; cur = null; }
+  }
+}
+for (const id of clientIds) {
+  if (!clientDifficulty[id]) {
+    fail(`${id}: no difficulty in its client manifest — the home filter and card label ` +
+         `need 'easy' | 'medium' | 'hard'`);
+  } else if (!DIFFICULTIES.has(clientDifficulty[id])) {
+    fail(`${id}: client difficulty '${clientDifficulty[id]}' is not one of easy/medium/hard`);
+  }
+}
+for (const [id, row] of Object.entries(GAME_REGISTRY)) {
+  const sd = row.manifest && row.manifest.difficulty;
+  if (!sd) { fail(`${id}: no difficulty in its server GAME_REGISTRY manifest`); continue; }
+  if (!DIFFICULTIES.has(sd)) { fail(`${id}: server difficulty '${sd}' is not one of easy/medium/hard`); continue; }
+  if (clientDifficulty[id] && clientDifficulty[id] !== sd) {
+    fail(`${id}: client difficulty '${clientDifficulty[id]}' != server difficulty '${sd}'`);
+  }
+}
+
 if (problems.length) {
   console.error('[check-registry] client and server registries disagree:\n  ' + problems.join('\n  '));
   process.exit(1);

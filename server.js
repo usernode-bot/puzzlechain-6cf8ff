@@ -120,52 +120,54 @@ let migrationsReady = false;
 //   input          — primary input paradigm: 'tap' | 'drag' | 'swipe' | 'keyboard'.
 //   undo           — undo policy: 'none' | 'free' (unlimited take-backs) |
 //                    'booster' (limited, counted uses).
+//   difficulty     — 'easy' | 'medium' | 'hard': the lobby's difficulty filter
+//                    and each card's difficulty label. Same value on both sides.
 const GAME_REGISTRY = {
   dracula:           { name: 'Escape from Dracula', category: 'classic', tier: 'C',
     manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   sudoku:            { name: 'Sudoku',            category: 'daily',   tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   sudokumini:        { name: 'Sudoku Mini',        category: 'daily',   tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'free' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'free' } },
   wordhunt:          { name: 'Word Search',       category: 'daily',   tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag',     undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'drag',     undo: 'none' } },
   cryptowordle:      { name: 'Daily Cipher',     category: 'daily',   tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'keyboard', undo: 'none' } },
   tilematchingdaily: { name: 'Daily Tile Match Puzzle', category: 'daily', tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'booster' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'booster' } },
   minesweeper:       { name: 'Mine Finder Classic', category: 'classic', tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   mancala:           { name: 'Mancala',           category: 'classic', tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   'chutes-ladders':  { name: 'Snakes & Ladders',  category: 'classic', tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   '2048':            { name: '2048',              category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'swipe',    undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'swipe',    undo: 'none' } },
   'knights-tour':    { name: "Knight's Tour",     category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   snake:             { name: 'Snake',             category: 'classic', tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
   blockblast:        { name: 'Block Fit',         category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'drag',     undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'drag',     undo: 'none' } },
   diamondrush:       { name: 'Diamond Rush',      category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   tilematching:      { name: 'Tile Match Puzzle', category: 'classic', tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
   bounce:            { name: 'Bounce',            category: 'classic', tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
   zuma:              { name: 'Marble Loop',              category: 'classic', dailyMode: true, tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   hashrush:          { name: 'Hash Rush',         category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   // Request #326 ("aerial combat with F-16s") lands here as Jet Run: the
   // platform's content rules ban combat and weapons as game mechanics, so the
   // jet threads gates, dodges storm clouds and collects fuel stars — nothing
   // is shot at. Tier B: no lib/dapp.js engine, finishes settle through the
   // snapshot + timing heuristics like the other self-shell games without one.
   jetrun:            { name: 'Jet Run',           category: 'classic', dailyMode: true, tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'drag',     undo: 'none' } },
   match3:            { name: 'Match-3 Puzzle',    category: 'classic', dailyMode: true, tier: 'A',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   // Phase 6 Lane A dailies — shared card/tile engine games. All tier B for now
   // (snapshot + timing heuristics through settleDailySession); per-game replay
   // engines land incrementally in lib/dapp.js, flipping each to tier A without
@@ -173,45 +175,45 @@ const GAME_REGISTRY = {
   // GAME_IDS → server-issued seeds, consume-on-start locks, resume, streaks,
   // and the per-game daily leaderboard.
   klondike:          { name: 'Klondike Solitaire', category: 'daily',  tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   spider:            { name: 'Spider Solitaire',  category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   mahjongsol:        { name: 'Mahjong Solitaire', category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'booster' } },
   nonogram:          { name: 'Nonogram',          category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   minefinder:        { name: 'Mine Finder',       category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   anagrams:          { name: 'Anagram Sprint',    category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   cratepush:         { name: 'Crate Push',        category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'medium', input: 'tap',      undo: 'free' } },
   dropstack:         { name: 'Drop Stack',        category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short', input: 'drag',      undo: 'none' } },
   // Spec change-list items 6, 8, 9 — Word Sprint (the Boggle-style launch
   // game, fresh id since `wordhunt` is the word search) plus seeded daily
   // variants of Snake and Bounce. Being category 'daily' automatically
   // enrolls all three in GAME_IDS → server seeds, locks, resume, streaks,
   // per-game leaderboards, and the GotD rotation (weight 1).
   wordsprint:        { name: 'Word Sprint',       category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'score-then-time', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'score-then-time', sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   snakedaily:        { name: 'Daily Snake',       category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'swipe',    undo: 'none' } },
   bouncedaily:       { name: 'Daily Bounce',      category: 'daily',   tier: 'B',
-    manifest: { scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'drag',     undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'time-then-steps', sessionLength: 'short',  input: 'drag',     undo: 'none' } },
   // Phase 5 board games — server-authoritative rules modules (lib/board-rules.js)
   // over classic_rooms; online head-to-head only, rated on the ladder. Tier C:
   // the server IS the referee, so no replay validation is needed.
   checkers:          { name: 'Checkers',          category: 'classic', tier: 'C',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'hard', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
   reversi:           { name: 'Reversi',           category: 'classic', tier: 'C',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   fourinarow:        { name: 'Four in a Row',     category: 'classic', tier: 'C',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'easy', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'short',  input: 'tap',      undo: 'none' } },
   gomoku:            { name: 'Gomoku',            category: 'classic', tier: 'C',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'medium', input: 'tap',      undo: 'none' } },
   ludo:              { name: 'Ludo',              category: 'classic', tier: 'C',
-    manifest: { scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
+    manifest: { difficulty: 'medium', scoreDirection: 'higher', tieBreak: 'first-to-score',  sessionLength: 'long',   input: 'tap',      undo: 'none' } },
 };
 // Retired games (Texas Hold 'Em, Idle Empire, the PvP staking arena's
 // tilematch_pvp pseudo-game) are deliberately absent: their routes and lobby
@@ -2438,11 +2440,15 @@ app.get('/api/social/profile/:userIdOrName', async (req, res) => {
 });
 
 // GET /api/social/friends
-// Returns the signed-in user's friend list
+// Returns the signed-in user's friend list. Streaks (#357) are computed LIVE
+// via computeStreak — the user_stats_snapshot.current_streak column this route
+// used to read is stale by design (the profile route's own comment says the
+// same) — and the list arrives sorted longest streak first so the comparison
+// is readable without re-sorting client-side.
 app.get('/api/social/friends', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT u.id, u.username, s.total_score, s.current_streak, s.last_win_at
+      `SELECT u.id, u.username, s.total_score, s.last_win_at
        FROM users u
        LEFT JOIN user_stats_snapshot s ON u.id = s.user_id
        WHERE u.id IN (
@@ -2452,15 +2458,19 @@ app.get('/api/social/friends', async (req, res) => {
       [req.user.id]
     );
 
+    const liveStreaks = await Promise.all(rows.map(r => computeStreak(r.id)));
+    const friends = rows.map((r, i) => ({
+      id: r.id,
+      username: r.username,
+      totalScore: r.total_score || 0,
+      currentStreak: liveStreaks[i],
+      lastWinAt: r.last_win_at,
+    })).sort((a, b) => b.currentStreak - a.currentStreak || a.username.localeCompare(b.username));
+
     res.json({
-      friends: rows.map(r => ({
-        id: r.id,
-        username: r.username,
-        totalScore: r.total_score || 0,
-        currentStreak: r.current_streak || 0,
-        lastWinAt: r.last_win_at,
-      })),
-      count: rows.length,
+      friends,
+      me: { streak: await computeStreak(req.user.id) },
+      count: friends.length,
     });
   } catch (err) {
     console.error('[social] friends failed:', err.message);
